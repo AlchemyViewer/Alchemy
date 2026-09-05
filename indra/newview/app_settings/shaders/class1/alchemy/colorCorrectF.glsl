@@ -33,7 +33,6 @@ out vec4 frag_color;
 
 // ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
-uniform sampler2D depthMap;
 
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name. Declared unconditionally --
@@ -80,7 +79,7 @@ vec3 applyChannelCurves(vec3 diff);
 #endif
 
 #ifdef HAS_POST_EFFECTS
-vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv);
+vec3 computeLensFlare(vec2 uv);
 vec4 applyChromaticAberration(sampler2D tex, vec2 uv);
 #endif
 
@@ -110,7 +109,7 @@ void main()
 
 #ifdef HAS_POST_EFFECTS
     vec4 diff = applyChromaticAberration(diffuseRect, vary_fragcoord);
-    diff.rgb += computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
+    diff.rgb += computeLensFlare(vary_fragcoord);
 #else
     vec4 diff = texture(diffuseRect, vary_fragcoord);
 #endif
