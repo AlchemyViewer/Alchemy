@@ -813,7 +813,18 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             {
                 // if not, let's stop it this time through and deactivate it the next
 
-                posep->setWeight(motionp->getFadeWeight());
+                // The ease out is already over by the time this branch is
+                // reached, so this last update exists to give the motion the
+                // stop time it never saw, not to show it. Writing the fade
+                // weight here brought the motion up to full for that one
+                // frame: a short animation stopped while it was still easing
+                // in -- the land during a busy transition, or any motion
+                // whose ease out a long frame stepped clean over -- was
+                // holding a fraction of a weight and flashed to all of it
+                // before deactivating on the next frame. Hold the weight it
+                // has, which for a motion that played out to its end is the
+                // full weight it already had.
+                posep->setWeight(llmin(motionp->getFadeWeight(), posep->getWeight()));
                 motionp->onUpdate(motionp->getStopTime() - motionp->mActivationTimestamp, last_joint_signature);
             }
             else

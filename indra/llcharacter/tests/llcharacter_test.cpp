@@ -370,4 +370,35 @@ namespace tut
         mCharacter.flushAllMotions();
         ensure("a flush drops the hand pose", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE) == nullptr);
     }
+
+    template<> template<>
+    void llcharacter_object::test<13>()
+    {
+        // A motion stopped before it finished easing in gets one more update,
+        // to hand it the stop time it never saw, and then deactivates. It
+        // must not be shown at a weight it never reached: it is a fraction of
+        // the way in, its ease out is over, and the frame in between used to
+        // bring it up to full.
+        LLUUID id;
+        ALTestMotion* motion = startFreshMotion(id);
+        animateJoint(motion, "mPelvis");
+        motion->mEaseInDuration = 10.f;
+        motion->mEaseOutDuration = 0.f;
+
+        runFrame();
+        runFrame();
+        const F32 easing_in = motion->getPose()->getWeight();
+        ensure("the motion is still easing in", easing_in < 0.5f);
+
+        mCharacter.stopMotion(id);
+        runFrame();
+
+        ensure("the last update does not raise the weight",
+               motion->getPose()->getWeight() <= easing_in);
+        ensure("the motion is still around for its last update",
+               activeMotions(LLMotion::NORMAL_BLEND).size() == 1u);
+
+        runFrame();
+        ensure("and is gone the frame after", activeMotions(LLMotion::NORMAL_BLEND).empty());
+    }
 }
