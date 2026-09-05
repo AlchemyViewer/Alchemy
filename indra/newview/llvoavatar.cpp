@@ -3916,7 +3916,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
             addNameTagLine(full_name, name_tag_color, LLFontGL::NORMAL, font, true);
         }
 
-        if (show_distance_in_tag)
+        if (!isSelf() && show_distance_in_tag)
         {
             addNameTagLine(fmt::format("{} m", distance_m), distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
         }
