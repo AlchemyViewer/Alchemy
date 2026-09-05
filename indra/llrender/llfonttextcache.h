@@ -154,11 +154,7 @@ private:
     size_t          mTextHash = 0;
     bool            mTextHashed = false;
     #ifdef LL_DEBUG
-<<<<<<< HEAD
         size_t mRecordedLength = 0;
-=======
-        std::string mRecordedText;
->>>>>>> db56575f0e (fix: resolve font cache assertion crashes on login screen)
     #endif
 
     const LLFontGL* mFont = nullptr;
