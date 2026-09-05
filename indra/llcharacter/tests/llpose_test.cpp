@@ -626,6 +626,28 @@ namespace tut
     }
 
     template<> template<>
+    void llposeblender_object::test<10>()
+    {
+        // Interpolating toward the cache writes every channel of the joint,
+        // and the channels the blend never touched arrive unchanged. A write
+        // that changes nothing must not dirty the joint, or every joint on
+        // the coarse clock is rebuilt every frame for a rotation-only blend.
+        ALTestMotion motion;
+        motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        arm(motion);
+
+        mBlender.addMotion(&motion);
+        mBlender.blendAndCache(true);
+        mA.updateWorldMatrixChildren();
+        ensure("the joint starts clean", mA.mDirtyFlags == 0);
+
+        mBlender.interpolate(0.5f);
+        ensure("the rotation moved, so the matrix is dirty", (mA.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+        ensure("an unchanged position and scale dirty nothing of their own",
+               (mA.mDirtyFlags & LLJoint::POSITION_DIRTY) == 0);
+    }
+
+    template<> template<>
     void llposeblender_object::test<4>()
     {
         // The controller feeds additive motions to the blender before normal

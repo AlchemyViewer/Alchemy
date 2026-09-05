@@ -477,6 +477,27 @@ namespace tut
         ensure_equals("after which the tree is clean", root.updateWorldMatrixChildren(), 0);
     }
 
+    template<> template<>
+    void lljoint_object::test<23>()
+    {
+        // A scale written back unchanged is not a change. The pose blender
+        // writes every channel of a joint each interpolated frame, so a
+        // rotation-only blend must not dirty the skeleton through the scale.
+        LLJoint root, a;
+        root.setup("root");
+        a.setup("a", &root);
+        root.setScale(LLVector3(2.f, 2.f, 2.f));
+        root.updateWorldMatrixChildren();
+        ensure("tree starts clean", root.mDirtyFlags == 0 && a.mDirtyFlags == 0);
+
+        root.setScale(LLVector3(2.f, 2.f, 2.f));
+        ensure("the same scale again dirties nothing", root.mDirtyFlags == 0 && a.mDirtyFlags == 0);
+
+        root.setScale(LLVector3(3.f, 2.f, 2.f));
+        ensure("a different scale dirties the joint", (root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+        ensure("and its children", (a.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+    }
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have

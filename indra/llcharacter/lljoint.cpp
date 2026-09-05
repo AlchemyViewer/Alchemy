@@ -939,13 +939,16 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
         }
         scale = active_override;
     }
-    if ((mXform.getScale() != scale) && do_debug_joint(getName()))
+    if (mXform.getScale() == scale)
+    {
+        return;
+    }
+    if (do_debug_joint(getName()))
     {
         LL_DEBUGS("Avatar") << " joint " << getName() << " set scale " << scale << LL_ENDL;
     }
     mXform.setScale(scale);
     touch();
-
 }
 
 
