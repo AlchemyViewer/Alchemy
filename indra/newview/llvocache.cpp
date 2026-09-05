@@ -438,6 +438,34 @@ S32 LLVOCacheEntry::writeToBuffer(U8 *data_buffer) const
     return ENTRY_HEADER_SIZE + size;
 }
 
+//static
+F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB, F32 low_setting_MB, F32 high_setting_MB)
+{
+    // The settings date from 32-bit builds and sit far below what a 64-bit
+    // viewer uses at rest, which pinned the factor at 0 and left the scene
+    // permanently loading at its tightest radii. Installed RAM sets the
+    // bounds, with the settings as floors so an explicit value still wins;
+    // settings can also arrive the wrong way round.
+    F32 low_bound_MB = llmax(low_setting_MB, physical_MB * 0.25f);
+    F32 high_bound_MB = llmax(high_setting_MB, physical_MB * 0.6f);
+    high_bound_MB = llmax(high_bound_MB, low_bound_MB + 1.f);
+
+    // Once the allocation reaches the heap cap, free memory reads as none and
+    // the last-resort limits take over. The gradual ones have to be finished
+    // before that, so both bounds shrink together until the tightest point
+    // sits under the cap.
+    const F32 cap_MB = heap_cap_MB * 0.9f;
+    if (high_bound_MB > cap_MB)
+    {
+        low_bound_MB *= cap_MB / high_bound_MB;
+        high_bound_MB = cap_MB;
+    }
+
+    const F32 clamped_memory = llclamp(allocated_MB, low_bound_MB, high_bound_MB);
+    const F32 adjust_range = llmax(high_bound_MB - low_bound_MB, 1.f);
+    return llclamp((high_bound_MB - clamped_memory) / adjust_range, 0.f, 1.f);
+}
+
 #ifndef LL_TEST
 //static
 void LLVOCacheEntry::updateDebugSettings()
@@ -467,17 +495,10 @@ void LLVOCacheEntry::updateDebugSettings()
     static const F32 KB_to_MB = 1.f / 1024.f;
     const F32 allocated_MB = LLMemory::getAllocatedMemKB().value() * KB_to_MB;
 
-    // The fixed bounds date from 32-bit builds and sit far below what a 64-bit
-    // viewer uses at rest, which pinned adjust_factor at 0 and left the scene
-    // permanently loading at its tightest radii. Scale them with installed RAM
-    // instead, keeping the settings as floors so an explicit value still wins.
     const F32 physical_MB = LLMemory::getMaxMemKB().value() * KB_to_MB;
-    const F32 low_bound_MB = llmax((F32)low_mem_bound_MB, physical_MB * 0.25f);
-    const F32 high_bound_MB = llmax((F32)high_mem_bound_MB, physical_MB * 0.6f);
-
-    const F32 clamped_memory = llclamp(allocated_MB, low_bound_MB, high_bound_MB);
-    const F32 adjust_range = llmax(high_bound_MB - low_bound_MB, 1.f);
-    const F32 adjust_factor = (high_bound_MB - clamped_memory) / adjust_range; // [0, 1]
+    const F32 heap_cap_MB = LLMemory::getMaxHeapSizeKB().value() * KB_to_MB;
+    const F32 adjust_factor = memoryAdjustFactor(allocated_MB, physical_MB, heap_cap_MB,
+                                                 (F32)low_mem_bound_MB, (F32)high_mem_bound_MB); // [0, 1]
 
     //min radius: all objects within this radius remain loaded in memory
     static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");

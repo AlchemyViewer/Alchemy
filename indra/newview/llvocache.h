@@ -159,6 +159,10 @@ public:
     U32  getUpdateFlags() const    {return mUpdateFlags;}
 
     static void updateDebugSettings();
+    // How far the scene-load radii are pulled in for the memory in use: 1 for
+    // not at all, 0 at the tightest. All figures in megabytes: the process's
+    // allocation, installed RAM, the heap cap, and the two bound settings.
+    static F32  memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB, F32 low_setting_MB, F32 high_setting_MB);
     static F32  getSquaredPixelThreshold(bool is_front);
 
 private:

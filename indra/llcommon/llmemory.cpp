@@ -155,7 +155,12 @@ void LLMemory::updateMemoryInfo()
 #endif
     sample(sAllocatedMem, sAllocatedMemInKB);
 
-    sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, sMaxHeapSizeInKB - sAllocatedMemInKB);
+    // Headroom under the heap cap. The units are unsigned, so an allocation
+    // past the cap has to read as no room left rather than wrap around.
+    const U32Kilobytes heap_headroom = sAllocatedMemInKB < sMaxHeapSizeInKB
+        ? U32Kilobytes(sMaxHeapSizeInKB - sAllocatedMemInKB)
+        : U32Kilobytes(0);
+    sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, heap_headroom);
 
     return ;
 }

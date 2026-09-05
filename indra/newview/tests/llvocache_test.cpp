@@ -466,4 +466,43 @@ namespace tut
         ensure("old version is refused", !LLVOCache::instance().readGenericExtrasFromCache(handle, id, old, objects));
         ensure("old version loads nothing", old.empty());
     }
+
+    template<> template<>
+    void vocacheTestObject::test<8>()
+    {
+        set_test_name("scene load memory factor: bounds from RAM, under the heap cap, always ordered");
+
+        auto factor = [](F32 allocated, F32 physical, F32 cap, F32 low, F32 high)
+        {
+            return LLVOCacheEntry::memoryAdjustFactor(allocated, physical, cap, low, high);
+        };
+        auto close_to = [](F32 a, F32 b) { return fabsf(a - b) < 1e-4f; };
+        const F32 no_cap = 4194303.f; // the cap before it is set: U32_MAX kilobytes
+
+        // 8 GB with the default settings: the bounds are the RAM fractions,
+        // 2048 and 4915, and the factor runs from 1 to 0 between them
+        ensure("at the low bound nothing is pulled in", close_to(factor(2048.f, 8192.f, no_cap, 750.f, 2048.f), 1.f));
+        ensure("at the high bound everything is", close_to(factor(4915.2f, 8192.f, no_cap, 750.f, 2048.f), 0.f));
+        ensure("halfway is half", close_to(factor(3481.6f, 8192.f, no_cap, 750.f, 2048.f), 0.5f));
+        ensure("well below the low bound is still 1", close_to(factor(100.f, 8192.f, no_cap, 750.f, 2048.f), 1.f));
+
+        // no RAM figure: the settings alone
+        ensure("without a RAM figure the settings are the bounds", close_to(factor(1399.f, 0.f, no_cap, 750.f, 2048.f), 0.5f));
+
+        // 64 GB behind a 16 GB heap cap: the tightest point moves under the
+        // cap and the loose point keeps its ratio to it
+        const F32 cap = 16384.f;
+        ensure("the tightest point sits under the cap", close_to(factor(cap * 0.9f, 65536.f, cap, 750.f, 2048.f), 0.f));
+        ensure("the loose point scaled with it", close_to(factor(6144.f, 65536.f, cap, 750.f, 2048.f), 1.f));
+        ensure("between them is between", close_to(factor(10444.8f, 65536.f, cap, 750.f, 2048.f), 0.5f));
+        ensure("past the cap is still a factor", factor(2.f * cap, 65536.f, cap, 750.f, 2048.f) == 0.f);
+
+        // settings the wrong way round
+        for (F32 allocated : { 0.f, 2000.f, 2500.f, 3000.f, 4000.f })
+        {
+            const F32 f = factor(allocated, 0.f, no_cap, 3000.f, 2048.f);
+            ensure("inverted settings still give a factor in [0, 1]", f >= 0.f && f <= 1.f);
+        }
+        ensure("inverted settings: below the low setting nothing is pulled in", close_to(factor(2000.f, 0.f, no_cap, 3000.f, 2048.f), 1.f));
+    }
 }

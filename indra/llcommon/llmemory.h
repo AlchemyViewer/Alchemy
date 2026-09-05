@@ -439,6 +439,7 @@ public:
 #endif
     static U32Kilobytes getAvailableMemKB() ;
     static U32Kilobytes getMaxMemKB() ;
+    static U32Kilobytes getMaxHeapSizeKB() { return sMaxHeapSizeInKB; }
     static U32Kilobytes getAllocatedMemKB() ;
 private:
     // LLMemoryInfo directly updates memory stats
