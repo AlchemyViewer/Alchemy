@@ -517,6 +517,83 @@ namespace tut
     }
 
     template<> template<>
+    void llposeblender_object::test<7>()
+    {
+        // The pool is indexed by joint number. A joint that never received one
+        // -- LLJoint::init leaves it at -1 -- is in the motion's pose, since
+        // LLMotion::addJointState inserts before it checks the range, but has
+        // nowhere to go in the pool. It is left alone; the rest of the motion
+        // is not.
+        LLJoint unnumbered;
+        unnumbered.setup("unnumbered");
+        ensure_equals("a fresh joint has no number", unnumbered.getJointNum(), -1);
+        const LLQuaternion before = unnumbered.getRotation();
+
+        ALTestMotion motion;
+        motion.addJoint(&unnumbered, LLJointState::ROT)->setRotation(ROT_B);
+        motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        arm(motion);
+
+        mBlender.addMotion(&motion);
+        mBlender.blendAndApply();
+        ensure_quat_equals("the unnumbered joint is not blended", unnumbered.getRotation(), before);
+        ensure_quat_equals("the numbered joint in the same motion is", mA.getRotation(), ROT_A);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<8>()
+    {
+        // Both ends of the pool: the first slot and the highest number a real
+        // joint can carry. setJointNum refuses the top two, which belong to
+        // the synthetic hand and face joints.
+        LLJoint last;
+        last.setup("last");
+        last.setJointNum(LL_CHARACTER_MAX_ANIMATED_JOINTS - 3);
+
+        ALTestMotion motion;
+        motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        motion.addJoint(&last, LLJointState::ROT)->setRotation(ROT_C);
+        arm(motion);
+
+        mBlender.addMotion(&motion);
+        mBlender.blendAndApply();
+        ensure_quat_equals("slot zero blends", mA.getRotation(), ROT_A);
+        ensure_quat_equals("the last slot blends", last.getRotation(), ROT_C);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<9>()
+    {
+        // The coarse clock's path: blend into the cache without touching the
+        // joint, then interpolate the joint toward it. The cache used to be a
+        // whole LLJoint per blender so the blend could be aimed at it through
+        // the joint interface; it is three vectors now, and has to hold the
+        // same blend.
+        ALTestMotion motion;
+        motion.addJoint(&mA, LLJointState::ROT | LLJointState::POS)->setRotation(ROT_A);
+        motion.getPose()->findJointState(&mA)->setPosition(LLVector3(2.f, 4.f, 6.f));
+        arm(motion);
+
+        mBlender.addMotion(&motion);
+        mBlender.blendAndCache(true);
+        ensure_quat_equals("caching leaves the joint's rotation alone", mA.getRotation(), LLQuaternion::DEFAULT);
+        ensure_vec3_equals("caching leaves the joint's position alone", mA.getPosition(), LLVector3::zero);
+
+        mBlender.interpolate(0.5f);
+        ensure_vec3_equals("half way toward the cached position", mA.getPosition(), LLVector3(1.f, 2.f, 3.f));
+
+        mBlender.interpolate(1.f);
+        ensure_vec3_equals("at the cached position", mA.getPosition(), LLVector3(2.f, 4.f, 6.f));
+        ensure_quat_equals("at the cached rotation", mA.getRotation(), ROT_A);
+
+        // and once the blenders are cleared, interpolating moves nothing
+        mBlender.clearBlenders();
+        mA.setPosition(LLVector3::zero);
+        mBlender.interpolate(1.f);
+        ensure_vec3_equals("a cleared blender no longer drives the joint", mA.getPosition(), LLVector3::zero);
+    }
+
+    template<> template<>
     void llposeblender_object::test<4>()
     {
         // The controller feeds additive motions to the blender before normal

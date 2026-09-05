@@ -87,6 +87,15 @@ protected:
     LLPointer<LLJointState> mJointStates[JSB_NUM_JOINT_STATES];
     S32             mPriorities[JSB_NUM_JOINT_STATES];
     bool            mAdditiveBlends[JSB_NUM_JOINT_STATES];
+
+    // Where the coarse clock's blend goes instead of the joint, for the
+    // frames in between to interpolate the joint toward.
+    LLVector3       mCachedPosition;
+    LLQuaternion    mCachedRotation;
+    LLVector3       mCachedScale;
+
+    // on the pose blender's list of blenders to run this frame
+    bool            mQueued;
 public:
     LLJointStateBlender();
     ~LLJointStateBlender();
@@ -96,8 +105,8 @@ public:
     void clear();
     void resetCachedJoint();
 
-public:
-    LLJoint mJointCache;
+    bool isQueued() const { return mQueued; }
+    void setQueued(bool queued) { mQueued = queued; }
 };
 
 class LLMotion;
@@ -106,8 +115,8 @@ class LLPoseBlender
 {
 protected:
     typedef std::vector<LLJointStateBlender*> blender_list_t;
-    typedef std::map<LLJoint*,LLJointStateBlender*> blender_map_t;
-    blender_map_t mJointStateBlenderPool;
+    // one slot per joint number, filled the first time that joint is animated
+    LLJointStateBlender* mJointStateBlenderPool[LL_CHARACTER_MAX_ANIMATED_JOINTS];
     blender_list_t mActiveBlenders;
 
     S32         mNextPoseSlot;

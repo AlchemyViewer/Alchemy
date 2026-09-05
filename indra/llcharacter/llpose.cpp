@@ -176,6 +176,8 @@ S32 LLPose::getNumJointStates() const
 //-----------------------------------------------------------------------------
 
 LLJointStateBlender::LLJointStateBlender()
+    : mCachedScale(1.f, 1.f, 1.f),
+      mQueued(false)
 {
     for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
     {
@@ -245,7 +247,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         return;
     }
 
-    LLJoint* target_joint = apply_now ? mJointStates[0]->getJoint() : &mJointCache;
+    LLJoint* target_joint = mJointStates[0]->getJoint();
 
     const S32 POS_WEIGHT = 0;
     const S32 ROT_WEIGHT = 1;
@@ -261,9 +263,11 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     // contribution so the untouched ones can be left alone.
     U32             contributed_usage = 0;
 
-    LLVector3       blended_pos = target_joint->getPosition();
-    LLQuaternion    blended_rot = target_joint->getRotation();
-    LLVector3       blended_scale = target_joint->getScale();
+    // Seeded from wherever the result is going: the joint, or the cache the
+    // coarse clock is interpolating the joint toward.
+    LLVector3       blended_pos = apply_now ? target_joint->getPosition() : mCachedPosition;
+    LLQuaternion    blended_rot = apply_now ? target_joint->getRotation() : mCachedRotation;
+    LLVector3       blended_scale = apply_now ? target_joint->getScale() : mCachedScale;
 
     LLVector3       added_pos;
     LLQuaternion    added_rot;
@@ -392,26 +396,34 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         blended_scale.setVec(1,1,1);
     }
 
-    // apply transforms
-    // SL-315
-    target_joint->setPosition(blended_pos + added_pos);
-    // blended_scale was seeded from the joint, which LLXform::setScale keeps
-    // finite, and only a joint state carrying SCALE can move it off that
-    // value. So the reset above is unreachable without a scale contribution,
-    // and skipping the write here cannot strand a non-finite scale.
-    if (contributed_usage & LLJointState::SCALE)
-    {
-        target_joint->setScale(blended_scale + added_scale);
-    }
-    target_joint->setRotation(added_rot * blended_rot);
-
     if (apply_now)
     {
+        // apply transforms
+        // SL-315
+        target_joint->setPosition(blended_pos + added_pos);
+        // blended_scale was seeded from the joint, which LLXform::setScale keeps
+        // finite, and only a joint state carrying SCALE can move it off that
+        // value. So the reset above is unreachable without a scale contribution,
+        // and skipping the write here cannot strand a non-finite scale.
+        if (contributed_usage & LLJointState::SCALE)
+        {
+            target_joint->setScale(blended_scale + added_scale);
+        }
+        target_joint->setRotation(added_rot * blended_rot);
+
         // now clear joint states
         for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
         {
             mJointStates[i] = NULL;
         }
+    }
+    else
+    {
+        // The cache is not a joint: nothing below it to dirty, so every
+        // channel is simply stored.
+        mCachedPosition = blended_pos + added_pos;
+        mCachedScale = blended_scale + added_scale;
+        mCachedRotation = added_rot * blended_rot;
     }
 }
 
@@ -433,9 +445,9 @@ void LLJointStateBlender::interpolate(F32 u)
     }
 
     // SL-315
-    target_joint->setPosition(lerp(target_joint->getPosition(), mJointCache.getPosition(), u));
-    target_joint->setScale(lerp(target_joint->getScale(), mJointCache.getScale(), u));
-    target_joint->setRotation(nlerp(u, target_joint->getRotation(), mJointCache.getRotation()));
+    target_joint->setPosition(lerp(target_joint->getPosition(), mCachedPosition, u));
+    target_joint->setScale(lerp(target_joint->getScale(), mCachedScale, u));
+    target_joint->setRotation(nlerp(u, target_joint->getRotation(), mCachedRotation));
 }
 
 //-----------------------------------------------------------------------------
@@ -461,9 +473,9 @@ void LLJointStateBlender::resetCachedJoint()
     }
     LLJoint* source_joint = mJointStates[0]->getJoint();
     // SL-315
-    mJointCache.setPosition(source_joint->getPosition());
-    mJointCache.setScale(source_joint->getScale());
-    mJointCache.setRotation(source_joint->getRotation());
+    mCachedPosition = source_joint->getPosition();
+    mCachedScale = source_joint->getScale();
+    mCachedRotation = source_joint->getRotation();
 }
 
 //-----------------------------------------------------------------------------
@@ -471,14 +483,17 @@ void LLJointStateBlender::resetCachedJoint()
 //-----------------------------------------------------------------------------
 
 LLPoseBlender::LLPoseBlender()
-    : mNextPoseSlot(0)
+    : mJointStateBlenderPool{},
+      mNextPoseSlot(0)
 {
 }
 
 LLPoseBlender::~LLPoseBlender()
 {
-    for_each(mJointStateBlenderPool.begin(), mJointStateBlenderPool.end(), DeletePairedPointer());
-    mJointStateBlenderPool.clear();
+    for (LLJointStateBlender* blender : mJointStateBlenderPool)
+    {
+        delete blender;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -489,34 +504,45 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLPose* pose = motion->getPose();
 
+    // Neither changes across the motion's joint states, and both are
+    // virtual calls.
+    const S32 motion_priority = motion->getPriority();
+    const bool additive_blend = (motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
+
     for(LLJointState* jsp = pose->getFirstJointState(); jsp; jsp = pose->getNextJointState())
     {
         LLJoint *jointp = jsp->getJoint();
-        LLJointStateBlender* joint_blender;
-        if (mJointStateBlenderPool.find(jointp) == mJointStateBlenderPool.end())
+        if (!jointp)
+        {
+            continue;
+        }
+
+        // A joint that never received a number is in the pose -- LLMotion
+        // inserts before it checks the range -- but never made the joint
+        // signature, so nothing scheduled an update for it. It has no slot
+        // here either.
+        const S32 joint_num = jointp->getJointNum();
+        if (joint_num < 0 || joint_num >= (S32)LL_CHARACTER_MAX_ANIMATED_JOINTS)
+        {
+            continue;
+        }
+
+        LLJointStateBlender* joint_blender = mJointStateBlenderPool[joint_num];
+        if (!joint_blender)
         {
             // this is the first time we are animating this joint
             // so create new jointblender and add it to our pool
             joint_blender = new LLJointStateBlender();
-            mJointStateBlenderPool[jointp] = joint_blender;
-        }
-        else
-        {
-            joint_blender = mJointStateBlenderPool[jointp];
+            mJointStateBlenderPool[joint_num] = joint_blender;
         }
 
-        if (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY)
-        {
-            joint_blender->addJointState(jsp, motion->getPriority(), motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
-        }
-        else
-        {
-            joint_blender->addJointState(jsp, jsp->getPriority(), motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
-        }
+        const S32 priority = (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY) ? motion_priority : jsp->getPriority();
+        joint_blender->addJointState(jsp, priority, additive_blend);
 
         // add it to our list of active blenders
-        if (std::find(mActiveBlenders.begin(), mActiveBlenders.end(), joint_blender) == mActiveBlenders.end())
+        if (!joint_blender->isQueued())
         {
+            joint_blender->setQueued(true);
             mActiveBlenders.push_back(joint_blender);
         }
     }
@@ -530,11 +556,12 @@ void LLPoseBlender::blendAndApply()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LL_PROFILE_ZONE_NUM(mActiveBlenders.size());
-    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
-         iter != end; )
+    // Order does not matter: each blender owns one joint and reads only
+    // that joint's local transform.
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter++;
         jsbp->blendJointStates();
+        jsbp->setQueued(false);
     }
 
     // we're done now so there are no more active blenders for this frame
@@ -546,10 +573,8 @@ void LLPoseBlender::blendAndApply()
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndCache(bool reset_cached_joints)
 {
-    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
-         iter != end; ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         if (reset_cached_joints)
         {
             jsbp->resetCachedJoint();
@@ -563,10 +588,8 @@ void LLPoseBlender::blendAndCache(bool reset_cached_joints)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::interpolate(F32 u)
 {
-    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
-         iter != end; ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         jsbp->interpolate(u);
     }
 }
@@ -576,11 +599,10 @@ void LLPoseBlender::interpolate(F32 u)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::clearBlenders()
 {
-    for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
-         iter != end; ++iter)
+    for (LLJointStateBlender* jsbp : mActiveBlenders)
     {
-        LLJointStateBlender* jsbp = *iter;
         jsbp->clear();
+        jsbp->setQueued(false);
     }
 
     mActiveBlenders.clear();
