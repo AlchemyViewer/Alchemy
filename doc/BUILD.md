@@ -137,7 +137,7 @@ sudo dnf install @development-tools @c-development cmake fontconfig-devel git gl
     autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel \
     ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel \
     libXtst-devel libXrandr-devel pipewire-devel pulseaudio-libs-devel alsa-lib-devel \
-    nasm
+    nasm libXScrnSaver-devel
 ```
 
 To build with Clang instead of GCC, also install: `sudo dnf install clang lld`
