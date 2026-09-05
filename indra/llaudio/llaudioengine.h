@@ -211,7 +211,7 @@ public:
                       const LLUUID& audio_source_id = LLUUID::null);
     void triggerSound(const SoundData& soundData);
 
-    bool preloadSound(const LLUUID &id, bool pin_buffer = true);
+    bool preloadSound(const LLUUID &id, bool pin_buffer = false);
 
     void addAudioSource(LLAudioSource *asp);
     void cleanupAudioSource(LLAudioSource *asp);
