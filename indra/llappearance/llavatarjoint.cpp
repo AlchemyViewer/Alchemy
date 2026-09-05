@@ -248,8 +248,6 @@ LLVector3 LLAvatarJointCollisionVolume::getVolumePos(LLVector3 &offset)
 
 void LLAvatarJointCollisionVolume::renderCollision()
 {
-    updateWorldMatrix();
-
     gGL.pushMatrix();
     gGL.multMatrix( getWorldMatrix().getF32ptr() );
 

@@ -1731,8 +1731,6 @@ void LLVOAvatar::renderCollisionVolumes()
 
         LLAvatarJointCollisionVolume& collision_volume = mCollisionVolumes[i];
 
-        collision_volume.updateWorldMatrix();
-
         gGL.pushMatrix();
         gGL.multMatrix( collision_volume.getWorldMatrix().getF32ptr() );
 
@@ -1810,8 +1808,6 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
             continue;
         }
 
-        jointp->updateWorldMatrix();
-
         LLVector3 occ_color, visible_color;
 
         LLVector3 pos;
@@ -1847,7 +1843,6 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
         }
         LLVector3 begin_pos(0,0,0);
         LLVector3 end_pos(jointp->getEnd());
-
 
         gGL.pushMatrix();
         gGL.multMatrix( jointp->getWorldMatrix().getF32ptr() );
@@ -1957,8 +1952,6 @@ void LLVOAvatar::renderJoints()
 
         ostr << jointp->getName() << ", ";
 
-        jointp->updateWorldMatrix();
-
         gGL.pushMatrix();
         gGL.multMatrix( jointp->getWorldMatrix().getF32ptr() );
 
@@ -2053,8 +2046,8 @@ bool LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
     {
         for (S32 i = 0; i < mNumCollisionVolumes; ++i)
         {
-            mCollisionVolumes[i].updateWorldMatrix();
-
+            // getWorldMatrix rebuilds the volume and every joint above it;
+            // updateWorldMatrix alone builds from whatever the parent last had
             glm::mat4 mat(glm::make_mat4(mCollisionVolumes[i].getWorldMatrix().getF32ptr()));
             glm::mat4 inverse = glm::inverse(mat);
             glm::mat4 norm_mat = glm::transpose(inverse);
