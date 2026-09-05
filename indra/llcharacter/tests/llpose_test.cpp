@@ -95,6 +95,80 @@ namespace tut
     };
 
     //-------------------------------------------------------------------------
+    // LLJointState
+    //-------------------------------------------------------------------------
+    struct lljointstate_data : public joints
+    {
+    };
+    typedef test_group<lljointstate_data> lljointstate_test;
+    typedef lljointstate_test::object lljointstate_object;
+    tut::lljointstate_test lljointstate_testcase("LLJointState");
+
+    template<> template<>
+    void lljointstate_object::test<1>()
+    {
+        // What a fresh state holds. The blender seeds a channel from the joint
+        // when nothing contributes to it, so these only ever reach a joint
+        // through a state that carries the matching usage, but a state that
+        // came back with something else in it would be a silent wrong pose.
+        LLPointer<LLJointState> state = new LLJointState(&mA);
+        ensure_equals("no usage", state->getUsage(), 0u);
+        ensure_equals("no weight", state->getWeight(), 0.f);
+        ensure_vec3_equals("position starts at the origin", state->getPosition(), LLVector3::zero);
+        ensure_quat_equals("rotation starts at identity", state->getRotation(), LLQuaternion::DEFAULT);
+        ensure_vec3_equals("scale starts at zero", state->getScale(), LLVector3::zero);
+    }
+
+    template<> template<>
+    void lljointstate_object::test<2>()
+    {
+        // The two views of a channel are the same channel: written either
+        // way, read either way.
+        LLPointer<LLJointState> state = new LLJointState(&mA);
+        state->setUsage(LLJointState::POS | LLJointState::ROT | LLJointState::SCALE);
+
+        const LLVector3 pos(1.5f, -2.25f, 3.f);
+        const LLVector3 scale(2.f, 4.f, 8.f);
+
+        state->setPosition(pos);
+        state->setRotation(ROT_A);
+        state->setScale(scale);
+
+        ensure_vec3_equals("position read back", state->getPosition(), pos);
+        ensure_quat_equals("rotation read back", state->getRotation(), ROT_A);
+        ensure_vec3_equals("scale read back", state->getScale(), scale);
+
+        ensure_vec3_equals("position through the vector view",
+                           LLVector3(state->getPositionV().getF32ptr()), pos);
+        ensure_vec3_equals("scale through the vector view",
+                           LLVector3(state->getScaleV().getF32ptr()), scale);
+        LLQuaternion from_vector;
+        state->getRotationQ().store(from_vector);
+        ensure_quat_equals("rotation through the vector view", from_vector, ROT_A);
+    }
+
+    template<> template<>
+    void lljointstate_object::test<3>()
+    {
+        // and written through the vector view, read through the scalar one
+        LLPointer<LLJointState> state = new LLJointState(&mA);
+        state->setUsage(LLJointState::POS | LLJointState::ROT | LLJointState::SCALE);
+
+        LLVector4a pos;
+        pos.set(-4.f, 5.f, 6.f, 0.f);
+        LLVector4a scale;
+        scale.set(0.5f, 0.25f, 0.125f, 0.f);
+
+        state->setPosition(pos);
+        state->setRotation(LLQuaternion2(ROT_B));
+        state->setScale(scale);
+
+        ensure_vec3_equals("position set as a vector", state->getPosition(), LLVector3(-4.f, 5.f, 6.f));
+        ensure_quat_equals("rotation set as a quaternion2", state->getRotation(), ROT_B);
+        ensure_vec3_equals("scale set as a vector", state->getScale(), LLVector3(0.5f, 0.25f, 0.125f));
+    }
+
+    //-------------------------------------------------------------------------
     // LLPose
     //-------------------------------------------------------------------------
     struct llpose_data : public joints

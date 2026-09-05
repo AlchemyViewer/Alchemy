@@ -308,8 +308,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                 // add in pos for this jointstate modulated by weight
-                LLVector4a state_pos;
-                state_pos.load3(jsp->getPosition().mV);
+                LLVector4a state_pos = jsp->getPositionV();
                 state_pos.mul(new_weight_sum - sum_weights[POS_WEIGHT]);
                 added_pos.add(state_pos);
             }
@@ -319,8 +318,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                 // add in scale for this jointstate modulated by weight
-                LLVector4a state_scale;
-                state_scale.load3(jsp->getScale().mV);
+                LLVector4a state_scale = jsp->getScaleV();
                 state_scale.mul(new_weight_sum - sum_weights[SCALE_WEIGHT]);
                 added_scale.add(state_scale);
             }
@@ -330,10 +328,8 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                 // add in rotation for this jointstate modulated by weight
-                LLQuaternion2 state_rot;
-                state_rot = jsp->getRotation();
                 LLQuaternion2 partial;
-                partial.setLerp(added_rot, state_rot, new_weight_sum - sum_weights[ROT_WEIGHT]);
+                partial.setLerp(added_rot, jsp->getRotationQ(), new_weight_sum - sum_weights[ROT_WEIGHT]);
                 LLQuaternion2 composed;
                 composed.setMul(partial, added_rot);
                 added_rot = composed;
@@ -346,15 +342,13 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // blend position
             if(current_usage & LLJointState::POS)
             {
-                LLVector4a state_pos;
-                state_pos.load3(jsp->getPosition().mV);
+                const LLVector4a& state_pos = jsp->getPositionV();
                 if(sum_usage & LLJointState::POS)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                     // blend positions from both
-                    LLVector4a from = state_pos;
-                    blended_pos.setLerp(from, blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
+                    blended_pos.setLerp(state_pos, blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
                     sum_weights[POS_WEIGHT] = new_weight_sum;
                 }
                 else
@@ -368,15 +362,13 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // now do scale
             if(current_usage & LLJointState::SCALE)
             {
-                LLVector4a state_scale;
-                state_scale.load3(jsp->getScale().mV);
+                const LLVector4a& state_scale = jsp->getScaleV();
                 if(sum_usage & LLJointState::SCALE)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                     // blend scales from both
-                    LLVector4a from = state_scale;
-                    blended_scale.setLerp(from, blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
+                    blended_scale.setLerp(state_scale, blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
                     sum_weights[SCALE_WEIGHT] = new_weight_sum;
                 }
                 else
@@ -390,15 +382,13 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // rotation
             if (current_usage & LLJointState::ROT)
             {
-                LLQuaternion2 state_rot;
-                state_rot = jsp->getRotation();
+                const LLQuaternion2& state_rot = jsp->getRotationQ();
                 if(sum_usage & LLJointState::ROT)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                     // blend rotations from both
-                    LLQuaternion2 from = state_rot;
-                    blended_rot.setLerp(from, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
+                    blended_rot.setLerp(state_rot, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
                     sum_weights[ROT_WEIGHT] = new_weight_sum;
                 }
                 else
