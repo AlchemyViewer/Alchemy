@@ -341,17 +341,17 @@ void FSPosingMotion::getJointStateAtTime(std::string jointPoseName, F32 timeToLo
         if (!boost::iequals(jointPoseName, jm->mJointName))
             continue;
 
-        *hasRotation = (jm->mRotationCurve.mNumKeys > 0);
+        *hasRotation = (jm->mRotationCurve.getNumKeys() > 0);
         if (hasRotation)
-            jointRotation->set(jm->mRotationCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jointRotation->set(jm->mRotationCurve.getValue(timeToLoadAt));
 
-        *hasPosition = (jm->mPositionCurve.mNumKeys > 0);
+        *hasPosition = (jm->mPositionCurve.getNumKeys() > 0);
         if (hasPosition)
-            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt));
 
-        *hasScale = (jm->mScaleCurve.mNumKeys > 0);
+        *hasScale = (jm->mScaleCurve.getNumKeys() > 0);
         if (hasScale)
-            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt, mJointMotionList->mDuration));
+            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt));
 
         return;
     }
@@ -380,7 +380,7 @@ bool FSPosingMotion::motionAnimatesJoints(const std::vector<S32>& recapturedJoin
         if (std::find(recapturedJointNumbers.begin(), recapturedJointNumbers.end(), joint->getJointNum()) == recapturedJointNumbers.end())
             continue;
 
-        if (jm->mRotationCurve.mNumKeys > 0)
+        if (jm->mRotationCurve.getNumKeys() > 0)
             return true;
     }
 

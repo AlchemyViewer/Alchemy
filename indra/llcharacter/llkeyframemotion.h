@@ -32,6 +32,7 @@
 //-----------------------------------------------------------------------------
 
 #include <string>
+#include <vector>
 
 #include "llassetstorage.h"
 #include "llbboxlocal.h"
@@ -284,99 +285,55 @@ public:
     enum InterpolationType { IT_STEP, IT_LINEAR, IT_SPLINE };
 
     //-------------------------------------------------------------------------
-    // ScaleKey
+    // KeyCurve
     //-------------------------------------------------------------------------
-    class ScaleKey
+    // One channel of one joint: its keys sorted by time and unique in it, the
+    // times in an array of their own so a search reads nothing else. A curve
+    // is shared by every avatar playing the animation, so the cursor that
+    // makes a run of nearby samples cheap belongs to the caller.
+    template <typename T>
+    class KeyCurve
     {
     public:
-        ScaleKey() { mTime = 0.0f; }
-        ScaleKey(F32 time, const LLVector3 &scale) { mTime = time; mScale = scale; }
+        // Adds a key, or replaces the one already at this time.
+        void setKey(F32 time, const T& value);
 
-        F32         mTime;
-        LLVector3   mScale;
+        U32 getNumKeys() const { return static_cast<U32>(mTimes.size()); }
+        F32 getKeyTime(U32 index) const { return mTimes[index]; }
+        const T& getKeyValue(U32 index) const { return mValues[index]; }
+
+        // The nearest key outside the keyed range, the key itself on one,
+        // otherwise the two neighbours blended.
+        T getValue(F32 time) const;
+        // The same, remembering where the sample landed so that the next one
+        // nearby is placed in a compare or two. Any cursor is safe to pass,
+        // including a stale one.
+        T getValue(F32 time, U32& cursor) const;
+
+        InterpolationType   mInterpolationType = IT_LINEAR;
+
+    private:
+        // The first key at or after the time, or the key count when none is.
+        U32 findKey(F32 time, U32 hint) const;
+
+        std::vector<F32>    mTimes;
+        std::vector<T>      mValues;
     };
 
+    typedef KeyCurve<LLVector3>     ScaleCurve;
+    typedef KeyCurve<LLQuaternion>  RotationCurve;
+    typedef KeyCurve<LLVector3>     PositionCurve;
+
     //-------------------------------------------------------------------------
-    // RotationKey
+    // KeyCursors
     //-------------------------------------------------------------------------
-    class RotationKey
+    // Where a joint's three channels were last sampled, kept by the motion
+    // instance playing them.
+    struct KeyCursors
     {
-    public:
-        RotationKey() { mTime = 0.0f; }
-        RotationKey(F32 time, const LLQuaternion &rotation) { mTime = time; mRotation = rotation; }
-
-        F32             mTime;
-        LLQuaternion    mRotation;
-    };
-
-    //-------------------------------------------------------------------------
-    // PositionKey
-    //-------------------------------------------------------------------------
-    class PositionKey
-    {
-    public:
-        PositionKey() { mTime = 0.0f; }
-        PositionKey(F32 time, const LLVector3 &position) { mTime = time; mPosition = position; }
-
-        F32         mTime;
-        LLVector3   mPosition;
-    };
-
-    //-------------------------------------------------------------------------
-    // ScaleCurve
-    //-------------------------------------------------------------------------
-    class ScaleCurve
-    {
-    public:
-        ScaleCurve();
-        ~ScaleCurve();
-        LLVector3 getValue(F32 time, F32 duration);
-        LLVector3 interp(F32 u, ScaleKey& before, ScaleKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, ScaleKey> key_map_t;
-        key_map_t           mKeys;
-        ScaleKey            mLoopInKey;
-        ScaleKey            mLoopOutKey;
-    };
-
-    //-------------------------------------------------------------------------
-    // RotationCurve
-    //-------------------------------------------------------------------------
-    class RotationCurve
-    {
-    public:
-        RotationCurve();
-        ~RotationCurve();
-        LLQuaternion getValue(F32 time, F32 duration);
-        LLQuaternion interp(F32 u, RotationKey& before, RotationKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, RotationKey> key_map_t;
-        key_map_t       mKeys;
-        RotationKey     mLoopInKey;
-        RotationKey     mLoopOutKey;
-    };
-
-    //-------------------------------------------------------------------------
-    // PositionCurve
-    //-------------------------------------------------------------------------
-    class PositionCurve
-    {
-    public:
-        PositionCurve();
-        ~PositionCurve();
-        LLVector3 getValue(F32 time, F32 duration);
-        LLVector3 interp(F32 u, PositionKey& before, PositionKey& after);
-
-        InterpolationType   mInterpolationType;
-        S32                 mNumKeys;
-        typedef std::map<F32, PositionKey> key_map_t;
-        key_map_t       mKeys;
-        PositionKey     mLoopInKey;
-        PositionKey     mLoopOutKey;
+        U32 mScale = 0;
+        U32 mRotation = 0;
+        U32 mPosition = 0;
     };
 
     //-------------------------------------------------------------------------
@@ -392,7 +349,7 @@ public:
         U32             mUsage;
         LLJoint::JointPriority  mPriority;
 
-        void update(LLJointState* joint_state, F32 time, F32 duration);
+        void update(LLJointState* joint_state, F32 time, KeyCursors& cursors);
     };
 
     //-------------------------------------------------------------------------
@@ -431,6 +388,7 @@ public:
 protected:
     JointMotionList*                mJointMotionList;
     std::vector<LLPointer<LLJointState> > mJointStates;
+    std::vector<KeyCursors>         mKeyCursors;
     LLJoint*                        mPelvisp;
     LLCharacter*                    mCharacter;
     typedef std::list<JointConstraint*> constraint_list_t;
