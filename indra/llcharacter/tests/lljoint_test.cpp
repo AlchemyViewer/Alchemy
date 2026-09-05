@@ -450,6 +450,33 @@ namespace tut
                       root.updateWorldMatrixChildren(), 0);
     }
 
+    template<> template<>
+    void lljoint_object::test<22>()
+    {
+        // The joint that was written is healed before the sweep -- the avatar
+        // asks its root for a world matrix right after moving it -- and the
+        // heal clears that joint's own matrix flag. Its children are still
+        // waiting, so it has to keep saying so, or the sweep turns back at it
+        // and leaves the skeleton below stale for as long as the pose holds.
+        LLJoint root, a, b;
+        root.setup("root");
+        a.setup("a", &root);
+        b.setup("b", &a);
+        root.updateWorldMatrixChildren();
+
+        root.touch();
+        root.setWorldPosition(LLVector3(1.f, 0.f, 0.f));
+        root.getWorldMatrix();
+        ensure_equals("a healed root still sends the sweep down to its children",
+                      root.updateWorldMatrixChildren(), 2);
+
+        a.setRotation(LLQuaternion(0.3f, LLVector3::x_axis));
+        a.getWorldMatrix();
+        ensure_equals("and so does a healed joint in the middle of the tree",
+                      root.updateWorldMatrixChildren(), 1);
+        ensure_equals("after which the tree is clean", root.updateWorldMatrixChildren(), 0);
+    }
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have

@@ -206,6 +206,15 @@ void LLJoint::touch(U32 flags)
         // This sits outside the early-out below on purpose: a joint can be
         // dirty already and still need the mark, because a joint that leaves
         // the sweep keeps its flags while its ancestors lose theirs.
+        //
+        // The written joint carries the mark itself when it has children.
+        // They are dirtied below, and a world matrix asked of this joint
+        // before the sweep clears its own matrix flag: without the mark the
+        // sweep would turn back here with everything below still waiting.
+        if (!mChildren.empty())
+        {
+            mDirtyFlags |= SUBTREE_DIRTY;
+        }
         for (LLJoint* ancestor = mParent;
              ancestor && !(ancestor->mDirtyFlags & SUBTREE_DIRTY);
              ancestor = ancestor->mParent)
