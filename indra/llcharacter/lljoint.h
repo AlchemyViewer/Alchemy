@@ -107,7 +107,11 @@ public:
         MATRIX_DIRTY = 0x1 << 0,
         ROTATION_DIRTY = 0x1 << 1,
         POSITION_DIRTY = 0x1 << 2,
-        ALL_DIRTY = 0x7
+        ALL_DIRTY = 0x7,
+        // Carried by every joint above one whose matrix is dirty, so that the
+        // sweep can leave a subtree with nothing to do in it alone. Not part
+        // of ALL_DIRTY: it says something about the joints below, not this one.
+        SUBTREE_DIRTY = 0x1 << 3
     };
 public:
     enum SupportCategory
@@ -129,9 +133,10 @@ protected:
     LLVector3       mDefaultPosition;
     LLVector3       mDefaultScale;
 
+    bool            mUpdateXform;
+
 public:
     U32             mDirtyFlags;
-    bool            mUpdateXform;
 
     // describes the skin binding pose
     LLVector3       mSkinOffset;
@@ -186,6 +191,7 @@ public:
 
 private:
     void init();
+    void dirtySubtree(U32 flags);
 
 public:
     // set name and parent
@@ -262,6 +268,10 @@ public:
     // get/set world matrix
     const LLMatrix4a& getWorldMatrix();
     void setWorldMatrix( const LLMatrix4& mat );
+
+    // whether this joint and everything below it take part in the sweep
+    bool getUpdateXform() const { return mUpdateXform; }
+    void setUpdateXform( bool update );
 
     // recomputes every dirty world matrix in this subtree; returns how many
     S32 updateWorldMatrixChildren();

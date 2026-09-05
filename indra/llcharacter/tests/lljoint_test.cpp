@@ -249,9 +249,13 @@ namespace tut
         root.setPosition(LLVector3(1.f, 2.f, 3.f));
         ensure_equals("root position dirties the whole tree", root.updateWorldMatrixChildren(), 5);
 
-        a.mUpdateXform = false;
+        a.setUpdateXform(false);
         root.setRotation(LLQuaternion(0.75f, LLVector3::z_axis));
         ensure_equals("subtree without mUpdateXform is skipped", root.updateWorldMatrixChildren(), 2);
+
+        // Coming back into the sweep rebuilds what was missed while out of it.
+        a.setUpdateXform(true);
+        ensure_equals("rejoining the sweep recomputes the subtree", root.updateWorldMatrixChildren(), 3);
     }
 
 
@@ -356,6 +360,67 @@ namespace tut
         // A real turn still has to reach the skeleton.
         root.setWorldRotationIfMoved(LLQuaternion(0.4f + 1.f * DEG_TO_RAD, LLVector3::y_axis));
         ensure_equals("a real turn dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+    }
+
+    template<> template<>
+    void lljoint_object::test<19>()
+    {
+        // The sweep walks only where something told it to. A joint carrying
+        // neither a dirty matrix of its own nor the mark left by a write below
+        // it is not descended into at all, which is what makes an idle
+        // skeleton cost one visit instead of a hundred and thirty four.
+        LLJoint root, a, b, c, d, e;
+        root.setup("root");
+        a.setup("a", &root);
+        b.setup("b", &a);
+        c.setup("c", &b);
+        d.setup("d", &root);
+        e.setup("e", &d);
+
+        root.updateWorldMatrixChildren();
+        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+
+        c.setRotation(LLQuaternion(0.3f, LLVector3::x_axis));
+        ensure("the write is announced all the way up",
+               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
+        ensure("the sibling branch is left alone", d.mDirtyFlags == 0);
+
+        // Dirty a joint behind the sweep's back, below a branch nothing
+        // marked. The sweep must stop at that branch's root and never look at
+        // it -- the old walk visited every joint and would have rebuilt it.
+        e.mDirtyFlags |= LLJoint::MATRIX_DIRTY;
+        ensure_equals("only the marked path is walked", root.updateWorldMatrixChildren(), 1);
+        ensure("the unmarked branch was never descended into",
+               (e.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0);
+
+        ensure("the mark is cleared once the subtree is clean",
+               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) == 0);
+    }
+
+    template<> template<>
+    void lljoint_object::test<20>()
+    {
+        // getWorldMatrix rebuilds this joint and the ones above it on the
+        // spot, without ever walking down. It must not carry the subtree mark
+        // off with it: the joints below have still not been rebuilt, and the
+        // sweep is the only thing that will do it.
+        LLJoint root, a, b;
+        root.setup("root");
+        a.setup("a", &root);
+        b.setup("b", &a);
+
+        root.updateWorldMatrixChildren();
+        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+
+        root.setRotation(LLQuaternion(0.3f, LLVector3::z_axis));
+        b.setRotation(LLQuaternion(0.2f, LLVector3::x_axis));
+        ensure("the root carries both its own dirt and the mark",
+               (root.mDirtyFlags & LLJoint::MATRIX_DIRTY) != 0 &&
+               (root.mDirtyFlags & LLJoint::SUBTREE_DIRTY) != 0);
+
+        root.getWorldMatrix();
+        ensure_equals("the joints below still get their turn",
+                      root.updateWorldMatrixChildren(), 2);
     }
 
     /*

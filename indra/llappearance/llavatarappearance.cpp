@@ -1022,7 +1022,7 @@ bool LLAvatarAppearance::loadSkeletonNode ()
     // make meshes children before calling parent version of the function
     for (LLAvatarJoint* joint : mMeshLOD)
     {
-        joint->mUpdateXform = false;
+        joint->setUpdateXform(false);
         joint->setMeshesToChildren();
     }
 

@@ -155,7 +155,7 @@ LLAvatarJointMesh::LLAvatarJointMesh()
     mFace = NULL;
 
     mMeshID = 0;
-    mUpdateXform = false;
+    setUpdateXform(false);
 
     mValid = false;
 

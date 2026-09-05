@@ -352,7 +352,7 @@ bool LLVOAvatarSelf::buildSkeletonSelf(const LLAvatarSkeletonInfo *info)
     // SL-315
     mScreenp->setWorldPosition(LLVector3::zero);
     // need to update screen agressively when sidebar opens/closes, for example
-    mScreenp->mUpdateXform = true;
+    mScreenp->setUpdateXform(true);
     return true;
 }
 

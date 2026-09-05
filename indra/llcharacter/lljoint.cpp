@@ -190,9 +190,37 @@ void LLJoint::setSupport(const std::string& support_name)
 
 //-----------------------------------------------------------------------------
 // touch()
-// Sets all dirty flags for all children, recursively.
+// Sets all dirty flags for all children, recursively, and tells every joint
+// above that there is now something dirty below it.
 //-----------------------------------------------------------------------------
 void LLJoint::touch(U32 flags)
+{
+    if (flags & MATRIX_DIRTY)
+    {
+        // updateWorldMatrixChildren does not descend into a joint that reports
+        // nothing dirty in or below it, so a dirty matrix has to be announced
+        // upwards or the sweep will walk straight past it. The walk stops at
+        // the first joint already carrying the mark, so the second write of a
+        // frame usually costs one step.
+        //
+        // This sits outside the early-out below on purpose: a joint can be
+        // dirty already and still need the mark, because a joint that leaves
+        // the sweep keeps its flags while its ancestors lose theirs.
+        for (LLJoint* ancestor = mParent;
+             ancestor && !(ancestor->mDirtyFlags & SUBTREE_DIRTY);
+             ancestor = ancestor->mParent)
+        {
+            ancestor->mDirtyFlags |= SUBTREE_DIRTY;
+        }
+    }
+
+    dirtySubtree(flags);
+}
+
+//-----------------------------------------------------------------------------
+// dirtySubtree()
+//-----------------------------------------------------------------------------
+void LLJoint::dirtySubtree(U32 flags)
 {
     if ((flags | mDirtyFlags) != mDirtyFlags)
     {
@@ -205,7 +233,7 @@ void LLJoint::touch(U32 flags)
 
         for (LLJoint* joint : mChildren)
         {
-            joint->touch(child_flags);
+            joint->dirtySubtree(child_flags);
         }
     }
 }
@@ -982,7 +1010,14 @@ void LLJoint::updateWorldPRSParent()
 //-----------------------------------------------------------------------------
 S32 LLJoint::updateWorldMatrixChildren()
 {
-    if (!this->mUpdateXform) return 0;
+    // The recursion is the cost here, not the recompute: the walk is a pointer
+    // chase over joints that are each their own allocation, and a skeleton of
+    // them does not fit in L1. A joint carrying neither its own dirty matrix
+    // nor the mark that says one is below it has nothing under it to visit.
+    if (!mUpdateXform || !(mDirtyFlags & (MATRIX_DIRTY | SUBTREE_DIRTY)))
+    {
+        return 0;
+    }
 
     S32 updated = 0;
     if (mDirtyFlags & MATRIX_DIRTY)
@@ -994,6 +1029,7 @@ S32 LLJoint::updateWorldMatrixChildren()
     {
         updated += joint->updateWorldMatrixChildren();
     }
+    mDirtyFlags &= ~SUBTREE_DIRTY;
     return updated;
 }
 
@@ -1007,7 +1043,30 @@ void LLJoint::updateWorldMatrix()
         // The transform builds straight into its own LLMatrix4a, so there is
         // one world matrix per joint rather than a scalar one to copy from.
         mXform.updateMatrix(false);
-        mDirtyFlags = 0x0;
+        // The subtree mark survives: this joint's matrix is current, but a
+        // joint below it may still be waiting, and updateWorldMatrixParent
+        // reaches here without visiting any of them.
+        mDirtyFlags &= ~ALL_DIRTY;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// setUpdateXform()
+//-----------------------------------------------------------------------------
+void LLJoint::setUpdateXform( bool update )
+{
+    // A joint without this is out of the sweep along with everything below it,
+    // and its dirty flags go stale there because nothing clears them while its
+    // ancestors clear theirs. Coming back in has to be announced, or the sweep
+    // will keep walking past a joint that never rebuilt its world matrix.
+    if (update && !mUpdateXform)
+    {
+        mUpdateXform = true;
+        touch();
+    }
+    else
+    {
+        mUpdateXform = update;
     }
 }
 
