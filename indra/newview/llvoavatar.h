@@ -288,6 +288,7 @@ public:
     virtual void    idleUpdateAppearanceAnimation();
     void            idleUpdateLipSync(bool voice_enabled);
     void            idleUpdateLoadingEffect();
+    void            startCloudParticles();
     void            idleUpdateWindEffect();
     void            idleUpdateNameTag(const LLVector3& root_pos_last);
     void            idleUpdateNameTagText(bool new_name);

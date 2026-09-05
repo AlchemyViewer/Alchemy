@@ -3129,7 +3129,11 @@ void LLVOAvatar::idleUpdateMisc(bool detailed_update)
     bool visible = isVisible() || mNeedsAnimUpdate;
 
     // update attachments positions
-    if (detailed_update)
+    // Nothing is ever attached to an animated object: it is an object, not
+    // somewhere to hang one. It carries the avatar skeleton's fifty-odd
+    // attachment points all the same, so without this it walks every one of
+    // them, every frame, to find nothing on any of them.
+    if (detailed_update && !isControlAvatar())
     {
         U32 draw_order = 0;
         bool attachment_selected = LLSelectMgr::getInstance()->getSelection()->getObjectCount() > 0 && LLSelectMgr::getInstance()->getSelection()->isAttachment();
@@ -3400,42 +3404,50 @@ void LLVOAvatar::idleUpdateLoadingEffect()
             deleteParticleSource();
             updateLOD();
         }
-        else
+        // A cloud says something is on its way. A dummy is not loading, and an
+        // avatar held back for being too complex or too slow is being
+        // deliberately not drawn rather than waited for -- so neither raises
+        // one, and neither builds the parameters for one either.
+        else if (!mIsDummy && !isTooComplex() && !isTooSlow())
         {
-            LLPartSysData particle_parameters;
-
-            // fancy particle cloud designed by Brent
-            particle_parameters.mPartData.mMaxAge            = 5.f;
-            particle_parameters.mPartData.mStartScale        = LLVector2(0.100250f, 0.100250f);
-            particle_parameters.mPartData.mEndScale          = LLVector2(1.000250f, 1.000250f);
-            particle_parameters.mPartData.mStartGlow         = 0;
-            particle_parameters.mPartData.mEndGlow           = 0;
-            particle_parameters.mPartData.mStartColor        = LLColor4(0.501773f, 0.743102f, 1.000000f, 1.f);
-            particle_parameters.mPartData.mEndColor          = LLColor4(0.000000f, 0.000000f, 0.000000f, 1.f);
-            particle_parameters.mPartData.mBlendFuncSource   = LLPartData::LL_PART_BF_SOURCE_COLOR;
-            particle_parameters.mPartData.mBlendFuncDest     = LLPartData::LL_PART_BF_SOURCE_ALPHA;
-
-            particle_parameters.mPartImageID                 = sCloudTexture->getID();
-            particle_parameters.mMaxAge                      = 0.f;
-            particle_parameters.mPattern                     = LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE;
-            particle_parameters.mInnerAngle                  = 0.f;
-            particle_parameters.mOuterAngle                  = 0.f;
-            particle_parameters.mBurstRate                   = 0.02f;
-            particle_parameters.mBurstRadius                 = 0.0f;
-            particle_parameters.mBurstPartCount              = 1;
-            particle_parameters.mBurstSpeedMin               = 0.01f;
-            particle_parameters.mBurstSpeedMax               = 0.6f;
-            particle_parameters.mPartData.mFlags             = ( LLPartData::LL_PART_INTERP_COLOR_MASK | LLPartData::LL_PART_INTERP_SCALE_MASK |
-                                                                 LLPartData::LL_PART_EMISSIVE_MASK | LLPartData::LL_PART_FOLLOW_SRC_MASK |
-                                                                 LLPartData::LL_PART_TARGET_POS_MASK );
-
-            // do not generate particles for dummy or overly-complex avatars
-            if (!mIsDummy && !isTooComplex() && !isTooSlow())
-            {
-                setParticleSource(particle_parameters, getID());
-            }
+            startCloudParticles();
         }
     }
+}
+
+//------------------------------------------------------------------------
+// startCloudParticles()
+//------------------------------------------------------------------------
+void LLVOAvatar::startCloudParticles()
+{
+    LLPartSysData particle_parameters;
+
+    // fancy particle cloud designed by Brent
+    particle_parameters.mPartData.mMaxAge            = 5.f;
+    particle_parameters.mPartData.mStartScale        = LLVector2(0.100250f, 0.100250f);
+    particle_parameters.mPartData.mEndScale          = LLVector2(1.000250f, 1.000250f);
+    particle_parameters.mPartData.mStartGlow         = 0;
+    particle_parameters.mPartData.mEndGlow           = 0;
+    particle_parameters.mPartData.mStartColor        = LLColor4(0.501773f, 0.743102f, 1.000000f, 1.f);
+    particle_parameters.mPartData.mEndColor          = LLColor4(0.000000f, 0.000000f, 0.000000f, 1.f);
+    particle_parameters.mPartData.mBlendFuncSource   = LLPartData::LL_PART_BF_SOURCE_COLOR;
+    particle_parameters.mPartData.mBlendFuncDest     = LLPartData::LL_PART_BF_SOURCE_ALPHA;
+
+    particle_parameters.mPartImageID                 = sCloudTexture->getID();
+    particle_parameters.mMaxAge                      = 0.f;
+    particle_parameters.mPattern                     = LLPartSysData::LL_PART_SRC_PATTERN_EXPLODE;
+    particle_parameters.mInnerAngle                  = 0.f;
+    particle_parameters.mOuterAngle                  = 0.f;
+    particle_parameters.mBurstRate                   = 0.02f;
+    particle_parameters.mBurstRadius                 = 0.0f;
+    particle_parameters.mBurstPartCount              = 1;
+    particle_parameters.mBurstSpeedMin               = 0.01f;
+    particle_parameters.mBurstSpeedMax               = 0.6f;
+    particle_parameters.mPartData.mFlags             = ( LLPartData::LL_PART_INTERP_COLOR_MASK | LLPartData::LL_PART_INTERP_SCALE_MASK |
+                                                         LLPartData::LL_PART_EMISSIVE_MASK | LLPartData::LL_PART_FOLLOW_SRC_MASK |
+                                                         LLPartData::LL_PART_TARGET_POS_MASK );
+
+    setParticleSource(particle_parameters, getID());
 }
 
 void LLVOAvatar::idleUpdateWindEffect()
