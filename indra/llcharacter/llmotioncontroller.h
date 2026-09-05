@@ -33,6 +33,7 @@
 #include <string>
 #include <map>
 #include <deque>
+#include <vector>
 
 #include "llmotion.h"
 #include "llpose.h"
@@ -82,7 +83,7 @@ protected:
 class LLMotionController
 {
 public:
-    typedef std::list<LLMotion*> motion_list_t;
+    typedef std::vector<LLMotion*> motion_list_t;
     typedef std::set<LLMotion*> motion_set_t;
     bool mIsSelf;
 
@@ -185,7 +186,11 @@ public:
 
     F32 getAnimTime() const { return mAnimTime; }
 
-    motion_list_t& getActiveMotions() { return mActiveMotions; }
+    // The motions playing, newest first, of one blend type. The update walks
+    // the additive list and then the normal one, so nothing asks each motion
+    // its type on the way past.
+    const motion_list_t& getActiveMotions(LLMotion::LLMotionBlendType blend_type) const { return mActiveMotions[blend_type]; }
+    size_t getNumActiveMotions() const { return mActiveMotions[LLMotion::NORMAL_BLEND].size() + mActiveMotions[LLMotion::ADDITIVE_BLEND].size(); }
 
     void incMotionCounts(S32& num_motions, S32& num_loading_motions, S32& num_loaded_motions, S32& num_active_motions, S32& num_deprecated_motions);
 
@@ -210,6 +215,7 @@ protected:
     void deprecateMotionInstance(LLMotion* motion);
     bool stopMotionInstance(LLMotion *motion, bool stop_imemdiate);
     void removeMotionInstance(LLMotion* motion);
+    void removeActiveMotion(LLMotion* motion);
     void updateRegularMotions();
     void updateAdditiveMotions();
     void resetJointSignatures();
@@ -233,14 +239,14 @@ protected:
 //  If the animations depend on any asset data, the appropriate data is fetched from the data server,
 //  and the animation is put on the mLoadingMotions list.
 //  Once an animations is loaded, it will be initialized and put on the mLoadedMotions list.
-//  Any animation that is currently playing also sits in the mActiveMotions list.
+//  Any animation that is currently playing also sits in the mActiveMotions list for its blend type.
 
     typedef std::map<LLUUID, LLMotion*> motion_map_t;
     motion_map_t    mAllMotions;
 
     motion_set_t        mLoadingMotions;
     motion_set_t        mLoadedMotions;
-    motion_list_t       mActiveMotions;
+    motion_list_t       mActiveMotions[LLMotion::NUM_BLEND_TYPES];
     motion_set_t        mDeprecatedMotions;
 
     LLFrameTimer        mTimer;

@@ -49,7 +49,8 @@ public:
     enum LLMotionBlendType
     {
         NORMAL_BLEND,
-        ADDITIVE_BLEND
+        ADDITIVE_BLEND,
+        NUM_BLEND_TYPES
     };
 
     enum LLMotionInitStatus

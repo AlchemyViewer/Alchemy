@@ -29,6 +29,8 @@
 #include "lljoint.h"
 #include "lljointstate.h"
 #include "llquaternion.h"
+#include "llframetimer.h"
+#include "lltimer.h"
 
 #include "altestcharacter.h"
 #include "altestmotion.h"
@@ -52,14 +54,37 @@ namespace tut
 
         // Registers a fresh motion id with the shared registry and starts it,
         // returning the instance the controller is actually running.
-        ALTestMotion* startFreshMotion(LLUUID& id)
+        ALTestMotion* startFreshMotion(LLUUID& id, LLMotionConstructor create = ALTestMotion::create)
         {
             id = LLUUID::generateNewID();
-            ensure("registerMotion", mCharacter.registerMotion(id, ALTestMotion::create));
+            ensure("registerMotion", mCharacter.registerMotion(id, create));
             ensure("startMotion", mCharacter.startMotion(id));
             LLMotion* motion = mCharacter.findMotion(id);
             ensure("started motion is findable", motion != nullptr);
             return static_cast<ALTestMotion*>(motion);
+        }
+
+        // Gives a motion a rotation on a joint of its own, so the joint
+        // signature never masks it and every update reaches its onUpdate.
+        void animateJoint(ALTestMotion* motion, const char* joint_name)
+        {
+            LLJoint* joint = mCharacter.getJoint(joint_name);
+            ensure("joint resolves", joint != nullptr);
+            motion->addJoint(joint, LLJointState::ROT);
+        }
+
+        // One frame of a running viewer: the frame clock moves before the
+        // motions are updated against it.
+        void runFrame()
+        {
+            ms_sleep(2);
+            LLFrameTimer::updateFrameTime();
+            mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+        }
+
+        const LLMotionController::motion_list_t& activeMotions(LLMotion::LLMotionBlendType blend_type)
+        {
+            return mCharacter.getMotionController().getActiveMotions(blend_type);
         }
     };
     typedef test_group<llcharacter_data> llcharacter_test;
@@ -136,5 +161,127 @@ namespace tut
 
         mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
         ensure("self-completing motion is marked stopped", motion->isStopped());
+    }
+
+    template<> template<>
+    void llcharacter_object::test<5>()
+    {
+        // The playing motions are kept newest first in a list per blend type,
+        // and an update walks the whole additive list before the normal one:
+        // the order the blender's masking depends on. Stopping a motion takes
+        // it out of its own list and leaves the other alone.
+        LLUUID normal_first_id, additive_first_id, normal_second_id, additive_second_id;
+        ALTestMotion* normal_first = startFreshMotion(normal_first_id);
+        ALTestMotion* additive_first = startFreshMotion(additive_first_id, ALTestMotion::createAdditive);
+        ALTestMotion* normal_second = startFreshMotion(normal_second_id);
+        ALTestMotion* additive_second = startFreshMotion(additive_second_id, ALTestMotion::createAdditive);
+        animateJoint(normal_first, "mPelvis");
+        animateJoint(additive_first, "mTorso");
+        animateJoint(normal_second, "mChest");
+        animateJoint(additive_second, "mNeck");
+
+        const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
+        const LLMotionController::motion_list_t& additives = activeMotions(LLMotion::ADDITIVE_BLEND);
+        ensure_equals("two normal motions", normals.size(), 2u);
+        ensure("normal list is newest first", normals[0] == normal_second && normals[1] == normal_first);
+        ensure_equals("two additive motions", additives.size(), 2u);
+        ensure("additive list is newest first", additives[0] == additive_second && additives[1] == additive_first);
+
+        mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+        ensure("newest additive motion is updated first", additive_second->mUpdateSerial < additive_first->mUpdateSerial);
+        ensure("the additive pass finishes before the normal pass begins", additive_first->mUpdateSerial < normal_second->mUpdateSerial);
+        ensure("newest normal motion is updated first", normal_second->mUpdateSerial < normal_first->mUpdateSerial);
+
+        ensure("stopMotion", mCharacter.stopMotion(additive_first_id, true));
+        ensure_equals("stopping an additive motion shortens the additive list", additives.size(), 1u);
+        ensure("the other additive motion stays", additives[0] == additive_second);
+        ensure_equals("and leaves the normal list alone", normals.size(), 2u);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<6>()
+    {
+        // A motion that finishes easing out takes itself off the list while
+        // the list is being walked. The older motion behind it moves into its
+        // slot and has to be updated that frame all the same, exactly once.
+        LLUUID oldest_id, ending_id, newest_id;
+        ALTestMotion* oldest = startFreshMotion(oldest_id);
+        ALTestMotion* ending = startFreshMotion(ending_id);
+        ALTestMotion* newest = startFreshMotion(newest_id);
+        animateJoint(oldest, "mPelvis");
+        animateJoint(ending, "mTorso");
+        animateJoint(newest, "mChest");
+        ensure("stopMotion", mCharacter.stopMotion(ending_id, false));
+
+        S32 frames = 0;
+        while (mCharacter.isMotionActive(ending_id) && frames < 20)
+        {
+            runFrame();
+            ++frames;
+        }
+        ensure("the ending motion left the list", !mCharacter.isMotionActive(ending_id));
+        ensure_equals("the ending motion was deactivated once", ending->mDeactivateCount, 1);
+        ensure_equals("the motion behind it was updated every frame", oldest->mUpdateCount, 1 + frames);
+        ensure_equals("the motion ahead of it was updated every frame", newest->mUpdateCount, 1 + frames);
+
+        const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
+        ensure_equals("two motions remain", normals.size(), 2u);
+        ensure("remaining motions are still newest first", normals[0] == newest && normals[1] == oldest);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<7>()
+    {
+        // The LOD test compares every motion against the character's pixel
+        // area, which is the same for all of them and a virtual call. It is
+        // asked once per pass, however many motions are playing.
+        LLUUID id;
+        animateJoint(startFreshMotion(id), "mPelvis");
+        mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+
+        mCharacter.mPixelAreaQueries = 0;
+        mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+        const S32 queries_with_one_motion = mCharacter.mPixelAreaQueries;
+
+        animateJoint(startFreshMotion(id), "mTorso");
+        animateJoint(startFreshMotion(id), "mChest");
+        animateJoint(startFreshMotion(id, ALTestMotion::createAdditive), "mNeck");
+        mCharacter.mPixelAreaQueries = 0;
+        mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+        ensure_equals("pixel area is not asked once per motion", mCharacter.mPixelAreaQueries, queries_with_one_motion);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<8>()
+    {
+        // A flush restarts every playing motion, whichever list it was on.
+        LLUUID normal_id, additive_id;
+        startFreshMotion(normal_id);
+        startFreshMotion(additive_id, ALTestMotion::createAdditive);
+
+        mCharacter.flushAllMotions();
+        ensure("normal motion restarted", mCharacter.isMotionActive(normal_id));
+        ensure("additive motion restarted", mCharacter.isMotionActive(additive_id));
+        ensure_equals("one normal motion", activeMotions(LLMotion::NORMAL_BLEND).size(), 1u);
+        ensure_equals("one additive motion", activeMotions(LLMotion::ADDITIVE_BLEND).size(), 1u);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<9>()
+    {
+        // Hidden, the controller drops every stopped motion in one pass, and
+        // a motion leaving the list must not hide the stopped one behind it.
+        LLUUID oldest_id, middle_id, newest_id;
+        startFreshMotion(oldest_id);
+        startFreshMotion(middle_id);
+        startFreshMotion(newest_id);
+        ensure("stop middle", mCharacter.stopMotion(middle_id, false));
+        ensure("stop oldest", mCharacter.stopMotion(oldest_id, false));
+
+        mCharacter.updateMotions(LLCharacter::HIDDEN_UPDATE);
+        ensure("the stopped middle motion left the list", !mCharacter.isMotionActive(middle_id));
+        ensure("the stopped motion behind it left the list too", !mCharacter.isMotionActive(oldest_id));
+        ensure("the running motion stayed", mCharacter.isMotionActive(newest_id));
+        ensure_equals("one motion remains", activeMotions(LLMotion::NORMAL_BLEND).size(), 1u);
     }
 }

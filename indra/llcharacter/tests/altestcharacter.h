@@ -71,7 +71,7 @@ public:
 
     LLJoint* getCharacterJoint(U32 i) override { return i < NUM_JOINTS ? &mJoints[i] : nullptr; }
     F32 getTimeDilation() override { return mTimeDilation; }
-    F32 getPixelArea() const override { return mPixelArea; }
+    F32 getPixelArea() const override { ++mPixelAreaQueries; return mPixelArea; }
     LLPolyMesh* getHeadMesh() override { return nullptr; }
     LLPolyMesh* getUpperBodyMesh() override { return nullptr; }
     LLVector3d getPosGlobalFromAgent(const LLVector3& position) override { return LLVector3d(position); }
@@ -89,6 +89,7 @@ public:
     F32 mGroundHeight = 0.f;
     F32 mTimeDilation = 1.f;
     F32 mPixelArea = 10000.f;
+    mutable S32 mPixelAreaQueries = 0;
     LLUUID mID = LLUUID::generateNewID();
     std::vector<std::string> mDebugText;
 };

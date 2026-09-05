@@ -42,6 +42,7 @@ public:
     }
 
     static LLMotion* create(const LLUUID& id) { return new ALTestMotion(id); }
+    static LLMotion* createAdditive(const LLUUID& id) { return new ALTestMotion(id, LLJoint::MEDIUM_PRIORITY, ADDITIVE_BLEND); }
 
     bool getLoop() override { return mLoop; }
     F32 getDuration() override { return mDuration; }
@@ -66,6 +67,7 @@ public:
     bool onUpdate(F32 time, U8*) override
     {
         ++mUpdateCount;
+        mUpdateSerial = ++sUpdateSerial;
         mLastUpdateTime = time;
         return mUpdateResult;
     }
@@ -101,4 +103,9 @@ public:
     S32 mUpdateCount = 0;
     S32 mDeactivateCount = 0;
     F32 mLastUpdateTime = 0.f;
+
+    // Which onUpdate this was, across every test motion: the order the
+    // controller visited them in.
+    static inline S32 sUpdateSerial = 0;
+    S32 mUpdateSerial = 0;
 };

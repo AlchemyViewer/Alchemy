@@ -4491,95 +4491,96 @@ LLViewerInventoryItem* recursiveGetObjectInventoryItem(LLViewerObject *vobj, LLU
 
 void LLVOAvatar::updateAnimationDebugText()
 {
-    for (LLMotionController::motion_list_t::iterator iter = mMotionController.getActiveMotions().begin();
-         iter != mMotionController.getActiveMotions().end(); ++iter)
+    for (LLMotion::LLMotionBlendType blend_type : { LLMotion::ADDITIVE_BLEND, LLMotion::NORMAL_BLEND })
     {
-        LLMotion* motionp = *iter;
-        if (motionp->getMinPixelArea() < getPixelArea())
+        for (LLMotion* motionp : mMotionController.getActiveMotions(blend_type))
         {
-            std::string output;
-            std::string motion_name = motionp->getName();
-            if (motion_name.empty())
+            if (motionp->getMinPixelArea() < getPixelArea())
             {
-                if (isControlAvatar())
+                std::string output;
+                std::string motion_name = motionp->getName();
+                if (motion_name.empty())
                 {
-                    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-                    // Try to get name from inventory of associated object
-                    LLVOVolume *volp = control_av->mRootVolp;
-                    LLViewerInventoryItem *item = recursiveGetObjectInventoryItem(volp,motionp->getID());
-                    if (item)
+                    if (isControlAvatar())
                     {
-                        motion_name = item->getName();
-                    }
-                }
-            }
-            if (motion_name.empty())
-            {
-                std::string name;
-                if (gAgent.isGodlikeWithoutAdminMenuFakery() || isSelf())
-                {
-                    name = motionp->getID().asString();
-                    LLVOAvatar::AnimSourceIterator anim_it = mAnimationSources.begin();
-                    for (; anim_it != mAnimationSources.end(); ++anim_it)
-                    {
-                        if (anim_it->second == motionp->getID())
+                        LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
+                        // Try to get name from inventory of associated object
+                        LLVOVolume *volp = control_av->mRootVolp;
+                        LLViewerInventoryItem *item = recursiveGetObjectInventoryItem(volp,motionp->getID());
+                        if (item)
                         {
-                            LLViewerObject* object = gObjectList.findObject(anim_it->first);
-                            if (!object)
-                            {
-                                break;
-                            }
-                            if (object->isAvatar())
-                            {
-                                if (mMotionController.mIsSelf)
-                                {
-                                    // Searching inventory by asset id is really long
-                                    // so just mark as inventory
-                                    // Also item is likely to be named by LLPreviewAnim
-                                    name += "(inventory)";
-                                }
-                            }
-                            else
-                            {
-                                LLViewerInventoryItem* item = NULL;
-                                if (!object->isInventoryDirty())
-                                {
-                                    item = object->getInventoryItemByAsset(motionp->getID());
-                                }
-                                if (item)
-                                {
-                                    name = item->getName();
-                                }
-                                else if (object->isAttachment())
-                                {
-                                    name += "(att:" + getAttachmentItemName() + ")";
-                                }
-                                else
-                                {
-                                    // in-world object, name or content unknown
-                                    name += "(in-world)";
-                                }
-                            }
-                            break;
+                            motion_name = item->getName();
                         }
                     }
                 }
-                else
+                if (motion_name.empty())
                 {
-                    name = LLUUID::null.asString();
+                    std::string name;
+                    if (gAgent.isGodlikeWithoutAdminMenuFakery() || isSelf())
+                    {
+                        name = motionp->getID().asString();
+                        LLVOAvatar::AnimSourceIterator anim_it = mAnimationSources.begin();
+                        for (; anim_it != mAnimationSources.end(); ++anim_it)
+                        {
+                            if (anim_it->second == motionp->getID())
+                            {
+                                LLViewerObject* object = gObjectList.findObject(anim_it->first);
+                                if (!object)
+                                {
+                                    break;
+                                }
+                                if (object->isAvatar())
+                                {
+                                    if (mMotionController.mIsSelf)
+                                    {
+                                        // Searching inventory by asset id is really long
+                                        // so just mark as inventory
+                                        // Also item is likely to be named by LLPreviewAnim
+                                        name += "(inventory)";
+                                    }
+                                }
+                                else
+                                {
+                                    LLViewerInventoryItem* item = NULL;
+                                    if (!object->isInventoryDirty())
+                                    {
+                                        item = object->getInventoryItemByAsset(motionp->getID());
+                                    }
+                                    if (item)
+                                    {
+                                        name = item->getName();
+                                    }
+                                    else if (object->isAttachment())
+                                    {
+                                        name += "(att:" + getAttachmentItemName() + ")";
+                                    }
+                                    else
+                                    {
+                                        // in-world object, name or content unknown
+                                        name += "(in-world)";
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        name = LLUUID::null.asString();
+                    }
+                    motion_name = name;
                 }
-                motion_name = name;
+                std::string motion_tag = "";
+                if (mPlayingAnimations.find(motionp->getID()) != mPlayingAnimations.end())
+                {
+                    motion_tag = "*";
+                }
+                output = llformat("%s%s - %d",
+                                  motion_name.c_str(),
+                                  motion_tag.c_str(),
+                                  (U32)motionp->getPriority());
+                addDebugText(output);
             }
-            std::string motion_tag = "";
-            if (mPlayingAnimations.find(motionp->getID()) != mPlayingAnimations.end())
-            {
-                motion_tag = "*";
-            }
-            output = llformat("%s%s - %d",
-                              motion_name.c_str(),
-                              motion_tag.c_str(),
-                              (U32)motionp->getPriority());
-            addDebugText(output);
         }
     }
 }
