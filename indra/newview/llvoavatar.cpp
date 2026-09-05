@@ -816,7 +816,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
 
     // set up animation variables
     mSpeed = 0.f;
-    setAnimationData("Speed", &mSpeed);
 
     mNeedsImpostorUpdate = true;
     mLastImpostorUpdateReason = 0;
@@ -5015,7 +5014,7 @@ void LLVOAvatar::updateTimeStep()
         {
             // disable walk motion servo controller as it doesn't work with motion timesteps
             stopMotion(ANIM_AGENT_WALK_ADJUST);
-            removeAnimationData("Walk Speed");
+            removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
         }
         else if (time_step == 0.f && isAnyAnimationSignaled(AGENT_WALK_ANIMS, NUM_AGENT_WALK_ANIMS))
         {

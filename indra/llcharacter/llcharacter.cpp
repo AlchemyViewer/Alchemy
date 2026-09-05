@@ -243,35 +243,6 @@ void LLCharacter::dumpCharacter( LLJoint* joint )
 }
 
 //-----------------------------------------------------------------------------
-// setAnimationData()
-//-----------------------------------------------------------------------------
-void LLCharacter::setAnimationData(std::string_view name, void *data)
-{
-    mAnimationData.insert_or_assign(name, data);
-}
-
-//-----------------------------------------------------------------------------
-// getAnimationData()
-//-----------------------------------------------------------------------------
-void* LLCharacter::getAnimationData(std::string_view name)
-{
-    auto it = mAnimationData.find(name);
-    if (it != mAnimationData.end())
-    {
-        return it->second;
-    }
-    return nullptr;
-}
-
-//-----------------------------------------------------------------------------
-// removeAnimationData()
-//-----------------------------------------------------------------------------
-void LLCharacter::removeAnimationData(std::string_view name)
-{
-    mAnimationData.erase(name);
-}
-
-//-----------------------------------------------------------------------------
 // setVisualParamWeight()
 //-----------------------------------------------------------------------------
 bool LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 weight)

@@ -190,11 +190,22 @@ public:
 
     virtual S32 getCollisionVolumeID(std::string &name) { return -1; }
 
-    void setAnimationData(std::string_view name, void *data);
-
-    void *getAnimationData(std::string_view name);
-
-    void removeAnimationData(std::string_view name);
+    // The values motions hand one another through the character. Each is a
+    // pointer into whoever owns it, set while that owner is active; a channel
+    // nobody is filling reads null. They were looked up by name, which hashed
+    // the string for every motion that asked, every frame.
+    enum EAnimationChannel
+    {
+        ANIM_CHANNEL_HAND_POSE,             // LLHandMotion::eHandPose
+        ANIM_CHANNEL_HAND_POSE_PRIORITY,    // LLJoint::JointPriority
+        ANIM_CHANNEL_LOOK_AT_POINT,         // LLVector3, agent space
+        ANIM_CHANNEL_POINT_AT_POINT,        // LLVector3, agent space
+        ANIM_CHANNEL_WALK_SPEED,            // F32
+        NUM_ANIM_CHANNELS
+    };
+    void  setAnimationData(EAnimationChannel channel, void* data) { mAnimationChannels[channel] = data; }
+    void* getAnimationData(EAnimationChannel channel) const { return mAnimationChannels[channel]; }
+    void  removeAnimationData(EAnimationChannel channel) { mAnimationChannels[channel] = nullptr; }
 
     void addVisualParam(LLVisualParam *param);
     void addSharedVisualParam(LLVisualParam *param);
@@ -292,8 +303,7 @@ public:
 protected:
     LLMotionController  mMotionController;
 
-    typedef boost::unordered_map<std::string, void*, ll::string_hash, std::equal_to<>> animation_data_map_t;
-    animation_data_map_t mAnimationData;
+    void*               mAnimationChannels[NUM_ANIM_CHANNELS] = {};
 
     F32                 mPreferredPelvisHeight;
     ESex                mSex;

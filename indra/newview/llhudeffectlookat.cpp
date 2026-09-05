@@ -541,7 +541,7 @@ void LLHUDEffectLookAt::markDead()
 {
     if (mSourceObject.notNull())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("LookAtPoint");
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
     }
 
     mSourceObject = NULL;
@@ -720,7 +720,7 @@ void LLHUDEffectLookAt::update()
  * (and possibly mTargetOffsetGlobal).
  * When mTargetObject is another avatar, it sets mTargetPos to be their eyes.
  *
- * Has the side-effect of also calling setAnimationData("LookAtPoint") with the new
+ * Has the side-effect of also setting the look-at channel to the new
  * mTargetPos on the source object which is assumed to be an avatar.
  *
  * Returns whether we successfully calculated a finite target position.
@@ -808,11 +808,11 @@ bool LLHUDEffectLookAt::calcTargetPosition()
     static LLCachedControl<bool> disable_look_at(gSavedSettings, "DisableLookAtAnimation", true);
     if (disable_look_at())
     {
-        source_avatar->removeAnimationData("LookAtPoint");
+        source_avatar->removeAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
     }
     else
     {
-        source_avatar->setAnimationData("LookAtPoint", (void*)&mTargetPos);
+        source_avatar->setAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT, (void*)&mTargetPos);
     }
 
     return true;

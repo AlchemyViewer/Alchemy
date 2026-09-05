@@ -127,7 +127,7 @@ bool LLHandMotion::onUpdate(F32 time, U8* joint_mask)
     F32 timeDelta = time - mLastTime;
     mLastTime = time;
 
-    requestedHandPose = (eHandPose *)mCharacter->getAnimationData("Hand Pose");
+    requestedHandPose = (eHandPose *)mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE);
     // check to see if requested pose has changed
     if (!requestedHandPose)
     {
@@ -197,8 +197,8 @@ bool LLHandMotion::onUpdate(F32 time, U8* joint_mask)
         }
     }
 
-    mCharacter->removeAnimationData("Hand Pose");
-    mCharacter->removeAnimationData("Hand Pose Priority");
+    mCharacter->removeAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE);
+    mCharacter->removeAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY);
 
 //  if (requestedHandPose)
 //      LL_INFOS() << "Hand Pose " << *requestedHandPose << LL_ENDL;

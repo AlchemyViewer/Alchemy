@@ -96,7 +96,6 @@ bool LLKeyframeWalkMotion::onActivate()
 //-----------------------------------------------------------------------------
 void LLKeyframeWalkMotion::onDeactivate()
 {
-    mCharacter->removeAnimationData("Down Foot");
     LLKeyframeMotion::onDeactivate();
 }
 
@@ -109,7 +108,7 @@ bool LLKeyframeWalkMotion::onUpdate(F32 time, U8* joint_mask)
     // compute time since last update
     F32 deltaTime = time - mRealTimeLast;
 
-    void* speed_ptr = mCharacter->getAnimationData("Walk Speed");
+    void* speed_ptr = mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
     F32 speed = (speed_ptr) ? *((F32 *)speed_ptr) : 1.f;
 
     // adjust the passage of time accordingly
@@ -309,7 +308,7 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     }
 
     // broadcast walk speed change
-    mCharacter->setAnimationData("Walk Speed", &mAnimSpeed);
+    mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &mAnimSpeed);
 
     // set position
     // need to update *some* joint to keep this animation active
@@ -323,7 +322,7 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 //-----------------------------------------------------------------------------
 void LLWalkAdjustMotion::onDeactivate()
 {
-    mCharacter->removeAnimationData("Walk Speed");
+    mCharacter->removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
 }
 
 //-----------------------------------------------------------------------------

@@ -183,7 +183,7 @@ bool LLHeadRotMotion::onUpdate(F32 time, U8* joint_mask)
     F32 head_slerp_amt = LLSmoothInterpolation::getInterpolant(HEAD_LOOKAT_LAG_HALF_LIFE);
     F32 torso_slerp_amt = LLSmoothInterpolation::getInterpolant(TORSO_LOOKAT_LAG_HALF_LIFE);
 
-    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData("LookAtPoint");
+    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
 
     if (targetPos)
     {
@@ -532,7 +532,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
         }
     }
 
-    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData("LookAtPoint");
+    LLVector3* targetPos = (LLVector3*)mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT);
 
     adjustEyeTarget(targetPos, *mLeftEyeState, *mRightEyeState);
     adjustEyeTarget(targetPos, *mAltLeftEyeState, *mAltRightEyeState);

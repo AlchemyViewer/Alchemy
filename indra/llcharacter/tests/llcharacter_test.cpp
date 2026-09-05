@@ -348,4 +348,26 @@ namespace tut
         ensure("newest first, the started one ahead of them all",
                normals[0] == started && normals[1] == newest && normals[2] == middle && normals[3] == oldest);
     }
+
+    template<> template<>
+    void llcharacter_object::test<12>()
+    {
+        // The values motions hand one another are slots on the character: set
+        // by whoever owns the value, empty when nobody does, and the hand pose
+        // is dropped with the motions on a flush.
+        F32 speed = 3.f;
+        ensure("an unset channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+        mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &speed);
+        ensure("a set channel reads back what was set", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == &speed);
+        ensure("the other channels are untouched",
+               mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE) == nullptr
+               && mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
+        mCharacter.removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
+        ensure("a removed channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
+
+        S32 pose = 1;
+        mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &pose);
+        mCharacter.flushAllMotions();
+        ensure("a flush drops the hand pose", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE) == nullptr);
+    }
 }

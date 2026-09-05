@@ -298,7 +298,7 @@ void LLHUDEffectPointAt::markDead()
 {
     if (!mSourceObject.isNull() && mSourceObject->isAvatar())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("PointAtPoint");
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT);
     }
 
     clearPointAtTarget();
@@ -374,7 +374,7 @@ void LLHUDEffectPointAt::update()
     {
         if (mTargetType == POINTAT_TARGET_NONE)
         {
-            ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData("PointAtPoint");
+            ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->removeAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT);
         }
         else
         {
@@ -443,7 +443,7 @@ bool LLHUDEffectPointAt::calcTargetPosition()
 
     if (mSourceObject->isAvatar())
     {
-        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->setAnimationData("PointAtPoint", (void *)&mTargetPos);
+        ((LLVOAvatar*)(LLViewerObject*)mSourceObject)->setAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT, (void *)&mTargetPos);
     }
 
     return true;

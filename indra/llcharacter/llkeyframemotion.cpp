@@ -607,19 +607,19 @@ void LLKeyframeMotion::applyKeyframes(F32 time)
         mJointMotionList->getJointMotion(i)->update(mJointStates[i], time, mKeyCursors[i]);
     }
 
-    LLJoint::JointPriority* pose_priority = (LLJoint::JointPriority* )mCharacter->getAnimationData("Hand Pose Priority");
+    LLJoint::JointPriority* pose_priority = (LLJoint::JointPriority* )mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY);
     if (pose_priority)
     {
         if (mJointMotionList->mMaxPriority >= *pose_priority)
         {
-            mCharacter->setAnimationData("Hand Pose", &mJointMotionList->mHandPose);
-            mCharacter->setAnimationData("Hand Pose Priority", &mJointMotionList->mMaxPriority);
+            mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &mJointMotionList->mHandPose);
+            mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY, &mJointMotionList->mMaxPriority);
         }
     }
     else
     {
-        mCharacter->setAnimationData("Hand Pose", &mJointMotionList->mHandPose);
-        mCharacter->setAnimationData("Hand Pose Priority", &mJointMotionList->mMaxPriority);
+        mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &mJointMotionList->mHandPose);
+        mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY, &mJointMotionList->mMaxPriority);
     }
 }
 
