@@ -576,6 +576,12 @@ private:
     F32         mLastSkinTime; //value of gFrameTimeSeconds at last skin update
 
     S32         mUpdatePeriod;
+    // An avatar wearing animesh is asked both of these once for itself and
+    // once more per attachment, every frame. Both answers hold for the frame
+    // they were worked out in.
+    S32         mUpdatePeriodFrame;
+    S32         mNeedsUpdateFrame;
+    bool        mNeedsUpdate;
     S32         mNumInitFaces; //number of faces generated when creating the avatar drawable, does not inculde splitted faces due to long vertex buffer.
 
     // profile handle

@@ -615,6 +615,7 @@ namespace
         S32 mHiddenByCull = 0;    // HIDDEN_UPDATE because the drawable is not visible
         S32 mThrottled = 0;       // mUpdatePeriod > 1
         S32 mJointUpdates = 0;    // world matrices recomputed by the skeleton sweep
+        S32 mRepeatPeriodCalls = 0; // computeUpdatePeriod() calls that reused the frame's answer
     };
 
     ALSkeletonUpdateCensus sAvatarCensus;
@@ -640,11 +641,13 @@ namespace
         LL_PROFILE_PLOT("Avatars: hidden by cull", (int64_t)sAvatarCensus.mHiddenByCull);
         LL_PROFILE_PLOT("Avatars: period > 1", (int64_t)sAvatarCensus.mThrottled);
         LL_PROFILE_PLOT("Avatars: joint updates", (int64_t)sAvatarCensus.mJointUpdates);
+        LL_PROFILE_PLOT("Avatars: repeat period calls", (int64_t)sAvatarCensus.mRepeatPeriodCalls);
         LL_PROFILE_PLOT("Animesh: full update", (int64_t)sAnimeshCensus.mFull);
         LL_PROFILE_PLOT("Animesh: hidden by period", (int64_t)sAnimeshCensus.mHiddenByPeriod);
         LL_PROFILE_PLOT("Animesh: hidden by cull", (int64_t)sAnimeshCensus.mHiddenByCull);
         LL_PROFILE_PLOT("Animesh: period > 1", (int64_t)sAnimeshCensus.mThrottled);
         LL_PROFILE_PLOT("Animesh: joint updates", (int64_t)sAnimeshCensus.mJointUpdates);
+        LL_PROFILE_PLOT("Animesh: repeat period calls", (int64_t)sAnimeshCensus.mRepeatPeriodCalls);
 
         sAvatarCensus = {};
         sAnimeshCensus = {};
@@ -748,6 +751,9 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mNeedsSkin(false),
     mLastSkinTime(0.f),
     mUpdatePeriod(1),
+    mUpdatePeriodFrame(-1),
+    mNeedsUpdateFrame(-1),
+    mNeedsUpdate(false),
     mOverallAppearance(AOA_INVISIBLE),
     mVisualComplexityStale(true),
     mVisuallyMuteSetting(AV_RENDER_NORMALLY),
@@ -4600,6 +4606,18 @@ void LLVOAvatar::updateFootstepSounds()
 // ------------------------------------------------------------------------
 void LLVOAvatar::computeUpdatePeriod()
 {
+    // Every animesh attached to this avatar asks for this once a frame, on top
+    // of the avatar's own call, and the answer costs a spatial extents read, a
+    // vector length and up to three impostor tests. None of what it reads
+    // moves within a frame.
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (frame == mUpdatePeriodFrame)
+    {
+        ++skeletonUpdateCensus(this).mRepeatPeriodCalls;
+        return;
+    }
+    mUpdatePeriodFrame = frame;
+
     bool visually_muted = isVisuallyMuted();
     if (mDrawable.notNull()
         && isVisible()
@@ -5022,7 +5040,18 @@ bool LLVOAvatar::computeNeedsUpdate()
     const F32 MAX_IMPOSTOR_INTERVAL = 4.0f;
     computeUpdatePeriod();
 
-    bool needs_update_by_frame_count = ((LLDrawable::getCurrentFrame()+mID.mData[0])%mUpdatePeriod == 0);
+    // Answering the same frame twice used to be able to give two different
+    // answers, when MAX_IMPOSTOR_INTERVAL fell between an animesh attachment's
+    // call and the avatar's own. Holding the first answer for the frame is
+    // what the comment in LLControlAvatar::computeNeedsUpdate asks for.
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (frame == mNeedsUpdateFrame)
+    {
+        return mNeedsUpdate;
+    }
+    mNeedsUpdateFrame = frame;
+
+    bool needs_update_by_frame_count = ((frame+mID.mData[0])%mUpdatePeriod == 0);
 
     bool needs_update_by_max_time = ((gFrameTimeSeconds-mLastImpostorUpdateFrameTime)> MAX_IMPOSTOR_INTERVAL);
     bool needs_update = needs_update_by_frame_count || needs_update_by_max_time;
@@ -5040,6 +5069,7 @@ bool LLVOAvatar::computeNeedsUpdate()
             //mLastImpostorUpdateReason = 10;
         }
     }
+    mNeedsUpdate = needs_update;
     return needs_update;
 }
 

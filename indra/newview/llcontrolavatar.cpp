@@ -47,6 +47,8 @@ LLControlAvatar::LLControlAvatar(const LLUUID& id, const LLPCode pcode, LLViewer
     mGlobalScale(1.0f),
     mMarkedForDeath(false),
     mRootVolp(NULL),
+    mAttachedAvatar(NULL),
+    mAttachedAvatarFrame(-1),
     mControlAVBridge(NULL),
     mScaleConstraintFixup(1.0),
     mRegionChanged(false)
@@ -79,22 +81,31 @@ void LLControlAvatar::initInstance()
     mInitFlags |= 1<<4;
 }
 
+LLVOAvatar *LLControlAvatar::findAttachedAvatar() const
+{
+    // Held for the frame it was found in. What it walks is the object parent
+    // chain, which only changes when an attach or detach is processed, and
+    // that happens before any of this frame's avatar work. markDead drops it
+    // along with the root volume.
+    const S32 frame = LLDrawable::getCurrentFrame();
+    if (frame != mAttachedAvatarFrame)
+    {
+        mAttachedAvatarFrame = frame;
+        mAttachedAvatar = (mRootVolp && mRootVolp->isAttachment())
+            ? mRootVolp->getAvatarAncestor()
+            : NULL;
+    }
+    return mAttachedAvatar;
+}
+
 const LLVOAvatar *LLControlAvatar::getAttachedAvatar() const
 {
-    if (mRootVolp && mRootVolp->isAttachment())
-    {
-        return mRootVolp->getAvatarAncestor();
-    }
-    return NULL;
+    return findAttachedAvatar();
 }
 
 LLVOAvatar *LLControlAvatar::getAttachedAvatar()
 {
-    if (mRootVolp && mRootVolp->isAttachment())
-    {
-        return mRootVolp->getAvatarAncestor();
-    }
-    return NULL;
+    return findAttachedAvatar();
 }
 
 void LLControlAvatar::getNewConstraintFixups(LLVector3& new_pos_fixup, F32& new_scale_fixup) const
@@ -372,6 +383,8 @@ void LLControlAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 void LLControlAvatar::markDead()
 {
     mRootVolp = NULL;
+    mAttachedAvatar = NULL;
+    mAttachedAvatarFrame = -1;
     super::markDead();
     mControlAVBridge = NULL;
 }

@@ -47,6 +47,16 @@ public:
     virtual const LLVOAvatar *getAttachedAvatar() const;
     virtual LLVOAvatar *getAttachedAvatar();
 
+private:
+    // The walk up the parent chain is asked for four times a frame; the chain
+    // it walks is rebuilt by object updates, which land between frames.
+    LLVOAvatar *findAttachedAvatar() const;
+
+    mutable LLVOAvatar *mAttachedAvatar;
+    mutable S32         mAttachedAvatarFrame;
+
+public:
+
     void getNewConstraintFixups(LLVector3& new_pos_constraint, F32& new_scale_constraint) const;
     void matchVolumeTransform();
     void updateVolumeGeom();
