@@ -785,10 +785,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     //VTResume();  // VTune
     setHoverOffset(LLVector3(0.0, 0.0, 0.0));
 
-    // mVoiceVisualizer is created by the hud effects manager and uses the HUD Effects pipeline
-    const bool needsSendToSim = false; // currently, this HUD effect doesn't need to pack and unpack data to do its job
-    mVoiceVisualizer = ( LLVoiceVisualizer *)LLHUDManager::getInstance()->createViewerEffect( LLHUDObject::LL_HUD_EFFECT_VOICE_VISUALIZER, needsSendToSim );
-
     LL_DEBUGS("Avatar","Message") << "LLVOAvatar Constructor (0x" << this << ") id:" << mID << LL_ENDL;
     mPelvisp = NULL;
 
@@ -953,7 +949,10 @@ void LLVOAvatar::markDead()
         mNameText = NULL;
         sNumVisibleChatBubbles--;
     }
-    mVoiceVisualizer->markDead();
+    if (mVoiceVisualizer)
+    {
+        mVoiceVisualizer->markDead();
+    }
     LLLoadedCallbackEntry::cleanUpCallbackList(&mCallbackTextureList) ;
     LLViewerObject::markDead();
 }
@@ -1357,7 +1356,17 @@ void LLVOAvatar::initInstance()
 
     //VTPause();  // VTune
 
-    mVoiceVisualizer->setVoiceEnabled( LLVoiceClient::getInstance()->getVoiceEnabled( mID ) );
+    // The voice visualizer is a HUD effect, and the HUD pipeline keeps working
+    // on one for as long as it exists. An animated object has no voice as a
+    // feature -- its id is made up client side and never joins a channel -- so
+    // it does not get one. This is late enough in construction for
+    // isControlAvatar() to answer; the constructor is not.
+    if (!isControlAvatar())
+    {
+        const bool needsSendToSim = false; // currently, this HUD effect doesn't need to pack and unpack data to do its job
+        mVoiceVisualizer = ( LLVoiceVisualizer *)LLHUDManager::getInstance()->createViewerEffect( LLHUDObject::LL_HUD_EFFECT_VOICE_VISUALIZER, needsSendToSim );
+        mVoiceVisualizer->setVoiceEnabled( LLVoiceClient::getInstance()->getVoiceEnabled( mID ) );
+    }
 
     mInitFlags |= 1<<1;
 }
@@ -2935,13 +2944,11 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
     mLastRootPos = mRoot->getWorldPosition();
     bool detailed_update = updateCharacter(agent);
 
-    // An animated object has neither a voice nor a name tag. Its id is made up
-    // client side and never joins a voice channel, so both questions below
-    // have one answer; and idleUpdateNameTag would build a HUD tag for it,
-    // position it and count it among the visible chat bubbles, only for
-    // idleUpdateNameTagText to find no name values to put in it. Its debug
-    // text does not come through here -- that goes out through setDebugText
-    // and LLViewerObject::mText.
+    // Neither voice nor a name tag is a thing an animated object has. Its id
+    // is made up client side and never joins a voice channel, and it has no
+    // first or last name for a tag to show, so it has no voice visualizer to
+    // drive and never builds a tag. Its debug text is not this -- that goes
+    // out through setDebugText and LLViewerObject::mText.
     const bool has_voice_and_name = !isControlAvatar();
 
     bool voice_enabled = false;
@@ -2953,16 +2960,17 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
                         LLVoiceClient::getInstance()->getVoiceEnabled(mID);
 
         hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+        idleUpdateVoiceVisualizer(voice_enabled, hud_name_pos);
     }
 
-    // Still called with voice off, so the visualizer is told to stay quiet
-    // rather than keeping whatever it was last set to.
-    idleUpdateVoiceVisualizer(voice_enabled, hud_name_pos);
     idleUpdateMisc( detailed_update );
     idleUpdateAppearanceAnimation();
     if (detailed_update)
     {
-        idleUpdateLipSync( voice_enabled );
+        if (has_voice_and_name)
+        {
+            idleUpdateLipSync( voice_enabled );
+        }
         idleUpdateLoadingEffect();
         idleUpdateBelowWater(); // wind effect uses this
         idleUpdateWindEffect();
@@ -3013,6 +3021,9 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
 
 void LLVOAvatar::idleUpdateVoiceVisualizer(bool voice_enabled, const LLVector3 &position)
 {
+    // Only an avatar that can have a voice has one of these to drive.
+    llassert(mVoiceVisualizer);
+
     bool render_visualizer = voice_enabled;
 
     // Don't render the user's own voice visualizer when in mouselook, or when opening the mic is disabled.
