@@ -706,7 +706,7 @@ bool start_chat( EKeystate s )
 
 bool start_gesture( EKeystate s )
 {
-    LLUICtrl* focus_ctrlp = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* focus_ctrlp = gFocusMgr.getKeyboardFocusCtrl();
     if (KEYSTATE_UP == s &&
         ! (focus_ctrlp && focus_ctrlp->acceptsTextInput()))
     {

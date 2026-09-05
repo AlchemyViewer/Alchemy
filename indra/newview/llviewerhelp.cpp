@@ -122,7 +122,7 @@ std::string LLViewerHelp::f1HelpTopic()
 std::string LLViewerHelp::getTopicFromFocus()
 {
     // use UI element with viewer's keyboard focus as basis for searching
-    LLUICtrl* focused = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* focused = gFocusMgr.getKeyboardFocusCtrl();
 
     if (focused)
     {

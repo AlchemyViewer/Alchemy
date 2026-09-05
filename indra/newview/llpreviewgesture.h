@@ -40,9 +40,11 @@ class LLScrollListItem;
 class LLButton;
 class LLRadioGroup;
 
-class LLPreviewGesture : public LLPreview
+class LLPreviewGesture final : public LLPreview
 {
 public:
+    AL_VIEW_TYPE(LLPreviewGesture, LLPreview);
+
     // Pass an object_id if this gesture is inside an object in the world,
     // otherwise use LLUUID::null.
     static LLPreviewGesture* show(const LLUUID& item_id, const LLUUID& object_id);

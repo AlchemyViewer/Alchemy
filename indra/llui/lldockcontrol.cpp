@@ -29,7 +29,7 @@
 #include "lldockcontrol.h"
 #include "lldockablefloater.h"
 
-LLDockControl::LLDockControl(LLView* dockWidget, LLFloater* dockableFloater,
+LLDockControl::LLDockControl(LLView* dockWidget, LLDockableFloater* dockableFloater,
         const LLUIImagePtr& dockTongue, DocAt dockAt, get_allowed_rect_callback_t get_allowed_rect_callback) :
         mDockableFloater(dockableFloater),
         mDockTongue(dockTongue),
@@ -127,12 +127,7 @@ void LLDockControl::repositionDockable()
             mDockableFloater->setDocked(false);
             // force off() since dockable may not have dockControll at this time
             off();
-            LLDockableFloater* dockable_floater =
-                    dynamic_cast<LLDockableFloater*> (mDockableFloater);
-            if(dockable_floater != NULL)
-            {
-                dockable_floater->onDockHidden();
-            }
+            mDockableFloater->onDockHidden();
         }
         else
         {
@@ -140,12 +135,7 @@ void LLDockControl::repositionDockable()
             {
                 moveDockable();
             }
-            LLDockableFloater* dockable_floater =
-                    dynamic_cast<LLDockableFloater*> (mDockableFloater);
-            if(dockable_floater != NULL)
-            {
-                dockable_floater->onDockShown();
-            }
+            mDockableFloater->onDockShown();
         }
 
         mPrevDockRect = dockRect;
@@ -203,13 +193,7 @@ void LLDockControl::moveDockable()
     LLRect rootRect;
     mGetAllowedRectCallback(rootRect);
 
-    bool use_tongue = false;
-    LLDockableFloater* dockable_floater =
-            dynamic_cast<LLDockableFloater*> (mDockableFloater);
-    if (dockable_floater != NULL)
-    {
-        use_tongue = dockable_floater->getUseTongue();
-    }
+    const bool use_tongue = mDockableFloater->getUseTongue();
 
     LLRect dockableRect = mDockableFloater->calcScreenRect();
     S32 x = 0;
@@ -372,13 +356,7 @@ void LLDockControl::forceRecalculatePosition()
 
 void LLDockControl::drawToungue()
 {
-    bool use_tongue = false;
-    LLDockableFloater* dockable_floater =
-            dynamic_cast<LLDockableFloater*> (mDockableFloater);
-    if (dockable_floater != NULL)
-    {
-        use_tongue = dockable_floater->getUseTongue();
-    }
+    const bool use_tongue = mDockableFloater->getUseTongue();
 
     if (mEnabled && use_tongue)
     {

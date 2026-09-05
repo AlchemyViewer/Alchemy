@@ -126,6 +126,7 @@ class LLFloater : public LLPanel, public LLInstanceTracker<LLFloater>
     friend class LLMultiFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloater, LLPanel);
 
     struct KeyCompare
     {
@@ -607,6 +608,8 @@ const S32 FLOATER_MIN_VISIBLE_PIXELS = 16;
 class LLFloaterView : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLFloaterView, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>{};
 
 protected:
@@ -614,6 +617,9 @@ protected:
     friend class LLUICtrlFactory;
 
 public:
+
+    // Every child is a floater; anything else is refused.
+    bool addChild(LLView* child, S32 tab_group = 0) override;
 
     /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void draw();

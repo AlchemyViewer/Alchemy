@@ -70,11 +70,13 @@ class LLParcel;
 class LLPanelLandExperiences;
 class LLPanelLandEnvironment;
 
-class LLFloaterLand
+class LLFloaterLand final
 :   public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterLand, LLFloater);
+
     static void refreshAll();
 
     static LLPanelLandObjects* getCurrentPanelLandObjects();
@@ -135,10 +137,12 @@ public:
 };
 
 
-class LLPanelLandGeneral
+class LLPanelLandGeneral final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandGeneral, LLPanel);
+
     LLPanelLandGeneral(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandGeneral();
     /*virtual*/ void refresh();
@@ -241,10 +245,12 @@ protected:
     static LLHandle<LLFloater> sBuyPassDialogHandle;
 };
 
-class LLPanelLandObjects
+class LLPanelLandObjects final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandObjects, LLPanel);
+
     LLPanelLandObjects(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandObjects();
     /*virtual*/ void refresh();
@@ -312,10 +318,12 @@ protected:
 };
 
 
-class LLPanelLandOptions
+class LLPanelLandOptions final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandOptions, LLPanel);
+
     LLPanelLandOptions(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandOptions();
     /*virtual*/ bool postBuild();
@@ -360,10 +368,12 @@ private:
 };
 
 
-class LLPanelLandAccess
+class LLPanelLandAccess final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandAccess, LLPanel);
+
     LLPanelLandAccess(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandAccess();
     void refresh();
@@ -407,10 +417,12 @@ protected:
 };
 
 
-class LLPanelLandCovenant
+class LLPanelLandCovenant final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandCovenant, LLPanel);
+
     LLPanelLandCovenant(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual ~LLPanelLandCovenant();
     virtual bool postBuild();

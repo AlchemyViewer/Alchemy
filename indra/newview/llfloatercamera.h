@@ -51,6 +51,8 @@ class LLFloaterCamera final : public LLFloater
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterCamera, LLFloater);
+
     /* whether in free camera mode */
     static bool inFreeCameraMode();
     /* callback for camera items selection changing */
@@ -150,10 +152,12 @@ private:
  * are changed in setValue()). This class doesn't implement selection logic-
  * it's items are used inside of flatlist.
  */
-class LLPanelCameraItem
+class LLPanelCameraItem final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelCameraItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<LLIconCtrl::Params> icon_over;

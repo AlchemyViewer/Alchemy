@@ -32,9 +32,11 @@
 #include "v4color.h"
 #include "lltrace.h"
 
-class LLStatGraph : public LLView
+class LLStatGraph final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLStatGraph, LLView);
+
     struct ThresholdParams : public LLInitParam::Block<ThresholdParams>
     {
         Mandatory<F32>  value;

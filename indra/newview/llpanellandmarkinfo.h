@@ -34,9 +34,11 @@ class LLComboBox;
 class LLLineEditor;
 class LLTextEditor;
 
-class LLPanelLandmarkInfo : public LLPanelPlaceInfo
+class LLPanelLandmarkInfo final : public LLPanelPlaceInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandmarkInfo, LLPanelPlaceInfo);
+
     LLPanelLandmarkInfo();
     /*virtual*/ ~LLPanelLandmarkInfo();
 

@@ -320,7 +320,6 @@ void HttpService::threadRun(LLCoreInt::HttpThread * thread)
 
             //output possible call stacks to log file.
             LLError::LLUserWarningMsg::showOutOfMemory();
-            LLError::LLCallStacks::print();
 
             LL_ERRS() << "Bad memory allocation in HttpService::threadRun()!" << LL_ENDL;
         }

@@ -32,11 +32,13 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-class LLFloaterPerms : public LLFloater
+class LLFloaterPerms final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterPerms, LLFloater);
+
     bool postBuild() override;
 
     // Convenience methods to get current permission preference bitfields from saved settings:
@@ -50,11 +52,13 @@ private:
 
 };
 
-class LLFloaterPermsDefault : public LLFloater
+class LLFloaterPermsDefault final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterPermsDefault, LLFloater);
+
     bool postBuild() override;
     void ok();
     void cancel();

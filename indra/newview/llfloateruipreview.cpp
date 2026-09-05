@@ -102,9 +102,11 @@ class LLFadeEventTimer;
 class LLPreviewedFloater;
 
 // Implementation of custom overlapping element display panel
-class LLOverlapPanel : public LLPanel
+class LLOverlapPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLOverlapPanel, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Params() {}
@@ -128,9 +130,10 @@ public:
 };
 
 
-class LLFloaterUIPreview : public LLFloater
+class LLFloaterUIPreview final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterUIPreview, LLFloater);
     // Setup
     LLFloaterUIPreview(const LLSD& key);
     virtual ~LLFloaterUIPreview();
@@ -261,9 +264,10 @@ private:
 
 // Implementation of previewed floater
 // Used to override draw and mouse handler
-class LLPreviewedFloater : public LLFloater
+class LLPreviewedFloater final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLPreviewedFloater, LLFloater);
     LLPreviewedFloater(LLFloaterUIPreview* floater, const Params& params)
         : LLFloater(LLSD(), params),
           mFloaterUIPreview(floater)
@@ -532,7 +536,7 @@ bool LLFloaterUIPreview::postBuild()
 // Callback for language combo box selection: refresh current floater when you change languages
 void LLFloaterUIPreview::onLanguageComboSelect(LLUICtrl* ctrl)
 {
-    LLComboBox* caller = dynamic_cast<LLComboBox*>(ctrl);
+    LLComboBox* caller = ALViewType::as<LLComboBox>(ctrl);
     if (!caller)
         return;
     if(caller->getName() == std::string("language_select_combo"))
@@ -1250,11 +1254,7 @@ void LLFloaterUIPreview::highlightChangedElements()
         if(!failed)
         {
             // Now that we have a pointer to the actual element, add it to the list of elements to be highlighted
-            std::set<LLView*>::iterator iter2 = std::find(LLView::sPreviewHighlightedElements.begin(), LLView::sPreviewHighlightedElements.end(), element);
-            if(iter2 == LLView::sPreviewHighlightedElements.end())
-            {
-                LLView::sPreviewHighlightedElements.insert(element);
-            }
+            LLView::sPreviewHighlightedElements.insert(element);
         }
     }
 
@@ -1367,7 +1367,7 @@ bool LLPreviewedFloater::handleToolTip(S32 x, S32 y, MASK mask)
         }
         // only report xui names for LLUICtrls, not the various container LLViews
 
-        else if (dynamic_cast<LLUICtrl*>(viewp))
+        else if (viewp->as<LLUICtrl>())
         {
             // if we are in a new part of the tree (not a descendent of current tooltip_view)
             // then push the results for tooltip_view and start with a new potential view
@@ -1539,16 +1539,16 @@ void LLFloaterUIPreview::findOverlapsInChildren(LLView* parent)
 // *NOTE: If a list of elements which have localizable content were created, this function should return false if viewp's class is in that list.
 bool LLFloaterUIPreview::overlapIgnorable(LLView* viewp)
 {
-    return  NULL != dynamic_cast<LLDragHandle*>(viewp) ||
-            NULL != dynamic_cast<LLViewBorder*>(viewp) ||
-            NULL != dynamic_cast<LLResizeBar*>(viewp);
+    return  ALViewType::as<LLDragHandle>(viewp) ||
+            ALViewType::as<LLViewBorder>(viewp) ||
+            ALViewType::as<LLResizeBar>(viewp);
 }
 
 // *HACK: these are the only two container types as of 8/08, per Richard
-// This is using dynamic casts because there is no object-oriented way to tell which elements are containers.
+// It asks by type because there is no object-oriented way to tell which elements are containers.
 bool LLFloaterUIPreview::containerType(LLView* viewp)
 {
-    return NULL != dynamic_cast<LLPanel*>(viewp) || NULL != dynamic_cast<LLLayoutStack*>(viewp);
+    return ALViewType::as<LLPanel>(viewp) || ALViewType::as<LLLayoutStack>(viewp);
 }
 
 // Check if two llview's rectangles overlap, with some tolerance

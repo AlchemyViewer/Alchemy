@@ -41,12 +41,13 @@
 /**
  * Posts a snapshot to My Profile feed.
  */
-class LLPanelSnapshotProfile
+class LLPanelSnapshotProfile final
 :   public LLPanelSnapshot
 {
     LOG_CLASS(LLPanelSnapshotProfile);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotProfile, LLPanelSnapshot);
     LLPanelSnapshotProfile();
 
     bool postBuild() override;

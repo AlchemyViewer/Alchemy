@@ -1135,7 +1135,7 @@ void LLFloaterEditExtDayCycle::updateTabs()
 void LLFloaterEditExtDayCycle::updateWaterTabs(const LLSettingsWaterPtr_t &p_water)
 {
     LLView* tab_container = mWaterTabLayoutContainer->getChild<LLView>(TABS_WATER); //can't extract panels directly, since it is in 'tuple'
-    LLPanelSettingsWaterMainTab* panel = dynamic_cast<LLPanelSettingsWaterMainTab*>(tab_container->findChildView("water_panel"));
+    LLPanelSettingsWaterMainTab* panel = tab_container->findChild<LLPanelSettingsWaterMainTab>("water_panel");
     if (panel)
     {
         panel->setWater(p_water);
@@ -1147,17 +1147,17 @@ void LLFloaterEditExtDayCycle::updateSkyTabs(const LLSettingsSkyPtr_t &p_sky)
     LLTabContainer* tab_container = mSkyTabLayoutContainer->getChild<LLTabContainer>(TABS_SKYS); //can't extract panels directly, since they are in 'tuple'
 
     LLPanelSettingsSky* panel;
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("atmosphere_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("atmosphere_panel");
     if (panel)
     {
         panel->setSky(p_sky);
     }
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("clouds_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("clouds_panel");
     if (panel)
     {
         panel->setSky(p_sky);
     }
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("moon_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("moon_panel");
     if (panel)
     {
         panel->setSky(p_sky);

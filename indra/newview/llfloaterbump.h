@@ -34,9 +34,12 @@
 class LLMeanCollisionData;
 class LLScrollListCtrl;
 
-class LLFloaterBump
+class LLFloaterBump final
 : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterBump, LLFloater);
+private:
     friend class LLFloaterReg;
 protected:
     void add(LLScrollListCtrl* list, LLMeanCollisionData *mcd);

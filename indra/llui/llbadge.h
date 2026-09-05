@@ -89,10 +89,12 @@ namespace LLInitParam
 // Classes
 //
 
-class LLBadge
+class LLBadge final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLBadge, LLUICtrl);
+
     struct Params
     : public LLInitParam::Block<Params, LLUICtrl::Params>
     {

@@ -1212,7 +1212,7 @@ void LLPanelPeople::onTabSelected(const LLSD& param)
 
 void LLPanelPeople::onAvatarListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1262,7 +1262,7 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 
 void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1643,7 +1643,7 @@ bool LLPanelPeople::notifyChildren(const LLSD& info)
 {
     if (info.has("task-panel-action") && info["task-panel-action"].asString() == "handle-tri-state")
     {
-        LLSideTrayPanelContainer* container = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* container = getParentAs<LLSideTrayPanelContainer>();
         if (!container)
         {
             LL_WARNS() << "Cannot find People panel container" << LL_ENDL;

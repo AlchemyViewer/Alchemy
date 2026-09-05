@@ -91,6 +91,8 @@ class LLAvatarIconCtrl
 : public LLIconCtrl, public LLAvatarPropertiesObserver
 {
 public:
+    AL_VIEW_TYPE(LLAvatarIconCtrl, LLIconCtrl);
+
     struct Params : public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
         Optional<LLUUID>        avatar_id;

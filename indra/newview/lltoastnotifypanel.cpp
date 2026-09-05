@@ -489,7 +489,7 @@ bool LLToastNotifyPanel::isControlPanelEnabled() const
         LLView::child_list_const_iter_t child_it_end = mControlPanel->endChild();
         for(; child_it != child_it_end; ++child_it)
         {
-            LLButton * buttonp = dynamic_cast<LLButton *>(*child_it);
+            LLButton * buttonp = (*child_it)->as<LLButton>();
             if (buttonp && buttonp->getEnabled())
             {
                 some_buttons_enabled = true;
@@ -552,7 +552,7 @@ void LLIMToastNotifyPanel::compactButtons()
     // so to get buttons in correct order reverse iterator is used (EXT-5906)
     for (child_list_t::const_reverse_iterator it = children->rbegin(); it != children->rend(); it++)
     {
-        LLButton * button = dynamic_cast<LLButton*> (*it);
+        LLButton * button = (*it)->as<LLButton>();
         if (button != NULL)
         {
             button->setOrigin( offset,button->getRect().mBottom);

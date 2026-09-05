@@ -36,9 +36,11 @@ class LLComboBox;
 class LLLineEditor;
 class LLScrollListCtrl;
 
-class LLPanelDirClassified : public LLPanelDirBrowser
+class LLPanelDirClassified final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirClassified, LLPanelDirBrowser);
+
     LLPanelDirClassified();
     /*virtual*/ ~LLPanelDirClassified();
 

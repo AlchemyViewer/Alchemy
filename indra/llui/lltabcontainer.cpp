@@ -27,7 +27,6 @@
 #include "linden_common.h"
 
 #include "lltabcontainer.h"
-#include "llviewereventrecorder.h"
 #include "llfocusmgr.h"
 #include "lllocalcliprect.h"
 #include "llrect.h"
@@ -97,9 +96,11 @@ public:
  * @file lltabcontainer.cpp
  * @brief class implements LLButton with LLIconCtrl on it
  */
-class LLCustomButtonIconCtrl : public LLButton
+class LLCustomButtonIconCtrl final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLCustomButtonIconCtrl, LLButton);
+
     struct Params
     :   public LLInitParam::Block<Params, LLButton::Params>
     {
@@ -182,8 +183,10 @@ private:
 };
 //============================================================================
 
-struct LLPlaceHolderPanel : public LLPanel
+struct LLPlaceHolderPanel final : public LLPanel
 {
+    AL_VIEW_TYPE(LLPlaceHolderPanel, LLPanel);
+
     // create dummy param block to register with "placeholder" nane
     struct Params : public LLPanel::Params{};
     LLPlaceHolderPanel(const Params& p) : LLPanel(p)
@@ -370,11 +373,14 @@ LLView* LLTabContainer::findChildView(std::string_view name, bool recurse) const
 
 bool LLTabContainer::addChild(LLView* view, S32 tab_group)
 {
-    LLPanel* panelp = dynamic_cast<LLPanel*>(view);
-
-    if (panelp)
+    if (!view)
     {
-        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()).is_placeholder(dynamic_cast<LLPlaceHolderPanel*>(view) != NULL));
+        return false;
+    }
+
+    if (LLPanel* panelp = view->as<LLPanel>())
+    {
+        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()).is_placeholder(view->as<LLPlaceHolderPanel>() != nullptr));
         return true;
     }
     else
@@ -608,11 +614,6 @@ bool LLTabContainer::handleMouseDown( S32 x, S32 y, MASK mask )
             mMouseDownTimer.start();
         }
     }
-    if (handled) {
-        // Note: May need to also capture local coords right here ?
-        LLViewerEventRecorder::instance().update_xui(getPathname( ));
-    }
-
     return handled;
 }
 
@@ -718,10 +719,6 @@ bool LLTabContainer::handleMouseUp( S32 x, S32 y, MASK mask )
             }
         }
         gFocusMgr.setMouseCapture(NULL);
-    }
-    if (handled) {
-        // Note: may need to capture local coords here
-        LLViewerEventRecorder::instance().update_xui(getPathname( ));
     }
     return handled;
 }
@@ -1536,7 +1533,8 @@ bool LLTabContainer::selectTab(S32 which)
         cbdata = selected_tuple->mTabPanel->getName();
 
     bool result = false;
-    if (!mValidateSignal || (*mValidateSignal)(this, cbdata))
+    enable_signal_t* signal = validateSignal();
+    if (!signal || (*signal)(this, cbdata))
     {
         result = setTab(which);
         if (result && mCommitSignal)
@@ -1707,7 +1705,7 @@ void LLTabContainer::setTabImage(LLPanel* child, LLIconCtrl* icon)
 
     if(tuple)
     {
-        button = dynamic_cast<LLCustomButtonIconCtrl*>(tuple->mButton);
+        button = ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton);
         if(button)
         {
             hasButton = true;
@@ -1735,7 +1733,7 @@ void LLTabContainer::reshapeTuple(LLTabTuple* tuple)
 
         if(mCustomIconCtrlUsed)
         {
-            LLCustomButtonIconCtrl* button = dynamic_cast<LLCustomButtonIconCtrl*>(tuple->mButton);
+            LLCustomButtonIconCtrl* button = ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton);
             LLIconCtrl* icon_ctrl = button ? button->getIconCtrl() : NULL;
             image_overlay_width = icon_ctrl ? icon_ctrl->getRect().getWidth() : 0;
         }

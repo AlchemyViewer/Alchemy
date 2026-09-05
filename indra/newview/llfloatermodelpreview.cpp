@@ -1198,7 +1198,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue(param[i].mDetails.mRange.mLow.mFloat);
                     slider->setMaxValue(param[i].mDetails.mRange.mHigh.mFloat);
@@ -1206,7 +1206,7 @@ void LLFloaterModelPreview::initDecompControls()
                     slider->setValue(param[i].mDefault.mFloat);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLSpinCtrl* spinner = dynamic_cast<LLSpinCtrl*>(ctrl))
+                else if (LLSpinCtrl* spinner = ALViewType::as<LLSpinCtrl>(ctrl))
                 {
                     bool is_retain_ctrl = "Retain%" == name;
                     float coefficient = is_retain_ctrl ? (F32)RETAIN_COEFFICIENT : 1.f;
@@ -1217,7 +1217,7 @@ void LLFloaterModelPreview::initDecompControls()
                     spinner->setValue(param[i].mDefault.mFloat * coefficient);
                     spinner->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))
+                else if (LLComboBox* combo_box = ALViewType::as<LLComboBox>(ctrl))
                 {
                     float min = param[i].mDetails.mRange.mLow.mFloat;
                     float max = param[i].mDetails.mRange.mHigh.mFloat;
@@ -1247,7 +1247,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue((F32)param[i].mDetails.mRange.mLow.mIntOrEnumValue);
                     slider->setMaxValue((F32)param[i].mDetails.mRange.mHigh.mIntOrEnumValue);
@@ -1255,7 +1255,7 @@ void LLFloaterModelPreview::initDecompControls()
                     slider->setValue((F32)param[i].mDefault.mIntOrEnumValue);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLComboBox* combo_box = dynamic_cast<LLComboBox*>(ctrl))
+                else if (LLComboBox* combo_box = ALViewType::as<LLComboBox>(ctrl))
                 {
                     for(int k = param[i].mDetails.mRange.mLow.mIntOrEnumValue; k<=param[i].mDetails.mRange.mHigh.mIntOrEnumValue; k+=param[i].mDetails.mRange.mDelta.mIntOrEnumValue)
                     {

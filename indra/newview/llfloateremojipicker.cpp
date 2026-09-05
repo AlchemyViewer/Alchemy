@@ -75,9 +75,10 @@ static const std::string sKeyRecentlyUsed("RecentlyUsed");
 static const std::string sKeyFrequentlyUsed("FrequentlyUsed");
 }
 
-class LLEmojiGridRow : public LLScrollingPanel
+class LLEmojiGridRow final : public LLScrollingPanel
 {
 public:
+    AL_VIEW_TYPE(LLEmojiGridRow, LLScrollingPanel);
     LLEmojiGridRow(const LLPanel::Params& panel_params,
         const LLScrollingPanelList::Params& list_params)
         : LLScrollingPanel(panel_params)
@@ -92,9 +93,10 @@ public:
     LLScrollingPanelList* mList;
 };
 
-class LLEmojiGridDivider : public LLScrollingPanel
+class LLEmojiGridDivider final : public LLScrollingPanel
 {
 public:
+    AL_VIEW_TYPE(LLEmojiGridDivider, LLScrollingPanel);
     LLEmojiGridDivider(const LLPanel::Params& panel_params, std::string text)
         : LLScrollingPanel(panel_params)
         , mText(std::move(text))
@@ -126,9 +128,10 @@ private:
     const std::string mText;
 };
 
-class LLEmojiGridIcon : public LLScrollingPanel
+class LLEmojiGridIcon final : public LLScrollingPanel
 {
 public:
+    AL_VIEW_TYPE(LLEmojiGridIcon, LLScrollingPanel);
     typedef std::function<void(LLEmojiGridIcon*)> right_click_cb_t;
 
     LLEmojiGridIcon(
@@ -199,9 +202,10 @@ private:
     right_click_cb_t mRightClickCb;
 };
 
-class LLEmojiPreviewPanel : public LLPanel
+class LLEmojiPreviewPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLEmojiPreviewPanel, LLPanel);
     LLEmojiPreviewPanel()
         : LLPanel()
     {
@@ -1355,7 +1359,7 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
         cell->setBackgroundOpaque(true);
         cell->setMouseEnterCallback([this](LLUICtrl* c, const LLSD&)
         {
-            if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+            if (auto* p = ALViewType::as<LLEmojiGridIcon>(c))
             {
                 p->setBackgroundVisible(true);
                 // Update the floater's preview pane so the variant's
@@ -1367,7 +1371,7 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
         });
         cell->setMouseLeaveCallback([](LLUICtrl* c, const LLSD&)
         {
-            if (auto* p = dynamic_cast<LLEmojiGridIcon*>(c))
+            if (auto* p = ALViewType::as<LLEmojiGridIcon>(c))
             {
                 p->setBackgroundVisible(false);
                 // Don't touch the preview here. The framework fires
@@ -1381,7 +1385,7 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
         });
         cell->setMouseUpCallback([this](LLUICtrl* c, S32, S32, MASK)
         {
-            if (LLEmojiGridIcon* picked = dynamic_cast<LLEmojiGridIcon*>(c))
+            if (LLEmojiGridIcon* picked = ALViewType::as<LLEmojiGridIcon>(c))
                 commitVariant(picked->getChar());
         });
         flyout->addChild(cell);
@@ -1595,7 +1599,7 @@ void LLFloaterEmojiPicker::commitVariant(const std::string& sequence)
 
 void LLFloaterEmojiPicker::onGroupButtonClick(LLUICtrl* ctrl)
 {
-    if (LLButton* button = dynamic_cast<LLButton*>(ctrl))
+    if (LLButton* button = ALViewType::as<LLButton>(ctrl))
     {
         if (button == mGroupButtons[mSelectedGroupIndex] || button->getToggleState())
             return;
@@ -1610,7 +1614,7 @@ void LLFloaterEmojiPicker::onGroupButtonClick(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onGroupButtonMouseEnter(LLUICtrl* ctrl)
 {
-    if (LLButton* button = dynamic_cast<LLButton*>(ctrl))
+    if (LLButton* button = ALViewType::as<LLButton>(ctrl))
     {
         button->setUseFontColor(true);
     }
@@ -1618,7 +1622,7 @@ void LLFloaterEmojiPicker::onGroupButtonMouseEnter(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onGroupButtonMouseLeave(LLUICtrl* ctrl)
 {
-    if (LLButton* button = dynamic_cast<LLButton*>(ctrl))
+    if (LLButton* button = ALViewType::as<LLButton>(ctrl))
     {
         button->setUseFontColor(button->getToggleState());
     }
@@ -1626,7 +1630,7 @@ void LLFloaterEmojiPicker::onGroupButtonMouseLeave(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onEmojiMouseEnter(LLUICtrl* ctrl)
 {
-    if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
+    if (LLEmojiGridIcon* icon = ALViewType::as<LLEmojiGridIcon>(ctrl))
     {
         // While the variant flyout is up, the base icon is "locked" —
         // hovering other grid icons must not highlight them or hijack
@@ -1653,7 +1657,7 @@ void LLFloaterEmojiPicker::onEmojiMouseEnter(LLUICtrl* ctrl)
 
 void LLFloaterEmojiPicker::onEmojiMouseLeave(LLUICtrl* ctrl)
 {
-    if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
+    if (LLEmojiGridIcon* icon = ALViewType::as<LLEmojiGridIcon>(ctrl))
     {
         if (icon == mLongPressIcon)
             mLongPressIcon = nullptr;
@@ -1680,7 +1684,7 @@ void LLFloaterEmojiPicker::onEmojiMouseDown(LLUICtrl* ctrl)
 {
     // Start the long-press timer; draw() polls it so the variant flyout
     // can fire after a short hold without depending on a global timer pool.
-    if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
+    if (LLEmojiGridIcon* icon = ALViewType::as<LLEmojiGridIcon>(ctrl))
     {
         mLongPressIcon = icon;
         mLongPressFired = false;
@@ -1712,7 +1716,7 @@ void LLFloaterEmojiPicker::onEmojiMouseUp(LLUICtrl* ctrl)
         make_ui_sound("UISndClickRelease");
     }
 
-    if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
+    if (LLEmojiGridIcon* icon = ALViewType::as<LLEmojiGridIcon>(ctrl))
     {
         LLSD value(icon->getChar());
         setValue(value);
@@ -1734,8 +1738,8 @@ void LLFloaterEmojiPicker::selectFocusedIcon()
     }
 
     // Both mFocusedIconRow and mFocusedIconCol should be already verified
-    LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(mEmojiGrid->getPanelList()[mFocusedIconRow]);
-    mFocusedIcon = row ? dynamic_cast<LLEmojiGridIcon*>(row->mList->getPanelList()[mFocusedIconCol]) : nullptr;
+    LLEmojiGridRow* row = mEmojiGrid->getPanelList()[mFocusedIconRow]->as<LLEmojiGridRow>();
+    mFocusedIcon = row ? row->mList->getPanelList()[mFocusedIconCol]->as<LLEmojiGridIcon>() : nullptr;
 
     if (mFocusedIcon && !mHoveredIcon)
     {
@@ -1751,7 +1755,7 @@ bool LLFloaterEmojiPicker::moveFocusedIconUp()
     for (S32 i = mFocusedIconRow - 1; i >= 0; --i)
     {
         LLScrollingPanel* panel = mEmojiGrid->getPanelList()[i];
-        LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(panel);
+        LLEmojiGridRow* row = panel->as<LLEmojiGridRow>();
         if (row && row->mList->getPanelList().size() > mFocusedIconCol)
         {
             mEmojiScroll->scrollToShowRect(row->getBoundingRect());
@@ -1773,7 +1777,7 @@ bool LLFloaterEmojiPicker::moveFocusedIconDown()
     for (size_t i = mFocusedIconRow + 1; i < rowCount; ++i)
     {
         LLScrollingPanel* panel = mEmojiGrid->getPanelList()[i];
-        LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(panel);
+        LLEmojiGridRow* row = panel->as<LLEmojiGridRow>();
         if (row && row->mList->getPanelList().size() > mFocusedIconCol)
         {
             mEmojiScroll->scrollToShowRect(row->getBoundingRect());
@@ -1801,7 +1805,7 @@ bool LLFloaterEmojiPicker::moveFocusedIconPrev()
     for (S32 i = mFocusedIconRow - 1; i >= 0; --i)
     {
         LLScrollingPanel* panel = mEmojiGrid->getPanelList()[i];
-        LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(panel);
+        LLEmojiGridRow* row = panel->as<LLEmojiGridRow>();
         if (row && row->mList->getPanelList().size())
         {
             mEmojiScroll->scrollToShowRect(row->getBoundingRect());
@@ -1824,7 +1828,7 @@ bool LLFloaterEmojiPicker::moveFocusedIconNext()
         return false;
 
     LLScrollingPanel* panel = mEmojiGrid->getPanelList()[mFocusedIconRow];
-    LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(panel);
+    LLEmojiGridRow* row = panel->as<LLEmojiGridRow>();
     S32 colCount = row ? static_cast<S32>(row->mList->getPanelList().size()) : 0;
     if (mFocusedIconCol < colCount - 1)
     {
@@ -1837,7 +1841,7 @@ bool LLFloaterEmojiPicker::moveFocusedIconNext()
     for (size_t i = mFocusedIconRow + 1; i < rowCount; ++i)
     {
         LLScrollingPanel* panel = mEmojiGrid->getPanelList()[i];
-        LLEmojiGridRow* row = dynamic_cast<LLEmojiGridRow*>(panel);
+        LLEmojiGridRow* row = panel->as<LLEmojiGridRow>();
         if (row && row->mList->getPanelList().size())
         {
             mEmojiScroll->scrollToShowRect(row->getBoundingRect());

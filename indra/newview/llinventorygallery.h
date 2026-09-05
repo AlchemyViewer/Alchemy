@@ -46,9 +46,11 @@ class LLInventoryGalleryContextMenu;
 
 typedef std::function<void()> callback_t;
 
-class LLInventoryGallery : public LLPanel, public LLEditMenuHandler
+class LLInventoryGallery final : public LLPanel, public LLEditMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLInventoryGallery, LLPanel);
+    LLView* asView() override { return this; }
 
     typedef boost::signals2::signal<void(const LLUUID&)> selection_change_signal_t;
     typedef std::function<void(const LLUUID&)> selection_change_callback_t;
@@ -283,9 +285,11 @@ private:
     std::string mUsername;
 };
 
-class LLInventoryGalleryItem : public LLPanel
+class LLInventoryGalleryItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventoryGalleryItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {};
 

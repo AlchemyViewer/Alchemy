@@ -39,6 +39,8 @@ class LLRadioGroup;
 class LLFloaterNameDesc : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterNameDesc, LLFloater);
+
     LLFloaterNameDesc(const LLSD& args);
     virtual ~LLFloaterNameDesc();
     bool postBuild() override;
@@ -61,23 +63,29 @@ protected:
     LLUUID          mDestinationFolderId;
 };
 
-class LLFloaterSoundPreview : public LLFloaterNameDesc
+class LLFloaterSoundPreview final : public LLFloaterNameDesc
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSoundPreview, LLFloaterNameDesc);
+
     LLFloaterSoundPreview(const LLSD& filename );
     bool postBuild() override;
 };
 
-class LLFloaterAnimPreview : public LLFloaterNameDesc
+class LLFloaterAnimPreview final : public LLFloaterNameDesc
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAnimPreview, LLFloaterNameDesc);
+
     LLFloaterAnimPreview(const LLSD& filename );
     bool postBuild() override;
 };
 
-class LLFloaterScriptPreview : public LLFloaterNameDesc
+class LLFloaterScriptPreview final : public LLFloaterNameDesc
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptPreview, LLFloaterNameDesc);
+
     LLFloaterScriptPreview(const LLSD& filename );
     bool postBuild() override;
 };

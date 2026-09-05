@@ -209,7 +209,7 @@ void LLPanelProfilePicks::selectPick(const LLUUID& pick_id)
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
             if (pick_panel)
             {
                 if (pick_panel->getPickId() == pick_id)
@@ -258,7 +258,7 @@ void LLPanelProfilePicks::onClickNewBtn()
 
 void LLPanelProfilePicks::onClickDelete()
 {
-    LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
+    LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getCurrentPanel());
     if (pick_panel)
     {
         LLUUID pick_id = pick_panel->getPickId();
@@ -281,7 +281,7 @@ void LLPanelProfilePicks::callbackDeletePick(const LLSD& notification, const LLS
         LLUUID pick_id = notification["payload"]["pick_id"].asUUID();
         S32 tab_idx = notification["payload"]["tab_idx"].asInteger();
 
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->getPickId() == pick_id)
         {
             mTabContainer->removeTabPanel(pick_panel);
@@ -321,7 +321,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
     {
         if (mTabContainer->getTabCount() > 0)
         {
-            LLPanelProfilePick* active_pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getCurrentPanel());
+            LLPanelProfilePick* active_pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getCurrentPanel());
             if (active_pick_panel)
             {
                 selected_id = active_pick_panel->getPickId();
@@ -336,7 +336,7 @@ void LLPanelProfilePicks::processProperties(const LLAvatarData* avatar_picks)
 
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->getPickId().notNull())
         {
             std::string location = pick_panel->getPickLocation();
@@ -451,7 +451,7 @@ void LLPanelProfilePicks::apply()
     {
         for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
         {
-            LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+            LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
             if (pick_panel)
             {
                 pick_panel->apply();
@@ -481,7 +481,7 @@ bool LLPanelProfilePicks::hasUnsavedChanges()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel && pick_panel->isDirty())
         {
             return true;
@@ -494,7 +494,7 @@ void LLPanelProfilePicks::commitUnsavedChanges()
 {
     for (S32 tab_idx = 0; tab_idx < mTabContainer->getTabCount(); ++tab_idx)
     {
-        LLPanelProfilePick* pick_panel = dynamic_cast<LLPanelProfilePick*>(mTabContainer->getPanelByIndex(tab_idx));
+        LLPanelProfilePick* pick_panel = ALViewType::as<LLPanelProfilePick>(mTabContainer->getPanelByIndex(tab_idx));
         if (pick_panel)
         {
             pick_panel->apply();
@@ -1031,7 +1031,7 @@ std::string LLPanelProfilePick::createLocationText(const std::string& owner_name
 void LLPanelProfilePick::updateTabLabel(const std::string& title)
 {
     setLabel(title);
-    LLTabContainer* parent = dynamic_cast<LLTabContainer*>(getParent());
+    LLTabContainer* parent = getParentAs<LLTabContainer>();
     if (parent)
     {
         parent->setCurrentTabName(title);

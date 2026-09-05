@@ -59,6 +59,8 @@ protected:
 class LLFloaterMessageLog final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMessageLog, LLFloater);
+
     LLFloaterMessageLog(const LLSD& key);
     ~LLFloaterMessageLog() override;
 

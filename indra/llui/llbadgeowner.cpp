@@ -93,7 +93,7 @@ void LLBadgeOwner::addBadgeToParentHolder()
 
         while (parent)
         {
-            LLBadgeHolder * badge_holder_panel = dynamic_cast<LLBadgeHolder *>(parent);
+            LLBadgeHolder * badge_holder_panel = parent->asBadgeHolder();
 
             if (badge_holder_panel && badge_holder_panel->acceptsBadge())
             {

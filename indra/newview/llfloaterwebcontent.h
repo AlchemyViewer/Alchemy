@@ -43,6 +43,7 @@ class LLFloaterWebContent :
     public LLInstanceTracker<LLFloaterWebContent, std::string, LLInstanceTrackerReplaceOnCollision>
 {
 public:
+    AL_VIEW_TYPE(LLFloaterWebContent, LLFloater);
 
     typedef LLInstanceTracker<LLFloaterWebContent, std::string, LLInstanceTrackerReplaceOnCollision> instance_tracker_t;
     LOG_CLASS(LLFloaterWebContent);

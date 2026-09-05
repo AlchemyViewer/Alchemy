@@ -114,7 +114,7 @@ bool LLAlertHandler::processNotification(const LLNotificationPtr& notification, 
     LLToast::Params p;
     p.notif_id = notification->getID();
     p.notification = notification;
-    p.panel = dynamic_cast<LLToastPanel*>(alert_dialog);
+    p.panel = alert_dialog;
     p.enable_hide_btn = false;
     p.can_fade = false;
     p.is_modal = mIsModal;
@@ -125,7 +125,7 @@ bool LLAlertHandler::processNotification(const LLNotificationPtr& notification, 
     LLRect rc = progress && progress->getVisible() ? progress->getRect() : gViewerWindow->getWorldViewRectScaled();
     mChannel.get()->updatePositionAndSize(rc);
 
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if(channel)
         channel->addToast(p);
 
@@ -135,7 +135,7 @@ bool LLAlertHandler::processNotification(const LLNotificationPtr& notification, 
 void LLAlertHandler::onChange( LLNotificationPtr notification )
 {
     LLToastAlertPanel* alert_dialog = new LLToastAlertPanel(notification, mIsModal);
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if(channel)
         channel->modifyToastByNotificationID(notification->getID(), (LLToastPanel*)alert_dialog);
 }

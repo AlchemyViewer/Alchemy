@@ -34,9 +34,11 @@
 class LLHighlightEntry;
 
 //Chat log widget allowing addition of a message as a widget
-class LLChatHistory : public LLUICtrl
+class LLChatHistory final : public LLUICtrl
 {
     public:
+    AL_VIEW_TYPE(LLChatHistory, LLUICtrl);
+
         struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
         {
             //Message header filename

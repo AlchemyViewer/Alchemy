@@ -78,7 +78,6 @@
 #include "lluri.h"
 #include "llviewercontrol.h"
 #include "llviewercamera.h"
-#include "llviewereventrecorder.h"
 #include "llviewermenufile.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"
@@ -301,8 +300,7 @@ public:
     {
         if (params.size() < 1) return false;
 
-        LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
-            (LLFloaterReg::showInstance("preferences"));
+        LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
 
         if (prefsfloater)
         {
@@ -1099,7 +1097,7 @@ void LLFloaterPreference::onUIFontSelected(LLUICtrl* ctrl, const LLSD& userdata)
 {
     const std::string family = userdata.asString();
     if (family.empty()) return;
-    LLComboBox* combo = dynamic_cast<LLComboBox*>(ctrl);
+    LLComboBox* combo = ALViewType::as<LLComboBox>(ctrl);
     if (!combo) return;
     const std::string value = combo->getValue().asString();
     setFontOverride(family, value);
@@ -1118,7 +1116,7 @@ void LLFloaterPreference::onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userda
 {
     const std::string family = userdata.asString();
     if (family.empty()) return;
-    LLLineEditor* editor = dynamic_cast<LLLineEditor*>(ctrl);
+    LLLineEditor* editor = ALViewType::as<LLLineEditor>(ctrl);
     if (!editor) return;
     const std::string raw = editor->getText();
     setFontOverride(family, raw);
@@ -1171,7 +1169,7 @@ void LLFloaterPreference::saveSettings()
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->saveSettings();
     }
@@ -1192,7 +1190,7 @@ void LLFloaterPreference::apply()
          iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->apply();
     }
@@ -1256,7 +1254,7 @@ void LLFloaterPreference::cancel(const std::vector<std::string> settings_to_skip
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->cancel(settings_to_skip);
     }
@@ -1526,7 +1524,7 @@ void LLFloaterPreference::setRecommendedSettings()
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
         {
             panel->setHardwareDefaults();
@@ -1571,7 +1569,7 @@ void LLFloaterPreference::getControlNames(std::vector<std::string>& names)
             LLView* curview = stack.front();
             stack.pop_front();
 
-            LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(curview);
+            LLUICtrl* ctrl = curview->as<LLUICtrl>();
             if (ctrl)
             {
                 LLControlVariable* control = ctrl->getControlVariable();
@@ -1611,7 +1609,7 @@ void LLFloaterPreference::onBtnOK(const LLSD& userdata)
     // commit any outstanding text entry
     if (hasFocus())
     {
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+        LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
         if (cur_focus && cur_focus->acceptsTextInput())
         {
             cur_focus->onCommit();
@@ -1679,7 +1677,7 @@ void LLFloaterPreference::onBtnCancel(const LLSD& userdata)
 {
     if (hasFocus())
     {
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+        LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
         if (cur_focus && cur_focus->acceptsTextInput())
         {
             cur_focus->onCommit();
@@ -2483,7 +2481,7 @@ void LLFloaterPreference::onClickAdvanced()
          iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceGraphics* panel = dynamic_cast<LLPanelPreferenceGraphics*>(view);
+        LLPanelPreferenceGraphics* panel = view->as<LLPanelPreferenceGraphics>();
         if (panel)
         {
             panel->resetDirtyChilds();
@@ -2569,7 +2567,7 @@ void LLFloaterPreference::updateClickActionControls()
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceControls* panel = dynamic_cast<LLPanelPreferenceControls*>(view);
+        LLPanelPreferenceControls* panel = view->as<LLPanelPreferenceControls>();
         if (panel)
         {
             panel->setKeyBind("walk_to",
@@ -2608,7 +2606,7 @@ void LLFloaterPreference::updateClickActionViews()
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceControls* panel = dynamic_cast<LLPanelPreferenceControls*>(view);
+        LLPanelPreferenceControls* panel = view->as<LLPanelPreferenceControls>();
         if (panel)
         {
             click_to_walk = panel->canKeyBindHandle("walk_to",
@@ -2870,14 +2868,14 @@ void LLPanelPreference::saveSettings()
         LLView* curview = view_stack.front();
         view_stack.pop_front();
 
-        LLColorSwatchCtrl* color_swatch = dynamic_cast<LLColorSwatchCtrl *>(curview);
+        LLColorSwatchCtrl* color_swatch = curview->as<LLColorSwatchCtrl>();
         if (color_swatch)
         {
             mSavedColors[color_swatch->getName()] = color_swatch->get();
         }
         else
         {
-            LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(curview);
+            LLUICtrl* ctrl = curview->as<LLUICtrl>();
             if (ctrl)
             {
                 LLControlVariable* control = ctrl->getControlVariable();
@@ -3026,9 +3024,10 @@ void LLPanelPreference::setHardwareDefaults()
 {
 }
 
-class LLPanelPreferencePrivacy : public LLPanelPreference
+class LLPanelPreferencePrivacy final : public LLPanelPreference
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreferencePrivacy, LLPanelPreference);
     LLPanelPreferencePrivacy()
     {
         mAccountIndependentSettings.push_back("AutoDisengageMic");
@@ -3248,7 +3247,7 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
     combo->setCommitCallback(
         [setting_key](LLUICtrl* ctrl, const LLSD&)
         {
-            if (auto* c = dynamic_cast<LLComboBox*>(ctrl))
+            if (auto* c = ALViewType::as<LLComboBox>(ctrl))
             {
                 const std::string id = c->getSelectedValue().asString();
                 // Persist for next launch …
@@ -3369,7 +3368,7 @@ bool LLPanelPreferenceGraphics::hasDirtyChilds()
         LLView* curview = view_stack.front();
         view_stack.pop_front();
 
-        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(curview);
+        LLUICtrl* ctrl = curview->as<LLUICtrl>();
         if (ctrl)
         {
             if (ctrl->isDirty())
@@ -3411,7 +3410,7 @@ void LLPanelPreferenceGraphics::resetDirtyChilds()
         LLView* curview = view_stack.front();
         view_stack.pop_front();
 
-        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(curview);
+        LLUICtrl* ctrl = curview->as<LLUICtrl>();
         if (ctrl)
         {
             ctrl->resetDirty();
@@ -4130,7 +4129,7 @@ void LLFloaterPreferenceProxy::saveSettings()
         LLView* curview = view_stack.front();
         view_stack.pop_front();
 
-        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(curview);
+        LLUICtrl* ctrl = curview->as<LLUICtrl>();
         if (ctrl)
         {
             LLControlVariable* control = ctrl->getControlVariable();
@@ -4154,7 +4153,7 @@ void LLFloaterPreferenceProxy::onBtnOk()
     // commit any outstanding text entry
     if (hasFocus())
     {
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+        LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
         if (cur_focus && cur_focus->acceptsTextInput())
         {
             cur_focus->onCommit();
@@ -4193,7 +4192,7 @@ void LLFloaterPreferenceProxy::onBtnCancel()
 {
     if (hasFocus())
     {
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+        LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
         if (cur_focus && cur_focus->acceptsTextInput())
         {
             cur_focus->onCommit();

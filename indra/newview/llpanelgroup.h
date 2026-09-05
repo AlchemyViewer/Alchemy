@@ -43,12 +43,14 @@ class LLAccordionCtrl;
 class LLAgent;
 
 
-class LLPanelGroup : public LLPanel,
+class LLPanelGroup final : public LLPanel,
                      public LLGroupMgrObserver,
                      public LLVoiceClientStatusObserver,
                      public LLOldEvents::LLSimpleListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroup, LLPanel);
+
     LLPanelGroup();
     virtual ~LLPanelGroup();
 
@@ -138,6 +140,8 @@ private:
 class LLPanelGroupTab : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupTab, LLPanel);
+
     LLPanelGroupTab();
     virtual ~LLPanelGroupTab();
 

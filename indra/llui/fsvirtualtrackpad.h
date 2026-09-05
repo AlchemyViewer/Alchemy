@@ -33,10 +33,12 @@
 #include "lluictrl.h"
 #include "llpanel.h"
 
-class FSVirtualTrackpad
+class FSVirtualTrackpad final
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(FSVirtualTrackpad, LLUICtrl);
+
     struct Params
         : public LLInitParam::Block<Params, LLUICtrl::Params>
     {

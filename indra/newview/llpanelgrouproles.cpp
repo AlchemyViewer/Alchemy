@@ -141,7 +141,7 @@ bool LLPanelGroupRoles::postBuild()
     for (S32 i = 0; i < mSubTabContainer->getTabCount(); ++i)
     {
         LLPanel* panel = mSubTabContainer->getPanelByIndex(i);
-        LLPanelGroupSubTab* subtabp = dynamic_cast<LLPanelGroupSubTab*>(panel);
+        LLPanelGroupSubTab* subtabp = ALViewType::as<LLPanelGroupSubTab>(panel);
         if (!subtabp)
         {
             LL_WARNS() << "Invalid subtab panel: " << panel->getName() << LL_ENDL;
@@ -611,7 +611,7 @@ void LLPanelGroupSubTab::buildActionCategory(LLScrollListCtrl* ctrl,
 
         LLScrollListItem* title_row = ctrl->addElement(row, ADD_BOTTOM, action_set->mActionSetData);
 
-        LLScrollListText* name_textp = dynamic_cast<LLScrollListText*>(title_row->getColumn(2)); //?? I have no idea fix getColumn(1) return column spacer...
+        LLScrollListText* name_textp = title_row->getColumn<LLScrollListText>(2); //?? I have no idea fix getColumn(1) return column spacer...
         if (name_textp)
             name_textp->setFontStyle(LLFontGL::BOLD);
 
@@ -2429,7 +2429,7 @@ struct ActionCBData
 
 void LLPanelGroupRolesSubTab::handleActionCheck(LLUICtrl* ctrl, bool force)
 {
-    LLCheckBoxCtrl* check = dynamic_cast<LLCheckBoxCtrl*>(ctrl);
+    LLCheckBoxCtrl* check = ALViewType::as<LLCheckBoxCtrl>(ctrl);
     if (!check)
         return;
 

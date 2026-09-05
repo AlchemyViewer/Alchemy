@@ -38,6 +38,8 @@ class LLTabTuple;
 class LLTabContainer : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLTabContainer, LLPanel);
+
     enum TabPosition
     {
         TOP,
@@ -130,6 +132,7 @@ public:
     //              bool bordered, bool is_vertical);
 
     /*virtual*/ ~LLTabContainer();
+
 
     // from LLView
     /*virtual*/ void setValue(const LLSD& value);

@@ -40,9 +40,11 @@ class LLAccordionCtrlTab;
 class LLFlatListView;
 class LLMenuButton;
 
-class LLTeleportHistoryPanel : public LLPanelPlacesTab
+class LLTeleportHistoryPanel final : public LLPanelPlacesTab
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryPanel, LLPanelPlacesTab);
+
     LLTeleportHistoryPanel();
     virtual ~LLTeleportHistoryPanel();
 

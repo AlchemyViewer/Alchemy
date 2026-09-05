@@ -46,9 +46,11 @@ class LLTextureCtrl;
 class LLInventoryItem;
 class LLUUID;
 
-class LLPanelObject : public LLPanel
+class LLPanelObject final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelObject, LLPanel);
+
     LLPanelObject();
     virtual ~LLPanelObject();
 

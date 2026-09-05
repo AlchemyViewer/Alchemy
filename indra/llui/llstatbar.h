@@ -31,9 +31,13 @@
 #include "llframetimer.h"
 #include "lltracerecording.h"
 
-class LLStatBar : public LLView
+#include <array>
+#include <string_view>
+
+class LLStatBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLStatBar, LLView);
 
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
@@ -71,9 +75,42 @@ public:
 
     /*virtual*/ LLRect getRequiredRect();   // Return the height of this object, given the set options.
 
+    // The spacing that lands the most tick marks on round numbers across
+    // [min, max]. Zero when the range is empty.
+    static F32  calcTickValue(F32 min, F32 max);
+
+    // Widens [min, max] to a range that contains zero and ends on a round
+    // number, and reports the tick spacing that suits the result.
+    static void calcAutoScaleRange(F32& min, F32& max, F32& tick);
+
 private:
-    void drawLabelAndValue( F32 mean, std::string &unit_label, LLRect &bar_rect, S32 decimal_digits );
-    void drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect );
+    // One formatted number. The value line and the tick labels are rebuilt
+    // every frame, so they are formatted in place and handed to the font as a
+    // view rather than through the allocator.
+    typedef std::array<char, 64> text_buf_t;
+
+    static std::string_view bufView(const text_buf_t& buf, size_t written);
+    static std::string_view formatTickLabel(text_buf_t& buf, F32 tick_value, S32 decimal_digits);
+
+    // A tick's label, collected while the bar geometry is being batched and
+    // drawn once that batch closes. Text bound between two rects splits the
+    // batch on both sides of itself, and a labelled tick would do that several
+    // times per bar. The capacity is far past what the label spacing allows
+    // across a bar of any width the UI can give one.
+    struct TickLabel
+    {
+        text_buf_t mText;
+        U32        mLength;
+        F32        mX;
+        F32        mY;
+    };
+    typedef std::array<TickLabel, 24> tick_label_list_t;
+
+    void batchRect( S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color ) const;
+    void drawLabelAndValue( F32 mean, const std::string &unit_label, LLRect &bar_rect, S32 decimal_digits );
+    void updateBarRange( F32 min, F32 max );
+    U32  drawTickMarks( F32 value_scale, LLRect &bar_rect, tick_label_list_t& labels );
+    void drawTickLabels( const tick_label_list_t& labels, U32 num_labels );
 
     F32          mTargetMinBar,
                  mTargetMaxBar,
@@ -108,6 +145,31 @@ private:
 
     LLUIString   mLabel;
     std::string  mUnitLabel;
+
+    // The unit the value line prints beside the number. It follows from the
+    // stat and this widget's own override, and neither moves between frames.
+    std::string  mDisplayUnitLabel;
+
+    // What the last walk over the history window produced. Each of these costs
+    // a pass over every recorded period, and the line they feed only changes on
+    // MEAN_VALUE_UPDATE_TIME.
+    F32          mCachedMin,
+                 mCachedMax,
+                 mCachedMean;
+    S32          mCachedDecimalDigits;
+    bool         mCachedShowsCurrent,   // value line tracks `current`, frame to frame
+                 mHaveAggregates;
+
+    // The value line as last formatted, kept so its width is measured only when
+    // the bytes change. Measuring is a shaping pass, and the width is needed
+    // every frame to reserve room for the label beside it.
+    text_buf_t   mValueText;
+    U32          mValueTextLength;
+    S32          mValueWidth;
+
+    // Stands in for a value that is not a number. Resolved once: the row asks
+    // for it on every draw, and it is the same string every time.
+    std::string  mNotApplicable;
 
     bool         mDisplayBar,           // Display the bar graph.
                  mDisplayHistory,

@@ -79,7 +79,7 @@ LLUIString& LLUIString::operator=(LLUIString&& other) noexcept
     return *this;
 }
 
-void LLUIString::assign(const std::string& s)
+void LLUIString::assign(std::string_view s)
 {
     // Assigning the value already held substitutes to the same result. A panel
     // that refreshes a readout every frame assigns most of its labels what

@@ -35,6 +35,7 @@
 
 #include "../test/lltut.h"
 
+#include <string_view>
 #include <utility>
 
 namespace tut
@@ -210,5 +211,33 @@ namespace tut
         greeting.clearArgs();
         ensure_equals("clearing none of them is not a change",
                       greeting.getGeneration(), cleared);
+    }
+
+    // assign takes a view, so a caller holding a string_view -- or a substring
+    // of one -- reaches it without building a string first. The contract
+    // LLTextBox::setText leans on is the one below it: assigning the value
+    // already held is not a change, whatever the argument was spelled as.
+    template<> template<>
+    void object::test<9>()
+    {
+        LLUIString label("Region (128, 64, 22)");
+        const U32 settled = label.getGeneration();
+
+        const std::string_view same("Region (128, 64, 22)");
+        label.assign(same);
+        ensure_equals("assigning the value already held is not a change",
+                      label.getGeneration(), settled);
+
+        label.assign(std::string_view("Region (130, 64, 22)"));
+        ensure("assigning a different value is", label.getGeneration() > settled);
+        ensure_equals("and the value is the new one",
+                      label.getString(), std::string("Region (130, 64, 22)"));
+
+        // A view need not be null-terminated, and need not outlive the call.
+        const std::string backing("Region (130, 64, 22) and then some");
+        const U32 unchanged = label.getGeneration();
+        label.assign(std::string_view(backing).substr(0, 20));
+        ensure_equals("a view of the same bytes is the same value",
+                      label.getGeneration(), unchanged);
     }
 }

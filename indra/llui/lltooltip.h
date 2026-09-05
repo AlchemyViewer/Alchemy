@@ -36,9 +36,11 @@
 //
 // Classes
 //
-class LLToolTipView : public LLView
+class LLToolTipView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLToolTipView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params();
@@ -59,6 +61,7 @@ public:
 class LLToolTip : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLToolTip, LLPanel);
 
     struct StyledText : public LLInitParam::Block<StyledText>
     {
@@ -134,9 +137,11 @@ protected:
 };
 
 // used for the inspector tooltips which need different background images etc.
-class LLInspector : public LLToolTip
+class LLInspector final : public LLToolTip
 {
 public:
+    AL_VIEW_TYPE(LLInspector, LLToolTip);
+
     struct Params : public LLInitParam::Block<Params, LLToolTip::Params>
     {};
 };

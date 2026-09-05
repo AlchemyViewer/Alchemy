@@ -49,9 +49,11 @@ class LLTextureCtrl;
 class LLUICtrl;
 
 #if 0 // Moved to LLFloaterPublishClassified
-class LLPublishClassifiedFloater : public LLFloater
+class LLPublishClassifiedFloater final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLPublishClassifiedFloater, LLFloater);
+
     LLPublishClassifiedFloater(const LLSD& key);
     virtual ~LLPublishClassifiedFloater();
 
@@ -68,10 +70,12 @@ public:
 /**
 * Panel for displaying Avatar's picks.
 */
-class LLPanelProfileClassifieds
+class LLPanelProfileClassifieds final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileClassifieds, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfileClassifieds();
     /*virtual*/ ~LLPanelProfileClassifieds();
 
@@ -115,10 +119,11 @@ private:
 };
 
 
-class LLPanelProfileClassified
+class LLPanelProfileClassified final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileClassified, LLPanelProfilePropertiesProcessorTab);
 
     static LLPanelProfileClassified* create();
 

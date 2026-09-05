@@ -36,10 +36,11 @@
  * buttons (usually radio buttons).  Automatically handles the mutex
  * condition by highlighting only one button at a time.
  */
-class LLRadioGroup
+class LLRadioGroup final
 :   public LLUICtrl, public LLCtrlSelectionInterface
 {
 public:
+    AL_VIEW_TYPE(LLRadioGroup, LLUICtrl);
 
     struct ItemParams : public LLInitParam::Block<ItemParams, LLCheckBoxCtrl::Params>
     {

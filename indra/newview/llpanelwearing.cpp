@@ -534,7 +534,7 @@ boost::signals2::connection LLPanelWearing::setSelectionChangeCallback(commit_ca
 
 void LLPanelWearing::onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(ctrl);
+    LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(ctrl);
     if (!list) return;
 
     uuid_vec_t selected_uuids;
@@ -546,7 +546,7 @@ void LLPanelWearing::onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 
 void LLPanelWearing::onTempAttachmentsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLScrollListCtrl* list = dynamic_cast<LLScrollListCtrl*>(ctrl);
+    LLScrollListCtrl* list = ALViewType::as<LLScrollListCtrl>(ctrl);
     if (!list) return;
     list->selectItemAt(x, y, MASK_NONE);
     uuid_vec_t selected_uuids;

@@ -31,9 +31,11 @@
 
 class LLFlatListView;
 
-class LLPanelGroupExperiences : public LLPanelGroupTab
+class LLPanelGroupExperiences final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupExperiences, LLPanelGroupTab);
+
     LLPanelGroupExperiences();
     virtual ~LLPanelGroupExperiences();
 

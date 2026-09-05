@@ -37,10 +37,12 @@
 //
 class LLColor4;
 
-class LLColorSwatchCtrl
+class LLColorSwatchCtrl final
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLColorSwatchCtrl, LLUICtrl);
+
     typedef enum e_color_pick_op
     {
         COLOR_CHANGE,

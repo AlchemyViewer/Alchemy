@@ -48,11 +48,12 @@
 
 /// Group Inspector, a small information window used when clicking
 /// on group names in the 2D UI
-class LLInspectGroup : public LLInspect, public LLGroupMgrObserver
+class LLInspectGroup final : public LLInspect, public LLGroupMgrObserver
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLInspectGroup, LLInspect);
     // key["group_id"] - Group ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLInspectGroup(const LLSD& key);

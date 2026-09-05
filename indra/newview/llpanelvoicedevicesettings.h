@@ -30,9 +30,11 @@
 
 #include "llpanel.h"
 
-class LLPanelVoiceDeviceSettings : public LLPanel
+class LLPanelVoiceDeviceSettings final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelVoiceDeviceSettings, LLPanel);
+
     LLPanelVoiceDeviceSettings();
     ~LLPanelVoiceDeviceSettings();
 

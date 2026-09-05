@@ -88,7 +88,7 @@ void LLScriptHandler::addToastWithNotification(const LLNotificationPtr& notifica
                         || notification->getPriority() >= NOTIFICATION_PRIORITY_HIGH;
     }
 
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if(channel)
     {
         channel->addToast(p);
@@ -146,7 +146,7 @@ bool LLScriptHandler::processNotification(const LLNotificationPtr& notification,
 
 void LLScriptHandler::onChange( LLNotificationPtr notification )
 {
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if (channel)
     {
         channel->removeToastByNotificationID(notification->getID());

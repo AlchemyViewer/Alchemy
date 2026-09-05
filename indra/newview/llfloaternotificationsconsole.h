@@ -33,12 +33,13 @@
 
 class LLNotification;
 
-class LLFloaterNotificationConsole :
+class LLFloaterNotificationConsole final :
     public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterNotificationConsole, LLFloater);
 
     // LLPanel
     bool postBuild();
@@ -58,9 +59,11 @@ private:
 /*
  * @brief Pop-up debugging view of a generic new notification.
  */
-class LLFloaterNotification : public LLFloater
+class LLFloaterNotification final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterNotification, LLFloater);
+
     LLFloaterNotification(LLNotification* note);
 
     // LLPanel

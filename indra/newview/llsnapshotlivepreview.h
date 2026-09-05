@@ -36,10 +36,12 @@ class LLImageJPEG;
 ///----------------------------------------------------------------------------
 /// Class LLSnapshotLivePreview
 ///----------------------------------------------------------------------------
-class LLSnapshotLivePreview : public LLView
+class LLSnapshotLivePreview final : public LLView
 {
     LOG_CLASS(LLSnapshotLivePreview);
 public:
+    AL_VIEW_TYPE(LLSnapshotLivePreview, LLView);
+
     typedef boost::signals2::signal<void(void)> snapshot_saved_signal_t;
 
     static void saveLocal(LLPointer<LLImageFormatted> image, const snapshot_saved_signal_t::slot_type& success_cb = snapshot_saved_signal_t(), const snapshot_saved_signal_t::slot_type& failure_cb = snapshot_saved_signal_t());

@@ -41,6 +41,7 @@ class LLFloaterSettingsDebug final
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterSettingsDebug, LLFloater);
 
     virtual bool postBuild();
     virtual void draw();

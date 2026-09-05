@@ -48,6 +48,8 @@ class LLFolderViewModelItemInventory;
 class LLLandmarksPanel : public LLPanelPlacesTab, LLRemoteParcelInfoObserver
 {
 public:
+    AL_VIEW_TYPE(LLLandmarksPanel, LLPanelPlacesTab);
+
     LLLandmarksPanel();
     LLLandmarksPanel(bool is_landmark_panel);
     virtual ~LLLandmarksPanel();
@@ -157,9 +159,11 @@ private:
 };
 
 
-class LLFavoritesPanel : public LLLandmarksPanel
+class LLFavoritesPanel final : public LLLandmarksPanel
 {
 public:
+    AL_VIEW_TYPE(LLFavoritesPanel, LLLandmarksPanel);
+
     LLFavoritesPanel();
 
     bool postBuild() override;

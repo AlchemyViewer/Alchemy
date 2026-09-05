@@ -65,9 +65,11 @@ private:
     LLNotificationListView* mUnTaggedList;
 };
 
-class LLFloaterNotificationsTabbed : public LLTransientDockableFloater
+class LLFloaterNotificationsTabbed final : public LLTransientDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterNotificationsTabbed, LLTransientDockableFloater);
+
     LOG_CLASS(LLFloaterNotificationsTabbed);
 
     LLFloaterNotificationsTabbed(const LLSD& key);

@@ -37,7 +37,6 @@
 #include "llinventorypanel.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
-#include "llviewereventrecorder.h"
 #include "v4coloru.h"
 
 // newview includes
@@ -111,6 +110,7 @@
 #include "llstatusbar.h"
 #include "llterrainpaintmap.h"
 #include "lltextureview.h"
+#include "lltoolbar.h"
 #include "lltoolbarview.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
@@ -2452,44 +2452,6 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
     }
 };
 
-////////////////////
-// EVENT Recorder //
-///////////////////
-
-
-class LLAdvancedViewerEventRecorder : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        std::string command = userdata.asString();
-        if ("start playback" == command)
-        {
-            LL_INFOS() << "Event Playback starting" << LL_ENDL;
-            LLViewerEventRecorder::instance().playbackRecording();
-            LL_INFOS() << "Event Playback completed" << LL_ENDL;
-        }
-        else if ("stop playback" == command)
-        {
-            // Future
-        }
-        else if ("start recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOn();
-            LL_INFOS() << "Event recording started" << LL_ENDL;
-        }
-        else if ("stop recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOff();
-            LL_INFOS() << "Event recording stopped" << LL_ENDL;
-        }
-
-        return true;
-    }
-};
-
-
-
-
 /////////////////
 // AGENT PILOT //
 /////////////////
@@ -4402,7 +4364,7 @@ void handle_reset_interest_lists()
 
 void handle_dump_focus()
 {
-    LLUICtrl *ctrl = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl *ctrl = gFocusMgr.getKeyboardFocusCtrl();
 
     LL_INFOS() << "Keyboard focus " << (ctrl ? ctrl->getName() : "(none)") << LL_ENDL;
 }
@@ -6421,7 +6383,7 @@ class LLEditDelete : public view_listener_t
 
 void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD& param)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6439,8 +6401,8 @@ void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD&
 
 bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(ctrl);
-    const LLContextMenu* menu = (item) ? dynamic_cast<const LLContextMenu*>(item->getParent()) : NULL;
+    LLMenuItemGL* item = ALViewType::as<LLMenuItemGL>(ctrl);
+    const LLContextMenu* menu = (item) ? item->getParentAs<LLContextMenu>() : NULL;
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6459,7 +6421,7 @@ bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 
 void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToDictionary()) )
     {
@@ -6469,14 +6431,14 @@ void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToDictionary());
 }
 
 void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToIgnore()) )
     {
@@ -6486,7 +6448,7 @@ void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToIgnore());
 }
@@ -7371,7 +7333,7 @@ void handle_edit_outfit()
 
 void handle_now_wearing()
 {
-    LLSidepanelAppearance *panel_appearance = dynamic_cast<LLSidepanelAppearance *>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance *panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     if (panel_appearance && panel_appearance->isInVisibleChain() && panel_appearance->isCOFPanelVisible())
     {
         LLFloaterReg::findInstance("appearance")->closeFloater();
@@ -8003,7 +7965,7 @@ static bool onEnableAttachmentLabel(LLUICtrl* ctrl, const LLSD& data)
     bool fRlvEnable = true;
 // [/RLVa:KB]
     std::string label;
-    LLMenuItemGL* menu = dynamic_cast<LLMenuItemGL*>(ctrl);
+    LLMenuItemGL* menu = ALViewType::as<LLMenuItemGL>(ctrl);
     if (menu)
     {
         const LLViewerJointAttachment *attachment = get_if_there(gAgentAvatarp->mAttachmentPoints, data["index"].asInteger(), (LLViewerJointAttachment*)NULL);
@@ -9975,6 +9937,10 @@ class LLViewShowHUDAttachments : public view_listener_t
 // [/RLVa:KB]
 
         LLPipeline::sShowHUDAttachments = !LLPipeline::sShowHUDAttachments;
+        // Two toolbar predicates read this flag, and this is the only place a
+        // person changes it -- the rest are snapshot code hiding HUDs around a
+        // capture and putting them back.
+        LLToolBar::requestRefresh();
         return true;
     }
 };
@@ -10525,8 +10491,6 @@ void initialize_menus()
     // Don't prepend MenuName.Foo because these can be used in any menu.
     enable.add("IsGodCustomerService", boost::bind(&is_god_customer_service));
 
-    enable.add("displayViewerEventRecorderMenuItems",boost::bind(&LLViewerEventRecorder::displayViewerEventRecorderMenuItems,&LLViewerEventRecorder::instance()));
-
     view_listener_t::addEnable(new LLUploadCostCalculator(), "Upload.CalculateCosts");
 
     view_listener_t::addEnable(new LLUpdateMembershipLabel(), "Membership.UpdateLabel");
@@ -10805,7 +10769,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedAgentPilot(), "Advanced.AgentPilot");
     view_listener_t::addMenu(new LLAdvancedToggleAgentPilotLoop(), "Advanced.ToggleAgentPilotLoop");
     view_listener_t::addMenu(new LLAdvancedCheckAgentPilotLoop(), "Advanced.CheckAgentPilotLoop");
-    view_listener_t::addMenu(new LLAdvancedViewerEventRecorder(), "Advanced.EventRecorder");
 
     // Advanced > Debugging
     view_listener_t::addMenu(new LLAdvancedForceErrorBreakpoint(), "Advanced.ForceErrorBreakpoint");

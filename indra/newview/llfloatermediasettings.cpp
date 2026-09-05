@@ -222,7 +222,7 @@ void LLFloaterMediaSettings::commitFields()
 {
     if (hasFocus())
     {
-        LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+        LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
         if (cur_focus && cur_focus->acceptsTextInput())
         {
             cur_focus->onCommit();

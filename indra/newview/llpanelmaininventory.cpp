@@ -76,9 +76,10 @@ static LLPanelInjector<LLPanelMainInventory> t_inventory("panel_main_inventory")
 /// LLFloaterInventoryFinder
 ///----------------------------------------------------------------------------
 
-class LLFloaterInventoryFinder : public LLFloater
+class LLFloaterInventoryFinder final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterInventoryFinder, LLFloater);
     LLFloaterInventoryFinder(LLPanelMainInventory* inventory_view);
     void draw();
     bool postBuild();
@@ -501,10 +502,10 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
     {
-        LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+        LLFloaterSidePanelContainer* inventory_container = (*iter++)->as<LLFloaterSidePanelContainer>();
         if (inventory_container)
         {
-            LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+            LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
             if (sidepanel_inventory)
             {
                 LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -527,7 +528,7 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterSidePanelContainer* inventory_container = LLFloaterReg::showTypedInstance<LLFloaterSidePanelContainer>("inventory", LLSD(instance_num));
     if(inventory_container)
     {
-        LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
         if (sidepanel_inventory)
         {
             LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -861,46 +862,6 @@ void LLPanelMainInventory::onFilterEdit(const std::string& search_string )
     }
 }
 
-
- //static
- bool LLPanelMainInventory::incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward)
- {
-    LLPanelMainInventory* active_view = NULL;
-
-    LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
-    for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
-    {
-        LLPanelMainInventory* iv = dynamic_cast<LLPanelMainInventory*>(*iter);
-        if (iv)
-        {
-            if (gFocusMgr.childHasKeyboardFocus(iv))
-            {
-                active_view = iv;
-                break;
-            }
-        }
-    }
-
-    if (!active_view)
-    {
-        return false;
-    }
-
-    std::string search_string(find_text);
-
-    if (search_string.empty())
-    {
-        return false;
-    }
-
-    if (active_view->getPanel() &&
-        active_view->getPanel()->getRootFolder()->search(first_item, search_string, backward))
-    {
-        return true;
-    }
-
-    return false;
- }
 
 void LLPanelMainInventory::onFilterSelected()
 {
@@ -1955,7 +1916,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
             LLFloaterSidePanelContainer* inventory_container = newWindow();
             if (inventory_container)
             {
-                LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+                LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
                 if (sidepanel_inventory)
                 {
                     LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -2015,7 +1976,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
         LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
         for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
         {
-            LLFloaterSidePanelContainer* iv = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+            LLFloaterSidePanelContainer* iv = (*iter++)->as<LLFloaterSidePanelContainer>();
             if (iv)
             {
                 iv->closeFloater();
@@ -2622,10 +2583,10 @@ void LLPanelMainInventory::updateNavButtons()
 
 LLSidepanelInventory* LLPanelMainInventory::getParentSidepanelInventory()
 {
-    LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(gFloaterView->getParentFloater(this));
+    LLFloaterSidePanelContainer* inventory_container = ALViewType::as<LLFloaterSidePanelContainer>(gFloaterView->getParentFloater(this));
     if(inventory_container)
     {
-        return dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        return inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
     }
     return NULL;
 }

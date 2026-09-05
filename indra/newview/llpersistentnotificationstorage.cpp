@@ -114,7 +114,7 @@ void LLPersistentNotificationStorage::loadNotifications()
     }
 
     using namespace LLNotificationsUI;
-    LLScreenChannel* notification_channel = dynamic_cast<LLScreenChannel*>(LLChannelManager::getInstance()->
+    LLScreenChannel* notification_channel = ALViewType::as<LLScreenChannel>(LLChannelManager::getInstance()->
         findChannelByID(LLNotificationsUI::NOTIFICATION_CHANNEL_UUID));
 
     LLNotifications& instance = LLNotifications::instance();

@@ -33,6 +33,8 @@ class LLFrameTimer;
 class ALPanelQuickSettingsPulldown final : public LLPanelPulldown
 {
 public:
+    AL_VIEW_TYPE(ALPanelQuickSettingsPulldown, LLPanelPulldown);
+
     ALPanelQuickSettingsPulldown();
 };
 

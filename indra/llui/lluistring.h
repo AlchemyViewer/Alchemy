@@ -78,7 +78,14 @@ public:
     LLUIString(LLUIString&& other) noexcept = default;
     LLUIString& operator=(LLUIString&& other) noexcept;
 
-    void assign(const std::string& instring);
+    // By view: the common call assigns a string this already holds, which is
+    // answered by a comparison and no copy at all, and the one that does move
+    // the value assigns straight into the string that owns it.
+    //
+    // Only assign takes the view. A converting constructor from one would need
+    // two user conversions to reach LLUIString from std::string, and an
+    // operator= taking one ties with copy-assignment for the same argument.
+    void assign(std::string_view instring);
     LLUIString& operator=(const std::string& s) { assign(s); return *this; }
 
     void setArgList(const LLStringUtil::format_map_t& args);

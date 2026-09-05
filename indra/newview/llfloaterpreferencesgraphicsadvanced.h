@@ -32,9 +32,11 @@
 class LLSliderCtrl;
 class LLTextBox;
 
-class LLFloaterPreferenceGraphicsAdvanced : public LLFloater
+class LLFloaterPreferenceGraphicsAdvanced final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceGraphicsAdvanced, LLFloater);
+
     LLFloaterPreferenceGraphicsAdvanced(const LLSD& key);
     ~LLFloaterPreferenceGraphicsAdvanced();
     /*virtual*/ bool postBuild();

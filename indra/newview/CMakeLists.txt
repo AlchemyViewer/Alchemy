@@ -190,7 +190,9 @@ set(viewer_SOURCE_FILES
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
+    alagentlocationformat.cpp
     alpanelaomini.cpp
+    alparceliconstrip.cpp
     alpanelaopulldown.cpp
     alpanelavatarlegacy.cpp
     alpanelclassified.cpp
@@ -971,7 +973,9 @@ set(viewer_HEADER_FILES
     algradehistory.h
     allegacynotificationwellwindow.h
     alobjectproperties.h
+    alagentlocationformat.h
     alpanelaomini.h
+    alparceliconstrip.h
     alpanelaopulldown.h
     alpanelavatarlegacy.h
     alpanelclassified.h
@@ -2402,6 +2406,7 @@ if (BUILD_TESTING)
   # This creates a separate test project per file listed.
 
   SET(viewer_TEST_SOURCE_FILES
+    alagentlocationformat.cpp
     alcolorwheelmodel.cpp
     alcurvemodel.cpp
     aldaycyclelandmarks.cpp

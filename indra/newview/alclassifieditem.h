@@ -38,6 +38,7 @@ static const std::string CLASSIFIED_NAME("classified_name");
 class ALClassifiedItem final : public LLPanel, public LLAvatarPropertiesObserver
 {
 public:
+    AL_VIEW_TYPE(ALClassifiedItem, LLPanel);
 
     ALClassifiedItem(const LLUUID& avatar_id, const LLUUID& classified_id);
     virtual ~ALClassifiedItem();

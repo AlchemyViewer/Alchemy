@@ -1974,7 +1974,7 @@ void LLScriptEditorWSServer::sendCompileResults(const std::string &script_id, co
     {
         return;
     }
-    LLScriptEdContainer* editor = dynamic_cast<LLScriptEdContainer*>(editor_handle.get());
+    LLScriptEdContainer* editor = ALViewType::as<LLScriptEdContainer>(editor_handle.get());
     if (!editor)
     {
         return;

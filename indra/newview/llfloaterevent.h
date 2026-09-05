@@ -34,11 +34,13 @@
 class LLMediaCtrl;
 class LLButton;
 
-class LLFloaterEvent : public LLFloater,
+class LLFloaterEvent final : public LLFloater,
                        public LLViewerMediaObserver
 
 {
 public:
+    AL_VIEW_TYPE(LLFloaterEvent, LLFloater);
+
     LLFloaterEvent(const LLSD& key);
     /*virtual*/ ~LLFloaterEvent();
 

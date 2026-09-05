@@ -39,6 +39,8 @@ class LLPanelTipToast : public LLToastPanel
 {
     LOG_CLASS(LLPanelTipToast);
 public:
+    AL_VIEW_TYPE(LLPanelTipToast, LLToastPanel);
+
     LLPanelTipToast(const LLNotificationPtr& notification): LLToastPanel(notification) {}
     bool postBuild() override;
 private:

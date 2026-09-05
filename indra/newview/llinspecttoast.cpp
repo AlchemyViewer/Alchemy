@@ -38,9 +38,10 @@ using namespace LLNotificationsUI;
 /**
  * Represents inspectable toast .
  */
-class LLInspectToast: public LLInspect
+class LLInspectToast final: public LLInspect
 {
 public:
+    AL_VIEW_TYPE(LLInspectToast, LLInspect);
 
     LLInspectToast(const LLSD& notification_idl);
     virtual ~LLInspectToast();
@@ -62,7 +63,7 @@ LLInspectToast::LLInspectToast(const LLSD& notification_id) :
 {
     LLScreenChannelBase* channel = LLChannelManager::getInstance()->findChannelByID(
         LLNotificationsUI::NOTIFICATION_CHANNEL_UUID);
-    mScreenChannel = dynamic_cast<LLScreenChannel*>(channel);
+    mScreenChannel = ALViewType::as<LLScreenChannel>(channel);
     if(NULL == mScreenChannel)
     {
         LL_WARNS() << "Could not get requested screen channel." << LL_ENDL;

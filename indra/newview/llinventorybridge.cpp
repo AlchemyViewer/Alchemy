@@ -456,7 +456,7 @@ void LLInvFVBridge::navigateToFolder(bool new_window, bool change_mode)
         }
         else
         {
-            LLInventorySingleFolderPanel* panel = dynamic_cast<LLInventorySingleFolderPanel*>(mInventoryPanel.get());
+            LLInventorySingleFolderPanel* panel = ALViewType::as<LLInventorySingleFolderPanel>(mInventoryPanel.get());
             if (!panel || !getInventoryModel() || mUUID.isNull())
             {
                 return;
@@ -738,7 +738,7 @@ void disable_context_entries_if_present(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if ((name == "More") && branchp)
         {
             disable_context_entries_if_present(*branchp->getBranch(), disabled_entries);
@@ -758,9 +758,9 @@ void disable_context_entries_if_present(LLMenuGL& menu,
         if (found)
         {
             menu_item->setVisible(true);
-            // A bit of a hack so we can remember that some UI element explicitly set this to be visible
-            // so that some other UI element from multi-select doesn't later set this invisible.
-            menu_item->pushVisible(true);
+            // Claim it, so a later pass over the same menu for another item in
+            // a multi-selection does not hide what this one showed.
+            LLMenuItemGL::claimContextEntry(menu_item);
 
             menu_item->setEnabled(false);
         }
@@ -784,7 +784,7 @@ void hide_context_entries(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if (((name == "More") || (name == "create_new")) && branchp)
         {
             hide_context_entries(*branchp->getBranch(), entries_to_show, disabled_entries);
@@ -802,14 +802,14 @@ void hide_context_entries(LLMenuGL& menu,
         // between two separators).
         if (found)
         {
-            const bool is_entry_separator = (dynamic_cast<LLMenuItemSeparatorGL *>(menu_item) != NULL);
+            const bool is_entry_separator = (menu_item->as<LLMenuItemSeparatorGL>() != NULL);
             found = !(is_entry_separator && is_previous_entry_separator);
             is_previous_entry_separator = is_entry_separator;
         }
 
         if (!found)
         {
-            if (!menu_item->getLastVisible())
+            if (!LLMenuItemGL::contextEntryClaimed(menu_item))
             {
                 menu_item->setVisible(false);
             }
@@ -833,9 +833,9 @@ void hide_context_entries(LLMenuGL& menu,
         else
         {
             menu_item->setVisible(true);
-            // A bit of a hack so we can remember that some UI element explicitly set this to be visible
-            // so that some other UI element from multi-select doesn't later set this invisible.
-            menu_item->pushVisible(true);
+            // Claim it, so a later pass over the same menu for another item in
+            // a multi-selection does not hide what this one showed.
+            LLMenuItemGL::claimContextEntry(menu_item);
 
             bool enabled = true;
             for (itor2 = disabled_entries.begin(); enabled && (itor2 != disabled_entries.end()); ++itor2)
@@ -3631,7 +3631,7 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
 {
     if ("open" == action)
     {
-        LLFolderViewFolder *f = dynamic_cast<LLFolderViewFolder   *>(mInventoryPanel.get()->getItemByID(mUUID));
+        LLFolderViewFolder *f = mInventoryPanel.get()->getFolderByID(mUUID);
         if (f)
         {
             f->toggleOpen();

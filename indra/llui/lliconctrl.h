@@ -46,6 +46,8 @@ class LLIconCtrl
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLIconCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLUIImage*>    image;

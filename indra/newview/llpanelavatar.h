@@ -42,9 +42,11 @@ class LLLineEditor;
 // its parent.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLProfileDropTarget : public LLView
+class LLProfileDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLProfileDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<LLUUID> agent_id;
@@ -81,6 +83,7 @@ class LLPanelProfileTab
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfileTab, LLPanel);
 
     /**
      * Sets avatar ID, sets panel as observer of avatar related info replies from server.
@@ -155,6 +158,8 @@ class LLPanelProfilePropertiesProcessorTab
     , public LLAvatarPropertiesObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfilePropertiesProcessorTab, LLPanelProfileTab);
+
     LLPanelProfilePropertiesProcessorTab();
     ~LLPanelProfilePropertiesProcessorTab();
 

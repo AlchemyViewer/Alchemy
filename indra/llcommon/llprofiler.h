@@ -183,6 +183,24 @@
 #define LL_PROFILE_FREE(ptr)                    (void)(ptr);
 #endif
 
+// A named value sampled over time, drawn as its own track rather than as part
+// of a zone. Use it for a quantity a zone cannot answer for -- how many of
+// something there are, how often a thing that has no zone of its own happens --
+// and a zone's own value (LL_PROFILE_ZONE_NUM) for anything that belongs to one
+// call. `name` must be a string literal: Tracy keeps the pointer rather than
+// the characters, and a track is identified by that pointer for the run.
+//
+// LL_PROFILE_PLOT_CONFIG is optional and takes effect from wherever it is
+// called; run it once, at startup, for any plot whose default presentation is
+// wrong. `format` is a tracy::PlotFormatType -- Number, Memory or Percentage.
+#if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+#define LL_PROFILE_PLOT(name, val)                              TracyPlot(name, val)
+#define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) TracyPlotConfig(name, format, step, fill, color)
+#else
+#define LL_PROFILE_PLOT(name, val)                              do { (void)(name); (void)(val); } while (0)
+#define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) do { (void)(name); } while (0)
+#endif
+
 #if LL_PROFILER_ENABLE_RENDER_DOC
 #define LL_LABEL_OBJECT_GL(type, name, length, label) glObjectLabel(type, name, length, label)
 #else

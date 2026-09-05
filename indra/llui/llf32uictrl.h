@@ -34,6 +34,8 @@
 class LLF32UICtrl: public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLF32UICtrl, LLUICtrl);
+
     struct Params: public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<F32>   min_value,
@@ -53,7 +55,7 @@ protected:
 public:
     virtual F32     getValueF32() const;
 
-    virtual void    setValue(const LLSD& value ) { mViewModel->setValue(value); }
+    virtual void    setValue(const LLSD& value ) { viewModel()->setValue(value); }
     virtual LLSD    getValue() const        { return LLSD(getValueF32()); }
 
     virtual void    setMinValue(const LLSD& min_value)  { setMinValue((F32)min_value.asReal()); }

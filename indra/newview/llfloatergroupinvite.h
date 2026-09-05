@@ -31,10 +31,12 @@
 #include "llfloater.h"
 #include "lluuid.h"
 
-class LLFloaterGroupInvite
+class LLFloaterGroupInvite final
 : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGroupInvite, LLFloater);
+
     virtual ~LLFloaterGroupInvite();
 
     static void showForGroup(const LLUUID &group_id, uuid_vec_t *agent_ids = NULL, bool request_update = true);

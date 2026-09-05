@@ -69,9 +69,11 @@ protected:
     LLUUID      mParcelID;
 };
 
-class LLFloaterWorldMap : public LLFloater
+class LLFloaterWorldMap final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterWorldMap, LLFloater);
+
     LLFloaterWorldMap(const LLSD& key);
     virtual ~LLFloaterWorldMap();
 
@@ -260,9 +262,11 @@ private:
 extern LLFloaterWorldMap* gFloaterWorldMap;
 
 
-class LLPanelHideBeacon : public LLPanel
+class LLPanelHideBeacon final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelHideBeacon, LLPanel);
+
     static LLPanelHideBeacon* getInstance();
 
     LLPanelHideBeacon();

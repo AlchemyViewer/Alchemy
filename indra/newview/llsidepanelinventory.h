@@ -40,9 +40,11 @@ class LLPanelMainInventory;
 class LLSidepanelItemInfo;
 class LLSidepanelTaskInfo;
 
-class LLSidepanelInventory : public LLPanel
+class LLSidepanelInventory final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelInventory, LLPanel);
+
     LLSidepanelInventory();
     virtual ~LLSidepanelInventory();
 

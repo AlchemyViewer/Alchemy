@@ -410,7 +410,7 @@ void* LLFloaterWorldMap::createWorldMapView(void* data)
 
 bool LLFloaterWorldMap::postBuild()
 {
-    mMapView = dynamic_cast<LLWorldMapView*>(getChild<LLPanel>("objects_mapview"));
+    mMapView = getChild<LLPanel>("objects_mapview")->as<LLWorldMapView>();
     mMapView->setPan(0, 0, true);
 
     mTeleportButton = getChild<LLButton>("Teleport");

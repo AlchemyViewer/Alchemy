@@ -42,6 +42,7 @@ class LLFloaterSettingsColor final
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterSettingsColor, LLFloater);
 
     bool postBuild() override;
     void draw() override;

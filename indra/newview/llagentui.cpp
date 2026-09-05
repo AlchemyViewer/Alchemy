@@ -31,6 +31,8 @@
 // Library includes
 #include "llparcel.h"
 
+#include "alagentlocationformat.h"
+
 // Viewer includes
 #include "llagent.h"
 #include "llviewercontrol.h"
@@ -78,16 +80,18 @@ bool LLAgentUI::checkAgentDistance(const LLVector3& pole, F32 radius)
 
     return  sqrt( delta_x* delta_x + delta_y* delta_y ) < radius;
 }
-bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region)
+//static
+void LLAgentUI::getDisplayPos(S32& pos_x, S32& pos_y, S32& pos_z)
 {
-    LLViewerRegion* region = gAgent.getRegion();
-    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+    getDisplayPos(gAgent.getPositionAgent(), pos_x, pos_y, pos_z);
+}
 
-    if (!region || !parcel) return false;
-
-    S32 pos_x = S32(agent_pos_region.mV[VX] + 0.5f);
-    S32 pos_y = S32(agent_pos_region.mV[VY] + 0.5f);
-    S32 pos_z = S32(agent_pos_region.mV[VZ] + 0.5f);
+//static
+void LLAgentUI::getDisplayPos(const LLVector3& agent_pos_region, S32& pos_x, S32& pos_y, S32& pos_z)
+{
+    pos_x = S32(agent_pos_region.mV[VX] + 0.5f);
+    pos_y = S32(agent_pos_region.mV[VY] + 0.5f);
+    pos_z = S32(agent_pos_region.mV[VZ] + 0.5f);
 
     // Round the numbers based on the velocity
     F32 velocity_mag_sq = gAgent.getVelocity().magVecSquared();
@@ -107,103 +111,47 @@ bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt,const 
         pos_x -= pos_x % 2;
         pos_y -= pos_y % 2;
     }
+}
+
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat format,const LLVector3& agent_pos_region)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    LLViewerRegion* region = gAgent.getRegion();
+    LLParcel* parcel = LLViewerParcelMgr::getInstance()->getAgentParcel();
+
+    if (!region || !parcel) return false;
+
+    S32 pos_x, pos_y, pos_z;
+    getDisplayPos(agent_pos_region, pos_x, pos_y, pos_z);
 
     // create a default name and description for the landmark
-    std::string parcel_name = LLViewerParcelMgr::getInstance()->getAgentParcelName();
-    std::string region_name = region->getName();
+    //
+    // Viewed, not copied: every source below hands back a reference that
+    // outlives this call -- the parcel's own name, the region's own name, or
+    // RLVa's string map -- and this runs whenever the readout rebuilds.
+    std::string_view parcel_name = LLViewerParcelMgr::getInstance()->getAgentParcelName();
+    std::string_view region_name = region->getName();
 // [RLVa:KB] - Checked: 2010-04-04 (RLVa-1.2.0d) | Modified: RLVa-1.2.0d
     // RELEASE-RLVa: [SL-2.0.0] Check ELocationFormat to make sure our switch still makes sense
     if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC))
     {
         parcel_name = RlvStrings::getString(RlvStringKeys::Hidden::Parcel);
         region_name = RlvStrings::getString(RlvStringKeys::Hidden::Region);
-        if (LOCATION_FORMAT_NO_MATURITY == fmt)
-            fmt = LOCATION_FORMAT_LANDMARK;
-        else if (LOCATION_FORMAT_FULL == fmt)
-            fmt = LOCATION_FORMAT_NO_COORDS;
+        if (LOCATION_FORMAT_NO_MATURITY == format)
+            format = LOCATION_FORMAT_LANDMARK;
+        else if (LOCATION_FORMAT_FULL == format)
+            format = LOCATION_FORMAT_NO_COORDS;
     }
 // [/RLVa:KB]
-    std::string sim_access_string = region->getSimAccessString();
-    std::string buffer;
-    if( parcel_name.empty() )
-    {
-        // the parcel doesn't have a name
-        switch (fmt)
-        {
-        case LOCATION_FORMAT_LANDMARK:
-            buffer = llformat("%.100s", region_name.c_str());
-            break;
-        case LOCATION_FORMAT_NORMAL:
-            buffer = llformat("%s", region_name.c_str());
-            break;
-        case LOCATION_FORMAT_NORMAL_COORDS:
-            buffer = llformat("%s (%d, %d, %d)",
-                region_name.c_str(),
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_COORDS:
-            buffer = llformat("%s%s%s",
-                region_name.c_str(),
-                sim_access_string.empty() ? "" : " - ",
-                sim_access_string.c_str());
-            break;
-        case LOCATION_FORMAT_NO_MATURITY:
-            buffer = llformat("%s (%d, %d, %d)",
-                region_name.c_str(),
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_FULL:
-            buffer = llformat("%s (%d, %d, %d)%s%s",
-                region_name.c_str(),
-                pos_x, pos_y, pos_z,
-                sim_access_string.empty() ? "" : " - ",
-                sim_access_string.c_str());
-            break;
-        }
-    }
-    else
-    {
-        // the parcel has a name, so include it in the landmark name
-        switch (fmt)
-        {
-        case LOCATION_FORMAT_LANDMARK:
-            buffer = llformat("%.100s", parcel_name.c_str());
-            break;
-        case LOCATION_FORMAT_NORMAL:
-            buffer = llformat("%s, %s", parcel_name.c_str(), region_name.c_str());
-            break;
-        case LOCATION_FORMAT_NORMAL_COORDS:
-            buffer = llformat("%s (%d, %d, %d)",
-                parcel_name.c_str(),
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_MATURITY:
-            buffer = llformat("%s, %s (%d, %d, %d)",
-                parcel_name.c_str(),
-                region_name.c_str(),
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_COORDS:
-            buffer = llformat("%s, %s%s%s",
-                              parcel_name.c_str(),
-                              region_name.c_str(),
-                              sim_access_string.empty() ? "" : " - ",
-                              sim_access_string.c_str());
-                break;
-        case LOCATION_FORMAT_FULL:
-            buffer = llformat("%s, %s (%d, %d, %d)%s%s",
-                parcel_name.c_str(),
-                region_name.c_str(),
-                pos_x, pos_y, pos_z,
-                sim_access_string.empty() ? "" : " - ",
-                sim_access_string.c_str());
-            break;
-        }
-    }
-    str = buffer;
+    // The region hands this back by reference.
+    const std::string& sim_access_string = region->getSimAccessString();
+
+    ALAgentLocationFormat::format(str, format, parcel_name, region_name,
+                                  sim_access_string, pos_x, pos_y, pos_z);
     return true;
 }
-bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat fmt)
+bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat format)
 {
-    return buildLocationString(str,fmt, gAgent.getPositionAgent());
+    return buildLocationString(str, format, gAgent.getPositionAgent());
 }

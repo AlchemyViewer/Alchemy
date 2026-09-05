@@ -43,12 +43,14 @@ class LLNetMap;
 class LLAccordionCtrl;
 class LLAccordionCtrlTab;
 
-class LLPanelPeople
+class LLPanelPeople final
     : public LLPanel
     , public LLVoiceClientStatusObserver
 {
     LOG_CLASS(LLPanelPeople);
 public:
+    AL_VIEW_TYPE(LLPanelPeople, LLPanel);
+
     LLPanelPeople();
     virtual ~LLPanelPeople();
 

@@ -105,6 +105,7 @@ bool LLViewerRegion::sVOCacheCullingEnabled = false;
 S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
 LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
+LLViewerRegion::region_info_signal_t LLViewerRegion::sRegionInfoChangedSignal;
 
 typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> CapabilityMap;
 
@@ -944,8 +945,11 @@ bool LLViewerRegion::canManageEstate() const
         || gAgent.getID() == getOwner();
 }
 
-const std::string LLViewerRegion::getSimAccessString() const
+const std::string& LLViewerRegion::getSimAccessString() const
 {
+    // By reference: accessToString hands back one of five strings it owns for
+    // the life of the process, and this is asked for whenever a location
+    // readout rebuilds.
     return accessToString(mSimAccess);
 }
 
@@ -3132,6 +3136,13 @@ void LLViewerRegion::unpackRegionHandshake()
         region_flags = flags;
     }
 
+    // What this handshake is about to overwrite, so the signal at the end of
+    // this function can say whether it moved. The sim re-sends the handshake
+    // when region-level settings change, so this is the path an estate
+    // manager's maturity change or a rename actually arrives on.
+    const U8 old_sim_access = mSimAccess;
+    const std::string old_name = mName;
+
     setRegionFlags(region_flags);
     setRegionProtocols(region_protocols);
     setSimAccess(sim_access);
@@ -3315,6 +3326,20 @@ void LLViewerRegion::unpackRegionHandshake()
         NULL);
 
     mRegionTimer.reset(); //reset region timer.
+
+    // Announced after the reply is away, and only when one of the two values
+    // anyone listens for actually moved -- a handshake arrives for every
+    // neighbour that comes into view, and almost none of them are a change to
+    // a region already on screen.
+    if (mSimAccess != old_sim_access || mName != old_name)
+    {
+        sRegionInfoChangedSignal(this);
+    }
+}
+
+boost::signals2::connection LLViewerRegion::setRegionInfoChangedCallback(const region_info_signal_t::slot_type& cb)
+{
+    return sRegionInfoChangedSignal.connect(cb);
 }
 
 // static

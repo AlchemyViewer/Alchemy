@@ -72,9 +72,10 @@
 /**
  * Item look varies depending on the type (backward/current/forward).
  */
-class LLTeleportHistoryMenuItem : public LLMenuItemCallGL
+class LLTeleportHistoryMenuItem final : public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryMenuItem, LLMenuItemCallGL);
     typedef enum e_item_type
     {
         TYPE_BACKWARD,
@@ -350,6 +351,8 @@ void LLNavigationBar::setVisible(bool visible)
 
 void LLNavigationBar::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     if (isBackgroundVisible())
     {
         static LLUIColor color_drop_shadow = LLUIColorTable::instance().getColor("ColorDropShadow");
@@ -657,7 +660,7 @@ void    LLNavigationBar::showTeleportHistoryMenu(LLUICtrl* btn_ctrl)
     mTeleportHistoryMenu->updateParent(LLMenuGL::sMenuContainer);
     const S32 MENU_SPAWN_PAD = -1;
     LLMenuGL::showPopup(btn_ctrl, mTeleportHistoryMenu, 0, MENU_SPAWN_PAD);
-    LLButton* nav_button = dynamic_cast<LLButton*>(btn_ctrl);
+    LLButton* nav_button = ALViewType::as<LLButton>(btn_ctrl);
     if(nav_button)
     {
         if(mHistoryMenuConnection.connected())

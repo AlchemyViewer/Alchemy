@@ -43,6 +43,8 @@
 class LLNotificationListItem : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLNotificationListItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         LLUUID          notification_id;
@@ -137,6 +139,8 @@ class LLGroupNotificationListItem
     : public LLNotificationListItem, public LLGroupMgrObserver
 {
 public:
+    AL_VIEW_TYPE(LLGroupNotificationListItem, LLNotificationListItem);
+
     virtual ~LLGroupNotificationListItem();
     virtual bool postBuild();
 
@@ -163,10 +167,12 @@ private:
     bool updateFromCache();
 };
 
-class LLGroupInviteNotificationListItem
+class LLGroupInviteNotificationListItem final
     : public LLGroupNotificationListItem
 {
 public:
+    AL_VIEW_TYPE(LLGroupInviteNotificationListItem, LLGroupNotificationListItem);
+
     static std::set<std::string> getTypes();
     virtual bool postBuild();
 
@@ -190,10 +196,12 @@ private:
     LLButton*       mInfoBtn;
 };
 
-class LLGroupNoticeNotificationListItem
+class LLGroupNoticeNotificationListItem final
     : public LLGroupNotificationListItem
 {
 public:
+    AL_VIEW_TYPE(LLGroupNoticeNotificationListItem, LLGroupNotificationListItem);
+
     static std::set<std::string> getTypes();
     virtual bool postBuild();
 
@@ -218,9 +226,11 @@ private:
     LLOfferInfo*    mInventoryOffer;
 };
 
-class LLTransactionNotificationListItem : public LLNotificationListItem
+class LLTransactionNotificationListItem final : public LLNotificationListItem
 {
 public:
+    AL_VIEW_TYPE(LLTransactionNotificationListItem, LLNotificationListItem);
+
     static std::set<std::string> getTypes();
     virtual bool postBuild();
 private:
@@ -232,9 +242,11 @@ private:
     LLAvatarIconCtrl* mAvatarIconExp;
 };
 
-class LLSystemNotificationListItem : public LLNotificationListItem
+class LLSystemNotificationListItem final : public LLNotificationListItem
 {
 public:
+    AL_VIEW_TYPE(LLSystemNotificationListItem, LLNotificationListItem);
+
     virtual bool postBuild();
 private:
     friend class LLNotificationListItem;

@@ -791,7 +791,7 @@ void LLWearableItemsList::updateChangedItems(const uuid_vec_t& changed_items_uui
     while (pairs_iter != pairs_end)
     {
         LLPanel* panel = (*(pairs_iter++))->first;
-        LLPanelInventoryListItemBase* item = dynamic_cast<LLPanelInventoryListItemBase*>(panel);
+        LLPanelInventoryListItemBase* item = panel->as<LLPanelInventoryListItemBase>();
         if (!item)
             continue;
 
@@ -868,14 +868,14 @@ LLWearableItemsList::ContextMenu::ContextMenu()
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, const uuid_vec_t& uuids, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLListContextMenu::show(spawning_view, uuids, x, y);
     mParent = NULL; // to avoid dereferencing an invalid pointer
 }
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, LLWearableType::EType w_type, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLContextMenu* menup = mMenuHandle.get();
     if (menup)
     {

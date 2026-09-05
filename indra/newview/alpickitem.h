@@ -39,6 +39,8 @@ static const std::string PICK_NAME("pick_name");
 class ALPickItem final : public LLPanel, public LLAvatarPropertiesObserver
 {
 public:
+    AL_VIEW_TYPE(ALPickItem, LLPanel);
+
     ALPickItem();
     ~ALPickItem();
     bool postBuild() override;

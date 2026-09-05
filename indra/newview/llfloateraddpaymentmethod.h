@@ -29,11 +29,13 @@
 
 #include "llfloater.h"
 
-class LLFloaterAddPaymentMethod:
+class LLFloaterAddPaymentMethod final:
     public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterAddPaymentMethod, LLFloater);
+
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
 

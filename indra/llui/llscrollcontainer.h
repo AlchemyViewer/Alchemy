@@ -55,6 +55,8 @@ struct ScrollContainerRegistry : public LLChildRegistry<ScrollContainerRegistry>
 class LLScrollContainer : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollContainer, LLUICtrl);
+
     // Note: vertical comes before horizontal because vertical
     // scrollbars have priority for mouse and keyboard events.
 

@@ -33,11 +33,12 @@
 class LLCheckBoxCtrl;
 class LLComboBox;
 
-class LLFloaterJoystick : public LLFloater
+class LLFloaterJoystick final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterJoystick, LLFloater);
 
     virtual bool postBuild();
     virtual void refresh();

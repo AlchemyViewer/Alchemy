@@ -107,9 +107,11 @@ protected:
     U32         mTextureName;
 };
 
-class LLFloaterImagePreview : public LLFloaterNameDesc
+class LLFloaterImagePreview final : public LLFloaterNameDesc
 {
 public:
+    AL_VIEW_TYPE(LLFloaterImagePreview, LLFloaterNameDesc);
+
     LLFloaterImagePreview(const LLSD& args);
     virtual ~LLFloaterImagePreview();
 

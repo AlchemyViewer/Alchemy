@@ -71,6 +71,8 @@ struct LLFolderViewItemStyle
 class LLFolderViewItem : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLFolderViewItem, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<LLUIImage*>                        favorite_image,
@@ -117,28 +119,38 @@ protected:
 
     LLFolderViewItem(const Params& p);
 
-    std::string                 mLabel;
-    S32                         mLabelWidth;
-    bool                        mLabelWidthDirty;
-    bool                        mIsFavorite;
-    bool                        mHasFavorites;
-    S32                         mLabelPaddingRight;
+    // Declared largest first, with every small member together at the end. They
+    // were interleaved, and on a 64-bit build a bool or an S32 sitting between
+    // two pointers opens a hole the size of what comes next -- which an open
+    // inventory pays two hundred thousand times.
+
     LLFolderViewFolder*         mParentFolder;
+    LLFolderView*               mRoot;
     LLPointer<LLFolderViewModelItem> mViewModelItem;
-    LLFontGL::StyleFlags        mLabelStyle;
-    std::string                 mLabelSuffix;
-    bool                        mSuffixNeedsRefresh; //suffix and icons
     LLUIImagePtr                mIcon,
-                                mIconOpen,
                                 mIconOverlay;
     // Shared, interned const layout + colors (see LLFolderViewItemStyle).
     const LLFolderViewItemStyle* mStyle;
-    S32                         mIndentation;
-    S32                         mDragStartX,
-                                mDragStartY;
 
-    F32                         mControlLabelRotation;
-    LLFolderView*               mRoot;
+    std::string                 mLabel;
+    std::string                 mLabelSuffix;
+
+    S32                         mLabelWidth;
+    S32                         mLabelPaddingRight;
+    S32                         mIndentation;
+    // Where a drag on this item began. Written by handleMouseDown before
+    // handleHover, which is the only reader, can run -- it asks for mouse
+    // capture first -- but a member that is read at all is worth starting.
+    S32                         mDragStartX = 0;
+    S32                         mDragStartY = 0;
+    S32                         mCutGeneration;
+    LLFontGL::StyleFlags        mLabelStyle;
+
+    bool                        mLabelWidthDirty;
+    bool                        mIsFavorite;
+    bool                        mHasFavorites;
+    bool                        mSuffixNeedsRefresh; //suffix and icons
+    bool                        mIsSelected;
     bool                        mHasVisibleChildren,
                                 mIsCurSelection,
                                 mDragAndDropTarget,
@@ -150,13 +162,10 @@ protected:
                                 mSelectPending,
                                 mIsItemCut;
 
-    S32                         mCutGeneration;
-
     static bool                 sColorSetInitialized;
 
     // For now assuming all colors are the same in derived classes.
     static LLUIColor            sFgColor;
-    static LLUIColor            sFgDisabledColor;
     static LLUIColor            sHighlightBgColor;
     static LLUIColor            sFlashBgColor;
     static LLUIColor            sFocusOutlineColor;
@@ -166,6 +175,10 @@ protected:
     static LLUIColor            sSuffixColor;
     static LLUIColor            sSearchStatusColor;
     static LLUIColor            sFavoriteColor;
+
+    // Read by LLFolderViewFolder::drawOpenFolderArrow as well as by this class.
+    static S32                  sTopPad;
+    static LLUIImagePtr         sFolderArrowImg;
 
 
     // this is an internal method used for adding items to folders. A
@@ -181,8 +194,6 @@ protected:
     static LLFontGL* getLabelFontForStyle(U8 style);
     const LLFontGL* getLabelFont();
 
-    bool                        mIsSelected;
-
 public:
     static void initClass();
     static void cleanupClass();
@@ -194,6 +205,7 @@ public:
     void arrangeAndSet(bool set_selection, bool take_keyboard_focus);
 
     virtual ~LLFolderViewItem( void );
+
 
     // addToFolder() returns true if it succeeds. false otherwise
     virtual void addToFolder(LLFolderViewFolder* folder);
@@ -267,7 +279,7 @@ public:
     // Override to provide lazy tooltip generation without memory overhead
     // Inventory can consist of millions of items, yet most stay invisible,
     // much less need to show a tooltip, so avoid storing tooltips.
-    virtual const std::string getToolTip() const;
+    std::string getToolTip() const override;
 
     // This method returns the label displayed on the view. This
     // method was primarily added to allow sorting on the folder
@@ -339,7 +351,17 @@ public:
 
     //  virtual void handleDropped();
     virtual void draw();
-    void drawOpenFolderArrow();
+
+    // The disclosure triangle, and which icon the row shows. Only a folder has
+    // either: a plain item's arrow is gated on hasVisibleChildren() and
+    // isFolderComplete(), which are false and true for one respectively, and
+    // its open icon on a rotation only a folder ever turns. So the members
+    // behind them live on the folder, and an item answers for itself.
+    virtual void drawOpenFolderArrow() {}
+    virtual LLUIImagePtr getDrawIcon() const { return mIcon; }
+
+    // Read the open icon from the model, for the one subclass that has one.
+    virtual void refreshOpenIcon(const LLFolderViewModelItem& vmi) {}
     void drawFavoriteIcon();
     void drawHighlight(bool showContent, bool hasKeyboardFocus, const LLUIColor& selectColor, const LLUIColor& flashColor, const LLUIColor& outlineColor, const LLUIColor& mouseOverColor);
     void drawLabel(const LLFontGL* font, const F32 x, const F32 y, const LLColor4& color, F32 &right_x);
@@ -351,8 +373,6 @@ public:
 
 private:
     static std::map<U8, LLFontGL*> sFonts; // map of styles to fonts
-    static S32 sTopPad;
-    static LLUIImagePtr sFolderArrowImg;
     static LLUIImagePtr sSelectionImg;
     static LLUIImagePtr sFavoriteImg;
     static LLUIImagePtr sFavoriteContentImg;
@@ -386,6 +406,9 @@ private:
     // of it, because a rebuild the change did not need is the safe direction.
     std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
     std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
+    // The font mLabelStyle resolves to, worked out once and dropped whenever
+    // the style moves.
+    LLFontGL*                        pLabelFont { nullptr };
     U32                              mLabelGeneration = 0;
 
     // What mLabelWidth was measured from. The strings and the font are the
@@ -416,7 +439,6 @@ private:
     // filter is matching.
     S32 labelWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
     S32 suffixWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
-    LLFontGL* pLabelFont{nullptr};
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -429,6 +451,10 @@ private:
 
 class LLFolderViewFolder : public LLFolderViewItem
 {
+public:
+    AL_VIEW_TYPE(LLFolderViewFolder, LLFolderViewItem);
+
+private:
 protected:
     LLFolderViewFolder( const LLFolderViewItem::Params& );
     friend class LLUICtrlFactory;
@@ -443,14 +469,19 @@ public:
 protected:
     items_t mItems;
     folders_t mFolders;
+    LLUIImagePtr mIconOpen;
 
-    bool        mIsOpen;
-    bool        mExpanderHighlighted;
     F32         mCurHeight;
     F32         mTargetHeight;
     F32         mAutoOpenCountdown;
     S32         mLastArrangeGeneration;
     S32         mLastCalculatedWidth;
+    // How far round the disclosure triangle is turned, and with it whether the
+    // open icon is the one to draw. updateLabelRotation is the only writer.
+    F32         mControlLabelRotation;
+    S32         mFavoritesDirtyFlags { 0 };
+
+    bool        mIsOpen;
     bool        mIsFolderComplete; // indicates that some children were not loaded/added yet
     bool        mAreChildrenInited; // indicates that no children were initialized
 
@@ -465,6 +496,7 @@ public:
 
 
     virtual ~LLFolderViewFolder( void );
+
 
     LLFolderViewItem* getNextFromChild( LLFolderViewItem*, bool include_children = true );
     LLFolderViewItem* getPreviousFromChild( LLFolderViewItem*, bool include_children = true  );
@@ -511,7 +543,6 @@ private:
     constexpr static S32 FAVORITE_ADDED = 1;
     constexpr static S32 FAVORITE_REMOVED = 2;
     constexpr static S32 FAVORITE_CLEANUP = 4;
-    S32 mFavoritesDirtyFlags { 0 };
 public:
 
     // destroys this folder, and all children
@@ -585,6 +616,11 @@ public:
                                        EAcceptance* accept,
                                        std::string& tooltip_msg);
     virtual void draw();
+
+    // The disclosure triangle and the open icon: only a folder has either.
+    void drawOpenFolderArrow() override;
+    LLUIImagePtr getDrawIcon() const override;
+    void refreshOpenIcon(const LLFolderViewModelItem& vmi) override;
 
     folders_t::iterator getFoldersBegin() { return mFolders.begin(); }
     folders_t::iterator getFoldersEnd() { return mFolders.end(); }

@@ -35,9 +35,11 @@
 class LLLineEditor;
 class LLComboBox;
 
-class LLFloaterURLEntry : public LLFloater
+class LLFloaterURLEntry final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterURLEntry, LLFloater);
+
     // Can only be shown by LLPanelLandMedia, and pushes data back into
     // that panel via the handle.
     static LLHandle<LLFloater> show(LLHandle<LLPanel> panel_land_media_handle, const std::string media_url);

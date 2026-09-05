@@ -17,6 +17,8 @@ class ALFloaterExploreSounds final
 : public LLFloater, public LLEventTimer
 {
 public:
+    AL_VIEW_TYPE(ALFloaterExploreSounds, LLFloater);
+
     ALFloaterExploreSounds(const LLSD& key);
     bool postBuild();
 

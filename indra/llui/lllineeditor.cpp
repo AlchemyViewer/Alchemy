@@ -420,12 +420,12 @@ void LLLineEditor::updateTextPadding()
 }
 
 
-void LLLineEditor::setText(const LLStringExplicit &new_text)
+void LLLineEditor::setText(ALStringViewExplicit new_text)
 {
     setText(new_text, true);
 }
 
-void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit)
+void LLLineEditor::setText(ALStringViewExplicit new_text, bool use_size_limit)
 {
     // If new text is identical, don't copy and don't move insertion point
     if (mText.getString() == new_text)
@@ -443,7 +443,7 @@ void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit
     // also consider entire string selected when mSelectAllonFocusReceived is set on an empty, focused line editor
     all_selected = all_selected || (len == 0 && hasFocus() && mSelectAllonFocusReceived);
 
-    std::string truncated_utf8 = new_text;
+    std::string truncated_utf8(new_text);
     // Whatever the caller was handed -- an object name off the wire, a value
     // out of an asset -- and nothing promises it is UTF-8. The conversion into
     // the UTF-32 this field used to hold ran simdutf and replaced what it
@@ -976,8 +976,8 @@ bool LLLineEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     // delay cursor flashing
     mKeystrokeTimer.reset();
 
-    if (mMouseDownSignal)
-        (*mMouseDownSignal)(this,x,y,mask);
+    if (mouse_signal_t* signal = mouseDownSignal())
+        (*signal)(this,x,y,mask);
 
     return true;
 }
@@ -1104,8 +1104,8 @@ bool LLLineEditor::handleMouseUp(S32 x, S32 y, MASK mask)
     }
 
     // We won't call LLUICtrl::handleMouseUp to avoid double calls of  childrenHandleMouseUp().Just invoke the signal manually.
-    if (mMouseUpSignal)
-        (*mMouseUpSignal)(this,x,y, mask);
+    if (mouse_signal_t* signal = mouseUpSignal())
+        (*signal)(this,x,y, mask);
     return handled;
 }
 

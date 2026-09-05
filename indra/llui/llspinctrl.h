@@ -35,10 +35,12 @@
 #include "llrect.h"
 
 
-class LLSpinCtrl
+class LLSpinCtrl final
 : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSpinCtrl, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<S32> label_width;
@@ -60,6 +62,7 @@ protected:
     friend class LLUICtrlFactory;
 public:
     virtual ~LLSpinCtrl() {} // Children all cleaned up by default view destructor.
+
 
     virtual void    forceSetValue(const LLSD& value ) ;
     virtual void    setValue(const LLSD& value );

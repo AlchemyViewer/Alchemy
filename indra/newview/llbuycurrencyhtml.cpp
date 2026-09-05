@@ -128,7 +128,7 @@ void LLBuyCurrencyHTML::openCurrencyFloater( const std::string& message, S32 sum
 // static
 void LLBuyCurrencyHTML::showDialog( bool specific_sum_requested, const std::string& message, S32 sum )
 {
-    LLFloaterBuyCurrencyHTML* buy_currency_floater = dynamic_cast< LLFloaterBuyCurrencyHTML* >( LLFloaterReg::getInstance( "buy_currency_html" ) );
+    LLFloaterBuyCurrencyHTML* buy_currency_floater = LLFloaterReg::getTypedInstance<LLFloaterBuyCurrencyHTML>("buy_currency_html");
     if ( buy_currency_floater )
     {
         // pass on flag indicating if we want to buy specific amount and if so, how much
@@ -156,7 +156,7 @@ void LLBuyCurrencyHTML::showDialog( bool specific_sum_requested, const std::stri
 //
 void LLBuyCurrencyHTML::closeDialog()
 {
-    LLFloaterBuyCurrencyHTML* buy_currency_floater = dynamic_cast< LLFloaterBuyCurrencyHTML* >(LLFloaterReg::getInstance( "buy_currency_html" ) );
+    LLFloaterBuyCurrencyHTML* buy_currency_floater = LLFloaterReg::getTypedInstance<LLFloaterBuyCurrencyHTML>("buy_currency_html");
     if ( buy_currency_floater )
     {
         buy_currency_floater->closeFloater();

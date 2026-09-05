@@ -246,7 +246,7 @@ void LLPanelOutfitsInventory::onSave()
 //static
 LLPanelOutfitsInventory* LLPanelOutfitsInventory::findInstance()
 {
-    return dynamic_cast<LLPanelOutfitsInventory*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfits_inventory"));
+    return LLFloaterSidePanelContainer::getPanel<LLPanelOutfitsInventory>("appearance", "panel_outfits_inventory");
 }
 
 void LLPanelOutfitsInventory::openApearanceTab(const std::string& tab_name)
@@ -347,7 +347,7 @@ void LLPanelOutfitsInventory::initTabPanels()
 void LLPanelOutfitsInventory::onTabChange()
 {
     if (!mAppearanceTabs) return;
-    mActivePanel = dynamic_cast<LLPanelAppearanceTab*>(mAppearanceTabs->getCurrentPanel());
+    mActivePanel = ALViewType::as<LLPanelAppearanceTab>(mAppearanceTabs->getCurrentPanel());
     if (!mActivePanel) return;
 
     mActivePanel->checkFilterSubString();
@@ -417,8 +417,7 @@ void LLPanelOutfitsInventory::onWearablesLoading()
 // static
 LLSidepanelAppearance* LLPanelOutfitsInventory::getAppearanceSP()
 {
-    LLSidepanelAppearance* panel_appearance =
-        dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance* panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     return panel_appearance;
 }
 

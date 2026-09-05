@@ -34,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <cstdio>
 #include <cwchar>                   // std::wcslen()
@@ -490,6 +491,34 @@ public:
     LLStringExplicit(const std::string& s) : std::string(s) {}
     LLStringExplicit(const std::string& s, size_type pos, size_type n = std::string::npos) : std::string(s, pos, n) {}
 };
+
+//@ The same bar, for a parameter that has no reason to own what it is handed.
+//  A literal is still refused, for the reason above -- that is the whole point
+//  of the type and has nothing to do with how the bytes are held. What is
+//  dropped is the copy: the callees taking this all copy their argument anyway
+//  because they have to validate and truncate it, so an owning parameter meant
+//  the caller copied it first for the callee to copy it again.
+//
+//  Taken by value like the std::string_view it is, not by reference: it is a
+//  pointer and a length, and a reference to one is a pointer to that.
+class ALStringViewExplicit : public std::string_view
+{
+public:
+    explicit ALStringViewExplicit(const char* s) : std::string_view(s) {}
+    ALStringViewExplicit(const std::string& s) : std::string_view(s) {}
+    ALStringViewExplicit(std::string_view s) : std::string_view(s) {}
+};
+
+// Checked rather than trusted. Refusing the literal is the only thing this
+// type does, it does it through the absence of a conversion, and nothing else
+// in the build would notice if an edit quietly let one through.
+static_assert(!std::is_convertible_v<const char*, ALStringViewExplicit>,
+              "a bare literal must not convert to ALStringViewExplicit -- "
+              "English text in code belongs in a translatable XUI file");
+static_assert(std::is_convertible_v<const std::string&, ALStringViewExplicit>,
+              "a std::string must convert to ALStringViewExplicit");
+static_assert(std::is_convertible_v<std::string_view, ALStringViewExplicit>,
+              "a std::string_view must convert to ALStringViewExplicit");
 
 struct LLDictionaryLess
 {

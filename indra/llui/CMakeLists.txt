@@ -105,7 +105,6 @@ target_sources(llui
     llviewmodel.cpp
     llview.cpp
     llviewquery.cpp
-    llviewereventrecorder.cpp
     llvirtualtrackball.cpp
     llwindowshade.cpp
     llxuiparser.cpp
@@ -115,6 +114,7 @@ target_sources(llui
     FILE_SET HEADERS
     FILES
     altextcaret.h
+    alviewtype.h
     fsvirtualtrackpad.h
     llaccordionctrl.h
     llaccordionctrltab.h
@@ -229,7 +229,6 @@ target_sources(llui
     llviewinject.h
     llviewmodel.h
     llview.h
-    llviewereventrecorder.h
     llviewquery.h
     llvirtualtrackball.h
     llwindowshade.h
@@ -311,8 +310,23 @@ if(BUILD_TESTING)
   # INTEGRATION TESTS
   set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
   set(test_project llui)
+  LL_ADD_INTEGRATION_TEST(llstatbar "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llview "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(lluistring "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfocusmgr "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lllayoutstack "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alviewtype "" "${test_libs}" "${test_project}")
+
+  # Tests that build widgets above LLView stand up a UI over the source
+  # tree's skins and fonts; this is where it is.
+  foreach(ui_test lllayoutstack llfloater alviewtype)
+    if (TARGET INTEGRATION_TEST_${ui_test})
+      target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
+          "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")
+    endif()
+  endforeach()
 endif()

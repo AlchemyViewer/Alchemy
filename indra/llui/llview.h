@@ -33,7 +33,6 @@
 
 #include "stdtypes.h"
 #include "llcoord.h"
-#include "llfontgl.h"
 #include "llhandle.h"
 #include "llmortician.h"
 #include "llmousehandler.h"
@@ -42,16 +41,18 @@
 #include "llui.h"
 #include "lluistring.h"
 #include "llviewquery.h"
-#include "lluistring.h"
 #include "llcursortypes.h"
 #include "lluictrlfactory.h"
 #include "lltreeiterators.h"
 #include "llfocusmgr.h"
+#include "alviewtype.h"
 
 #include <functional>
 #include <list>
 
 class LLSD;
+class LLBadgeHolder;
+class LLFontGL;
 
 constexpr U32   FOLLOWS_NONE    = 0x00;
 constexpr U32   FOLLOWS_LEFT    = 0x01;
@@ -62,8 +63,6 @@ constexpr U32   FOLLOWS_ALL     = 0x33;
 
 constexpr bool  MOUSE_OPAQUE = true;
 constexpr bool  NOT_MOUSE_OPAQUE = false;
-
-constexpr U32 GL_NAME_UI_RESERVED = 2;
 
 
 // maintains render state during traversal of UI tree
@@ -155,7 +154,7 @@ public:
     };
 
     // most widgets are valid children of LLView
-    typedef LLDefaultChildRegistry child_registry_t;
+    using child_registry_t = LLDefaultChildRegistry;
 
     void initFromParams(const LLView::Params&);
 
@@ -163,13 +162,12 @@ protected:
     LLView(const LLView::Params&);
     friend class LLUICtrlFactory;
 
-private:
     // widgets in general are not copyable
-    LLView(const LLView& other);
+    LLView(const LLView&) = delete;
+    LLView& operator=(const LLView&) = delete;
+
 public:
-//#if LL_DEBUG
     static bool sIsDrawing;
-//#endif
     enum ESoundFlags
     {
         SILENT = 0,
@@ -192,19 +190,19 @@ public:
         SNAP_BOTTOM
     };
 
-    typedef std::list<LLView*> child_list_t;
-    typedef child_list_t::iterator                  child_list_iter_t;
-    typedef child_list_t::const_iterator            child_list_const_iter_t;
-    typedef child_list_t::reverse_iterator          child_list_reverse_iter_t;
-    typedef child_list_t::const_reverse_iterator    child_list_const_reverse_iter_t;
+    using child_list_t = std::list<LLView*>;
+    using child_list_iter_t = child_list_t::iterator;
+    using child_list_const_iter_t = child_list_t::const_iterator;
+    using child_list_reverse_iter_t = child_list_t::reverse_iterator;
+    using child_list_const_reverse_iter_t = child_list_t::const_reverse_iterator;
 
-    typedef std::pair<LLView *, S32>                tab_order_pair_t;
+    using tab_order_pair_t = std::pair<LLView *, S32>;
     // this structure primarily sorts by the tab group, secondarily by the insertion ordinal (lastly by the value of the pointer)
-    typedef std::map<const LLView*, S32>        child_tab_order_t;
-    typedef child_tab_order_t::iterator                 child_tab_order_iter_t;
-    typedef child_tab_order_t::const_iterator           child_tab_order_const_iter_t;
-    typedef child_tab_order_t::reverse_iterator         child_tab_order_reverse_iter_t;
-    typedef child_tab_order_t::const_reverse_iterator   child_tab_order_const_reverse_iter_t;
+    using child_tab_order_t = std::map<const LLView*, S32>;
+    using child_tab_order_iter_t = child_tab_order_t::iterator;
+    using child_tab_order_const_iter_t = child_tab_order_t::const_iterator;
+    using child_tab_order_reverse_iter_t = child_tab_order_t::reverse_iterator;
+    using child_tab_order_const_reverse_iter_t = child_tab_order_t::const_reverse_iterator;
 
     virtual ~LLView();
 
@@ -214,6 +212,40 @@ public:
     virtual bool isCtrl() const;
 
     virtual bool isPanel() const;
+
+    // What this view is: its class's place in the hierarchy. A virtual, so
+    // that while a view is being destroyed it answers for whatever base is
+    // left standing, which is what dynamic_cast says of it then.
+    using ALViewSelf = LLView;
+    static constexpr ALViewType sViewType{nullptr, "LLView"};
+    virtual const ALViewType* viewType() const { return &sViewType; }
+
+    // This view as a T, or null: one compare. Every view class declares its
+    // type with AL_VIEW_TYPE; asking for one that has not is an error here
+    // rather than a slower answer.
+    template <class T> T* as()
+    {
+        static_assert(ALViewTypeOf<T>::declared, "T has no AL_VIEW_TYPE declaration");
+        return viewType()->isA(T::sViewType) ? static_cast<T*>(this) : nullptr;
+    }
+
+    LLView* asView() override { return this; }
+
+    // The badge holder this view is, or null. A view that holds badges says
+    // so here, and the walk that attaches them asks nothing else.
+    virtual LLBadgeHolder* asBadgeHolder() { return nullptr; }
+
+    template <class T> const T* as() const
+    {
+        return const_cast<LLView*>(this)->as<T>();
+    }
+
+    // The parent as a T, or null when there is none or it is not one.
+    template <class T> T* getParentAs() const
+    {
+        LLView* parent = getParent();
+        return parent ? parent->as<T>() : nullptr;
+    }
 
     //
     // MANIPULATORS
@@ -236,14 +268,14 @@ public:
     void        setFollowsAll()                 { mReshapeFlags |= FOLLOWS_ALL; }
 
     void        setSoundFlags(U8 flags)         { mSoundFlags = flags; }
-    void        setName(std::string name)           { mName = name; }
+    void        setName(std::string name)           { mName = std::move(name); }
     void        setUseBoundingRect( bool use_bounding_rect );
     bool        getUseBoundingRect() const;
 
     ECursorType getHoverCursor() const { return mHoverCursor; }
 
     static F32 getTooltipTimeout();
-    virtual const std::string getToolTip() const;
+    virtual std::string getToolTip() const;
     virtual const std::string& getText() const { return LLStringUtil::null; }
     virtual const LLFontGL* getFont() const { return nullptr; }
 
@@ -260,7 +292,7 @@ public:
 
     virtual bool    postBuild() { return true; }
 
-    const child_tab_order_t& getTabOrder() const        { return mTabOrder; }
+    const child_tab_order_t& getTabOrder() const;
 
     void setDefaultTabGroup(S32 d)              { mDefaultTabGroup = d; }
     S32 getDefaultTabGroup() const              { return mDefaultTabGroup; }
@@ -322,6 +354,13 @@ public:
     // it; see updateBoundingRect.
     static S32      sReshapeDepth;
 
+    // How deep in a subtree teardown the current delete is. Everything under
+    // the outermost one is going away with it, so the region they vacate is
+    // the region it vacates, claimed once where the teardown started. A view
+    // deleted from a parent that survives is a teardown of depth zero and
+    // claims its own region as before.
+    static S32      sDeleteDepth;
+
     // Views the last push actually descended into. An open inventory keeps the
     // items of its closed folders hidden, and they are most of a floater.
     static S32      sTransparencyViewsWalked;
@@ -347,9 +386,29 @@ public:
     virtual void    onVisibilityChange ( bool new_visibility );
     virtual void    onUpdateScrollToChild(const LLUICtrl * cntrl);
 
-    void            pushVisible(bool visible)   { mLastVisible = mVisible; setVisible(visible); }
-    void            popVisible()                { setVisible(mLastVisible); }
-    bool            getLastVisible()    const   { return mLastVisible; }
+    // A one-deep save slot for a caller that hides a set of views and then puts
+    // them back: LLFloaterView for the snapshot, LLFloaterReg for mouselook.
+    // Nesting the two loses the outer one's saved value.
+    void            pushVisible(bool visible)
+    {
+        mSavedVisible = mVisible ? SAVED_VISIBLE : SAVED_HIDDEN;
+        setVisible(visible);
+    }
+
+    // A view nobody saved has nothing to put back. popVisibleAll walks the
+    // child list as it stands when the pop runs, so a floater opened while the
+    // set was hidden arrives here never having been pushed -- and what it would
+    // otherwise read is the value every view is constructed with, which would
+    // hide it.
+    void            popVisible()
+    {
+        if (mSavedVisible != SAVED_NOTHING)
+        {
+            const bool was_visible = (mSavedVisible == SAVED_VISIBLE);
+            mSavedVisible = SAVED_NOTHING;
+            setVisible(was_visible);
+        }
+    }
 
     U32         getFollows() const              { return mReshapeFlags; }
     bool        followsLeft() const             { return mReshapeFlags & FOLLOWS_LEFT; }
@@ -367,7 +426,11 @@ public:
     virtual LLRect getSnapRect() const;
     LLRect getLocalSnapRect() const;
 
-    std::string getLayout() { return mLayout; }
+    // Whether this view's rect params were written top-edge-relative. Only the
+    // exact word "topleft" ever meant that; every other value, including the
+    // handful of XUI files carrying something meant for follows, reads as the
+    // historical bottom-left.
+    bool isLayoutTopLeft() const                { return mLayoutTopLeft; }
 
     // Override and return required size for this object. 0 for width/height means don't care.
     virtual LLRect getRequiredRect();
@@ -376,30 +439,30 @@ public:
 
     LLView*     getRootView();
     LLView*     getParent() const               { return mParentView; }
-    LLView*     getFirstChild() const           { return (mChildList.empty()) ? NULL : *(mChildList.begin()); }
+    LLView*     getFirstChild() const           { return (mChildList && !mChildList->empty()) ? mChildList->front() : nullptr; }
     LLView*     findPrevSibling(LLView* child);
     LLView*     findNextSibling(LLView* child);
-    S32         getChildCount() const           { return (S32)mChildList.size(); }
-    template<class _Pr3> void sortChildren(_Pr3 _Pred) { mChildList.sort(_Pred); }
+    S32         getChildCount() const           { return mChildList ? (S32)mChildList->size() : 0; }
+    template<class _Pr3> void sortChildren(_Pr3 _Pred) { if (mChildList) mChildList->sort(_Pred); }
     bool        hasAncestor(const LLView* parentp) const;
     bool        hasChild(std::string_view childname, bool recurse = false) const;
     bool        childHasKeyboardFocus( std::string_view childname ) const;
 
     // these iterators are used for collapsing various tree traversals into for loops
-    typedef LLTreeDFSIter<LLView, child_list_const_iter_t> tree_iterator_t;
+    using tree_iterator_t = LLTreeDFSIter<LLView, child_list_const_iter_t>;
     tree_iterator_t beginTreeDFS();
     tree_iterator_t endTreeDFS();
 
-    typedef LLTreeDFSPostIter<LLView, child_list_const_iter_t> tree_post_iterator_t;
+    using tree_post_iterator_t = LLTreeDFSPostIter<LLView, child_list_const_iter_t>;
     tree_post_iterator_t beginTreeDFSPost();
     tree_post_iterator_t endTreeDFSPost();
 
-    typedef LLTreeBFSIter<LLView, child_list_const_iter_t> bfs_tree_iterator_t;
+    using bfs_tree_iterator_t = LLTreeBFSIter<LLView, child_list_const_iter_t>;
     bfs_tree_iterator_t beginTreeBFS();
     bfs_tree_iterator_t endTreeBFS();
 
 
-    typedef LLTreeDownIter<LLView> root_to_view_iterator_t;
+    using root_to_view_iterator_t = LLTreeDownIter<LLView>;
     root_to_view_iterator_t beginRootToView();
     root_to_view_iterator_t endRootToView();
 
@@ -441,11 +504,11 @@ public:
     bool getFromXUI() const { return mFromXUI; }
     void setFromXUI(bool b) { mFromXUI = b; }
 
-    typedef enum e_hit_test_type
+    enum EHitTestType
     {
         HIT_TEST_USE_BOUNDING_RECT,
         HIT_TEST_IGNORE_BOUNDING_RECT
-    }EHitTestType;
+    };
 
     bool parentPointInView(S32 x, S32 y, EHitTestType type = HIT_TEST_USE_BOUNDING_RECT) const;
     bool pointInView(S32 x, S32 y, EHitTestType type = HIT_TEST_USE_BOUNDING_RECT) const;
@@ -459,9 +522,14 @@ public:
 
     LLControlVariable *findControl(std::string_view name);
 
-    const child_list_t* getChildList() const { return &mChildList; }
-    child_list_const_iter_t beginChild() const { return mChildList.begin(); }
-    child_list_const_iter_t endChild() const { return mChildList.end(); }
+    // Walk it, do not keep it. A view with no children has no list of its own
+    // and this hands back a shared empty one, so two childless views return
+    // the same pointer, and a pointer taken before the first addChild goes on
+    // pointing at the empty one after children arrive. Both are fine for the
+    // caller that iterates and lets go, which is every caller today.
+    const child_list_t* getChildList() const { return &children(); }
+    child_list_const_iter_t beginChild() const { return children().begin(); }
+    child_list_const_iter_t endChild() const { return children().end(); }
 
     // LLMouseHandler functions
     //  Default behavior is to pass events to children
@@ -496,8 +564,7 @@ public:
     template <class T> T* findChild(std::string_view name, bool recurse = true) const
     {
         LLView* child = findChildView(name, recurse);
-        T* result = dynamic_cast<T*>(child);
-        return result;
+        return ALViewType::as<T>(child);
     }
 
     template <class T> T* getChild(std::string_view name, bool recurse = true) const;
@@ -513,32 +580,29 @@ public:
     template <class T> T* getDefaultWidget(std::string_view name) const
     {
         LLView* widgetp = getDefaultWidgetContainer().findChildView(name);
-        return dynamic_cast<T*>(widgetp);
+        return ALViewType::as<T>(widgetp);
     }
 
     template <class T> T* getParentByType() const
     {
-        LLView* parent = getParent();
-        while(parent)
+        for (LLView* parent = getParent(); parent; parent = parent->getParent())
         {
-            if (dynamic_cast<T*>(parent))
+            if (T* found = parent->as<T>())
             {
-                return static_cast<T*>(parent);
+                return found;
             }
-            parent = parent->getParent();
         }
-        return NULL;
+        return nullptr;
     }
 
     //////////////////////////////////////////////
     // statics
     //////////////////////////////////////////////
-    //static LLFontGL::HAlign selectFontHAlign(LLXMLNodePtr node);
 
     // focuses the item in the list after the currently-focused item, wrapping if necessary
-    static  bool focusNext(LLView::child_list_t & result);
+    static  bool focusNext(viewList_t & result);
     // focuses the item in the list before the currently-focused item, wrapping if necessary
-    static  bool focusPrev(LLView::child_list_t & result);
+    static  bool focusPrev(viewList_t & result);
 
     // returns query for iterating over controls in tab order
     static const LLViewQuery & getTabOrderQuery();
@@ -578,6 +642,16 @@ public:
     LLSD getInfo(void);
 
 protected:
+    // A screen-space bound on which children are worth drawing at all, for a
+    // view that knows something the general cull cannot. The general cull only
+    // asks whether a child is on screen and in the dirty region; a view that is
+    // scrolled inside a window has most of its children failing neither test
+    // and scissored away only after drawing themselves. LLRect::null leaves the
+    // general cull as the only one, which is every view that does not override.
+    //
+    // Asked once per parent per draw, not once per child.
+    virtual LLRect  getChildCullRectScreen() { return LLRect::null; }
+
     void            drawDebugRect();
     void            drawChild(LLView* childp, S32 x_offset = 0, S32 y_offset = 0, bool force_draw = false);
     void            drawChildren();
@@ -626,56 +700,79 @@ private:
         return handleUnicodeChar(uni_char, from_parent);
     }
 
+    // Declared largest-first, and every small member together at the end. They
+    // were interleaved with the pointers and rects, and on a 64-bit build each
+    // one of them opened a hole big enough to hold whatever came next: a bool
+    // ahead of a std::string cost eight bytes, not one.
+
     LLView*     mParentView;
-    child_list_t mChildList;
+
+    // Allocated on the first child. MSVC's std::list allocates a sentinel node
+    // in its default constructor, so a view that never has one was paying a
+    // heap allocation and a pointer's worth of list to say so -- and an open
+    // inventory holds two hundred thousand views with no children at all.
+    child_list_t* mChildList { nullptr };
+
+    // Allocated on the first child given a tab group, which almost none are.
+    // std::map allocates a head node in its default constructor for the same
+    // reason std::list allocates a sentinel.
+    child_tab_order_t* mTabOrder { nullptr };
+
+    LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
+
+    using default_widget_map_t = std::map<std::string, LLView*>;
+    // allocate this map no demand, as it is rarely needed
+    mutable LLView* mDefaultWidgets;
+
+    // location in pixels, relative to surrounding structure, bottom,left=0,0
+    LLRect      mRect;
+    LLRect      mBoundingRect;
+
+    std::string mName;
+
+    U32         mReshapeFlags;
+    S32         mDefaultTabGroup;
+    S32         mLastTabGroup;
+
+    U8          mSoundFlags;
 
     // The transparency a floater tried to give this view while it was hidden,
     // kept until it is shown. See applyTransparencyType.
     U8          mPendingTransparency = 0;
     bool        mHasPendingTransparency = false;
 
-    // location in pixels, relative to surrounding structure, bottom,left=0,0
     bool        mVisible;
-    LLRect      mRect;
-    LLRect      mBoundingRect;
-
-    std::string mLayout;
-    std::string mName;
-
-    U32         mReshapeFlags;
-
-    child_tab_order_t mTabOrder;
-    S32         mDefaultTabGroup;
-    S32         mLastTabGroup;
-
+    bool        mLayoutTopLeft { false };
     bool        mEnabled;       // Enabled means "accepts input that has an effect on the state of the application."
                                 // A disabled view, for example, may still have a scrollbar that responds to mouse events.
     bool        mMouseOpaque;   // Opaque views handle all mouse events that are over their rect.
-    LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
-
-    U8          mSoundFlags;
     bool        mFromXUI;
-
     bool        mIsFocusRoot;
     bool        mUseBoundingRect; // hit test against bounding rectangle that includes all child elements
-
-    bool        mLastVisible;
+    // What pushVisible saved, and whether it saved anything. One value rather
+    // than a bool and a flag beside it: they say one thing between them, and
+    // the flag on its own was eight bytes once alignment had its say.
+    enum ESavedVisible : U8 { SAVED_NOTHING = 0, SAVED_HIDDEN, SAVED_VISIBLE };
+    ESavedVisible mSavedVisible { SAVED_NOTHING };
 
     bool        mInDraw;
 
-    static LLWindow* sWindow;   // All root views must know about their window.
-
-    typedef std::map<std::string, LLView*> default_widget_map_t;
-    // allocate this map no demand, as it is rarely needed
-    mutable LLView* mDefaultWidgets;
-
     LLView& getDefaultWidgetContainer() const;
+
+    // The containers above, allocated if this is the first caller to need one.
+    child_list_t&      childList();
+    child_tab_order_t& tabOrder();
+
+    // What there is to read. A view with no children shares one empty list
+    // rather than owning one, so every caller that only walks the children
+    // works whether or not any were ever added.
+    const child_list_t& children() const;
 
     // tooltip holder is allocated on demand; most widgets never set one
     LLUIString& getOrCreateToolTipMsg();
 
     // This allows special mouse-event targeting logic for testing.
-    typedef std::function<bool(const LLView*, S32 x, S32 y)> DrilldownFunc;
+    using DrilldownFunc = std::function<bool(const LLView*, S32 x, S32 y)>;
     static DrilldownFunc sDrilldown;
 
 public:
@@ -729,13 +826,10 @@ public:
     static bool sDebugKeys;
     static bool sDebugMouseHandling;
     static std::string sMouseHandlerMessage;
-    static S32  sSelectID;
     static std::set<LLView*> sPreviewHighlightedElements;   // DEV-16869
     static bool sHighlightingDiffs;                         // DEV-16869
     static LLView* sPreviewClickedElement;                  // DEV-16869
     static bool sDrawPreviewHighlights;
-    static S32 sLastLeftXML;
-    static S32 sLastBottomXML;
     static bool sForceReshape;
 };
 
@@ -751,7 +845,7 @@ struct TypeValues<LLView::EOrientation> : public LLInitParam::TypeValuesHelper<L
 template <class T> T* LLView::getChild(std::string_view name, bool recurse) const
 {
     LLView* child = findChildView(name, recurse);
-    T* result = dynamic_cast<T*>(child);
+    T* result = ALViewType::as<T>(child);
     if (!result)
     {
         // did we find *something* with that name?
@@ -777,6 +871,16 @@ template <class T> T* LLView::getChild(std::string_view name, bool recurse) cons
         }
     }
     return result;
+}
+
+template <class T> T* ALViewType::as(LLView* view)
+{
+    return view ? view->as<T>() : nullptr;
+}
+
+template <class T> const T* ALViewType::as(const LLView* view)
+{
+    return view ? view->as<T>() : nullptr;
 }
 
 // Compiler optimization - don't generate these specializations inline,

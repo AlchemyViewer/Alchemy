@@ -39,9 +39,11 @@ class LLQuaternion;
 class LLSD;
 class LLVector3;
 
-class LLFloaterPathfindingCharacters : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingCharacters final : public LLFloaterPathfindingObjects
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPathfindingCharacters, LLFloaterPathfindingObjects);
+
     virtual void                                    onClose(bool pIsAppQuitting);
 
     bool                                            isShowPhysicsCapsule() const;

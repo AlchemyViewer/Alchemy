@@ -31,12 +31,14 @@
 
 class LLToggleableMenu;
 
-class LLMenuButton
+class LLMenuButton final
 : public LLButton
 {
     LOG_CLASS(LLMenuButton);
 
 public:
+    AL_VIEW_TYPE(LLMenuButton, LLButton);
+
     typedef enum e_menu_position
     {
         MP_TOP_LEFT,
@@ -89,7 +91,7 @@ protected:
 private:
     void cleanup();
 
-    LLHandle<LLView>        mMenuHandle;
+    LLHandle<LLToggleableMenu> mMenuHandle;
     bool                    mIsMenuShown;
     EMenuPosition           mMenuPosition;
     S32                     mX;

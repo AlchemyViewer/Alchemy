@@ -34,9 +34,11 @@ class LLScrollListCtrl;
 class LLTextBox;
 class LLFloaterMediaSettings;
 
-class LLPanelMediaSettingsSecurity : public LLPanel
+class LLPanelMediaSettingsSecurity final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMediaSettingsSecurity, LLPanel);
+
     LLPanelMediaSettingsSecurity();
     ~LLPanelMediaSettingsSecurity();
 

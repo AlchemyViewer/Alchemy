@@ -42,12 +42,13 @@
 /**
  * The panel provides UI for saving snapshot as an inventory texture.
  */
-class LLPanelSnapshotInventory
+class LLPanelSnapshotInventory final
     : public LLPanelSnapshot
 {
     LOG_CLASS(LLPanelSnapshotInventory);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotInventory, LLPanelSnapshot);
     LLPanelSnapshotInventory();
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

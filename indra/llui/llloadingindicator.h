@@ -45,11 +45,12 @@
  * @see start()
  * @see stop()
  */
-class LLLoadingIndicator
+class LLLoadingIndicator final
 : public LLUICtrl
 {
     LOG_CLASS(LLLoadingIndicator);
 public:
+    AL_VIEW_TYPE(LLLoadingIndicator, LLUICtrl);
 
     struct Images : public LLInitParam::Block<Images>
     {

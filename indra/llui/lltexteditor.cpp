@@ -337,7 +337,7 @@ LLTextEditor::~LLTextEditor()
 // LLTextEditor
 // Public methods
 
-void LLTextEditor::setText(const LLStringExplicit &utf8str, const LLStyle::Params& input_params)
+void LLTextEditor::setText(ALStringViewExplicit utf8str, const LLStyle::Params& input_params)
 {
     // validate incoming text if necessary
     if (mPrevalidator)

@@ -51,6 +51,7 @@ class LLAccordionCtrlTab : public LLUICtrl
 {
 // Interface
 public:
+    AL_VIEW_TYPE(LLAccordionCtrlTab, LLUICtrl);
 
     struct Params
      : public LLInitParam::Block<Params, LLUICtrl::Params>

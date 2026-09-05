@@ -194,9 +194,10 @@ bool LLGroupList::handleDoubleClick(S32 x, S32 y, MASK mask)
     // Handle double click only for the selected item in the list, skip clicks on empty space.
     if (handled)
     {
-        if (mDoubleClickSignal && getItemsRect().pointInRect(x, y))
+        mouse_signal_t* signal = doubleClickSignal();
+        if (signal && getItemsRect().pointInRect(x, y))
         {
-            (*mDoubleClickSignal)(this, x, y, mask);
+            (*signal)(this, x, y, mask);
         }
     }
 
@@ -342,7 +343,7 @@ bool LLGroupList::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD&
             getItems(items);
             for (std::vector<LLPanel*>::iterator it = items.begin(); it != items.end(); ++it)
             {
-                LLGroupListItem* item = dynamic_cast<LLGroupListItem*>(*it);
+                LLGroupListItem* item = (*it)->as<LLGroupListItem>();
                 if (item && item->getGroupID() == group_id)
                 {
                     item->setVisibleInProfile(visible);

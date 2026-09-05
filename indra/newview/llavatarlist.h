@@ -43,10 +43,12 @@ class LLListContextMenu;
  * @see setDirty()
  * @see setNameFilter()
  */
-class LLAvatarList : public LLFlatListViewEx
+class LLAvatarList final : public LLFlatListViewEx
 {
     LOG_CLASS(LLAvatarList);
 public:
+    AL_VIEW_TYPE(LLAvatarList, LLFlatListViewEx);
+
     struct ShowPermissionTypeNames : public LLInitParam::TypeValuesHelper<EShowPermissionType, ShowPermissionTypeNames>
     {
         static void declareValues();

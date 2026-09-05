@@ -44,6 +44,8 @@ class LLSysWellChiclet;
 class LLSysWellWindow : public LLTransientDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLSysWellWindow, LLTransientDockableFloater);
+
     LOG_CLASS(LLSysWellWindow);
 
     LLSysWellWindow(const LLSD& key);
@@ -101,9 +103,11 @@ protected:
  *
  * It contains a list list of all active IM sessions.
  */
-class LLIMWellWindow : public LLSysWellWindow, LLInitClass<LLIMWellWindow>
+class LLIMWellWindow final : public LLSysWellWindow, LLInitClass<LLIMWellWindow>
 {
 public:
+    AL_VIEW_TYPE(LLIMWellWindow, LLSysWellWindow);
+
     LLIMWellWindow(const LLSD& key);
     ~LLIMWellWindow();
 
@@ -126,9 +130,11 @@ private:
     bool confirmCloseAll(const LLSD& notification, const LLSD& response);
     void closeAllImpl();
 
-    class ObjectRowPanel: public LLPanel
+    class ObjectRowPanel final: public LLPanel
     {
     public:
+        AL_VIEW_TYPE(ObjectRowPanel, LLPanel);
+
         ObjectRowPanel(const LLUUID& notification_id, bool new_message = false);
         virtual ~ObjectRowPanel();
         /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask);

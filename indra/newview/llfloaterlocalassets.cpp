@@ -77,6 +77,7 @@ namespace
 class LLPanelLocalAssetBase : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLocalAssetBase, LLPanel);
     bool postBuild() override;
 
     // Rebuild the visible list (decoded units + dimmed undecoded saved paths).
@@ -458,6 +459,7 @@ void LLPanelLocalAssetBase::onFilesPicked(const std::vector<std::string>& filena
 class LLPanelLocalMesh final : public LLPanelLocalAssetBase
 {
 public:
+    AL_VIEW_TYPE(LLPanelLocalMesh, LLPanelLocalAssetBase);
     ~LLPanelLocalMesh() override;
 
     // Actions shared by the side buttons and the right-click row menu (decoded units).
@@ -508,8 +510,7 @@ protected:
     void doUpload(const std::string& path) override
     {
         // Hand the file to the standard Model upload floater (LOD/physics/cost).
-        if (LLFloaterModelPreview* fmp =
-                dynamic_cast<LLFloaterModelPreview*>(LLFloaterReg::showInstance("upload_model")))
+        if (LLFloaterModelPreview* fmp = LLFloaterReg::showTypedInstance<LLFloaterModelPreview>("upload_model"))
         {
             fmp->loadModel(LLModel::LOD_HIGH, path);
         }
@@ -889,6 +890,7 @@ void LLPanelLocalMesh::doSelect(const LLUUID& tracking_id)
 class LLPanelLocalAnim final : public LLPanelLocalAssetBase
 {
 public:
+    AL_VIEW_TYPE(LLPanelLocalAnim, LLPanelLocalAssetBase);
     void draw() override;
 
 protected:
@@ -1151,6 +1153,9 @@ void apply_local_material_to_selection(const LLUUID& world_id)
 // ============================================================================
 class LLPanelLocalApplyAsset : public LLPanelLocalAssetBase
 {
+public:
+    AL_VIEW_TYPE(LLPanelLocalApplyAsset, LLPanelLocalAssetBase);
+
 protected:
     virtual std::string applyLabel() = 0;                       // button label
     virtual LLUUID      worldIdFor(const LLUUID& tracking_id) = 0; // unit -> world id
@@ -1215,6 +1220,9 @@ private:
 // ============================================================================
 class LLPanelLocalTexture final : public LLPanelLocalApplyAsset
 {
+public:
+    AL_VIEW_TYPE(LLPanelLocalTexture, LLPanelLocalApplyAsset);
+
 protected:
     void feedList() override
     {
@@ -1271,6 +1279,9 @@ protected:
 // ============================================================================
 class LLPanelLocalMaterial final : public LLPanelLocalApplyAsset
 {
+public:
+    AL_VIEW_TYPE(LLPanelLocalMaterial, LLPanelLocalApplyAsset);
+
 protected:
     void feedList() override
     {
@@ -1341,6 +1352,7 @@ protected:
 class LLPanelLocalSpawned final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLocalSpawned, LLPanel);
     bool postBuild() override;
     void draw() override;
 
@@ -1604,7 +1616,7 @@ void LLFloaterLocalAssets::dropFiles(const std::vector<std::string>& paths)
         }
 
         // The tab panels are LLPanelLocalAssetBase (anon-namespace, visible here).
-        if (LLPanelLocalAssetBase* panel = dynamic_cast<LLPanelLocalAssetBase*>(mTabs->getPanelByName(tab_name)))
+        if (LLPanelLocalAssetBase* panel = ALViewType::as<LLPanelLocalAssetBase>(mTabs->getPanelByName(tab_name)))
         {
             mTabs->selectTabPanel(panel);
             panel->loadFile(path); // decode + add (+ persist) via the manager

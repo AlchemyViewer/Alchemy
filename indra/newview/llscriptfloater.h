@@ -147,9 +147,10 @@ private:
  * LLScriptFloater will create script form based on notification data and
  * will auto fit the form.
  */
-class LLScriptFloater : public LLDockableFloater
+class LLScriptFloater final : public LLDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLScriptFloater, LLDockableFloater);
 
     /**
      * key - UUID of scripted Object

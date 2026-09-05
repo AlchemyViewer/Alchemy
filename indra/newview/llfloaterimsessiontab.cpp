@@ -1085,7 +1085,7 @@ void LLFloaterIMSessionTab::processChatHistoryStyleUpdate(bool clean_messages/* 
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
             iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater)
         {
             floater->reloadMessages(clean_messages);
@@ -1106,7 +1106,7 @@ void LLFloaterIMSessionTab::reloadEmptyFloaters()
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
         iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater && floater->getLastChatMessageIndex() == -1)
         {
             floater->reloadMessages(true);
@@ -1131,7 +1131,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 
 void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     bool should_be_expanded = false;
     if (host_floater)
     {
@@ -1163,7 +1163,7 @@ void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 
 void LLFloaterIMSessionTab::onCollapseToLine(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     if (!host_floater)
     {
         bool expand = self->isMessagePaneExpanded();
@@ -1230,7 +1230,7 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 {
     if (!checkIfTornOff())
     {
-        if(LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost()))
+        if(LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(getHost()))
         {
             // Show the messages pane when opening a floater hosted in the Conversations
             host_floater->collapseMessagesPane(false);

@@ -35,9 +35,11 @@
 
 class LLGroupIconCtrl;
 
-class LLToastIMPanel: public LLToastPanel
+class LLToastIMPanel final: public LLToastPanel
 {
 public:
+    AL_VIEW_TYPE(LLToastIMPanel, LLToastPanel);
+
     struct Params
     {
         LLNotificationPtr   notification;

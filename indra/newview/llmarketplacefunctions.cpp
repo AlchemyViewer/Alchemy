@@ -31,6 +31,7 @@
 #include "llagent.h"
 #include "llbufferstream.h"
 #include "llcallbacklist.h"
+#include "lltoolbar.h"
 #include "llinventoryfunctions.h"
 #include "llinventoryobserver.h"
 #include "llnotificationsutil.h"
@@ -1303,6 +1304,8 @@ void LLMarketplaceData::setSLMStatus(U32 status)
 {
     mMarketPlaceStatus = status;
     mMarketPlaceFailureReason.clear();
+    // Marketplace.Enabled reads this, and a toolbar button is drawn from it.
+    LLToolBar::requestRefresh();
     if (mStatusUpdatedSignal)
     {
         (*mStatusUpdatedSignal)();

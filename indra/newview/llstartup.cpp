@@ -289,8 +289,6 @@
 
 #include "llenvironment.h"
 
-#include "llstacktrace.h"
-
 #include "threadpool.h"
 #include "llperfstats.h"
 

@@ -524,7 +524,7 @@ void LLChicletPanel::objectChicletCallback(const LLSD& data)
     std::list<LLChiclet *>::iterator iter;
     for (iter = chiclets.begin(); iter != chiclets.end(); iter++)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*iter);
+        LLIMChiclet* chiclet = (*iter)->as<LLIMChiclet>();
         if (chiclet != NULL)
         {
             chiclet->setShowNewMessagesIcon(new_message);
@@ -565,7 +565,7 @@ void LLChicletPanel::onCurrentVoiceChannelChanged(const LLUUID& session_id)
 
     for(std::list<LLChiclet *>::iterator it = chiclets.begin(); it != chiclets.end(); ++it)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*it);
+        LLIMChiclet* chiclet = (*it)->as<LLIMChiclet>();
         if(chiclet)
         {
             if (gSavedSettings.getBOOL("OpenIMOnVoice"))
@@ -696,7 +696,7 @@ void LLChicletPanel::removeChiclet(const LLUUID& im_session_id)
     chiclet_list_t::iterator it = mChicletList.begin();
     for( ; mChicletList.end() != it; ++it)
     {
-        LLIMChiclet* chiclet = dynamic_cast<LLIMChiclet*>(*it);
+        LLIMChiclet* chiclet = (*it)->as<LLIMChiclet>();
 
         if(chiclet->getSessionId() == im_session_id)
         {
@@ -902,7 +902,7 @@ void LLChicletPanel::draw()
     for( ; getChildList()->end() != it; ++it)
     {
         LLView* child = *it;
-        if(child == dynamic_cast<LLView*>(mScrollArea))
+        if(child == mScrollArea)
         {
             LLLocalClipRect clip(mScrollArea->getRect());
             drawChild(mScrollArea);

@@ -34,10 +34,12 @@
 #include "llfontgl.h"
 #include "lltextbox.h"
 
-class LLNameBox
+class LLNameBox final
 :   public LLTextBox
 {
 public:
+    AL_VIEW_TYPE(LLNameBox, LLTextBox);
+
     struct Params : public LLInitParam::Block<Params, LLTextBox::Params>
     {
         Optional<bool>      is_group;

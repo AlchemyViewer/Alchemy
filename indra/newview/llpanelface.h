@@ -98,9 +98,11 @@ public:
     virtual DataType get(LLTextureEntry* entry) { return (entry*(TEGetFunc)); }
 };
 
-class LLPanelFace : public LLPanel
+class LLPanelFace final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelFace, LLPanel);
+
     virtual bool    postBuild();
     LLPanelFace();
     virtual ~LLPanelFace();

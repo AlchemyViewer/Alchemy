@@ -40,6 +40,8 @@ class LLTextBase;
 class ALFloaterProgressView final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterProgressView, LLFloater);
+
     ALFloaterProgressView(const LLSD& key);
     bool postBuild() override;
     void setShowProgress(bool visible);

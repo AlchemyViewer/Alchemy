@@ -29,9 +29,11 @@
 
 class LLScrollListCtrl;
 
-class LLFloaterGestureAutocompletePicker : public LLFloater
+class LLFloaterGestureAutocompletePicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGestureAutocompletePicker, LLFloater);
+
     LLFloaterGestureAutocompletePicker(const LLSD& key);
 
     bool postBuild() override;

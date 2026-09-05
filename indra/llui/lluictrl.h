@@ -48,13 +48,15 @@ class LLUICtrl
     : public LLView, public boost::signals2::trackable
 {
 public:
-    typedef std::function<void (LLUICtrl* ctrl, const LLSD& param)> commit_callback_t;
-    typedef boost::signals2::signal<void (LLUICtrl* ctrl, const LLSD& param)> commit_signal_t;
-    // *TODO: add xml support for this type of signal in the future
-    typedef boost::signals2::signal<void (LLUICtrl* ctrl, S32 x, S32 y, MASK mask)> mouse_signal_t;
+    AL_VIEW_TYPE(LLUICtrl, LLView);
 
-    typedef std::function<bool (LLUICtrl* ctrl, const LLSD& param)> enable_callback_t;
-    typedef boost::signals2::signal<bool (LLUICtrl* ctrl, const LLSD& param), boost_boolean_combiner> enable_signal_t;
+    using commit_callback_t = std::function<void (LLUICtrl* ctrl, const LLSD& param)>;
+    using commit_signal_t = boost::signals2::signal<void (LLUICtrl* ctrl, const LLSD& param)>;
+    // *TODO: add xml support for this type of signal in the future
+    using mouse_signal_t = boost::signals2::signal<void (LLUICtrl* ctrl, S32 x, S32 y, MASK mask)>;
+
+    using enable_callback_t = std::function<bool (LLUICtrl* ctrl, const LLSD& param)>;
+    using enable_signal_t = boost::signals2::signal<bool (LLUICtrl* ctrl, const LLSD& param), boost_boolean_combiner>;
 
     struct CallbackParam : public LLInitParam::Block<CallbackParam>
     {
@@ -138,7 +140,7 @@ protected:
     friend class LLUICtrlFactory;
     static const Params& getDefaultParams();
     LLUICtrl(const Params& p = getDefaultParams(),
-             const LLViewModelPtr& viewmodel=LLViewModelPtr(new LLViewModel));
+             const LLViewModelPtr& viewmodel=LLViewModelPtr());
 
     commit_signal_t::slot_type initCommitCallback(const CommitCallbackParam& cb);
     enable_signal_t::slot_type initEnableCallback(const EnableCallbackParam& cb);
@@ -177,7 +179,7 @@ public:
 
     bool setControlValue(const LLSD& value);
     void setControlVariable(LLControlVariable* control);
-    virtual void setControlName(const std::string& control, LLView *context = NULL);
+    virtual void setControlName(const std::string& control, LLView *context = nullptr);
     void removeControlVariable();
 
     LLControlVariable* getControlVariable() { return mControlVariables ? mControlVariables->mControlVariable : nullptr; }
@@ -188,7 +190,16 @@ public:
     void setMakeVisibleControlVariable(LLControlVariable* control);
     void setMakeInvisibleControlVariable(LLControlVariable* control);
 
-    void setFunctionName(const std::string& function_name);
+    // The name of the registered callback this control fires, kept for the
+    // UIUsage debug log and read by nothing else. A shipping build does not
+    // carry it at all; inline, so the assignment goes away with the member
+    // rather than becoming a call that discards its argument.
+    void setFunctionName(const std::string& function_name)
+    {
+#if !LL_RELEASE_FOR_DOWNLOAD
+        mFunctionName = function_name;
+#endif
+    }
 
     virtual void    setTentative(bool b);
     virtual bool    getTentative() const;
@@ -268,7 +279,7 @@ public:
     class LLTextInputFilter : public LLQueryFilter, public LLSingleton<LLTextInputFilter>
     {
         LLSINGLETON_EMPTY_CTOR(LLTextInputFilter);
-        /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override
+        /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override
         {
             return filterResult_t(view->isCtrl() && static_cast<const LLUICtrl *>(view)->acceptsTextInput(), true);
         }
@@ -291,22 +302,54 @@ protected:
 
     static bool controlListener(const LLSD& newvalue, LLHandle<LLUICtrl> handle, std::string type);
 
+    // Almost every control has one of these; the viewer connects one at 858
+    // call sites.
     commit_signal_t*        mCommitSignal;
-    enable_signal_t*        mValidateSignal;
 
-    commit_signal_t*        mMouseEnterSignal;
-    commit_signal_t*        mMouseLeaveSignal;
+    // The other eight, which almost no control has: the mouse callbacks are
+    // connected at a couple of hundred call sites between them and the
+    // validate callback at four. Eight pointers on every control to say so
+    // cost more than the block the first of them allocates.
+    struct RareSignals
+    {
+        enable_signal_t* mValidate { nullptr };
+        commit_signal_t* mMouseEnter { nullptr };
+        commit_signal_t* mMouseLeave { nullptr };
+        mouse_signal_t*  mMouseDown { nullptr };
+        mouse_signal_t*  mMouseUp { nullptr };
+        mouse_signal_t*  mRightMouseDown { nullptr };
+        mouse_signal_t*  mRightMouseUp { nullptr };
+        mouse_signal_t*  mDoubleClick { nullptr };
 
-    mouse_signal_t*     mMouseDownSignal;
-    mouse_signal_t*     mMouseUpSignal;
-    mouse_signal_t*     mRightMouseDownSignal;
-    mouse_signal_t*     mRightMouseUpSignal;
+        ~RareSignals();
+    };
 
-    mouse_signal_t*     mDoubleClickSignal;
+    RareSignals* mRareSignals { nullptr };
+    RareSignals& rareSignals(); // allocates
 
-    LLViewModelPtr  mViewModel;
+    // Null unless something connected that callback.
+    enable_signal_t* validateSignal() const       { return mRareSignals ? mRareSignals->mValidate : nullptr; }
+    commit_signal_t* mouseEnterSignal() const     { return mRareSignals ? mRareSignals->mMouseEnter : nullptr; }
+    commit_signal_t* mouseLeaveSignal() const     { return mRareSignals ? mRareSignals->mMouseLeave : nullptr; }
+    mouse_signal_t*  mouseDownSignal() const      { return mRareSignals ? mRareSignals->mMouseDown : nullptr; }
+    mouse_signal_t*  mouseUpSignal() const        { return mRareSignals ? mRareSignals->mMouseUp : nullptr; }
+    mouse_signal_t*  rightMouseDownSignal() const { return mRareSignals ? mRareSignals->mRightMouseDown : nullptr; }
+    mouse_signal_t*  rightMouseUpSignal() const   { return mRareSignals ? mRareSignals->mRightMouseUp : nullptr; }
+    mouse_signal_t*  doubleClickSignal() const    { return mRareSignals ? mRareSignals->mDoubleClick : nullptr; }
 
+    // Created on first use. The model holds the control's value, and most
+    // controls never have one -- panels, icons, buttons that carry no value --
+    // so the default argument on the constructor was allocating one apiece for
+    // nothing. Named apart from what it was so that every place reaching past
+    // it has to be looked at rather than silently reading a null.
+    const LLViewModelPtr& viewModelPtr() const;
+    LLViewModel* viewModel() const { return viewModelPtr().get(); }
+
+    mutable LLViewModelPtr mViewModelStorage;
+
+#if !LL_RELEASE_FOR_DOWNLOAD
     std::string mFunctionName;
+#endif
 
     static F32 sActiveControlTransparency;
     static F32 sInactiveControlTransparency;

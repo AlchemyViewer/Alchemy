@@ -39,6 +39,8 @@ class ALFloaterDirectory;
 class ALPanelSearch : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelSearch, LLPanel);
+
     ALPanelSearch();
     bool postBuild() override { return false; }
     void setSearchFloater(ALFloaterDirectory* floater);

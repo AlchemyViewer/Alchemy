@@ -49,6 +49,13 @@ LLStyle::Params::Params()
 {}
 
 
+//static
+const LLStyle::Params& LLStyle::defaultParams()
+{
+    static const Params sDefault;
+    return sDefault;
+}
+
 LLStyle::LLStyle(const LLStyle::Params& p)
 :   mVisible(p.visible),
     mColor(p.color),

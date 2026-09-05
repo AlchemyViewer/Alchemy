@@ -40,6 +40,8 @@ class LLInventoryItem;
 class LLSidepanelInventorySubpanel : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelInventorySubpanel, LLPanel);
+
     LLSidepanelInventorySubpanel(const LLPanel::Params& p = getDefaultParams());
     virtual ~LLSidepanelInventorySubpanel();
 

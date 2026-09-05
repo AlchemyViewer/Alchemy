@@ -70,6 +70,8 @@ class LLTextBox;
 class ALFloaterScopes final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterScopes, LLFloater);
+
     ALFloaterScopes(const LLSD& key);
     ~ALFloaterScopes() override;
 

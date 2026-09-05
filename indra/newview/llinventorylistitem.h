@@ -61,6 +61,8 @@ class LLViewerInventoryItem;
 class LLPanelInventoryListItemBase : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelInventoryListItemBase, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<LLStyle::Params>   default_style,

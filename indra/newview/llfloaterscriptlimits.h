@@ -42,10 +42,11 @@ class LLAvatarName;
 
 class LLPanelScriptLimitsRegionMemory;
 
-class LLFloaterScriptLimits : public LLFloater
+class LLFloaterScriptLimits final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterScriptLimits, LLFloater);
 
     /*virtual*/ bool postBuild();
 
@@ -69,6 +70,8 @@ protected:
 class LLPanelScriptLimitsInfo : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelScriptLimitsInfo, LLPanel);
+
     LLPanelScriptLimitsInfo();
 
     virtual bool postBuild();
@@ -86,10 +89,12 @@ protected:
 // Memory panel
 /////////////////////////////////////////////////////////////////////////////
 
-class LLPanelScriptLimitsRegionMemory : public LLPanelScriptLimitsInfo, LLRemoteParcelInfoObserver
+class LLPanelScriptLimitsRegionMemory final : public LLPanelScriptLimitsInfo, LLRemoteParcelInfoObserver
 {
 
 public:
+    AL_VIEW_TYPE(LLPanelScriptLimitsRegionMemory, LLPanelScriptLimitsInfo);
+
     LLPanelScriptLimitsRegionMemory()
         : LLPanelScriptLimitsInfo(), LLRemoteParcelInfoObserver(),
 

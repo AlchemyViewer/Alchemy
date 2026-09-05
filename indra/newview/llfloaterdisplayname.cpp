@@ -40,9 +40,10 @@
 #include "llagent.h"
 
 
-class LLFloaterDisplayName : public LLFloater
+class LLFloaterDisplayName final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterDisplayName, LLFloater);
     LLFloaterDisplayName(const LLSD& key);
     virtual ~LLFloaterDisplayName() { }
     /*virtual*/ bool    postBuild();

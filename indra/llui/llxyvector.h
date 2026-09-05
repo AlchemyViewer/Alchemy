@@ -35,10 +35,12 @@
 #include "lltextbox.h"
 #include "lllineeditor.h"
 
-class LLXYVector
+class LLXYVector final
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLXYVector, LLUICtrl);
+
     struct Params
         : public LLInitParam::Block<Params, LLUICtrl::Params>
     {

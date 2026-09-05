@@ -507,11 +507,12 @@ LLAgentHandler gAgentHandler;
 /// LLFloaterProfilePermissions
 ///----------------------------------------------------------------------------
 
-class LLFloaterProfilePermissions
+class LLFloaterProfilePermissions final
     : public LLFloater
     , public LLFriendObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterProfilePermissions, LLFloater);
     LLFloaterProfilePermissions(LLView * owner, const LLUUID &avatar_id);
     ~LLFloaterProfilePermissions();
     bool postBuild() override;
@@ -1044,7 +1045,7 @@ void LLPanelProfileSecondLife::setProfileImageUploaded(const LLUUID &image_asset
     LLFloater *floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->loadAsset(mSecondLifePic->getImageAssetId());
     }
 
@@ -1056,7 +1057,7 @@ bool LLPanelProfileSecondLife::hasUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             return true;
@@ -1071,7 +1072,7 @@ void LLPanelProfileSecondLife::commitUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             perm->onApplyRights();
@@ -1798,7 +1799,7 @@ void LLPanelProfileSecondLife::onShowAgentProfileTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mSecondLifePic->getImageAssetId().notNull())
@@ -1888,7 +1889,7 @@ void LLPanelProfileSecondLife::onCommitProfileImage(const LLUUID& id)
     LLFloater* floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         if (texture_view)
         {
             if (id.isNull())
@@ -2321,7 +2322,7 @@ void LLPanelProfileFirstLife::onShowAgentFirstlifeTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mPicture->getImageAssetId().notNull())
@@ -2455,7 +2456,7 @@ bool LLPanelProfile::postBuild()
 
 void LLPanelProfile::onTabChange()
 {
-    LLPanelProfileTab* active_panel = dynamic_cast<LLPanelProfileTab*>(mTabContainer->getCurrentPanel());
+    LLPanelProfileTab* active_panel = ALViewType::as<LLPanelProfileTab>(mTabContainer->getCurrentPanel());
     if (active_panel)
     {
         active_panel->updateData();
