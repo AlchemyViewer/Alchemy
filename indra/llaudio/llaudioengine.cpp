@@ -1714,15 +1714,6 @@ bool LLAudioSource::play(const LLUUID &audio_uuid)
         return false;
     addAudioData(adp);
 
-    if (mType == LLAudioEngine::AUDIO_TYPE_UI)
-    {
-        adp->setPinned(true);
-        if (adp->getBuffer())
-        {
-            adp->getBuffer()->setPinned(true);
-        }
-    }
-
     if (isMuted())
     {
         return false;
@@ -2152,7 +2143,7 @@ bool LLAudioData::load()
             mHasCompletedDecode = false;
             mHasDecodeFailed = false;
             mHasWAVLoadFailed = false;
-            gAudiop->preloadSound(mID);
+            gAudiop->preloadSound(mID, mPinned);
         }
 
         return false;
