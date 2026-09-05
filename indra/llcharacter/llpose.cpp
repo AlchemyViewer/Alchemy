@@ -47,45 +47,21 @@ LLPose::~LLPose()
 }
 
 //-----------------------------------------------------------------------------
-// getFirstJointState()
-//-----------------------------------------------------------------------------
-LLJointState* LLPose::getFirstJointState()
-{
-    mListIter = mJointMap.begin();
-    if (mListIter == mJointMap.end())
-    {
-        return NULL;
-    }
-    else
-    {
-        return mListIter->second;
-    }
-}
-
-//-----------------------------------------------------------------------------
-// getNextJointState()
-//-----------------------------------------------------------------------------
-LLJointState *LLPose::getNextJointState()
-{
-    mListIter++;
-    if (mListIter == mJointMap.end())
-    {
-        return NULL;
-    }
-    else
-    {
-        return mListIter->second;
-    }
-}
-
-//-----------------------------------------------------------------------------
 // addJointState()
 //-----------------------------------------------------------------------------
 bool LLPose::addJointState(const LLPointer<LLJointState>& jointState)
 {
-    if (mJointMap.find(jointState->getJoint()->getName()) == mJointMap.end())
+    // One state per joint, first one in wins. The physics motion relies on
+    // this: its six sub-motions share two joints, and each blender slot
+    // they would otherwise take is one the animation cannot have.
+    if (!findJointState(jointState->getJoint()))
     {
-        mJointMap[jointState->getJoint()->getName()] = jointState;
+        // Every state in a pose carries the pose's weight -- setWeight can
+        // then skip the walk when nothing changed -- so one that arrives
+        // late is brought up to it rather than sitting at zero until the
+        // next change.
+        jointState->setWeight(mWeight);
+        mJointStates.push_back(jointState);
     }
     return true;
 }
@@ -95,7 +71,15 @@ bool LLPose::addJointState(const LLPointer<LLJointState>& jointState)
 //-----------------------------------------------------------------------------
 bool LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
 {
-    mJointMap.erase(jointState->getJoint()->getName());
+    LLJoint* joint = jointState->getJoint();
+    for (joint_state_list_t::iterator iter = mJointStates.begin(); iter != mJointStates.end(); ++iter)
+    {
+        if ((*iter)->getJoint() == joint)
+        {
+            mJointStates.erase(iter);
+            break;
+        }
+    }
     return true;
 }
 
@@ -104,7 +88,7 @@ bool LLPose::removeJointState(const LLPointer<LLJointState>& jointState)
 //-----------------------------------------------------------------------------
 bool LLPose::removeAllJointStates()
 {
-    mJointMap.clear();
+    mJointStates.clear();
     return true;
 }
 
@@ -113,33 +97,29 @@ bool LLPose::removeAllJointStates()
 //-----------------------------------------------------------------------------
 LLJointState* LLPose::findJointState(LLJoint *joint)
 {
-    joint_map_iterator iter = mJointMap.find(joint->getName());
-
-    if (iter == mJointMap.end())
+    for (const LLPointer<LLJointState>& state : mJointStates)
     {
-        return NULL;
+        if (state->getJoint() == joint)
+        {
+            return state;
+        }
     }
-    else
-    {
-        return iter->second;
-    }
+    return NULL;
 }
 
 //-----------------------------------------------------------------------------
 // findJointState()
 //-----------------------------------------------------------------------------
-LLJointState* LLPose::findJointState(const std::string &name)
+LLJointState* LLPose::findJointState(std::string_view name)
 {
-    joint_map_iterator iter = mJointMap.find(name);
-
-    if (iter == mJointMap.end())
+    for (const LLPointer<LLJointState>& state : mJointStates)
     {
-        return NULL;
+        if (state->getJoint()->getName() == name)
+        {
+            return state;
+        }
     }
-    else
-    {
-        return iter->second;
-    }
+    return NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -147,10 +127,17 @@ LLJointState* LLPose::findJointState(const std::string &name)
 //-----------------------------------------------------------------------------
 void LLPose::setWeight(F32 weight)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-    for (joint_map_value_type& joint_pair : mJointMap)
+    // Every state already carries mWeight, so an unchanged weight has
+    // nothing to write. The controller sets this once per motion per frame,
+    // and for a motion that is simply playing it is the same 1.0 each time.
+    if (weight == mWeight)
     {
-        joint_pair.second->setWeight(weight);
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    for (const LLPointer<LLJointState>& state : mJointStates)
+    {
+        state->setWeight(weight);
     }
     mWeight = weight;
 }
@@ -168,7 +155,7 @@ F32 LLPose::getWeight() const
 //-----------------------------------------------------------------------------
 S32 LLPose::getNumJointStates() const
 {
-    return (S32)mJointMap.size();
+    return (S32)mJointStates.size();
 }
 
 //-----------------------------------------------------------------------------
@@ -509,8 +496,9 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
     const S32 motion_priority = motion->getPriority();
     const bool additive_blend = (motion->getBlendType() == LLMotion::ADDITIVE_BLEND);
 
-    for(LLJointState* jsp = pose->getFirstJointState(); jsp; jsp = pose->getNextJointState())
+    for (const LLPointer<LLJointState>& state : pose->getJointStates())
     {
+        LLJointState* jsp = state;
         LLJoint *jointp = jsp->getJoint();
         if (!jointp)
         {

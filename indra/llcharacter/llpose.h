@@ -37,6 +37,8 @@
 
 #include <map>
 #include <string>
+#include <string_view>
+#include <vector>
 
 
 //-----------------------------------------------------------------------------
@@ -45,20 +47,18 @@
 class LLPose
 {
     friend class LLPoseBlender;
-protected:
-    typedef std::map<std::string, LLPointer<LLJointState> > joint_map;
-    typedef joint_map::iterator joint_map_iterator;
-    typedef joint_map::value_type joint_map_value_type;
-
-    joint_map                   mJointMap;
-    F32                         mWeight;
-    joint_map_iterator          mListIter;
 public:
-    // Iterate through jointStates
-    LLJointState* getFirstJointState();
-    LLJointState* getNextJointState();
+    typedef std::vector<LLPointer<LLJointState> > joint_state_list_t;
+protected:
+    // A few dozen states at most, added and removed at setup or by the
+    // poser, and walked by the blender every frame: contiguous, with a
+    // linear find. One state per joint; addJointState keeps it that way.
+    joint_state_list_t          mJointStates;
+    F32                         mWeight;
+public:
+    const joint_state_list_t& getJointStates() const { return mJointStates; }
     LLJointState* findJointState(LLJoint *joint);
-    LLJointState* findJointState(const std::string &name);
+    LLJointState* findJointState(std::string_view name);
 public:
     // Constructor
     LLPose() : mWeight(0.f) {}

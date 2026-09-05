@@ -108,7 +108,7 @@ namespace tut
     void llpose_object::test<1>()
     {
         ensure_equals("empty pose has no states", mPose.getNumJointStates(), 0);
-        ensure("empty pose has no first state", mPose.getFirstJointState() == nullptr);
+        ensure("empty pose has nothing to iterate", mPose.getJointStates().empty());
         ensure("empty pose finds nothing by joint", mPose.findJointState(&mA) == nullptr);
         ensure("empty pose finds nothing by name", mPose.findJointState(std::string("a")) == nullptr);
         ensure_equals("empty pose weight", mPose.getWeight(), 0.f);
@@ -123,8 +123,8 @@ namespace tut
         ensure("find by joint", mPose.findJointState(&mA) == sa.get());
         ensure("find by name", mPose.findJointState(std::string("a")) == sa.get());
         ensure("other joint absent", mPose.findJointState(&mB) == nullptr);
-        ensure("first state is the one added", mPose.getFirstJointState() == sa.get());
-        ensure("no second state", mPose.getNextJointState() == nullptr);
+        ensure_equals("one state to iterate", mPose.getJointStates().size(), (size_t)1);
+        ensure("the state to iterate is the one added", mPose.getJointStates()[0].get() == sa.get());
     }
 
     template<> template<>
@@ -158,7 +158,7 @@ namespace tut
 
         mPose.removeAllJointStates();
         ensure_equals("removeAll empties", mPose.getNumJointStates(), 0);
-        ensure("nothing to iterate", mPose.getFirstJointState() == nullptr);
+        ensure("nothing to iterate", mPose.getJointStates().empty());
     }
 
     template<> template<>
@@ -172,9 +172,9 @@ namespace tut
         mPose.addJointState(sc);
 
         std::vector<LLJointState*> seen;
-        for (LLJointState* state = mPose.getFirstJointState(); state; state = mPose.getNextJointState())
+        for (const LLPointer<LLJointState>& state : mPose.getJointStates())
         {
-            seen.push_back(state);
+            seen.push_back(state.get());
         }
         ensure_equals("iteration visits every state", seen.size(), (size_t)3);
         ensure("iteration visits a", std::count(seen.begin(), seen.end(), sa.get()) == 1);
@@ -195,15 +195,47 @@ namespace tut
         ensure_equals("weight reaches a", sa->getWeight(), 0.5f);
         ensure_equals("weight reaches b", sb->getWeight(), 0.5f);
 
-        // A state added after setWeight keeps its own weight.
+        // A state added after setWeight is brought up to the pose's weight.
+        // Every state carrying the pose weight is what lets setWeight skip
+        // the walk when the weight has not changed; left at its own weight,
+        // a late state would sit there until the next change.
         LLPointer<LLJointState> sc = make_state(&mC, LLJointState::ROT, 0.f);
         mPose.addJointState(sc);
-        ensure_equals("late state keeps its own weight", sc->getWeight(), 0.f);
+        ensure_equals("late state receives the pose weight", sc->getWeight(), 0.5f);
 
         mPose.setWeight(1.f);
         ensure_equals("second setWeight reaches a", sa->getWeight(), 1.f);
         ensure_equals("second setWeight reaches b", sb->getWeight(), 1.f);
         ensure_equals("second setWeight reaches c", sc->getWeight(), 1.f);
+    }
+
+    template<> template<>
+    void llpose_object::test<7>()
+    {
+        // The poser's runtime path: find the state on a joint, remove it, add
+        // another for the same joint. Dedup is by joint, so two states on
+        // one joint are still one entry; find by name still reaches it; and
+        // removing a state that is not there is harmless.
+        LLPointer<LLJointState> first = make_state(&mA, LLJointState::ROT);
+        LLPointer<LLJointState> second = make_state(&mA, LLJointState::POS);
+        LLPointer<LLJointState> other = make_state(&mB, LLJointState::ROT);
+        mPose.addJointState(first);
+        mPose.addJointState(second);
+        mPose.addJointState(other);
+        ensure_equals("two states on one joint are one entry", mPose.getNumJointStates(), 2);
+        ensure("found by joint", mPose.findJointState(&mA) == first.get());
+        ensure("found by name", mPose.findJointState("a") == first.get());
+        ensure("the other joint is found by name too", mPose.findJointState("b") == other.get());
+        ensure("an unknown name finds nothing", mPose.findJointState("nobody") == nullptr);
+
+        mPose.removeJointState(mPose.findJointState(&mA));
+        ensure_equals("removed by the state found", mPose.getNumJointStates(), 1);
+        ensure("the joint is gone", mPose.findJointState(&mA) == nullptr);
+        mPose.removeJointState(second);
+        ensure_equals("removing an absent state changes nothing", mPose.getNumJointStates(), 1);
+
+        mPose.addJointState(second);
+        ensure("the joint can be re-added with a different state", mPose.findJointState(&mA) == second.get());
     }
 
     //-------------------------------------------------------------------------
