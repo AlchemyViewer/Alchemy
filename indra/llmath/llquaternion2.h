@@ -55,6 +55,12 @@ public:
     // Ctor from LLQuaternion
     explicit LLQuaternion2( const class LLQuaternion& quat );
 
+    // Ctor from the raw <x, y, z, w> vector
+    explicit LLQuaternion2( const LLVector4a& q ) : mQ(q) {}
+
+    // The rotation that changes nothing
+    static inline const LLQuaternion2& identity();
+
     //////////////////////////
     // Get/Set
     //////////////////////////
@@ -64,6 +70,9 @@ public:
     {
         mQ.loadua( quat.mQ );
     }
+
+    // Write out to an LLQuaternion
+    inline void store( LLQuaternion& dst ) const;
 
     // Return the internal LLVector4a representation of the quaternion
     inline const LLVector4a& getVector4a() const;
@@ -75,6 +84,17 @@ public:
 
     // Set this quaternion to the conjugate of src
     inline void setConjugate(const LLQuaternion2& src);
+
+    // Set this to the product LLQuaternion's operator* gives: the rotation a
+    // and then the rotation b, so that rotating by the result is rotating by
+    // a and then by b.
+    inline void setMul(const LLQuaternion2& a, const LLQuaternion2& b);
+
+    // Set this to the normalized linear interpolation from a to b, over the
+    // shorter of the two ways round. Unlike the free nlerp() this is a
+    // normalized lerp for every pair, including the ones more than a half
+    // turn apart, where that one hands over to slerp and its three sines.
+    inline void setLerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u);
 
     // Renormalizes the quaternion. Assumes it has nonzero length.
     inline void normalize();
@@ -88,6 +108,14 @@ public:
     /////////////////////////
     // Quaternion inspection
     /////////////////////////
+
+    // Rotate a vector by this quaternion, the way LLVector3's operator* does.
+    // The result carries the w it was handed.
+    inline void rotate(const LLVector4a& v, LLVector4a& result) const;
+
+    // The four component dot product: the cosine of half the angle between
+    // the two rotations, negative when they are more than half a turn apart.
+    inline LLSimdScalar dot(const LLQuaternion2& rhs) const;
 
     // Return true if this quaternion is equal to 'rhs'.
     // Note! Quaternions exhibit "double-cover", so any rotation has two equally valid

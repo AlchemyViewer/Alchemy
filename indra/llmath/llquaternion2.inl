@@ -32,9 +32,20 @@ inline LLQuaternion2::LLQuaternion2( const LLQuaternion& quat )
     mQ.set(quat.mQ[VX], quat.mQ[VY], quat.mQ[VZ], quat.mQ[VW]);
 }
 
+inline const LLQuaternion2& LLQuaternion2::identity()
+{
+    static const LLQuaternion2 ident(LLVector4a(0.f, 0.f, 0.f, 1.f));
+    return ident;
+}
+
 //////////////////////////
 // Get/Set
 //////////////////////////
+
+inline void LLQuaternion2::store( LLQuaternion& dst ) const
+{
+    _mm_storeu_ps( dst.mQ, (LLQuad)mQ );
+}
 
 // Return the internal LLVector4a representation of the quaternion
 inline const LLVector4a& LLQuaternion2::getVector4a() const
@@ -57,6 +68,60 @@ inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
     // XOR the sign bit (bit pattern 0x80000000 == -0.f) into x/y/z; leave w.
     const __m128 signMask = _mm_set_ps(0.f, -0.f, -0.f, -0.f);
     mQ = _mm_xor_ps(src.mQ, signMask);
+}
+
+// Set this to a * b, in LLQuaternion's order
+inline void LLQuaternion2::setMul(const LLQuaternion2& a, const LLQuaternion2& b)
+{
+    // LLQuaternion's a * b is the Hamilton product of b with a. Written out,
+    // each component is one term from b's scalar part times a, plus a cyclic
+    // triple, which is four multiplies of four shuffled operands rather than
+    // the sixteen the component form does one at a time.
+    //
+    //   r.x = b.w*a.x + b.x*a.w + b.y*a.z - b.z*a.y
+    //   r.y = b.w*a.y + b.y*a.w + b.z*a.x - b.x*a.z
+    //   r.z = b.w*a.z + b.z*a.w + b.x*a.y - b.y*a.x
+    //   r.w = b.w*a.w - b.x*a.x - b.y*a.y - b.z*a.z
+    //
+    // The last column of the second and third terms is the odd one out --
+    // subtracted where the others are added -- so it is folded in by flipping
+    // the sign bit of w rather than by a separate operation.
+    const LLQuad p = (LLQuad)b.mQ;
+    const LLQuad q = (LLQuad)a.mQ;
+
+    const LLQuad negate_w = _mm_castsi128_ps(_mm_setr_epi32(0, 0, 0, (int)0x80000000u));
+
+    const LLQuad term_scalar = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(3, 3, 3, 3)), q);
+    const LLQuad term_b = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(0, 2, 1, 0)),
+                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(0, 3, 3, 3)));
+    const LLQuad term_c = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(1, 0, 2, 1)),
+                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(1, 1, 0, 2)));
+    const LLQuad term_d = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(2, 1, 0, 2)),
+                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(2, 0, 2, 1)));
+
+    LLQuad r = _mm_add_ps(term_scalar, _mm_xor_ps(term_b, negate_w));
+    r = _mm_add_ps(r, _mm_xor_ps(term_c, negate_w));
+    mQ = _mm_sub_ps(r, term_d);
+}
+
+// Set this to the normalized lerp from a to b over the shorter way round
+inline void LLQuaternion2::setLerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u)
+{
+    // A rotation and its negation are the same rotation, so the end that is
+    // more than half a turn away is brought round to the near side first --
+    // otherwise the interpolation takes the long way and passes through
+    // rotations neither end asked for.
+    const LLQuad sign_bit = _mm_castsi128_ps(_mm_set1_epi32((int)0x80000000u));
+
+    LLVector4a cos_half_angle;
+    cos_half_angle.setAllDot4(a.mQ, b.mQ);
+    const LLQuad flip = _mm_and_ps(_mm_cmplt_ps((LLQuad)cos_half_angle, _mm_setzero_ps()), sign_bit);
+
+    LLVector4a near_b;
+    near_b = _mm_xor_ps((LLQuad)b.mQ, flip);
+
+    mQ.setLerp(a.mQ, near_b, u);
+    mQ.normalize4();
 }
 
 // Renormalizes the quaternion. Assumes it has nonzero length.
@@ -83,6 +148,39 @@ inline void LLQuaternion2::quantize16()
 /////////////////////////
 // Quaternion inspection
 /////////////////////////
+
+// Rotate a vector by this quaternion
+inline void LLQuaternion2::rotate(const LLVector4a& v, LLVector4a& result) const
+{
+    // q (x) v (x) conj(q), written out in full rather than through the
+    // cross-product identity. That identity is a rotation only for a
+    // quaternion of unit length, and this is what LLVector3's operator* does
+    // for whatever it is handed -- a rotation that has drifted off unit
+    // scales the vector, and callers rely on getting the same answer.
+    const LLVector4Logical scalar_lane = _mm_castsi128_ps(_mm_setr_epi32(0, 0, 0, -1));
+
+    LLQuaternion2 vector_as_quaternion;
+    vector_as_quaternion.mQ.setSelectWithMask(scalar_lane, LLVector4a::getZero(), v);
+
+    // setMul(a, b) composes as LLQuaternion's a * b does, which is the
+    // Hamilton product of b with a, so the operands read backwards here.
+    LLQuaternion2 rotated;
+    rotated.setMul(vector_as_quaternion, *this);
+
+    LLQuaternion2 conjugate;
+    conjugate.setConjugate(*this);
+
+    LLQuaternion2 restored;
+    restored.setMul(conjugate, rotated);
+
+    // the w handed in comes back, so a caller carrying something there keeps it
+    result.setSelectWithMask(scalar_lane, v, restored.mQ);
+}
+
+inline LLSimdScalar LLQuaternion2::dot(const LLQuaternion2& rhs) const
+{
+    return mQ.dot4(rhs.mQ);
+}
 
 // Return true if this quaternion is equal to 'rhs'.
 // Note! Quaternions exhibit "double-cover", so any rotation has two equally valid
