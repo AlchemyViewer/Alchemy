@@ -43,7 +43,10 @@
 typedef std::map<std::string, std::string> controller_map_t;
 typedef std::map<std::string, F32> default_controller_map_t;
 
-#define MIN_REQUIRED_PIXEL_AREA_AVATAR_PHYSICS_MOTION 0.f
+// Where head turning stops too: an avatar about twenty-two pixels on a side,
+// well below where a bounce could be seen. This was zero, so the six
+// sub-motions integrated forces for every avatar at every distance.
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_AVATAR_PHYSICS_MOTION = 500.f;
 // we use TIME_ITERATION_STEP_MAX in division operation, make sure this is a simple
 // value and devision result won't end with repeated/recurring tail like 1.333(3)
 #define TIME_ITERATION_STEP_MAX 0.05f // minimal step size will end up as 0.025
