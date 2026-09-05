@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "llcharacter.h"
 #include "llmotion.h"
 #include "lljointstate.h"
 #include "lluuid.h"
