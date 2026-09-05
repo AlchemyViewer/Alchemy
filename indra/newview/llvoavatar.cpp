@@ -743,7 +743,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mNameAppearance(false),
     mNameFriend(false),
     mNameAlpha(0.f),
-    mDistanceCentimetres(-1),
+    mDistanceMetres(-1),
     mRenderGroupTitles(sRenderGroupTitles),
     mNameCloud(false),
     mFirstTEMessageReceived( false ),
@@ -3739,10 +3739,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
     LLColor4 name_tag_color = getNameTagColor(is_friend);
     LLColor4 distance_color = name_tag_color;
-    // The distance line prints to the centimetre, so that is the unit the
-    // tag is compared and rebuilt on. Formatting it every frame to find
-    // out whether it changed was a heap string and a printf per avatar.
-    S32 distance_cm = -1;
+    // The distance line prints whole metres, so that is the unit the tag is
+    // compared and rebuilt on. A change to the line rebuilds every line of
+    // the tag, and to the centimetre that was every frame anyone moved.
+    S32 distance_m = -1;
 
     static LLCachedControl<bool> show_distance_color_tag(gSavedSettings, "NameTagShowDistanceColors", false);
     static LLCachedControl<bool> show_distance_in_tag(gSavedSettings, "NameTagShowDistance", true);
@@ -3773,7 +3773,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         if (show_distance_in_tag)
         {
-            distance_cm = ll_round((F32)sqrt(distance_squared) * 100.f);
+            distance_m = ll_round((F32)sqrt(distance_squared));
         }
 
         // Override nametag color only if friend color is disabled
@@ -3798,7 +3798,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         || is_friend != mNameFriend
         || is_cloud != mNameCloud
         || is_typing != mTypingLast
-        || distance_cm != mDistanceCentimetres
+        || distance_m != mDistanceMetres
         || name_tag_color != mNameTagColor)
     {
         clearNameTag();
@@ -3918,7 +3918,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         if (show_distance_in_tag)
         {
-            addNameTagLine(fmt::format("{:.2f} m", distance_cm / 100.f), distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
+            addNameTagLine(fmt::format("{} m", distance_m), distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
         }
 
         if (show_rez_status)
@@ -3934,7 +3934,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         mNameFriend = is_friend;
         mNameCloud = is_cloud;
         mTypingLast = is_typing;
-        mDistanceCentimetres = distance_cm;
+        mDistanceMetres = distance_m;
         mTitle = title ? title->getString() : "";
         mNameTagColor = name_tag_color;
         LLStringFn::replace_ascii_controlchars(mTitle,LL_UNKNOWN_CHAR);

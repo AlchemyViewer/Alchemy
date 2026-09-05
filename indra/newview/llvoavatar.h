@@ -1257,8 +1257,8 @@ private:
     F32             mNameAlpha;
     S32             mRenderGroupTitles;
     LLColor4        mNameTagColor;
-    // what the distance line last showed, to the centimetre it is printed to
-    S32             mDistanceCentimetres;
+    // what the distance line last showed, in the whole metres it prints
+    S32             mDistanceMetres;
 
     //--------------------------------------------------------------------
     // Display the name (then optionally fade it out)
