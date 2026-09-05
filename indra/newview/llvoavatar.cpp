@@ -3949,7 +3949,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         static const LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
         static const LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
-        LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(getID(), isSelf() ? agent_chat_color : user_chat_color, ALAvatarGroups::COLOR_CHAT);
+        LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(this, isSelf() ? agent_chat_color : user_chat_color, ALAvatarGroups::COLOR_CHAT);
         LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);
         LLColor4 old_chat = lerp(normal_chat, LLColor4(0.6f, 0.6f, 0.6f, 1.f), 0.7f);
 
@@ -4211,7 +4211,7 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 #endif
     static LLUIColor name_tag_match = LLUIColorTable::instance().getColor("NameTagMatch");
     LLColor4 color_name = name_tag_match;
-    color_name = ALAvatarGroups::instance().getAvatarColor(getID(), color_name, ALAvatarGroups::COLOR_NAMETAG);
+    color_name = ALAvatarGroups::instance().getAvatarColor(this, color_name, ALAvatarGroups::COLOR_NAMETAG);
 
     return color_name;
 }
@@ -4310,6 +4310,24 @@ bool LLVOAvatar::isInMuteList() const
         mCachedInMuteList = muted;
     }
     return muted;
+}
+
+bool LLVOAvatar::isStaffUser() const
+{
+    // Whether an avatar is staff never changes, so the first real answer is
+    // the last. The name cache is the only thing that can give one, and it
+    // has nothing to say until the name has arrived; asked before that it
+    // would call everyone a non-Linden, so nothing is recorded until it does.
+    if (!mStaffUserKnown)
+    {
+        std::string full_name;
+        if (gCacheName->getFullName(getID(), full_name))
+        {
+            mIsStaffUser = LLMuteList::isLinden(full_name);
+            mStaffUserKnown = true;
+        }
+    }
+    return mIsStaffUser;
 }
 
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)

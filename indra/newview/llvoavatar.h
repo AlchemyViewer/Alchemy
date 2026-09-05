@@ -502,6 +502,7 @@ public:
     U32         renderImpostor(LLColor4U color = LLColor4U(255,255,255,255), S32 diffuse_channel = 0);
     bool        isVisuallyMuted();
     bool        isInMuteList() const;
+    bool        isStaffUser() const;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     bool        isRlvSilhouette() const;
 // [/RLVa:KB]
@@ -600,6 +601,9 @@ private:
     mutable bool        mCachedInMuteList;
     mutable F64         mCachedMuteListUpdateTime;
     mutable bool        mCachedInBuddyList = false;
+    // final once the name is known; an avatar's staff status never changes
+    mutable bool        mIsStaffUser = false;
+    mutable bool        mStaffUserKnown = false;
     mutable F64         mCachedBuddyListUpdateTime = 0.0;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     mutable bool        mCachedIsRlvSilhouette = false;
