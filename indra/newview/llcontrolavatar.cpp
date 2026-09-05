@@ -190,7 +190,7 @@ void LLControlAvatar::matchVolumeTransform()
                 LLQuaternion obj_rot = mRootVolp->mDrawable->getRotation();
                 obj_pos.rotVec(joint_rot);
                 mRoot->setWorldPosition(obj_pos + joint_pos);
-                mRoot->setWorldRotation(obj_rot * joint_rot);
+                mRoot->setWorldRotationIfMoved(obj_rot * joint_rot);
                 setRotation(mRoot->getRotation());
 
                 setGlobalScale(mScaleConstraintFixup);
@@ -236,7 +236,7 @@ void LLControlAvatar::matchVolumeTransform()
             }
 #endif
             setRotation(bind_rot*obj_rot);
-            mRoot->setWorldRotation(bind_rot*obj_rot);
+            mRoot->setWorldRotationIfMoved(bind_rot*obj_rot);
             if (getRegion() && !isDead())
             {
                 setPositionAgent(vol_pos);

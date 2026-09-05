@@ -316,6 +316,48 @@ namespace tut
         ensure_equals("a rotated seat dirties the whole tree", root.updateWorldMatrixChildren(), 2);
     }
 
+    template<> template<>
+    void lljoint_object::test<18>()
+    {
+        // The avatar root is written every frame from a slerp toward a target
+        // that has stopped moving, with an interpolant taken from the frame
+        // time. slerp blends its two arguments instead of returning either,
+        // so the root lands a rounding short of where it already was, and a
+        // different frame time rounds a different way: it never arrives, and
+        // the equality compare in setRotation never fires.
+        LLJoint root, child;
+        root.setup("root");
+        child.setup("child", &root);
+
+        const LLQuaternion target(0.4f, LLVector3::y_axis);
+        root.setWorldRotationIfMoved(LLQuaternion(0.42f, LLVector3::y_axis));
+        root.updateWorldMatrixChildren();
+
+        // Long enough to catch up: the gap closes by a factor of u each frame.
+        for (S32 frame = 0; frame < 600; ++frame)
+        {
+            const F32 u = (0.010f + 0.006f * (frame % 5)) / 0.4f;
+            root.setWorldRotationIfMoved(slerp(u, root.getWorldRotation(), target));
+        }
+        root.updateWorldMatrixChildren();
+
+        for (S32 frame = 0; frame < 8; ++frame)
+        {
+            const F32 u = (0.010f + 0.006f * (frame % 5)) / 0.4f;
+            root.setWorldRotationIfMoved(slerp(u, root.getWorldRotation(), target));
+        }
+        ensure_equals("a root that has caught up with its target stops dirtying the tree",
+                      root.updateWorldMatrixChildren(), 0);
+
+        // What it stopped short by is the whole cost of the tolerance.
+        ensure("the root stopped within a hundredth of a degree of its target",
+               root.getWorldRotation().isEqualEps(target, 1.e-4f));
+
+        // A real turn still has to reach the skeleton.
+        root.setWorldRotationIfMoved(LLQuaternion(0.4f + 1.f * DEG_TO_RAD, LLVector3::y_axis));
+        ensure_equals("a real turn dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+    }
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have

@@ -851,6 +851,31 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
     setRotation(LLQuaternion(temp_mat));
 }
 
+//--------------------------------------------------------------------
+// setWorldRotationIfMoved()
+//--------------------------------------------------------------------
+void LLJoint::setWorldRotationIfMoved( const LLQuaternion& rot )
+{
+    // A rotation recomputed every frame from inputs that did not change does
+    // not come back bit identical, so the equality compare in setRotation
+    // never fires for a caller fed from one. The avatar root is written from
+    // a slerp toward a target it is already sitting on, and slerp blends its
+    // two arguments rather than returning either, so the root lands a
+    // rounding short of where it already was and dirties the skeleton, every
+    // frame, forever.
+    //
+    // What this tolerance costs is a residual: an interpolating caller stops
+    // once its step falls below it, leaving a gap of the tolerance over the
+    // interpolant. For the root that is at worst a hundredth of a degree,
+    // which moves a joint a metre out by a tenth of a millimetre.
+    constexpr F32 ROTATION_UNCHANGED_EPSILON = 1.e-6f;
+
+    if (getWorldRotation().isNotEqualEps(rot, ROTATION_UNCHANGED_EPSILON))
+    {
+        setWorldRotation(rot);
+    }
+}
+
 
 //--------------------------------------------------------------------
 // getScale()

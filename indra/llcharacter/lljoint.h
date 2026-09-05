@@ -250,6 +250,11 @@ public:
     LLQuaternion getLastWorldRotation();
     void setWorldRotation( const LLQuaternion& rot );
 
+    // writes the world rotation only when it differs by more than a tolerance,
+    // for callers whose value is recomputed every frame and does not come back
+    // bit identical
+    void setWorldRotationIfMoved( const LLQuaternion& rot );
+
     // get/set local scale
     const LLVector3& getScale();
     void setScale( const LLVector3& scale, bool apply_attachment_overrides = false );

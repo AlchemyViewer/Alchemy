@@ -4819,7 +4819,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 
     F32 u = llclamp((delta_time / pelvis_lag_time), 0.0f, 1.0f);
 
-            mRoot->setWorldRotation( slerp(u, mRoot->getWorldRotation(), wQv) );
+            mRoot->setWorldRotationIfMoved( slerp(u, mRoot->getWorldRotation(), wQv) );
 }
 
 //------------------------------------------------------------------------
