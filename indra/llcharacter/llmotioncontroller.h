@@ -158,8 +158,14 @@ public:
     bool isPaused() const { return mPaused; }
     S32 getPausedFrame() const { return mPausedFrame; }
 
+    // Changes the quantum the animation clock runs on; zero is continuous.
+    // Only a real change does anything, so it is safe to call every frame.
     void setTimeStep(F32 step);
     F32 getTimeStep() const { return mTimeStep; }
+    // Snaps a requested quantum onto the ladder setTimeStep is meant to be
+    // fed from: sixteenths of a second up to a quarter, and nothing finer
+    // than a sixteenth, which is not worth quantizing for.
+    static F32 quantizeTimeStep(F32 requested_step);
 
     // The quantized clock's arithmetic, kept apart from the controller so it
     // can be driven without a character or a frame timer.

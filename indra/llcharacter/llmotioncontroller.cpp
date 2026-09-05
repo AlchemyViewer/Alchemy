@@ -303,11 +303,28 @@ F32 LLMotionController::quantumInterpolant(F32 interp, F32 last_interp)
 //-----------------------------------------------------------------------------
 void LLMotionController::setTimeStep(F32 step)
 {
+    if (step == mTimeStep)
+    {
+        return;
+    }
+
+    // The quantum count is in units of the old step, and the blender is
+    // part way toward a target computed on the old grid. Finish that move,
+    // drop the cache and let the next update start the new grid from
+    // scratch, whichever direction the change is.
+    mPoseBlender.interpolate(1.f);
+    clearBlenders();
+    mTimeStepCount = 0;
+    mLastInterp = 0.f;
+
+    const bool entering = (mTimeStep == 0.f);
     mTimeStep = step;
 
-    if (step != 0.f)
+    if (step != 0.f && entering)
     {
-        // make sure timestamps conform to new quantum
+        // make sure timestamps conform to new quantum -- once, on the way
+        // in. Doing it on every change walked them backwards a fraction of
+        // a step each time the quantum moved a rung.
         for (motion_list_t::iterator iter = mActiveMotions.begin();
              iter != mActiveMotions.end(); ++iter)
         {
@@ -320,6 +337,21 @@ void LLMotionController::setTimeStep(F32 step)
             motionp->mSendStopTimestamp = (F32)llfloor(motionp->mSendStopTimestamp / step) * step;
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+// quantizeTimeStep()
+//-----------------------------------------------------------------------------
+F32 LLMotionController::quantizeTimeStep(F32 requested_step)
+{
+    // The request is a smooth function of screen size and crowd size, so
+    // left alone it changes a little every frame, and every change costs a
+    // pose recompute and a cache. Sixteenths are exact in binary, which
+    // keeps the clock's accumulation exact at every rung.
+    constexpr F32 RUNG = 1.f / 16.f;
+    constexpr F32 MAX_STEP = 0.25f;
+    const F32 capped = llmin(requested_step, MAX_STEP);
+    return llmax(0.f, floorf(capped / RUNG)) * RUNG;
 }
 
 //-----------------------------------------------------------------------------

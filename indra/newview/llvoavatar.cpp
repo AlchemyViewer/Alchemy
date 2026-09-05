@@ -4977,24 +4977,34 @@ void LLVOAvatar::updateTimeStep()
         // standard avatars in the same bucket. Is this desirable?
         F32 time_quantum = clamp_rescale((F32)sInstances.size(), 10.f, 35.f, 0.f, 0.25f);
         F32 pixel_area_scale = clamp_rescale(mPixelArea, 100, 5000, 1.f, 0.f);
-        F32 time_step = time_quantum * pixel_area_scale;
         // Extrema:
         //   If number of avs is 10 or less, time_step is unmodified (flagged with 0.0).
         //   If area of av is 5000 or greater, time_step is unmodified (flagged with 0.0).
         //   If number of avs is 35 or greater, and area of av is 100 or less,
         //   time_step takes the maximum possible value of 0.25.
         //   Other situations will give values within the (0, 0.25) range.
-        if (time_step != 0.f)
+        // Snapped to the controller's ladder, so an avatar drifting in size
+        // does not hand it a new quantum every frame.
+        const F32 time_step = LLMotionController::quantizeTimeStep(time_quantum * pixel_area_scale);
+        const F32 previous_step = mMotionController.getTimeStep();
+        if (time_step == previous_step)
+        {
+            return;
+        }
+
+        if (previous_step == 0.f)
         {
             // disable walk motion servo controller as it doesn't work with motion timesteps
             stopMotion(ANIM_AGENT_WALK_ADJUST);
             removeAnimationData("Walk Speed");
         }
-        // See SL-763 - playback with altered time step does not
-        // appear to work correctly, odd behavior for distant avatars.
-        // As of 11-2017, LLMotionController::updateMotions() will
-        // ignore the value here. Need to re-enable if it's every
-        // fixed.
+        else if (time_step == 0.f && isAnyAnimationSignaled(AGENT_WALK_ANIMS, NUM_AGENT_WALK_ANIMS))
+        {
+            // Back on the continuous clock while walking: the servo was
+            // stopped on the way out, and the animation state that would
+            // start it has not changed, so nothing else will.
+            startMotion(ANIM_AGENT_WALK_ADJUST);
+        }
         mMotionController.setTimeStep(time_step);
     }
 }
@@ -5271,8 +5281,7 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     //--------------------------------------------------------------------
     // change animation time quanta based on avatar render load
     //--------------------------------------------------------------------
-    // SL-763 the time step quantization does not currently work.
-    //updateTimeStep();
+    updateTimeStep();
 
     //--------------------------------------------------------------------
     // Update sitting state based on parent and active animation info.

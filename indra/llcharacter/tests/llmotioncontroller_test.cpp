@@ -163,6 +163,27 @@ namespace tut
     }
 
     template<> template<>
+    void llmotioncontroller_object::test<7>()
+    {
+        // The requested quantum is a smooth function of size and crowd and
+        // would move a little every frame. It lands on sixteenths, never
+        // finer than one and never coarser than a quarter, and anything under
+        // a sixteenth is not worth quantizing at all.
+        ensure_equals("a quarter stays a quarter", LLMotionController::quantizeTimeStep(0.25f), 0.25f);
+        ensure_equals("more than a quarter is capped", LLMotionController::quantizeTimeStep(0.4f), 0.25f);
+        ensure_equals("a fifth rounds down to three sixteenths", LLMotionController::quantizeTimeStep(0.2f), 0.1875f);
+        ensure_equals("just under an eighth is a sixteenth", LLMotionController::quantizeTimeStep(0.124f), 0.0625f);
+        ensure_equals("a twentieth is too fine to bother with", LLMotionController::quantizeTimeStep(0.05f), 0.f);
+        ensure_equals("nothing asked for is nothing", LLMotionController::quantizeTimeStep(0.f), 0.f);
+        ensure_equals("a negative request is nothing", LLMotionController::quantizeTimeStep(-1.f), 0.f);
+
+        // Every rung is exact in binary, so a clock stepping by one is exact.
+        F32 t = 0.f;
+        for (S32 i = 0; i < 64; ++i) { t += LLMotionController::quantizeTimeStep(0.0625f); }
+        ensure_equals("sixty-four sixteenths is exactly four", t, 4.f);
+    }
+
+    template<> template<>
     void llmotioncontroller_object::test<6>()
     {
         // The edges: no progress is no movement, reaching the end is all of
