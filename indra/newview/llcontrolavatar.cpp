@@ -715,6 +715,15 @@ bool LLControlAvatar::isImpostor()
 // virtual
 bool LLControlAvatar::isInView() const
 {
+    // An attached animated object is drawn with its avatar. Its volumes sit
+    // in that avatar's attachment bridge, which the pipeline leaves unstamped
+    // while the avatar is impostored, so their own stamp says nothing: the
+    // avatar's answer is the answer for everything hanging off it.
+    if (const LLVOAvatar* attached_av = getAttachedAvatar())
+    {
+        return attached_av->isInView();
+    }
+
     // An animated object's own drawable never draws anything, so the base
     // class answers visible for it regardless of the cull. What is drawn is
     // the volume, whose drawable roots the control-avatar bridge and is
