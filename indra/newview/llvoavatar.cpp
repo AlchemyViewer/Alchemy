@@ -3440,6 +3440,15 @@ void LLVOAvatar::idleUpdateLoadingEffect()
 
 void LLVOAvatar::idleUpdateWindEffect()
 {
+    // The ripple this drives is applied to the system avatar's clothing, in
+    // the skinned passes of the avatar pool. An animated object has no system
+    // avatar mesh -- initInstance releases it -- so there is no cloth for the
+    // wind to move.
+    if (isControlAvatar())
+    {
+        return;
+    }
+
     // update wind effect
     if (LLPipeline::RenderAvatarCloth)
     {
@@ -4158,6 +4167,14 @@ LLColor4 LLVOAvatar::getNameTagColor(bool is_friend)
 
 void LLVOAvatar::idleUpdateBelowWater()
 {
+    // Two things read mBelowWater: the cloth wind, which needs a system avatar
+    // mesh to move, and your own avatar's AO. An animated object is neither,
+    // so it does not pay for a global position and a region lookup a frame.
+    if (isControlAvatar())
+    {
+        return;
+    }
+
     F32 avatar_height = (F32)(getPositionGlobal().mdV[VZ]);
 
     F32 water_height;
@@ -6211,6 +6228,14 @@ const S32 MAX_TEXTURE_UPDATE_INTERVAL = 64 ; //need to call updateTextures() at 
 const S32 MAX_TEXTURE_VIRTUAL_SIZE_RESET_INTERVAL = S32_MAX ; //frames
 void LLVOAvatar::checkTextureLoading()
 {
+    // This pauses and resumes the fetches behind an avatar's baked textures.
+    // An animated object has no baked textures, no wearables and no layer
+    // sets, so it has nothing here to pause.
+    if (isControlAvatar())
+    {
+        return;
+    }
+
     static const F32 MAX_INVISIBLE_WAITING_TIME = 15.f ; //seconds
 
     bool pause = !isVisible() ;
