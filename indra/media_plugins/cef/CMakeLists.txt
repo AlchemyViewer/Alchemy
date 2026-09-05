@@ -193,7 +193,7 @@ elseif (DARWIN)
     )
 
 elseif (LINUX)
-  target_link_options(media_plugin_cef PRIVATE  "LINKER:--build-id" "LINKER:-rpath,'$ORIGIN:$ORIGIN/../../lib'")
+  target_link_options(media_plugin_cef PRIVATE  "LINKER:--build-id" "LINKER:-rpath,\$ORIGIN:\$ORIGIN/../../lib")
 
   set(CEF_RESOURCE_FILES
     "${CEF_RESOURCE_DIR}/chrome_100_percent.pak"
