@@ -40,6 +40,7 @@
 #include "lldir.h"
 #include "llendianswizzle.h"
 #include "llkeyframemotion.h"
+#include "llsimdmath.h"
 #include "llquantize.h"
 #include "m3math.h"
 #include "message.h"
@@ -137,7 +138,21 @@ namespace
 
     LLQuaternion blend_keys(F32 u, const LLQuaternion& before, const LLQuaternion& after)
     {
-        return nlerp(u, before, after);
+        // A normalized lerp for every pair. The free nlerp() hands the pairs
+        // more than a half turn apart to slerp, which costs an arc cosine and
+        // three sines, and this is sampled once per rotation channel per joint
+        // per playing motion per frame.
+        LLQuaternion2 from;
+        from = before;
+        LLQuaternion2 to;
+        to = after;
+
+        LLQuaternion2 blended;
+        blended.setLerp(from, to, u);
+
+        LLQuaternion result;
+        blended.store(result);
+        return result;
     }
 }
 

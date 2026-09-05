@@ -33,6 +33,7 @@
 
 #include "llmotion.h"
 #include "llmath.h"
+#include "llsimdmath.h"
 #include "llstl.h"
 
 //-----------------------------------------------------------------------------
@@ -251,17 +252,37 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     // contribution so the untouched ones can be left alone.
     U32             contributed_usage = 0;
 
+    // The whole blend is done in vector registers and written out once at the
+    // end. Every value it touches is three or four floats wide, and the
+    // rotation interpolation in particular was a call into llquaternion.cpp
+    // that ran a square root in the good case and an arc cosine and three
+    // sines in the case where the two rotations were more than half a turn
+    // apart -- which, blending two animations that disagree about a joint, is
+    // a third of the time.
+    //
     // Seeded from wherever the result is going: the joint, or the cache the
     // coarse clock is interpolating the joint toward.
-    LLVector3       blended_pos = apply_now ? target_joint->getPosition() : mCachedPosition;
-    LLQuaternion    blended_rot = apply_now ? target_joint->getRotation() : mCachedRotation;
-    LLVector3       blended_scale = apply_now ? target_joint->getScale() : mCachedScale;
+    LLVector4a      blended_pos;
+    LLVector4a      blended_scale;
+    LLQuaternion2   blended_rot;
+    if (apply_now)
+    {
+        blended_pos.load3(target_joint->getPosition().mV);
+        blended_scale.load3(target_joint->getScale().mV);
+        blended_rot = target_joint->getRotation();
+    }
+    else
+    {
+        blended_pos.load3(mCachedPosition.mV);
+        blended_scale.load3(mCachedScale.mV);
+        blended_rot = mCachedRotation;
+    }
 
-    LLVector3       added_pos;
-    LLQuaternion    added_rot;
-    LLVector3       added_scale;
-
-    //S32               joint_state_index;
+    LLVector4a      added_pos;
+    LLVector4a      added_scale;
+    added_pos.clear();
+    added_scale.clear();
+    LLQuaternion2   added_rot = LLQuaternion2::identity();
 
     sum_weights[POS_WEIGHT] = 0.f;
     sum_weights[ROT_WEIGHT] = 0.f;
@@ -287,7 +308,10 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                 // add in pos for this jointstate modulated by weight
-                added_pos += jsp->getPosition() * (new_weight_sum - sum_weights[POS_WEIGHT]);
+                LLVector4a state_pos;
+                state_pos.load3(jsp->getPosition().mV);
+                state_pos.mul(new_weight_sum - sum_weights[POS_WEIGHT]);
+                added_pos.add(state_pos);
             }
 
             if(current_usage & LLJointState::SCALE)
@@ -295,7 +319,10 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                 // add in scale for this jointstate modulated by weight
-                added_scale += jsp->getScale() * (new_weight_sum - sum_weights[SCALE_WEIGHT]);
+                LLVector4a state_scale;
+                state_scale.load3(jsp->getScale().mV);
+                state_scale.mul(new_weight_sum - sum_weights[SCALE_WEIGHT]);
+                added_scale.add(state_scale);
             }
 
             if (current_usage & LLJointState::ROT)
@@ -303,7 +330,13 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                 F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                 // add in rotation for this jointstate modulated by weight
-                added_rot = nlerp((new_weight_sum - sum_weights[ROT_WEIGHT]), added_rot, jsp->getRotation()) * added_rot;
+                LLQuaternion2 state_rot;
+                state_rot = jsp->getRotation();
+                LLQuaternion2 partial;
+                partial.setLerp(added_rot, state_rot, new_weight_sum - sum_weights[ROT_WEIGHT]);
+                LLQuaternion2 composed;
+                composed.setMul(partial, added_rot);
+                added_rot = composed;
             }
         }
         else
@@ -313,18 +346,21 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // blend position
             if(current_usage & LLJointState::POS)
             {
+                LLVector4a state_pos;
+                state_pos.load3(jsp->getPosition().mV);
                 if(sum_usage & LLJointState::POS)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[POS_WEIGHT]);
 
                     // blend positions from both
-                    blended_pos = lerp(jsp->getPosition(), blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
+                    LLVector4a from = state_pos;
+                    blended_pos.setLerp(from, blended_pos, sum_weights[POS_WEIGHT] / new_weight_sum);
                     sum_weights[POS_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy position from current
-                    blended_pos = jsp->getPosition();
+                    blended_pos = state_pos;
                     sum_weights[POS_WEIGHT] = current_weight;
                 }
             }
@@ -332,18 +368,21 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // now do scale
             if(current_usage & LLJointState::SCALE)
             {
+                LLVector4a state_scale;
+                state_scale.load3(jsp->getScale().mV);
                 if(sum_usage & LLJointState::SCALE)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[SCALE_WEIGHT]);
 
                     // blend scales from both
-                    blended_scale = lerp(jsp->getScale(), blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
+                    LLVector4a from = state_scale;
+                    blended_scale.setLerp(from, blended_scale, sum_weights[SCALE_WEIGHT] / new_weight_sum);
                     sum_weights[SCALE_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy scale from current
-                    blended_scale = jsp->getScale();
+                    blended_scale = state_scale;
                     sum_weights[SCALE_WEIGHT] = current_weight;
                 }
             }
@@ -351,18 +390,21 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
             // rotation
             if (current_usage & LLJointState::ROT)
             {
+                LLQuaternion2 state_rot;
+                state_rot = jsp->getRotation();
                 if(sum_usage & LLJointState::ROT)
                 {
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                     // blend rotations from both
-                    blended_rot = nlerp(sum_weights[ROT_WEIGHT] / new_weight_sum, jsp->getRotation(), blended_rot);
+                    LLQuaternion2 from = state_rot;
+                    blended_rot.setLerp(from, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
                     sum_weights[ROT_WEIGHT] = new_weight_sum;
                 }
                 else
                 {
                     // copy rotation from current
-                    blended_rot = jsp->getRotation();
+                    blended_rot = state_rot;
                     sum_weights[ROT_WEIGHT] = current_weight;
                 }
             }
@@ -372,30 +414,39 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         }
     }
 
-    if (!added_scale.isFinite())
+    if (!added_scale.isFinite3())
     {
-        added_scale.clearVec();
+        added_scale.clear();
     }
 
-    if (!blended_scale.isFinite())
+    if (!blended_scale.isFinite3())
     {
-        blended_scale.setVec(1,1,1);
+        blended_scale.set(1.f, 1.f, 1.f, 0.f);
     }
+
+    LLVector4a final_pos;
+    final_pos.setAdd(blended_pos, added_pos);
+    LLQuaternion2 final_rot;
+    final_rot.setMul(added_rot, blended_rot);
 
     if (apply_now)
     {
         // apply transforms
         // SL-315
-        target_joint->setPosition(blended_pos + added_pos);
+        target_joint->setPosition(LLVector3(final_pos.getF32ptr()));
         // blended_scale was seeded from the joint, which LLXform::setScale keeps
         // finite, and only a joint state carrying SCALE can move it off that
         // value. So the reset above is unreachable without a scale contribution,
         // and skipping the write here cannot strand a non-finite scale.
         if (contributed_usage & LLJointState::SCALE)
         {
-            target_joint->setScale(blended_scale + added_scale);
+            LLVector4a final_scale;
+            final_scale.setAdd(blended_scale, added_scale);
+            target_joint->setScale(LLVector3(final_scale.getF32ptr()));
         }
-        target_joint->setRotation(added_rot * blended_rot);
+        LLQuaternion rot;
+        final_rot.store(rot);
+        target_joint->setRotation(rot);
 
         // now clear joint states
         for(S32 i = 0; i < mNumStates; i++)
@@ -408,9 +459,11 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     {
         // The cache is not a joint: nothing below it to dirty, so every
         // channel is simply stored.
-        mCachedPosition = blended_pos + added_pos;
-        mCachedScale = blended_scale + added_scale;
-        mCachedRotation = added_rot * blended_rot;
+        LLVector4a final_scale;
+        final_scale.setAdd(blended_scale, added_scale);
+        mCachedPosition.set(final_pos.getF32ptr());
+        mCachedScale.set(final_scale.getF32ptr());
+        final_rot.store(mCachedRotation);
     }
 }
 

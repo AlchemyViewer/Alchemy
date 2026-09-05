@@ -51,9 +51,29 @@ namespace
         return lerp(before, after, u);
     }
 
+    // The curve interpolates rotations with a normalized lerp for every pair,
+    // including the ones more than a half turn apart, where the free nlerp()
+    // hands over to slerp. Written out here rather than called, so that what
+    // the curve is compared against is a second implementation and not the
+    // same one.
     LLQuaternion blend_reference(F32 u, const LLQuaternion& before, const LLQuaternion& after)
     {
-        return nlerp(u, before, after);
+        LLQuaternion near_after = after;
+        if (dot(before, after) < 0.f)
+        {
+            for (S32 i = 0; i < 4; ++i)
+            {
+                near_after.mQ[i] = -near_after.mQ[i];
+            }
+        }
+
+        LLQuaternion result;
+        for (S32 i = 0; i < 4; ++i)
+        {
+            result.mQ[i] = before.mQ[i] + (near_after.mQ[i] - before.mQ[i]) * u;
+        }
+        result.normalize();
+        return result;
     }
 
     // The curve as it was: a map from time to value, searched from the root
@@ -158,6 +178,21 @@ namespace
     void ensure_same_value(const char* what, F32 time, const T& got, const T& want)
     {
         tut::ensure(std::string(what) + " at t=" + std::to_string(time), got == want);
+    }
+
+    // Rotations are normalized on the way out of the blend, and the curve does
+    // that with a reciprocal square root refined by one Newton step where this
+    // reference divides by a real one. They agree to about a part in ten
+    // million, which is not the same bits. Everything else here is compared
+    // exactly, this one to a tolerance well inside what a rotation can carry.
+    void ensure_same_value(const char* what, F32 time, const LLQuaternion& got, const LLQuaternion& want)
+    {
+        for (S32 i = 0; i < 4; ++i)
+        {
+            tut::ensure_approximately_equals_range(
+                (std::string(what) + " at t=" + std::to_string(time)).c_str(),
+                got.mQ[i], want.mQ[i], 1e-6f);
+        }
     }
 
     // Every way of sampling a curve without a cursor: far outside the keys,

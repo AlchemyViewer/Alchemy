@@ -26,6 +26,7 @@
 #include "linden_common.h"
 
 #include "xform.h"
+#include "llsimdmath.h"
 
 // LLXform default ctor and destructor are now inline constexpr defaulted in
 // the header (using in-class member initialisers). isRoot/isRootEdit below
@@ -65,14 +66,32 @@ void LLXformMatrix::update()
 {
     if (mParent)
     {
-        mWorldPosition = mPosition;
+        // Rotating the offset and composing the two rotations were two calls
+        // into llquaternion.cpp, each returning a value the caller then wrote
+        // to memory, and a skeleton runs this once per joint per frame. The
+        // vector forms are inline and read the same operands.
+        const LLQuaternion2 parent_rotation(mParent->getWorldRotation());
+
+        LLVector4a offset;
+        offset.load3(mPosition.mV);
         if (mParent->getScaleChildOffset())
         {
-            mWorldPosition.scaleVec(mParent->getScale());
+            LLVector4a parent_scale;
+            parent_scale.load3(mParent->getScale().mV);
+            offset.mul(parent_scale);
         }
-        mWorldPosition *= mParent->getWorldRotation();
-        mWorldPosition += mParent->getWorldPosition();
-        mWorldRotation = mRotation * mParent->getWorldRotation();
+
+        LLVector4a rotated;
+        parent_rotation.rotate(offset, rotated);
+
+        LLVector4a parent_position;
+        parent_position.load3(mParent->getWorldPosition().mV);
+        rotated.add(parent_position);
+        mWorldPosition.set(rotated.getF32ptr());
+
+        LLQuaternion2 world_rotation;
+        world_rotation.setMul(LLQuaternion2(mRotation), parent_rotation);
+        world_rotation.store(mWorldRotation);
     }
     else
     {
