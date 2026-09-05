@@ -278,6 +278,74 @@ namespace tut
     }
 
     template<> template<>
+    void llmatrix4a_object::test<10>()
+    {
+        // matMulBoundBox used to transform all eight corners and take their
+        // min and max. It now grows the transformed centre by the half
+        // extents run through the absolute basis, which spans exactly the
+        // same box. Pin that against the corner walk, over the same spread of
+        // transforms and a few boxes, including a flat one and one handed in
+        // with its min and max swapped.
+        const LLVector3 BOXES[][2] = {
+            { LLVector3(-1.f, -1.f, -1.f), LLVector3(1.f, 1.f, 1.f) },
+            { LLVector3(0.2f, -3.f, 10.f), LLVector3(0.7f, 4.f, 10.5f) },
+            { LLVector3(0.f, 0.f, 0.f), LLVector3(0.f, 0.f, 0.f) },
+            { LLVector3(2.f, 2.f, 2.f), LLVector3(-2.f, 1.f, 3.f) },
+        };
+
+        for (const LLQuaternion& rot : ROTATIONS)
+        for (const LLVector3& scale : SCALES)
+        for (const LLVector3& pos : POSITIONS)
+        for (const auto& box : BOXES)
+        {
+            LLMatrix4a m;
+            m.initAll(scale, rot, pos);
+
+            LLVector4a in[2];
+            in[0].load3(box[0].mV);
+            in[1].load3(box[1].mV);
+
+            // the eight corners, the way it was done before
+            LLVector4a expected[2];
+            for (U32 corner = 0; corner < 8; ++corner)
+            {
+                LLVector4a v, tv;
+                v.set((corner & 4) ? in[1][0] : in[0][0],
+                      (corner & 2) ? in[1][1] : in[0][1],
+                      (corner & 1) ? in[1][2] : in[0][2]);
+                m.affineTransform(v, tv);
+                if (corner == 0)
+                {
+                    expected[0] = expected[1] = tv;
+                }
+                else
+                {
+                    expected[0].setMin(expected[0], tv);
+                    expected[1].setMax(expected[1], tv);
+                }
+            }
+
+            LLVector4a out[2];
+            matMulBoundBox(m, in, out);
+
+            for (U32 side = 0; side < 2; ++side)
+            for (U32 axis = 0; axis < 3; ++axis)
+            {
+                std::ostringstream msg;
+                msg << "box " << (&box - BOXES) << " scale " << scale << " pos " << pos
+                    << (side ? " max" : " min") << " axis " << axis;
+                // Absolute slack scaled to the magnitudes in play: the
+                // corner walk and the centre form round differently, and the
+                // 1000x scale row amplifies whichever rounds first.
+                const F32 magnitude = llmax(1.f, fabsf(expected[side][axis]));
+                ensure_approximately_equals_range(msg.str().c_str(),
+                                                  out[side][axis], expected[side][axis],
+                                                  magnitude * 1e-4f);
+            }
+        }
+    }
+
+    template<> template<>
     void llmatrix4a_object::test<4>()
     {
         // Scale lands on the corresponding basis row, not the diagonal, so a

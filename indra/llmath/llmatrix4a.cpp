@@ -35,48 +35,36 @@
 // necessarily the fastest way to implement.
 void matMulBoundBox(const LLMatrix4a &mat, const LLVector4a *in_extents, LLVector4a *out_extents)
 {
-        //get 8 corners of bounding box
-        LLVector4Logical mask[6];
+    // The box that bounds an affinely transformed box is the transformed
+    // centre, grown on each axis by the half extents run through the basis
+    // with every sign dropped: a half extent along an input axis contributes
+    // its magnitude times that basis row's magnitudes, whichever way the row
+    // points. That is the same box the eight transformed corners span, for
+    // one transform and three multiply-adds rather than eight transforms and
+    // seven pairs of min and max.
+    LLVector4a center, half;
+    center.setAdd(in_extents[0], in_extents[1]);
+    center.mul(0.5f);
+    half.setSub(in_extents[1], in_extents[0]);
+    half.mul(0.5f);
+    half.setAbs(half);
 
-        for (U32 i = 0; i < 6; ++i)
-        {
-            mask[i].clear();
-        }
+    LLVector4a new_center;
+    mat.affineTransform(center, new_center);
 
-        mask[0].setElement<2>(); //001
-        mask[1].setElement<1>(); //010
-        mask[2].setElement<1>(); //011
-        mask[2].setElement<2>();
-        mask[3].setElement<0>(); //100
-        mask[4].setElement<0>(); //101
-        mask[4].setElement<2>();
-        mask[5].setElement<0>(); //110
-        mask[5].setElement<1>();
+    LLVector4a row, hx, hy, hz, grown;
+    row.setAbs(mat.getRow<0>());
+    hx.splat<0>(half);
+    grown.setMul(hx, row);
+    row.setAbs(mat.getRow<1>());
+    hy.splat<1>(half);
+    hy.mul(row);
+    grown.add(hy);
+    row.setAbs(mat.getRow<2>());
+    hz.splat<2>(half);
+    hz.mul(row);
+    grown.add(hz);
 
-        LLVector4a v[8];
-
-        v[6] = in_extents[0];
-        v[7] = in_extents[1];
-
-        for (U32 i = 0; i < 6; ++i)
-        {
-            v[i].setSelectWithMask(mask[i], in_extents[0], in_extents[1]);
-        }
-
-        LLVector4a tv[8];
-
-        //transform bounding box into drawable space
-        for (U32 i = 0; i < 8; ++i)
-        {
-            mat.affineTransform(v[i], tv[i]);
-        }
-
-        //find bounding box
-        out_extents[0] = out_extents[1] = tv[0];
-
-        for (U32 i = 1; i < 8; ++i)
-        {
-            out_extents[0].setMin(out_extents[0], tv[i]);
-            out_extents[1].setMax(out_extents[1], tv[i]);
-        }
+    out_extents[0].setSub(new_center, grown);
+    out_extents[1].setAdd(new_center, grown);
 }

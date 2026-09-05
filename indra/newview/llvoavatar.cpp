@@ -1565,7 +1565,9 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                     const LLViewerObject* attached_object = attachment_iter->get();
                     if (attached_object && !attached_object->isHUDAttachment())
                     {
-                        const LLVOVolume *vol = dynamic_cast<const LLVOVolume*>(attached_object);
+                        const LLVOVolume *vol = attached_object->getPCode() == LL_PCODE_VOLUME
+                            ? static_cast<const LLVOVolume*>(attached_object)
+                            : nullptr;
                         if (vol && vol->isAnimatedObject())
                         {
                             // Animated objects already have a bounding box in their control av, use that.
@@ -1619,35 +1621,49 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     if (box_detail>=3)
     {
         updateRiggingInfo();
-        for (S32 joint_num = 0; joint_num < LL_CHARACTER_MAX_ANIMATED_JOINTS; joint_num++)
+
+        // Most of the table is joints nothing is rigged to, and the joints
+        // above the bones -- collision volumes, attachment points -- are
+        // found by getJoint through a map. Read the flag first and look the
+        // joint up only for the entries that carry a box.
+        const S32 first_attachment_joint = mNumBones + mNumCollisionVolumes;
+        const S32 rigged_joints = mJointRiggingInfoTab.size();
+        for (S32 joint_num = 0; joint_num < rigged_joints; joint_num++)
         {
-            LLJoint *joint = getJoint(joint_num);
-            LLJointRiggingInfo *rig_info = NULL;
-            if (joint_num < mJointRiggingInfoTab.size())
+            const LLJointRiggingInfo& rig_info = mJointRiggingInfoTab[joint_num];
+            if (!rig_info.isRiggedTo())
             {
-                rig_info = &mJointRiggingInfoTab[joint_num];
+                continue;
             }
 
-            if (joint && rig_info && rig_info->isRiggedTo())
+            // Joint numbers past the bones and collision volumes are
+            // attachment points, numbered from 1, and getJoint would only
+            // find them in the same map and hand the result back as a plain
+            // LLJoint -- a virtual base, so there is no casting it back.
+            LLJoint *joint = nullptr;
+            if (joint_num >= first_attachment_joint)
             {
-                LLViewerJointAttachment *as_joint_attach = dynamic_cast<LLViewerJointAttachment*>(joint);
-                if (as_joint_attach && as_joint_attach->getIsHUDAttachment())
+                attachment_map_t::iterator iter = mAttachmentPoints.find(joint_num - first_attachment_joint + 1);
+                if (iter == mAttachmentPoints.end() || iter->second->getIsHUDAttachment())
                 {
                     // Ignore bounding box of HUD joints
                     continue;
                 }
-                LLMatrix4a mat;
-                LLVector4a new_extents[2];
-                mat = joint->getWorldMatrix();
-                matMulBoundBox(mat, rig_info->getRiggedExtents(), new_extents);
-                update_min_max(newMin, newMax, new_extents[0]);
-                update_min_max(newMin, newMax, new_extents[1]);
-                //if (isSelf())
-                //{
-                //    LL_INFOS() << joint->getName() << " extents " << new_extents[0] << "," << new_extents[1] << LL_ENDL;
-                //    LL_INFOS() << joint->getName() << " av box is " << newMin << "," << newMax << LL_ENDL;
-                //}
+                joint = iter->second;
             }
+            else
+            {
+                joint = getJoint(joint_num);
+                if (!joint)
+                {
+                    continue;
+                }
+            }
+
+            LLVector4a new_extents[2];
+            matMulBoundBox(joint->getWorldMatrix(), rig_info.getRiggedExtents(), new_extents);
+            update_min_max(newMin, newMax, new_extents[0]);
+            update_min_max(newMin, newMax, new_extents[1]);
         }
     }
 
@@ -11423,22 +11439,17 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
         }
     }
 
-    LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-    if (control_av)
+    if (isControlAvatar())
     {
-        LLVOVolume *volp = control_av->mRootVolp;
+        LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
         if (volp)
         {
             volumes.push_back(volp);
-            LLViewerObject::const_child_list_t& children = volp->getChildren();
-            for (LLViewerObject::const_child_list_t::const_iterator it = children.begin();
-                 it != children.end(); ++it)
+            for (LLViewerObject* childp : volp->getChildren())
             {
-                LLViewerObject *childp = *it;
-                LLVOVolume *volume = dynamic_cast<LLVOVolume*>(childp);
-                if (volume)
+                if (!childp->isDead() && childp->getPCode() == LL_PCODE_VOLUME)
                 {
-                    volumes.push_back(volume);
+                    volumes.push_back(static_cast<LLVOVolume*>(childp));
                 }
             }
         }
