@@ -1044,6 +1044,10 @@ private:
     //--------------------------------------------------------------------
 public:
     bool            isVisible() const;
+    // Whether what this avatar draws is inside the view this frame. The
+    // same as isVisible() for an avatar; an animated object answers for its
+    // volume, since it never draws anything of its own.
+    virtual bool    isInView() const;
     virtual bool    shouldRenderRigged() const;
     void            setVisibilityRank(U32 rank);
     U32             getVisibilityRank() const { return mVisibilityRank; }

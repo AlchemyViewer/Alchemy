@@ -5239,7 +5239,12 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
         return false;
     }
 
-    bool visible = isVisible();
+    // isInView rather than isVisible: an animated object reports itself
+    // visible whatever the cull says, so this is what lets one that is off
+    // screen take the hidden update and skip the skeleton sweep the way a
+    // culled avatar does. The rank throttle in computeUpdatePeriod still
+    // runs on isVisible, so nothing that was cheap gets dearer.
+    bool visible = isInView();
 
     // For fading out the names above heads, only let the timer
     // run if we're visible.
@@ -8873,6 +8878,12 @@ bool LLVOAvatar::isVisible() const
         && (!friends_only() || isUIAvatar() || isSelf() || isControlAvatar() || isBuddy());
 }
 
+// virtual
+bool LLVOAvatar::isInView() const
+{
+    return isVisible();
+}
+
 // Determine if we have enough avatar data to render
 bool LLVOAvatar::getHasMissingParts() const
 {
@@ -11593,7 +11604,7 @@ void LLVOAvatar::updateImpostors()
     {
         LLVOAvatar* avatar = (LLVOAvatar*)character;
         if (!avatar->isDead()
-            && avatar->isVisible()
+            && avatar->isInView()
             && avatar->isImpostor()
             && avatar->needsImpostorUpdate())
         {

@@ -712,6 +712,19 @@ bool LLControlAvatar::isImpostor()
     return LLVOAvatar::isImpostor();
 }
 
+// virtual
+bool LLControlAvatar::isInView() const
+{
+    // An animated object's own drawable never draws anything, so the base
+    // class answers visible for it regardless of the cull. What is drawn is
+    // the volume, whose drawable roots the control-avatar bridge and is
+    // stamped by the cull like any other.
+    return LLVOAvatar::isInView()
+        && mRootVolp
+        && mRootVolp->mDrawable.notNull()
+        && mRootVolp->mDrawable->isVisible();
+}
+
 // static
 void LLControlAvatar::onRegionChanged()
 {

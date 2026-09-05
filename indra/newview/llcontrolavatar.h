@@ -95,6 +95,7 @@ public:
     virtual bool shouldRenderRigged() const;
 
     virtual bool isImpostor();
+    virtual bool isInView() const;
     virtual bool isBuddy() const { return false; }
 
     bool mPlaying;
