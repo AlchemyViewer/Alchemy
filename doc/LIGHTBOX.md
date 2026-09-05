@@ -100,7 +100,34 @@ The floater's C++ provides:
 - `LightBox.CommitSplitToneGraph` — the split-tone band graph's handle, which
   writes `RenderSplitToneBalance`.
 - `LightBox.PickWhiteBalance` — arms the eyedropper.
+- `LightBox.OpenLUTFolder` — reveals the user's colour-LUT folder, creating it
+  on first use.
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
+
+**Asset-picker rows are a third kind of dropdown**, distinct from the enum
+recipe below. They bind a `combo_box allow_text_entry="true"` to a *string*
+setting naming a file, and are filled from C++ by
+`populateAssetCombo(combo_name, dir_name, extensions, setting_name)`: bundled
+entries from `app_settings/<dir>` first, then the user's own from
+`user_settings/<dir>` behind a separator, matching the order the renderer
+itself resolves names in. Four things are not optional. The XUI carries one
+literal `<combo_box.item value="" label="None"/>` and nothing else. `postBuild`
+must call the populate helper, because the list does not exist until it does.
+The helper's closing `selectByValue` is load-bearing rather than cosmetic —
+with `allow_text_entry` nothing else restores the saved value when the floater
+opens. And the extension whitelist must list only what the loader can actually
+decode, or the picker offers files that silently fail. Pair it with an
+`openUserAssetFolder(dir_name)` button so the folder is discoverable.
+
+The colour LUT is currently the only picker — the lens dirt plate that shared
+these helpers is generated now. Both stay parameterised by directory anyway,
+because the shape is the shared part and collapsing them back to a constant
+only has to be undone for the next asset. Before reaching for a picker at all,
+ask whether the asset could be generated instead: a texture a shader can draw
+into a render target once needs no file, no packaging entry, no extension
+whitelist and no fitting to the window, and it can be put on sliders. See
+`generateLensDirt` in pipeline.cpp for the shape — gate, cached parameter set,
+allocate, draw, release when the effect goes off.
 
 The last four are examples of the per-control cost: a graph or a tool needs
 something to interpret its input, so it gets one callback and one `setup*`
@@ -811,13 +838,20 @@ only; apply per row, not on the parent panel. Reference patterns:
   The snapshot floater's "No post-processing" box has to mean it, so a new
   *print* effect must check it wherever its strength is uploaded — there are
   `clean_plate` gates in **two** places, because post-grade is two passes.
-  Effects in the final blit (vignette, grain, CVD, the preview modes) gate in
-  `renderFinalize`; effects applied *inside* the colorCorrect program
-  (chromatic aberration, lens flare) gate in `colorCorrect`, because they run
-  in every variant including the no-post ones — those two leaked through the
-  first time for exactly that reason. The one deliberate exception is dither,
+  Effects in the final blit (lens distortion, vignette, grain, CVD, the preview
+  modes) gate in `renderFinalize`; effects applied *inside* the colorCorrect
+  program (chromatic aberration, lens flare, lens dirt, the cross-filter
+  composite) gate in `colorCorrect`, because they run in every variant
+  including the no-post ones — the first two leaked through the first time for
+  exactly that reason. The one deliberate exception is dither,
   which is a quantisation aid rather than a look and which an 8-bit PNG wants
   either way.
+- **A generation pass is a third case, and gating it is a mistake.**
+  `generateLensDirt` deliberately ignores `gSnapshotNoPost`: the flag is true
+  for the single frame a no-post snapshot is taken, so releasing the plate for
+  it would buy a full regeneration on the very next frame — a hitch every time
+  someone takes one. What has to be gated is the *use* of the plate, in
+  `colorCorrect`, not its production.
 
 Two things that only show up on screen, both of which did:
 
@@ -855,6 +889,15 @@ Skip it and Looks silently won't carry the effect. Do **not** add: Scene-tab
 keys, `Persist=0` keys, structural buffer-shape knobs, or debug toggles.
 A startup `LL_WARNS("Presets")` fires for whitelist names that stop existing,
 so renames get caught.
+
+`audit_bundled_looks()` runs from the `LLPresetsManager` constructor and checks
+the bundled Looks two ways: any whitelisted key a Look is missing, and any key
+whose stored `Comment` no longer matches the live setting's. The second is a
+maintenance rule worth stating plainly — **rewording a setting's `Comment` in
+`settings_alchemy.xml` obliges you to re-save the three bundled Looks**, which
+each carry their own copy that nothing reads. Five keys had already drifted
+that way before the check existed, silently, because presence was all anything
+verified.
 
 Bundled starter Looks live in `app_settings/looks/` as full whitelist
 snapshots ({Comment, Persist, Type, Value} per key, URI-escaped filenames).

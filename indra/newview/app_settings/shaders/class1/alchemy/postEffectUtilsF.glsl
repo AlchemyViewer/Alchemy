@@ -18,11 +18,18 @@
  *     vec3 computeLensFlare       (sampler2D diff, sampler2D depth, vec2 uv)
  *
  *   DISPLAY SPACE (blitWithEffectsF)
+ *     vec2 applyLensDistortion    (vec2 uv)          -- UV in, UV out
  *     vec3 applyVignette          (vec3 color, vec2 uv)
  *     vec3 applyCVDCompensation   (vec3 color)
  *     vec3 applyFilmGrain         (vec3 color, vec2 fragCoord)
  *     vec3 applyDither            (vec3 color, vec2 fragCoord)
  *     vec3 applyPreview           (vec3 color)
+ *
+ * applyLensDistortion is the odd one out: it transforms a sample coordinate
+ * rather than a colour, so it runs *before* the scene is sampled and the
+ * colour effects above run on the result. It is a lens effect; everything
+ * else in the DISPLAY SPACE group is a sensor or print effect and stays in
+ * unwarped screen space.
  *
  * Conventions used throughout:
  *   - Every effect has an `amount <= 0` fast-path that returns the input
@@ -812,4 +819,133 @@ vec3 applyDither(vec3 color, vec2 fragCoord)
 
     float levels = (uDitherBits >= 10) ? 1023.0 : 255.0;
     return color + tpdf * (uDitherAmount / levels);
+}
+
+
+// =============================================================================
+// Geometric lens distortion — Brown-Conrady radial + tangential
+// =============================================================================
+//
+// The only entry point here that transforms a coordinate instead of a colour.
+// Runs in the final blit, warping the coordinate the scene is sampled at, so
+// the vignette/grain/dither/CVD chain that follows stays in unwarped sensor
+// space. That split is deliberate: distortion happens in the lens, the print
+// effects happen at the sensor and on the print.
+//
+// This is the *inverse* map — for each output pixel it answers "where in the
+// source does this come from", which is the direction a gather-based post
+// process needs. Negative k1 therefore reads as barrel and positive as
+// pincushion, matching how the coefficients are named on a real lens profile.
+//
+// Radial distance is measured in aspect-corrected units using the same
+// branchless form the rest of this file uses: one component of `scale` stays
+// 1.0 and the other carries the ratio, so the wide axis is stretched to its
+// true physical extent and r lands near 1.0 at the frame corners. That is not
+// cosmetic -- on a 16:9 frame the corners really are further from the optical
+// axis than the edge midpoints, and a lens distorts by physical radius.
+//
+// Note: uLensDistortAmount, uLensDistortK, uLensDistortScale, uLensDistortSqueeze
+// and uLensDistortTangential arrive pre-baked from the CPU (pipeline.cpp).
+// The master amount is folded into the coefficients there, so the shader does
+// one gate and then pure polynomial evaluation. The slider ranges quoted below
+// are the *user-facing* values before baking.
+
+uniform float uLensDistortAmount;      // artist range [0, 1]: master gate. 0 disables.
+uniform vec2  uLensDistortK;           // (k1, k2) already multiplied by amount on the CPU.
+                                       //   k1 artist range [-0.5, 0.5]: negative barrel,
+                                       //   positive pincushion. k2 [-0.25, 0.25] shapes the tail.
+uniform float uLensDistortScale;       // auto-fit rescale, applied as a direct multiplier. Solved
+                                       //   exactly on the CPU over a dense frame probe (boundary
+                                       //   walk, plus an interior grid in Fit mode).
+                                       //   Uploaded as 1.0 when fit is off -- never 0.
+uniform vec2  uLensDistortSqueeze;     // (1 / squeeze, 1), pre-reciprocated. Anamorphic desqueeze.
+uniform vec2  uLensDistortCenter;      // [-0.5, 0.5] optical axis offset from frame centre.
+uniform vec2  uLensDistortTangential;  // (p1, p2) already multiplied by amount on the CPU.
+                                       //   Decentering terms; tiny values (< 0.01) are realistic.
+
+vec2 applyLensDistortion(vec2 uv)
+{
+    // Fast path when the effect is disabled — the uniform branch is coherent
+    // across the whole draw, and zero-initialized uniforms land here (see the
+    // GL 4.1 no-default-initializers note in llshadermgr).
+    if (uLensDistortAmount <= 0.0)
+        return uv;
+
+    // Offset from the optical axis, then aspect-corrected so the radial term
+    // is isotropic in physical units rather than in UV units.
+    vec2  p      = uv - 0.5 - uLensDistortCenter;
+    float aspect = uResolution.x / max(uResolution.y, 1.0);
+    vec2  scale  = max(vec2(aspect, 1.0 / max(aspect, 1e-4)), 1.0);
+    vec2  q      = p * scale;
+
+    float r2 = dot(q, q);
+
+    // Radial: 1 + k1*r^2 + k2*r^4. Horner keeps it to two FMAs.
+    float radial = 1.0 + r2 * (uLensDistortK.x + r2 * uLensDistortK.y);
+
+    // Tangential: the classic Brown-Conrady decentering pair. Zero by default,
+    // and the two terms vanish independently, so leaving them at 0 costs only
+    // the multiplies.
+    float p1 = uLensDistortTangential.x;
+    float p2 = uLensDistortTangential.y;
+    vec2  tangential = vec2(2.0 * p1 * q.x * q.y + p2 * (r2 + 2.0 * q.x * q.x),
+                            p1 * (r2 + 2.0 * q.y * q.y) + 2.0 * p2 * q.x * q.y);
+
+    // Warp, rescale to keep the frame filled, undo the aspect correction, then
+    // apply the anamorphic squeeze in UV space.
+    vec2 warped = (q * radial + tangential) * uLensDistortScale;
+    warped /= scale;
+    warped *= uLensDistortSqueeze;
+
+    return warped + 0.5 + uLensDistortCenter;
+}
+
+// =============================================================================
+// Lens dirt — grime on the front element, lit by whatever is already glowing
+// =============================================================================
+//
+// Contributes nothing on its own. Dirt is only visible where light is already
+// falling on it, so this takes the bloom and flare terms as its input rather
+// than the scene: point the camera at a flat wall and the lens looks clean no
+// matter how high the strength goes, exactly as a real one does. It is also
+// what makes the effect cheap -- the cost rides on effects that are already
+// running.
+//
+// Tier 3 (uniform branch) rather than a compile-time permutation, because this
+// file is a shared object attached to all nine post programs and no
+// per-program define can reach it. The strength is forced to 0 by the CPU
+// whenever no plate is loaded, so the sampler is never read unbound.
+//
+// Single-channel plates are swizzled R -> RGB at upload, so mono and colour
+// plates both arrive here as plain RGB.
+
+uniform sampler2D uLensDirtMap;
+uniform float     uLensDirtStrength;   // 0 disables
+
+vec3 applyLensDirt(vec2 uv, vec3 lens_light)
+{
+    if (uLensDirtStrength <= 0.0)
+        return vec3(0.0);
+
+    // Sampled with raw screen UV, and there is no fitting to do: the plate is
+    // generated at the frame's own aspect, so a mote is already round on the
+    // display it was made for. The square plates this replaced needed a
+    // cover-fit and gave up the frame's edges to get it.
+    //
+    // Single channel -- dirt is a scalar mask, and the generator writes one.
+    return lens_light * texture(uLensDirtMap, uv).r * uLensDirtStrength;
+}
+
+
+// Companion to the above: 1.0 inside the frame, 0.0 outside, so the call site
+// can resolve out-of-frame samples to black instead of smearing the edge texel
+// across the corners. Branchless, and identically 1.0 when distortion is off
+// (the early-out above returns an in-range uv, and the gate makes that exact).
+float lensDistortMask(vec2 duv)
+{
+    if (uLensDistortAmount <= 0.0)
+        return 1.0;
+
+    vec2 inside = step(vec2(0.0), duv) * step(duv, vec2(1.0));
+    return inside.x * inside.y;
 }

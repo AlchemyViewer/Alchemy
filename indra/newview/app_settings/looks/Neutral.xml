@@ -74,7 +74,7 @@
         <key>RenderBloomScatter</key>
         <map>
             <key>Comment</key>
-            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values &gt;1 widen the bloom per octave; &gt;~2.5 starts to alias because the tent skips source texels.</string>
+            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values >1 widen the bloom per octave; >~2.5 starts to alias because the tent skips source texels.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -103,6 +103,168 @@
             <string>F32</string>
             <key>Value</key>
             <real>2.5</real>
+        </map>
+        <key>RenderBokehAnamorphicSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Stretches out-of-focus highlights into ovals, the way the cylindrical element of an anamorphic lens does. 1.0 is a round spherical-lens disc. Above 1 gives taller-than-wide ovals, the classic anamorphic signature; below 1 gives wider-than-tall. The stretch preserves area, so this changes the shape of the blur without changing how strong it is. Range 0.25 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBokehApertureBlades</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of aperture blades shaping the out-of-focus highlights. 0 gives the perfectly round bokeh of an idealised lens. 5 to 9 reproduce real diaphragms, where the discs become visible polygons - 6 is the most common on stills lenses. Values below 3 are treated as circular. Range 0 to 11.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBokehApertureCurvature</key>
+        <map>
+            <key>Comment</key>
+            <string>Rounds the aperture blades back toward a circle. 0 gives hard straight-edged polygons; 1 is fully round, matching a rounded diaphragm held wide open. Only has an effect when Aperture Blades is 3 or more. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehApertureRotation</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the aperture polygon in degrees. Only has an effect when Aperture Blades is 3 or more. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehCatEyeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 1.0 is heavy. The range runs past the old maximum because measuring from the image circle lowered the offset everywhere -- a value tuned before that change wants roughly half again as much. Range 0 to 1.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehComaAsymmetry</key>
+        <map>
+            <key>Comment</key>
+            <string>Comatic asymmetry - draws each out-of-focus highlight into a comet whose tail points away from the centre of frame, the way a real lens flares off-axis. Zero on the optical axis and strongest in the corners, and it follows the highlight's actual shape, so it stays aligned with an anamorphic squeeze or a swirl rather than drifting off them. 0 disables. Pairs with RenderBokehFieldStretch, which supplies the elongation the tail runs along. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly field aberration builds from the centre of the frame toward the corners. 1 spreads it fairly evenly across the frame; higher values keep the middle clean and concentrate the deformation at the edges. Shape control only; use RenderBokehFieldStretch to toggle the effect. Range 1 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>RenderBokehFieldStretch</key>
+        <map>
+            <key>Comment</key>
+            <string>Field aberration - stretches out-of-focus highlights toward the frame edges while the centre stays round. 0 disables. Positive stretches them across the radius so they line up along circles and the frame appears to swirl, the look of old fast portrait glass; negative stretches them along the radius into comet shapes. Area-preserving, so highlights change shape without changing brightness. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Longitudinal chromatic aberration - the colour cast real glass leaves on the rim of an out-of-focus highlight, which flips hue either side of the focal plane. 0 disables. 0.2 is a subtle uncorrected-lens feel; 0.6 is strong. This is separate from the frame-wide fringe under Chromatic Aberration, which appears whether or not anything is defocused. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeFarTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights behind the focal plane. The default light green is the counterpart to the near tint; a real lens shifts hue in opposite directions either side of focus.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.85</real>
+                <real>1.0</real>
+                <real>0.9</real>
+            </array>
+        </map>
+        <key>RenderBokehFringeNearTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights in front of the focal plane. The default light magenta matches the usual signature of uncorrected glass; swap with the far tint to reverse the effect.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>0.85</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderBokehHighlightGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Extra weight given to bright samples inside the defocus blur, which makes out-of-focus highlights read as distinct bokeh discs rather than a smooth blur. 0 is a plain average and is also the cheapest. 0.5 is a gentle lift; 2.0 is a strong cinematic pop. Range 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehHighlightThreshold</key>
+        <map>
+            <key>Comment</key>
+            <string>Brightness above which the highlight boost starts to apply. 0 boosts the whole range; raising it restricts the effect to genuine highlights and leaves midtones averaging normally. Only has an effect when Highlight Gain is above 0. Range 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehSphericalAberration</key>
+        <map>
+            <key>Comment</key>
+            <string>Spherical aberration - how the light inside an out-of-focus highlight is spread across it. 0 is the evenly lit disc of a perfectly corrected lens. Positive brightens the rim and hollows out the middle, the soap-bubble look; negative fills the middle and softens the edge, the creamy look. The sign flips either side of the focal plane exactly as it does in real glass, so a lens with bright-rimmed background bokeh has bright-centred foreground bokeh. Needs a few pixels of blur before there is any shape to work with, and fades out below that. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>RenderCASSharpness</key>
         <map>
@@ -228,7 +390,7 @@
         <key>RenderColorGradeBrightness</key>
         <map>
             <key>Comment</key>
-            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (&#177;0.05) are already noticeable.</string>
+            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (±0.05) are already noticeable.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -446,6 +608,72 @@
             <string>F32</string>
             <key>Value</key>
             <real>1.0</real>
+        </map>
+        <key>RenderCrossFilterAngle</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the whole star in degrees, as if turning the filter in its thread. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterChromatic</key>
+        <map>
+            <key>Comment</key>
+            <string>Rainbow dispersion along the arms. A real star filter is a diffraction grating, and a grating separates wavelengths by angle, so the tips of the streaks go coloured while the core stays white. 0 gives clean white spokes. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly each arm fades along its length, measured as how much brightness is lost between the core of a highlight and the tip of its arm. Low values give long even spokes; high values keep the star tight around the highlight. This changes only the shape of the arms - brightness belongs to Strength. Range 0.1 to 3.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.5</real>
+        </map>
+        <key>RenderCrossFilterLength</key>
+        <map>
+            <key>Comment</key>
+            <string>Spacing of the samples that build each arm, which sets how far the star reaches. 1.0 is the tuned value and gives a clean continuous streak; higher spreads the arms further, and lower draws them in tight. The range stops at 2 because beyond that the samples building each arm stop overlapping and the streak breaks up into a repeating lattice rather than getting longer. Length and falloff work together - a long streak with a fast falloff still fades out early, which is usually what reads best. Range 0.25 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderCrossFilterPoints</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of arms on each star. 4 is the classic cross filter, 6 and 8 match the denser gratings. Odd counts give an asymmetric star, since the arms are spread evenly rather than in opposed pairs. Range 2 to 12.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderCrossFilterStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the cross-screen (star) filter - the etched glass filter that diffracts every bright point in frame into a star. 0 disables. The arms carry a highlight's light spread along their length, so they are much dimmer than the core and this generally wants a large value - try 8 and work outward. Unlike the starburst under Lens Flare, which is locked to the sun, this streaks every highlight. Streaks ride on the bloom pyramid, so bloom strength 0 silences them. HDR only. Range 0 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>RenderDynamicExposureCoefficient</key>
         <map>
@@ -701,6 +929,201 @@
             <key>Value</key>
             <real>1.3</real>
         </map>
+        <key>RenderLensDirtBloomResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly bloom lights up the dirt. 0 means bloom passes through a clean lens; 1 is the full response. Raise it for hazy sunlit shots where the grime should catch everything. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtFlareResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly the lens flare lights up the dirt. 0 means the flare passes through a clean lens; 1 is the full response. This is the response that reads most like a real lens, since flare and grime share the same front element. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall brightness of the generated dirt plate, applied after the tone curve. Mostly a trim for Toe: raise it when a high Toe has crushed the plate too far. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtGrime</key>
+        <map>
+            <key>Comment</key>
+            <string>How much muck is on the glass. Scales every layer of dust and grit at once, so this is the master density. Starting points, with Smudge and Toe to match: a lens that has been outdoors 0.45 / 0.5 / 1.8, one nobody has wiped in a while 1.0 / 1.0 / 1.6, a damaged one 0.95 / 0.9 / 1.2 with scratches, and filthy 1.9 / 1.5 / 1.2. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtMoteScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Size of the dust motes. Above 1 the specks grow and thin out, which reads as a lens that has picked up a few big flecks rather than an even film; below 1 they shrink and multiply into finer grime. Range 0.5 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtScratches</key>
+        <map>
+            <key>Comment</key>
+            <string>How many scratches cross the glass. 0 is undamaged; around 16 reads as a well-used lens with coating chips. Scratches are straight and bright where dust is soft and scattered, so a few go a long way. Range 0 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderLensDirtSeed</key>
+        <map>
+            <key>Comment</key>
+            <string>Reshuffles the grime - every value lays the dirt out differently at the same settings. It also moves the overall density by twenty or thirty percent, because dirt pools rather than spreading evenly and where it pools changes with the seed. If a plate comes out dirtier than the last, that is this and not Grime. Range 0 to 999.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>7</integer>
+        </map>
+        <key>RenderLensDirtSmudge</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the wipe marks - the broad, soft smears a cloth leaves behind, as opposed to the discrete specks. Raise it for a lens cleaned in a hurry. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the lens dirt overlay - grime on the front element catching bloom and flare, the way a real lens lights up when something bright is in frame. 0 disables. 0.3 is a subtle used-lens feel; 1.0 is a filthy one. Only lights up where there is already bloom or flare to catch, so a flat scene stays clean no matter how high this goes. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDirtToe</key>
+        <map>
+            <key>Comment</key>
+            <string>Shapes the low end of the plate - how much of the faint grime survives into the result. Lower values keep the midtones dirt actually lives in; higher values crush them and leave only the brightest specks, which reads clean no matter how high Strength goes. Range 0.6 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.6</real>
+        </map>
+        <key>RenderLensDistortionAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall strength of the geometric lens distortion. 0 disables the effect entirely. 0.25 is a subtle wide-angle bend; 1.0 applies the shape coefficients in full. Only the world view is warped - nametags, selection outlines and UI are drawn afterwards and stay straight. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionCenter</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.5, 0.5] Offset of the optical axis from the frame center, x and y, z component unused. Non-zero values decenter the distortion the way a shifted or tilted lens does. Leave at zero for a centered lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderLensDistortionFit</key>
+        <map>
+            <key>Comment</key>
+            <string>How the warped image is rescaled - 0 = none (pincushion can show black corners), 1 = fit (scaled so nothing ever goes black; the usual choice), 2 = fill (scaled so the whole undistorted frame stays visible, which can letterbox the corners)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderLensDistortionK1</key>
+        <map>
+            <key>Comment</key>
+            <string>Primary radial distortion coefficient. Negative values give barrel distortion (straight lines bow outward, the wide-angle look); positive values give pincushion (lines bow inward, common on telephoto). -0.2 is a mild wide angle, -0.4 approaches a fisheye look. Has no effect until Amount is raised. Range -0.5 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-0.2</real>
+        </map>
+        <key>RenderLensDistortionK2</key>
+        <map>
+            <key>Comment</key>
+            <string>Secondary radial distortion coefficient, shaping the falloff toward the corners. Leave at 0 for a simple bend; small non-zero values reproduce the moustache distortion of real wide-angle lenses, where the bend reverses direction near the frame edge. Range -0.25 to 0.25.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Anamorphic desqueeze factor. 1.0 is a spherical lens and does nothing. 1.33 and 2.0 match the common anamorphic formats, stretching the image horizontally the way a desqueezed cinema frame looks. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDistortionTangential</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.05, 0.05] Brown-Conrady tangential (decentering) coefficients p1 and p2 in x and y, z component unused. These model a lens element mounted slightly off-axis and shear the image rather than bending it radially. Realistic values are tiny - below 0.01. Leave at zero unless deliberately faking a misaligned lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
         <key>RenderLensFlareChromaticSpread</key>
         <map>
             <key>Comment</key>
@@ -869,7 +1292,7 @@
         <key>RenderLensFlareStarburstSpikes</key>
         <map>
             <key>Comment</key>
-            <string>Number of aperture-like spikes in the starburst. Real cameras typically show 2x the blade count (6-blade = 12 spikes, etc). Range 1 to 32.</string>
+            <string>Angular frequency of the starburst rather than a literal spike count - it draws two opposed spikes per cycle, so the star carries twice this many primary spikes (the default 4 gives 8, matching an 8-blade iris) with fainter secondary rays between them. Real lenses show one spike per aperture blade when the blade count is even and two per blade when it is odd, so use half the blade count for an even iris (6 blades = 3) and the blade count itself for an odd one (7 blades = 7). Range 1 to 32.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

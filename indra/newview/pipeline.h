@@ -96,6 +96,7 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
+    void generateLensDirt();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -148,7 +149,10 @@ public:
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
     void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void renderDoF(LLRenderTarget* src, LLRenderTarget* dst);
+    // Operates in place on mRT->screen: the combine writes colour back under a
+    // mask that leaves the prim-glow alpha untouched, so callers neither pass
+    // buffers nor swap afterwards.
+    void renderDoF();
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
@@ -823,6 +827,23 @@ public:
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
 
+        // Depth of field scratch, owned by the DoF pass alone.
+        //
+        // DoF runs pre-tonemap on linear HDR, so it cannot borrow postPingMap
+        // (GL_RGB10_A2 under HDR). It deliberately does not borrow
+        // deferredLight either: that is the SSAO / sun-shadow factor buffer
+        // every deferred lighting shader samples, and widening it to RGBA16F
+        // to serve one late pass would double a frame-wide bandwidth cost on
+        // exactly the low-end hardware this DoF path exists for.
+        //
+        // dofSharp is RGBA16F because it carries the sharp linear copy plus
+        // the signed CoF in alpha. dofBlur drops alpha entirely -- the combine
+        // reads CoF from dofSharp and its own alpha output is discarded by the
+        // colour mask -- so it uses the pyramid's R11F_G11F_B10F and costs half.
+        // Both are main-pack only and released whenever DoF is off.
+        LLRenderTarget          dofSharp;
+        LLRenderTarget          dofBlur;
+
         //sun shadow map
         LLRenderTarget          shadow[4];
 
@@ -830,6 +851,16 @@ public:
         // mBloomMip[0] is full-res extract; subsequent levels are halved.
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
+
+        // Cross-screen filter ping-pong. Allocated on the first frame the
+        // effect is actually on and released again when it is switched off, so
+        // the strength control can stay a live slider -- wiring a slider to a
+        // reallocation handler would fire on every mouse-move.
+        LLRenderTarget              crossFilter[3];
+        // The height the targets were last (re)built for -- kept even when
+        // the build FAILED, so an impossible size is not retried every frame;
+        // pair it with isComplete() to tell the two states apart.
+        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -984,6 +1015,40 @@ public:
     U32                 mSMAAAreaMap = 0;
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
+
+    // Lens dirt plate, generated rather than loaded -- see generateLensDirt.
+    // Nothing is allocated until the effect is switched on, and the memory goes
+    // back when it is switched off, so an incomplete target is also the signal
+    // to force the strength uniform to 0 and leave the sampler unread.
+    LLRenderTarget      mLensDirtMap;
+
+    // What the current plate was generated from. Comparing the whole set each
+    // frame is what triggers a rebuild, which covers parameter edits and window
+    // resizes through one test and needs no commit-signal plumbing. It also
+    // records a *failed* attempt, so a plate that could not be allocated is
+    // retried when something changes rather than on every frame.
+    struct LensDirtParams
+    {
+        U32 width      = 0;
+        U32 height     = 0;
+        F32 seed       = -1.f;
+        F32 grime      = -1.f;
+        F32 mote_scale = -1.f;
+        F32 smudge     = -1.f;
+        S32 scratches  = -1;
+        F32 toe        = -1.f;
+        F32 gain       = -1.f;
+
+        bool operator==(const LensDirtParams&) const = default;
+    };
+    LensDirtParams      mLensDirtParams;
+
+    // Raised by the Lightbox while one of the generation sliders is being
+    // dragged. The plate is full-resolution, so rebuilding on every frame of a
+    // drag is a stutter rather than a preview -- and worse the slower the
+    // machine, which is backwards. Holding off means the rebuild lands once, on
+    // release, which is also where the user expects to see the result.
+    bool                mLensDirtSliderHeld = false;
 
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;
