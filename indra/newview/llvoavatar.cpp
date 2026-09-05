@@ -11408,6 +11408,28 @@ void showRigInfoTabExtents(LLVOAvatar *avatar, LLJointRiggingInfoTab& tab, S32& 
 void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    // Nothing is ever attached to an animated object, and it has the
+    // skeleton's fifty-odd attachment points all the same: a map walk that
+    // finds nothing, every time the box is recomputed. Its volumes are its
+    // root and the root's children, below.
+    if (isControlAvatar())
+    {
+        LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
+        if (volp)
+        {
+            volumes.push_back(volp);
+            for (LLViewerObject* childp : volp->getChildren())
+            {
+                if (!childp->isDead() && childp->getPCode() == LL_PCODE_VOLUME)
+                {
+                    volumes.push_back(static_cast<LLVOVolume*>(childp));
+                }
+            }
+        }
+        return;
+    }
+
     for (const auto& iter : mAttachmentPoints)
     {
         LLViewerJointAttachment* attachment = iter.second;
@@ -11438,22 +11460,6 @@ void LLVOAvatar::getAssociatedVolumes(std::vector<LLVOVolume*>& volumes)
             }
         }
     }
-
-    if (isControlAvatar())
-    {
-        LLVOVolume *volp = static_cast<LLControlAvatar*>(this)->mRootVolp;
-        if (volp)
-        {
-            volumes.push_back(volp);
-            for (LLViewerObject* childp : volp->getChildren())
-            {
-                if (!childp->isDead() && childp->getPCode() == LL_PCODE_VOLUME)
-                {
-                    volumes.push_back(static_cast<LLVOVolume*>(childp));
-                }
-            }
-        }
-    }
 }
 
 // virtual
@@ -11473,14 +11479,19 @@ void LLVOAvatar::updateRiggingInfo()
         LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("update rig info - get key");
         size_t hash = 0;
         // Get current rigging info key
+        // Keyed on the skin the rigging table is actually built from, not the
+        // mesh id the object names: the two differ while a new mesh's skin
+        // is still on its way, and the table can only change once it lands.
+        // That is also one object fewer to touch per volume -- the skin,
+        // shared by every volume of the same mesh, rather than each one's
+        // LLVolume -- and no virtual call to ask whether it is rigged.
         for (LLVOVolume* vol : volumes)
         {
-            if (vol->isRiggedMesh())
+            if (const LLMeshSkinInfo* skin = vol->getSkinInfo())
             {
-                const LLUUID& mesh_id = vol->getVolume()->getParams().getSculptID();
                 S32 max_lod = llmax(vol->getLOD(), vol->mLastRiggingInfoLOD);
 
-                boost::hash_combine(hash, mesh_id);
+                boost::hash_combine(hash, skin->mMeshID);
                 boost::hash_combine(hash, max_lod);
             }
         }
