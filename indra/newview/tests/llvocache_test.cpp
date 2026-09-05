@@ -572,6 +572,17 @@ namespace tut
             ensure("inverted settings still give a factor in [0, 1]", f >= 0.f && f <= 1.f);
         }
         ensure("inverted settings: below the low setting nothing is pulled in", close_to(factor(2000.f, 0.f, no_cap, 3000.f, 2048.f), 1.f));
+
+        // a bound set by hand is the bound, tighter than RAM would make it too
+        auto explicit_factor = [](F32 allocated, F32 physical, F32 cap, F32 low, F32 high)
+        {
+            return LLVOCacheEntry::memoryAdjustFactor(allocated, physical, cap, low, high, true, true);
+        };
+        ensure("explicit bounds on a big machine: at the low one nothing is pulled in", close_to(explicit_factor(1000.f, 65536.f, no_cap, 1000.f, 2000.f), 1.f));
+        ensure("explicit bounds on a big machine: at the high one everything is", close_to(explicit_factor(2000.f, 65536.f, no_cap, 1000.f, 2000.f), 0.f));
+        ensure("explicit bounds on a big machine: halfway is half", close_to(explicit_factor(1500.f, 65536.f, no_cap, 1000.f, 2000.f), 0.5f));
+        ensure("an explicit high with a default low still comes out ordered",
+               LLVOCacheEntry::memoryAdjustFactor(16000.f, 65536.f, no_cap, 750.f, 2048.f, false, true) >= 0.f);
     }
 
     template<> template<>

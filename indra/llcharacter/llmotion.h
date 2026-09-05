@@ -80,7 +80,7 @@ public:
     const LLUUID& getID() const { return mID; }
 
     // returns the pose associated with the current state of this motion
-    virtual LLPose* getPose() { return &mPose;}
+    LLPose* getPose() { return &mPose; }
 
     void fadeOut();
 

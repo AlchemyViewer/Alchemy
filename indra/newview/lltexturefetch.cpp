@@ -1041,6 +1041,7 @@ bool LLTextureFetchWorker::doWork(S32 param)
     static const LLCore::HttpStatus http_not_found(HTTP_NOT_FOUND);                     // 404
     static const LLCore::HttpStatus http_service_unavail(HTTP_SERVICE_UNAVAILABLE);     // 503
     static const LLCore::HttpStatus http_not_sat(HTTP_REQUESTED_RANGE_NOT_SATISFIABLE); // 416;
+    static const LLCore::HttpStatus http_forbidden(HTTP_FORBIDDEN);                     // 403
 
     LLMutexLock lock(&mWorkMutex);                                      // +Mw
 
@@ -1575,10 +1576,11 @@ bool LLTextureFetchWorker::doWork(S32 param)
                     // Allowed, we'll accept whatever data we have as complete.
                     mHaveAllData = true;
                 }
-                else if (mFTType != FTT_MAP_TILE)
+                else if (mFTType != FTT_MAP_TILE || http_forbidden != mGetStatus)
                 {
                     // Map tiles that do not exist come back 403 from the CDN;
                     // that is the expected answer for open water, not a failure.
+                    // Anything else a tile fetch gets back is still news.
                     LL_INFOS(LOG_TXT) << "HTTP GET failed for: " << mUrl
                                       << " Status: " << mGetStatus.toTerseString()
                                       << " Reason: '" << mGetReason << "'"

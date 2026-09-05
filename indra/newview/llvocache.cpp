@@ -453,15 +453,17 @@ S32 LLVOCacheEntry::writeToBuffer(U8 *data_buffer) const
 }
 
 //static
-F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB, F32 low_setting_MB, F32 high_setting_MB)
+F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB,
+                                       F32 low_setting_MB, F32 high_setting_MB,
+                                       bool low_is_explicit, bool high_is_explicit)
 {
-    // The settings date from 32-bit builds and sit far below what a 64-bit
-    // viewer uses at rest, which pinned the factor at 0 and left the scene
-    // permanently loading at its tightest radii. Installed RAM sets the
-    // bounds, with the settings as floors so an explicit value still wins;
-    // settings can also arrive the wrong way round.
-    F32 low_bound_MB = llmax(low_setting_MB, physical_MB * 0.25f);
-    F32 high_bound_MB = llmax(high_setting_MB, physical_MB * 0.6f);
+    // The default settings date from 32-bit builds and sit far below what a
+    // 64-bit viewer uses at rest, which pinned the factor at 0 and left the
+    // scene permanently loading at its tightest radii. A bound left at its
+    // default follows installed RAM; one set by hand is taken as it is, in
+    // either direction. Settings can also arrive the wrong way round.
+    F32 low_bound_MB = low_is_explicit ? low_setting_MB : llmax(low_setting_MB, physical_MB * 0.25f);
+    F32 high_bound_MB = high_is_explicit ? high_setting_MB : llmax(high_setting_MB, physical_MB * 0.6f);
     high_bound_MB = llmax(high_bound_MB, low_bound_MB + 1.f);
 
     // Once the allocation reaches the heap cap, free memory reads as none and
@@ -509,10 +511,16 @@ void LLVOCacheEntry::updateDebugSettings()
     static const F32 KB_to_MB = 1.f / 1024.f;
     const F32 allocated_MB = LLMemory::getAllocatedMemKB().value() * KB_to_MB;
 
+    // a bound left at its default follows installed RAM; one set by hand is
+    // the bound
+    static const U32 low_default = gSavedSettings.getControl("SceneLoadLowMemoryBound")->getDefault().asInteger();
+    static const U32 high_default = gSavedSettings.getControl("SceneLoadHighMemoryBound")->getDefault().asInteger();
     const F32 physical_MB = LLMemory::getMaxMemKB().value() * KB_to_MB;
     const F32 heap_cap_MB = LLMemory::getMaxHeapSizeKB().value() * KB_to_MB;
     const F32 adjust_factor = memoryAdjustFactor(allocated_MB, physical_MB, heap_cap_MB,
-                                                 (F32)low_mem_bound_MB, (F32)high_mem_bound_MB); // [0, 1]
+                                                 (F32)low_mem_bound_MB, (F32)high_mem_bound_MB,
+                                                 (U32)low_mem_bound_MB != low_default,
+                                                 (U32)high_mem_bound_MB != high_default); // [0, 1]
 
     //min radius: all objects within this radius remain loaded in memory
     static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");

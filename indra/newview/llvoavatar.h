@@ -372,6 +372,10 @@ public:
     static bool     sShowAnimationDebug; // show animation debug info
     static bool     sShowCollisionVolumes;  // show skeletal collision volumes
     static bool     sVisibleInFirstPerson;
+    // bumped whenever the mute or friend list changes; the per-avatar caches
+    // of membership are renewed against them
+    static U32      sMuteListGeneration;
+    static U32      sBuddyListGeneration;
     static S32      sNumLODChangesThisFrame;
     static S32      sNumVisibleChatBubbles;
     static bool     sDebugInvisible;
@@ -599,12 +603,12 @@ private:
     F32 mCPURenderTime = 0.f;
 
     mutable bool        mCachedInMuteList;
-    mutable F64         mCachedMuteListUpdateTime;
+    mutable U32         mCachedMuteListGeneration = U32_MAX;
     mutable bool        mCachedInBuddyList = false;
+    mutable U32         mCachedBuddyListGeneration = U32_MAX;
     // final once the name is known; an avatar's staff status never changes
     mutable bool        mIsStaffUser = false;
     mutable bool        mStaffUserKnown = false;
-    mutable F64         mCachedBuddyListUpdateTime = 0.0;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setcam_avdist)
     mutable bool        mCachedIsRlvSilhouette = false;
     mutable F64         mCachedRlvSilhouetteUpdateTime = 0.f;

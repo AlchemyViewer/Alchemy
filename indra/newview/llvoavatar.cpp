@@ -655,6 +655,24 @@ namespace
     }
 }
 
+namespace
+{
+    // The friend and mute lists change on events, not on a clock. Each avatar
+    // caches its own answer against the generation it was worked out for, and
+    // these bump the generation, so every cache is renewed exactly when a list
+    // changes and never otherwise.
+    struct ALMuteListGeneration final : public LLMuteListObserver
+    {
+        void onChange() override { ++LLVOAvatar::sMuteListGeneration; }
+    };
+    struct ALBuddyListGeneration final : public LLFriendObserver
+    {
+        void changed(U32) override { ++LLVOAvatar::sBuddyListGeneration; }
+    };
+    ALMuteListGeneration sMuteListObserver;
+    ALBuddyListGeneration sBuddyListObserver;
+}
+
 //-----------------------------------------------------------------------------
 // Static Data
 //-----------------------------------------------------------------------------
@@ -687,6 +705,8 @@ bool LLVOAvatar::sDebugInvisible = false;
 bool LLVOAvatar::sShowAttachmentPoints = false;
 bool LLVOAvatar::sShowAnimationDebug = false;
 bool LLVOAvatar::sVisibleInFirstPerson = false;
+U32 LLVOAvatar::sMuteListGeneration = 0;
+U32 LLVOAvatar::sBuddyListGeneration = 0;
 F32 LLVOAvatar::sLODFactor = 1.f;
 F32 LLVOAvatar::sPhysicsLODFactor = 1.f;
 F32 LLVOAvatar::sUnbakedTime = 0.f;
@@ -776,7 +796,6 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mUseLocalAppearance(false),
     mLastUpdateRequestCOFVersion(-1),
     mLastUpdateReceivedCOFVersion(-1),
-    mCachedMuteListUpdateTime(0),
     mCachedInMuteList(false),
     mIsControlAvatar(false),
     mIsUIAvatar(false),
@@ -1281,11 +1300,19 @@ void LLVOAvatar::initClass()
     LLControlAvatar::sRegionChangedSlot = gAgent.addRegionChangedCallback(&LLControlAvatar::onRegionChanged);
 
     sCloudTexture = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png");
+
+    LLMuteList::getInstance()->addObserver(&sMuteListObserver);
+    LLAvatarTracker::instance().addObserver(&sBuddyListObserver);
 }
 
 
 void LLVOAvatar::cleanupClass()
 {
+    if (LLMuteList::instanceExists())
+    {
+        LLMuteList::getInstance()->removeObserver(&sMuteListObserver);
+    }
+    LLAvatarTracker::instance().removeObserver(&sBuddyListObserver);
 }
 
 // virtual
@@ -1421,7 +1448,11 @@ const LLVector3 LLVOAvatar::getRenderPosition() const
     }
     else
     {
-        return getPosition() * mDrawable->getParent()->getRenderMatrix().toMatrix4();
+        LLVector4a local_pos;
+        local_pos.load3(getPosition().mV);
+        LLVector4a render_pos;
+        mDrawable->getParent()->getRenderMatrix().affineTransform(local_pos, render_pos);
+        return LLVector3(render_pos.getF32ptr());
     }
 }
 
@@ -1507,16 +1538,16 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
     // known starting point, but in general there isn't. Ideally the
     // box update logic should be modified to handle the no-point-yet
     // case. For most models, starting with the pelvis is safe though.
-    LLVector3 zero_pos;
     LLVector4a pos;
-    if (dist_vec(zero_pos, mPelvisp->getWorldPosition())<0.001)
+    const LLVector3 pelvis_pos = mPelvisp->getWorldPosition();
+    if (pelvis_pos.magVecSquared() < 0.001f * 0.001f)
     {
         // Don't use pelvis until av initialized
         pos.load3(getRenderPosition().mV);
     }
     else
     {
-        pos.load3(mPelvisp->getWorldPosition().mV);
+        pos.load3(pelvis_pos.mV);
     }
     newMin = pos;
     newMax = pos;
@@ -4288,21 +4319,13 @@ bool LLVOAvatar::isVisuallyMuted()
 
 bool LLVOAvatar::isInMuteList() const
 {
-    bool muted = false;
-    F64 now = LLFrameTimer::getTotalSeconds();
-    if (now < mCachedMuteListUpdateTime)
+    // renewed when the mute list changes, not once a second regardless
+    if (mCachedMuteListGeneration != sMuteListGeneration)
     {
-        muted = mCachedInMuteList;
+        mCachedInMuteList = LLMuteList::getInstance()->isMuted(getID());
+        mCachedMuteListGeneration = sMuteListGeneration;
     }
-    else
-    {
-        muted = LLMuteList::getInstance()->isMuted(getID());
-
-        const F64 SECONDS_BETWEEN_MUTE_UPDATES = 1;
-        mCachedMuteListUpdateTime = now + SECONDS_BETWEEN_MUTE_UPDATES;
-        mCachedInMuteList = muted;
-    }
-    return muted;
+    return mCachedInMuteList;
 }
 
 bool LLVOAvatar::isStaffUser() const
@@ -4848,7 +4871,9 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
                 }
             }
 
-            LLQuaternion root_rotation = mRoot->getWorldMatrix().toMatrix4().quaternion();
+            // the rotation straight from the transform: a matrix built,
+            // stored and decomposed gave the same answer for more
+            const LLQuaternion root_rotation = mRoot->getWorldRotation();
             F32 root_roll, root_pitch, root_yaw;
             root_rotation.getEulerAngles(&root_roll, &root_pitch, &root_yaw);
 
@@ -4857,7 +4882,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
             // and head turn.  Once in motion, it must conform however.
             bool self_in_mouselook = isSelf() && gAgentCamera.cameraMouselook();
 
-            LLVector3 pelvisDir( mRoot->getWorldMatrix().toMatrix4().getFwdRow4().mV );
+            const LLVector3 pelvisDir = LLVector3::x_axis * root_rotation;
 
             static LLCachedControl<F32> s_pelvis_rot_threshold_slow(gSavedSettings, "AvatarRotateThresholdSlow", 60.0);
             static LLCachedControl<F32> s_pelvis_rot_threshold_fast(gSavedSettings, "AvatarRotateThresholdFast", 2.0);
@@ -12846,20 +12871,12 @@ F32 LLVOAvatar::getAverageGPURenderTime()
 
 bool LLVOAvatar::isBuddy() const
 {
-    bool is_friend = false;
-    F64 now = LLFrameTimer::getTotalSeconds();
-    if (now < mCachedBuddyListUpdateTime)
+    // renewed when the friend list changes, not once a second regardless
+    if (mCachedBuddyListGeneration != sBuddyListGeneration)
     {
-        is_friend = mCachedInBuddyList;
+        mCachedInBuddyList = LLAvatarTracker::instance().isBuddy(getID());
+        mCachedBuddyListGeneration = sBuddyListGeneration;
     }
-    else
-    {
-        is_friend = LLAvatarTracker::instance().isBuddy(getID());
-
-        const F64 SECONDS_BETWEEN_BUDDY_UPDATES = 1;
-        mCachedBuddyListUpdateTime = now + SECONDS_BETWEEN_BUDDY_UPDATES;
-        mCachedInBuddyList = is_friend;
-    }
-    return is_friend;
+    return mCachedInBuddyList;
 }
 

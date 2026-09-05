@@ -83,7 +83,7 @@ bool FSPosingMotion::onUpdate(F32 time, U8* joint_mask)
     LLVector3 currentScale;
     LLVector3 targetScale;
 
-    for (FSJointPose jointPose : mJointPoses)
+    for (FSJointPose& jointPose : mJointPoses)
     {
         LLJoint* joint = jointPose.getJointState()->getJoint();
         if (!joint)

@@ -4070,7 +4070,7 @@ bool LLVOVolume::isHUDAttachment() const
 }
 
 
-const LLMatrix4a LLVOVolume::getRenderMatrix() const
+const LLMatrix4a& LLVOVolume::getRenderMatrix() const
 {
     if (mDrawable->isActive() && !mDrawable->isRoot())
     {

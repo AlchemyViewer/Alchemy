@@ -148,6 +148,14 @@ namespace
 template <typename T>
 void LLKeyframeMotion::KeyCurve<T>::setKey(F32 time, const T& value)
 {
+    // Keys arrive in time order from every asset that is not out to cost
+    // something, so the common case appends without a search.
+    if (mTimes.empty() || time > mTimes.back())
+    {
+        mTimes.push_back(time);
+        mValues.push_back(value);
+        return;
+    }
     auto at = std::lower_bound(mTimes.begin(), mTimes.end(), time);
     const size_t index = at - mTimes.begin();
     if (at != mTimes.end() && *at == time)

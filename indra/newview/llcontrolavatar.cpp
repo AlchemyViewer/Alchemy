@@ -194,7 +194,6 @@ void LLControlAvatar::matchVolumeTransform()
                 {
                     setPositionAgent(mRootVolp->getRenderPosition());
                 }
-                attach->updateWorldPRSParent();
                 LLVector3 joint_pos = attach->getWorldPosition();
                 LLQuaternion joint_rot = attach->getWorldRotation();
                 LLVector3 obj_pos = mRootVolp->mDrawable->getPosition();

@@ -101,14 +101,16 @@ void LLViewerJointMesh::uploadJointMatrices()
     LLPolyMesh *reference_mesh = mMesh->getReferenceMesh();
 
     //calculate joint matrices
+    LLMatrix4a model_view;
+    model_view.loadu(&LLDrawPoolAvatar::getModelView().mMatrix[0][0]);
     size_t num_joints = llmin(reference_mesh->mJointRenderData.size(), LL_CHARACTER_MAX_JOINTS_PER_MESH);
     for (joint_num = 0; joint_num < num_joints; joint_num++)
     {
-        LLMatrix4 joint_mat = reference_mesh->mJointRenderData[joint_num]->mJoint->getWorldMatrix().toMatrix4();
-
-        joint_mat *= LLDrawPoolAvatar::getModelView();
-        gJointMatUnaligned[joint_num] = joint_mat;
-        gJointRotUnaligned[joint_num] = joint_mat.getMat3();
+        // joint to world to eye, in registers; only the result is stored
+        LLMatrix4a joint_mat;
+        joint_mat.setMulNoAlias(reference_mesh->mJointRenderData[joint_num]->mJoint->getWorldMatrix(), model_view);
+        gJointMatUnaligned[joint_num] = joint_mat.toMatrix4();
+        gJointRotUnaligned[joint_num] = gJointMatUnaligned[joint_num].getMat3();
     }
 
     bool last_pivot_uploaded{ false };

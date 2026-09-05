@@ -141,8 +141,6 @@ void LLSkinningUtil::initSkinningMatrixPalette(
         return;
     }
 
-    LLMatrix4a world[LL_CHARACTER_MAX_ANIMATED_JOINTS];
-
     for (S32 j = 0; j < count; ++j)
     {
         S32 joint_num = skin->mJointNums[j];
@@ -150,7 +148,8 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 
         if (joint)
         {
-            world[j] = joint->getWorldMatrix();
+            // bind space to world, straight from the joint's own matrix
+            mat[j].setMulNoAlias(skin->mInvBindMatrix[j], joint->getWorldMatrix());
         }
         else
         {
@@ -169,17 +168,6 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 #endif
             dump_avatar_and_skin_state("initSkinningMatrixPalette joint not found", avatar, skin);
         }
-    }
-
-    //NOTE: pointer striders used here as a micro-optimization over vector/array lookups
-    const LLMatrix4a* invBind = &(skin->mInvBindMatrix[0]);
-    const LLMatrix4a* w = world;
-    LLMatrix4a* m = mat;
-    LLMatrix4a* end = m + count;
-
-    while (m < end)
-    {
-        (m++)->setMulNoAlias(*(invBind++), *(w++));
     }
 }
 
