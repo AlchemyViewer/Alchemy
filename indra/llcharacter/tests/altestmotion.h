@@ -52,9 +52,10 @@ public:
     LLMotionBlendType getBlendType() override { return mBlendType; }
     F32 getMinPixelArea() override { return mMinPixelArea; }
 
-    LLMotionInitStatus onInitialize(LLCharacter*) override
+    LLMotionInitStatus onInitialize(LLCharacter* character) override
     {
         ++mInitializeCount;
+        mCharacter = character;
         return mInitStatus;
     }
 
@@ -69,6 +70,13 @@ public:
         ++mUpdateCount;
         mUpdateSerial = ++sUpdateSerial;
         mLastUpdateTime = time;
+        if (mStartOnUpdate.notNull() && mCharacter)
+        {
+            // once: the way an emote restarts the sit animation
+            const LLUUID id = mStartOnUpdate;
+            mStartOnUpdate.setNull();
+            mCharacter->startMotion(id);
+        }
         return mUpdateResult;
     }
 
@@ -110,6 +118,8 @@ public:
     S32 mUpdateCount = 0;
     S32 mDeactivateCount = 0;
     S32 mStopTimeCalls = 0;
+    LLCharacter* mCharacter = nullptr;
+    LLUUID mStartOnUpdate;
     F32 mLastUpdateTime = 0.f;
 
     // Which onUpdate this was, across every test motion: the order the

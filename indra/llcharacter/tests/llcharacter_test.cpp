@@ -309,4 +309,43 @@ namespace tut
         ensure("the stopped motion is still stopped", stopped->isStopped());
         ensure_equals("its stop time sits on the quantum", fmodf(stopped->getStopTime(), 0.25f), 0.f);
     }
+
+    template<> template<>
+    void llcharacter_object::test<11>()
+    {
+        // A motion's update can start another motion -- an emote's does when
+        // it finds the sit animation is for the wrong sex -- and the new one
+        // goes in at the front of the very list being walked. Everything
+        // already on the list is still updated exactly once that frame, and
+        // the new one waits for the next. The motions ease in slowly so that
+        // a second visit would reach their update rather than be idled away
+        // by the joint signature.
+        LLUUID oldest_id, middle_id, newest_id;
+        ALTestMotion* oldest = startFreshMotion(oldest_id);
+        ALTestMotion* middle = startFreshMotion(middle_id);
+        ALTestMotion* newest = startFreshMotion(newest_id);
+        animateJoint(oldest, "mPelvis");
+        animateJoint(middle, "mTorso");
+        animateJoint(newest, "mChest");
+        oldest->mEaseInDuration = 10.f;
+        middle->mEaseInDuration = 10.f;
+        newest->mEaseInDuration = 10.f;
+
+        const LLUUID started_id = LLUUID::generateNewID();
+        ensure("registerMotion", mCharacter.registerMotion(started_id, ALTestMotion::create));
+        middle->mStartOnUpdate = started_id;
+
+        mCharacter.updateMotions(LLCharacter::NORMAL_UPDATE);
+        ensure("the started motion is playing", mCharacter.isMotionActive(started_id));
+        ensure_equals("the motion ahead of the starter was updated once", newest->mUpdateCount, 2);
+        ensure_equals("the starter was updated once", middle->mUpdateCount, 2);
+        ensure_equals("the motion behind the starter was updated once", oldest->mUpdateCount, 2);
+        ALTestMotion* started = static_cast<ALTestMotion*>(mCharacter.findMotion(started_id));
+        ensure_equals("the new motion had only its activation update", started->mUpdateCount, 1);
+
+        const LLMotionController::motion_list_t& normals = activeMotions(LLMotion::NORMAL_BLEND);
+        ensure_equals("four motions listed", normals.size(), 4u);
+        ensure("newest first, the started one ahead of them all",
+               normals[0] == started && normals[1] == newest && normals[2] == middle && normals[3] == oldest);
+    }
 }

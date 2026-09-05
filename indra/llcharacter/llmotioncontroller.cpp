@@ -125,12 +125,19 @@ LLMotion *LLMotionRegistry::createMotion( const LLUUID &id )
 
 namespace
 {
-    // The index to visit after the motion at index, which may have taken
-    // itself off the list on the way past; then the next one is already in
-    // its slot.
+    // The index to visit after the motion at index. That motion may have
+    // taken itself off the list on the way past, in which case the next one
+    // is already in its slot; or its update may have started another motion,
+    // which goes in at the front and shifts everything down, in which case
+    // the walk carries on from wherever the visited one has moved to.
     size_t next_motion(const LLMotionController::motion_list_t& motions, size_t index, const LLMotion* visited)
     {
-        return (index < motions.size() && motions[index] == visited) ? index + 1 : index;
+        if (index < motions.size() && motions[index] == visited)
+        {
+            return index + 1;
+        }
+        auto at = std::find(motions.begin(), motions.end(), visited);
+        return at == motions.end() ? index : (size_t)(at - motions.begin()) + 1;
     }
 }
 
