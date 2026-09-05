@@ -638,7 +638,9 @@ void LLViewerTexture::updateClass()
 U32Megabytes LLViewerTexture::getFreeSystemMemory()
 {
     LLMemory::updateFreeSystemMemory(); //samples at most once per second.
-    return LLMemory::getAvailableMemKB();
+    // the same figure the draw-distance factor budgets against, so the two
+    // escalate in the order intended whichever kind of memory runs out first
+    return U32Megabytes(LLMemory::getScarcestFreeMemMB());
 }
 
 S32Megabytes get_render_free_main_memory_treshold()

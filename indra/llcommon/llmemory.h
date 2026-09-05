@@ -438,6 +438,11 @@ public:
     static U32Megabytes getAvailableCommitMemMB();
 #endif
     static U32Kilobytes getAvailableMemKB() ;
+    // The free memory that runs out first: physical, or on Windows the commit
+    // charge when that is the scarcer. Everything that acts on memory pressure
+    // reads this one figure, so the texture bias and the draw-distance factor
+    // escalate in the order they were designed to.
+    static S32Megabytes getScarcestFreeMemMB();
     static U32Kilobytes getMaxMemKB() ;
     static U32Kilobytes getMaxHeapSizeKB() { return sMaxHeapSizeInKB; }
     static U32Kilobytes getAllocatedMemKB() ;

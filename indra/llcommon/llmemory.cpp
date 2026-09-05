@@ -37,6 +37,7 @@
 # include <mach/mach_init.h>
 #include <mach/mach_host.h>
 #elif LL_LINUX
+# include <cstdio>
 # include <unistd.h>
 # include <sys/resource.h>
 # include <sys/sysinfo.h>
@@ -156,11 +157,16 @@ void LLMemory::updateMemoryInfo()
     sample(sAllocatedMem, sAllocatedMemInKB);
 
     // Headroom under the heap cap. The units are unsigned, so an allocation
-    // past the cap has to read as no room left rather than wrap around.
-    const U32Kilobytes heap_headroom = sAllocatedMemInKB < sMaxHeapSizeInKB
-        ? U32Kilobytes(sMaxHeapSizeInKB - sAllocatedMemInKB)
-        : U32Kilobytes(0);
-    sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, heap_headroom);
+    // past the cap has to read as no room left rather than wrap around. A
+    // platform that could not say what is available leaves the sentinel in
+    // place, so the readers know there is no figure rather than a large one.
+    if (sAvailPhysicalMemInKB != U32Kilobytes(U32_MAX))
+    {
+        const U32Kilobytes heap_headroom = sAllocatedMemInKB < sMaxHeapSizeInKB
+            ? U32Kilobytes(sMaxHeapSizeInKB - sAllocatedMemInKB)
+            : U32Kilobytes(0);
+        sAvailPhysicalMemInKB = llmin(sAvailPhysicalMemInKB, heap_headroom);
+    }
 
     return ;
 }
@@ -224,6 +230,24 @@ void LLMemory::setSystemMemoryBudgetEnabled(bool enabled)
     }
 }
 
+S32Megabytes LLMemory::getScarcestFreeMemMB()
+{
+    S32Megabytes free_mem = getAvailableMemKB();
+#if LL_WINDOWS
+    // Running out of commit charge kills us just as fast as running out of
+    // physical memory, so budget against whichever is scarcer. Physical is
+    // the one that matters in practice: commit includes the page file and
+    // only collapses once the machine is already thrashing.
+    const U32Megabytes avail_commit = getAvailableCommitMemMB();
+    if (avail_commit != U32Megabytes(U32_MAX)) // unset would convert to -1MB
+    {
+        free_mem = llmin(free_mem, S32Megabytes(avail_commit));
+    }
+#endif
+    return free_mem;
+}
+
+//static
 F32 LLMemory::getSystemMemoryBudgetFactor()
 {
     if (!sSysMemoryBudgetEnabled)
@@ -247,18 +271,7 @@ F32 LLMemory::getSystemMemoryBudgetFactor()
         return sSysMemoryFactor;
     }
 
-    S32Megabytes free_sys_mem = getAvailableMemKB();
-#if LL_WINDOWS
-    // Running out of commit charge kills us just as fast as running out of
-    // physical memory, so budget against whichever is scarcer. Physical is
-    // the one that matters in practice: commit includes the page file and
-    // only collapses once the machine is already thrashing.
-    const U32Megabytes avail_commit = getAvailableCommitMemMB();
-    if (avail_commit != U32Megabytes(U32_MAX)) // unset would convert to -1MB
-    {
-        free_sys_mem = llmin(free_sys_mem, S32Megabytes(avail_commit));
-    }
-#endif
+    const S32Megabytes free_sys_mem = getScarcestFreeMemMB();
     // sSysMemoryFactor divides draw distance, so 1 is full range and 2 is half.
     // The target is 1 at the threshold and 2 once only PAD_BUFFER is left, so a
     // shallow dip costs a little range and a deep one costs a lot.
@@ -380,15 +393,27 @@ U64 LLMemory::getCurrentRSS()
 
 U64 LLMemory::getCurrentRSS()
 {
-    struct rusage usage;
-
-    if (getrusage(RUSAGE_SELF, &usage) != 0) {
-        // Error handling code could be here
-        return 0;
+    // /proc/self/statm: size resident shared text lib data dt, in pages. The
+    // resident figure is the set as it is now. getrusage's ru_maxrss is the
+    // peak, and a memory budget that reads the peak only ever tightens.
+    if (FILE* statm = fopen("/proc/self/statm", "r"))
+    {
+        long size = 0;
+        long resident = 0;
+        const int got = fscanf(statm, "%ld %ld", &size, &resident);
+        fclose(statm);
+        if (got == 2 && resident > 0)
+        {
+            return (U64)resident * (U64)sysconf(_SC_PAGESIZE);
+        }
     }
 
-    // ru_maxrss (since Linux 2.6.32)
-    // This is the maximum resident set size used (in kilobytes).
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) != 0)
+    {
+        return 0;
+    }
+    // ru_maxrss (since Linux 2.6.32): the peak resident set size, in kilobytes
     return usage.ru_maxrss * 1024;
 }
 

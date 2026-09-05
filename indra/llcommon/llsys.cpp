@@ -71,6 +71,7 @@ using namespace llsd;
 #   include <sys/types.h>
 #   include <mach/mach_init.h>
 #elif LL_LINUX
+#   include <cstdio>
 #   include <errno.h>
 #   include <sys/utsname.h>
 #   include <unistd.h>
@@ -834,15 +835,22 @@ void LLMemoryInfo::updateAvailableMemory()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
 #if LL_WINDOWS
-    MEMORYSTATUSEX state;
+    MEMORYSTATUSEX state = {};
     state.dwLength = sizeof(state);
-    GlobalMemoryStatusEx(&state);
+    if (GlobalMemoryStatusEx(&state))
+    {
+        LLMemory::sAvailPhysicalMemInKB = U32Kilobytes::convert(U64Bytes(state.ullAvailPhys));
 
-    LLMemory::sAvailPhysicalMemInKB = U32Kilobytes::convert(U64Bytes(state.ullAvailPhys));
-
-    // Despite the confusing naming "PageFile", this is the committed memory
-    // limit for the system or the current process, whichever is smaller.
-    LLMemory::sAvailCommitMemInMB = U32Megabytes::convert(U64Bytes(state.ullAvailPageFile));
+        // Despite the confusing naming "PageFile", this is the committed memory
+        // limit for the system or the current process, whichever is smaller.
+        LLMemory::sAvailCommitMemInMB = U32Megabytes::convert(U64Bytes(state.ullAvailPageFile));
+    }
+    else
+    {
+        // no figure is better than stack garbage read as one
+        LLMemory::sAvailPhysicalMemInKB = U32Kilobytes(U32_MAX);
+        LLMemory::sAvailCommitMemInMB = U32Megabytes(U32_MAX);
+    }
 
     PROCESS_MEMORY_COUNTERS_EX pmem;
     pmem.cb = sizeof(pmem);
@@ -876,8 +884,27 @@ void LLMemoryInfo::updateAvailableMemory()
     }
 
 #elif LL_LINUX
-    U64 phys = U64(getpagesize()) * U64(get_avphys_pages());
-    LLMemory::sAvailPhysicalMemInKB = U64Bytes(phys);
+    // MemAvailable is the kernel's own estimate of what can be had without
+    // swapping, page cache included. The free page count leaves the cache
+    // out, and reads as scarcity on any desktop that has been up for an hour.
+    unsigned long long avail_kb = 0;
+    if (FILE* meminfo = fopen("/proc/meminfo", "r"))
+    {
+        char line[128];
+        while (fgets(line, sizeof(line), meminfo))
+        {
+            if (sscanf(line, "MemAvailable: %llu kB", &avail_kb) == 1)
+            {
+                break;
+            }
+        }
+        fclose(meminfo);
+    }
+    if (avail_kb == 0)
+    {
+        avail_kb = (unsigned long long)getpagesize() * (unsigned long long)get_avphys_pages() / 1024ULL;
+    }
+    LLMemory::sAvailPhysicalMemInKB = U32Kilobytes((U32)llmin(avail_kb, (unsigned long long)U32_MAX - 1));
 #else
     //do not know how to collect available memory info for other systems.
     //leave it blank here for now.
