@@ -26,9 +26,17 @@
 
 #include "llkeyframemotion.h"
 
+#include "lldatapacker.h"
+#include "llquantize.h"
+
+#include "altestcharacter.h"
+
 #include <cmath>
 #include <map>
 #include <random>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "../test/lltut.h"
 
@@ -199,10 +207,126 @@ namespace
     }
 }
 
+namespace
+{
+    // One joint of an animation asset: a name, a priority, and the keys of
+    // its two curves. The times are packed as fractions of the duration and
+    // the rotations as a packed vector, both the way the format wants them,
+    // so what comes back is quantized and only approximately what went in.
+    struct AssetJoint
+    {
+        std::string mName;
+        S32 mPriority = LLJoint::HIGH_PRIORITY;
+        std::vector<std::pair<F32, LLQuaternion> > mRotations;
+        std::vector<std::pair<F32, LLVector3> > mPositions;
+    };
+
+    struct AssetAnimation
+    {
+        S32 mBasePriority = LLJoint::MEDIUM_PRIORITY;
+        F32 mDuration = 2.f;
+        F32 mLoopInPoint = 0.f;
+        F32 mLoopOutPoint = 2.f;
+        S32 mLoop = 1;
+        F32 mEaseIn = 0.3f;
+        F32 mEaseOut = 0.4f;
+        U32 mHandPose = LLHandMotion::HAND_POSE_RELAXED;
+        std::vector<AssetJoint> mJoints;
+        S32 mNumConstraints = 0;
+        // written in place of the real joint count when set, for a header
+        // that lies about how much follows it
+        S32 mClaimedJoints = -1;
+    };
+
+    void pack_animation(LLDataPackerBinaryBuffer& dp, const AssetAnimation& anim)
+    {
+        dp.packU16(1, "version");
+        dp.packU16(0, "sub_version");
+        dp.packS32(anim.mBasePriority, "base_priority");
+        dp.packF32(anim.mDuration, "duration");
+        dp.packString("", "emote_name");
+        dp.packF32(anim.mLoopInPoint, "loop_in_point");
+        dp.packF32(anim.mLoopOutPoint, "loop_out_point");
+        dp.packS32(anim.mLoop, "loop");
+        dp.packF32(anim.mEaseIn, "ease_in_duration");
+        dp.packF32(anim.mEaseOut, "ease_out_duration");
+        dp.packU32(anim.mHandPose, "hand_pose");
+        dp.packU32(anim.mClaimedJoints >= 0 ? (U32)anim.mClaimedJoints : (U32)anim.mJoints.size(), "num_joints");
+
+        for (const AssetJoint& joint : anim.mJoints)
+        {
+            dp.packString(joint.mName, "joint_name");
+            dp.packS32(joint.mPriority, "joint_priority");
+
+            dp.packS32((S32)joint.mRotations.size(), "num_rot_keys");
+            for (const auto& key : joint.mRotations)
+            {
+                dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
+                LLVector3 packed = key.second.packToVector3();
+                packed.quantize16(-1.f, 1.f, -1.f, 1.f);
+                dp.packU16(F32_to_U16(packed.mV[VX], -1.f, 1.f), "rot_angle_x");
+                dp.packU16(F32_to_U16(packed.mV[VY], -1.f, 1.f), "rot_angle_y");
+                dp.packU16(F32_to_U16(packed.mV[VZ], -1.f, 1.f), "rot_angle_z");
+            }
+
+            dp.packS32((S32)joint.mPositions.size(), "num_pos_keys");
+            for (const auto& key : joint.mPositions)
+            {
+                dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
+                dp.packU16(F32_to_U16(key.second.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_x");
+                dp.packU16(F32_to_U16(key.second.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_y");
+                dp.packU16(F32_to_U16(key.second.mV[VZ], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET), "pos_z");
+            }
+        }
+
+        dp.packS32(anim.mNumConstraints, "num_constraints");
+    }
+
+    AssetAnimation two_joint_animation()
+    {
+        AssetAnimation anim;
+
+        AssetJoint pelvis;
+        pelvis.mName = "mPelvis";
+        pelvis.mPriority = LLJoint::HIGH_PRIORITY;
+        pelvis.mRotations.push_back({ 0.f, LLQuaternion(0.4f, LLVector3::z_axis) });
+        pelvis.mRotations.push_back({ 1.f, LLQuaternion(-0.6f, LLVector3::y_axis) });
+        pelvis.mRotations.push_back({ 2.f, LLQuaternion(0.2f, LLVector3::x_axis) });
+        pelvis.mPositions.push_back({ 0.f, LLVector3(0.f, 0.f, 0.25f) });
+        pelvis.mPositions.push_back({ 2.f, LLVector3(0.1f, -0.2f, 0.3f) });
+        anim.mJoints.push_back(pelvis);
+
+        AssetJoint torso;
+        torso.mName = "mTorso";
+        torso.mPriority = LLJoint::MEDIUM_PRIORITY;
+        torso.mRotations.push_back({ 0.5f, LLQuaternion(0.9f, LLVector3::x_axis) });
+        anim.mJoints.push_back(torso);
+
+        return anim;
+    }
+}
+
 namespace tut
 {
     struct llkeyframemotion_data
     {
+        ALTestCharacter mCharacter;
+
+        // The keyframe data a successful deserialize produces is owned by the
+        // global cache, not by the motion, so it outlives the test unless the
+        // cache is emptied.
+        ~llkeyframemotion_data() { LLKeyframeDataCache::clear(); }
+
+        // Reads `anim` into a motion the way an arriving asset would.
+        // Returns whether it was accepted.
+        bool load(LLKeyframeMotion& motion, const AssetAnimation& anim, U8* buffer, S32 size)
+        {
+            LLDataPackerBinaryBuffer dp(buffer, size);
+            pack_animation(dp, anim);
+            LLDataPackerBinaryBuffer reader(buffer, dp.getCurrentSize());
+            motion.setCharacter(&mCharacter);
+            return motion.deserialize(reader, motion.getID());
+        }
     };
     typedef test_group<llkeyframemotion_data> llkeyframemotion_test;
     typedef llkeyframemotion_test::object llkeyframemotion_object;
@@ -351,5 +475,75 @@ namespace tut
         ensure_equals("after the only key: cursor", cursor, 1u);
         ensure("back before the only key", one.getValue(0.5f, cursor) == key);
         ensure_equals("back before the only key: cursor", cursor, 0u);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<6>()
+    {
+        // An asset read in gives one joint motion per joint in the file, in
+        // file order, each holding the keys that followed its name. The
+        // motions live in one block, which is what every playing instance
+        // walks every frame.
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        std::vector<U8> buffer(4096);
+        const AssetAnimation anim = two_joint_animation();
+        ensure("the animation is accepted", load(motion, anim, buffer.data(), (S32)buffer.size()));
+
+        ensure_equals("both joints came through", motion.getNumJointMotions(), 2);
+        ensure_approximately_equals("duration", motion.getDuration(), anim.mDuration, 16);
+        ensure("the animation loops", motion.getLoop());
+        ensure_approximately_equals("ease in", motion.getEaseInDuration(), anim.mEaseIn, 16);
+        ensure_approximately_equals("ease out", motion.getEaseOutDuration(), anim.mEaseOut, 16);
+        ensure_equals("base priority", (S32)motion.getPriority(), anim.mBasePriority);
+
+        LLPose* pose = motion.getPose();
+        ensure_equals("a joint state per joint motion", pose->getNumJointStates(), 2);
+        LLJointState* pelvis_state = pose->findJointState(std::string("mPelvis"));
+        ensure("the pelvis is in the pose", pelvis_state != nullptr);
+        ensure_equals("the pelvis carries both channels",
+                      pelvis_state->getUsage(), (U32)(LLJointState::ROT | LLJointState::POS));
+        LLJointState* torso_state = pose->findJointState(std::string("mTorso"));
+        ensure("the torso is in the pose", torso_state != nullptr);
+        ensure_equals("the torso carries rotation only", torso_state->getUsage(), (U32)LLJointState::ROT);
+        ensure_equals("the torso keeps its own priority",
+                      (S32)torso_state->getPriority(), anim.mJoints[1].mPriority);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<7>()
+    {
+        // What was read can be written back and read again, and the second
+        // reading agrees with the first joint for joint and key for key. The
+        // format quantizes on the way out, so this holds only because the
+        // first reading was already quantized.
+        LLKeyframeMotion first(LLUUID::generateNewID());
+        std::vector<U8> buffer(4096);
+        ensure("the animation is accepted", load(first, two_joint_animation(), buffer.data(), (S32)buffer.size()));
+
+        std::vector<U8> written(first.getFileSize());
+        LLDataPackerBinaryBuffer writer(written.data(), (S32)written.size());
+        ensure("it serializes", first.serialize(writer));
+
+        LLKeyframeMotion second(LLUUID::generateNewID());
+        second.setCharacter(&mCharacter);
+        LLDataPackerBinaryBuffer reader(written.data(), writer.getCurrentSize());
+        ensure("what was written reads back", second.deserialize(reader, second.getID()));
+
+        ensure_equals("same joint count", second.getNumJointMotions(), first.getNumJointMotions());
+        ensure_approximately_equals("same duration", second.getDuration(), first.getDuration(), 16);
+        ensure_equals("same base priority", (S32)second.getPriority(), (S32)first.getPriority());
+
+        LLPose* first_pose = first.getPose();
+        LLPose* second_pose = second.getPose();
+        ensure_equals("same joint state count",
+                      second_pose->getNumJointStates(), first_pose->getNumJointStates());
+        for (const char* name : { "mPelvis", "mTorso" })
+        {
+            LLJointState* a = first_pose->findJointState(std::string(name));
+            LLJointState* b = second_pose->findJointState(std::string(name));
+            ensure("joint survived the round trip", a != nullptr && b != nullptr);
+            ensure_equals("same usage", b->getUsage(), a->getUsage());
+            ensure_equals("same priority", (S32)b->getPriority(), (S32)a->getPriority());
+        }
     }
 }

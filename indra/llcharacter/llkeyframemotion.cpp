@@ -83,7 +83,6 @@ LLKeyframeMotion::JointMotionList::~JointMotionList()
 {
     for_each(mConstraints.begin(), mConstraints.end(), DeletePointer());
     mConstraints.clear();
-    for_each(mJointMotionArray.begin(), mJointMotionArray.end(), DeletePointer());
     mJointMotionArray.clear();
 }
 
@@ -93,7 +92,7 @@ U32 LLKeyframeMotion::JointMotionList::dumpDiagInfo()
 
     for (U32 i = 0; i < getNumJointMotions(); i++)
     {
-        LLKeyframeMotion::JointMotion* joint_motion_p = mJointMotionArray[i];
+        LLKeyframeMotion::JointMotion* joint_motion_p = &mJointMotionArray[i];
 
         LL_INFOS() << "\tJoint " << joint_motion_p->mJointName << LL_ENDL;
         if (joint_motion_p->mUsage & LLJointState::SCALE)
@@ -1313,8 +1312,12 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
         return false;
     }
 
+    // Built to size in one go rather than grown: the loop below holds a
+    // pointer into the array across the whole of a joint's parse, and a
+    // growing vector would move it out from under itself. A joint the parse
+    // gives up on leaves its entry blank, and the list is thrown away.
     joint_motion_list->mJointMotionArray.clear();
-    joint_motion_list->mJointMotionArray.reserve(num_motions);
+    joint_motion_list->mJointMotionArray.resize(num_motions);
     mJointStates.clear();
     mJointStates.reserve(num_motions);
 
@@ -1324,8 +1327,7 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
 
     for (U32 i = 0; i < num_motions; ++i)
     {
-        JointMotion* joint_motion = new JointMotion;
-        joint_motion_list->mJointMotionArray.push_back(joint_motion);
+        JointMotion* joint_motion = &joint_motion_list->mJointMotionArray[i];
 
         std::string joint_name;
         if (!dp.unpackString(joint_name, "joint_name"))

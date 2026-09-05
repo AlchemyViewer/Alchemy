@@ -358,7 +358,10 @@ public:
     class JointMotionList
     {
     public:
-        std::vector<JointMotion*> mJointMotionArray;
+        // The joints an animation writes, in one block. Every playing
+        // instance walks all of them every frame, and one heap allocation
+        // each turned that walk into a chase across the heap.
+        std::vector<JointMotion> mJointMotionArray;
         F32                     mDuration;
         bool                    mLoop;
         F32                     mLoopInPoint;
@@ -381,7 +384,7 @@ public:
         JointMotionList();
         ~JointMotionList();
         U32 dumpDiagInfo();
-        JointMotion* getJointMotion(U32 index) const { llassert(index < mJointMotionArray.size()); return mJointMotionArray[index]; }
+        JointMotion* getJointMotion(U32 index) { llassert(index < mJointMotionArray.size()); return &mJointMotionArray[index]; }
         U32 getNumJointMotions() const { return static_cast<U32>(mJointMotionArray.size()); }
     };
 
