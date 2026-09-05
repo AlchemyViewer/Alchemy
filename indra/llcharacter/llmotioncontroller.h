@@ -161,6 +161,19 @@ public:
     void setTimeStep(F32 step);
     F32 getTimeStep() const { return mTimeStep; }
 
+    // The quantized clock's arithmetic, kept apart from the controller so it
+    // can be driven without a character or a frame timer.
+    struct QuantumStep
+    {
+        S32  count;     // the quantum whose boundary the pose is heading for
+        F32  interp;    // how far through the current quantum real time is, [0,1)
+        bool advanced;  // count differs from the last one handed in
+    };
+    static QuantumStep computeQuantumStep(F32 continuous_time, F32 time_step, S32 last_count);
+    // the fraction to lerp the pose by so that it tracks real time within a
+    // quantum, given how far it was last moved
+    static F32 quantumInterpolant(F32 interp, F32 last_interp);
+
     void setTimeFactor(F32 time_factor);
     F32 getTimeFactor() const { return mTimeFactor; }
 
@@ -226,7 +239,8 @@ protected:
 
     LLFrameTimer        mTimer;
     F32                 mPrevTimerElapsed;
-    F32                 mAnimTime;
+    F32                 mContinuousTime;        // real animation time, the only accumulator
+    F32                 mAnimTime;              // what the motions see; quantized when mTimeStep is set
     F32                 mLastTime;
     bool                mHasRunOnce;
     bool                mPaused;

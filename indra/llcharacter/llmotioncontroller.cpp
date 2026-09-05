@@ -130,6 +130,7 @@ LLMotion *LLMotionRegistry::createMotion( const LLUUID &id )
 LLMotionController::LLMotionController()
     : mTimeFactor(sCurrentTimeFactor),
       mCharacter(NULL),
+      mContinuousTime(0.f),
       mAnimTime(0.f),
       mPrevTimerElapsed(0.f),
       mLastTime(0.0f),
@@ -257,6 +258,44 @@ void LLMotionController::deactivateStoppedMotions()
             deactivateMotionInstance(motionp);
         }
     }
+}
+
+//-----------------------------------------------------------------------------
+// computeQuantumStep()
+//-----------------------------------------------------------------------------
+LLMotionController::QuantumStep LLMotionController::computeQuantumStep(F32 continuous_time, F32 time_step, S32 last_count)
+{
+    // One quantum ahead of real time, on purpose: the pose computed for the
+    // boundary this lands on is what the frames until then interpolate
+    // toward, so by the time real time reaches it the pose has arrived.
+    // That is the +1. It was never the defect -- the defect was the caller
+    // writing the snapped time back into its accumulator, which turned the
+    // lookahead into a full quantum of advance every frame.
+    const F32 quanta = continuous_time / time_step;
+    const F32 whole = llmax(0.f, floorf(quanta));
+
+    QuantumStep step;
+    step.count = (S32)whole + 1;
+    step.interp = llclamp(quanta - whole, 0.f, 1.f);
+    step.advanced = (step.count != last_count);
+    return step;
+}
+
+//-----------------------------------------------------------------------------
+// quantumInterpolant()
+//-----------------------------------------------------------------------------
+F32 LLMotionController::quantumInterpolant(F32 interp, F32 last_interp)
+{
+    // The blender lerps from wherever the pose is now toward the quantum's
+    // target, so the fraction it needs is of the distance still to go, not
+    // of the whole quantum. Handed interp - last_interp instead, it closed
+    // on the target geometrically -- (1-du)^n of the way still to go after
+    // n frames -- and the boundary snapped the remainder.
+    if (last_interp >= 1.f)
+    {
+        return 1.f;
+    }
+    return llclamp((interp - last_interp) / (1.f - last_interp), 0.f, 1.f);
 }
 
 //-----------------------------------------------------------------------------
@@ -873,22 +912,20 @@ void LLMotionController::updateMotions(bool force_update)
     // Update timing info for this time step.
     if (!mPaused)
     {
-        F32 update_time = mAnimTime + delta_time * mTimeFactor;
+        // The continuous clock is the only accumulator, and it moves on
+        // every frame, including the ones that leave below. The quantized
+        // clock is derived from it and never fed back: written back, its
+        // one-quantum lookahead became a full quantum of advance every frame
+        // whatever the frame time, which is SL-763.
+        mContinuousTime += delta_time * mTimeFactor;
         if (use_quantum)
         {
-            F32 time_interval = fmodf(update_time, mTimeStep);
-
-            // always animate *ahead* of actual time
-            S32 quantum_count = llmax(0, llfloor((update_time - time_interval) / mTimeStep)) + 1;
-            if (quantum_count == mTimeStepCount)
+            const QuantumStep step = computeQuantumStep(mContinuousTime, mTimeStep, mTimeStepCount);
+            if (!step.advanced)
             {
-                // we're still in same time quantum as before, so just interpolate and exit
-                if (!mPaused)
-                {
-                    F32 interp = time_interval / mTimeStep;
-                    mPoseBlender.interpolate(interp - mLastInterp);
-                    mLastInterp = interp;
-                }
+                // still in the same quantum: move the pose toward its target
+                mPoseBlender.interpolate(quantumInterpolant(step.interp, mLastInterp));
+                mLastInterp = step.interp;
 
                 updateLoadingMotions();
 
@@ -899,13 +936,13 @@ void LLMotionController::updateMotions(bool force_update)
             mPoseBlender.interpolate(1.f);
             clearBlenders();
 
-            mTimeStepCount = quantum_count;
-            mAnimTime = (F32)quantum_count * mTimeStep;
+            mTimeStepCount = step.count;
+            mAnimTime = (F32)step.count * mTimeStep;
             mLastInterp = 0.f;
         }
         else
         {
-            mAnimTime = update_time;
+            mAnimTime = mContinuousTime;
         }
     }
 
