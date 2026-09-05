@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 #include <vector>
 
 namespace
@@ -477,6 +478,41 @@ namespace tut
         ensure("holding the pose does not dirty the joint again", mA.mDirtyFlags == 0);
     }
 
+    template<> template<>
+    void lljointstateblender_object::test<13>()
+    {
+        // There are six slots. Filling them refuses anything of lower or
+        // equal priority, and applying the blend hands them all back.
+        std::vector<LLPointer<LLJointState> > states;
+        for (S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+        {
+            states.push_back(make_state(&mA, LLJointState::ROT));
+            states.back()->setRotation(ROT_B);
+            ensure("a free slot takes the state",
+                   mBlender.addJointState(states.back(), LLJoint::HIGH_PRIORITY, false));
+        }
+
+        LLPointer<LLJointState> equal = make_state(&mA, LLJointState::ROT);
+        ensure("a full blender refuses an equal priority",
+               !mBlender.addJointState(equal, LLJoint::HIGH_PRIORITY, false));
+
+        LLPointer<LLJointState> higher = make_state(&mA, LLJointState::ROT);
+        higher->setRotation(ROT_A);
+        ensure("a full blender takes a higher priority",
+               mBlender.addJointState(higher, LLJoint::HIGHEST_PRIORITY, false));
+
+        mBlender.blendJointStates();
+        ensure_quat_equals("the highest priority won", mA.getRotation(), ROT_A);
+
+        // Applying releases every slot, so the next frame starts empty rather
+        // than inheriting six states that are already spoken for.
+        LLPointer<LLJointState> next = make_state(&mA, LLJointState::ROT);
+        next->setRotation(ROT_C);
+        ensure("the slots came back", mBlender.addJointState(next, LLJoint::LOW_PRIORITY, false));
+        mBlender.blendJointStates();
+        ensure_quat_equals("the next frame blends only its own state", mA.getRotation(), ROT_C);
+    }
+
     //-------------------------------------------------------------------------
     // LLPoseBlender
     //-------------------------------------------------------------------------
@@ -709,5 +745,32 @@ namespace tut
         ALTestMotion motion;
         motion.addJoint(&unnumbered, LLJointState::ROT);
         ensure_equals("unnumbered joint stays in the pose", motion.getPose()->getNumJointStates(), 1);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<11>()
+    {
+        // A joint has six blend slots and they go by priority. A motion at
+        // zero weight contributes nothing whatever slot it lands in, so
+        // letting it take one costs the joint a motion that had something to
+        // say. Six of them easing in or out over a transition is enough to
+        // shut out the animation underneath for a frame.
+        std::vector<std::unique_ptr<ALTestMotion> > silent;
+        for (S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+        {
+            silent.push_back(std::make_unique<ALTestMotion>(LLUUID::generateNewID(), LLJoint::HIGH_PRIORITY));
+            silent.back()->addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
+            // left at the weight a pose starts and ends its life on
+            ensure_equals("a silent motion weighs nothing", silent.back()->getPose()->getWeight(), 0.f);
+            mBlender.addMotion(silent.back().get());
+        }
+
+        ALTestMotion playing(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        playing.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        arm(playing);
+        mBlender.addMotion(&playing);
+
+        mBlender.blendAndApply();
+        ensure_quat_equals("the motion with a weight still reaches the joint", mA.getRotation(), ROT_A);
     }
 }

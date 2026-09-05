@@ -37,8 +37,11 @@
 #include "llanimationstates.h"
 #include "llstl.h"
 
-// This is why LL_CHARACTER_MAX_ANIMATED_JOINTS needs to be a multiple of 4.
-const S32 NUM_JOINT_SIGNATURE_STRIDES = LL_CHARACTER_MAX_ANIMATED_JOINTS / 4;
+// The signatures are merged eight joints at a time, so this is why
+// LL_CHARACTER_MAX_ANIMATED_JOINTS needs to be a multiple of eight.
+const S32 NUM_JOINT_SIGNATURE_STRIDES = LL_CHARACTER_MAX_ANIMATED_JOINTS / 8;
+static_assert(LL_CHARACTER_MAX_ANIMATED_JOINTS % 8 == 0,
+              "the joint signature merge reads the table eight joints at a time");
 const U32 MAX_MOTION_INSTANCES = 32;
 
 //-----------------------------------------------------------------------------
@@ -710,40 +713,43 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         }
         else
         {
-            for (S32 i = 0; i < NUM_JOINT_SIGNATURE_STRIDES; i++)
+            for (S32 stride = 0; stride < NUM_JOINT_SIGNATURE_STRIDES; stride++)
             {
-                // The joint signatures live in U8[] arrays; treating four-byte
-                // strides as U32 directly is strict-aliasing UB. memcpy in/out
-                // of U32 locals lets GCC fold each direction to a single load
-                // or store while staying inside the rules.
-                const S32 offset = i * 4;
+                // The joint signatures live in U8[] arrays; treating eight-byte
+                // strides as U64 directly is strict-aliasing UB. memcpy in/out
+                // of U64 locals lets the compiler fold each direction to a
+                // single load or store while staying inside the rules. The
+                // per-joint values are nested bit masks -- a priority of n is
+                // 0xff >> (7 - n) -- so an OR of two of them is the higher of
+                // the two, and eight of them merge in one instruction.
+                const S32 offset = stride * 8;
 
                 // Pass 0: merge motionp's pass-0 signature into our pass-0
                 // signature; if any new bits land, mark for update.
-                U32 cur0;
-                std::memcpy(&cur0, &mJointSignature[0][offset], sizeof(U32));
-                U32 test0;
-                std::memcpy(&test0, &motionp->mJointSignature[0][offset], sizeof(U32));
-                if ((cur0 | test0) > cur0)
+                U64 cur0;
+                std::memcpy(&cur0, &mJointSignature[0][offset], sizeof(U64));
+                U64 test0;
+                std::memcpy(&test0, &motionp->mJointSignature[0][offset], sizeof(U64));
+                if ((cur0 | test0) != cur0)
                 {
                     cur0 |= test0;
-                    std::memcpy(&mJointSignature[0][offset], &cur0, sizeof(U32));
+                    std::memcpy(&mJointSignature[0][offset], &cur0, sizeof(U64));
                     update_motion = true;
                 }
 
                 // Snapshot pass 1 of our previous signature into
                 // last_joint_signature, then do the same merge as pass 0.
-                U32 last1;
-                std::memcpy(&last1, &mJointSignature[1][offset], sizeof(U32));
-                std::memcpy(&last_joint_signature[offset], &last1, sizeof(U32));
+                U64 last1;
+                std::memcpy(&last1, &mJointSignature[1][offset], sizeof(U64));
+                std::memcpy(&last_joint_signature[offset], &last1, sizeof(U64));
 
-                U32 cur1 = last1;
-                U32 test1;
-                std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U32));
-                if ((cur1 | test1) > cur1)
+                U64 cur1 = last1;
+                U64 test1;
+                std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U64));
+                if ((cur1 | test1) != cur1)
                 {
                     cur1 |= test1;
-                    std::memcpy(&mJointSignature[1][offset], &cur1, sizeof(U32));
+                    std::memcpy(&mJointSignature[1][offset], &cur1, sizeof(U64));
                     update_motion = true;
                 }
             }
@@ -756,6 +762,13 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         }
 
         LLPose *posep = motionp->getPose();
+
+        // Both are virtual, both are asked for two or three times on the way
+        // through, and neither can change between here and the end of this
+        // motion's turn: a motion's ease is fixed when it is loaded, or, for
+        // the fall, when it is activated.
+        const F32 ease_in_duration = motionp->getEaseInDuration();
+        const F32 ease_out_duration = motionp->getEaseOutDuration();
 
         // only filter by LOD after running every animation at least once (to prime the avatar state)
         if (mHasRunOnce && motionp->getMinPixelArea() > pixel_area)
@@ -776,7 +789,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
             if (motionp->getFadeWeight() < 0.01f)
             {
-                if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + motionp->getEaseOutDuration())
+                if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + ease_out_duration)
                 {
                     posep->setWeight(0.f);
                     deactivateMotionInstance(motionp);
@@ -792,7 +805,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         //**********************
         // MOTION INACTIVE
         //**********************
-        if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + motionp->getEaseOutDuration())
+        if (motionp->isStopped() && mAnimTime > motionp->getStopTime() + ease_out_duration)
         {
             // this motion has gone on too long, deactivate it
             // did we have a chance to stop it?
@@ -823,13 +836,13 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
                 motionp->mResidualWeight = motionp->getPose()->getWeight();
             }
 
-            if (motionp->getEaseOutDuration() == 0.f)
+            if (ease_out_duration == 0.f)
             {
                 posep->setWeight(0.f);
             }
             else
             {
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - ((mAnimTime - motionp->getStopTime()) / motionp->getEaseOutDuration())));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight * cubic_step(1.f - ((mAnimTime - motionp->getStopTime()) / ease_out_duration)));
             }
 
             // perform motion update
@@ -839,7 +852,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         //**********************
         // MOTION ACTIVE
         //**********************
-        else if (mAnimTime > motionp->mActivationTimestamp + motionp->getEaseInDuration())
+        else if (mAnimTime > motionp->mActivationTimestamp + ease_in_duration)
         {
             posep->setWeight(motionp->getFadeWeight());
 
@@ -870,14 +883,14 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             {
                 motionp->mResidualWeight = motionp->getPose()->getWeight();
             }
-            if (motionp->getEaseInDuration() == 0.f)
+            if (ease_in_duration == 0.f)
             {
                 posep->setWeight(motionp->getFadeWeight());
             }
             else
             {
                 // perform motion update
-                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((mAnimTime - motionp->mActivationTimestamp) / motionp->getEaseInDuration()));
+                posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((mAnimTime - motionp->mActivationTimestamp) / ease_in_duration));
             }
             // perform motion update
             update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);

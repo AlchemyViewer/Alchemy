@@ -163,12 +163,12 @@ S32 LLPose::getNumJointStates() const
 //-----------------------------------------------------------------------------
 
 LLJointStateBlender::LLJointStateBlender()
-    : mCachedScale(1.f, 1.f, 1.f),
+    : mNumStates(0),
+      mCachedScale(1.f, 1.f, 1.f),
       mQueued(false)
 {
     for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
     {
-        mJointStates[i] = NULL;
         mPriorities[i] = S32_MIN;
         mAdditiveBlends[i] = false;
     }
@@ -190,35 +190,36 @@ bool LLJointStateBlender::addJointState(const LLPointer<LLJointState>& joint_sta
         // this joint state doesn't point to an actual joint, so we don't care about applying it
         return false;
 
-    for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+    // The first slot holding a lower priority, or the first empty one.
+    // Previous joint states (newer motions) with the same priority stay in
+    // place.
+    S32 slot = 0;
+    while (slot < mNumStates && priority <= mPriorities[slot])
     {
-        if (mJointStates[i].isNull())
-        {
-            mJointStates[i] = joint_state;
-            mPriorities[i] = priority;
-            mAdditiveBlends[i] = additive_blend;
-            return true;
-        }
-        else if (priority > mPriorities[i])
-        {
-            // we're at a higher priority than the current joint state in this slot
-            // so shift everyone over
-            // previous joint states (newer motions) with same priority should stay in place
-            for (S32 j = JSB_NUM_JOINT_STATES - 1; j > i; j--)
-            {
-                mJointStates[j] = mJointStates[j - 1];
-                mPriorities[j] = mPriorities[j - 1];
-                mAdditiveBlends[j] = mAdditiveBlends[j - 1];
-            }
-            // now store ourselves in this slot
-            mJointStates[i] = joint_state;
-            mPriorities[i] = priority;
-            mAdditiveBlends[i] = additive_blend;
-            return true;
-        }
+        ++slot;
     }
 
-    return false;
+    if (slot >= JSB_NUM_JOINT_STATES)
+    {
+        // every slot is taken by a higher priority
+        return false;
+    }
+
+    // Shift the states below down one, dropping the last when full. Only the
+    // occupied slots move: assigning an empty slot to an empty slot is six
+    // refcounted no-ops per joint per frame.
+    for (S32 j = llmin(mNumStates, (S32)JSB_NUM_JOINT_STATES - 1); j > slot; j--)
+    {
+        mJointStates[j] = mJointStates[j - 1];
+        mPriorities[j] = mPriorities[j - 1];
+        mAdditiveBlends[j] = mAdditiveBlends[j - 1];
+    }
+
+    mJointStates[slot] = joint_state;
+    mPriorities[slot] = priority;
+    mAdditiveBlends[slot] = additive_blend;
+    mNumStates = llmin(mNumStates + 1, (S32)JSB_NUM_JOINT_STATES);
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -229,7 +230,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     // we need at least one joint to blend
     // if there is one, it will be in slot zero according to insertion logic
     // instead of resetting joint state to default, just leave it unchanged from last frame
-    if (mJointStates[0].isNull())
+    if (mNumStates == 0)
     {
         return;
     }
@@ -266,9 +267,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     sum_weights[ROT_WEIGHT] = 0.f;
     sum_weights[SCALE_WEIGHT] = 0.f;
 
-    for(S32 joint_state_index = 0;
-        joint_state_index < JSB_NUM_JOINT_STATES && mJointStates[joint_state_index].notNull();
-        joint_state_index++)
+    for(S32 joint_state_index = 0; joint_state_index < mNumStates; joint_state_index++)
     {
         LLJointState* jsp = mJointStates[joint_state_index];
         U32 current_usage = jsp->getUsage();
@@ -399,10 +398,11 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         target_joint->setRotation(added_rot * blended_rot);
 
         // now clear joint states
-        for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+        for(S32 i = 0; i < mNumStates; i++)
         {
             mJointStates[i] = NULL;
         }
+        mNumStates = 0;
     }
     else
     {
@@ -420,7 +420,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
 void LLJointStateBlender::interpolate(F32 u)
 {
     // only interpolate if we have a joint state
-    if (!mJointStates[0])
+    if (mNumStates == 0)
     {
         return;
     }
@@ -443,10 +443,11 @@ void LLJointStateBlender::interpolate(F32 u)
 void LLJointStateBlender::clear()
 {
     // now clear joint states
-    for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+    for(S32 i = 0; i < mNumStates; i++)
     {
         mJointStates[i] = NULL;
     }
+    mNumStates = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -454,7 +455,7 @@ void LLJointStateBlender::clear()
 //-----------------------------------------------------------------------------
 void LLJointStateBlender::resetCachedJoint()
 {
-    if (!mJointStates[0])
+    if (mNumStates == 0)
     {
         return;
     }
@@ -477,10 +478,6 @@ LLPoseBlender::LLPoseBlender()
 
 LLPoseBlender::~LLPoseBlender()
 {
-    for (LLJointStateBlender* blender : mJointStateBlenderPool)
-    {
-        delete blender;
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -490,6 +487,18 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLPose* pose = motion->getPose();
+
+    // A pose at zero weight contributes nothing to any joint it touches:
+    // every one of its states carries the pose weight, and blendJointStates
+    // passes over a state weighing nothing. Adding them anyway cost a walk of
+    // the pose, and worse, each state took one of a joint's six blend slots
+    // away from a motion that did have something to say. A motion easing in
+    // or out crosses zero weight, and a stopped one sits there until it is
+    // deactivated.
+    if (pose->getWeight() == 0.f)
+    {
+        return true;
+    }
 
     // Neither changes across the motion's joint states, and both are
     // virtual calls.
@@ -520,7 +529,7 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
         {
             // this is the first time we are animating this joint
             // so create new jointblender and add it to our pool
-            joint_blender = new LLJointStateBlender();
+            joint_blender = &mBlenderStorage.emplace_back();
             mJointStateBlenderPool[joint_num] = joint_blender;
         }
 

@@ -35,6 +35,7 @@
 #include "lljoint.h"
 #include "llpointer.h"
 
+#include <deque>
 #include <map>
 #include <string>
 #include <string_view>
@@ -80,13 +81,17 @@ public:
 
 const S32 JSB_NUM_JOINT_STATES = 6;
 
-class alignas(16) LLJointStateBlender
+class LLJointStateBlender
 {
-    LL_ALIGN_NEW
 protected:
+    // Sorted by priority, highest first, and packed: the first mNumStates
+    // slots hold something and the rest are empty. One joint is written by
+    // one or two motions almost always, so nothing here walks six slots to
+    // find that out.
     LLPointer<LLJointState> mJointStates[JSB_NUM_JOINT_STATES];
     S32             mPriorities[JSB_NUM_JOINT_STATES];
     bool            mAdditiveBlends[JSB_NUM_JOINT_STATES];
+    S32             mNumStates;
 
     // Where the coarse clock's blend goes instead of the joint, for the
     // frames in between to interpolate the joint toward.
@@ -115,6 +120,12 @@ class LLPoseBlender
 {
 protected:
     typedef std::vector<LLJointStateBlender*> blender_list_t;
+    // The blenders themselves, in the order the joints were first animated,
+    // which for a skeleton driven by one animation is joint order. A deque
+    // keeps addresses stable while still handing out neighbours in the same
+    // block: the per-frame walk is over pointers, and one blender per heap
+    // allocation made it a walk across the heap.
+    std::deque<LLJointStateBlender> mBlenderStorage;
     // one slot per joint number, filled the first time that joint is animated
     LLJointStateBlender* mJointStateBlenderPool[LL_CHARACTER_MAX_ANIMATED_JOINTS];
     blender_list_t mActiveBlenders;
