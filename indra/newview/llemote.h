@@ -33,7 +33,7 @@
 #include "llmotion.h"
 #include "lltimer.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_EMOTE 2000.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EMOTE = 2000.f;
 
 #define EMOTE_MORPH_FADEIN_TIME 0.3f
 #define EMOTE_MORPH_IN_TIME 1.1f

@@ -37,7 +37,7 @@
 #define EDITING_EASEIN_DURATION 0.0f
 #define EDITING_EASEOUT_DURATION 0.5f
 #define EDITING_PRIORITY LLJoint::HIGH_PRIORITY
-#define MIN_REQUIRED_PIXEL_AREA_EDITING 500.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EDITING = 500.f;
 
 //-----------------------------------------------------------------------------
 // class LLEditingMotion

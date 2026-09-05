@@ -33,8 +33,8 @@
 #include "llmotion.h"
 #include "llframetimer.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_HEAD_ROT 500.f;
-#define MIN_REQUIRED_PIXEL_AREA_EYE 25000.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_HEAD_ROT = 500.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_EYE = 25000.f;
 
 //-----------------------------------------------------------------------------
 // class LLHeadRotMotion

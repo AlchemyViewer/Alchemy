@@ -34,7 +34,7 @@
 #include "fsjointpose.h"
 #include "llkeyframemotion.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_POSING 500.f
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_POSING = 500.f;
 
 //-----------------------------------------------------------------------------
 // class FSPosingMotion

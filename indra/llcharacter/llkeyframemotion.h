@@ -46,7 +46,12 @@
 class LLKeyframeDataCache;
 class LLDataPacker;
 
-#define MIN_REQUIRED_PIXEL_AREA_KEYFRAME (40.f)
+// Where head turning stops too: an avatar about twenty-two pixels on a
+// side. This was 40 -- six pixels on a side -- so the one motion that
+// writes most of the skeleton ran at full cost long after the cheap ones
+// had faded. Below it the controller fades the motion out and stops
+// updating it, and the joints keep the pose they were left in.
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_KEYFRAME = 500.f;
 #define MAX_CHAIN_LENGTH (4)
 
 const S32 KEYFRAME_MOTION_VERSION = 1;

@@ -34,8 +34,8 @@
 #include "llcharacter.h"
 #include "v3dmath.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_WALK_ADJUST (20.f)
-#define MIN_REQUIRED_PIXEL_AREA_FLY_ADJUST (20.f)
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_WALK_ADJUST = 20.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_FLY_ADJUST = 20.f;
 
 //-----------------------------------------------------------------------------
 // class LLKeyframeWalkMotion

@@ -33,7 +33,7 @@
 #include "llmotion.h"
 #include "lltimer.h"
 
-#define MIN_REQUIRED_PIXEL_AREA_HAND 10000.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_HAND = 10000.f;
 
 //-----------------------------------------------------------------------------
 // class LLHandMotion

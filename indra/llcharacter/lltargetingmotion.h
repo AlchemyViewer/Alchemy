@@ -35,7 +35,7 @@
 #define TARGETING_EASEIN_DURATION   0.3f
 #define TARGETING_EASEOUT_DURATION 0.5f
 #define TARGETING_PRIORITY LLJoint::HIGH_PRIORITY
-#define MIN_REQUIRED_PIXEL_AREA_TARGETING 1000.f;
+constexpr F32 MIN_REQUIRED_PIXEL_AREA_TARGETING = 1000.f;
 
 
 //-----------------------------------------------------------------------------
