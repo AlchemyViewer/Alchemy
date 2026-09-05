@@ -284,4 +284,29 @@ namespace tut
         ensure("the running motion stayed", mCharacter.isMotionActive(newest_id));
         ensure_equals("one motion remains", activeMotions(LLMotion::NORMAL_BLEND).size(), 1u);
     }
+
+    template<> template<>
+    void llcharacter_object::test<10>()
+    {
+        // Moving onto the coarse clock snaps every playing motion's timestamps
+        // to the quantum. A running motion has no stop time to snap, and
+        // stopping it to snap one would give it a stop time it never had; a
+        // motion that never ends has no send-stop time to snap either. A
+        // motion that is stopped keeps its stop, on the quantum.
+        LLUUID running_id, stopped_id;
+        ALTestMotion* running = startFreshMotion(running_id);
+        ALTestMotion* stopped = startFreshMotion(stopped_id);
+        runFrame();
+        ensure("stopMotion", mCharacter.stopMotion(stopped_id, false));
+        stopped->mStopTimeCalls = 0;
+        running->mStopTimeCalls = 0;
+
+        mCharacter.getMotionController().setTimeStep(0.25f);
+        ensure("the running motion is still running", !running->isStopped());
+        ensure_equals("its stop time was never set", running->mStopTimeCalls, 0);
+        ensure_equals("and it still reads as never stopped", running->getStopTime(), 0.f);
+        ensure("a motion that never ends keeps its open send-stop time", running->sendStopTimestamp() == F32_MAX);
+        ensure("the stopped motion is still stopped", stopped->isStopped());
+        ensure_equals("its stop time sits on the quantum", fmodf(stopped->getStopTime(), 0.25f), 0.f);
+    }
 }

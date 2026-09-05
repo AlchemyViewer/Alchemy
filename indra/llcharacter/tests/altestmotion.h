@@ -74,6 +74,13 @@ public:
 
     void onDeactivate() override { ++mDeactivateCount; }
 
+    void setStopTime(F32 time) override
+    {
+        ++mStopTimeCalls;
+        LLMotion::setStopTime(time);
+    }
+    F32 sendStopTimestamp() const { return mSendStopTimestamp; }
+
     using LLMotion::addJointState;
 
     // Creates a joint state on `joint` with `usage`, adds it to the motion, and
@@ -102,6 +109,7 @@ public:
     S32 mActivateCount = 0;
     S32 mUpdateCount = 0;
     S32 mDeactivateCount = 0;
+    S32 mStopTimeCalls = 0;
     F32 mLastUpdateTime = 0.f;
 
     // Which onUpdate this was, across every test motion: the order the

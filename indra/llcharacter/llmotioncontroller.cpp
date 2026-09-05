@@ -343,12 +343,20 @@ void LLMotionController::setTimeStep(F32 step)
         {
             for (LLMotion* motionp : motions)
             {
-                F32 activation_time = motionp->mActivationTimestamp;
-                motionp->mActivationTimestamp = (F32)(llfloor(activation_time / step)) * step;
-                bool stopped = motionp->isStopped();
-                motionp->setStopTime((F32)(llfloor(motionp->getStopTime() / step)) * step);
-                motionp->setStopped(stopped);
-                motionp->mSendStopTimestamp = (F32)llfloor(motionp->mSendStopTimestamp / step) * step;
+                motionp->mActivationTimestamp = (F32)llfloor(motionp->mActivationTimestamp / step) * step;
+                // setStopTime stops a motion, and the keyframe motion's
+                // override aligns whatever time it is handed to the loop, so
+                // a running motion is left alone rather than given a stop
+                // time it never had. A motion that never stops itself has no
+                // send-stop time to snap either.
+                if (motionp->isStopped())
+                {
+                    motionp->mStopTimestamp = (F32)llfloor(motionp->mStopTimestamp / step) * step;
+                }
+                if (motionp->mSendStopTimestamp != F32_MAX)
+                {
+                    motionp->mSendStopTimestamp = (F32)llfloor(motionp->mSendStopTimestamp / step) * step;
+                }
             }
         }
     }
