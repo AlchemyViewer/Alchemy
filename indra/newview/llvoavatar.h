@@ -1253,7 +1253,8 @@ private:
     F32             mNameAlpha;
     S32             mRenderGroupTitles;
     LLColor4        mNameTagColor;
-    std::string     mDistanceString;
+    // what the distance line last showed, to the centimetre it is printed to
+    S32             mDistanceCentimetres;
 
     //--------------------------------------------------------------------
     // Display the name (then optionally fade it out)

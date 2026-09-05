@@ -46,7 +46,11 @@ LLColor4 ALAvatarGroups::getAvatarColor(const LLUUID& id, LLColor4 color, EColor
         MUTED_CHAT_COLOR, MUTED_NAME_TAG_COLOR, MUTED_MAP_COLOR,
         LINDEN_CHAT_COLOR, LINDEN_NAME_TAG_COLOR, LINDEN_MAP_COLOR
     };
-    std::vector<LLUIColor> ui_color_cache;
+    // Filled once. An LLUIColor is a handle into the colour table, so the
+    // colours themselves still follow a skin change; what this saves is the
+    // twelve name lookups behind them, which this used to repeat on every
+    // call because the vector was a local.
+    static std::vector<LLUIColor> ui_color_cache;
     if (ui_color_cache.empty())
     {
         auto& ui_color_inst = LLUIColorTable::instance();

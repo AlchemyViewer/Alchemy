@@ -126,6 +126,7 @@
 #include "llperfstats.h"
 
 #include <boost/lexical_cast.hpp>
+#include <fmt/format.h>
 
 extern F32 SPEED_ADJUST_MAX;
 extern F32 SPEED_ADJUST_MAX_SEC;
@@ -742,6 +743,7 @@ LLVOAvatar::LLVOAvatar(const LLUUID& id,
     mNameAppearance(false),
     mNameFriend(false),
     mNameAlpha(0.f),
+    mDistanceCentimetres(-1),
     mRenderGroupTitles(sRenderGroupTitles),
     mNameCloud(false),
     mFirstTEMessageReceived( false ),
@@ -3669,11 +3671,29 @@ void LLVOAvatar::idleUpdateNameTag(const LLVector3& root_pos_last)
     idleUpdateNameTagAlpha(new_name, alpha);
 }
 
+namespace
+{
+    // getNVPair canonicalises its name through the name-value string table
+    // on every call -- a lock and a hash -- to get the pointer the map is
+    // keyed by. These three names are asked for every frame for every avatar
+    // with a tag, so their pointers are taken once. The table is counted and
+    // nothing ever releases these, so the pointers stay good.
+    template <class NameValueMap>
+    LLNameValue* find_name_value(const NameValueMap& pairs, char* canonical_name)
+    {
+        auto iter = pairs.find(canonical_name);
+        return iter != pairs.end() ? iter->second : nullptr;
+    }
+}
+
 void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 {
-    LLNameValue *title = getNVPair("Title");
-    LLNameValue* firstname = getNVPair("FirstName");
-    LLNameValue* lastname = getNVPair("LastName");
+    static char* const title_key = gNVNameTable.addString("Title");
+    static char* const firstname_key = gNVNameTable.addString("FirstName");
+    static char* const lastname_key = gNVNameTable.addString("LastName");
+    LLNameValue *title = find_name_value(mNameValuePairs, title_key);
+    LLNameValue* firstname = find_name_value(mNameValuePairs, firstname_key);
+    LLNameValue* lastname = find_name_value(mNameValuePairs, lastname_key);
 
     // Avatars must have a first and last name
     if (!firstname || !lastname) return;
@@ -3719,7 +3739,10 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
     LLColor4 name_tag_color = getNameTagColor(is_friend);
     LLColor4 distance_color = name_tag_color;
-    std::string distance_string;
+    // The distance line prints to the centimetre, so that is the unit the
+    // tag is compared and rebuilt on. Formatting it every frame to find
+    // out whether it changed was a heap string and a printf per avatar.
+    S32 distance_cm = -1;
 
     static LLCachedControl<bool> show_distance_color_tag(gSavedSettings, "NameTagShowDistanceColors", false);
     static LLCachedControl<bool> show_distance_in_tag(gSavedSettings, "NameTagShowDistance", true);
@@ -3750,7 +3773,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         if (show_distance_in_tag)
         {
-            distance_string = llformat("%.02f m", sqrt(distance_squared));
+            distance_cm = ll_round((F32)sqrt(distance_squared) * 100.f);
         }
 
         // Override nametag color only if friend color is disabled
@@ -3775,7 +3798,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         || is_friend != mNameFriend
         || is_cloud != mNameCloud
         || is_typing != mTypingLast
-        || distance_string != mDistanceString
+        || distance_cm != mDistanceCentimetres
         || name_tag_color != mNameTagColor)
     {
         clearNameTag();
@@ -3895,7 +3918,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
 
         if (show_distance_in_tag)
         {
-            addNameTagLine(distance_string, distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
+            addNameTagLine(fmt::format("{:.2f} m", distance_cm / 100.f), distance_color, LLFontGL::NORMAL, LLFontGL::getFontSansSerifSmall());
         }
 
         if (show_rez_status)
@@ -3911,7 +3934,7 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         mNameFriend = is_friend;
         mNameCloud = is_cloud;
         mTypingLast = is_typing;
-        mDistanceString = distance_string;
+        mDistanceCentimetres = distance_cm;
         mTitle = title ? title->getString() : "";
         mNameTagColor = name_tag_color;
         LLStringFn::replace_ascii_controlchars(mTitle,LL_UNKNOWN_CHAR);
