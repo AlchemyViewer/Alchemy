@@ -729,6 +729,9 @@ private:
 public:
     virtual bool isImpostor();
     bool        shouldImpostor(const F32 rank_factor = 1.0);
+    // the rank half of shouldImpostor, for callers that have already
+    // established this avatar is neither self nor visually muted
+    bool        shouldImpostorByRank(const F32 rank_factor = 1.0) const;
     bool        needsImpostorUpdate() const;
     const LLVector3& getImpostorOffset() const;
     const LLVector2& getImpostorDim() const;

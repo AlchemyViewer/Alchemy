@@ -2935,12 +2935,28 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
     mLastRootPos = mRoot->getWorldPosition();
     bool detailed_update = updateCharacter(agent);
 
-    static LLUICachedControl<bool> visualizers_in_calls("ShowVoiceVisualizersInCalls", false);
-    bool voice_enabled = (visualizers_in_calls || LLVoiceClient::getInstance()->inProximalChannel()) &&
-                         LLVoiceClient::getInstance()->getVoiceEnabled(mID);
+    // An animated object has neither a voice nor a name tag. Its id is made up
+    // client side and never joins a voice channel, so both questions below
+    // have one answer; and idleUpdateNameTag would build a HUD tag for it,
+    // position it and count it among the visible chat bubbles, only for
+    // idleUpdateNameTagText to find no name values to put in it. Its debug
+    // text does not come through here -- that goes out through setDebugText
+    // and LLViewerObject::mText.
+    const bool has_voice_and_name = !isControlAvatar();
 
-    LLVector3 hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+    bool voice_enabled = false;
+    LLVector3 hud_name_pos;
+    if (has_voice_and_name)
+    {
+        static LLUICachedControl<bool> visualizers_in_calls("ShowVoiceVisualizersInCalls", false);
+        voice_enabled = (visualizers_in_calls || LLVoiceClient::getInstance()->inProximalChannel()) &&
+                        LLVoiceClient::getInstance()->getVoiceEnabled(mID);
 
+        hud_name_pos = idleCalcNameTagPosition(mLastRootPos);
+    }
+
+    // Still called with voice off, so the visualizer is told to stay quiet
+    // rather than keeping whatever it was last set to.
     idleUpdateVoiceVisualizer(voice_enabled, hud_name_pos);
     idleUpdateMisc( detailed_update );
     idleUpdateAppearanceAnimation();
@@ -2952,7 +2968,10 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         idleUpdateWindEffect();
     }
 
-    idleUpdateNameTag(hud_name_pos);
+    if (has_voice_and_name)
+    {
+        idleUpdateNameTag(hud_name_pos);
+    }
 
     // Complexity has stale mechanics, but updates still can be very rapid
     // so spread avatar complexity calculations over frames to lesen load from
@@ -4635,18 +4654,23 @@ void LLVOAvatar::computeUpdatePeriod()
         const S32 UPDATE_RATE_MED = 48;
         const S32 UPDATE_RATE_FAST = 32;
 
+        // Everything below the first branch is reached only with
+        // visually_muted false, which shouldImpostor would otherwise ask
+        // isVisuallyMuted() all over again to find out -- three times, once
+        // per call. The outer condition settles the other two inputs the same
+        // way: not muted means not self, and means sLimitNonImpostors.
         if (visually_muted)
         {   // visually muted avatars update at lowest rate
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
-        else if (!shouldImpostor()
+        else if (!shouldImpostorByRank()
             || mDrawable->mDistanceWRTCamera < 1.f + mag)
         {   // first 25% of max visible avatars are not impostored
             // also, don't impostor avatars whose bounding box may be penetrating the
             // impostor camera near clip plane
             mUpdatePeriod = 1;
         }
-        else if (shouldImpostor(4.0))
+        else if (shouldImpostorByRank(4.0))
         { //background avatars are REALLY slow updating impostors
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
@@ -4655,7 +4679,7 @@ void LLVOAvatar::computeUpdatePeriod()
             // Don't update cloud avatars too often
             mUpdatePeriod = UPDATE_RATE_SLOW;
         }
-        else if (shouldImpostor(3.0))
+        else if (shouldImpostorByRank(3.0))
         { //back 25% of max visible avatars are slow updating impostors
             mUpdatePeriod = UPDATE_RATE_MED;
         }
@@ -11467,6 +11491,11 @@ bool LLVOAvatar::isImpostor()
     return isVisuallyMuted() || (sLimitNonImpostors && (mUpdatePeriod > 1));
 }
 
+bool LLVOAvatar::shouldImpostorByRank(const F32 rank_factor) const
+{
+    return sLimitNonImpostors && (mVisibilityRank > sMaxNonImpostors * rank_factor);
+}
+
 bool LLVOAvatar::shouldImpostor(const F32 rank_factor)
 {
     if (isSelf())
@@ -11477,7 +11506,7 @@ bool LLVOAvatar::shouldImpostor(const F32 rank_factor)
     {
         return true;
     }
-    return sLimitNonImpostors && (mVisibilityRank > sMaxNonImpostors * rank_factor);
+    return shouldImpostorByRank(rank_factor);
 }
 
 bool LLVOAvatar::needsImpostorUpdate() const
