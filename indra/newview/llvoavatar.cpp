@@ -6532,7 +6532,12 @@ void LLVOAvatar::processAnimationStateChanges()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if ( isAnyAnimationSignaled(AGENT_WALK_ANIMS, NUM_AGENT_WALK_ANIMS) )
     {
-        startMotion(ANIM_AGENT_WALK_ADJUST);
+        // The servo does not work on the coarse clock. updateTimeStep stops
+        // it on the way onto that clock and starts it again on the way back.
+        if (mMotionController.getTimeStep() == 0.f)
+        {
+            startMotion(ANIM_AGENT_WALK_ADJUST);
+        }
         stopMotion(ANIM_AGENT_FLY_ADJUST);
     }
     else if (mInAir && !isSitting())
