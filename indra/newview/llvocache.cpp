@@ -196,8 +196,12 @@ LLVOCacheEntry::LLVOCacheEntry()
 
 LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
 :   LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
-    mBuffer(NULL),
+    mLocalID(0),
+    mCRC(0),
     mUpdateFlags(-1),
+    mHitCount(0),
+    mCRCChangeCount(0),
+    mBuffer(NULL),
     mState(INACTIVE),
     mSceneContrib(0.f),
     mValid(false),
