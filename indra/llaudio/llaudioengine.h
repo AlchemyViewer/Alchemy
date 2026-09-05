@@ -64,7 +64,7 @@ struct LLAudioOutputDevice
 };
 
 #define LL_MAX_AUDIO_CHANNELS 120
-#define LL_MAX_AUDIO_BUFFERS 140 // Some extra for preloading, maybe?
+#define LL_MAX_AUDIO_BUFFERS 180 // Some extra for preloading and pinning UI sounds
 
 class LLAudioSource;
 class LLAudioData;
@@ -211,7 +211,7 @@ public:
                       const LLUUID& audio_source_id = LLUUID::null);
     void triggerSound(const SoundData& soundData);
 
-    bool preloadSound(const LLUUID &id);
+    bool preloadSound(const LLUUID &id, bool pin_buffer = true);
 
     void addAudioSource(LLAudioSource *asp);
     void cleanupAudioSource(LLAudioSource *asp);
@@ -532,12 +532,14 @@ class LLAudioData
     bool hasCompletedDecode() const { return mHasCompletedDecode; }
     bool hasDecodeFailed() const { return mHasDecodeFailed; }
     bool hasWAVLoadFailed() const { return mHasWAVLoadFailed; }
+    bool isPinned() const { return mPinned; }
 
     void setHasLocalData(const bool hld) { mHasLocalData = hld; }
     void setHasDecodedData(const bool hdd) { mHasDecodedData = hdd; }
     void setHasCompletedDecode(const bool hcd) { mHasCompletedDecode = hcd; }
     void setHasDecodeFailed(const bool hdf) { mHasDecodeFailed = hdf; }
     void setHasWAVLoadFailed(const bool hwlf) { mHasWAVLoadFailed = hwlf; }
+    void setPinned(const bool pinned);
 
     friend class LLAudioEngine;  // Severe laziness, bad.
 
@@ -550,6 +552,7 @@ class LLAudioData
     bool           mHasDecodeFailed;     // Set true if decoding failed, meaning the sound asset is bad
     bool mHasWAVLoadFailed;  // Set true if loading the decoded WAV file failed, meaning the sound asset should be decoded instead if
                              // possible
+    bool           mPinned{ false };
 };
 
 
@@ -608,14 +611,27 @@ public:
     virtual bool loadWAV(const std::string& filename) = 0;
     virtual U32 getLength() = 0;
 
+    void setPinned(bool pinned) { mPinned = pinned; }
+    bool isPinned() const { return mPinned; }
+
     friend class LLAudioEngine;
     friend class LLAudioChannel;
     friend class LLAudioData;
 protected:
     bool mInUse;
+    bool mPinned{ false };
     LLAudioData *mAudioDatap;
     LLFrameTimer mLastUseTimer;
 };
+
+inline void LLAudioData::setPinned(const bool pinned)
+{
+    mPinned = pinned;
+    if (mBufferp)
+    {
+        mBufferp->setPinned(pinned);
+    }
+}
 
 struct SoundData
 {
