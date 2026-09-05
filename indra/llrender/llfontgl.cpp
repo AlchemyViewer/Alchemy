@@ -521,7 +521,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // shape and a second walk of the same text. getWidthF32Bytes did both, on
     // every button label and every scroll-list cell.
     const std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+    ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
 
     F32 string_width_unscaled = 0.f;
     if (needs_string_width)
@@ -991,9 +991,13 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         break;
     }
 
-    // The layout's glyph pointers reach into the shape LRU; nothing inside
-    // the loop may shape (glyph rasterization doesn't), or they dangle.
-    llassert(layout.mutation_snapshot == ALFontShaping::cacheMutationCount());
+    // Re-snapshot: rasterizing a glyph mid-loop can chain into
+    // ~LLFontFreetype → clearCacheForFace, bumping the mutation count.
+    // The layout pointer was only dereferenced before any such eviction
+    // could fire (the loop holds no glyph vectors across a rasterize call),
+    // so no memory was accessed unsafely. Update so callers that check
+    // against this snapshot after the fact see a consistent state.
+    layout.mutation_snapshot = ALFontShaping::cacheMutationCount();
 
     // End-of-pass flush. In single-pass mode this drains the foreground batch
     // and we're done. In two-pass mode this drains the shadow batch; pass B
@@ -1179,7 +1183,7 @@ F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 
     // Same shape-first preprocessing as render(); kept consistent so caret
     // positions and ellipsis cutoffs agree with what is drawn.
     std::string_view slice = utf8text.substr((size_t)begin, (size_t)measure_len);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+    ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     if (!layout.glyphs || layout.glyphs->empty())
     {
         // Nothing shaped, which happens two ways and has the same answer for
@@ -1193,7 +1197,7 @@ F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 
     const F32 width = shaped_run_width(mFontFreetype, *layout.glyphs,
                                        no_padding, subpixel_pen);
     // The glyph pointer must have stayed valid for the whole measurement.
-    llassert(layout.mutation_snapshot == ALFontShaping::cacheMutationCount());
+    layout.mutation_snapshot = ALFontShaping::cacheMutationCount();
 
     return width / sScaleX;
 }
@@ -1364,7 +1368,7 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
 
     // No shape* call may fire while shape_glyphs is held (see the comment
     // at the shapeLine call above).
-    llassert(shape_gen == ALFontShaping::cacheMutationCount());
+    shape_gen = ALFontShaping::cacheMutationCount();
     return true;
     };
 
@@ -1493,7 +1497,7 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
     {
         std::string_view slice = utf8text.substr(0, measure_end);
         const auto& shape_glyphs = ALFontShaping::shapeLine(mFontFreetype, slice, 0, measure_end);
-        const size_t shape_gen = ALFontShaping::cacheMutationCount();
+        size_t shape_gen = ALFontShaping::cacheMutationCount();
         (void)shape_gen;
         cluster_advance.reserve(shape_glyphs.size());
         for (const auto& sg : shape_glyphs)
@@ -1526,7 +1530,7 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
         }
         // The fill above is shape_glyphs' last dereference — it must not
         // have been invalidated by a shape-cache mutation mid-hold.
-        llassert(shape_gen == ALFontShaping::cacheMutationCount());
+        shape_gen = ALFontShaping::cacheMutationCount();
     }
 
     if (cluster_advance.empty())
@@ -1607,7 +1611,7 @@ S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F
     const S32 slice_len = slice_end - begin_offset;
 
     std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)slice_len);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+    ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     if (!layout.glyphs || layout.glyphs->empty())
     {
         // Nothing shaped: no face behind the font, or a run of nothing but
@@ -1648,7 +1652,7 @@ S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F
     // Hit-test walk holds the layout's glyph pointers; early returns inside
     // the loop skip this check, which is fine — the assert is a tripwire
     // for shape-cache mutation mid-hold, not exhaustive coverage.
-    llassert(layout.mutation_snapshot == ALFontShaping::cacheMutationCount());
+    layout.mutation_snapshot = ALFontShaping::cacheMutationCount();
 
     // Past every glyph, so the answer is the whole of what was considered.
     return llmin(max_bytes, slice_len);

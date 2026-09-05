@@ -101,6 +101,7 @@ public:
         const size_t print = fingerprint(text);
         if (!mTextHashed)
         {
+<<<<<<< HEAD
             #ifdef LL_DEBUG
             mRecordedLength = text.size();
             #endif
@@ -118,6 +119,19 @@ public:
                        << " new hash: "        << print
                        << LL_ENDL;
             #endif
+=======
+            mRecordedText = std::string(text);   // <-- add (debug only)
+            mTextHash = print;
+            mTextHashed = true;
+            return true;
+        }
+        if (print != mTextHash)                  // <-- change return to if-block
+        {
+            LL_WARNS() << "sameTextAsRecorded mismatch!"
+                       << " recorded: \"" << mRecordedText << "\""
+                       << " new: \"" << std::string(text) << "\""
+                       << LL_ENDL;
+>>>>>>> db56575f0e (fix: resolve font cache assertion crashes on login screen)
             return false;
         }
         return true;
@@ -154,7 +168,11 @@ private:
     size_t          mTextHash = 0;
     bool            mTextHashed = false;
     #ifdef LL_DEBUG
+<<<<<<< HEAD
         size_t mRecordedLength = 0;
+=======
+        std::string mRecordedText;
+>>>>>>> db56575f0e (fix: resolve font cache assertion crashes on login screen)
     #endif
 
     const LLFontGL* mFont = nullptr;

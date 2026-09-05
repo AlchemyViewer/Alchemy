@@ -2059,6 +2059,13 @@ void LLLineEditor::draw()
 
         std::string buffer;
         mText = std::string(drawnText(buffer));
+
+        // The font buffers were keyed on the real text; the bullet string
+        // is a different string in the same object, so drop the cached
+        // geometry now and let it rebuild from the drawn text below.
+        mFontBufferPreSelection.reset();
+        mFontBufferSelection.reset();
+        mFontBufferPostSelection.reset();
     }
 
     S32 text_len = mText.lengthBytes();
@@ -2417,6 +2424,12 @@ void LLLineEditor::draw()
         mSelectionStart = saved_selection_start;
         mSelectionEnd   = saved_selection_end;
         mScrollHPos     = saved_scroll;
+
+        // Real text is back; drop bullet geometry so the next width
+        // measurement or draw uses the correct string.
+        mFontBufferPreSelection.reset();
+        mFontBufferSelection.reset();
+        mFontBufferPostSelection.reset();
     }
 }
 
