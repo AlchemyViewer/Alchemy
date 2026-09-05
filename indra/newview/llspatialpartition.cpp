@@ -1131,8 +1131,9 @@ public:
     {
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
 
-        if (group->getOctreeNode()->getParent() &&  //never occlusion cull the root node
-            LLPipeline::sUseOcclusion &&            //ignore occlusion if disabled
+        if (group->getOctreeNode() &&               // ← add this
+            group->getOctreeNode()->getParent() &&
+            LLPipeline::sUseOcclusion &&
             group->isOcclusionState(LLSpatialGroup::OCCLUDED))
         {
             return true;
@@ -1208,9 +1209,10 @@ public:
     {
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
 
-        if (mResult || //already found a node, don't check any more
-            (group->getOctreeNode()->getParent() && //never occlusion cull the root node
-             LLPipeline::sUseOcclusion &&           //ignore occlusion if disabled
+        if (mResult ||
+            (group->getOctreeNode() &&              // ← add this
+             group->getOctreeNode()->getParent() &&
+             LLPipeline::sUseOcclusion &&
              group->isOcclusionState(LLSpatialGroup::OCCLUDED)))
         {
             return true;
