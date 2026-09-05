@@ -104,7 +104,7 @@ void LLViewerJointMesh::uploadJointMatrices()
     size_t num_joints = llmin(reference_mesh->mJointRenderData.size(), LL_CHARACTER_MAX_JOINTS_PER_MESH);
     for (joint_num = 0; joint_num < num_joints; joint_num++)
     {
-        LLMatrix4 joint_mat = reference_mesh->mJointRenderData[joint_num]->mWorldMatrix->toMatrix4();
+        LLMatrix4 joint_mat = reference_mesh->mJointRenderData[joint_num]->mJoint->getWorldMatrix().toMatrix4();
 
         joint_mat *= LLDrawPoolAvatar::getModelView();
         gJointMatUnaligned[joint_num] = joint_mat;

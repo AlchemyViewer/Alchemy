@@ -1515,7 +1515,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
             for (S32 joint_num = 0; joint_num < mesh->mJointRenderData.size(); joint_num++)
             {
                 LLVector4a trans;
-                trans.load3( mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().getF32ptr());
+                trans.load3( mesh->mJointRenderData[joint_num]->mJoint->getWorldPosition().mV);
                 update_min_max(newMin, newMax, trans);
             }
         }
@@ -5203,7 +5203,17 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     // Generate footstep sounds when feet hit the ground
     updateFootstepSounds();
 
-    // Update child joints as needed.
+    // Update child joints as needed. A culled avatar has no reader for its
+    // world matrices: nothing skins it, nothing draws it, and everything that
+    // does ask -- the skinning palette, the bounding box, a rigged face --
+    // goes through getWorldMatrix or getWorldPosition, which rebuild what
+    // they need on the spot. Skipping the sweep leaves the dirty flags where
+    // they are rather than clearing them, so the first visible frame catches
+    // up on its own. Self is never skipped: its skeleton feeds the camera.
+    //
+    // Animated objects report themselves visible whatever the cull says, so
+    // this never applies to them.
+    if (visible || isSelf())
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("updateWorldMatrixChildren");
         const S32 updates = mRoot->updateWorldMatrixChildren();

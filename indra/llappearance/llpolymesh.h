@@ -145,10 +145,14 @@ public:
 class LLJointRenderData
 {
 public:
-    LLJointRenderData(const LLMatrix4a* world_matrix, LLSkinJoint* skin_joint) : mWorldMatrix(world_matrix), mSkinJoint(skin_joint) {}
+    LLJointRenderData(LLJoint* joint, LLSkinJoint* skin_joint) : mJoint(joint), mSkinJoint(skin_joint) {}
     ~LLJointRenderData(){}
 
-    const LLMatrix4a*       mWorldMatrix;
+    // The joint rather than its matrix: LLJoint::getWorldMatrix rebuilds a
+    // stale one on the spot, where a pointer straight at the matrix reads
+    // whatever the last skeleton sweep left there, and the sweep does not run
+    // for every avatar every frame.
+    LLJoint*                mJoint;
     LLSkinJoint*            mSkinJoint;
 };
 

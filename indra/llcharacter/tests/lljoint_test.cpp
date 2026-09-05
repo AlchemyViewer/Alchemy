@@ -423,6 +423,33 @@ namespace tut
                       root.updateWorldMatrixChildren(), 2);
     }
 
+    template<> template<>
+    void lljoint_object::test<21>()
+    {
+        // A culled avatar does not get swept at all, which is only safe
+        // because skipping the sweep costs nothing but time: the dirty flags
+        // stay where they are, and anything that does ask for a world
+        // transform in the meantime rebuilds what it needs by itself.
+        LLJoint root, a, b;
+        root.setup("root");
+        a.setup("a", &root);
+        b.setup("b", &a);
+        root.updateWorldMatrixChildren();
+
+        root.setPosition(LLVector3(1.f, 0.f, 0.f));
+        ensure("a world position is current with no sweep in between",
+               b.getWorldPosition() == LLVector3(1.f, 0.f, 0.f));
+        ensure_equals("and the sweep still owes the matrices",
+                      root.updateWorldMatrixChildren(), 3);
+
+        root.setPosition(LLVector3(2.f, 0.f, 0.f));
+        const LLVector3 world_translation(b.getWorldMatrix().getTranslation().getF32ptr());
+        ensure("a world matrix is current with no sweep in between",
+               world_translation == LLVector3(2.f, 0.f, 0.f));
+        ensure_equals("and asking for it was the sweep's work",
+                      root.updateWorldMatrixChildren(), 0);
+    }
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have
