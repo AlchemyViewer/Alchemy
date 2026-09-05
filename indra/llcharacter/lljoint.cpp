@@ -351,14 +351,19 @@ const LLVector3& LLJoint::getPosition()
     return mXform.getPosition();
 }
 
-bool do_debug_joint(const std::string& name)
+// Whether a joint's writes are being traced by name. Every setter asks, so in
+// a shipped build the answer is a constant and the compiler drops the sites.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+static inline bool do_debug_joint(const std::string&)
 {
-    if (std::find(LLJoint::s_debugJointNames.begin(), LLJoint::s_debugJointNames.end(),name) != LLJoint::s_debugJointNames.end())
-    {
-        return true;
-    }
     return false;
 }
+#else
+static bool do_debug_joint(const std::string& name)
+{
+    return LLJoint::s_debugJointNames.find(name) != LLJoint::s_debugJointNames.end();
+}
+#endif
 
 //--------------------------------------------------------------------
 // setPosition()
