@@ -39,6 +39,7 @@
 
 #include <fmt/xchar.h>
 
+#include <bitset>
 #include <sstream>
 
 //static variables
@@ -52,6 +53,13 @@ bool LLVOCachePartition::sNeedsOcclusionCheck = false;
 // local id, CRC, hit count, body size
 const S32 ENTRY_HEADER_SIZE = 4 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
+// No cache file is legitimately anywhere near this. One that is has been
+// damaged or planted, and is not read into memory to find out which.
+const S64 MAX_CACHE_FILE_SIZE = 512 * 1024 * 1024;
+// An override record is a map of arrays of maps of arrays: four levels deep.
+const S32 MAX_OVERRIDE_LLSD_DEPTH = 16;
+// A file with this many unreadable records is not a cache with a bad record in it.
+const U32 MAX_UNREADABLE_RECORDS = 16;
 
 bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
 {
@@ -105,7 +113,13 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
             mSides.reserve(sides.size());
             for (int i = 0; i < sides.size(); ++i)
             {
-                mSides[sides[i].asInteger()] = gltf_llsd[i];
+                // a face index outside any object's range is not an override
+                const S32 side = sides[i].asInteger();
+                if (side < 0 || side >= (S32)LLTEContents::MAX_TES)
+                {
+                    continue;
+                }
+                mSides[side] = gltf_llsd[i];
             }
         }
         else
@@ -1447,7 +1461,11 @@ void LLVOCache::readCacheHeader()
                 }
 
                 HeaderEntryInfo* entry = new HeaderEntryInfo(record);
-                entry->mIndex = mNumEntries++ ;
+                // The slot it was read from, which is where updateEntry writes
+                // it back. Counting the live ones instead put every entry
+                // after a hole one slot too early.
+                entry->mIndex = (S32)num_read - 1;
+                mNumEntries++;
                 mHeaderEntryQueue.insert(entry) ;
                 mHandleEntryMap[entry->mHandle] = entry ;
             }
@@ -1525,6 +1543,31 @@ void LLVOCache::writeCacheHeader()
     return ;
 }
 
+S32 LLVOCache::firstFreeSlot() const
+{
+    // The header file is a fixed array of slots and the queue knows which are
+    // taken; a removal leaves a hole rather than closing up, so the count of
+    // live entries says nothing about where the next one can go. The purge
+    // keeps the count under the cache size, which is at most the slot count,
+    // so there is always one.
+    std::bitset<MAX_NUM_OBJECT_ENTRIES> taken;
+    for (const HeaderEntryInfo* entry : mHeaderEntryQueue)
+    {
+        if (entry->mIndex >= 0 && (U32)entry->mIndex < MAX_NUM_OBJECT_ENTRIES)
+        {
+            taken.set((size_t)entry->mIndex);
+        }
+    }
+    for (U32 slot = 0; slot < MAX_NUM_OBJECT_ENTRIES; ++slot)
+    {
+        if (!taken.test(slot))
+        {
+            return (S32)slot;
+        }
+    }
+    return (S32)MAX_NUM_OBJECT_ENTRIES - 1;
+}
+
 bool LLVOCache::updateEntry(const HeaderEntryInfo* entry)
 {
     std::error_code ec;
@@ -1549,7 +1592,8 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
     handle_entry_map_t::iterator iter = mHandleEntryMap.find(handle) ;
     if(iter == mHandleEntryMap.end()) //no cache
     {
-        LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
+        // the normal case for a region never visited from this cache
+        LL_DEBUGS("VOCache") << "No handle map entry for " << handle << LL_ENDL;
         return false; // arguably no a problem, but we'll mark this as dirty anyway.
     }
 
@@ -1570,7 +1614,7 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
         }
 
         const S64 file_size = success ? apr_file.size(ec) : 0;
-        if (file_size < (S64)(UUID_BYTES + sizeof(S32)) || ec)
+        if (file_size < (S64)(UUID_BYTES + sizeof(S32)) || file_size > MAX_CACHE_FILE_SIZE || ec)
         {
             success = false;
         }
@@ -1609,13 +1653,14 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
                 for (; i < num_entries && cursor < end; i++)
                 {
                     LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(cursor, end);
-                    if (!entry->getLocalID())
+                    const U32 local_id = entry->getLocalID();
+                    if (!local_id)
                     {
                         LL_WARNS() << "Aborting cache file load for " << filename << ", cache file corruption!" << LL_ENDL;
                         success = false ;
                         break ;
                     }
-                    cache_entry_map[entry->getLocalID()] = entry;
+                    cache_entry_map.insert_or_assign(local_id, std::move(entry));
                 }
 
                 // A file shorter than its own count is truncated. Fail it so
@@ -1653,7 +1698,7 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
 
     if(mHandleEntryMap.find(handle) == mHandleEntryMap.end()) //no cache
     {
-        LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
+        LL_DEBUGS("VOCache") << "No handle map entry for " << handle << LL_ENDL;
         return true;
     }
 
@@ -1671,7 +1716,7 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
         std::error_code ec;
         LLFile file(getObjectCacheExtrasFilename(handle), LLFile::in|LLFile::binary, ec);
         const S64 size = (file && !ec) ? file.size(ec) : 0;
-        if (size <= 0 || ec)
+        if (size <= 0 || size > MAX_CACHE_FILE_SIZE || ec)
         {
             LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
             return false;
@@ -1741,6 +1786,7 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
     LL_DEBUGS("GLTF") << "Beginning reading extras cache for handle " << handle << " from " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
 
     LLSD entry_llsd;
+    U32 unreadable = 0;
     for (U32 i = 0; i < num_entries; i++)
     {
         U32 length = 0;
@@ -1758,13 +1804,21 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
         }
 
         // Each record carries its own length, so one that fails to parse is
-        // stepped over instead of costing the rest of the file.
+        // stepped over instead of costing the rest of the file -- up to a
+        // point: a file full of them is not a cache with a bad record in it.
+        // The depth cap keeps a crafted record from recursing the parser off
+        // the stack.
         LLMemoryStream record(cursor, (S32)length);
-        const bool parsed = LLSDSerialize::fromBinary(entry_llsd, record, length) != LLSDParser::PARSE_FAILURE;
+        const bool parsed = LLSDSerialize::fromBinary(entry_llsd, record, length, MAX_OVERRIDE_LLSD_DEPTH) != LLSDParser::PARSE_FAILURE;
         cursor += length;
         if (!parsed)
         {
-            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": unreadable record skipped" << LL_ENDL;
+            if (++unreadable > MAX_UNREADABLE_RECORDS)
+            {
+                LL_WARNS() << "Failed reading extras cache for handle " << handle << ": " << unreadable << " unreadable records, giving up" << LL_ENDL;
+                return false;
+            }
+            LL_DEBUGS("VOCache") << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": unreadable record skipped" << LL_ENDL;
             discarded++;
             continue;
         }
@@ -1775,7 +1829,7 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
             discarded++;
             continue;
         }
-        U32 local_id = entry_llsd["local_id"].asInteger();
+        const U32 local_id = entry.mLocalId;
         // only add entries that exist in the primary cache
         // this is a self-healing test that avoids us polluting the cache with entries that are no longer valid based on the main cache.
         if(cache_entry_map.find(local_id)!= cache_entry_map.end())
@@ -1789,6 +1843,10 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
         }
     }
     LL_PROFILE_ZONE_NUM(loaded);
+    if (unreadable > 0)
+    {
+        LL_WARNS() << "Extras cache for handle " << handle << " had " << unreadable << " unreadable records" << LL_ENDL;
+    }
     LL_DEBUGS("GLTF") << "Completed reading extras cache for handle " << handle << ", " << loaded << " loaded, " << discarded << " discarded" << LL_ENDL;
     return true;
 }
@@ -1838,7 +1896,8 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
         entry = new HeaderEntryInfo();
         entry->mHandle = handle ;
         entry->mTime = (U32)time(NULL) ;
-        entry->mIndex = mNumEntries++;
+        entry->mIndex = firstFreeSlot();
+        mNumEntries++;
         mHeaderEntryQueue.insert(entry) ;
         mHandleEntryMap[handle] = entry ;
     }
@@ -1964,27 +2023,31 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
 
     std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
 
+    if (!dirty_cache)
+    {
+        LL_DEBUGS("VOCache") << "Skipping write of extras cache for handle " << handle << ": overrides not dirty" << LL_ENDL;
+        return;
+    }
+
     // get ViewerRegion pointer from handle
     LLWorld* world = LLWorld::getInstance();
     LLViewerRegion* pRegion = world ? world->getRegionFromHandle(handle) : nullptr;
 
     // Laid out in memory first and written once: a text version line an older
     // reader can reject, the cache id, the count of records actually written,
-    // then each record as its length followed by its LLSD in binary form.
-    std::string data;
-    data.reserve(64 + cache_extras_entry_map.size() * 256);
-    data += LLGLTFOverrideCacheEntry::VERSION_LABEL;
-    data += ':';
-    data += std::to_string(LLGLTFOverrideCacheEntry::VERSION);
-    data += '\n';
-    data.append(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
-    const size_t count_offset = data.size();
-    data.append(sizeof(U32), '\0');
+    // then each record as its length followed by its LLSD in binary form. The
+    // records are serialised straight into the one stream; each length is
+    // filled in behind its record once that is known.
+    std::ostringstream out;
+    out << LLGLTFOverrideCacheEntry::VERSION_LABEL << ':' << LLGLTFOverrideCacheEntry::VERSION << '\n';
+    out.write(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+    const U32 zero = 0;
+    const std::streampos count_pos = out.tellp();
+    out.write(reinterpret_cast<const char*>(&zero), sizeof(U32));
 
     U32 num_entries = 0;
     U32 skipped = 0;
     size_t inmem_entries = cache_extras_entry_map.size();
-    std::ostringstream record;
     for (const auto& [local_id, entry] : cache_extras_entry_map)
     {
         // Only write out GLTFOverrides that we can actually apply again on import.
@@ -2006,13 +2069,14 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
             entry_llsd["local_id"] = (S32)local_id;
             entry_llsd["object_id"] = object_id;
 
-            record.str(std::string());
-            record.clear();
-            LLSDSerialize::toBinary(entry_llsd, record);
-            const std::string bytes = record.str();
-            const U32 length = (U32)bytes.size();
-            data.append(reinterpret_cast<const char*>(&length), sizeof(U32));
-            data += bytes;
+            const std::streampos length_pos = out.tellp();
+            out.write(reinterpret_cast<const char*>(&zero), sizeof(U32));
+            LLSDSerialize::toBinary(entry_llsd, out);
+            const std::streampos end_pos = out.tellp();
+            const U32 length = (U32)((end_pos - length_pos) - (std::streamoff)sizeof(U32));
+            out.seekp(length_pos);
+            out.write(reinterpret_cast<const char*>(&length), sizeof(U32));
+            out.seekp(end_pos);
             num_entries++;
         }
         else
@@ -2020,15 +2084,19 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
             skipped++;
         }
     }
-    memcpy(data.data() + count_offset, &num_entries, sizeof(U32));
+    out.seekp(count_pos);
+    out.write(reinterpret_cast<const char*>(&num_entries), sizeof(U32));
+    std::string data = out.str();
 
     std::error_code ec;
     LLFile file(filename, LLFile::out|LLFile::trunc|LLFile::binary, ec);
     if (ec || !file || !check_write(&file, data.data(), (S32)data.size()))
     {
-        // We're not in a good place when this happens so we might as well nuke the file.
+        // A half-written file would read as a bad cache next time and take the
+        // object cache down with it. The object cache just written is sound,
+        // so only this file goes.
         LL_WARNS() << "Failed writing extras cache for handle " << handle << ". Corrupted cache file " << filename << " removed." << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
+        LLFile::remove(filename);
         return;
     }
     LL_DEBUGS("GLTF") << "Completed writing extras cache for handle " << handle << ", " << num_entries << " entries. Total in RAM: " << inmem_entries << " skipped (no persist): " << skipped << LL_ENDL;

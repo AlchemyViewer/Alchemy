@@ -729,9 +729,11 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
 
     if (tex.isArray())
     {
-        for (int i = 0; i < tex.size(); ++i)
+        // a message or a cache record can name more textures than there are
+        const size_t count = llmin((size_t)tex.size(), mTextureId.size());
+        for (size_t i = 0; i < count; ++i)
         {
-            mTextureId[i] = tex[i].asUUID();
+            mTextureId[i] = tex[(S32)i].asUUID();
         }
     }
 

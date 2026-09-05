@@ -641,6 +641,7 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
     mViewerAssetUrl(""),
     mCacheLoaded(false),
     mCacheDirty(false),
+    mGLTFOverridesDirty(false),
     mReleaseNotesRequested(false),
     mCapabilitiesState(CAPABILITIES_STATE_INIT),
     mSimulatorFeaturesReceived(false),
@@ -837,8 +838,9 @@ void LLViewerRegion::saveObjectCache()
         LLVOCache & instance = LLVOCache::instance();
 
         instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled);
-        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mCacheDirty, removal_enabled);
+        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mGLTFOverridesDirty, removal_enabled);
         mCacheDirty = false;
+        mGLTFOverridesDirty = false;
     }
 
     if (LLAppViewer::instance()->isQuitting())
@@ -1215,7 +1217,10 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
         }
     }
     // Kill the assocaited overrides
-    mImpl->mGLTFOverridesLLSD.erase(entry->getLocalID());
+    if (mImpl->mGLTFOverridesLLSD.erase(entry->getLocalID()))
+    {
+        mGLTFOverridesDirty = true;
+    }
     //will remove it from the object cache, real deletion
     entry->setState(LLVOCacheEntry::INACTIVE);
     entry->removeOctreeEntry();
@@ -2950,10 +2955,11 @@ void LLViewerRegion::cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry overri
     if (override_data.mSides.size() > 0)
     { // empty override means overrides were removed from this object
         mImpl->mGLTFOverridesLLSD[local_id] = std::move(override_data);
+        mGLTFOverridesDirty = true;
     }
-    else
+    else if (mImpl->mGLTFOverridesLLSD.erase(local_id))
     {
-        mImpl->mGLTFOverridesLLSD.erase(local_id);
+        mGLTFOverridesDirty = true;
     }
 }
 

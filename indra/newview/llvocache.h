@@ -328,6 +328,7 @@ private:
     void removeEntry(HeaderEntryInfo* entry) ;
     void purgeEntries(U32 size);
     bool updateEntry(const HeaderEntryInfo* entry);
+    S32 firstFreeSlot() const;
 
 private:
     bool                 mEnabled;

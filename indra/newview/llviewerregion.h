@@ -596,6 +596,7 @@ public:
     // a structure of size 2^14 = 16,000
     bool                                    mCacheLoaded;
     bool                                    mCacheDirty;
+    bool                                    mGLTFOverridesDirty;
     bool    mAlive;                 // can become false if circuit disconnects
     bool    mSimulatorFeaturesReceived;
     bool    mReleaseNotesRequested;

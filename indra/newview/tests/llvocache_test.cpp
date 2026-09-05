@@ -43,6 +43,7 @@
 #include "llvieweroctree_stub.cpp"
 
 #include <filesystem>
+#include <fstream>
 
 // LLGLTFMaterial, which the override entries build, reaches tinygltf, whose
 // single-header implementation the viewer compiles into its GLTF loader. The
@@ -185,6 +186,73 @@ namespace tut
             LLGLTFOverrideCacheEntry entry;
             ensure("override parses", entry.fromLLSD(makeOverrideLLSD(local_id, handle, LLUUID::generateNewID(), sides)));
             return entry;
+        }
+
+        // An extras file written by hand: the header the reader expects, then
+        // each record as its length and its bytes, whatever they are.
+        void writeExtrasFile(U64 handle, const LLUUID& id, const std::vector<std::string>& records) const
+        {
+            std::string data;
+            data += LLGLTFOverrideCacheEntry::VERSION_LABEL;
+            data += ':';
+            data += std::to_string(LLGLTFOverrideCacheEntry::VERSION);
+            data += '\n';
+            data.append(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+            const U32 count = (U32)records.size();
+            data.append(reinterpret_cast<const char*>(&count), sizeof(U32));
+            for (const std::string& record : records)
+            {
+                const U32 length = (U32)record.size();
+                data.append(reinterpret_cast<const char*>(&length), sizeof(U32));
+                data += record;
+            }
+            std::ofstream out(objectFile(handle, "_extras.slec"), std::ios::binary | std::ios::trunc);
+            out.write(data.data(), (std::streamsize)data.size());
+        }
+
+        static std::string binaryRecord(const LLSD& llsd)
+        {
+            std::ostringstream out;
+            LLSDSerialize::toBinary(llsd, out);
+            return out.str();
+        }
+
+        static LLSD nestedArrays(int depth)
+        {
+            LLSD inner = 1;
+            for (int i = 0; i < depth; ++i)
+            {
+                LLSD outer;
+                outer.append(inner);
+                inner = outer;
+            }
+            return inner;
+        }
+
+        std::filesystem::path headerFile() const { return mRoot / "objectcache" / "object.cache"; }
+
+        static std::string slurp(const std::filesystem::path& file)
+        {
+            std::ifstream in(file, std::ios::binary);
+            return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        }
+
+        static void spit(const std::filesystem::path& file, const std::string& bytes)
+        {
+            std::ofstream out(file, std::ios::binary | std::ios::trunc);
+            out.write(bytes.data(), (std::streamsize)bytes.size());
+        }
+
+        // Restarts the cache the way a crash would have left it: the header the
+        // last in-place update wrote, not the compacted one a clean shutdown
+        // writes over it.
+        void restartAsAfterCrash()
+        {
+            const std::string header = slurp(headerFile());
+            LLVOCache::deleteSingleton();
+            spit(headerFile(), header);
+            LLVOCache::initParamSingleton(false);
+            LLVOCache::instance().initCache(LL_PATH_CACHE, CACHE_NUMBER_OF_REGIONS, CACHE_VERSION);
         }
 
         static void ensureSameOverride(const LLGLTFOverrideCacheEntry& expected, const LLGLTFOverrideCacheEntry& actual)
@@ -504,5 +572,112 @@ namespace tut
             ensure("inverted settings still give a factor in [0, 1]", f >= 0.f && f <= 1.f);
         }
         ensure("inverted settings: below the low setting nothing is pulled in", close_to(factor(2000.f, 0.f, no_cap, 3000.f, 2048.f), 1.f));
+    }
+
+    template<> template<>
+    void vocacheTestObject::test<9>()
+    {
+        set_test_name("hostile extras records: a depth cap, a budget for unreadable ones, and no face out of range");
+
+        const U64 handle = to_region_handle(1006 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(4);
+        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
+
+        // a legitimate record carrying something nested a little loads; one
+        // nested past the cap is refused rather than parsed
+        LLSD shallow = makeOverrideLLSD(1, handle, LLUUID::generateNewID(), 1);
+        shallow["deep"] = nestedArrays(8);
+        LLSD deep = makeOverrideLLSD(2, handle, LLUUID::generateNewID(), 1);
+        deep["deep"] = nestedArrays(24);
+        writeExtrasFile(handle, id, { binaryRecord(shallow), binaryRecord(deep) });
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        ensure("a file with one bad record is still a cache", LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+        ensure_equals("the shallow record loaded, the deep one did not", overrides.size(), 1u);
+        ensure("it is the shallow one", overrides.find(1) != overrides.end());
+
+        // up to the budget, unreadable records are skipped; past it the file is refused
+        std::vector<std::string> garbage(16, std::string("\xff\xfe\xfd\xfc", 4));
+        garbage.push_back(binaryRecord(makeOverrideLLSD(3, handle, LLUUID::generateNewID(), 1)));
+        writeExtrasFile(handle, id, garbage);
+        overrides.clear();
+        ensure("sixteen unreadable records are within the budget", LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+        ensure_equals("and the good record after them loaded", overrides.size(), 1u);
+
+        garbage.insert(garbage.begin(), std::string("\xff\xfe\xfd\xfc", 4));
+        writeExtrasFile(handle, id, garbage);
+        overrides.clear();
+        ensure("seventeen is a bad file", !LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+
+        // a face index no object has is dropped by the record parser
+        LLSD faces = makeOverrideLLSD(4, handle, LLUUID::generateNewID(), 2);
+        faces["sides"][1] = 300;
+        LLGLTFOverrideCacheEntry entry;
+        ensure("the record still parses", entry.fromLLSD(faces));
+        ensure_equals("only the face in range is kept", entry.mSides.size(), 1u);
+        ensure("and it is face 0", entry.mSides.find(0) != entry.mSides.end());
+        faces["sides"][1] = -1;
+        LLGLTFOverrideCacheEntry negative;
+        ensure("a negative face parses", negative.fromLLSD(faces));
+        ensure_equals("and is dropped too", negative.mSides.size(), 1u);
+    }
+
+    template<> template<>
+    void vocacheTestObject::test<10>()
+    {
+        set_test_name("header slots survive a removal followed by a crash");
+
+        const LLUUID id = LLUUID::generateNewID();
+        const U64 first = to_region_handle(1010 * 256, 1000 * 256);
+        const U64 second = to_region_handle(1011 * 256, 1000 * 256);
+        const U64 third = to_region_handle(1012 * 256, 1000 * 256);
+        const U64 fourth = to_region_handle(1013 * 256, 1000 * 256);
+        LLVOCache::instance().writeToCache(first, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(second, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(third, id, makeEntries(3), true, false);
+
+        // removing the middle region leaves a hole in the header on disk; a
+        // crash means nobody closes it up
+        LLVOCache::instance().removeEntry(second);
+        restartAsAfterCrash();
+        ensure_equals("two regions come back", LLVOCache::instance().getCacheEntries(), 2u);
+
+        // a new region has to take the hole, not the slot of the one behind it
+        LLVOCache::instance().writeToCache(fourth, id, makeEntries(3), true, false);
+        restartAsAfterCrash();
+        ensure_equals("three regions come back", LLVOCache::instance().getCacheEntries(), 3u);
+        LLVOCacheEntry::vocache_entry_map_t read;
+        ensure("the first region is still there", LLVOCache::instance().readFromCache(first, id, read));
+        read.clear();
+        ensure("the third region was not overwritten", LLVOCache::instance().readFromCache(third, id, read));
+        read.clear();
+        ensure("the new region is there", LLVOCache::instance().readFromCache(fourth, id, read));
+    }
+
+    template<> template<>
+    void vocacheTestObject::test<11>()
+    {
+        set_test_name("extras are only rewritten when the overrides changed");
+
+        const U64 handle = to_region_handle(1020 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(4);
+        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1] = makeOverride(1, handle, 2);
+        overrides[2] = makeOverride(2, handle, 3);
+        LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, true, false);
+
+        // a save with nothing dirty leaves the file as it was, whatever it is handed
+        LLVOCacheEntry::vocache_gltf_overrides_map_t nothing;
+        LLVOCache::instance().writeGenericExtrasToCache(handle, id, nothing, false, false);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t read;
+        ensure("the file still reads", LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
+        ensure_equals("and still holds both overrides", read.size(), 2u);
+        ensureSameOverride(overrides[1], read[1]);
+        ensureSameOverride(overrides[2], read[2]);
     }
 }
