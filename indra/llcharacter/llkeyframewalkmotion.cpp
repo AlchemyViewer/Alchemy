@@ -241,23 +241,31 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     LLQuaternion world_to_avatar_rot(avatar_to_world_rot);
     world_to_avatar_rot.conjugate();
 
+    // calculate world-space foot drift
+    // use global coordinates to seamlessly handle region crossings
+    //
+    // The feet are somewhere whether or not the avatar is moving, and the
+    // first frame of a walk has to measure one frame of drift. Kept only while
+    // already walking, this measured the whole of the stand instead -- however
+    // far the feet had been moved since the last step, by foot placement
+    // reaching for ground, by a turn, by being put somewhere else entirely.
+    // One frame of that is a foot travelling forward faster than any avatar,
+    // which is the reading the playback rate below cannot make sense of.
+    LLVector3d leftFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
+    leftFootGlobalPosition.mdV[VZ] = 0.0;
+    LLVector3 leftFootDelta(leftFootGlobalPosition - mLastLeftFootGlobalPos);
+    mLastLeftFootGlobalPos = leftFootGlobalPosition;
+
+    LLVector3d rightFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mRightAnkleJoint->getWorldPosition());
+    rightFootGlobalPosition.mdV[VZ] = 0.0;
+    LLVector3 rightFootDelta(rightFootGlobalPosition - mLastRightFootGlobalPos);
+    mLastRightFootGlobalPos = rightFootGlobalPosition;
+
     LLVector3 foot_slip_vector;
 
     // find foot drift along velocity vector
     if (speed > MIN_WALK_SPEED)
     {   // walking/running
-
-        // calculate world-space foot drift
-        // use global coordinates to seamlessly handle region crossings
-        LLVector3d leftFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
-        leftFootGlobalPosition.mdV[VZ] = 0.0;
-        LLVector3 leftFootDelta(leftFootGlobalPosition - mLastLeftFootGlobalPos);
-        mLastLeftFootGlobalPos = leftFootGlobalPosition;
-
-        LLVector3d rightFootGlobalPosition = mCharacter->getPosGlobalFromAgent(mRightAnkleJoint->getWorldPosition());
-        rightFootGlobalPosition.mdV[VZ] = 0.0;
-        LLVector3 rightFootDelta(rightFootGlobalPosition - mLastRightFootGlobalPos);
-        mLastRightFootGlobalPos = rightFootGlobalPosition;
 
         // get foot drift along avatar direction of motion
         F32 left_foot_slip_amt = leftFootDelta * avatar_velocity;
