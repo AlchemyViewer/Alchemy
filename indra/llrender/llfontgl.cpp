@@ -521,7 +521,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // shape and a second walk of the same text. getWidthF32Bytes did both, on
     // every button label and every scroll-list cell.
     const std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+    ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
 
     F32 string_width_unscaled = 0.f;
     if (needs_string_width)
@@ -773,6 +773,16 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                                     ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
 
     bool shape_run_taken = false;
+
+    // Two measurements above shape, and so may miss-insert into the shape
+    // cache after build_shape_layout took its snapshot: the empty-layout width
+    // fallback, and the ellipsis padding width, which shapes "...." the first
+    // time anything in the process ellipsizes. Neither can have evicted the
+    // layout's own entry -- an insert drops the LRU tail and this entry was
+    // just put at the head -- so carry the count forward here. What the assert
+    // after the loop guards is the loop, which is the part that holds the
+    // pointer; snapshotting there instead would guard nothing.
+    layout.mutation_snapshot = ALFontShaping::cacheMutationCount();
 
     S32 next_i = begin_offset;
     for (i = begin_offset; i < begin_offset + length; i = next_i)
