@@ -3356,12 +3356,17 @@ void LLViewerRegion::unpackRegionHandshake()
             if (!mTerrainQueryOnCaps)
             {
                 mTerrainQueryOnCaps = true;
-                setCapabilitiesReceivedCallback([](const LLUUID&, LLViewerRegion* region)
+                // The signal fires inside the seed-cap coroutine, and the
+                // query launches a coroutine of its own from the main coro.
+                setCapabilitiesReceivedCallback([](const LLUUID& region_id, LLViewerRegion*)
                 {
-                    if (region)
+                    LLAppViewer::instance()->postToMainCoro([region_id]()
                     {
-                        region->queryPBRTerrainFeatures();
-                    }
+                        if (LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id))
+                        {
+                            region->queryPBRTerrainFeatures();
+                        }
+                    });
                 });
             }
         }
