@@ -138,8 +138,12 @@ public:
     // Destructor
     ~LLPoseBlender();
 
-    // request motion joint states to be added to pose blender joint state records
-    bool addMotion(LLMotion* motion);
+    // Request motion joint states to be added to pose blender joint state
+    // records. `saturated_joints` carries the priority at which each joint is
+    // already claimed by a motion at full weight; a state that only rotates
+    // such a joint is left out, since the blend would interpolate it to
+    // nothing and it would take one of the joint's six slots to do it.
+    bool addMotion(LLMotion* motion, const U8* saturated_joints);
 
     // blend all joint states and apply to skeleton
     void blendAndApply();

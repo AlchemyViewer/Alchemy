@@ -838,4 +838,48 @@ namespace tut
             }
         }
     }
+
+    template<> template<>
+    void llkeyframemotion_object::test<10>()
+    {
+        // A joint already turned by a motion at full weight, at a priority
+        // this one cannot reach, is not sampled: the blend would interpolate
+        // what came out of those curves away to nothing. The mask says which
+        // joints those are.
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        std::vector<U8> buffer(4096);
+        const AssetAnimation anim = two_joint_animation();
+        ensure("the animation loads", load(motion, anim, buffer.data(), (S32)buffer.size()));
+
+        U8 nothing_claimed[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        U8 all_claimed[LL_CHARACTER_MAX_ANIMATED_JOINTS];
+        memset(all_claimed, 0xff, sizeof(all_claimed));
+
+        LLPose* pose = motion.getPose();
+        LLJointState* torso = pose->findJointState(std::string("mTorso"));
+        LLJointState* pelvis = pose->findJointState(std::string("mPelvis"));
+        ensure("both joints are in the pose", torso != nullptr && pelvis != nullptr);
+        ensure_equals("the torso only rotates", torso->getUsage(), (U32)LLJointState::ROT);
+
+        const LLQuaternion marker(2.4f, LLVector3(0.f, 0.f, 1.f));
+
+        // claimed: the curves are not read and the state keeps what it held
+        torso->setRotation(marker);
+        motion.onUpdate(1.5f, all_claimed);
+        ensure_approximately_equals_range("a claimed rotation is left alone",
+                                          fabsf(dot(torso->getRotation(), marker)), 1.f, 1e-5f);
+
+        // and unclaimed, the same sample writes it
+        motion.onUpdate(1.5f, nothing_claimed);
+        ensure("an unclaimed rotation is sampled",
+               fabsf(dot(torso->getRotation(), marker)) < 0.999f);
+
+        // The pelvis carries a position as well, which is summed on its own
+        // account however much of the rotation is spoken for, so it is sampled
+        // whatever the mask says.
+        pelvis->setRotation(marker);
+        motion.onUpdate(0.5f, all_claimed);
+        ensure("a joint that also moves is sampled whatever is claimed",
+               fabsf(dot(pelvis->getRotation(), marker)) < 0.999f);
+    }
 }

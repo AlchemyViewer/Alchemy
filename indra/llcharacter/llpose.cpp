@@ -526,7 +526,7 @@ LLPoseBlender::~LLPoseBlender()
 //-----------------------------------------------------------------------------
 // addMotion()
 //-----------------------------------------------------------------------------
-bool LLPoseBlender::addMotion(LLMotion* motion)
+bool LLPoseBlender::addMotion(LLMotion* motion, const U8* saturated_joints)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLPose* pose = motion->getPose();
@@ -577,6 +577,18 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
         }
 
         const S32 priority = (jsp->getPriority() == LLJoint::USE_MOTION_PRIORITY) ? motion_priority : jsp->getPriority();
+
+        // A rotation onto a joint already turned by a motion at full weight is
+        // a contribution the blend interpolates away to nothing. Anything else
+        // this state carries -- a position, a scale -- is summed on its own
+        // account, so only a rotation-only state can be left out.
+        if (!additive_blend
+            && (jsp->getUsage() & (LLJointState::POS | LLJointState::SCALE)) == 0
+            && saturated_joints[joint_num] >= (0xff >> (7 - priority)))
+        {
+            continue;
+        }
+
         joint_blender->addJointState(jsp, priority, additive_blend);
 
         // add it to our list of active blenders

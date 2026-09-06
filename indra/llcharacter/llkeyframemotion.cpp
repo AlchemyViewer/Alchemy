@@ -639,7 +639,7 @@ bool LLKeyframeMotion::onUpdate(F32 time, U8* joint_mask)
         mLastLoopedTime = time;
     }
 
-    applyKeyframes(mLastLoopedTime);
+    applyKeyframes(mLastLoopedTime, joint_mask);
 
     applyConstraints(mLastLoopedTime, joint_mask);
 
@@ -651,7 +651,7 @@ bool LLKeyframeMotion::onUpdate(F32 time, U8* joint_mask)
 //-----------------------------------------------------------------------------
 // applyKeyframes()
 //-----------------------------------------------------------------------------
-void LLKeyframeMotion::applyKeyframes(F32 time)
+void LLKeyframeMotion::applyKeyframes(F32 time, const U8* joint_mask)
 {
     const U32 count = mJointMotionList->getNumJointMotions();
     llassert_always(count <= mJointStates.size());
@@ -659,9 +659,40 @@ void LLKeyframeMotion::applyKeyframes(F32 time)
     {
         mKeyCursors.resize(count);
     }
+
+    const S32 motion_priority = mJointMotionList->mBasePriority;
+
     for (U32 i = 0; i < count; i++)
     {
-        mJointMotionList->getJointMotion(i)->update(mJointStates[i], time, mKeyCursors[i]);
+        JointMotion* joint_motion = mJointMotionList->getJointMotion(i);
+
+        // A joint already turned by a motion at full weight, and at a priority
+        // this one cannot reach, is a joint whose curves are sampled into a
+        // contribution the blend then interpolates away to nothing. The mask
+        // is built from full weight motions only, so a motion still easing in
+        // holds nothing here and everything under it is still sampled.
+        //
+        // Only the rotation is skipped this way. A position or a scale is
+        // summed on its own account, and the asset format has no scale keys at
+        // all, so a joint carrying anything but rotation is left alone.
+        if ((joint_motion->mUsage & (LLJointState::POS | LLJointState::SCALE)) == 0)
+        {
+            const LLJoint* joint = mJointStates[i]->getJoint();
+            if (joint)
+            {
+                const S32 joint_num = joint->getJointNum();
+                const S32 priority = (joint_motion->mPriority == LLJoint::USE_MOTION_PRIORITY)
+                                   ? motion_priority : joint_motion->mPriority;
+                if (joint_num >= 0
+                    && joint_num < (S32)LL_CHARACTER_MAX_ANIMATED_JOINTS
+                    && joint_mask[joint_num] >= (0xff >> (7 - priority)))
+                {
+                    continue;
+                }
+            }
+        }
+
+        joint_motion->update(mJointStates[i], time, mKeyCursors[i]);
     }
 
     LLJoint::JointPriority* pose_priority = (LLJoint::JointPriority* )mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY);
@@ -1442,6 +1473,18 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
         if (joint_priority < LLJoint::USE_MOTION_PRIORITY)
         {
             LL_WARNS() << "joint priority unknown - too low."
+                       << " for animation " << asset() << LL_ENDL;
+            return false;
+        }
+
+        // A priority becomes a run of low bits, 0xff >> (7 - priority), in
+        // every joint signature and in every test against one. Above seven
+        // that shift runs off the end of the word, and the asset says what the
+        // priority is.
+        if (joint_priority > LL_CHARACTER_MAX_PRIORITY)
+        {
+            LL_WARNS() << "joint priority " << joint_priority << " is above "
+                       << LL_CHARACTER_MAX_PRIORITY
                        << " for animation " << asset() << LL_ENDL;
             return false;
         }

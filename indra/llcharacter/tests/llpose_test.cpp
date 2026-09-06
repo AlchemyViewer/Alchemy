@@ -594,6 +594,12 @@ namespace tut
     {
         LLPoseBlender mBlender;
 
+        // No joint already claimed by a motion at full weight, which is what
+        // every test below means unless it says otherwise.
+        U8 mNothingSaturated[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+
+        bool addMotion(LLMotion* motion) { return mBlender.addMotion(motion, mNothingSaturated); }
+
         static void arm(ALTestMotion& motion) { motion.getPose()->setWeight(1.f); }
     };
     typedef test_group<llposeblender_data> llposeblender_test;
@@ -610,7 +616,7 @@ namespace tut
         sb->setPosition(LLVector3(3.f, 2.f, 1.f));
         arm(motion);
 
-        ensure("addMotion returns true", mBlender.addMotion(&motion));
+        ensure("addMotion returns true", addMotion(&motion));
         mBlender.blendAndApply();
 
         ensure_quat_equals("motion rotation applied", mA.getRotation(), ROT_A);
@@ -628,14 +634,14 @@ namespace tut
         high.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
         arm(high);
 
-        mBlender.addMotion(&low);
-        mBlender.addMotion(&high);
+        addMotion(&low);
+        addMotion(&high);
         mBlender.blendAndApply();
         ensure_quat_equals("higher motion priority wins, low first", mA.getRotation(), ROT_B);
 
         mA.setRotation(LLQuaternion::DEFAULT);
-        mBlender.addMotion(&high);
-        mBlender.addMotion(&low);
+        addMotion(&high);
+        addMotion(&low);
         mBlender.blendAndApply();
         ensure_quat_equals("higher motion priority wins, high first", mA.getRotation(), ROT_B);
     }
@@ -652,8 +658,8 @@ namespace tut
         medium.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
         arm(medium);
 
-        mBlender.addMotion(&medium);
-        mBlender.addMotion(&low);
+        addMotion(&medium);
+        addMotion(&low);
         mBlender.blendAndApply();
         ensure_quat_equals("joint state priority beats motion priority", mA.getRotation(), ROT_A);
     }
@@ -676,7 +682,7 @@ namespace tut
         motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
         arm(motion);
 
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.blendAndApply();
         ensure_quat_equals("the unnumbered joint is not blended", unnumbered.getRotation(), before);
         ensure_quat_equals("the numbered joint in the same motion is", mA.getRotation(), ROT_A);
@@ -697,7 +703,7 @@ namespace tut
         motion.addJoint(&last, LLJointState::ROT)->setRotation(ROT_C);
         arm(motion);
 
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.blendAndApply();
         ensure_quat_equals("slot zero blends", mA.getRotation(), ROT_A);
         ensure_quat_equals("the last slot blends", last.getRotation(), ROT_C);
@@ -716,7 +722,7 @@ namespace tut
         motion.getPose()->findJointState(&mA)->setPosition(LLVector3(2.f, 4.f, 6.f));
         arm(motion);
 
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.blendAndCache(true);
         ensure_quat_equals("caching leaves the joint's rotation alone", mA.getRotation(), LLQuaternion::DEFAULT);
         ensure_vec3_equals("caching leaves the joint's position alone", mA.getPosition(), LLVector3::zero);
@@ -746,7 +752,7 @@ namespace tut
         motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
         arm(motion);
 
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.blendAndCache(true);
         mA.updateWorldMatrixChildren();
         ensure("the joint starts clean", mA.mDirtyFlags == 0);
@@ -772,14 +778,14 @@ namespace tut
         additive.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
         arm(additive);
 
-        mBlender.addMotion(&additive);
-        mBlender.addMotion(&base);
+        addMotion(&additive);
+        addMotion(&base);
         mBlender.blendAndApply();
         ensure_quat_equals("additive ahead of the base composes onto it", mA.getRotation(), ROT_B * ROT_A);
 
         mA.setRotation(LLQuaternion::DEFAULT);
-        mBlender.addMotion(&base);
-        mBlender.addMotion(&additive);
+        addMotion(&base);
+        addMotion(&additive);
         mBlender.blendAndApply();
         ensure_quat_equals("additive behind a saturated base is masked", mA.getRotation(), ROT_A);
     }
@@ -791,7 +797,7 @@ namespace tut
         motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
         arm(motion);
 
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.blendAndApply();
         ensure_quat_equals("first apply", mA.getRotation(), ROT_A);
 
@@ -801,7 +807,7 @@ namespace tut
         ensure_quat_equals("second apply without addMotion is a no-op", mA.getRotation(), ROT_C);
 
         // clearBlenders() discards queued states.
-        mBlender.addMotion(&motion);
+        addMotion(&motion);
         mBlender.clearBlenders();
         mBlender.blendAndApply();
         ensure_quat_equals("cleared queue is a no-op", mA.getRotation(), ROT_C);
@@ -836,15 +842,133 @@ namespace tut
             silent.back()->addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
             // left at the weight a pose starts and ends its life on
             ensure_equals("a silent motion weighs nothing", silent.back()->getPose()->getWeight(), 0.f);
-            mBlender.addMotion(silent.back().get());
+            addMotion(silent.back().get());
         }
 
         ALTestMotion playing(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
         playing.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
         arm(playing);
-        mBlender.addMotion(&playing);
+        addMotion(&playing);
 
         mBlender.blendAndApply();
         ensure_quat_equals("the motion with a weight still reaches the joint", mA.getRotation(), ROT_A);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<12>()
+    {
+        // The differential the skip rests on. A motion at full weight claims
+        // the whole of a joint's rotation, so a lower priority rotation
+        // underneath it is interpolated away to nothing whether it is blended
+        // in or left out -- and left out it does not take one of the joint's
+        // six slots to arrive at the same answer.
+        ALTestMotion owner(LLUUID::generateNewID(), LLJoint::HIGH_PRIORITY);
+        owner.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+
+        ALTestMotion underneath(LLUUID::generateNewID(), LLJoint::MEDIUM_PRIORITY);
+        underneath.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
+        arm(underneath);
+
+        U8 saturated[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        saturated[mA.getJointNum()] = 0xff >> (7 - LLJoint::HIGH_PRIORITY);
+
+        // left in
+        arm(owner);
+        mA.setRotation(LLQuaternion::DEFAULT);
+        addMotion(&owner);
+        addMotion(&underneath);
+        mBlender.blendAndApply();
+        const LLQuaternion blended_in = mA.getRotation();
+
+        // left out
+        mA.setRotation(LLQuaternion::DEFAULT);
+        addMotion(&owner);
+        mBlender.addMotion(&underneath, saturated);
+        mBlender.blendAndApply();
+        const LLQuaternion left_out = mA.getRotation();
+
+        ensure_quat_equals("blending it in gives the owner's rotation", blended_in, ROT_A);
+        ensure_quat_equals("and so does leaving it out", left_out, blended_in);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<14>()
+    {
+        // Which is why the mask is built from motions at full weight and no
+        // others. An owner only part way in has not claimed the joint, the one
+        // underneath is still visible through it, and leaving it out would be
+        // a pose nobody asked for.
+        ALTestMotion owner(LLUUID::generateNewID(), LLJoint::HIGH_PRIORITY);
+        owner.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        owner.getPose()->setWeight(0.5f);
+
+        ALTestMotion underneath(LLUUID::generateNewID(), LLJoint::MEDIUM_PRIORITY);
+        underneath.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_B);
+        arm(underneath);
+
+        mA.setRotation(LLQuaternion::DEFAULT);
+        addMotion(&owner);
+        addMotion(&underneath);
+        mBlender.blendAndApply();
+
+        const LLQuaternion got = mA.getRotation();
+        ensure("a half faded owner leaves the one underneath showing through",
+               fabsf(dot(got, ROT_A)) < 0.999f && fabsf(dot(got, ROT_B)) < 0.999f);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<13>()
+    {
+        // Only a rotation is left out. A state that also moves or scales the
+        // joint is summed on its own account, whatever is claimed above it.
+        U8 saturated[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        saturated[mA.getJointNum()] = 0xff >> (7 - LLJoint::HIGHEST_PRIORITY);
+
+        const LLVector3 offset(0.f, 0.f, 0.75f);
+
+        ALTestMotion mover(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        LLPointer<LLJointState> state = mover.addJoint(&mA, LLJointState::ROT | LLJointState::POS);
+        state->setRotation(ROT_B);
+        state->setPosition(offset);
+        arm(mover);
+
+        mBlender.addMotion(&mover, saturated);
+        mBlender.blendAndApply();
+
+        ensure_vec3_equals("the position still reaches the joint", mA.getPosition(), offset);
+        ensure_quat_equals("and so does the rotation that came with it", mA.getRotation(), ROT_B);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<15>()
+    {
+        // What leaving them out buys, beyond the work: a joint has six slots
+        // and a state that would be interpolated away to nothing was taking
+        // one. Six claimed rotations and then something that actually has
+        // somewhere to put the joint -- with them left in, the six fill the
+        // slots and it is turned away.
+        U8 saturated[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        saturated[mA.getJointNum()] = 0xff >> (7 - LLJoint::HIGH_PRIORITY);
+
+        std::vector<std::unique_ptr<ALTestMotion> > claimed;
+        for (S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
+        {
+            claimed.push_back(std::make_unique<ALTestMotion>(LLUUID::generateNewID(), LLJoint::HIGH_PRIORITY));
+            claimed.back()->addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+            arm(*claimed.back());
+            mBlender.addMotion(claimed.back().get(), saturated);
+        }
+
+        const LLVector3 offset(0.f, 0.f, 1.25f);
+        ALTestMotion mover(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        LLPointer<LLJointState> state = mover.addJoint(&mA, LLJointState::ROT | LLJointState::POS);
+        state->setRotation(ROT_B);
+        state->setPosition(offset);
+        arm(mover);
+        mBlender.addMotion(&mover, saturated);
+
+        mBlender.blendAndApply();
+        ensure_vec3_equals("the slots were there for the motion that needed one",
+                           mA.getPosition(), offset);
     }
 }

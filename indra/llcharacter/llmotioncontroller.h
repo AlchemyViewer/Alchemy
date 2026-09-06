@@ -262,6 +262,15 @@ protected:
     F32                 mLastInterp;
 
     U8                  mJointSignature[2][LL_CHARACTER_MAX_ANIMATED_JOINTS];
+
+    // Which joints are already spoken for, and at what priority, by a motion
+    // that is playing at full weight. A motion further down the list cannot
+    // reach one of these: the blend takes the first contribution it is given
+    // and, once that has claimed the whole weight, interpolates every later
+    // one to nothing. The plain signature above says who owns a joint whatever
+    // weight they own it at, which is not the same question -- a motion still
+    // easing in owns nothing yet.
+    U8                  mJointSaturated[LL_CHARACTER_MAX_ANIMATED_JOINTS];
 private:
     U32                 mLastCountAfterPurge; //for logging and debugging purposes
 };

@@ -401,4 +401,44 @@ namespace tut
         runFrame();
         ensure("and is gone the frame after", activeMotions(LLMotion::NORMAL_BLEND).empty());
     }
+
+    template<> template<>
+    void llcharacter_object::test<14>()
+    {
+        // The mask that lets a motion's joints go unread is built from motions
+        // at full weight and no others. One still easing in has claimed
+        // nothing, so what is under it is still blended and still shows.
+        LLJoint* joint = mCharacter.getJoint("mPelvis");
+        ensure("the joint resolves", joint != nullptr);
+
+        const LLQuaternion under_rot(0.9f, LLVector3::x_axis);
+        const LLQuaternion over_rot(-1.4f, LLVector3::y_axis);
+
+        LLUUID under_id;
+        ALTestMotion* under = startFreshMotion(under_id);
+        under->mPriority = LLJoint::MEDIUM_PRIORITY;
+        under->addJoint(joint, LLJointState::ROT)->setRotation(under_rot);
+
+        LLUUID over_id;
+        ALTestMotion* over = startFreshMotion(over_id);
+        over->mPriority = LLJoint::HIGH_PRIORITY;
+        over->mEaseInDuration = 100.f;
+        over->addJoint(joint, LLJointState::ROT)->setRotation(over_rot);
+
+        runFrame();
+        runFrame();
+
+        ensure("the one easing in has not reached full weight",
+               over->getPose()->getWeight() < 0.5f);
+        ensure("so the one underneath is what the joint shows",
+               fabsf(dot(joint->getRotation(), under_rot)) > 0.99f);
+
+        // and once it is all the way in, it owns the joint
+        over->mEaseInDuration = 0.f;
+        runFrame();
+
+        ensure_equals("it is at full weight now", over->getPose()->getWeight(), 1.f);
+        ensure("and the joint is what it asked for",
+               fabsf(dot(joint->getRotation(), over_rot)) > 0.99f);
+    }
 }

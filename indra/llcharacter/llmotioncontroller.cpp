@@ -622,6 +622,7 @@ void LLMotionController::resetJointSignatures()
 {
     memset(&mJointSignature[0][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
     memset(&mJointSignature[1][0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
+    memset(&mJointSaturated[0], 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
 }
 
 //-----------------------------------------------------------------------------
@@ -690,11 +691,14 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
     motion_list_t& motions = mActiveMotions[anim_type];
     LL_PROFILE_ZONE_NUM(motions.size());
     bool update_result = true;
-    U8 last_joint_signature[LL_CHARACTER_MAX_ANIMATED_JOINTS];
     S32 motions_blended = 0;
     S32 joint_states_blended = 0;
 
-    memset(&last_joint_signature, 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
+    // A joint an additive motion writes is composed onto whatever is under it
+    // rather than replacing it, so nothing an additive motion does saturates a
+    // joint. The mask is cleared before each pass and only the normal one
+    // fills it.
+    const bool saturates = (anim_type == LLMotion::NORMAL_BLEND);
 
     // the same for every motion this frame, and a virtual call
     const F32 pixel_area = mCharacter->getPixelArea();
@@ -737,13 +741,9 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
                     update_motion = true;
                 }
 
-                // Snapshot pass 1 of our previous signature into
-                // last_joint_signature, then do the same merge as pass 0.
-                U64 last1;
-                std::memcpy(&last1, &mJointSignature[1][offset], sizeof(U64));
-                std::memcpy(&last_joint_signature[offset], &last1, sizeof(U64));
-
-                U64 cur1 = last1;
+                // Pass 1, the same merge as pass 0.
+                U64 cur1;
+                std::memcpy(&cur1, &mJointSignature[1][offset], sizeof(U64));
                 U64 test1;
                 std::memcpy(&test1, &motionp->mJointSignature[1][offset], sizeof(U64));
                 if ((cur1 | test1) != cur1)
@@ -825,7 +825,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
                 // has, which for a motion that played out to its end is the
                 // full weight it already had.
                 posep->setWeight(llmin(motionp->getFadeWeight(), posep->getWeight()));
-                motionp->onUpdate(motionp->getStopTime() - motionp->mActivationTimestamp, last_joint_signature);
+                motionp->onUpdate(motionp->getStopTime() - motionp->mActivationTimestamp, mJointSaturated);
             }
             else
             {
@@ -857,7 +857,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
             }
 
             // perform motion update
-            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
         }
 
         //**********************
@@ -881,7 +881,7 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
             // perform motion update
             {
-                update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+                update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
             }
         }
 
@@ -904,12 +904,12 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
                 posep->setWeight(motionp->getFadeWeight() * motionp->mResidualWeight + (1.f - motionp->mResidualWeight) * cubic_step((mAnimTime - motionp->mActivationTimestamp) / ease_in_duration));
             }
             // perform motion update
-            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, last_joint_signature);
+            update_result = motionp->onUpdate(mAnimTime - motionp->mActivationTimestamp, mJointSaturated);
         }
         else
         {
             posep->setWeight(0.f);
-            update_result = motionp->onUpdate(0.f, last_joint_signature);
+            update_result = motionp->onUpdate(0.f, mJointSaturated);
         }
 
         // allow motions to deactivate themselves
@@ -927,9 +927,28 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
         }
 
         // even if onupdate returns false, add this motion in to the blend one last time
-        mPoseBlender.addMotion(motionp);
+        mPoseBlender.addMotion(motionp, mJointSaturated);
         ++motions_blended;
         joint_states_blended += posep->getNumJointStates();
+
+        // and then it owns what it writes, for everything still to come
+        if (saturates && posep->getWeight() >= 1.f)
+        {
+            for (S32 stride = 0; stride < NUM_JOINT_SIGNATURE_STRIDES; stride++)
+            {
+                const S32 offset = stride * 8;
+
+                U64 owned;
+                std::memcpy(&owned, &mJointSaturated[offset], sizeof(U64));
+                U64 mine;
+                std::memcpy(&mine, &motionp->mJointSignature[1][offset], sizeof(U64));
+                if ((owned | mine) != owned)
+                {
+                    owned |= mine;
+                    std::memcpy(&mJointSaturated[offset], &owned, sizeof(U64));
+                }
+            }
+        }
     }
     LL_PROFILE_ZONE_NUM(motions_blended);
     LL_PROFILE_ZONE_NUM(joint_states_blended);
@@ -1143,7 +1162,7 @@ bool LLMotionController::activateMotionInstance(LLMotion *motion, F32 time)
     motions.insert(motions.begin(), motion);
 
     motion->activate(time);
-    motion->onUpdate(0.f, mJointSignature[1]);
+    motion->onUpdate(0.f, mJointSaturated);
 
     if (mAnimTime >= motion->mSendStopTimestamp)
     {

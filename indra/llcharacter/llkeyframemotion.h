@@ -265,7 +265,7 @@ protected:
         F32                         mFixupDistanceRMS;
     };
 
-    void applyKeyframes(F32 time);
+    void applyKeyframes(F32 time, const U8* joint_mask);
 
     void applyConstraints(F32 time, U8* joint_mask);
 
