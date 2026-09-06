@@ -33,7 +33,9 @@
 #include "llbvhconsts.h"
 
 #include <cmath>
+#include <limits>
 #include <map>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -307,6 +309,11 @@ namespace
         S32 mPriority = LLJoint::HIGH_PRIORITY;
         std::vector<std::pair<F32, LLQuaternion> > mRotations;
         std::vector<std::pair<F32, LLVector3> > mPositions;
+        // written in place of the real key counts when set, for a joint that
+        // lies about how many keys follow it. A negative count is one of the
+        // things worth writing, so this cannot be a negative sentinel.
+        std::optional<S32> mClaimedRotationKeys;
+        std::optional<S32> mClaimedPositionKeys;
     };
 
     // A constraint as the file carries it: a chain length, the volume it is
@@ -325,6 +332,9 @@ namespace
 
     struct AssetAnimation
     {
+        U16 mVersion = 1;
+        U16 mSubVersion = 0;
+        std::string mEmoteName;
         S32 mBasePriority = LLJoint::MEDIUM_PRIORITY;
         F32 mDuration = 2.f;
         F32 mLoopInPoint = 0.f;
@@ -335,32 +345,33 @@ namespace
         U32 mHandPose = LLHandMotion::HAND_POSE_RELAXED;
         std::vector<AssetJoint> mJoints;
         std::vector<AssetConstraint> mConstraints;
-        // written in place of the real joint count when set, for a header
-        // that lies about how much follows it
-        S32 mClaimedJoints = -1;
+        // written in place of the real counts when set, for a header that
+        // lies about how much follows it
+        std::optional<S32> mClaimedJoints;
+        std::optional<S32> mClaimedConstraints;
     };
 
     void pack_animation(LLDataPackerBinaryBuffer& dp, const AssetAnimation& anim)
     {
-        dp.packU16(1, "version");
-        dp.packU16(0, "sub_version");
+        dp.packU16(anim.mVersion, "version");
+        dp.packU16(anim.mSubVersion, "sub_version");
         dp.packS32(anim.mBasePriority, "base_priority");
         dp.packF32(anim.mDuration, "duration");
-        dp.packString("", "emote_name");
+        dp.packString(anim.mEmoteName, "emote_name");
         dp.packF32(anim.mLoopInPoint, "loop_in_point");
         dp.packF32(anim.mLoopOutPoint, "loop_out_point");
         dp.packS32(anim.mLoop, "loop");
         dp.packF32(anim.mEaseIn, "ease_in_duration");
         dp.packF32(anim.mEaseOut, "ease_out_duration");
         dp.packU32(anim.mHandPose, "hand_pose");
-        dp.packU32(anim.mClaimedJoints >= 0 ? (U32)anim.mClaimedJoints : (U32)anim.mJoints.size(), "num_joints");
+        dp.packU32((U32)anim.mClaimedJoints.value_or((S32)anim.mJoints.size()), "num_joints");
 
         for (const AssetJoint& joint : anim.mJoints)
         {
             dp.packString(joint.mName, "joint_name");
             dp.packS32(joint.mPriority, "joint_priority");
 
-            dp.packS32((S32)joint.mRotations.size(), "num_rot_keys");
+            dp.packS32(joint.mClaimedRotationKeys.value_or((S32)joint.mRotations.size()), "num_rot_keys");
             for (const auto& key : joint.mRotations)
             {
                 dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
@@ -371,7 +382,7 @@ namespace
                 dp.packU16(F32_to_U16(packed.mV[VZ], -1.f, 1.f), "rot_angle_z");
             }
 
-            dp.packS32((S32)joint.mPositions.size(), "num_pos_keys");
+            dp.packS32(joint.mClaimedPositionKeys.value_or((S32)joint.mPositions.size()), "num_pos_keys");
             for (const auto& key : joint.mPositions)
             {
                 dp.packU16(F32_to_U16(key.first, 0.f, anim.mDuration), "time");
@@ -381,7 +392,7 @@ namespace
             }
         }
 
-        dp.packS32((S32)anim.mConstraints.size(), "num_constraints");
+        dp.packS32(anim.mClaimedConstraints.value_or((S32)anim.mConstraints.size()), "num_constraints");
         for (const AssetConstraint& constraint : anim.mConstraints)
         {
             U8 volume_name[16];
@@ -881,5 +892,266 @@ namespace tut
         motion.onUpdate(0.5f, all_claimed);
         ensure("a joint that also moves is sampled whatever is claimed",
                fabsf(dot(pelvis->getRotation(), marker)) < 0.999f);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<11>()
+    {
+        // The header, field by field, with one thing wrong at a time. Every
+        // one of these arrives in an animation another avatar can play at you.
+        std::vector<U8> buffer(8192);
+        const F32 nan = std::numeric_limits<F32>::quiet_NaN();
+        const F32 infinity = std::numeric_limits<F32>::infinity();
+
+        auto refuses = [&](const char* what, const AssetAnimation& anim)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure(what, !load(motion, anim, buffer.data(), (S32)buffer.size()));
+        };
+        auto accepts = [&](const char* what, const AssetAnimation& anim)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure(what, load(motion, anim, buffer.data(), (S32)buffer.size()));
+        };
+
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mDuration = MAX_ANIM_DURATION + 1.f;
+            refuses("a duration past the limit is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mDuration = nan;
+            refuses("a duration that is not a number is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mDuration = infinity;
+            refuses("an infinite duration is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mLoopInPoint = nan;
+            refuses("a loop in point that is not a number is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mLoopOutPoint = infinity;
+            refuses("an infinite loop out point is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mEaseIn = nan;
+            refuses("an ease in that is not a number is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mEaseOut = infinity;
+            refuses("an infinite ease out is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mHandPose = LLHandMotion::NUM_HAND_POSES + 1;
+            refuses("a hand pose off the end of the list is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mBasePriority = LLJoint::USE_MOTION_PRIORITY - 1;
+            refuses("a base priority below the lowest is refused", anim);
+        }
+        {
+            // clamped rather than refused, which is what it has always done
+            AssetAnimation anim = two_joint_animation();
+            anim.mBasePriority = LLJoint::ADDITIVE_PRIORITY;
+            accepts("a base priority at the additive one is taken and clamped", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints.clear();
+            anim.mClaimedJoints = 0;
+            refuses("an animation with no joints is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mClaimedJoints = LL_CHARACTER_MAX_ANIMATED_JOINTS + 1;
+            refuses("more joints than a skeleton has is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mClaimedJoints = 5;
+            refuses("a joint count larger than the body is refused", anim);
+        }
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<12>()
+    {
+        // The joints, the same way.
+        std::vector<U8> buffer(8192);
+
+        auto refuses = [&](const char* what, const AssetAnimation& anim)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure(what, !load(motion, anim, buffer.data(), (S32)buffer.size()));
+        };
+
+        for (const char* special : { "mRoot", "mScreen" })
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mName = special;
+            refuses("an animation naming a special joint is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mPriority = LLJoint::USE_MOTION_PRIORITY - 1;
+            refuses("a joint priority below the lowest is refused", anim);
+        }
+        {
+            // The priority becomes a shift of 0xff by seven less than it, so
+            // anything above seven runs off the end of the word.
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mPriority = LL_CHARACTER_MAX_PRIORITY + 1;
+            refuses("a joint priority above the highest is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mPriority = 0x7fffffff;
+            refuses("and so is one as large as it will go", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mClaimedRotationKeys = -1000;
+            refuses("a negative rotation key count is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mClaimedPositionKeys = -1;
+            refuses("a negative position key count is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[0].mClaimedRotationKeys = 100000;
+            refuses("more rotation keys than the body holds is refused", anim);
+        }
+        {
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[1].mClaimedPositionKeys = 0x7ffffff;
+            refuses("more position keys than the body holds is refused", anim);
+        }
+        {
+            // Not refused: an unknown joint is dropped and the rest is kept,
+            // because content outlives skeletons.
+            AssetAnimation anim = two_joint_animation();
+            anim.mJoints[1].mName = "mNotAJointAtAll";
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure("an unknown joint does not sink the animation",
+                   load(motion, anim, buffer.data(), (S32)buffer.size()));
+            ensure_equals("and its joint motion is still there", motion.getNumJointMotions(), 2);
+        }
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<13>()
+    {
+        // Constraints. The chain length is the one that used to run off the
+        // end of five fixed arrays.
+        std::vector<U8> buffer(8192);
+
+        auto refuses = [&](const char* what, const AssetAnimation& anim)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure(what, !load(motion, anim, buffer.data(), (S32)buffer.size()));
+        };
+        auto accepts = [&](const char* what, const AssetAnimation& anim)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure(what, load(motion, anim, buffer.data(), (S32)buffer.size()));
+        };
+
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mConstraints[0].mConstraintType = NUM_CONSTRAINT_TYPES;
+            refuses("a constraint type off the end of the list is refused", anim);
+        }
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mConstraints[0].mConstraintType = 200;
+            refuses("and so is one nowhere near the list", anim);
+        }
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mConstraints[0].mSourceVolume = "mNotAVolume";
+            refuses("a constraint anchored to nothing is refused", anim);
+        }
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mClaimedConstraints = 500;
+            accepts("too many constraints are ignored rather than refused", anim);
+        }
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mClaimedConstraints = -1000;
+            accepts("and so is a negative count", anim);
+        }
+        {
+            AssetAnimation anim = constrained_animation(1);
+            anim.mClaimedConstraints = 3;
+            refuses("a constraint count larger than the body is refused", anim);
+        }
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<14>()
+    {
+        // Cut anywhere and it is refused rather than half read. Every prefix
+        // of a well formed animation, so the cut lands in each field in turn,
+        // including inside every key of every curve.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        LLDataPackerBinaryBuffer writer(buffer.data(), (S32)buffer.size());
+        pack_animation(writer, anim);
+        const S32 whole = writer.getCurrentSize();
+        ensure("the animation is worth cutting up", whole > 40);
+
+        for (S32 length = 0; length < whole; ++length)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            motion.setCharacter(&mCharacter);
+            LLDataPackerBinaryBuffer reader(buffer.data(), length);
+            ensure("an animation cut short is refused", !motion.deserialize(reader, motion.getID()));
+        }
+
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        motion.setCharacter(&mCharacter);
+        LLDataPackerBinaryBuffer reader(buffer.data(), whole);
+        ensure("and the whole of it is not", motion.deserialize(reader, motion.getID()));
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<15>()
+    {
+        // The same for a constrained animation, whose tail is the part with
+        // the volume names and the four ease times in it.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = constrained_animation(2);
+
+        LLDataPackerBinaryBuffer writer(buffer.data(), (S32)buffer.size());
+        pack_animation(writer, anim);
+        const S32 whole = writer.getCurrentSize();
+
+        for (S32 length = 0; length < whole; ++length)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            motion.setCharacter(&mCharacter);
+            LLDataPackerBinaryBuffer reader(buffer.data(), length);
+            ensure("a constrained animation cut short is refused",
+                   !motion.deserialize(reader, motion.getID()));
+        }
+
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        motion.setCharacter(&mCharacter);
+        LLDataPackerBinaryBuffer reader(buffer.data(), whole);
+        ensure("and the whole of it is not", motion.deserialize(reader, motion.getID()));
     }
 }

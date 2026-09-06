@@ -296,4 +296,62 @@ namespace tut
                    !step_accepts(cut, without_last_field(bytes)));
         }
     }
+
+    template<> template<>
+    void llmultigesture_object::test<6>()
+    {
+        // The header, one thing wrong at a time. Each of these is a line in
+        // the file, and the file comes from whoever sent the gesture.
+        auto read = [](const std::string& text)
+        {
+            std::vector<char> bytes(text.begin(), text.end());
+            bytes.push_back('\0');
+            LLMultiGesture gesture;
+            LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
+            return gesture.deserialize(dp);
+        };
+
+        ensure("a version from another format is refused",
+               !read("1\n71\n0\n/wave\n\n0\n"));
+        ensure("and so is one from no format at all",
+               !read("999\n71\n0\n/wave\n\n0\n"));
+        ensure("a negative step count is refused",
+               !read("2\n71\n0\n/wave\n\n-5\n"));
+        ensure("a step type off the end of the list is refused",
+               !read("2\n71\n0\n/wave\n\n1\n99\n"));
+        ensure("a negative step type is refused",
+               !read("2\n71\n0\n/wave\n\n1\n-1\n"));
+        ensure("nothing at all is refused", !read(""));
+        ensure("and so is a lone newline", !read("\n"));
+
+        // A gesture with no steps in it is a gesture, and loads.
+        ensure("no steps is not the same as broken",
+               read("2\n71\n0\n/wave\n\n0\n"));
+    }
+
+    template<> template<>
+    void llmultigesture_object::test<7>()
+    {
+        // A count smaller than the body leaves the rest unread, which is not
+        // an error: the reader takes what it was told to take.
+        std::unique_ptr<LLMultiGesture> written = sample_gesture();
+        const std::vector<char> bytes = serialize(*written);
+
+        std::vector<char> fewer = bytes;
+        const std::string text(bytes.data());
+
+        // the step count is the sixth line
+        size_t at = 0;
+        for (S32 line = 0; line < 5; ++line)
+        {
+            at = text.find('\n', at) + 1;
+        }
+        ensure("the step count line was found", text[at] == '4');
+        fewer[at] = '2';
+
+        LLMultiGesture read;
+        LLDataPackerAsciiBuffer dp(fewer.data(), (S32)fewer.size());
+        ensure("a gesture that claims fewer steps than it holds is taken", read.deserialize(dp));
+        ensure_equals("with the number it claimed", read.mSteps.size(), 2u);
+    }
 }
