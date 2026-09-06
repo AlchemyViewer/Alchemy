@@ -140,12 +140,13 @@ namespace
 
     LLQuaternion2 blend_keys(F32 u, const LLQuaternion2& before, const LLQuaternion2& after)
     {
-        // A normalized lerp for every pair. The free nlerp() hands the pairs
-        // more than a half turn apart to slerp, which costs an arc cosine and
-        // three sines, and this is sampled once per rotation channel per joint
-        // per playing motion per frame.
+        // Along the arc, not across the chord. A lerp arrives early in the
+        // middle of the move, by an amount that grows with how far apart the
+        // two keys are -- and the optimizer that wrote this animation deleted
+        // every key its own interpolation could do without, so the keys left
+        // are the ones furthest apart.
         LLQuaternion2 blended;
-        blended.setLerp(before, after, u);
+        blended.setSlerp(before, after, u);
         return blended;
     }
 

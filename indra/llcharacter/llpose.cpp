@@ -329,7 +329,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
 
                 // add in rotation for this jointstate modulated by weight
                 LLQuaternion2 partial;
-                partial.setLerp(added_rot, jsp->getRotationQ(), new_weight_sum - sum_weights[ROT_WEIGHT]);
+                partial.setSlerp(added_rot, jsp->getRotationQ(), new_weight_sum - sum_weights[ROT_WEIGHT]);
                 LLQuaternion2 composed;
                 composed.setMul(partial, added_rot);
                 added_rot = composed;
@@ -388,7 +388,7 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
                     F32 new_weight_sum = llmin(1.f, current_weight + sum_weights[ROT_WEIGHT]);
 
                     // blend rotations from both
-                    blended_rot.setLerp(state_rot, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
+                    blended_rot.setSlerp(state_rot, blended_rot, sum_weights[ROT_WEIGHT] / new_weight_sum);
                     sum_weights[ROT_WEIGHT] = new_weight_sum;
                 }
                 else

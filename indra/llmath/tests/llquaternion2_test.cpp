@@ -32,6 +32,7 @@
 #include "../llquaternion2.h"
 #include "../v3math.h"
 
+#include <random>
 #include <string>
 #include <vector>
 
@@ -343,6 +344,126 @@ namespace tut
 
             LLQuaternion ident;
             ensure_same_rotation("q times its conjugate is identity", product, ident);
+        }
+    }
+
+    template<> template<>
+    void llquaternion2_object::test<11>()
+    {
+        // Against the free slerp, which is the second implementation this is
+        // compared with rather than the same one written twice.
+        auto check = [](const char* what, const LLQuaternion& a, const LLQuaternion& b, F32 u)
+        {
+            LLQuaternion2 blended;
+            blended.setSlerp(LLQuaternion2(a), LLQuaternion2(b), u);
+            LLQuaternion got;
+            blended.store(got);
+
+            LLQuaternion expected = slerp(u, a, b);
+            // q and -q are the same rotation.
+            tut::ensure_approximately_equals_range(what, fabsf(dot(got, expected)), 1.f, 1e-4f);
+        };
+
+        // A half turn apart, which is where a lerp is furthest out and where
+        // the free nlerp used to hand over.
+        const LLQuaternion at_zero(0.f, LLVector3::z_axis);
+        const LLQuaternion half_turn(F_PI * 0.99f, LLVector3::z_axis);
+        for (F32 u = 0.f; u <= 1.f; u += 0.125f)
+        {
+            check("a half turn follows the arc", at_zero, half_turn, u);
+        }
+
+        // A quarter turn, comfortably inside the range a lerp used to take.
+        const LLQuaternion quarter(F_PI_BY_TWO, LLVector3::y_axis);
+        for (F32 u = 0.f; u <= 1.f; u += 0.125f)
+        {
+            check("a quarter turn follows the arc", at_zero, quarter, u);
+        }
+
+        // About an axis that is not a basis vector.
+        LLVector3 axis(1.f, 2.f, -3.f);
+        axis.normalize();
+        const LLQuaternion oblique(2.f, axis);
+        for (F32 u = 0.f; u <= 1.f; u += 0.125f)
+        {
+            check("an oblique axis follows the arc", at_zero, oblique, u);
+        }
+    }
+
+    template<> template<>
+    void llquaternion2_object::test<12>()
+    {
+        // The ends are the ends, whatever the pair.
+        const LLQuaternion a(0.3f, LLVector3::x_axis);
+        const LLQuaternion b(2.9f, LLVector3::y_axis);
+
+        LLQuaternion2 at_start;
+        at_start.setSlerp(LLQuaternion2(a), LLQuaternion2(b), 0.f);
+        LLQuaternion start;
+        at_start.store(start);
+        ensure_approximately_equals_range("nought is the first", fabsf(dot(start, a)), 1.f, 1e-5f);
+
+        LLQuaternion2 at_end;
+        at_end.setSlerp(LLQuaternion2(a), LLQuaternion2(b), 1.f);
+        LLQuaternion end;
+        at_end.store(end);
+        ensure_approximately_equals_range("one is the second", fabsf(dot(end, b)), 1.f, 1e-5f);
+
+        // Two rotations that are the same rotation stay put rather than
+        // dividing by the sine of nothing.
+        LLQuaternion2 same;
+        same.setSlerp(LLQuaternion2(a), LLQuaternion2(a), 0.5f);
+        LLQuaternion held;
+        same.store(held);
+        ensure_approximately_equals_range("the same pair holds", fabsf(dot(held, a)), 1.f, 1e-5f);
+        ensure("and stays a rotation", same.isOkRotation());
+
+        // Handed the far side of the same rotation, it comes back the short
+        // way rather than through the rotations neither end asked for.
+        LLQuaternion negated = a;
+        for (S32 i = 0; i < 4; ++i)
+        {
+            negated.mQ[i] = -negated.mQ[i];
+        }
+        LLQuaternion2 shortest;
+        shortest.setSlerp(LLQuaternion2(a), LLQuaternion2(negated), 0.5f);
+        LLQuaternion midway;
+        shortest.store(midway);
+        ensure_approximately_equals_range("a rotation and its negation are one place",
+                                          fabsf(dot(midway, a)), 1.f, 1e-4f);
+    }
+
+    template<> template<>
+    void llquaternion2_object::test<13>()
+    {
+        // Every result is a rotation, over a spread of pairs and positions.
+        std::mt19937 rng(20260906u);
+        std::uniform_real_distribution<F32> spread(-4.f, 4.f);
+
+        for (S32 trial = 0; trial < 200; ++trial)
+        {
+            LLVector3 axis_a(spread(rng), spread(rng), spread(rng));
+            LLVector3 axis_b(spread(rng), spread(rng), spread(rng));
+            if (axis_a.magVecSquared() < 1e-6f || axis_b.magVecSquared() < 1e-6f)
+            {
+                continue;
+            }
+            axis_a.normalize();
+            axis_b.normalize();
+
+            const LLQuaternion a(spread(rng), axis_a);
+            const LLQuaternion b(spread(rng), axis_b);
+            const F32 u = (F32)trial / 199.f;
+
+            LLQuaternion2 blended;
+            blended.setSlerp(LLQuaternion2(a), LLQuaternion2(b), u);
+            ensure("a blend of two rotations is a rotation", blended.isOkRotation());
+
+            LLQuaternion got;
+            blended.store(got);
+            LLQuaternion expected = slerp(u, a, b);
+            ensure_approximately_equals_range("and it is the one slerp gives",
+                                              fabsf(dot(got, expected)), 1.f, 1e-3f);
         }
     }
 }

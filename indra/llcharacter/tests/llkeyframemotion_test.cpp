@@ -106,26 +106,42 @@ namespace
         return lerp(before, after, u);
     }
 
-    // The curve interpolates rotations with a normalized lerp for every pair,
-    // including the ones more than a half turn apart, where the free nlerp()
-    // hands over to slerp. Written out here rather than called, so that what
-    // the curve is compared against is a second implementation and not the
-    // same one.
+    // The curve interpolates rotations along the arc between the two keys,
+    // over the shorter way round, dropping to the chord where the two are
+    // close enough that nothing can tell them apart. Written out here rather
+    // than called, so that what the curve is compared against is a second
+    // implementation and not the same one seen twice.
     LLQuaternion blend_reference(F32 u, const LLQuaternion& before, const LLQuaternion& after)
     {
+        F32 cos_half_angle = dot(before, after);
+
         LLQuaternion near_after = after;
-        if (dot(before, after) < 0.f)
+        if (cos_half_angle < 0.f)
         {
             for (S32 i = 0; i < 4; ++i)
             {
                 near_after.mQ[i] = -near_after.mQ[i];
             }
+            cos_half_angle = -cos_half_angle;
+        }
+
+        // The same place the curve gives up on the arc.
+        constexpr F32 SLERP_WORTH_IT = 0.9f;
+
+        F32 from = 1.f - u;
+        F32 to = u;
+        if (cos_half_angle < SLERP_WORTH_IT)
+        {
+            const F32 half_angle = acosf(llmin(cos_half_angle, 1.f));
+            const F32 sin_half_angle = sinf(half_angle);
+            from = sinf((1.f - u) * half_angle) / sin_half_angle;
+            to = sinf(u * half_angle) / sin_half_angle;
         }
 
         LLQuaternion result;
         for (S32 i = 0; i < 4; ++i)
         {
-            result.mQ[i] = before.mQ[i] + (near_after.mQ[i] - before.mQ[i]) * u;
+            result.mQ[i] = before.mQ[i] * from + near_after.mQ[i] * to;
         }
         result.normalize();
         return result;

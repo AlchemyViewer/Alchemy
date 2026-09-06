@@ -134,6 +134,47 @@ inline void LLQuaternion2::setLerp(const LLQuaternion2& a, const LLQuaternion2& 
     mQ.normalize4();
 }
 
+// Set this to the interpolation from a to b over the shorter way round, along
+// the arc rather than the chord where the two are far enough apart to tell.
+inline void LLQuaternion2::setSlerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u)
+{
+    // A lerp cuts the chord and an slerp follows the arc, so a lerp arrives
+    // early in the middle of the move and late at the ends. How early depends
+    // on how far apart the two are: a hundredth of a degree over a twenty
+    // degree turn, a fifth of a degree over fifty, and eight degrees over a
+    // half turn. Past this the difference is worth the trigonometry; short of
+    // it nothing can see it, and most pairs are short of it.
+    constexpr F32 SLERP_WORTH_IT = 0.9f;
+
+    const LLQuad sign_bit = _mm_castsi128_ps(_mm_set1_epi32((int)0x80000000u));
+
+    LLVector4a cos_half_angle;
+    cos_half_angle.setAllDot4(a.mQ, b.mQ);
+    const LLQuad flip = _mm_and_ps(_mm_cmplt_ps((LLQuad)cos_half_angle, _mm_setzero_ps()), sign_bit);
+
+    LLVector4a near_b;
+    near_b = _mm_xor_ps((LLQuad)b.mQ, flip);
+
+    const F32 cos_t = fabsf(cos_half_angle.getScalarAt<0>().getF32());
+    if (cos_t >= SLERP_WORTH_IT)
+    {
+        mQ.setLerp(a.mQ, near_b, u);
+        mQ.normalize4();
+        return;
+    }
+
+    const F32 half_angle = acosf(llmin(cos_t, 1.f));
+    const F32 sin_half_angle = sinf(half_angle);
+    const F32 from = sinf((1.f - u) * half_angle) / sin_half_angle;
+    const F32 to = sinf(u * half_angle) / sin_half_angle;
+
+    LLVector4a scaled_a = a.mQ;
+    scaled_a.mul(from);
+    near_b.mul(to);
+    mQ.setAdd(scaled_a, near_b);
+    mQ.normalize4();
+}
+
 // Renormalizes the quaternion. Assumes it has nonzero length.
 inline void LLQuaternion2::normalize()
 {

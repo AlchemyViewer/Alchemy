@@ -102,6 +102,11 @@ public:
     // turn apart, where that one hands over to slerp and its three sines.
     inline void setLerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u);
 
+    // The same, but following the arc rather than the chord once the two are
+    // far enough apart for the difference to show. Interpolating an animation
+    // wants this; the two agree, and this costs the same, for close pairs.
+    inline void setSlerp(const LLQuaternion2& a, const LLQuaternion2& b, F32 u);
+
     // Renormalizes the quaternion. Assumes it has nonzero length.
     inline void normalize();
 
