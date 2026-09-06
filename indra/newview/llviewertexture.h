@@ -191,6 +191,7 @@ protected:
 
     ll_face_list_t    mFaceList[LLRender::NUM_TEXTURE_CHANNELS]; //reverse pointer pointing to the faces using this image as texture
     U32               mNumFaces[LLRender::NUM_TEXTURE_CHANNELS];
+    U32               mFaceWalkCursor = 0; // where the update window's next visit starts in mFaceList, counted across channels
     LLFrameTimer      mLastFaceListUpdateTimer ;
 
     ll_volume_list_t  mVolumeList[LLRender::NUM_VOLUME_TEXTURE_CHANNELS];

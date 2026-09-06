@@ -776,6 +776,7 @@ void LLViewerTextureList::updateImages(F32 max_time)
     LL_PROFILE_PLOT("TextureList: faces walked", (int64_t)sFaceWalkCount);
     LL_PROFILE_PLOT("TextureList: faces off screen", (int64_t)sFaceOffScreenCount);
     LL_PROFILE_PLOT("TextureList: pixel area calcs", (int64_t)sPixelAreaCalcCount);
+    LL_PROFILE_PLOT("TextureList: discard bias", (double)LLViewerTexture::sDesiredDiscardBias);
     sFindCount = sFindMissCount = sCreateCount = sDeleteCount = 0;
     sVisitCount = sVisitBoostedCount = sVisitFacelessCount = 0;
     sFaceWalkCount = sFaceOffScreenCount = sPixelAreaCalcCount = 0;
@@ -886,8 +887,20 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         F32 max_vsize = 0.f;
         bool on_screen = false;
 
+        constexpr U32 max_faces_to_check = 1024;
+        // Faces one visit walks while the stat it feeds is a running max: a
+        // texture with more faces than this converges on its largest face
+        // over a few visits. Above BIAS_TRS_OUT_OF_SCREEN the max is reset
+        // every visit, and the whole list is walked so the reset sees all of it.
+        constexpr U32 faces_per_visit = 32;
+
+        U32 channel_faces[LLRender::NUM_TEXTURE_CHANNELS];
         U32 face_count = 0;
-        U32 max_faces_to_check = 1024;
+        for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        {
+            channel_faces[i] = imagep->getNumFaces(i);
+            face_count += channel_faces[i];
+        }
 
         // get adjusted bias based on image resolution
         LLImageGL* img = imagep->getGLTexture();
@@ -897,14 +910,34 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         // convert bias into a vsize scaler
         bias = (F32) llroundf(powf(4, bias - 1.f));
 
-        for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
+        if (face_count > 0 && face_count <= max_faces_to_check)
         {
-            face_count += imagep->getNumFaces(i);
-            S32 faces_to_check = (face_count > max_faces_to_check) ? 0 : imagep->getNumFaces(i);
-
-            for (S32 fi = 0; fi < faces_to_check; ++fi)
+            U32 to_walk = face_count;
+            U32 position = 0;
+            if (face_count > faces_per_visit && LLViewerTexture::sDesiredDiscardBias <= BIAS_TRS_OUT_OF_SCREEN)
             {
-                LLFace* face = (*(imagep->getFaceList(i)))[fi];
+                to_walk = faces_per_visit;
+                position = imagep->mFaceWalkCursor % face_count;
+                imagep->mFaceWalkCursor = position + to_walk;
+            }
+
+            // position counts across the channels' lists laid end to end
+            U32 channel = 0;
+            while (position >= channel_faces[channel])
+            {
+                position -= channel_faces[channel];
+                ++channel;
+            }
+
+            for (U32 walked = 0; walked < to_walk; ++walked)
+            {
+                while (position >= channel_faces[channel])
+                {
+                    position = 0;
+                    channel = (channel + 1) % LLRender::NUM_TEXTURE_CHANNELS;
+                }
+                LLFace* face = (*(imagep->getFaceList(channel)))[position];
+                ++position;
 
                 if (face && face->getViewerObject())
                 {
@@ -967,12 +1000,6 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                         break;
                     }
                 }
-            }
-
-            if (max_vsize >= LLViewerFetchedTexture::sMaxVirtualSize
-                && (on_screen || LLViewerTexture::sDesiredDiscardBias <= BIAS_TRS_ON_SCREEN))
-            {
-                break;
             }
         }
 
