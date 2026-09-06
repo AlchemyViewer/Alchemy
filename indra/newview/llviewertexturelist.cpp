@@ -69,6 +69,12 @@ void (*LLViewerTextureList::sUUIDCallback)(void **, const LLUUID&) = NULL;
 
 S32 LLViewerTextureList::sNumImages = 0;
 
+// Per-frame traffic on the list, sampled and reset by updateImages.
+static U32 sFindCount = 0;
+static U32 sFindMissCount = 0;
+static U32 sCreateCount = 0;
+static U32 sDeleteCount = 0;
+
 LLViewerTextureList gTextureList;
 
 extern LLGLSLShader gCopyProgram;
@@ -614,6 +620,7 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
                                                    LLHost request_from_host)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    ++sCreateCount;
 
     LLPointer<LLViewerFetchedTexture> imagep ;
     switch(texture_type)
@@ -679,10 +686,13 @@ void LLViewerTextureList::findTexturesByID(const LLUUID &image_id, std::vector<L
 
 LLViewerFetchedTexture *LLViewerTextureList::findImage(const LLTextureKey &search_key)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    ++sFindCount;
     uuid_map_t::iterator iter = mUUIDMap.find(search_key);
     if (iter == mUUIDMap.end())
+    {
+        ++sFindMissCount;
         return NULL;
+    }
     return iter->second;
 }
 
@@ -789,6 +799,7 @@ void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     if( image)
     {
+        ++sDeleteCount;
         if (image->hasCallbacks())
         {
             mCallbackList.erase(image);
@@ -806,6 +817,15 @@ void LLViewerTextureList::deleteImage(LLViewerFetchedTexture *image)
 void LLViewerTextureList::updateImages(F32 max_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    LL_PROFILE_PLOT("TextureList: textures", (int64_t)mUUIDMap.size());
+    LL_PROFILE_PLOT("TextureList: finds", (int64_t)sFindCount);
+    LL_PROFILE_PLOT("TextureList: find misses", (int64_t)sFindMissCount);
+    LL_PROFILE_PLOT("TextureList: creates", (int64_t)sCreateCount);
+    LL_PROFILE_PLOT("TextureList: deletes", (int64_t)sDeleteCount);
+    LL_PROFILE_PLOT("TextureList: callback textures", (int64_t)mCallbackList.size());
+    LL_PROFILE_PLOT("TextureList: fast cache pending", (int64_t)mFastCacheList.size());
+    sFindCount = sFindMissCount = sCreateCount = sDeleteCount = 0;
+
     static bool cleared = false;
     if(gTeleportDisplay)
     {
@@ -895,6 +915,7 @@ extern bool gCubeSnapshot;
 
 void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imagep, bool flush_images)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(!gCubeSnapshot);
 
     constexpr F32 BIAS_TRS_OUT_OF_SCREEN = 1.5f;
@@ -919,7 +940,6 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         // convert bias into a vsize scaler
         bias = (F32) llroundf(powf(4, bias - 1.f));
 
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
         for (U32 i = 0; i < LLRender::NUM_TEXTURE_CHANNELS; ++i)
         {
             face_count += imagep->getNumFaces(i);
@@ -1271,6 +1291,7 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
 
     { // copy entries out of UUID map to avoid iterator invalidation from deletion inside updateImageDecodeProiroty or updateFetch below
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - copy");
+        LL_PROFILE_ZONE_NUM(update_count);
 
         // copy entries out of UUID map for updating
         entries.reserve(update_count);
@@ -1292,20 +1313,28 @@ F32 LLViewerTextureList::updateImagesFetchTextures(F32 max_time)
 
     LLTimer timer;
 
-    for (auto& imagep : entries)
     {
-        mLastUpdateKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
-
-        if (imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vtluift - update");
+        U32 updated = 0;
+        for (auto& imagep : entries)
         {
-            updateImageDecodePriority(imagep);
-            imagep->updateFetch();
-        }
+            mLastUpdateKey = LLTextureKey(imagep->getID(), (ETexListType)imagep->getTextureListType());
 
-        if (timer.getElapsedTimeF32() > max_time)
-        {
-            break;
+            if (imagep->getNumRefs() > 1) // make sure this image hasn't been deleted before attempting to update (may happen as a side effect of some other image updating)
+            {
+                updateImageDecodePriority(imagep);
+                imagep->updateFetch();
+            }
+            ++updated;
+
+            if (timer.getElapsedTimeF32() > max_time)
+            {
+                break;
+            }
         }
+        LL_PROFILE_ZONE_NUM(updated);
+        LL_PROFILE_PLOT("TextureList: window", (int64_t)entries.size());
+        LL_PROFILE_PLOT("TextureList: updated", (int64_t)updated);
     }
 
     return timer.getElapsedTimeF32();
