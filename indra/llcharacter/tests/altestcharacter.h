@@ -43,6 +43,13 @@ public:
     static constexpr U32 NUM_JOINTS = 5;
     static constexpr const char* JOINT_NAMES[NUM_JOINTS] = { "mPelvis", "mTorso", "mChest", "mNeck", "mHead" };
 
+    // A collision volume hanging off the last joint, which is what a keyframe
+    // constraint anchors to. Its chain of parents is what the constraint walks
+    // to find the joints it solves, so it hangs off the end of the skeleton
+    // to leave as many of them above it as possible.
+    static constexpr const char* COLLISION_VOLUME_NAME = "mTestVolume";
+    static constexpr S32 COLLISION_VOLUME_ID = 0;
+
     ALTestCharacter()
     {
         mRoot.setup("mRoot", nullptr);
@@ -53,6 +60,24 @@ public:
             mJoints[i].setJointNum(i);
             parent = &mJoints[i];
         }
+        mCollisionVolume.setup(COLLISION_VOLUME_NAME, &mJoints[NUM_JOINTS - 1]);
+        mCollisionVolume.setJointNum(NUM_JOINTS);
+    }
+
+    S32 getCollisionVolumeID(std::string& name) override
+    {
+        return name == COLLISION_VOLUME_NAME ? COLLISION_VOLUME_ID : -1;
+    }
+
+    LLJoint* findCollisionVolume(S32 volume_id) override
+    {
+        return volume_id == COLLISION_VOLUME_ID ? &mCollisionVolume : nullptr;
+    }
+
+    LLVector3 getVolumePos(S32 volume_id, LLVector3& volume_offset) override
+    {
+        LLJoint* volume = findCollisionVolume(volume_id);
+        return volume ? volume->getWorldPosition() + volume_offset : LLVector3::zero;
     }
 
     const char* getAnimationPrefix() override { return "test"; }
@@ -81,6 +106,7 @@ public:
 
     LLJoint mRoot;
     std::array<LLJoint, NUM_JOINTS> mJoints;
+    LLJoint mCollisionVolume;
 
     LLVector3 mPosition;
     LLQuaternion mRotation;

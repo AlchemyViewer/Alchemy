@@ -149,6 +149,39 @@ namespace
         return blended;
     }
 
+    // The constraint solver writes the chain's joints with the motion's own
+    // rotations, so that it has a kinematic pose to measure against, and puts
+    // them back when it is done. Nearly every way out of that function is an
+    // early return -- a joint that is not there, a higher priority motion
+    // already holding the chain, a solution that is singular -- and each of
+    // them used to leave the joints written and the avatar wearing a pose no
+    // motion had asked for.
+    class ScopedChainRotations
+    {
+    public:
+        ~ScopedChainRotations()
+        {
+            for (S32 i = 0; i < mCount; ++i)
+            {
+                mJoints[i]->setRotation(mRotations[i]);
+            }
+        }
+
+        // Remembers what the joint is holding, before the caller writes it.
+        void hold(LLJoint* joint)
+        {
+            llassert(mCount < MAX_CHAIN_LENGTH);
+            mJoints[mCount] = joint;
+            mRotations[mCount] = joint->getRotation();
+            ++mCount;
+        }
+
+    private:
+        LLJoint*     mJoints[MAX_CHAIN_LENGTH] = {};
+        LLQuaternion mRotations[MAX_CHAIN_LENGTH];
+        S32          mCount = 0;
+    };
+
     // What a curve with no keys in it answers with. The vector types default
     // to whatever was in the memory, so this cannot be T().
     template <typename T> T empty_curve_value();
@@ -814,7 +847,7 @@ void LLKeyframeMotion::applyConstraint(JointConstraint* constraint, F32 time, U8
     LLVector3       positions[MAX_CHAIN_LENGTH];
     const F32*      joint_lengths = constraint->mJointLengths;
     LLVector3       velocities[MAX_CHAIN_LENGTH - 1];
-    LLQuaternion    old_rots[MAX_CHAIN_LENGTH];
+    ScopedChainRotations chain_rotations;
     S32             joint_num;
 
     if (time < shared_data->mEaseInStartTime)
@@ -863,7 +896,7 @@ void LLKeyframeMotion::applyConstraint(JointConstraint* constraint, F32 time, U8
             // skip constraint
             return;
         }
-        old_rots[joint_num] = cur_joint->getRotation();
+        chain_rotations.hold(cur_joint);
         cur_joint->setRotation(getJointState(shared_data->mJointStateIndices[joint_num])->getRotation());
     }
 
@@ -1085,17 +1118,8 @@ void LLKeyframeMotion::applyConstraint(JointConstraint* constraint, F32 time, U8
         constraint->mFixupDistanceRMS *= 1.f / (constraint->mTotalLength * (F32)(shared_data->mChainLength - 1));
         constraint->mFixupDistanceRMS = (F32) sqrt(constraint->mFixupDistanceRMS);
 
-        //reset old joint rots
-        for (joint_num = 0; joint_num <= shared_data->mChainLength; joint_num++)
-        {
-            LLJoint* cur_joint = getJoint(shared_data->mJointStateIndices[joint_num]);
-            if (!cur_joint)
-            {
-                return;
-            }
-
-            cur_joint->setRotation(old_rots[joint_num]);
-        }
+        // the chain's own rotations go back on the way out, whichever way out
+        // this takes
     }
     // simple positional constraint (pelvis only)
     else if (getJointState(shared_data->mJointStateIndices[0])->getUsage() & LLJointState::POS)
@@ -1735,6 +1759,21 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
             if((U32)constraintp->mChainLength > joint_motion_list->getNumJointMotions())
             {
                 LL_WARNS() << "invalid constraint chain length"
+                           << " for animation " << asset() << LL_ENDL;
+                return false;
+            }
+
+            // The solver holds a chain in fixed arrays of MAX_CHAIN_LENGTH,
+            // and indexes them from zero to the chain length inclusive -- the
+            // chain has one more joint in it than it has links. A longer one
+            // read straight past the end of five of those arrays, three of
+            // them on the stack and three inside the constraint, and the
+            // length arrives in a byte from the asset. Real content asks for
+            // two.
+            if (constraintp->mChainLength >= MAX_CHAIN_LENGTH)
+            {
+                LL_WARNS() << "constraint chain length " << constraintp->mChainLength
+                           << " is longer than " << (MAX_CHAIN_LENGTH - 1)
                            << " for animation " << asset() << LL_ENDL;
                 return false;
             }

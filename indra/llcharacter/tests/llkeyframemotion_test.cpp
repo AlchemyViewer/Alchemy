@@ -30,6 +30,7 @@
 #include "llquantize.h"
 
 #include "altestcharacter.h"
+#include "llbvhconsts.h"
 
 #include <cmath>
 #include <map>
@@ -308,6 +309,20 @@ namespace
         std::vector<std::pair<F32, LLVector3> > mPositions;
     };
 
+    // A constraint as the file carries it: a chain length, the volume it is
+    // anchored to, and the four ease times.
+    struct AssetConstraint
+    {
+        S32 mChainLength = 1;
+        U8 mConstraintType = CONSTRAINT_TYPE_POINT;
+        std::string mSourceVolume;
+        std::string mTargetVolume = "GROUND";
+        F32 mEaseInStart = 0.f;
+        F32 mEaseInStop = 0.f;
+        F32 mEaseOutStart = 100.f;
+        F32 mEaseOutStop = 100.f;
+    };
+
     struct AssetAnimation
     {
         S32 mBasePriority = LLJoint::MEDIUM_PRIORITY;
@@ -319,7 +334,7 @@ namespace
         F32 mEaseOut = 0.4f;
         U32 mHandPose = LLHandMotion::HAND_POSE_RELAXED;
         std::vector<AssetJoint> mJoints;
-        S32 mNumConstraints = 0;
+        std::vector<AssetConstraint> mConstraints;
         // written in place of the real joint count when set, for a header
         // that lies about how much follows it
         S32 mClaimedJoints = -1;
@@ -366,7 +381,58 @@ namespace
             }
         }
 
-        dp.packS32(anim.mNumConstraints, "num_constraints");
+        dp.packS32((S32)anim.mConstraints.size(), "num_constraints");
+        for (const AssetConstraint& constraint : anim.mConstraints)
+        {
+            U8 volume_name[16];
+
+            dp.packU8((U8)constraint.mChainLength, "chain_length");
+            dp.packU8(constraint.mConstraintType, "constraint_type");
+
+            memset(volume_name, 0, sizeof(volume_name));
+            memcpy(volume_name, constraint.mSourceVolume.c_str(),
+                   llmin(constraint.mSourceVolume.size(), sizeof(volume_name) - 1));
+            dp.packBinaryDataFixed(volume_name, 16, "source_volume");
+            dp.packVector3(LLVector3(0.f, 0.f, 0.f), "source_offset");
+
+            memset(volume_name, 0, sizeof(volume_name));
+            memcpy(volume_name, constraint.mTargetVolume.c_str(),
+                   llmin(constraint.mTargetVolume.size(), sizeof(volume_name) - 1));
+            dp.packBinaryDataFixed(volume_name, 16, "target_volume");
+            dp.packVector3(LLVector3(0.f, 0.f, 0.f), "target_offset");
+            dp.packVector3(LLVector3(0.f, 0.f, 0.f), "target_dir");
+
+            dp.packF32(constraint.mEaseInStart, "ease_in_start");
+            dp.packF32(constraint.mEaseInStop, "ease_in_stop");
+            dp.packF32(constraint.mEaseOutStart, "ease_out_start");
+            dp.packF32(constraint.mEaseOutStop, "ease_out_stop");
+        }
+    }
+
+    // The three joints a constraint anchored to the test character's collision
+    // volume walks up through, in the order the chain wants them.
+    AssetAnimation constrained_animation(S32 chain_length)
+    {
+        AssetAnimation anim;
+        // Every joint above the collision volume, so that a chain as long as
+        // the arrays would otherwise resolve and the length check is what
+        // refuses it.
+        for (const char* name : { "mHead", "mNeck", "mChest", "mTorso", "mPelvis" })
+        {
+            AssetJoint joint;
+            joint.mName = name;
+            joint.mPriority = LLJoint::MEDIUM_PRIORITY;
+            joint.mRotations.push_back({ 0.f, LLQuaternion(0.3f, LLVector3::z_axis) });
+            joint.mRotations.push_back({ 2.f, LLQuaternion(0.6f, LLVector3::y_axis) });
+            anim.mJoints.push_back(joint);
+        }
+
+        AssetConstraint constraint;
+        constraint.mChainLength = chain_length;
+        constraint.mSourceVolume = ALTestCharacter::COLLISION_VOLUME_NAME;
+        anim.mConstraints.push_back(constraint);
+
+        return anim;
     }
 
     AssetAnimation two_joint_animation()
@@ -636,6 +702,74 @@ namespace tut
         ensure_approximately_equals_range("the torso's one key survived the parse",
                                           fabsf(dot(torso_sample->getRotation(), anim.mJoints[1].mRotations[0].second)),
                                           1.f, 1e-3f);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<8>()
+    {
+        // The solver holds a constraint chain in arrays of MAX_CHAIN_LENGTH
+        // and indexes them from zero to the chain length inclusive, so a chain
+        // as long as those arrays reads and writes past the end of five of
+        // them, three on the stack. The length arrives in a byte from the
+        // asset, and was only checked against the number of joints.
+        std::vector<U8> buffer(4096);
+
+        for (S32 chain_length = 0; chain_length < MAX_CHAIN_LENGTH; ++chain_length)
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure("a chain the arrays can hold is accepted",
+                   load(motion, constrained_animation(chain_length), buffer.data(), (S32)buffer.size()));
+        }
+
+        {
+            // One longer, which every joint above the volume can still supply,
+            // so the length is the only thing left to refuse it.
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure("a chain as long as the arrays is refused",
+                   !load(motion, constrained_animation(MAX_CHAIN_LENGTH), buffer.data(), (S32)buffer.size()));
+        }
+
+        {
+            // and one past anything the skeleton could supply, which the
+            // joint count check has always refused
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure("a chain longer than the skeleton is refused",
+                   !load(motion, constrained_animation(200), buffer.data(), (S32)buffer.size()));
+        }
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<9>()
+    {
+        // The solver writes the chain's joints with the motion's own rotations
+        // to measure against, and has to put them back. It gives up part way
+        // through whenever a higher priority motion already owns a joint in
+        // the chain -- which is what the mask says -- and used to leave every
+        // joint it had already written holding a pose nothing asked for.
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        std::vector<U8> buffer(4096);
+        ensure("the constrained animation loads",
+               load(motion, constrained_animation(1), buffer.data(), (S32)buffer.size()));
+
+        // The chain runs up from the collision volume: its parent and then its
+        // grandparent, which for the test character is mHead and mNeck.
+        LLJoint* first_in_chain = mCharacter.getJoint("mHead");
+        LLJoint* second_in_chain = mCharacter.getJoint("mNeck");
+        ensure("the chain joints resolve", first_in_chain != nullptr && second_in_chain != nullptr);
+
+        const LLQuaternion marker(1.1f, LLVector3::x_axis);
+        first_in_chain->setRotation(marker);
+
+        // A mask that lets the first joint through and stops the solver on the
+        // second. The threshold is the motion's own priority.
+        U8 mask[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+        mask[second_in_chain->getJointNum()] = 0xff;
+
+        motion.onUpdate(1.f, mask);
+
+        const LLQuaternion after = first_in_chain->getRotation();
+        ensure_approximately_equals_range("the joint the solver wrote is put back",
+                                          fabsf(dot(after, marker)), 1.f, 1e-5f);
     }
 
     template<> template<>
