@@ -194,6 +194,32 @@ bool LLWalkAdjustMotion::onActivate()
 }
 
 //-----------------------------------------------------------------------------
+// LLWalkAdjustMotion::speedMultiplier()
+//-----------------------------------------------------------------------------
+// static
+F32 LLWalkAdjustMotion::speedMultiplier(F32 speed, F32 foot_speed, F32 min_multiplier, F32 max_multiplier)
+{
+    // How much faster the animation has to play for the planted foot to keep
+    // up with the ground. A foot going forward as fast as the avatar makes
+    // that ratio infinite, and one going forward faster makes it negative --
+    // and a negative ratio taken through a clamp comes out as the *smallest*
+    // multiplier there is, which slows the animation, which makes the foot
+    // slip further forward, which keeps the ratio negative. Once in, it stays
+    // in, and the avatar slides with its legs still.
+    //
+    // Running never gets there: the ratio it asks for is far above the
+    // ceiling, so it sits pinned at the top. Walking asks for about one, and
+    // one is where a foot's travel measured over a single frame changes sign
+    // at every footfall.
+    if (!(foot_speed > 0.f))
+    {
+        return max_multiplier;
+    }
+
+    return llclamp(speed / foot_speed, min_multiplier, max_multiplier);
+}
+
+//-----------------------------------------------------------------------------
 // LLWalkAdjustMotion::onUpdate()
 //-----------------------------------------------------------------------------
 bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
@@ -282,7 +308,8 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
 
         // multiply animation playback rate so that foot speed matches avatar speed
         F32 min_speed_multiplier = clamp_rescale(speed, 0.f, 1.f, 0.f, 0.1f);
-        F32 desired_speed_multiplier = llclamp(speed / foot_speed, min_speed_multiplier, ANIM_SPEED_MAX);
+        F32 desired_speed_multiplier =
+            speedMultiplier(speed, foot_speed, min_speed_multiplier, ANIM_SPEED_MAX);
 
         // blend towards new speed adjustment value
         F32 new_speed_adjust = LLSmoothInterpolation::lerp(mAdjustedSpeed, desired_speed_multiplier, SPEED_ADJUST_TIME_CONSTANT);

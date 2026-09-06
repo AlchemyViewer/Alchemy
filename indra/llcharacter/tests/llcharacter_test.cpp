@@ -32,6 +32,8 @@
 #include "llframetimer.h"
 #include "lltimer.h"
 
+#include "llkeyframewalkmotion.h"
+
 #include "altestcharacter.h"
 #include "altestmotion.h"
 
@@ -680,5 +682,54 @@ namespace tut
         ensure("the unknown parameter takes its info", unknown.setInfo(&unknown_info));
         ensure("a parameter with an id this character has not got is refused",
                !mCharacter.setVisualParamWeight(&unknown, 0.5f));
+    }
+
+    template<> template<>
+    void llcharacter_object::test<20>()
+    {
+        // The walk servo asks how much faster the animation has to play for
+        // the planted foot to keep up with the ground, and the answer changes
+        // sign the moment the foot is measured going forward faster than the
+        // avatar -- which is every footfall, since it is measured over one
+        // frame.
+        const F32 min_multiplier = 0.1f;
+        const F32 max_multiplier = 1.5f;
+        auto multiplier = [&](F32 speed, F32 foot_speed)
+        {
+            return LLWalkAdjustMotion::speedMultiplier(speed, foot_speed, min_multiplier, max_multiplier);
+        };
+
+        // A planted foot is going nowhere, so the foot speed is the avatar's
+        // and the animation plays as authored.
+        ensure_approximately_equals("a planted foot plays the animation as it is",
+                                    multiplier(1.5f, 1.5f), 1.f, 16);
+
+        // A foot that is not keeping up asks for more.
+        ensure_approximately_equals("a foot falling behind asks for more",
+                                    multiplier(1.5f, 1.0f), 1.5f, 16);
+        ensure_approximately_equals("but no more than it is allowed",
+                                    multiplier(1.5f, 0.1f), max_multiplier, 16);
+
+        // A foot going forward exactly as fast as the avatar cannot say how
+        // much faster to play, and the answer is as fast as allowed.
+        ensure_approximately_equals("a foot going with the avatar asks for all of it",
+                                    multiplier(1.5f, 0.f), max_multiplier, 16);
+
+        // And one going forward faster than the avatar is the case that used
+        // to come out as the slowest multiplier there is: the animation slowed,
+        // which made the foot slip further, which kept the answer negative.
+        ensure_approximately_equals("and one going faster than the avatar does too",
+                                    multiplier(1.5f, -0.2f), max_multiplier, 16);
+        ensure_approximately_equals("however much faster",
+                                    multiplier(1.5f, -50.f), max_multiplier, 16);
+
+        ensure("a foot going forward faster is never read as standing still",
+               multiplier(1.5f, -0.2f) > min_multiplier);
+
+        // Running asks for far more than it is allowed, so it sits at the top
+        // of the range and never goes near the sign change at all. That is why
+        // it was the walk that stuck.
+        ensure_approximately_equals("running is pinned at the ceiling",
+                                    multiplier(5.f, 0.5f), max_multiplier, 16);
     }
 }
