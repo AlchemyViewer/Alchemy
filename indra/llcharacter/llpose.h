@@ -79,7 +79,16 @@ public:
     S32 getNumJointStates() const;
 };
 
-const S32 JSB_NUM_JOINT_STATES = 6;
+// How many motions may write one joint in a frame. The pelvis of a moving
+// avatar is the most crowded joint there is: the pelvis fix, the walk servo
+// and the fly servo -- both of those on the frame one hands over to the other
+// -- whatever rotation a jump has on it, and the animation easing in over the
+// one easing out. That is seven, and at six the one left over was refused in
+// silence, since addJointState says so in a return value nothing reads. What
+// loses is the lowest priority, and that is the pelvis fix, whose whole job is
+// to take up the weight the animations have not claimed. Without it a pose at
+// an eighth of its weight arrives whole.
+const S32 JSB_NUM_JOINT_STATES = 8;
 
 class LLJointStateBlender
 {

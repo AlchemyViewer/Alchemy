@@ -1022,4 +1022,71 @@ namespace tut
                            mA.getRotation(), slerp(0.25f, LLQuaternion::DEFAULT, far_apart));
     }
 
+
+    template<> template<>
+    void llposeblender_object::test<18>()
+    {
+        // Landing from a run puts seven states on the pelvis at once: the two
+        // adjust servos, both live for the frame the fly one hands over to the
+        // walk one, the rotation the jump has on it, the animation coming in
+        // over the one going out, and the pelvis fix underneath them all. The
+        // fix is a full weight state at rest, and what it is there for is to
+        // take up the weight the animations have not claimed -- through the
+        // saturating sum, a pose the animations only claim an eighth of comes
+        // out an eighth as deep.
+        //
+        // It is also the lowest priority and the last one offered a slot, so
+        // it is the one refused when they run out. That put the whole of a
+        // landing crouch on the pelvis for one frame.
+        const LLVector3 crouch(0.f, 0.f, -0.3f);
+
+        // The additive pass runs first, so its states are offered slots first.
+        ALTestMotion fly(LLUUID::generateNewID(), LLJoint::HIGHER_PRIORITY, LLMotion::ADDITIVE_BLEND);
+        fly.addJoint(&mA, LLJointState::POS | LLJointState::ROT);
+        arm(fly);
+
+        ALTestMotion walk(LLUUID::generateNewID(), LLJoint::HIGH_PRIORITY, LLMotion::ADDITIVE_BLEND);
+        walk.addJoint(&mA, LLJointState::POS);
+        arm(walk);
+
+        ALTestMotion noise(LLUUID::generateNewID(), LLJoint::MEDIUM_PRIORITY, LLMotion::ADDITIVE_BLEND);
+        noise.addJoint(&mA, LLJointState::ROT);
+        arm(noise);
+
+        addMotion(&fly);
+        addMotion(&walk);
+        addMotion(&noise);
+
+        // then the normal one, newest motion first
+        ALTestMotion jump(LLUUID::generateNewID(), LLJoint::HIGHER_PRIORITY);
+        jump.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        jump.getPose()->setWeight(0.96f);
+
+        ALTestMotion run(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        run.addJoint(&mA, LLJointState::POS | LLJointState::ROT);
+        run.getPose()->setWeight(0.02f);
+
+        ALTestMotion land(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        land.addJoint(&mA, LLJointState::POS | LLJointState::ROT)->setPosition(crouch);
+        land.getPose()->setWeight(0.13f);
+
+        // the fix, oldest of them, so it is offered a slot last of all
+        ALTestMotion fix(LLUUID::generateNewID(), LLJoint::LOW_PRIORITY);
+        fix.addJoint(&mA, LLJointState::POS);
+        arm(fix);
+
+        addMotion(&run);
+        addMotion(&land);
+        addMotion(&jump);
+        addMotion(&fix);
+
+        mBlender.blendAndApply();
+
+        // The animations between them claim 0.15 of the joint, so the crouch
+        // arrives about a seventh as deep. Refuse the fix a slot and it
+        // arrives at seven eighths of it.
+        ensure("the pelvis fix took up the weight the animations did not claim",
+               fabsf(mA.getPosition().mV[VZ]) < 0.5f * fabsf(crouch.mV[VZ]));
+    }
+
 }
