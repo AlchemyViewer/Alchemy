@@ -69,7 +69,7 @@ enum ETexListType
 struct LLTextureKey
 {
     LLTextureKey();
-    LLTextureKey(LLUUID id, ETexListType tex_type);
+    LLTextureKey(const LLUUID& id, ETexListType tex_type);
     LLUUID textureId;
     ETexListType textureType;
 
@@ -83,6 +83,20 @@ struct LLTextureKey
         {
             return key1.textureType < key2.textureType;
         }
+    }
+
+    friend bool operator==(const LLTextureKey& key1, const LLTextureKey& key2)
+    {
+        return key1.textureId == key2.textureId && key1.textureType == key2.textureType;
+    }
+
+    // boost::hash, for the texture list's flat index. The list type is one
+    // bit of entropy; a full-width constant keeps it out of the tag bits the
+    // map probes on, where adding it to the low bits would put it.
+    friend size_t hash_value(const LLTextureKey& key) noexcept
+    {
+        return hash_value(key.textureId)
+             ^ (static_cast<size_t>(key.textureType) * static_cast<size_t>(0x9E3779B97F4A7C15ull));
     }
 };
 

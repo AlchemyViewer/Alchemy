@@ -27,8 +27,9 @@
 #include "llerror.h"
 #include "llpointer.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <algorithm>
-#include <map>
 #include <vector>
 
 // A set of ref-counted items addressed two ways: by key, for lookup, and by
@@ -45,7 +46,12 @@
 // T derives from LLRefCount and provides
 //     S32  getListIndex() const;
 //     void setListIndex(S32 index);
-// where -1 means "in no table". Key provides operator<.
+// where -1 means "in no table". Key provides operator== and a hash_value
+// found by argument-dependent lookup, as boost::hash expects.
+//
+// The key index is an open-addressing flat map: a lookup touches one
+// metadata group and one slot whatever the size. Nothing may hold a pointer
+// or iterator into it across an insert, since a rehash moves every entry.
 //
 // Not thread-safe; the owner serialises access.
 template <typename Key, typename T>
@@ -61,7 +67,11 @@ public:
     ALTextureTable(const ALTextureTable&) = delete;
     ALTextureTable& operator=(const ALTextureTable&) = delete;
 
-    void reserve(size_t count) { mItems.reserve(count); }
+    void reserve(size_t count)
+    {
+        mItems.reserve(count);
+        mIndex.reserve(count);
+    }
 
     size_t size() const { return mItems.size(); }
     bool empty() const { return mItems.empty(); }
@@ -221,7 +231,7 @@ public:
     }
 
 private:
-    using index_t = std::map<Key, T*>;
+    using index_t = boost::unordered_flat_map<Key, T*>;
 
     items_t mItems;
     index_t mIndex;

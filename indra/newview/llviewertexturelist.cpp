@@ -92,7 +92,7 @@ textureType(TEX_LIST_STANDARD)
 {
 }
 
-LLTextureKey::LLTextureKey(LLUUID id, ETexListType tex_type)
+LLTextureKey::LLTextureKey(const LLUUID& id, ETexListType tex_type)
 : textureId(id), textureType(tex_type)
 {
 }
@@ -109,6 +109,10 @@ void LLViewerTextureList::init()
 {
     mInitialized = true ;
     sNumImages = 0;
+    // A busy region settles around 25k textures and a teleport overlaps two
+    // regions until the old one flushes; this covers that without a growth
+    // ladder at region entry. A peak above it costs one rehash.
+    mImages.reserve(32768);
     doPreloadImages();
 }
 

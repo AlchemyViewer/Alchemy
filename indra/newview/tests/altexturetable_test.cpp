@@ -39,11 +39,17 @@ namespace
         U32 mId;
         U32 mType;
 
-        bool operator<(const Key& rhs) const
+        bool operator==(const Key& rhs) const
         {
-            return mId != rhs.mId ? mId < rhs.mId : mType < rhs.mType;
+            return mId == rhs.mId && mType == rhs.mType;
         }
     };
+
+    std::size_t hash_value(const Key& key)
+    {
+        return (static_cast<std::size_t>(key.mId) * 0x9E3779B97F4A7C15ull)
+             ^ (static_cast<std::size_t>(key.mType) * 0xC2B2AE3D27D4EB4Full);
+    }
 
     Key key(U32 id, U32 type = 0) { return Key{ id, type }; }
 
@@ -362,5 +368,44 @@ namespace tut
             ensure_equals("live", Item::sLive, 3);
         }
         ensure_equals("released", Item::sLive, 0);
+    }
+
+    // --- scale ---------------------------------------------------------------
+
+    // Growth through several rehashes keeps every item findable and every
+    // recorded position right, and a reservation up front changes nothing
+    // but the allocations.
+    template<> template<>
+    void texturetable_object::test<16>()
+    {
+        const U32 count = 20000;
+        std::vector<Item*> items = fill(count);
+        ensure("consistent after growth", mTable.consistent());
+        for (U32 i = 1; i <= count; i += 997)
+        {
+            ensure("found after growth", mTable.find(key(i)) == items[i - 1]);
+        }
+
+        // erase every third item, then look for all of them
+        for (U32 i = 3; i <= count; i += 3)
+        {
+            ensure("erase", mTable.erase(key(i)).notNull());
+        }
+        ensure_equals("size after erases", mTable.size(), (size_t)(count - count / 3));
+        ensure("consistent after erases", mTable.consistent());
+        for (U32 i = 1; i <= count; ++i)
+        {
+            Item* found = mTable.find(key(i));
+            ensure("erased gone, kept found", (i % 3 == 0) ? found == nullptr : found == items[i - 1]);
+        }
+
+        Table reserved;
+        reserved.reserve(count);
+        for (U32 i = 1; i <= 100; ++i)
+        {
+            ensure("reserved insert", reserved.insert(key(i), new Item(i)));
+        }
+        ensure_equals("reserved size", reserved.size(), (size_t)100);
+        ensure("reserved consistent", reserved.consistent());
     }
 }
