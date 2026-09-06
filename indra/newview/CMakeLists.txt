@@ -969,6 +969,7 @@ set(viewer_HEADER_FILES
     alfloatertransactionlog.h
     alsceneexplorerpredicate.h
     alscopedata.h
+    altexturetable.h
     alfloaterwebprofile.h
     algradehistory.h
     allegacynotificationwellwindow.h
@@ -2493,6 +2494,12 @@ if (BUILD_TESTING)
 
   #set(TEST_DEBUG on)
   LL_ADD_INTEGRATION_TEST(cppfeatures
+    ""
+    "${test_libs}"
+    "${test_project}"
+  )
+
+  LL_ADD_INTEGRATION_TEST(altexturetable
     ""
     "${test_libs}"
     "${test_project}"
