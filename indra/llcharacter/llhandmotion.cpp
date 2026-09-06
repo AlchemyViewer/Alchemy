@@ -121,7 +121,7 @@ bool LLHandMotion::onActivate()
 //-----------------------------------------------------------------------------
 bool LLHandMotion::onUpdate(F32 time, U8* joint_mask)
 {
-    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     eHandPose *requestedHandPose;
 
     F32 timeDelta = time - mLastTime;
