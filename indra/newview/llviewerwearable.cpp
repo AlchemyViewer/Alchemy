@@ -343,6 +343,17 @@ void LLViewerWearable::writeToAvatar(LLAvatarAppearance *avatarp)
             {
                 image_id = getDefaultTextureImageID((ETextureIndex) te);
             }
+
+            // The entry is written every frame and takes the same image every
+            // frame, and setLocalTextureTE drops an image the entry already
+            // holds. So the only reason to go and find the image is that it
+            // does not hold it.
+            const LLViewerTexture* current = viewer_avatar->getTEImage(te);
+            if (current && current->getID() == image_id)
+            {
+                continue;
+            }
+
             LLViewerTexture* image = LLViewerTextureManager::getFetchedTexture( image_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE );
             // MULTI-WEARABLE: assume index 0 will be used when writing to avatar. TODO: eliminate the need for this.
             viewer_avatar->setLocalTextureTE(te, image, 0);

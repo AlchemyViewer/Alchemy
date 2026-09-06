@@ -104,7 +104,11 @@ public:
 
 private:
     // helper function. Passed in param is assumed to be in avatar's parameter list.
-    bool setParamWeight(const LLViewerVisualParam *param, F32 weight);
+    bool setParamWeight(LLViewerVisualParam *param, F32 weight);
+
+    // How many of the weights the last writeWearablesToAvatar pushed were
+    // weights the avatar did not already have. Read by the profiler.
+    static S32 sParamWeightsChanged;
 
     std::mutex          mJointMapMutex; // getJoint gets used from mesh thread
 

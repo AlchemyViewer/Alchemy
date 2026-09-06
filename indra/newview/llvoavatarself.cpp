@@ -798,7 +798,7 @@ bool LLVOAvatarSelf::setVisualParamWeight(S32 index, S32 type, F32 weight)
     return false;
 }
 
-bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight)
+bool LLVOAvatarSelf::setParamWeight(LLViewerVisualParam *param, F32 weight)
 {
     if (!param)
     {
@@ -819,7 +819,18 @@ bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight
         }
     }
 
-    return LLCharacter::setVisualParamWeight(param,weight);
+    // How much of the wearable push is a push at all, for a capture to answer
+    // before anything is gated on it.
+    if (param->getWeight() != weight)
+    {
+        ++sParamWeightsChanged;
+    }
+
+    // Every caller of this found the parameter in this character's own map, so
+    // it is this character's parameter, and asking the map for it again by the
+    // id it was found under gives back the one already in hand.
+    param->setWeight(weight);
+    return true;
 }
 
 /*virtual*/
@@ -828,9 +839,12 @@ bool LLVOAvatarSelf::updateVisualParams()
     return LLVOAvatar::updateVisualParams();
 }
 
+S32 LLVOAvatarSelf::sParamWeightsChanged = 0;
+
 void LLVOAvatarSelf::writeWearablesToAvatar()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    sParamWeightsChanged = 0;
     for (U32 type = 0; type < LLWearableType::WT_COUNT; type++)
     {
         LLWearable *wearable = gAgentWearables.getTopWearable((LLWearableType::EType)type);
@@ -840,6 +854,7 @@ void LLVOAvatarSelf::writeWearablesToAvatar()
         }
     }
 
+    LL_PROFILE_ZONE_NUM(sParamWeightsChanged);
 }
 
 /*virtual*/

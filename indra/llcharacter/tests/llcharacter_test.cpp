@@ -647,4 +647,38 @@ namespace tut
         // it and this test has to.
         delete first;
     }
+
+    template<> template<>
+    void llcharacter_object::test<19>()
+    {
+        // Setting a weight through a parameter looks the parameter up by its
+        // id and writes whatever this character has under that id, which is
+        // not always the parameter it was handed: a wearable holds its own
+        // copy of a parameter with the same id, and it is the avatar's copy
+        // that has to move. That is why the lookup is there, and why skipping
+        // it is only right where the caller already holds this character's own.
+        ALTestVisualParam* mine = addParam(5, "Mine");
+
+        ALTestVisualParamInfo foreign_info(5, "Mine");
+        ALTestVisualParam foreign;
+        ensure("the foreign parameter takes its info", foreign.setInfo(&foreign_info));
+
+        ensure("a foreign parameter with a known id is taken",
+               mCharacter.setVisualParamWeight(&foreign, 0.5f));
+        ensure_approximately_equals("and this character's own is what moved",
+                                    mine->getWeight(), 0.5f, 16);
+        ensure_approximately_equals("not the one that was handed over",
+                                    foreign.getWeight(), 0.f, 16);
+
+        // Handed this character's own, the lookup finds that same one, which
+        // is what lets a caller who already has it write to it directly.
+        ensure_equals("the id finds the one that was added",
+                      mCharacter.getVisualParam(5), (LLVisualParam*)mine);
+
+        ALTestVisualParamInfo unknown_info(6, "Unknown");
+        ALTestVisualParam unknown;
+        ensure("the unknown parameter takes its info", unknown.setInfo(&unknown_info));
+        ensure("a parameter with an id this character has not got is refused",
+               !mCharacter.setVisualParamWeight(&unknown, 0.5f));
+    }
 }
