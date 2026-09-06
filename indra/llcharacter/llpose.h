@@ -94,10 +94,16 @@ protected:
     S32             mNumStates;
 
     // Where the coarse clock's blend goes instead of the joint, for the
-    // frames in between to interpolate the joint toward.
-    LLVector3       mCachedPosition;
-    LLQuaternion    mCachedRotation;
-    LLVector3       mCachedScale;
+    // frames in between to interpolate the joint toward. Held in the forms
+    // the blend writes them in and the interpolation reads them in, which is
+    // the same pair of forms the joint states carry.
+    LLVector4a      mCachedPosition;
+    LLQuaternion2   mCachedRotation;
+    LLVector4a      mCachedScale;
+
+    // Which of those three the blend actually wrote. The rest hold the
+    // joint's own value and are not interpolated toward anything.
+    U32             mCachedUsage;
 
     // on the pose blender's list of blenders to run this frame
     bool            mQueued;

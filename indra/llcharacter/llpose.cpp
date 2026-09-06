@@ -165,9 +165,14 @@ S32 LLPose::getNumJointStates() const
 
 LLJointStateBlender::LLJointStateBlender()
     : mNumStates(0),
-      mCachedScale(1.f, 1.f, 1.f),
+      mCachedUsage(0),
       mQueued(false)
 {
+    // The vector types do not zero themselves.
+    mCachedPosition.clear();
+    mCachedRotation = LLQuaternion2::identity();
+    mCachedScale.set(1.f, 1.f, 1.f, 0.f);
+
     for(S32 i = 0; i < JSB_NUM_JOINT_STATES; i++)
     {
         mPriorities[i] = S32_MIN;
@@ -273,8 +278,8 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     }
     else
     {
-        blended_pos.load3(mCachedPosition.mV);
-        blended_scale.load3(mCachedScale.mV);
+        blended_pos = mCachedPosition;
+        blended_scale = mCachedScale;
         blended_rot = mCachedRotation;
     }
 
@@ -448,12 +453,12 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     else
     {
         // The cache is not a joint: nothing below it to dirty, so every
-        // channel is simply stored.
-        LLVector4a final_scale;
-        final_scale.setAdd(blended_scale, added_scale);
-        mCachedPosition.set(final_pos.getF32ptr());
-        mCachedScale.set(final_scale.getF32ptr());
-        final_rot.store(mCachedRotation);
+        // channel is simply stored, along with which of them this blend had
+        // anything to say about.
+        mCachedPosition = final_pos;
+        mCachedScale.setAdd(blended_scale, added_scale);
+        mCachedRotation = final_rot;
+        mCachedUsage = contributed_usage;
     }
 }
 
@@ -474,10 +479,41 @@ void LLJointStateBlender::interpolate(F32 u)
         return;
     }
 
-    // SL-315
-    target_joint->setPosition(lerp(target_joint->getPosition(), mCachedPosition, u));
-    target_joint->setScale(lerp(target_joint->getScale(), mCachedScale, u));
-    target_joint->setRotation(nlerp(u, target_joint->getRotation(), mCachedRotation));
+    // Only the channels the blend wrote. A channel it did not write holds
+    // whatever the joint had when the cache was seeded, and leading the joint
+    // back to that undoes anything that moved it since -- a constraint, the
+    // foot solver, an attachment override -- a little more with every frame
+    // of the quantum.
+    if (mCachedUsage & LLJointState::POS)
+    {
+        LLVector4a current;
+        current.load3(target_joint->getPosition().mV);
+        LLVector4a blended;
+        blended.setLerp(current, mCachedPosition, u);
+        // SL-315
+        target_joint->setPosition(LLVector3(blended.getF32ptr()));
+    }
+
+    if (mCachedUsage & LLJointState::SCALE)
+    {
+        LLVector4a current;
+        current.load3(target_joint->getScale().mV);
+        LLVector4a blended;
+        blended.setLerp(current, mCachedScale, u);
+        target_joint->setScale(LLVector3(blended.getF32ptr()));
+    }
+
+    if (mCachedUsage & LLJointState::ROT)
+    {
+        // Along the arc. A quantum is up to a quarter second, which is as far
+        // apart as two poses of one joint ever get, and the chord cuts most
+        // where they are furthest apart.
+        LLQuaternion2 blended;
+        blended.setSlerp(LLQuaternion2(target_joint->getRotation()), mCachedRotation, u);
+        LLQuaternion rot;
+        blended.store(rot);
+        target_joint->setRotation(rot);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -491,6 +527,7 @@ void LLJointStateBlender::clear()
         mJointStates[i] = NULL;
     }
     mNumStates = 0;
+    mCachedUsage = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -504,9 +541,11 @@ void LLJointStateBlender::resetCachedJoint()
     }
     LLJoint* source_joint = mJointStates[0]->getJoint();
     // SL-315
-    mCachedPosition = source_joint->getPosition();
-    mCachedScale = source_joint->getScale();
+    mCachedPosition.load3(source_joint->getPosition().mV);
+    mCachedScale.load3(source_joint->getScale().mV);
     mCachedRotation = source_joint->getRotation();
+    // and nothing has been blended into it yet
+    mCachedUsage = 0;
 }
 
 //-----------------------------------------------------------------------------

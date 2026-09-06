@@ -744,10 +744,10 @@ namespace tut
     template<> template<>
     void llposeblender_object::test<10>()
     {
-        // Interpolating toward the cache writes every channel of the joint,
-        // and the channels the blend never touched arrive unchanged. A write
-        // that changes nothing must not dirty the joint, or every joint on
-        // the coarse clock is rebuilt every frame for a rotation-only blend.
+        // Interpolating toward the cache moves only the channels the blend
+        // wrote. A joint on the coarse clock is interpolated every frame, so
+        // a rotation-only blend that also wrote back an unchanged position
+        // would rebuild the joint's subtree every frame for nothing.
         ALTestMotion motion;
         motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
         arm(motion);
@@ -971,4 +971,55 @@ namespace tut
         ensure_vec3_equals("the slots were there for the motion that needed one",
                            mA.getPosition(), offset);
     }
+
+    template<> template<>
+    void llposeblender_object::test<16>()
+    {
+        // A rotation-only blend caches a rotation and nothing else. What sits
+        // in the other two is the joint's own value, put there when the cache
+        // was seeded, so leading the joint back toward it undoes whatever has
+        // moved the joint since -- the constraints and the foot solver write
+        // joints straight, in the frames between quanta that this is filling
+        // in -- a little further with every frame.
+        const LLVector3 moved(0.f, 0.f, 0.5f);
+        const LLVector3 rescaled(2.f, 2.f, 2.f);
+
+        ALTestMotion motion;
+        motion.addJoint(&mA, LLJointState::ROT)->setRotation(ROT_A);
+        arm(motion);
+
+        addMotion(&motion);
+        mBlender.blendAndCache(true);
+
+        mA.setPosition(moved);
+        mA.setScale(rescaled);
+
+        mBlender.interpolate(0.5f);
+        ensure_vec3_equals("a position nothing blended is left where it is", mA.getPosition(), moved);
+        ensure_vec3_equals("and so is a scale", mA.getScale(), rescaled);
+        ensure("the channel that was blended still moves", mA.getRotation() != LLQuaternion::DEFAULT);
+    }
+
+    template<> template<>
+    void llposeblender_object::test<17>()
+    {
+        // The frames between quanta follow the arc, like the blend they are
+        // standing in for. A quantum is up to a quarter of a second, which is
+        // as far apart as two poses of one joint ever get, and the chord cuts
+        // most where they are furthest apart. Nine tenths of a right angle
+        // short of a half turn, a quarter of the way along, is two degrees.
+        const LLQuaternion far_apart(2.6f, LLVector3::y_axis);
+
+        ALTestMotion motion;
+        motion.addJoint(&mA, LLJointState::ROT)->setRotation(far_apart);
+        arm(motion);
+
+        addMotion(&motion);
+        mBlender.blendAndCache(true);
+
+        mBlender.interpolate(0.25f);
+        ensure_quat_equals("a quarter of the way along the arc, not across it",
+                           mA.getRotation(), slerp(0.25f, LLQuaternion::DEFAULT, far_apart));
+    }
+
 }
