@@ -31,6 +31,7 @@
 //#include "message.h"
 #include "llgl.h"
 #include "llviewertexture.h"
+#include "altexturetable.h"
 #include "llui.h"
 #include <list>
 #include <boost/unordered_set.hpp>
@@ -131,7 +132,7 @@ public:
 
     void handleIRCallback(void **data, const S32 number);
 
-    S32 getNumImages()                  { return static_cast<S32>(mImageList.size()); }
+    S32 getNumImages()                  { return static_cast<S32>(mImages.size()); }
 
     // Local UI images
     // Local UI images
@@ -155,9 +156,6 @@ private:
 
     void addImage(LLViewerFetchedTexture *image, ETexListType tex_type);
     void deleteImage(LLViewerFetchedTexture *image);
-
-    void addImageToList(LLViewerFetchedTexture *image);
-    void removeImageFromList(LLViewerFetchedTexture *image);
 
     LLViewerFetchedTexture * getImage(const LLUUID &image_id,
                                      FTType f_type = FTT_DEFAULT,
@@ -210,6 +208,7 @@ private:
 public:
     typedef boost::unordered_set<LLPointer<LLViewerFetchedTexture>> image_list_t;
     typedef std::queue<LLPointer<LLViewerFetchedTexture> > image_queue_t;
+    typedef ALTextureTable<LLTextureKey, LLViewerFetchedTexture> image_table_t;
 
     // images that have been loaded but are waiting to be uploaded to GL
     image_queue_t mCreateTextureList;
@@ -223,15 +222,14 @@ public:
     bool mForceResetTextureStats;
 
     // to make "for (auto& imagep : gTextureList)" work
-    const image_list_t::const_iterator begin() const { return mImageList.cbegin(); }
-    const image_list_t::const_iterator end() const { return mImageList.cend(); }
+    image_table_t::const_iterator begin() const { return mImages.begin(); }
+    image_table_t::const_iterator end() const { return mImages.end(); }
 
 private:
-    typedef std::map< LLTextureKey, LLPointer<LLViewerFetchedTexture> > uuid_map_t;
-    uuid_map_t mUUIDMap;
-    LLTextureKey mLastUpdateKey;
-
-    image_list_t mImageList;
+    // Every fetched texture, keyed by id and list type, in the dense order
+    // the update window walks. The table holds the list's one reference to
+    // each texture; min_refs in updateImageDecodePriority counts on that.
+    image_table_t mImages;
 
     // simply holds on to LLViewerFetchedTexture references to stop them from being purged too soon
     boost::unordered_set<LLPointer<LLViewerFetchedTexture>> mImagePreloads;

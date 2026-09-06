@@ -928,8 +928,8 @@ void LLTextureView::draw()
             LL_INFOS() << "ID\tMEM\tBOOST\tPRI\tWIDTH\tHEIGHT\tDISCARD" << LL_ENDL;
         }
 
-        for (LLViewerTextureList::image_list_t::iterator iter = gTextureList.mImageList.begin();
-             iter != gTextureList.mImageList.end(); )
+        for (LLViewerTextureList::image_table_t::const_iterator iter = gTextureList.begin();
+             iter != gTextureList.end(); )
         {
             LLViewerFetchedTexture* imagep = *iter++;
             if(!imagep->hasFetcher())

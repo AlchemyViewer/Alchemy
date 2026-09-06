@@ -350,8 +350,10 @@ public:
     S32 getOriginalWidth() { return mOrigWidth; }
     S32 getOriginalHeight() { return mOrigHeight; }
 
-    bool isInImageList() const {return mInImageList ;}
-    void setInImageList(bool flag) {mInImageList = flag ;}
+    bool isInImageList() const { return mListIndex >= 0; }
+    // Position in the texture list's table, -1 when not in it. The table writes it.
+    S32  getListIndex() const { return mListIndex; }
+    void setListIndex(S32 index) { mListIndex = index; }
 
     LLFrameTimer* getLastPacketTimer() {return &mLastPacketTimer;}
 
@@ -492,7 +494,7 @@ protected:
     LLFrameTimer mLastPacketTimer;      // Time since last packet.
     LLFrameTimer mStopFetchingTimer;    // Time since mDecodePriority == 0.f.
 
-    bool  mInImageList;             // true if image is in list (in which case don't reset priority!)
+    S32   mListIndex;               // position in gTextureList's table, -1 when not in it (in which case don't reset priority!)
     // This needs to be atomic, since it is written both in the main thread
     // and in the GL image worker thread... HB
     LLAtomicBool  mNeedsCreateTexture;

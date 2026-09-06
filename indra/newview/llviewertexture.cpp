@@ -1121,7 +1121,7 @@ void LLViewerFetchedTexture::init(bool firstinit)
 
     if (firstinit)
     {
-        mInImageList = 0;
+        mListIndex = -1;
     }
 
     // Only set mIsMissingAsset true when we know for certain that the database
@@ -2760,7 +2760,7 @@ void LLViewerFetchedTexture::forceImmediateUpdate()
         return;
     }
     //if already called forceImmediateUpdate()
-    if(mInImageList && mMaxVirtualSize == LLViewerFetchedTexture::sMaxVirtualSize)
+    if(isInImageList() && mMaxVirtualSize == LLViewerFetchedTexture::sMaxVirtualSize)
     {
         return;
     }
