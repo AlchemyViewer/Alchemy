@@ -903,16 +903,16 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
             face_count += channel_faces[i];
         }
 
-        // get adjusted bias based on image resolution
-        LLImageGL* img = imagep->getGLTexture();
-        F32 max_discard = F32(img ? img->getMaxDiscardLevel() : MAX_DISCARD_LEVEL);
-        F32 bias = llclamp(max_discard - 2.f, 1.f, LLViewerTexture::sDesiredDiscardBias);
-
-        // convert bias into a vsize scaler
-        bias = (F32) llroundf(powf(4, bias - 1.f));
-
         if (face_count > 0 && face_count <= max_faces_to_check)
         {
+            // get adjusted bias based on image resolution
+            LLImageGL* img = imagep->getGLTexture();
+            F32 max_discard = F32(img ? img->getMaxDiscardLevel() : MAX_DISCARD_LEVEL);
+            F32 bias = llclamp(max_discard - 2.f, 1.f, LLViewerTexture::sDesiredDiscardBias);
+
+            // convert bias into a vsize scaler
+            bias = (F32) llroundf(powf(4, bias - 1.f));
+
             U32 to_walk = face_count;
             U32 position = 0;
             const bool sliced = face_count > faces_per_visit;
