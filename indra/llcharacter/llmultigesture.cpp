@@ -135,7 +135,11 @@ bool LLMultiGesture::serialize(LLDataPacker& dp) const
 bool LLMultiGesture::deserialize(LLDataPacker& dp)
 {
     S32 version;
-    dp.unpackS32(version, "version");
+    if (!dp.unpackS32(version, "version"))
+    {
+        LL_WARNS() << "Couldn't read LLMultiGesture version" << LL_ENDL;
+        return false;
+    }
     if (version != GESTURE_VERSION)
     {
         LL_WARNS() << "Bad LLMultiGesture version " << version
@@ -144,27 +148,42 @@ bool LLMultiGesture::deserialize(LLDataPacker& dp)
         return false;
     }
 
-    dp.unpackU8(mKey, "key");
-    dp.unpackU32(mMask, "mask");
-
-
-    dp.unpackString(mTrigger, "trigger");
-
-    dp.unpackString(mReplaceText, "replace");
+    if (!dp.unpackU8(mKey, "key")
+        || !dp.unpackU32(mMask, "mask")
+        || !dp.unpackString(mTrigger, "trigger")
+        || !dp.unpackString(mReplaceText, "replace"))
+    {
+        LL_WARNS() << "Couldn't read LLMultiGesture header" << LL_ENDL;
+        return false;
+    }
 
     S32 count;
-    dp.unpackS32(count, "step_count");
+    if (!dp.unpackS32(count, "step_count"))
+    {
+        LL_WARNS() << "Couldn't read LLMultiGesture step count" << LL_ENDL;
+        return false;
+    }
     if (count < 0)
     {
         LL_WARNS() << "Bad LLMultiGesture step count " << count << LL_ENDL;
         return false;
     }
 
+    // The count says how many steps to read, and is worth exactly as much as
+    // the buffer it came in: a step that cannot be read ends the gesture here
+    // rather than adding an empty one and going round again. Without that a
+    // count of two billion against a truncated body is two billion
+    // allocations, and the count arrives in the asset.
     S32 i;
     for (i = 0; i < count; ++i)
     {
         S32 type;
-        dp.unpackS32(type, "step_type");
+        if (!dp.unpackS32(type, "step_type"))
+        {
+            LL_WARNS() << "Couldn't read step " << i << " of " << count
+                       << " in LLMultiGesture" << LL_ENDL;
+            return false;
+        }
 
         EStepType step_type = (EStepType)type;
         switch(step_type)
@@ -265,7 +284,10 @@ bool LLGestureStepAnimation::serialize(LLDataPacker& dp) const
 
 bool LLGestureStepAnimation::deserialize(LLDataPacker& dp)
 {
-    dp.unpackString(mAnimName, "anim_name");
+    if (!dp.unpackString(mAnimName, "anim_name"))
+    {
+        return false;
+    }
 
     // Apparently an earlier version of the gesture code added \r to the end
     // of the animation names.  Get rid of it.  JC
@@ -275,8 +297,11 @@ bool LLGestureStepAnimation::deserialize(LLDataPacker& dp)
         mAnimName.resize(mAnimName.length() - 1);
     }
 
-    dp.unpackUUID(mAnimAssetID, "asset_id");
-    dp.unpackU32(mFlags, "flags");
+    if (!dp.unpackUUID(mAnimAssetID, "asset_id")
+        || !dp.unpackU32(mFlags, "flags"))
+    {
+        return false;
+    }
     return true;
 }
 // *NOTE: result is translated in LLPreviewGesture::getLabel()
@@ -347,10 +372,17 @@ bool LLGestureStepSound::serialize(LLDataPacker& dp) const
 
 bool LLGestureStepSound::deserialize(LLDataPacker& dp)
 {
-    dp.unpackString(mSoundName, "sound_name");
+    if (!dp.unpackString(mSoundName, "sound_name"))
+    {
+        return false;
+    }
 
-    dp.unpackUUID(mSoundAssetID, "asset_id");
-    dp.unpackU32(mFlags, "flags");
+
+    if (!dp.unpackUUID(mSoundAssetID, "asset_id")
+        || !dp.unpackU32(mFlags, "flags"))
+    {
+        return false;
+    }
     return true;
 }
 // *NOTE: result is translated in LLPreviewGesture::getLabel()
@@ -406,7 +438,11 @@ bool LLGestureStepChat::serialize(LLDataPacker& dp) const
 
 bool LLGestureStepChat::deserialize(LLDataPacker& dp)
 {
-    dp.unpackString(mChatText, "chat_text");
+    if (!dp.unpackString(mChatText, "chat_text"))
+    {
+        return false;
+    }
+
 
     dp.unpackU32(mFlags, "flags");
     return true;
@@ -461,8 +497,11 @@ bool LLGestureStepWait::serialize(LLDataPacker& dp) const
 
 bool LLGestureStepWait::deserialize(LLDataPacker& dp)
 {
-    dp.unpackF32(mWaitSeconds, "wait_seconds");
-    dp.unpackU32(mFlags, "flags");
+    if (!dp.unpackF32(mWaitSeconds, "wait_seconds")
+        || !dp.unpackU32(mFlags, "flags"))
+    {
+        return false;
+    }
     return true;
 }
 // *NOTE: result is translated in LLPreviewGesture::getLabel()

@@ -1,0 +1,196 @@
+/**
+ * @file llmultigesture_test.cpp
+ * @brief Unit tests for LLMultiGesture's reader, against content it did not write.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "llmultigesture.h"
+
+#include "lldatapacker.h"
+
+#include "../test/lltut.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace
+{
+    // A gesture with one of each step in it, written the way the viewer writes
+    // one, so the reader is fed its own format.
+    std::unique_ptr<LLMultiGesture> sample_gesture()
+    {
+        std::unique_ptr<LLMultiGesture> gesture = std::make_unique<LLMultiGesture>();
+        gesture->mKey = 'G';
+        gesture->mMask = 3;
+        gesture->mTrigger = "/wave";
+        gesture->mReplaceText = "waves";
+
+        LLGestureStepAnimation* anim = new LLGestureStepAnimation();
+        anim->mAnimName = "express_wave";
+        anim->mAnimAssetID.generate();
+        anim->mFlags = 1;
+        gesture->mSteps.push_back(anim);
+
+        LLGestureStepSound* sound = new LLGestureStepSound();
+        sound->mSoundName = "chime";
+        sound->mSoundAssetID.generate();
+        gesture->mSteps.push_back(sound);
+
+        LLGestureStepChat* chat = new LLGestureStepChat();
+        chat->mChatText = "hello";
+        gesture->mSteps.push_back(chat);
+
+        LLGestureStepWait* wait = new LLGestureStepWait();
+        wait->mWaitSeconds = 1.5f;
+        wait->mFlags = 2;
+        gesture->mSteps.push_back(wait);
+
+        return gesture;
+    }
+
+    // Writes it out and hands back the bytes, terminator included, the way the
+    // gesture manager hands them to the reader.
+    std::vector<char> serialize(LLMultiGesture& gesture)
+    {
+        std::vector<char> buffer(gesture.getMaxSerialSize() + 1, '\0');
+        LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
+        tut::ensure("the gesture serializes", gesture.serialize(dp));
+        buffer.resize(dp.getCurrentSize());
+        buffer.back() = '\0';
+        return buffer;
+    }
+}
+
+namespace tut
+{
+    struct llmultigesture_data
+    {
+    };
+    typedef test_group<llmultigesture_data> llmultigesture_test;
+    typedef llmultigesture_test::object llmultigesture_object;
+    tut::llmultigesture_test llmultigesture_testcase("LLMultiGesture");
+
+    template<> template<>
+    void llmultigesture_object::test<1>()
+    {
+        // What it writes it reads back.
+        std::unique_ptr<LLMultiGesture> written = sample_gesture();
+        std::vector<char> bytes = serialize(*written);
+
+        LLMultiGesture read;
+        LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
+        ensure("a gesture it wrote is accepted", read.deserialize(dp));
+
+        ensure_equals("key", read.mKey, written->mKey);
+        ensure_equals("mask", read.mMask, written->mMask);
+        ensure_equals("trigger", read.mTrigger, written->mTrigger);
+        ensure_equals("replace text", read.mReplaceText, written->mReplaceText);
+        ensure_equals("step count", read.mSteps.size(), written->mSteps.size());
+
+        ensure_equals("the animation step came back",
+                      static_cast<LLGestureStepAnimation*>(read.mSteps[0])->mAnimName,
+                      std::string("express_wave"));
+        ensure_equals("the chat step came back",
+                      static_cast<LLGestureStepChat*>(read.mSteps[2])->mChatText,
+                      std::string("hello"));
+    }
+
+    template<> template<>
+    void llmultigesture_object::test<2>()
+    {
+        // Cut anywhere, and it is refused rather than half read. Every prefix
+        // of a real gesture, so the cut lands in each field in turn.
+        //
+        // Every prefix but one: the format ends each field with a newline, and
+        // the last of those is the only byte in the file nothing depends on.
+        // Dropping just that one leaves every field still readable, and a
+        // gesture that reads is a gesture that loads.
+        std::unique_ptr<LLMultiGesture> written = sample_gesture();
+        const std::vector<char> bytes = serialize(*written);
+
+        for (S32 length = 1; length < (S32)bytes.size() - 1; ++length)
+        {
+            std::vector<char> truncated(bytes.begin(), bytes.begin() + length);
+            truncated.back() = '\0';
+
+            LLMultiGesture read;
+            LLDataPackerAsciiBuffer dp(truncated.data(), (S32)truncated.size());
+            ensure("a gesture cut short is refused", !read.deserialize(dp));
+        }
+    }
+
+    template<> template<>
+    void llmultigesture_object::test<3>()
+    {
+        // The step count says how many to read and arrives in the asset. Set
+        // against a body that has none of them, it used to be the number of
+        // steps the reader would allocate before it gave up, which is as many
+        // as the number says.
+        const std::string hostile =
+            "2\n"          // version
+            "71\n"         // key
+            "0\n"          // mask
+            "/boom\n"      // trigger
+            "\n"           // replace text
+            "2000000000\n" // step count, and nothing after it
+            ;
+
+        std::vector<char> bytes(hostile.begin(), hostile.end());
+        bytes.push_back('\0');
+
+        LLMultiGesture read;
+        LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
+        ensure("a step count with no steps behind it is refused", !read.deserialize(dp));
+        ensure("and nothing was built from it", read.mSteps.empty());
+    }
+
+    template<> template<>
+    void llmultigesture_object::test<4>()
+    {
+        // The same, with one real step in front of the lie: what was read is
+        // kept, the gesture is still refused, and the count does not turn into
+        // that many more.
+        const std::string hostile =
+            "2\n"
+            "71\n"
+            "0\n"
+            "/boom\n"
+            "\n"
+            "2000000000\n"
+            "0\n"              // STEP_ANIMATION
+            "express_wave\n"
+            "00000000-0000-0000-0000-000000000000\n"
+            "0\n"
+            ;
+
+        std::vector<char> bytes(hostile.begin(), hostile.end());
+        bytes.push_back('\0');
+
+        LLMultiGesture read;
+        LLDataPackerAsciiBuffer dp(bytes.data(), (S32)bytes.size());
+        ensure("still refused", !read.deserialize(dp));
+        ensure("and stopped at the one step the body actually held",
+               read.mSteps.size() <= 1u);
+    }
+}

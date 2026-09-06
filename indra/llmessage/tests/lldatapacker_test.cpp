@@ -569,4 +569,48 @@ namespace tut
         ensure_equals("LLDataPackerAsciiFile::packVector4 (iostring) failed", llvec4, unpkllvec4);
         ensure_equals("LLDataPackerAsciiFile::packUUID (iostring) failed", uuid, unpkuuid);
     }
+
+    template<> template<>
+    void datapacker_test_object_t::test<15>()
+    {
+        // An ascii buffer that has run out says so. Every unpack in that class
+        // comes through one place, and each one moves the cursor on by what it
+        // read, so a caller that keeps asking past the end used to keep being
+        // told yes while the cursor walked off the buffer.
+        char buffer[128];
+        LLDataPackerAsciiBuffer writer(buffer, sizeof(buffer));
+        ensure("packS32", writer.packS32(42, "first"));
+        ensure("packString", writer.packString("second", "second"));
+
+        const S32 written = writer.getCurrentSize();
+
+        LLDataPackerAsciiBuffer reader(buffer, written);
+        S32 first = 0;
+        std::string second;
+        ensure("the first field reads back", reader.unpackS32(first, "first"));
+        ensure_equals("and is what was written", first, 42);
+        ensure("the second field reads back", reader.unpackString(second, "second"));
+        ensure_equals("and is what was written", second, std::string("second"));
+
+        S32 past_the_end = 7;
+        ensure("a read past the end is refused", !reader.unpackS32(past_the_end, "third"));
+        ensure_equals("and leaves what it was handed alone", past_the_end, 7);
+
+        std::string also_past = "untouched";
+        ensure("and stays refused", !reader.unpackString(also_past, "fourth"));
+        ensure_equals("however many times it is asked", also_past, std::string("untouched"));
+    }
+
+    template<> template<>
+    void datapacker_test_object_t::test<16>()
+    {
+        // An empty buffer is refused from the first read rather than from the
+        // second.
+        char buffer[4] = { 0, 0, 0, 0 };
+        LLDataPackerAsciiBuffer reader(buffer, 0);
+
+        S32 value = 11;
+        ensure("nothing to read", !reader.unpackS32(value, "anything"));
+        ensure_equals("and nothing was written", value, 11);
+    }
 }

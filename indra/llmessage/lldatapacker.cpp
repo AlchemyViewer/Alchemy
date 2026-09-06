@@ -1548,6 +1548,20 @@ bool LLDataPackerAsciiBuffer::getValueStr(const char *name, char *out_value, S32
     char keyword[DP_BUFSIZE];   /* Flawfinder: ignore */
     char value[DP_BUFSIZE]; /* Flawfinder: ignore */
 
+    // Every unpack in this class comes through here, and each one moves the
+    // cursor on by whatever it read. Off the end there is nothing to read, so
+    // it moved on by one and read again from a byte further out, for as long
+    // as the caller kept asking. A caller asking is the ordinary way to find
+    // out that a buffer has run out, so say so.
+    // The terminator counts toward the size the writer reports, so being
+    // inside the buffer is not the same as having something left in it.
+    if (!mCurBufferp
+        || mCurBufferp >= mBufferp + mBufferSize
+        || *mCurBufferp == '\0')
+    {
+        return false;
+    }
+
     buffer[0] = '\0';
     keyword[0] = '\0';
     value[0] = '\0';
