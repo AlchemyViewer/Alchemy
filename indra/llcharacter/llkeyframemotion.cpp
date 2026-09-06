@@ -274,7 +274,15 @@ T LLKeyframeMotion::KeyCurve<T>::getValue(F32 time, U32& cursor) const
     cursor = right;
     if (right == count)
     {
-        // Past the last key
+        // Past the last key. A looping animation whose keys stop before its
+        // loop does spends this stretch on its way back to the pose the loop
+        // starts from; anything else holds where it ended.
+        const F32 last = mTimes[count - 1];
+        if (mLoopSeam && time > last)
+        {
+            const F32 u = llmin(1.f, (time - last) / (mLoopOutTime - last));
+            return blend_keys(u, mValues[count - 1], mLoopInValue);
+        }
         return mValues[count - 1];
     }
     if (right == 0 || mTimes[right] == time)
@@ -289,6 +297,25 @@ T LLKeyframeMotion::KeyCurve<T>::getValue(F32 time, U32& cursor) const
     const F32 before = mTimes[right - 1];
     const F32 u = (time - before) / (mTimes[right] - before);
     return blend_keys(u, mValues[right - 1], mValues[right]);
+}
+
+//-----------------------------------------------------------------------------
+// KeyCurve::setLoopSeam()
+//-----------------------------------------------------------------------------
+template <typename T>
+void LLKeyframeMotion::KeyCurve<T>::setLoopSeam(bool looping, F32 loop_in_time, F32 loop_out_time)
+{
+    mLoopSeam = false;
+    if (!looping || mTimes.empty() || loop_out_time <= mTimes.back())
+    {
+        return;
+    }
+
+    // Read the loop's first pose with the tail switched off, so that this is
+    // the keys talking and not a seam left over from the last time.
+    mLoopInValue = getValue(loop_in_time);
+    mLoopOutTime = loop_out_time;
+    mLoopSeam = true;
 }
 
 template class LLKeyframeMotion::KeyCurve<LLVector4a>;
@@ -2009,6 +2036,7 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
 
     // *FIX: support cleanup of old keyframe data
     mJointMotionList = joint_motion_list.release(); // release from unique_ptr to member;
+    setupLoopSeams();
     LLKeyframeDataCache::addKeyframeData(getID(),  mJointMotionList);
     mAssetStatus = ASSET_LOADED;
 
@@ -2325,6 +2353,29 @@ void LLKeyframeMotion::setLoop(bool loop)
     {
         mJointMotionList->mLoop = loop;
         mSendStopTimestamp = F32_MAX;
+        setupLoopSeams();
+    }
+}
+
+//-----------------------------------------------------------------------------
+// setupLoopSeams()
+//-----------------------------------------------------------------------------
+void LLKeyframeMotion::setupLoopSeams()
+{
+    if (!mJointMotionList)
+    {
+        return;
+    }
+
+    for (U32 i = 0; i < mJointMotionList->getNumJointMotions(); i++)
+    {
+        JointMotion* joint_motion = mJointMotionList->getJointMotion(i);
+        joint_motion->mPositionCurve.setLoopSeam(mJointMotionList->mLoop,
+            mJointMotionList->mLoopInPoint, mJointMotionList->mLoopOutPoint);
+        joint_motion->mRotationCurve.setLoopSeam(mJointMotionList->mLoop,
+            mJointMotionList->mLoopInPoint, mJointMotionList->mLoopOutPoint);
+        joint_motion->mScaleCurve.setLoopSeam(mJointMotionList->mLoop,
+            mJointMotionList->mLoopInPoint, mJointMotionList->mLoopOutPoint);
     }
 }
 
@@ -2337,6 +2388,7 @@ void LLKeyframeMotion::setLoopIn(F32 in_point)
     if (mJointMotionList)
     {
         mJointMotionList->mLoopInPoint = in_point;
+        setupLoopSeams();
     }
 }
 
@@ -2348,6 +2400,7 @@ void LLKeyframeMotion::setLoopOut(F32 out_point)
     if (mJointMotionList)
     {
         mJointMotionList->mLoopOutPoint = out_point;
+        setupLoopSeams();
     }
 }
 

@@ -183,6 +183,8 @@ public:
     }
 
     void setLoopIn(F32 in_point);
+    // Recomputes every curve's loop tail from the current loop settings.
+    void setupLoopSeams();
 
     void setLoopOut(F32 out_point);
 
@@ -314,6 +316,13 @@ public:
         // including a stale one.
         T getValue(F32 time, U32& cursor) const;
 
+        // Where a looping animation goes when its keys run out before its loop
+        // does: the stretch from the last key to the loop out point leads back
+        // to the pose the loop starts from, rather than holding still and then
+        // arriving there in one frame. Called with the loop off, or with a
+        // loop that ends on a key, it takes the tail away again.
+        void setLoopSeam(bool looping, F32 loop_in_time, F32 loop_out_time);
+
         InterpolationType   mInterpolationType = IT_LINEAR;
 
     private:
@@ -322,6 +331,10 @@ public:
 
         std::vector<F32>    mTimes;
         std::vector<T>      mValues;
+
+        T                   mLoopInValue {};
+        F32                 mLoopOutTime = 0.f;
+        bool                mLoopSeam = false;
     };
 
     // Held in the vector forms, which is what a joint state takes: a sample

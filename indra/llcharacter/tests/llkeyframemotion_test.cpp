@@ -1298,4 +1298,109 @@ namespace tut
                       LLKeyframeDataCache::size(), 1u);
         ensure_equals("and it is the same one", LLKeyframeDataCache::getKeyframeData(id), first_list);
     }
+
+    template<> template<>
+    void llkeyframemotion_object::test<21>()
+    {
+        // A looping animation whose keys stop before its loop does. Between
+        // the last key and the loop out point the curve used to hold the last
+        // key and then arrive at the loop's first pose in one frame; it leads
+        // back to it now.
+        PositionCurve curve;
+        set_key(curve, 0.f, LLVector3(0.f, 0.f, 0.f));
+        set_key(curve, 1.f, LLVector3(10.f, 0.f, 0.f));
+
+        // Without a seam the tail holds the last key, which is what a motion
+        // that does not loop wants.
+        ensure_approximately_equals_range("no seam: the tail holds the last key",
+                                          sample(curve, 1.5f).mV[VX], 10.f, 1e-4f);
+
+        // The loop runs to two, a second past the last key, and starts from
+        // the pose at zero.
+        curve.setLoopSeam(true, 0.f, 2.f);
+
+        ensure_approximately_equals_range("the last key is still the last key",
+                                          sample(curve, 1.f).mV[VX], 10.f, 1e-4f);
+        ensure_approximately_equals_range("half way along the tail is half way back",
+                                          sample(curve, 1.5f).mV[VX], 5.f, 1e-4f);
+        ensure_approximately_equals_range("and the end of the tail is the loop's first pose",
+                                          sample(curve, 2.f).mV[VX], 0.f, 1e-4f);
+        ensure_approximately_equals_range("past the loop out point it stays there",
+                                          sample(curve, 3.f).mV[VX], 0.f, 1e-4f);
+
+        // Inside the keys nothing changed.
+        ensure_approximately_equals_range("the keyed range is untouched",
+                                          sample(curve, 0.5f).mV[VX], 5.f, 1e-4f);
+
+        // Told it does not loop, the tail goes away again.
+        curve.setLoopSeam(false, 0.f, 2.f);
+        ensure_approximately_equals_range("without a loop the tail holds again",
+                                          sample(curve, 1.5f).mV[VX], 10.f, 1e-4f);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<22>()
+    {
+        // A loop that ends on its last key has no tail to lead anywhere, and
+        // one that ends before its last key never reaches it.
+        PositionCurve curve;
+        set_key(curve, 0.f, LLVector3(0.f, 0.f, 0.f));
+        set_key(curve, 1.f, LLVector3(10.f, 0.f, 0.f));
+
+        curve.setLoopSeam(true, 0.f, 1.f);
+        ensure_approximately_equals_range("a loop ending on the last key holds past it",
+                                          sample(curve, 1.5f).mV[VX], 10.f, 1e-4f);
+
+        curve.setLoopSeam(true, 0.f, 0.5f);
+        ensure_approximately_equals_range("a loop ending before the last key holds too",
+                                          sample(curve, 1.5f).mV[VX], 10.f, 1e-4f);
+
+        // A curve with one key has nowhere to lead from.
+        PositionCurve single;
+        set_key(single, 0.f, LLVector3(4.f, 0.f, 0.f));
+        single.setLoopSeam(true, 0.f, 2.f);
+        ensure_approximately_equals_range("one key is the whole animation",
+                                          sample(single, 1.f).mV[VX], 4.f, 1e-4f);
+
+        // An empty curve is asked nothing and says nothing.
+        PositionCurve empty;
+        empty.setLoopSeam(true, 0.f, 2.f);
+        ensure_equals("an empty curve has no keys", empty.getNumKeys(), 0u);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<23>()
+    {
+        // The loop's first pose is read from the keys, not from a tail left
+        // over from the last time the seam was set up.
+        PositionCurve curve;
+        set_key(curve, 0.f, LLVector3(0.f, 0.f, 0.f));
+        set_key(curve, 1.f, LLVector3(10.f, 0.f, 0.f));
+
+        curve.setLoopSeam(true, 0.f, 2.f);
+        ensure_approximately_equals_range("the tail leads back to zero",
+                                          sample(curve, 1.5f).mV[VX], 5.f, 1e-4f);
+
+        // Setting it up again against a later loop in point reads that pose,
+        // and reads it from the keys rather than through the tail it already
+        // has.
+        curve.setLoopSeam(true, 0.5f, 2.f);
+        ensure_approximately_equals_range("a later loop in point is read from the keys",
+                                          sample(curve, 1.5f).mV[VX], 7.5f, 1e-4f);
+        curve.setLoopSeam(true, 0.5f, 2.f);
+        ensure_approximately_equals_range("and reads the same the second time",
+                                          sample(curve, 1.5f).mV[VX], 7.5f, 1e-4f);
+
+        // A rotation curve leads back the same way.
+        RotationCurve rotations;
+        set_key(rotations, 0.f, LLQuaternion(0.f, LLVector3::z_axis));
+        set_key(rotations, 1.f, LLQuaternion(F_PI_BY_TWO, LLVector3::z_axis));
+        rotations.setLoopSeam(true, 0.f, 2.f);
+
+        const LLQuaternion at_end = sample(rotations, 2.f);
+        // q and -q are the same rotation, so compare through the dot product.
+        ensure_approximately_equals_range("the rotation tail ends on the loop's first pose",
+                                          fabsf(dot(at_end, LLQuaternion(0.f, LLVector3::z_axis))),
+                                          1.f, 1e-4f);
+    }
 }
