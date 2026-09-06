@@ -880,45 +880,30 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
     }
 
     // The local rotation that composes with the parent's world orientation to
-    // give this one, which is what this is for. Where the parent carries no
-    // scale that is exactly what the matrix route below arrives at, and six of
-    // these run every frame for a standing avatar -- two per leg in the
-    // inverse kinematics and one per ankle -- against a route that builds
-    // three matrices and inverts one of them.
+    // give this one. That is what the world rotation is built from -- the
+    // local rotation times the parent's, all the way up -- so scale plays no
+    // part in it, and neither does the position.
     //
-    // The test is for no scale rather than for a uniform one. A scaled parent
-    // makes the product below a rotation times that scale, and the extraction
-    // that pulls a quaternion out of it adds one to the trace before taking a
-    // root, which the scale does not divide out of; normalizing afterwards
-    // does not put it back. So a scaled parent gets a different answer from
-    // the two routes, and the one it has always had is the one below.
-    const LLVector3& parent_scale = mParent->getScale();
-    if (parent_scale.mV[VX] == 1.f && parent_scale.mV[VY] == 1.f && parent_scale.mV[VZ] == 1.f)
-    {
-        LLQuaternion2 parent_inverse;
-        parent_inverse.setConjugate(LLQuaternion2(mParent->getWorldRotation()));
+    // This used to go through matrices: one built from the rotation, one from
+    // the parent with its translation zeroed, that one inverted, the two
+    // multiplied and a quaternion pulled back out. Six of those run every
+    // frame for a standing avatar, two per leg in the inverse kinematics and
+    // one per ankle, and none of them gave back the rotation they were asked
+    // for when the parent carried a scale. LLMatrix4::invert transposes, which
+    // inverts a rotation but not a scale, and the extraction adds one to the
+    // trace before taking a root, which no later normalize can undo. The
+    // joints this runs on are a motion's copies of the avatar's leg joints and
+    // they carry the avatar's joint scales, so on a reshaped leg the answer
+    // was wrong by however far the scale was from one.
+    LLQuaternion2 parent_inverse;
+    parent_inverse.setInverse(LLQuaternion2(mParent->getWorldRotation()));
 
-        LLQuaternion2 local;
-        local.setMul(LLQuaternion2(rot), parent_inverse);
+    LLQuaternion2 local;
+    local.setMul(LLQuaternion2(rot), parent_inverse);
 
-        LLQuaternion local_rotation;
-        local.store(local_rotation);
-        setRotation(local_rotation);
-        return;
-    }
-
-    LLMatrix4 temp_mat(rot);
-
-    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix().toMatrix4();
-    parentWorldMatrix.mMatrix[VW][VX] = 0;
-    parentWorldMatrix.mMatrix[VW][VY] = 0;
-    parentWorldMatrix.mMatrix[VW][VZ] = 0;
-
-    LLMatrix4 invParentWorldMatrix = parentWorldMatrix.invert();
-
-    temp_mat *= invParentWorldMatrix;
-
-    setRotation(LLQuaternion(temp_mat));
+    LLQuaternion local_rotation;
+    local.store(local_rotation);
+    setRotation(local_rotation);
 }
 
 //--------------------------------------------------------------------

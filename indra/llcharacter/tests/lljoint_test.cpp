@@ -501,9 +501,9 @@ namespace tut
     template<> template<>
     void lljoint_object::test<24>()
     {
-        // A world rotation asked for is the world rotation that comes back,
-        // whatever uniform scale the parent carries. This is the route the
-        // foot solver takes six times a frame for a standing avatar.
+        // A world rotation asked for is the world rotation that comes back.
+        // This is the route the foot solver takes six times a frame for a
+        // standing avatar.
         LLJoint parent("parent", nullptr);
         LLJoint child("child", &parent);
 
@@ -513,51 +513,34 @@ namespace tut
         parent.setRotation(parent_rot);
         parent.setPosition(LLVector3(3.f, -1.f, 2.f));
 
-        parent.setScale(LLVector3(1.f, 1.f, 1.f));
-        child.setRotation(LLQuaternion::DEFAULT);
-        child.setWorldRotation(wanted);
+        // Whatever scale the parent carries. The world rotation is built from
+        // local rotations alone, so a scale has no business in this answer.
+        const LLVector3 scales[] = {
+            LLVector3(1.f, 1.f, 1.f),
+            LLVector3(1.5f, 1.5f, 1.5f),
+            LLVector3(0.25f, 0.25f, 0.25f),
+            LLVector3(2.f, 0.5f, 1.3f),
+        };
 
-        const LLQuaternion got = child.getWorldRotation();
-        ensure_approximately_equals("the world rotation asked for is the one that comes back",
-                                    fabsf(dot(got, wanted)), 1.f, 16);
-    }
+        for (const LLVector3& scale : scales)
+        {
+            parent.setScale(scale);
+            child.setRotation(LLQuaternion::DEFAULT);
+            child.setWorldRotation(wanted);
 
-    template<> template<>
-    void lljoint_object::test<26>()
-    {
-        // Why the route above is only taken for an unscaled parent. The
-        // matrix route pulls a quaternion out of a product that carries the
-        // parent's scale, and that extraction adds one to the trace before
-        // taking a root, which the scale does not divide out of. So a scaled
-        // parent does not give back the world rotation it was asked for, and
-        // that is the answer it has always given.
-        LLJoint parent("parent", nullptr);
-        LLJoint child("child", &parent);
-
-        const LLQuaternion wanted(-1.3f, LLVector3(0.577f, 0.577f, 0.577f));
-        parent.setRotation(LLQuaternion(0.8f, LLVector3(0.f, 0.f, 1.f)));
-
-        parent.setScale(LLVector3(1.f, 1.f, 1.f));
-        child.setWorldRotation(wanted);
-        const LLQuaternion unscaled = child.getWorldRotation();
-
-        parent.setScale(LLVector3(1.5f, 1.5f, 1.5f));
-        child.setRotation(LLQuaternion::DEFAULT);
-        child.setWorldRotation(wanted);
-        const LLQuaternion scaled = child.getWorldRotation();
-
-        ensure_approximately_equals("an unscaled parent gives back what was asked for",
-                                    fabsf(dot(unscaled, wanted)), 1.f, 16);
-        ensure("a scaled parent does not, and that is the long-standing answer",
-               fabsf(dot(scaled, wanted)) < 0.999f);
+            const LLQuaternion got = child.getWorldRotation();
+            ensure_approximately_equals("the world rotation asked for is the one that comes back",
+                                        fabsf(dot(got, wanted)), 1.f, 16);
+        }
     }
 
     template<> template<>
     void lljoint_object::test<25>()
     {
-        // and it is the same local rotation the matrix route arrives at, which
-        // is what lets that route be skipped. Written out here rather than
-        // called, so the two are separate implementations.
+        // With an unscaled parent it is the same local rotation the matrix
+        // route arrived at, so the joints that were already getting the right
+        // answer keep it. Written out here rather than called, so the two are
+        // separate implementations.
         LLJoint parent("parent", nullptr);
         LLJoint child("child", &parent);
 
@@ -579,6 +562,71 @@ namespace tut
 
         ensure_approximately_equals("the two routes agree on the local rotation",
                                     fabsf(dot(child.getRotation(), through_the_matrix)), 1.f, 16);
+    }
+
+    template<> template<>
+    void lljoint_object::test<26>()
+    {
+        // The route this replaced could not do that. It built the answer out
+        // of matrices, and LLMatrix4::invert transposes -- which inverts a
+        // rotation but leaves a scale where it was -- so the product it took a
+        // quaternion out of carried the parent's scale, and the extraction
+        // adds one to the trace before taking a root, which the later
+        // normalize cannot undo. Written out here so the difference is on the
+        // record rather than in a commit message.
+        LLJoint parent("parent", nullptr);
+        LLJoint child("child", &parent);
+
+        const LLQuaternion wanted(-1.3f, LLVector3(0.577f, 0.577f, 0.577f));
+        parent.setRotation(LLQuaternion(0.8f, LLVector3(0.f, 0.f, 1.f)));
+        parent.setScale(LLVector3(1.5f, 1.5f, 1.5f));
+
+        LLMatrix4 temp_mat(wanted);
+        LLMatrix4 parent_world = parent.getWorldMatrix().toMatrix4();
+        parent_world.mMatrix[VW][VX] = 0.f;
+        parent_world.mMatrix[VW][VY] = 0.f;
+        parent_world.mMatrix[VW][VZ] = 0.f;
+        temp_mat *= parent_world.invert();
+
+        child.setRotation(LLQuaternion(temp_mat));
+        const LLQuaternion through_the_matrix = child.getWorldRotation();
+
+        child.setRotation(LLQuaternion::DEFAULT);
+        child.setWorldRotation(wanted);
+        const LLQuaternion now = child.getWorldRotation();
+
+        ensure_approximately_equals("a scaled parent gives back what was asked for",
+                                    fabsf(dot(now, wanted)), 1.f, 16);
+        ensure("which the matrix route it replaced did not",
+               fabsf(dot(through_the_matrix, wanted)) < 0.999f);
+    }
+
+    template<> template<>
+    void lljoint_object::test<27>()
+    {
+        // Nothing normalizes a rotation on its way into a joint, so a parent
+        // can be carrying one that has drifted off unit length. The world
+        // rotation asked for is still the one that comes back, length and all:
+        // the parent is undone with its inverse, not its conjugate, and those
+        // differ by exactly that length.
+        LLJoint parent("parent", nullptr);
+        LLJoint child("child", &parent);
+
+        LLQuaternion drifted(0.3f, 0.4f, 0.5f, 0.6f);
+        ensure("the parent's rotation is not unit length",
+               fabsf(drifted.mQ[0]*drifted.mQ[0] + drifted.mQ[1]*drifted.mQ[1]
+                   + drifted.mQ[2]*drifted.mQ[2] + drifted.mQ[3]*drifted.mQ[3] - 1.f) > 0.05f);
+        parent.setRotation(drifted);
+
+        const LLQuaternion wanted(-1.3f, LLVector3(0.577f, 0.577f, 0.577f));
+        child.setWorldRotation(wanted);
+
+        const LLQuaternion got = child.getWorldRotation();
+        for (S32 i = 0; i < 4; ++i)
+        {
+            ensure_approximately_equals("the world rotation comes back as it was asked for",
+                                        got.mQ[i], wanted.mQ[i], 14);
+        }
     }
 
     /*

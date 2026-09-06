@@ -70,6 +70,16 @@ inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
     mQ = _mm_xor_ps(src.mQ, signMask);
 }
 
+// Set this quaternion to the inverse of src
+inline void LLQuaternion2::setInverse(const LLQuaternion2& src)
+{
+    LLVector4a length_squared;
+    length_squared.setAllDot4(src.mQ, src.mQ);
+
+    setConjugate(src);
+    mQ.div(length_squared);
+}
+
 // Set this to a * b, in LLQuaternion's order
 inline void LLQuaternion2::setMul(const LLQuaternion2& a, const LLQuaternion2& b)
 {

@@ -85,6 +85,12 @@ public:
     // Set this quaternion to the conjugate of src
     inline void setConjugate(const LLQuaternion2& src);
 
+    // Set this quaternion to the inverse of src: the conjugate over the
+    // squared length, so that src composed with it is the identity whatever
+    // length src carries. For a rotation of unit length the two are the same
+    // and the division is by one.
+    inline void setInverse(const LLQuaternion2& src);
+
     // Set this to the product LLQuaternion's operator* gives: the rotation a
     // and then the rotation b, so that rotating by the result is rotating by
     // a and then by b.

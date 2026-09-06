@@ -293,6 +293,42 @@ namespace tut
     }
 
     template<> template<>
+    void llquaternion2_object::test<10>()
+    {
+        // The inverse undoes the rotation whatever length it carries, where
+        // the conjugate only does for one of unit length. A rotation that has
+        // drifted is the case that tells them apart.
+        const LLQuaternion off_unit[] = {
+            LLQuaternion(1.f, 2.f, 3.f, 4.f),
+            LLQuaternion(0.1f, 0.f, 0.f, 0.1f),
+            LLQuaternion(0.f, 0.f, 0.f, 2.f),
+        };
+
+        std::vector<LLQuaternion> all = mRotations;
+        for (const LLQuaternion& q : off_unit)
+        {
+            all.push_back(q);
+        }
+
+        for (const LLQuaternion& q : all)
+        {
+            LLQuaternion2 inverse;
+            inverse.setInverse(LLQuaternion2(q));
+
+            LLQuaternion2 product;
+            product.setMul(LLQuaternion2(q), inverse);
+
+            LLQuaternion got;
+            product.store(got);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                ensure_approximately_equals_range("q times its inverse has no axis", got.mQ[i], 0.f, 1e-5f);
+            }
+            ensure_approximately_equals_range("q times its inverse is the identity", got.mQ[3], 1.f, 1e-5f);
+        }
+    }
+
+    template<> template<>
     void llquaternion2_object::test<8>()
     {
         // Conjugate undoes the rotation, and the product with it is identity.
