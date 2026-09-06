@@ -455,6 +455,22 @@ void LLEyeMotion::adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_s
 }
 
 //-----------------------------------------------------------------------------
+// LLEyeMotion::setBlinkWeights()
+//-----------------------------------------------------------------------------
+void LLEyeMotion::setBlinkWeights(F32 left, F32 right)
+{
+    if (mBlinkLeftParam)
+    {
+        mBlinkLeftParam->setWeight(left);
+    }
+    if (mBlinkRightParam)
+    {
+        mBlinkRightParam->setWeight(right);
+    }
+    mCharacter->updateVisualParams();
+}
+
+//-----------------------------------------------------------------------------
 // LLEyeMotion::onUpdate()
 //-----------------------------------------------------------------------------
 bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
@@ -492,6 +508,12 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
     }
 
     // do blinking
+    if (!mBlinkLeftParam)
+    {
+        mBlinkLeftParam = mCharacter->getVisualParam("Blink_Left");
+        mBlinkRightParam = mCharacter->getVisualParam("Blink_Right");
+    }
+
     if (!mEyesClosed && mEyeBlinkTimer.getElapsedTimeF32() >= mEyeBlinkTime)
     {
         F32 leftEyeBlinkMorph = mEyeBlinkTimer.getElapsedTimeF32() - mEyeBlinkTime;
@@ -499,9 +521,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
         leftEyeBlinkMorph = llclamp(leftEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
         rightEyeBlinkMorph = llclamp(rightEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
-        mCharacter->setVisualParamWeight("Blink_Left", leftEyeBlinkMorph);
-        mCharacter->setVisualParamWeight("Blink_Right", rightEyeBlinkMorph);
-        mCharacter->updateVisualParams();
+        setBlinkWeights(leftEyeBlinkMorph, rightEyeBlinkMorph);
 
         if (rightEyeBlinkMorph == 1.f)
         {
@@ -519,9 +539,7 @@ bool LLEyeMotion::onUpdate(F32 time, U8* joint_mask)
 
             leftEyeBlinkMorph = 1.f - llclamp(leftEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
             rightEyeBlinkMorph = 1.f - llclamp(rightEyeBlinkMorph / EYE_BLINK_SPEED, 0.f, 1.f);
-            mCharacter->setVisualParamWeight("Blink_Left", leftEyeBlinkMorph);
-            mCharacter->setVisualParamWeight("Blink_Right", rightEyeBlinkMorph);
-            mCharacter->updateVisualParams();
+            setBlinkWeights(leftEyeBlinkMorph, rightEyeBlinkMorph);
 
             if (rightEyeBlinkMorph == 0.f)
             {

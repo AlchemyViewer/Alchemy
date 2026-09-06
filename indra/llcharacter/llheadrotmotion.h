@@ -33,6 +33,8 @@
 #include "llmotion.h"
 #include "llframetimer.h"
 
+class LLVisualParam;
+
 constexpr F32 MIN_REQUIRED_PIXEL_AREA_HEAD_ROT = 500.f;
 constexpr F32 MIN_REQUIRED_PIXEL_AREA_EYE = 25000.f;
 
@@ -178,6 +180,8 @@ public:
 
     void adjustEyeTarget(LLVector3* targetPos, LLJointState& left_eye_state, LLJointState& right_eye_state);
 
+    void setBlinkWeights(F32 left, F32 right);
+
     // called per time step
     // must return true while it is active, and
     // must return false when the motion is completed.
@@ -210,6 +214,10 @@ public:
     LLFrameTimer        mEyeBlinkTimer;
     F32                 mEyeBlinkTime;
     bool                mEyesClosed;
+
+    // resolved once, since the parameters are added when the avatar loads
+    LLVisualParam*      mBlinkLeftParam = nullptr;
+    LLVisualParam*      mBlinkRightParam = nullptr;
 };
 
 #endif // LL_LLHEADROTMOTION_H

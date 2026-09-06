@@ -242,7 +242,7 @@ public:
     /*virtual*/ F32             getPixelArea() const;
     /*virtual*/ LLVector3d      getPosGlobalFromAgent(const LLVector3 &position);
     /*virtual*/ LLVector3       getPosAgentFromGlobal(const LLVector3d &position);
-    virtual void                updateVisualParams();
+    virtual bool                updateVisualParams();
 
 /**                    Inherited
  **                                                                            **
@@ -491,6 +491,8 @@ public:
     LLVector3           mTargetRootToHeadOffset;
 
     S32                 mLastSkeletonSerialNum;
+    // resolved once, since the parameters are added when the avatar loads
+    LLVisualParam*      mMaleParam = nullptr;
 
 
 /**                    Skeleton

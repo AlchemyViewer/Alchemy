@@ -7810,9 +7810,16 @@ void LLVOAvatar::initAttachmentPoints(bool ignore_hud_joints)
 //-----------------------------------------------------------------------------
 // updateVisualParams()
 //-----------------------------------------------------------------------------
-void LLVOAvatar::updateVisualParams()
+bool LLVOAvatar::updateVisualParams()
 {
-    ESex avatar_sex = (getVisualParamWeight("male") > 0.5f) ? SEX_MALE : SEX_FEMALE;
+    // The parameters are added once when the avatar is loaded, so the one
+    // that decides this is looked up once too.
+    if (!mMaleParam)
+    {
+        mMaleParam = getVisualParam("male");
+    }
+
+    ESex avatar_sex = (mMaleParam && mMaleParam->getWeight() > 0.5f) ? SEX_MALE : SEX_FEMALE;
     if (getSex() != avatar_sex)
     {
         if (mIsSitting && findMotion(avatar_sex == SEX_MALE ? ANIM_AGENT_SIT_FEMALE : ANIM_AGENT_SIT) != NULL)
@@ -7833,17 +7840,26 @@ void LLVOAvatar::updateVisualParams()
         }
     }
 
-    LLCharacter::updateVisualParams();
+    bool applied = LLCharacter::updateVisualParams();
 
     if (mLastSkeletonSerialNum != mSkeletonSerialNum)
     {
         computeBodySize();
         mLastSkeletonSerialNum = mSkeletonSerialNum;
         mRoot->updateWorldMatrixChildren();
+        applied = true;
     }
 
-    dirtyMesh();
+    // Rebuilding the mesh is for what the parameters changed, so a sweep that
+    // changed nothing has nothing to rebuild. A blink asks for this several
+    // times a second and moves two parameters out of hundreds.
+    if (applied)
+    {
+        dirtyMesh();
+    }
+
     updateHeadOffset();
+    return applied;
 }
 
 void LLVOAvatar::setCorrectedPixelArea(F32 area)

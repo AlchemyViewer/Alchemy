@@ -36,7 +36,6 @@
 
 #define SKEL_HEADER "Linden Skeleton 1.0"
 
-LLStringTable LLCharacter::sVisualParamNames(1024);
 
 std::list< LLCharacter* > LLCharacter::sInstances;
 bool LLCharacter::sAllowInstancesChange = true ;
@@ -65,9 +64,9 @@ LLCharacter::LLCharacter()
 //-----------------------------------------------------------------------------
 LLCharacter::~LLCharacter()
 {
-    for (const auto& it : mVisualParamIndexMap)
+    for (LLVisualParam* param : mVisualParams)
     {
-        delete it.second;
+        delete param;
     }
 
     llassert_always(sAllowInstancesChange) ;
@@ -262,10 +261,7 @@ bool LLCharacter::setVisualParamWeight(const LLVisualParam* which_param, F32 wei
 //-----------------------------------------------------------------------------
 bool LLCharacter::setVisualParamWeight(const char* param_name, F32 weight)
 {
-    std::string tname(param_name);
-    LLStringUtil::toLower(tname);
-    char *tableptr = sVisualParamNames.checkString(tname);
-    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(tableptr);
+    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(std::string_view(param_name));
     if (name_iter != mVisualParamNameMap.end())
     {
         name_iter->second->setWeight(weight);
@@ -338,10 +334,7 @@ F32 LLCharacter::getVisualParamWeight(LLVisualParam *which_param)
 //-----------------------------------------------------------------------------
 F32 LLCharacter::getVisualParamWeight(const char* param_name)
 {
-    std::string tname(param_name);
-    LLStringUtil::toLower(tname);
-    char *tableptr = sVisualParamNames.checkString(tname);
-    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(tableptr);
+    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(std::string_view(param_name));
     if (name_iter != mVisualParamNameMap.end())
     {
         return name_iter->second->getWeight();
@@ -388,10 +381,7 @@ void LLCharacter::clearVisualParamWeights()
 //-----------------------------------------------------------------------------
 LLVisualParam*  LLCharacter::getVisualParam(const char *param_name)
 {
-    std::string tname(param_name);
-    LLStringUtil::toLower(tname);
-    char *tableptr = sVisualParamNames.checkString(tname);
-    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(tableptr);
+    visual_param_name_map_t::iterator name_iter = mVisualParamNameMap.find(std::string_view(param_name));
     if (name_iter != mVisualParamNameMap.end())
     {
         return name_iter->second;
@@ -443,20 +433,25 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
         index_iter->second = param;
     }
 
+    // Keep the flat list the sweeps walk in step with the map, and in the
+    // same order, since the order parameters are applied in is the order the
+    // map had them.
+    std::vector<LLVisualParam*>::iterator at =
+        std::lower_bound(mVisualParams.begin(), mVisualParams.end(), index,
+                         [](const LLVisualParam* held, S32 id) { return held->getID() < id; });
+    if (at != mVisualParams.end() && (*at)->getID() == index)
+    {
+        *at = param;
+    }
+    else
+    {
+        mVisualParams.insert(at, param);
+    }
+
     if (param->getInfo())
     {
         // Add name map
-        std::string tname(param->getName());
-        LLStringUtil::toLower(tname);
-        char *tableptr = sVisualParamNames.addString(tname);
-        std::pair<visual_param_name_map_t::iterator, bool> nameres;
-        nameres = mVisualParamNameMap.insert(visual_param_name_map_t::value_type(tableptr, param));
-        if (!nameres.second)
-        {
-            // Already exists, copy param
-            visual_param_name_map_t::iterator name_iter = nameres.first;
-            name_iter->second = param;
-        }
+        mVisualParamNameMap[param->getName()] = param;
     }
     //LL_INFOS() << "Adding Visual Param '" << param->getName() << "' ( " << index << " )" << LL_ENDL;
 }
@@ -464,13 +459,11 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
 //-----------------------------------------------------------------------------
 // updateVisualParams()
 //-----------------------------------------------------------------------------
-void LLCharacter::updateVisualParams()
+bool LLCharacter::updateVisualParams()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     S32 applied = 0;
-    for (LLVisualParam *param = getFirstVisualParam();
-        param;
-        param = getNextVisualParam())
+    for (LLVisualParam* param : mVisualParams)
     {
         if (param->isAnimating())
         {
@@ -486,6 +479,7 @@ void LLCharacter::updateVisualParams()
     }
     LL_PROFILE_ZONE_NUM(getVisualParamCount());
     LL_PROFILE_ZONE_NUM(applied);
+    return applied != 0;
 }
 
 LLAnimPauseRequest LLCharacter::requestPause()

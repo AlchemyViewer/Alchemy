@@ -823,9 +823,9 @@ bool LLVOAvatarSelf::setParamWeight(const LLViewerVisualParam *param, F32 weight
 }
 
 /*virtual*/
-void LLVOAvatarSelf::updateVisualParams()
+bool LLVOAvatarSelf::updateVisualParams()
 {
-    LLVOAvatar::updateVisualParams();
+    return LLVOAvatar::updateVisualParams();
 }
 
 void LLVOAvatarSelf::writeWearablesToAvatar()

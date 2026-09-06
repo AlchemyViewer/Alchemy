@@ -98,7 +98,7 @@ public:
     /*virtual*/ bool setVisualParamWeight(const char* param_name, F32 weight);
     /*virtual*/ bool setVisualParamWeight(S32 index, F32 weight);
     /*virtual*/ bool setVisualParamWeight(S32 index, S32 type, F32 weight);
-    /*virtual*/ void updateVisualParams();
+    /*virtual*/ bool updateVisualParams();
     void writeWearablesToAvatar();
     /*virtual*/ void idleUpdateAppearanceAnimation();
 

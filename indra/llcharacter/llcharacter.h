@@ -30,12 +30,17 @@
 //-----------------------------------------------------------------------------
 // Header Files
 //-----------------------------------------------------------------------------
+#include <algorithm>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "lljoint.h"
 #include "llmotioncontroller.h"
+#include "llstring.h"
 #include "llvisualparam.h"
 #include "llstringtable.h"
 #include "llpointer.h"
@@ -116,8 +121,9 @@ public:
     // gets agent local coordinates from global coordinates
     virtual LLVector3   getPosAgentFromGlobal(const LLVector3d &position) = 0;
 
-    // updates all visual parameters for this character
-    virtual void updateVisualParams();
+    // updates all visual parameters for this character, and says whether any
+    // of them had anything to apply
+    virtual bool updateVisualParams();
 
     virtual void addDebugText( const std::string& text ) = 0;
 
@@ -226,22 +232,22 @@ public:
     // visual parameter accessors
     LLVisualParam*  getFirstVisualParam()
     {
-        mCurIterator = mVisualParamIndexMap.begin();
+        mCurVisualParam = 0;
         return getNextVisualParam();
     }
     LLVisualParam*  getNextVisualParam()
     {
-        if (mCurIterator == mVisualParamIndexMap.end())
+        if (mCurVisualParam >= mVisualParams.size())
             return 0;
-        return (mCurIterator++)->second;
+        return mVisualParams[mCurVisualParam++];
     }
 
     S32 getVisualParamCountInGroup(const EVisualParamGroup group) const
     {
         S32 rtn = 0;
-        for (const visual_param_index_map_t::value_type& index_pair : mVisualParamIndexMap)
+        for (const LLVisualParam* param : mVisualParams)
         {
-            if (index_pair.second->getGroup() == group)
+            if (param->getGroup() == group)
             {
                 ++rtn;
             }
@@ -268,20 +274,20 @@ public:
 
     void animateTweakableVisualParams(F32 delta)
     {
-        for (auto& it : mVisualParamIndexMap)
+        for (LLVisualParam* param : mVisualParams)
         {
-            if (it.second->isTweakable())
+            if (param->isTweakable())
             {
-                it.second->animate(delta);
+                param->animate(delta);
             }
         }
     }
 
     void applyAllVisualParams(ESex avatar_sex)
     {
-        for (auto& it : mVisualParamIndexMap)
+        for (LLVisualParam* param : mVisualParams)
         {
-            it.second->apply(avatar_sex);
+            param->apply(avatar_sex);
         }
     }
 
@@ -312,15 +318,46 @@ protected:
     LLAnimPauseRequest  mPauseRequest;
 
 private:
+    // The names come from avatar_lad.xml and are matched without regard to
+    // case, so the map hashes and compares them that way rather than making a
+    // lowercased copy of every name it is asked about.
+    struct visual_param_name_hash
+    {
+        using is_transparent = void;
+        size_t operator()(std::string_view name) const
+        {
+            U64 hash = 14695981039346656037ULL;
+            for (char c : name)
+            {
+                hash ^= (U64)(U8)LLStringOps::toLower(c);
+                hash *= 1099511628211ULL;
+            }
+            return (size_t)hash;
+        }
+    };
+    struct visual_param_name_equal
+    {
+        using is_transparent = void;
+        bool operator()(std::string_view a, std::string_view b) const
+        {
+            return a.size() == b.size()
+                && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y)
+                   { return LLStringOps::toLower(x) == LLStringOps::toLower(y); });
+        }
+    };
+
     // visual parameter stuff
     typedef std::map<S32, LLVisualParam *>      visual_param_index_map_t;
-    typedef std::map<char *, LLVisualParam *>   visual_param_name_map_t;
+    typedef boost::unordered_flat_map<std::string, LLVisualParam*,
+                                      visual_param_name_hash,
+                                      visual_param_name_equal> visual_param_name_map_t;
 
-    visual_param_index_map_t::iterator          mCurIterator;
+    // The same parameters as the index map, in the same order, for the sweeps
+    // that read every one of them every frame.
+    std::vector<LLVisualParam*>                 mVisualParams;
+    size_t                                      mCurVisualParam = 0;
     visual_param_index_map_t                    mVisualParamIndexMap;
     visual_param_name_map_t                     mVisualParamNameMap;
-
-    static LLStringTable sVisualParamNames;
 
     LLVector3 mHoverOffset;
 };

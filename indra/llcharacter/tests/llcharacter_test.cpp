@@ -35,6 +35,10 @@
 #include "altestcharacter.h"
 #include "altestmotion.h"
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "../test/lltut.h"
 
 namespace
@@ -46,11 +50,77 @@ namespace
     }
 }
 
+namespace
+{
+
+    // The info holds the name, the id and the range, and every one of its
+    // fields is protected, so the way to set them is to be a subclass.
+    class ALTestVisualParamInfo : public LLVisualParamInfo
+    {
+    public:
+        ALTestVisualParamInfo(S32 id, const std::string& name, ESex sex = SEX_BOTH)
+        {
+            mID = id;
+            mName = name;
+            mSex = sex;
+            mMinWeight = 0.f;
+            mMaxWeight = 1.f;
+            mDefaultWeight = 0.f;
+        }
+    };
+
+    // Counts what the sweep asked of it, and stamps the last weight the way a
+    // real apply does -- without that stamp every parameter stays changed and
+    // the sweep applies all of them forever.
+    class ALTestVisualParam : public LLVisualParam
+    {
+    public:
+        // LLVisualParam::setInfo is declared but commented out of the library,
+        // with a note that every subclass writes its own, so this one does.
+        bool setInfo(LLVisualParamInfo* info)
+        {
+            if (!info || info->getID() < 0)
+            {
+                return false;
+            }
+            mID = info->getID();
+            mInfo = info;
+            setWeight(getDefaultWeight());
+            return true;
+        }
+
+        void apply(ESex avatar_sex) override
+        {
+            ++mApplied;
+            mAppliedSex = avatar_sex;
+            setLastWeight((getSex() & avatar_sex) ? getWeight() : getDefaultWeight());
+        }
+
+        S32 getWearableType() const override { return 0; }
+
+        S32  mApplied = 0;
+        ESex mAppliedSex = SEX_BOTH;
+    };
+}
+
 namespace tut
 {
     struct llcharacter_data
     {
         ALTestCharacter mCharacter;
+
+        // The character deletes every parameter it was given; the infos are
+        // not owned by anything, so the fixture holds them.
+        std::vector<std::unique_ptr<LLVisualParamInfo>> mParamInfos;
+
+        ALTestVisualParam* addParam(S32 id, const std::string& name, ESex sex = SEX_BOTH)
+        {
+            mParamInfos.push_back(std::make_unique<ALTestVisualParamInfo>(id, name, sex));
+            ALTestVisualParam* param = new ALTestVisualParam();
+            ensure("the parameter takes its info", param->setInfo(mParamInfos.back().get()));
+            mCharacter.addVisualParam(param);
+            return param;
+        }
 
         // Registers a fresh motion id with the shared registry and starts it,
         // returning the instance the controller is actually running.
@@ -440,5 +510,141 @@ namespace tut
         ensure_equals("it is at full weight now", over->getPose()->getWeight(), 1.f);
         ensure("and the joint is what it asked for",
                fabsf(dot(joint->getRotation(), over_rot)) > 0.99f);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<15>()
+    {
+        // The sweep applies a parameter whose weight has moved and leaves the
+        // rest alone, and says whether it did anything.
+        ALTestVisualParam* first = addParam(1, "First");
+        ALTestVisualParam* second = addParam(2, "Second");
+
+        // A parameter arrives at its default weight, which is the weight it
+        // was last applied at, so there is nothing to do for either of them.
+        ensure("a sweep with nothing to do says so", !mCharacter.updateVisualParams());
+        ensure_equals("and applies nothing", first->mApplied, 0);
+        ensure_equals("to either of them", second->mApplied, 0);
+
+        first->setWeight(0.5f);
+        ensure("a sweep after a weight moves says so", mCharacter.updateVisualParams());
+        ensure_equals("the parameter that moved is applied", first->mApplied, 1);
+        ensure_equals("and the one that did not is not", second->mApplied, 0);
+
+        ensure("and once it has settled again there is nothing to do",
+               !mCharacter.updateVisualParams());
+        ensure_equals("with nothing applied a second time", first->mApplied, 1);
+
+        // Both of them at once.
+        first->setWeight(0.25f);
+        second->setWeight(0.75f);
+        ensure("a sweep with two to do says so", mCharacter.updateVisualParams());
+        ensure_equals("and applies the first", first->mApplied, 2);
+        ensure_equals("and the second", second->mApplied, 1);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<16>()
+    {
+        // A parameter that is animating is left to the animation, and one for
+        // the other sex is applied at its default rather than its weight.
+        ALTestVisualParam* animating = addParam(1, "Animating");
+        ALTestVisualParam* female = addParam(2, "Female", SEX_FEMALE);
+
+        mCharacter.setSex(SEX_MALE);
+        mCharacter.updateVisualParams();
+        const S32 settled = animating->mApplied;
+
+        animating->setAnimating(true);
+        animating->setWeight(0.5f);
+        ensure("an animating parameter is not swept", !mCharacter.updateVisualParams());
+        ensure_equals("and not applied", animating->mApplied, settled);
+
+        animating->setAnimating(false);
+        ensure("once it stops animating the sweep takes it", mCharacter.updateVisualParams());
+
+        // The female parameter settled at its default under a male sex, so
+        // moving its weight changes nothing the sweep can see.
+        const S32 female_settled = female->mApplied;
+        female->setWeight(0.75f);
+        ensure("a parameter for the other sex has nothing to apply",
+               !mCharacter.updateVisualParams());
+        ensure_equals("and is not applied", female->mApplied, female_settled);
+    }
+
+    template<> template<>
+    void llcharacter_object::test<17>()
+    {
+        // Parameters are found by name whatever case the name is asked in,
+        // and the sweep walks them in the order of their ids however they
+        // arrived, because that is the order they used to be applied in.
+        addParam(30, "Third");
+        addParam(10, "First");
+        addParam(20, "Second");
+
+        ensure_equals("every parameter is counted", mCharacter.getVisualParamCount(), 3);
+
+        std::vector<S32> ids;
+        for (LLVisualParam* param = mCharacter.getFirstVisualParam();
+             param;
+             param = mCharacter.getNextVisualParam())
+        {
+            ids.push_back(param->getID());
+        }
+        ensure_equals("all three are walked", ids.size(), 3u);
+        ensure_equals("in id order, not the order they arrived", ids[0], 10);
+        ensure_equals("second", ids[1], 20);
+        ensure_equals("third", ids[2], 30);
+
+        LLVisualParam* by_name = mCharacter.getVisualParam("Second");
+        ensure("a parameter is found by its name", by_name != nullptr);
+        ensure_equals("and it is the right one", by_name->getID(), 20);
+
+        ensure_equals("the name is matched without regard to case",
+                      mCharacter.getVisualParam("sEcOnD"), by_name);
+        ensure_equals("in either direction",
+                      mCharacter.getVisualParam("SECOND"), by_name);
+        ensure("a name nobody has is not found",
+               mCharacter.getVisualParam("NotAParameter") == nullptr);
+
+        // And by id, which is the other way in.
+        ensure_equals("a parameter is found by its id",
+                      mCharacter.getVisualParam(20), by_name);
+
+        ensure("setting a weight by name finds it",
+               mCharacter.setVisualParamWeight("SeCoNd", 0.25f));
+        ensure_approximately_equals("and sets it",
+                                    mCharacter.getVisualParamWeight("second"), 0.25f, 16);
+        ensure("setting one nobody has does not",
+               !mCharacter.setVisualParamWeight("NotAParameter", 0.25f));
+    }
+
+    template<> template<>
+    void llcharacter_object::test<18>()
+    {
+        // A parameter added under an id that is already taken replaces the one
+        // there, in the list the sweep walks as well as in the map.
+        ALTestVisualParam* first = addParam(7, "First");
+        ALTestVisualParam* second = addParam(7, "Second");
+
+        ensure_equals("the second one took the first one's place",
+                      mCharacter.getVisualParamCount(), 1);
+        ensure_equals("and it is the one that is found",
+                      mCharacter.getVisualParam(7), (LLVisualParam*)second);
+
+        S32 walked = 0;
+        for (LLVisualParam* param = mCharacter.getFirstVisualParam();
+             param;
+             param = mCharacter.getNextVisualParam())
+        {
+            ensure_equals("the list holds the one that is found",
+                          param, (LLVisualParam*)second);
+            walked++;
+        }
+        ensure_equals("once", walked, 1);
+
+        // The one it replaced is nobody's now, so the character will not free
+        // it and this test has to.
+        delete first;
     }
 }
