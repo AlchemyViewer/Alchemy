@@ -4680,7 +4680,12 @@ void LLVOAvatar::updateFootstepSounds()
         }
     }
 
-    const LLUUID AGENT_FOOTSTEP_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_RUN, ANIM_AGENT_LAND};
+    // The same five stand-ins the walk list needs: an avatar walking on the
+    // new animations, or on the female ones, puts its feet down too.
+    const LLUUID AGENT_FOOTSTEP_ANIMS[] = {ANIM_AGENT_WALK, ANIM_AGENT_WALK_NEW,
+                                           ANIM_AGENT_FEMALE_WALK, ANIM_AGENT_FEMALE_WALK_NEW,
+                                           ANIM_AGENT_RUN, ANIM_AGENT_RUN_NEW,
+                                           ANIM_AGENT_FEMALE_RUN_NEW, ANIM_AGENT_LAND};
     const S32 NUM_AGENT_FOOTSTEP_ANIMS = LL_ARRAY_SIZE(AGENT_FOOTSTEP_ANIMS);
 
     if ( gAudiop && isAnyAnimationSignaled(AGENT_FOOTSTEP_ANIMS, NUM_AGENT_FOOTSTEP_ANIMS) )
