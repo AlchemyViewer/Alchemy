@@ -31,6 +31,7 @@
 
 #include "altestcharacter.h"
 
+#include <fstream>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -1097,4 +1098,41 @@ namespace tut
                    merged.mRotKeys[1] == one_frame.mRotKeys[1]);
         }
     }
+
+#ifdef AL_SHIPPED_ANIM_INI
+    template<> template<>
+    void llbvhloader_object::test<15>()
+    {
+        // The table the viewer ships is read by this parser before every BVH
+        // upload, and one it refuses stops the upload, so the file itself is
+        // read here rather than something that looks like it.
+        std::ifstream file(AL_SHIPPED_ANIM_INI);
+        ensure("the shipped translation table was found", file.good());
+
+        std::unique_ptr<LLBVHLoader> loader = makeLoader();
+        ensure_equals("the shipped translation table is read",
+                      loader->loadTranslationTable(file), E_ST_OK);
+
+        // Nothing in it is a setting, so nothing in it may become one by
+        // accident: an example that stopped being a comment would be read.
+        std::ifstream again(AL_SHIPPED_ANIM_INI);
+        std::string line;
+        S32 number = 0;
+        while (std::getline(again, line))
+        {
+            number++;
+            if (number == 1)
+            {
+                ensure_equals("the header is the first line of it",
+                              line.compare(0, 16, "Translations 1.0"), 0);
+                continue;
+            }
+
+            const size_t first = line.find_first_not_of(" \t\r");
+            ensure("every line after it is blank or a comment",
+                   first == std::string::npos || line[first] == '#');
+        }
+        ensure("the file has something in it", number > 1);
+    }
+#endif
 }

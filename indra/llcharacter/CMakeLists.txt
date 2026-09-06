@@ -84,4 +84,8 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llkeyframemotion "" "${character_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llmultigesture "" "${character_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llbvhloader "" "${character_test_libs}" "${test_project}")
+  # The translation table this parser reads is shipped by newview, and one it
+  # refuses stops every BVH upload, so the test reads the shipped file itself.
+  target_compile_definitions(INTEGRATION_TEST_llbvhloader
+    PRIVATE "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\"")
 endif()
