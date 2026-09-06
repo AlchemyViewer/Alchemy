@@ -443,8 +443,10 @@ bool LLGestureStepChat::deserialize(LLDataPacker& dp)
         return false;
     }
 
-
-    dp.unpackU32(mFlags, "flags");
+    if (!dp.unpackU32(mFlags, "flags"))
+    {
+        return false;
+    }
     return true;
 }
 // *NOTE: result is translated in LLPreviewGesture::getLabel()

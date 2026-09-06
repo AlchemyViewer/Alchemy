@@ -80,6 +80,40 @@ namespace
         buffer.back() = '\0';
         return buffer;
     }
+
+    // Writes one step out and hands back the bytes, terminator included.
+    std::vector<char> serialize_step(const LLGestureStep& step)
+    {
+        std::vector<char> buffer(step.getMaxSerialSize() + 1, '\0');
+        LLDataPackerAsciiBuffer dp(buffer.data(), (S32)buffer.size());
+        tut::ensure("the step serializes", step.serialize(dp));
+        buffer.resize(dp.getCurrentSize());
+        buffer.back() = '\0';
+        return buffer;
+    }
+
+    // The same bytes with the last field taken off. Each field is a line, so
+    // that is everything up to and including the newline before the last one.
+    std::vector<char> without_last_field(const std::vector<char>& bytes)
+    {
+        const std::string text(bytes.data());
+        const size_t last = text.find_last_of('\n');
+        tut::ensure("the step has a last field", last != std::string::npos && last > 0);
+        const size_t previous = text.find_last_of('\n', last - 1);
+        tut::ensure("and one before it", previous != std::string::npos);
+
+        std::vector<char> shortened(bytes.begin(), bytes.begin() + previous + 1);
+        shortened.push_back('\0');
+        return shortened;
+    }
+
+    // Reads a step back from bytes.
+    bool step_accepts(LLGestureStep& step, const std::vector<char>& bytes)
+    {
+        std::vector<char> mutableBytes = bytes;
+        LLDataPackerAsciiBuffer dp(mutableBytes.data(), (S32)mutableBytes.size());
+        return step.deserialize(dp);
+    }
 }
 
 namespace tut
@@ -192,5 +226,74 @@ namespace tut
         ensure("still refused", !read.deserialize(dp));
         ensure("and stopped at the one step the body actually held",
                read.mSteps.size() <= 1u);
+    }
+
+    template<> template<>
+    void llmultigesture_object::test<5>()
+    {
+        // Each step reads back what it wrote, and refuses what is missing its
+        // last field. Through a whole gesture the difference does not show --
+        // the reader gives up on the next step either way -- so the steps are
+        // asked directly.
+        {
+            LLGestureStepAnimation full;
+            full.mAnimName = "express_wave";
+            full.mAnimAssetID.generate();
+            full.mFlags = 1;
+            const std::vector<char> bytes = serialize_step(full);
+
+            LLGestureStepAnimation whole;
+            ensure("the animation step reads back", step_accepts(whole, bytes));
+            ensure_equals("with its name", whole.mAnimName, full.mAnimName);
+            ensure_equals("and its flags", whole.mFlags, full.mFlags);
+
+            LLGestureStepAnimation cut;
+            ensure("an animation step missing its flags is refused",
+                   !step_accepts(cut, without_last_field(bytes)));
+        }
+        {
+            LLGestureStepSound full;
+            full.mSoundName = "chime";
+            full.mSoundAssetID.generate();
+            full.mFlags = 1;
+            const std::vector<char> bytes = serialize_step(full);
+
+            LLGestureStepSound whole;
+            ensure("the sound step reads back", step_accepts(whole, bytes));
+            ensure_equals("with its name", whole.mSoundName, full.mSoundName);
+
+            LLGestureStepSound cut;
+            ensure("a sound step missing its flags is refused",
+                   !step_accepts(cut, without_last_field(bytes)));
+        }
+        {
+            LLGestureStepChat full;
+            full.mChatText = "hello";
+            full.mFlags = 1;
+            const std::vector<char> bytes = serialize_step(full);
+
+            LLGestureStepChat whole;
+            ensure("the chat step reads back", step_accepts(whole, bytes));
+            ensure_equals("with its text", whole.mChatText, full.mChatText);
+            ensure_equals("and its flags", whole.mFlags, full.mFlags);
+
+            LLGestureStepChat cut;
+            ensure("a chat step missing its flags is refused",
+                   !step_accepts(cut, without_last_field(bytes)));
+        }
+        {
+            LLGestureStepWait full;
+            full.mWaitSeconds = 1.5f;
+            full.mFlags = 2;
+            const std::vector<char> bytes = serialize_step(full);
+
+            LLGestureStepWait whole;
+            ensure("the wait step reads back", step_accepts(whole, bytes));
+            ensure_equals("with its flags", whole.mFlags, full.mFlags);
+
+            LLGestureStepWait cut;
+            ensure("a wait step missing its flags is refused",
+                   !step_accepts(cut, without_last_field(bytes)));
+        }
     }
 }
