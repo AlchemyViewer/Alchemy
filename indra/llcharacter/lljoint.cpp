@@ -879,6 +879,34 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
         return;
     }
 
+    // The local rotation that composes with the parent's world orientation to
+    // give this one, which is what this is for. Where the parent carries no
+    // scale that is exactly what the matrix route below arrives at, and six of
+    // these run every frame for a standing avatar -- two per leg in the
+    // inverse kinematics and one per ankle -- against a route that builds
+    // three matrices and inverts one of them.
+    //
+    // The test is for no scale rather than for a uniform one. A scaled parent
+    // makes the product below a rotation times that scale, and the extraction
+    // that pulls a quaternion out of it adds one to the trace before taking a
+    // root, which the scale does not divide out of; normalizing afterwards
+    // does not put it back. So a scaled parent gets a different answer from
+    // the two routes, and the one it has always had is the one below.
+    const LLVector3& parent_scale = mParent->getScale();
+    if (parent_scale.mV[VX] == 1.f && parent_scale.mV[VY] == 1.f && parent_scale.mV[VZ] == 1.f)
+    {
+        LLQuaternion2 parent_inverse;
+        parent_inverse.setConjugate(LLQuaternion2(mParent->getWorldRotation()));
+
+        LLQuaternion2 local;
+        local.setMul(LLQuaternion2(rot), parent_inverse);
+
+        LLQuaternion local_rotation;
+        local.store(local_rotation);
+        setRotation(local_rotation);
+        return;
+    }
+
     LLMatrix4 temp_mat(rot);
 
     LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix().toMatrix4();

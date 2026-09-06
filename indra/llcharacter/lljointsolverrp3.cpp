@@ -170,12 +170,18 @@ void LLJointSolverRP3::solve()
     //-------------------------------------------------------------------------
     // get the poleVector in world space
     //-------------------------------------------------------------------------
-    LLMatrix4 worldJointAParentMat;
+    // The pole vector through the parent's upper three rows, which is what
+    // rotate_vector did with the matrix it was handed; the matrix is already
+    // in this form, so there is nothing to copy it into first.
+    LLVector3 poleVec = mPoleVector;
     if ( mJointA->getParent() )
     {
-        worldJointAParentMat = mJointA->getParent()->getWorldMatrix().toMatrix4();
+        LLVector4a pole;
+        pole.load3( mPoleVector.mV );
+        LLVector4a rotated;
+        mJointA->getParent()->getWorldMatrix().rotate( pole, rotated );
+        poleVec.set( rotated.getF32ptr() );
     }
-    LLVector3 poleVec = rotate_vector( mPoleVector, worldJointAParentMat );
 
     //-------------------------------------------------------------------------
     // compute the following:
