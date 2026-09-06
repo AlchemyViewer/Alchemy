@@ -888,10 +888,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         bool on_screen = false;
 
         constexpr U32 max_faces_to_check = 1024;
-        // Faces one visit walks while the stat it feeds is a running max: a
-        // texture with more faces than this converges on its largest face
-        // over a few visits. Above BIAS_TRS_OUT_OF_SCREEN the max is reset
-        // every visit, and the whole list is walked so the reset sees all of it.
+        // Faces one visit walks. The stat this feeds is a running max, so a
+        // texture with more faces than this converges on its largest face over
+        // a few visits. Above BIAS_TRS_OUT_OF_SCREEN the max is reset every
+        // visit; the slice's max is carried across a rotation of the list so
+        // the reset still sees the whole list, one rotation late.
         constexpr U32 faces_per_visit = 32;
 
         U32 channel_faces[LLRender::NUM_TEXTURE_CHANNELS];
@@ -914,11 +915,14 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
         {
             U32 to_walk = face_count;
             U32 position = 0;
-            if (face_count > faces_per_visit && LLViewerTexture::sDesiredDiscardBias <= BIAS_TRS_OUT_OF_SCREEN)
+            const bool sliced = face_count > faces_per_visit;
+            bool rotation_done = false;
+            if (sliced)
             {
                 to_walk = faces_per_visit;
                 position = imagep->mFaceWalkCursor % face_count;
                 imagep->mFaceWalkCursor = position + to_walk;
+                rotation_done = position + to_walk >= face_count;
             }
 
             // position counts across the channels' lists laid end to end
@@ -1000,6 +1004,22 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                         break;
                     }
                 }
+            }
+
+            if (sliced)
+            {
+                imagep->mFaceWalkMax = llmax(imagep->mFaceWalkMax, max_vsize);
+                if (rotation_done)
+                {
+                    imagep->mFaceWalkRotationMax = imagep->mFaceWalkMax;
+                    imagep->mFaceWalkMax = 0.f;
+                }
+                max_vsize = llmax(max_vsize, llmax(imagep->mFaceWalkMax, imagep->mFaceWalkRotationMax));
+            }
+            else
+            {
+                imagep->mFaceWalkMax = 0.f;
+                imagep->mFaceWalkRotationMax = 0.f;
             }
         }
 
