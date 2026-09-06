@@ -75,6 +75,14 @@ static U32 sFindMissCount = 0;
 static U32 sCreateCount = 0;
 static U32 sDeleteCount = 0;
 
+// Per-frame shape of the update window's visits, sampled and reset the same way.
+static U32 sVisitCount = 0;
+static U32 sVisitBoostedCount = 0;   // skipped the face loop on boost level
+static U32 sVisitFacelessCount = 0;  // walked the channels and found no face
+static U32 sFaceWalkCount = 0;
+static U32 sFaceOffScreenCount = 0;
+static U32 sPixelAreaCalcCount = 0;
+
 LLViewerTextureList gTextureList;
 
 extern LLGLSLShader gCopyProgram;
@@ -762,7 +770,15 @@ void LLViewerTextureList::updateImages(F32 max_time)
     LL_PROFILE_PLOT("TextureList: deletes", (int64_t)sDeleteCount);
     LL_PROFILE_PLOT("TextureList: callback textures", (int64_t)mCallbackList.size());
     LL_PROFILE_PLOT("TextureList: fast cache pending", (int64_t)mFastCacheList.size());
+    LL_PROFILE_PLOT("TextureList: visits", (int64_t)sVisitCount);
+    LL_PROFILE_PLOT("TextureList: visits boosted", (int64_t)sVisitBoostedCount);
+    LL_PROFILE_PLOT("TextureList: visits faceless", (int64_t)sVisitFacelessCount);
+    LL_PROFILE_PLOT("TextureList: faces walked", (int64_t)sFaceWalkCount);
+    LL_PROFILE_PLOT("TextureList: faces off screen", (int64_t)sFaceOffScreenCount);
+    LL_PROFILE_PLOT("TextureList: pixel area calcs", (int64_t)sPixelAreaCalcCount);
     sFindCount = sFindMissCount = sCreateCount = sDeleteCount = 0;
+    sVisitCount = sVisitBoostedCount = sVisitFacelessCount = 0;
+    sFaceWalkCount = sFaceOffScreenCount = sPixelAreaCalcCount = 0;
 
     static bool cleared = false;
     if(gTeleportDisplay)
@@ -859,6 +875,9 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     constexpr F32 BIAS_TRS_OUT_OF_SCREEN = 1.5f;
     constexpr F32 BIAS_TRS_ON_SCREEN = 1.f;
 
+    ++sVisitCount;
+    U32 faces_walked = 0;
+
     if (imagep->getBoostLevel() < LLViewerFetchedTexture::BOOST_HIGH)  // don't bother checking face list for boosted textures
     {
         static LLCachedControl<F32> texture_scale_min(gSavedSettings, "TextureScaleMinAreaFactor", 0.0095f);
@@ -891,6 +910,7 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                 {
                     F32 radius;
                     F32 cos_angle_to_view_dir;
+                    ++faces_walked;
 
                     if ((gFrameCount - face->mLastTextureUpdate) > 10)
                     { // only call calcPixelArea at most once every 10 frames for a given face
@@ -898,11 +918,16 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
                         // assigned to them, such as is the case with GLTF materials or Blinn-Phong materials
                         face->mInFrustum = face->calcPixelArea(cos_angle_to_view_dir, radius);
                         face->mLastTextureUpdate = gFrameCount;
+                        ++sPixelAreaCalcCount;
                     }
 
                     F32 vsize = face->getPixelArea();
 
                     on_screen |= face->mInFrustum;
+                    if (!face->mInFrustum)
+                    {
+                        ++sFaceOffScreenCount;
+                    }
 
                     // Scale desired texture resolution higher or lower depending on texture scale
                     //
@@ -956,6 +981,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
             // this is especially important because the above is not time sliced and can hit multiple ms for a single texture
             max_vsize = MAX_IMAGE_AREA;
         }
+        else if (face_count == 0)
+        {
+            ++sVisitFacelessCount;
+        }
+        sFaceWalkCount += faces_walked;
 
         if (imagep->getType() == LLViewerTexture::LOD_TEXTURE && imagep->getBoostLevel() == LLViewerTexture::BOOST_NONE)
         { // conditionally reset max virtual size for unboosted LOD_TEXTURES
@@ -971,6 +1001,11 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
 
         imagep->addTextureStats(max_vsize);
     }
+    else
+    {
+        ++sVisitBoostedCount;
+    }
+    LL_PROFILE_ZONE_NUM(faces_walked);
 
 #if 0
     imagep->setDebugText(llformat("%d/%d - %d/%d -- %d/%d",
