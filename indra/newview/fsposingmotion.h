@@ -218,7 +218,6 @@ private:
     /// <summary>
     /// Constructor and usage requires this not be NULL.
     /// </summary>
-    JointMotionList dummyMotionList;
 
     /// <summary>
     /// The time constant, in seconds, we use for transitioning between one animation-state to another; this affects the 'damping'

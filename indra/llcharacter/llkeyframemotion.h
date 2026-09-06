@@ -34,12 +34,16 @@
 #include <string>
 #include <vector>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include "llassetstorage.h"
 #include "llbboxlocal.h"
 #include "llhandmotion.h"
 #include "lljointstate.h"
 #include "llmotion.h"
+#include "llpointer.h"
 #include "llquaternion.h"
+#include "llrefcount.h"
 #include "v3dmath.h"
 #include "v3math.h"
 #include "llbvhconsts.h"
@@ -359,7 +363,9 @@ public:
     //-------------------------------------------------------------------------
     // JointMotionList
     //-------------------------------------------------------------------------
-    class JointMotionList
+    // Held by the cache and by every motion playing it, so it goes when the
+    // last of them lets go rather than when the first of them does.
+    class JointMotionList : public LLRefCount
     {
     public:
         // The joints an animation writes, in one block. Every playing
@@ -379,8 +385,6 @@ public:
         constraint_list_t       mConstraints;
         LLBBoxLocal             mPelvisBBox;
         // mEmoteName is a facial motion, but it's necessary to appear here so that it's cached.
-        // TODO: LLKeyframeDataCache::getKeyframeData should probably return a class containing
-        // JointMotionList and mEmoteName, see LLKeyframeMotion::onInitialize.
         std::string             mEmoteName;
         LLUUID                  mEmoteID;
 
@@ -393,7 +397,7 @@ public:
     };
 
 protected:
-    JointMotionList*                mJointMotionList;
+    LLPointer<JointMotionList>      mJointMotionList;
     std::vector<LLPointer<LLJointState> > mJointStates;
     std::vector<KeyCursors>         mKeyCursors;
     LLJoint*                        mPelvisp;
@@ -409,20 +413,27 @@ public:
     void setCharacter(LLCharacter* character) { mCharacter = character; }
 };
 
+// Every animation any character has played is kept here so that playing it
+// again costs nothing. Nothing is owned outright: an entry goes when the cache
+// and every motion holding it have all let go.
 class LLKeyframeDataCache
 {
 public:
-    // *FIX: implement this as an actual singleton member of LLKeyframeMotion
-    LLKeyframeDataCache(){};
-    ~LLKeyframeDataCache();
+    LLKeyframeDataCache() = delete;
 
-    typedef std::map<LLUUID, class LLKeyframeMotion::JointMotionList*> keyframe_data_map_t;
+    typedef boost::unordered_flat_map<LLUUID, LLPointer<LLKeyframeMotion::JointMotionList>> keyframe_data_map_t;
     static keyframe_data_map_t sKeyframeDataMap;
 
     static void addKeyframeData(const LLUUID& id, LLKeyframeMotion::JointMotionList*);
     static LLKeyframeMotion::JointMotionList* getKeyframeData(const LLUUID& id);
 
     static void removeKeyframeData(const LLUUID& id);
+
+    // Drops every entry no motion is still holding. What is left is what some
+    // character can still play without fetching it again.
+    static void purge();
+
+    static size_t size() { return sKeyframeDataMap.size(); }
 
     //print out diagnostic info
     static void dumpDiagInfo();

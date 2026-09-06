@@ -2311,8 +2311,9 @@ void LLKeyframeMotion::setEaseOut(F32 ease_in)
 //-----------------------------------------------------------------------------
 void LLKeyframeMotion::flushKeyframeCache()
 {
-    // TODO: Make this safe to do
-//  LLKeyframeDataCache::clear();
+    // Safe now: the cache holds a reference rather than the animation itself,
+    // so letting go of one still being played leaves it playing.
+    LLKeyframeDataCache::clear();
 }
 
 //-----------------------------------------------------------------------------
@@ -2473,16 +2474,35 @@ void LLKeyframeDataCache::addKeyframeData(const LLUUID& id, LLKeyframeMotion::Jo
 }
 
 //--------------------------------------------------------------------
+// LLKeyframeDataCache::purge()
+//--------------------------------------------------------------------
+void LLKeyframeDataCache::purge()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    const size_t before = sKeyframeDataMap.size();
+
+    // One reference is this map's own, so an entry with only that one is an
+    // animation no character is able to play any more.
+    boost::unordered::erase_if(sKeyframeDataMap, [](const keyframe_data_map_t::value_type& entry)
+    {
+        return entry.second.isNull() || entry.second->getNumRefs() == 1;
+    });
+
+    LL_PROFILE_ZONE_NUM(before);
+    LL_PROFILE_ZONE_NUM(sKeyframeDataMap.size());
+    if (before != sKeyframeDataMap.size())
+    {
+        LL_DEBUGS("Animation") << "keyframe cache " << before << " -> "
+                               << sKeyframeDataMap.size() << LL_ENDL;
+    }
+}
+
+//--------------------------------------------------------------------
 // LLKeyframeDataCache::removeKeyframeData()
 //--------------------------------------------------------------------
 void LLKeyframeDataCache::removeKeyframeData(const LLUUID& id)
 {
-    keyframe_data_map_t::iterator found_data = sKeyframeDataMap.find(id);
-    if (found_data != sKeyframeDataMap.end())
-    {
-        delete found_data->second;
-        sKeyframeDataMap.erase(found_data);
-    }
+    sKeyframeDataMap.erase(id);
 }
 
 //--------------------------------------------------------------------
@@ -2498,20 +2518,11 @@ LLKeyframeMotion::JointMotionList* LLKeyframeDataCache::getKeyframeData(const LL
     return found_data->second;
 }
 
-//--------------------------------------------------------------------
-// ~LLKeyframeDataCache::LLKeyframeDataCache()
-//--------------------------------------------------------------------
-LLKeyframeDataCache::~LLKeyframeDataCache()
-{
-    clear();
-}
-
 //-----------------------------------------------------------------------------
 // clear()
 //-----------------------------------------------------------------------------
 void LLKeyframeDataCache::clear()
 {
-    for_each(sKeyframeDataMap.begin(), sKeyframeDataMap.end(), DeletePairedPointer());
     sKeyframeDataMap.clear();
 }
 

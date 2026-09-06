@@ -33,7 +33,7 @@ FSPosingMotion::FSPosingMotion(const LLUUID& id) : LLKeyframeMotion(id)
 {
     mName = "fs_poser_pose";
     mMotionID = id;
-    mJointMotionList = &dummyMotionList;
+    mJointMotionList = new JointMotionList;
 }
 
 LLMotion::LLMotionInitStatus FSPosingMotion::onInitialize(LLCharacter* character)

@@ -5475,6 +5475,16 @@ void LLAppViewer::idle()
             viewer_stats_timer.reset();
         }
 
+        // Let go of the animations no character can still play. Nothing here
+        // is urgent -- it is memory, not latency -- so it is done on a timer
+        // rather than on whichever frame an animation happened to arrive.
+        static LLFrameTimer keyframe_cache_timer;
+        if (keyframe_cache_timer.getElapsedTimeF32() > 10.f)
+        {
+            keyframe_cache_timer.reset();
+            LLKeyframeDataCache::purge();
+        }
+
         // Print the object debugging stats
         static LLFrameTimer object_debug_timer;
         if (object_debug_timer.getElapsedTimeF32() > 5.f)

@@ -1154,4 +1154,148 @@ namespace tut
         LLDataPackerBinaryBuffer reader(buffer.data(), whole);
         ensure("and the whole of it is not", motion.deserialize(reader, motion.getID()));
     }
+
+    template<> template<>
+    void llkeyframemotion_object::test<16>()
+    {
+        // What an animation was read into is kept so that playing it again
+        // costs nothing, and it belongs to the cache and to every motion
+        // playing it at once rather than to whichever of them was last.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        ensure_equals("the cache starts empty", LLKeyframeDataCache::size(), 0u);
+
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        ensure("the animation is read", load(motion, anim, buffer.data(), (S32)buffer.size()));
+
+        ensure_equals("and kept", LLKeyframeDataCache::size(), 1u);
+        LLKeyframeMotion::JointMotionList* held = LLKeyframeDataCache::getKeyframeData(motion.getID());
+        ensure("under the id it was read for", held != nullptr);
+        ensure_equals("with the joints it was read with", held->getNumJointMotions(), 2u);
+
+        // Counted rather than owned: the cache has one hold on it and the
+        // motion reading it has the other.
+        ensure_equals("two things are holding it", held->getNumRefs(), 2);
+
+        {
+            LLKeyframeMotion second(motion.getID());
+            ensure_equals("a second motion reading it makes three",
+                          second.onInitialize(&mCharacter), LLMotion::STATUS_SUCCESS);
+            ensure_equals("holds", held->getNumRefs(), 3);
+        }
+        ensure_equals("and letting go puts it back", held->getNumRefs(), 2);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<17>()
+    {
+        // Emptying the cache does not stop an animation somebody is playing.
+        // This is what the cache could not do before: it held the animation
+        // itself, so letting go of one took it out from under the motion.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        ensure("the animation is read", load(motion, anim, buffer.data(), (S32)buffer.size()));
+        const F32 duration = motion.getDuration();
+        ensure("it has a duration to lose", duration > 0.f);
+
+        LLKeyframeDataCache::clear();
+        ensure_equals("the cache lets go of it", LLKeyframeDataCache::size(), 0u);
+        ensure("and no longer hands it out",
+               LLKeyframeDataCache::getKeyframeData(motion.getID()) == nullptr);
+
+        ensure_approximately_equals("the motion still has it", motion.getDuration(), duration, 16);
+        ensure_equals("whole", motion.getNumJointMotions(), 2);
+
+        // And it still plays, which reads the curves the cache used to own.
+        LLJointState* state = sampleAt(motion, 0.5f, "mPelvis");
+        ensure("a motion whose cache entry is gone still animates", state != nullptr);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<18>()
+    {
+        // Removing one by name is the same: it goes from the cache and stays
+        // with whoever is playing it.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        LLKeyframeMotion motion(LLUUID::generateNewID());
+        ensure("the animation is read", load(motion, anim, buffer.data(), (S32)buffer.size()));
+
+        LLKeyframeDataCache::removeKeyframeData(motion.getID());
+        ensure_equals("the cache lets go of it", LLKeyframeDataCache::size(), 0u);
+        ensure_equals("the motion does not", motion.getNumJointMotions(), 2);
+
+        // Removing one nobody has is not an error.
+        LLKeyframeDataCache::removeKeyframeData(LLUUID::generateNewID());
+        ensure_equals("and the cache is no worse for it", LLKeyframeDataCache::size(), 0u);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<19>()
+    {
+        // The purge drops what no motion is holding and keeps what one is,
+        // which is the whole of how the cache is allowed to end a session
+        // smaller than it would otherwise be.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        LLKeyframeMotion kept(LLUUID::generateNewID());
+        ensure("the first animation is read", load(kept, anim, buffer.data(), (S32)buffer.size()));
+
+        LLUUID dropped_id;
+        {
+            LLKeyframeMotion dropped(LLUUID::generateNewID());
+            dropped_id = dropped.getID();
+            ensure("the second is read", load(dropped, anim, buffer.data(), (S32)buffer.size()));
+            ensure_equals("both are in the cache", LLKeyframeDataCache::size(), 2u);
+
+            LLKeyframeDataCache::purge();
+            ensure_equals("a purge keeps what is being played", LLKeyframeDataCache::size(), 2u);
+        }
+
+        // The second motion is gone, so nothing can play what it was reading.
+        LLKeyframeDataCache::purge();
+        ensure_equals("a purge drops what nobody is playing", LLKeyframeDataCache::size(), 1u);
+        ensure("the one that went is the one nobody had",
+               LLKeyframeDataCache::getKeyframeData(dropped_id) == nullptr);
+        ensure("and the one that stayed is the one somebody had",
+               LLKeyframeDataCache::getKeyframeData(kept.getID()) != nullptr);
+        ensure_equals("still whole", kept.getNumJointMotions(), 2);
+    }
+
+    template<> template<>
+    void llkeyframemotion_object::test<20>()
+    {
+        // Two motions reading the same animation share the one copy of it,
+        // and it outlives either of them going.
+        std::vector<U8> buffer(8192);
+        const AssetAnimation anim = two_joint_animation();
+
+        const LLUUID id = LLUUID::generateNewID();
+        LLKeyframeMotion::JointMotionList* first_list = nullptr;
+
+        LLKeyframeMotion second(id);
+        {
+            LLKeyframeMotion first(id);
+            ensure("the animation is read", load(first, anim, buffer.data(), (S32)buffer.size()));
+            first_list = LLKeyframeDataCache::getKeyframeData(id);
+            ensure("and kept", first_list != nullptr);
+
+            // The second finds it in the cache rather than reading it again,
+            // which is the path every repeat play of an animation takes.
+            ensure_equals("the second motion is initialized from the cache",
+                          second.onInitialize(&mCharacter), LLMotion::STATUS_SUCCESS);
+            ensure_equals("with the joints the first one read",
+                          second.getNumJointMotions(), 2);
+        }
+
+        LLKeyframeDataCache::purge();
+        ensure_equals("one motion going does not take the animation with it",
+                      LLKeyframeDataCache::size(), 1u);
+        ensure_equals("and it is the same one", LLKeyframeDataCache::getKeyframeData(id), first_list);
+    }
 }
