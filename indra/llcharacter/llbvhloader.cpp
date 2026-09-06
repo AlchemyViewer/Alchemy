@@ -210,10 +210,14 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
 
     LL_INFOS("BVH") << "NOTE: Loading translation table: " << fileName << LL_ENDL;
 
-    //--------------------------------------------------------------------
-    // register file to be closed on function exit
-    //--------------------------------------------------------------------
+    return loadTranslationTable(infile);
+}
 
+//------------------------------------------------------------------------
+// LLBVHLoader::loadTranslationTable()
+//------------------------------------------------------------------------
+ELoadStatus LLBVHLoader::loadTranslationTable(std::istream& infile)
+{
     //--------------------------------------------------------------------
     // load header
     //--------------------------------------------------------------------
@@ -307,8 +311,8 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
                 return E_ST_NO_XLT_LOOP;
             }
 
-            mLoopInPoint = loop_in * mDuration;
-            mLoopOutPoint = loop_out * mDuration;
+            mLoopInFraction = loop_in;
+            mLoopOutFraction = loop_out;
 
             continue;
         }
@@ -475,9 +479,9 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         }
     }
 
-    infile.close() ;
     return E_ST_OK;
 }
+
 void LLBVHLoader::makeTranslation(std::string alias_name, std::string joint_name)
 {
     //Translation &newTrans = (foomap.insert(value_type(alias_name, Translation()))).first();
@@ -586,6 +590,7 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
     tokenizer::iterator iter = tokens.begin();
 
     mLineNumber = 0;
+    std::for_each(mJoints.begin(), mJoints.end(), DeletePointer());
     mJoints.clear();
 
     std::vector<S32> parent_joints;
@@ -646,9 +651,16 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
         }
         else if ( strstr(line.c_str(), "End Site") )
         {
-            iter++; // {
-            iter++; //     OFFSET
-            iter++; // }
+            // {, OFFSET, }. A file that stops inside them stops here rather
+            // than walking the token iterator off the end of the file.
+            for (S32 skipped = 0; skipped < 3; skipped++)
+            {
+                if (iter == tokens.end())
+                {
+                    return E_ST_EOF;
+                }
+                iter++;
+            }
             S32 depth = 0;
             for (S32 j = (S32)parent_joints.size() - 1; j >= 0; j--)
             {
@@ -791,10 +803,21 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
             }
         }
 
+        // Three rotations, or three positions and three rotations, is the
+        // whole of what the frame reader below takes off each line. Any other
+        // count and it would read a number of floats the line was never
+        // required to carry.
+        if (joint->mNumChannels != 3 && joint->mNumChannels != 6)
+        {
+            strncpy(error_text, line.c_str(), 127);     /*Flawfinder: ignore*/
+            return E_ST_NO_CHANNELS;
+        }
+
         //----------------------------------------------------------------
         // get rotation order
         //----------------------------------------------------------------
-        const char *p = line.c_str();
+        const char *start = line.c_str();
+        const char *p = start;
         for (S32 i=0; i<3; i++)
         {
             p = strstr(p, "rotation");
@@ -804,7 +827,8 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
                 return E_ST_NO_ROTATION;
             }
 
-            const char axis = *(p - 1);
+            // the axis is the character before the word, so there has to be one
+            const char axis = (p > start) ? *(p - 1) : '\0';
             if ((axis != 'X') && (axis != 'Y') && (axis != 'Z'))
             {
                 strncpy(error_text, line.c_str(), 127);     /*Flawfinder: ignore*/
@@ -848,6 +872,12 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
         return E_ST_NO_FRAMES;
     }
 
+    if (mNumFrames <= 0)
+    {
+        strncpy(error_text, line.c_str(), 127);     /*Flawfinder: ignore*/
+        return E_ST_NO_FRAMES;
+    }
+
     //--------------------------------------------------------------------
     // get frame time
     //--------------------------------------------------------------------
@@ -870,14 +900,20 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
         return E_ST_NO_FRAME_TIME;
     }
 
+    // Every key time is written as a fraction of the duration, so a frame
+    // time that is zero, negative or not a number has no fraction to be.
+    if (!llfinite(mFrameTime) || mFrameTime <= 0.f)
+    {
+        strncpy(error_text, line.c_str(), 127);     /*Flawfinder: ignore*/
+        return E_ST_NO_FRAME_TIME;
+    }
+
     // If the user only supplies one animation frame (after the ignored reference frame 0), hold for mFrameTime.
     // If the user supples exactly one total frame, it isn't clear if that is a pose or reference frame, and the
     // behavior is not defined. In this case, retain historical undefined behavior.
     mDuration = llmax((F32)(mNumFrames - NUMBER_OF_UNPLAYED_FRAMES), 1.0f) * mFrameTime;
-    if (!mLoop)
-    {
-        mLoopOutPoint = mDuration;
-    }
+    mLoopInPoint = mLoopInFraction * mDuration;
+    mLoopOutPoint = mLoopOutFraction * mDuration;
 
     //--------------------------------------------------------------------
     // load frames
@@ -902,6 +938,13 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
             try
             {
                 F32 val = boost::lexical_cast<float>(*float_token_iter);
+                // A key that is not a number reaches the writer, where the
+                // time and the value are both quantized by dividing.
+                if (!llfinite(val))
+                {
+                    strncpy(error_text, line.c_str(), 127); /*Flawfinder: ignore*/
+                    return E_ST_NO_POS;
+                }
                 floats.push_back(val);
             }
             catch (const boost::bad_lexical_cast&)
@@ -918,7 +961,7 @@ ELoadStatus LLBVHLoader::loadBVHFile(const char *buffer, char* error_text, S32 &
             joint->mKeys.push_back( Key() );
             Key &key = joint->mKeys.back();
 
-            if (floats.size() < joint->mNumChannels)
+            if ((S32)floats.size() < joint->mNumChannels)
             {
                 strncpy(error_text, line.c_str(), 127); /*Flawfinder: ignore*/
                 return E_ST_NO_POS;
@@ -1244,6 +1287,8 @@ void LLBVHLoader::reset()
 
     mPriority = 2;
     mLoop = false;
+    mLoopInFraction = 0.f;
+    mLoopOutFraction = 1.f;
     mLoopInPoint = 0.f;
     mLoopOutPoint = 0.f;
     mEaseIn = 0.3f;
@@ -1260,7 +1305,7 @@ void LLBVHLoader::reset()
 //------------------------------------------------------------------------
 // LLBVHLoader::getLine()
 //------------------------------------------------------------------------
-bool LLBVHLoader::getLine(llifstream& fp)
+bool LLBVHLoader::getLine(std::istream& fp)
 {
     if (fp.eof())
     {
@@ -1369,11 +1414,16 @@ bool LLBVHLoader::serialize(LLDataPacker& dp)
 
             time = llmax((F32)(frame - NUMBER_OF_IGNORED_FRAMES_AT_START), 0.0f) * mFrameTime; // Time elapsed before this frame starts.
 
-            if (mergeParent)
+            // Both merge joints are read one frame behind this one, so there
+            // has to be a frame behind, and it has to be one they have. A
+            // single frame animation has neither.
+            const S32 merge_frame = frame - 1;
+
+            if (mergeParent && merge_frame >= 0 && merge_frame < (S32)mergeParent->mKeys.size())
             {
-                mergeParentRot = mayaQ( mergeParent->mKeys[frame-1].mRot[0],
-                                        mergeParent->mKeys[frame-1].mRot[1],
-                                        mergeParent->mKeys[frame-1].mRot[2],
+                mergeParentRot = mayaQ( mergeParent->mKeys[merge_frame].mRot[0],
+                                        mergeParent->mKeys[merge_frame].mRot[1],
+                                        mergeParent->mKeys[merge_frame].mRot[2],
                                         bvhStringToOrder(mergeParent->mOrder) );
                 LLQuaternion parentFrameRot( mergeParent->mFrameMatrix );
                 LLQuaternion parentOffsetRot( mergeParent->mOffsetMatrix );
@@ -1384,11 +1434,11 @@ bool LLBVHLoader::serialize(LLDataPacker& dp)
                 mergeParentRot.loadIdentity();
             }
 
-            if (mergeChild)
+            if (mergeChild && merge_frame >= 0 && merge_frame < (S32)mergeChild->mKeys.size())
             {
-                mergeChildRot = mayaQ(  mergeChild->mKeys[frame-1].mRot[0],
-                                        mergeChild->mKeys[frame-1].mRot[1],
-                                        mergeChild->mKeys[frame-1].mRot[2],
+                mergeChildRot = mayaQ(  mergeChild->mKeys[merge_frame].mRot[0],
+                                        mergeChild->mKeys[merge_frame].mRot[1],
+                                        mergeChild->mKeys[merge_frame].mRot[2],
                                         bvhStringToOrder(mergeChild->mOrder) );
                 LLQuaternion childFrameRot( mergeChild->mFrameMatrix );
                 LLQuaternion childOffsetRot( mergeChild->mOffsetMatrix );

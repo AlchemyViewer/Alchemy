@@ -108,19 +108,22 @@ struct Joint
 };
 
 
+// The joint names and the target direction are written into the uploaded
+// asset whole, and not every line of a translation table fills all of them,
+// so they start empty rather than holding whatever was on the stack.
 struct Constraint
 {
-    char            mSourceJointName[16];       /* Flawfinder: ignore */
-    char            mTargetJointName[16];       /* Flawfinder: ignore */
-    S32             mChainLength;
+    char            mSourceJointName[16] {};    /* Flawfinder: ignore */
+    char            mTargetJointName[16] {};    /* Flawfinder: ignore */
+    S32             mChainLength = 0;
     LLVector3       mSourceOffset;
     LLVector3       mTargetOffset;
     LLVector3       mTargetDir;
-    F32             mEaseInStart;
-    F32             mEaseInStop;
-    F32             mEaseOutStart;
-    F32             mEaseOutStop;
-    EConstraintType mConstraintType;
+    F32             mEaseInStart = 0.f;
+    F32             mEaseInStop = 0.f;
+    F32             mEaseOutStart = 0.f;
+    F32             mEaseOutStop = 0.f;
+    EConstraintType mConstraintType = CONSTRAINT_TYPE_POINT;
 };
 
 //------------------------------------------------------------------------
@@ -250,6 +253,9 @@ public:
     // Loads the specified translation table.
     ELoadStatus loadTranslationTable(const char *fileName);
 
+    // Reads a translation table that is already open.
+    ELoadStatus loadTranslationTable(std::istream& stream);
+
     //Create a new joint alias
     void makeTranslation(std::string key, std::string value);
 
@@ -288,7 +294,7 @@ public:
 
 protected:
     // Consumes one line of input from file.
-    bool getLine(llifstream& fp);
+    bool getLine(std::istream& fp);
 
     // parser state
     char        mLine[BVH_PARSER_LINE_SIZE];        /* Flawfinder: ignore */
@@ -303,6 +309,11 @@ protected:
 
     S32                 mPriority;
     bool                mLoop;
+    // The translation table gives the loop points as fractions of the
+    // animation, and is read before there is an animation to take a fraction
+    // of, so they are kept as fractions until the duration is known.
+    F32                 mLoopInFraction;
+    F32                 mLoopOutFraction;
     F32                 mLoopInPoint;
     F32                 mLoopOutPoint;
     F32                 mEaseIn;
