@@ -28,6 +28,7 @@
 
 #include "lldatapacker.h"
 #include "llkeyframemotion.h"
+#include "llxmlnode.h"
 
 #include "altestcharacter.h"
 
@@ -251,6 +252,50 @@ namespace
         }
 
         return ok;
+    }
+
+
+    typedef std::map<std::string, std::string, std::less<>> alias_map_t;
+
+    // The aliases a bone declares, gathered the way LLAvatarAppearance does:
+    // the bone's own name is an alias for itself, and the aliases attribute is
+    // a list separated by spaces. This is a second reading of the same file
+    // rather than a call into that one, because llappearance is built on top
+    // of this library and cannot be called from underneath it.
+    void collect_bone_aliases(const LLXMLNodePtr& node, alias_map_t& map,
+                              std::vector<std::string>& claimed_twice)
+    {
+        for (LLXMLNodePtr child = node->getFirstChild(); child.notNull(); child = child->getNextSibling())
+        {
+            std::string name;
+            if (child->hasName("bone") && child->getAttributeString("name", name) && !name.empty())
+            {
+                auto claim = [&](const std::string& alias)
+                {
+                    alias_map_t::iterator found = map.find(alias);
+                    if (found != map.end() && found->second != name)
+                    {
+                        claimed_twice.push_back(alias);
+                    }
+                    map[alias] = name;
+                };
+
+                claim(name);
+
+                std::string aliases;
+                if (child->getAttributeString("aliases", aliases))
+                {
+                    std::istringstream words(aliases);
+                    std::string word;
+                    while (words >> word)
+                    {
+                        claim(word);
+                    }
+                }
+            }
+
+            collect_bone_aliases(child, map, claimed_twice);
+        }
     }
 
     std::string volume_name(const U8 (&field)[16])
@@ -1133,6 +1178,59 @@ namespace tut
                    first == std::string::npos || line[first] == '#');
         }
         ensure("the file has something in it", number > 1);
+    }
+#endif
+
+#ifdef AL_SHIPPED_AVATAR_SKELETON
+    template<> template<>
+    void llbvhloader_object::test<16>()
+    {
+        // Every joint name a .bvh is allowed to use comes from the shipped
+        // skeleton, and the root joint check turns away any file whose root is
+        // not the pelvis under one of them. Nothing else stands between an
+        // edit to that file and every BVH upload failing, so it is read here.
+        LLXMLNodePtr root;
+        ensure("the shipped skeleton was read",
+               LLXMLNode::parseFile(AL_SHIPPED_AVATAR_SKELETON, root, nullptr));
+        ensure("and it has a root", root.notNull());
+
+        alias_map_t aliases;
+        std::vector<std::string> claimed_twice;
+        collect_bone_aliases(root, aliases, claimed_twice);
+
+        ensure("the skeleton has its bones", aliases.size() > 100);
+
+        // The name the BVH reader insists the root joint answers to.
+        alias_map_t::iterator hip = aliases.find("hip");
+        ensure("the skeleton still calls the pelvis hip", hip != aliases.end());
+        ensure_equals("and means the pelvis by it", hip->second, std::string("mPelvis"));
+
+        // A bone claiming a name another bone already has takes it, and only
+        // says so in the log.
+        ensure_equals("no alias is claimed by two bones",
+                      claimed_twice.empty() ? std::string() : claimed_twice.front(),
+                      std::string());
+
+        // The whole map through the whole reader, which is what the upload
+        // does with it.
+        std::unique_ptr<LLBVHLoader> loader = makeLoader();
+        loader->reset();
+        for (const auto& [alias, joint] : aliases)
+        {
+            loader->makeTranslation(alias, joint);
+        }
+
+        ensure_equals("a BVH is read against the shipped skeleton",
+                      load(*loader, sample_lines()), E_ST_OK);
+
+        std::vector<U8> bytes = write(*loader);
+        WrittenAnimation written;
+        ensure("the animation can be read back", read_written(bytes, written));
+        ensure_equals("both joints are written", written.mNumJoints, 2u);
+        ensure_equals("the root under the name the skeleton gives it",
+                      written.mJointNames[0], std::string("mPelvis"));
+        ensure_equals("and the other one too",
+                      written.mJointNames[1], std::string("mTorso"));
     }
 #endif
 }

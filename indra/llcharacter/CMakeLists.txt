@@ -86,6 +86,9 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llbvhloader "" "${character_test_libs}" "${test_project}")
   # The translation table this parser reads is shipped by newview, and one it
   # refuses stops every BVH upload, so the test reads the shipped file itself.
+  # The joint names a .bvh may use come from the shipped skeleton, and the
+  # root joint check will not pass without them, so the test reads it too.
   target_compile_definitions(INTEGRATION_TEST_llbvhloader
-    PRIVATE "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\"")
+    PRIVATE "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\""
+            "AL_SHIPPED_AVATAR_SKELETON=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/character/avatar_skeleton.xml\"")
 endif()

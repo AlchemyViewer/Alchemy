@@ -1740,6 +1740,15 @@ void LLAvatarAppearance::makeJointAliases(LLAvatarBoneInfo* bone_info, joint_ali
 LLAvatarAppearance::joint_alias_map_t LLAvatarAppearance::buildJointAliases()
 {
     joint_alias_map_t map;
+
+    // A static anyone may call, and the skeleton it reads is only there once
+    // the avatar definitions have been read.
+    if (!sAvatarSkeletonInfo || !sAvatarXmlInfo)
+    {
+        LL_WARNS() << "avatar skeleton: asked for joint aliases before the skeleton was read" << LL_ENDL;
+        return map;
+    }
+
     for (LLAvatarBoneInfo* bone_info : sAvatarSkeletonInfo->mBoneInfoList)
     {
         makeJointAliases(bone_info, map);

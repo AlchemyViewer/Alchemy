@@ -37,7 +37,6 @@
 #include "llquantize.h"
 #include "llstl.h"
 #include "llfile.h"
-#include "llsdserialize.h"
 
 
 using namespace std;
@@ -663,44 +662,6 @@ if (joint_name == "mPelvis")
         newTrans.mRelativeRotationKey = true;
     }
 
-}
-
-ELoadStatus LLBVHLoader::loadAliases(const char * filename)
-{
-    LLSD aliases_sd;
-
-    std::string fullpath = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS,filename);
-
-    llifstream input_stream;
-    input_stream.open(fullpath.c_str(), std::ios::in | std::ios::binary);
-
-    if(input_stream.is_open())
-    {
-        if ( LLSDSerialize::fromXML(aliases_sd, input_stream) )
-        {
-            for(LLSD::map_iterator alias_iter = aliases_sd.beginMap();
-                alias_iter != aliases_sd.endMap();
-                ++alias_iter)
-            {
-                LLSD::String alias_name = alias_iter->first;
-                LLSD::String joint_name = alias_iter->second;
-                makeTranslation(alias_name, joint_name);
-
-            }
-        }
-        else
-        {
-            return E_ST_NO_XLT_HEADER;
-        }
-        input_stream.close();
-    }
-    else
-    {
-        LL_WARNS("BVH") << "Can't open joint alias file " << fullpath << LL_ENDL;
-        return E_ST_NO_XLT_FILE;
-    }
-
-    return E_ST_OK;
 }
 
 void LLBVHLoader::dumpBVHInfo()
