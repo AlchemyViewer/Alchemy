@@ -135,6 +135,15 @@ LLBVHLoader::LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &error
 {
     reset();
     errorLine = 0;
+
+    // Recognize all names we've been told are legal, before the translation
+    // table is read, so that a table naming one of them has the last word on
+    // what it is called and what frame it is in.
+    for (const auto& [alias, joint] : joint_alias_map)
+    {
+        makeTranslation(alias, joint);
+    }
+
     mStatus = loadTranslationTable("anim.ini");
     loadStatus = mStatus;
     LL_INFOS("BVH") << "Load Status 00 : " << loadStatus << LL_ENDL;
@@ -153,12 +162,6 @@ LLBVHLoader::LLBVHLoader(const char* buffer, ELoadStatus &loadStatus, S32 &error
             loadStatus = mStatus;
             return;
         }
-    }
-
-    // Recognize all names we've been told are legal.
-    for (const auto& [alias, joint] : joint_alias_map)
-    {
-        makeTranslation(alias, joint);
     }
 
     char error_text[128];       /* Flawfinder: ignore */
@@ -230,6 +233,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(std::istream& infile)
     // load data one line at a time
     //--------------------------------------------------------------------
     bool loadingGlobals = false;
+    Translation* trans = nullptr;
     while (getLine(infile))
     {
         //----------------------------------------------------------------
@@ -254,8 +258,15 @@ ELoadStatus LLBVHLoader::loadTranslationTable(std::istream& infile)
             if (strcmp(name, "GLOBALS")==0)
             {
                 loadingGlobals = true;
+                trans = nullptr;
                 continue;
             }
+
+            // Everything until the next section is about this joint. The
+            // subscript makes the entry if the alias map did not.
+            loadingGlobals = false;
+            trans = &mTranslations[ name ];
+            continue;
         }
 
         //----------------------------------------------------------------
@@ -475,6 +486,156 @@ ELoadStatus LLBVHLoader::loadTranslationTable(std::istream& infile)
 
             constraint.mConstraintType = CONSTRAINT_TYPE_PLANE;
             mConstraints.push_back(constraint);
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // everything from here belongs to a joint, so there has to be one
+        //----------------------------------------------------------------
+        if ( ! trans )
+            return E_ST_NO_XLT_NAME;
+
+        //----------------------------------------------------------------
+        // check for ignore flag
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "ignore") )
+        {
+            char trueFalse[128];    /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %127s", trueFalse) != 1 )    /* Flawfinder: ignore */
+                return E_ST_NO_XLT_IGNORE;
+
+            trans->mIgnore = LLStringUtil::isEqualInsensitiveASCII(trueFalse, "true");
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for relativepos flag
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "relativepos") )
+        {
+            F32 x, y, z;
+            char relpos[128];   /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %f %f %f", &x, &y, &z) == 3 )
+            {
+                // This is subtracted from every position key, which is then
+                // quantized by dividing, so it has to be a number.
+                if (!llfinite(x) || !llfinite(y) || !llfinite(z))
+                    return E_ST_NO_XLT_RELATIVE;
+
+                trans->mRelativePosition.setVec( x, y, z );
+            }
+            else if ( sscanf(mLine, " %*s = %127s", relpos) == 1 )  /* Flawfinder: ignore */
+            {
+                if ( ! LLStringUtil::isEqualInsensitiveASCII(relpos, "firstkey") )
+                    return E_ST_NO_XLT_RELATIVE;
+
+                trans->mRelativePositionKey = true;
+            }
+            else
+            {
+                return E_ST_NO_XLT_RELATIVE;
+            }
+
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for relativerot flag
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "relativerot") )
+        {
+            char relrot[128];   /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %127s", relrot) != 1 )   /* Flawfinder: ignore */
+                return E_ST_NO_XLT_RELATIVE;
+
+            if ( ! LLStringUtil::isEqualInsensitiveASCII(relrot, "firstkey") )
+                return E_ST_NO_XLT_RELATIVE;
+
+            trans->mRelativeRotationKey = true;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for outname value
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "outname") )
+        {
+            char outName[128];  /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %127s", outName) != 1 )  /* Flawfinder: ignore */
+                return E_ST_NO_XLT_OUTNAME;
+
+            trans->mOutName = outName;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for frame matrix value
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "frame") )
+        {
+            LLMatrix3 fm;
+            if ( sscanf(mLine, " %*s = %f %f %f, %f %f %f, %f %f %f",
+                    &fm.mMatrix[0][0], &fm.mMatrix[0][1], &fm.mMatrix[0][2],
+                    &fm.mMatrix[1][0], &fm.mMatrix[1][1], &fm.mMatrix[1][2],
+                    &fm.mMatrix[2][0], &fm.mMatrix[2][1], &fm.mMatrix[2][2] ) != 9 )
+                return E_ST_NO_XLT_MATRIX;
+
+            trans->mFrameMatrix = fm;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for offset matrix value
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "offset") )
+        {
+            LLMatrix3 om;
+            if ( sscanf(mLine, " %*s = %f %f %f, %f %f %f, %f %f %f",
+                    &om.mMatrix[0][0], &om.mMatrix[0][1], &om.mMatrix[0][2],
+                    &om.mMatrix[1][0], &om.mMatrix[1][1], &om.mMatrix[1][2],
+                    &om.mMatrix[2][0], &om.mMatrix[2][1], &om.mMatrix[2][2] ) != 9 )
+                return E_ST_NO_XLT_MATRIX;
+
+            trans->mOffsetMatrix = om;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for mergeparent value
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "mergeparent") )
+        {
+            char mergeParentName[128];  /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %127s", mergeParentName) != 1 )  /* Flawfinder: ignore */
+                return E_ST_NO_XLT_MERGEPARENT;
+
+            trans->mMergeParentName = mergeParentName;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for mergechild value
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "mergechild") )
+        {
+            char mergeChildName[128];   /* Flawfinder: ignore */
+            if ( sscanf(mLine, " %*s = %127s", mergeChildName) != 1 )   /* Flawfinder: ignore */
+                return E_ST_NO_XLT_MERGECHILD;
+
+            trans->mMergeChildName = mergeChildName;
+            continue;
+        }
+
+        //----------------------------------------------------------------
+        // check for per-joint priority
+        //----------------------------------------------------------------
+        if ( LLStringUtil::isEqualInsensitiveASCII(token, "priority") )
+        {
+            S32 priority;
+            if ( sscanf(mLine, " %*s = %d", &priority) != 1 )
+                return E_ST_NO_XLT_PRIORITY;
+
+            trans->mPriorityModifier = priority;
             continue;
         }
     }
@@ -1085,9 +1246,15 @@ void LLBVHLoader::applyTranslations()
 
         //----------------------------------------------------------------
         // Set joint priority
+        //
+        // Both halves come off a line of the translation table, so the sum is
+        // taken wide and then brought back to the range a joint priority is
+        // written in.
         //----------------------------------------------------------------
-        joint->mPriority = mPriority + trans.mPriorityModifier;
-
+        const S64 priority = (S64)mPriority + (S64)trans.mPriorityModifier;
+        joint->mPriority = (S32)llclamp(priority,
+                                        (S64)LLJoint::USE_MOTION_PRIORITY,
+                                        (S64)LL_CHARACTER_MAX_PRIORITY);
     }
 }
 

@@ -108,6 +108,18 @@ namespace
         return line;
     }
 
+    // The same file with a first frame that is not all zeroes, so that keys
+    // taken relative to the first frame are not the keys themselves.
+    std::vector<std::string> moving_lines()
+    {
+        std::vector<std::string> lines = sample_lines();
+        for (S32 frame = 0; frame < 4; ++frame)
+        {
+            lines[LINE_FIRST_FRAME + frame] = frame_line(frame + 1, 9);
+        }
+        return lines;
+    }
+
     std::string bvh_text(const std::vector<std::string>& lines)
     {
         std::string text;
@@ -144,6 +156,10 @@ namespace
         std::vector<S32> mJointPriorities;
         std::vector<S32> mNumRotKeys;
         std::vector<S32> mNumPosKeys;
+        // four words a key, so that two animations built from the same frames
+        // can be compared for whether a table line changed them
+        std::vector<std::vector<U16>> mRotKeys;
+        std::vector<std::vector<U16>> mPosKeys;
 
         S32 mNumConstraints = 0;
         // the first constraint, whole
@@ -202,14 +218,17 @@ namespace
                 }
                 (pass ? out.mNumPosKeys : out.mNumRotKeys).push_back(num_keys);
 
+                std::vector<U16> words;
                 for (S32 k = 0; ok && k < num_keys; ++k)
                 {
                     U16 word = 0;
-                    ok = dp.unpackU16(word, "time")
-                        && dp.unpackU16(word, "x")
-                        && dp.unpackU16(word, "y")
-                        && dp.unpackU16(word, "z");
+                    for (S32 part = 0; ok && part < 4; ++part)
+                    {
+                        ok = dp.unpackU16(word, "key");
+                        words.push_back(word);
+                    }
                 }
+                (pass ? out.mPosKeys : out.mRotKeys).push_back(words);
             }
         }
 
@@ -315,6 +334,19 @@ namespace tut
                 loader.serialize(dp);
             }
             return bytes;
+        }
+
+        // A translation table, then a BVH, then the animation that comes out.
+        WrittenAnimation build(const std::string& table, const std::vector<std::string>& lines)
+        {
+            std::unique_ptr<LLBVHLoader> loader = makeLoader();
+            ensure_equals("the table is read", readTable(*loader, table), E_ST_OK);
+            ensure_equals("the BVH is read", load(*loader, lines), E_ST_OK);
+
+            std::vector<U8> bytes = write(*loader);
+            WrittenAnimation written;
+            ensure("the animation can be read back", read_written(bytes, written));
+            return written;
         }
 
         // Reads those bytes the way an arriving animation asset is read.
@@ -822,6 +854,247 @@ namespace tut
             ensure_equals("a name longer than the field is refused", readTable(*loader,
                 header + "constraint = 2 0.0 0.2 0.8 1.0 mAJointWithAVeryLongNameIndeed 0 0 0 mGroundPlane 0 0 0\n"),
                 E_ST_NO_CONSTRAINT);
+        }
+    }
+
+    template<> template<>
+    void llbvhloader_object::test<11>()
+    {
+        // A section named for a joint, and the keys under it that say what
+        // becomes of that joint. None of these were read at all before.
+        const std::string header = "Translations 1.0\n";
+
+        {
+            // The table has the last word over the alias map, which is the
+            // whole point of a table: it is read after the aliases now.
+            WrittenAnimation written = build(header + "[abdomen]\noutname = mChest\n", sample_lines());
+            ensure_equals("both joints are still written", written.mNumJoints, 2u);
+            ensure_equals("the root keeps the name the alias gave it",
+                          written.mJointNames[0], std::string("mPelvis"));
+            ensure_equals("and the table renames the other",
+                          written.mJointNames[1], std::string("mChest"));
+        }
+        {
+            // And the reason it has to be read after them: an alias writes the
+            // name and the frame whole, so one applied after a table takes the
+            // table's outname away with it.
+            std::unique_ptr<LLBVHLoader> loader = makeLoader();
+            ensure_equals("the table is read",
+                          readTable(*loader, header + "[abdomen]\noutname = mChest\n"), E_ST_OK);
+            loader->makeTranslation("abdomen", "mTorso");
+            ensure_equals("the BVH is read", load(*loader, sample_lines()), E_ST_OK);
+
+            std::vector<U8> bytes = write(*loader);
+            WrittenAnimation written;
+            ensure("the animation can be read back", read_written(bytes, written));
+            ensure_equals("an alias read after a table undoes what it said",
+                          written.mJointNames[1], std::string("mTorso"));
+        }
+        {
+            WrittenAnimation written = build(header + "[abdomen]\nignore = true\n", sample_lines());
+            ensure_equals("an ignored joint is not written", written.mNumJoints, 1u);
+            ensure_equals("and the one left is the other one",
+                          written.mJointNames[0], std::string("mPelvis"));
+        }
+        {
+            WrittenAnimation written = build(header + "[abdomen]\nignore = false\n", sample_lines());
+            ensure_equals("a joint told not to be ignored is written", written.mNumJoints, 2u);
+        }
+        {
+            WrittenAnimation written = build(
+                header + "[GLOBALS]\npriority = 3\n[abdomen]\npriority = 2\n", sample_lines());
+            ensure_equals("the base priority is the global one", written.mBasePriority, 3);
+            ensure_equals("a joint with no section of its own takes it",
+                          written.mJointPriorities[0], 3);
+            ensure_equals("and a joint with one adds its own to it",
+                          written.mJointPriorities[1], 5);
+        }
+        {
+            WrittenAnimation written = build(
+                header + "[GLOBALS]\npriority = 3\n[abdomen]\npriority = -2\n", sample_lines());
+            ensure_equals("a modifier may take it down again",
+                          written.mJointPriorities[1], 1);
+        }
+        {
+            // Both halves come off a line of the file, so their sum is taken
+            // wide and brought back into the range a priority is written in.
+            WrittenAnimation written = build(
+                header + "[GLOBALS]\npriority = 2147483647\n[abdomen]\npriority = 2147483647\n",
+                sample_lines());
+            ensure_equals("the global priority is written as it was given",
+                          written.mBasePriority, 2147483647);
+            ensure_equals("but a joint priority is brought into range",
+                          written.mJointPriorities[1], LL_CHARACTER_MAX_PRIORITY);
+        }
+        {
+            WrittenAnimation written = build(
+                header + "[GLOBALS]\npriority = -2147483648\n[abdomen]\npriority = -2147483648\n",
+                sample_lines());
+            ensure_equals("from the other end too",
+                          written.mJointPriorities[1], (S32)LLJoint::USE_MOTION_PRIORITY);
+        }
+        {
+            // A key nobody knows is left alone, which is how a table written
+            // for a later viewer still reads on this one.
+            WrittenAnimation written = build(header + "[abdomen]\nwibble = 3\n", sample_lines());
+            ensure_equals("an unknown key is ignored", written.mNumJoints, 2u);
+        }
+    }
+
+    template<> template<>
+    void llbvhloader_object::test<12>()
+    {
+        // Every one of those keys with nothing after the equals, or with
+        // something the key does not take.
+        const std::string joint = "Translations 1.0\n[abdomen]\n";
+
+        auto table = [&](const char* what, const std::string& text, ELoadStatus expected)
+        {
+            std::unique_ptr<LLBVHLoader> loader = makeLoader();
+            ensure_equals(what, readTable(*loader, text), expected);
+        };
+
+        // A key before any section belongs to no joint.
+        table("a joint key with no joint is refused",
+              "Translations 1.0\nignore = true\n", E_ST_NO_XLT_NAME);
+        table("and one in the globals section belongs to no joint either",
+              "Translations 1.0\n[GLOBALS]\noutname = mFoo\n", E_ST_NO_XLT_NAME);
+        // Not to the last joint named before the globals section, either,
+        // which is where it would land if the section did not clear it.
+        table("even with a joint named earlier in the file",
+              "Translations 1.0\n[abdomen]\n[GLOBALS]\noutname = mFoo\n", E_ST_NO_XLT_NAME);
+
+        table("an ignore with no value is refused", joint + "ignore = \n", E_ST_NO_XLT_IGNORE);
+
+        table("a relative position with two numbers is refused",
+              joint + "relativepos = 1 2\n", E_ST_NO_XLT_RELATIVE);
+        table("a relative position that is no key it knows is refused",
+              joint + "relativepos = lastkey\n", E_ST_NO_XLT_RELATIVE);
+        table("a relative position with no value is refused",
+              joint + "relativepos = \n", E_ST_NO_XLT_RELATIVE);
+        // Subtracted from every position key, which is then quantized by
+        // dividing, so it has to be a number.
+        table("a relative position that is not a number is refused",
+              joint + "relativepos = nan nan nan\n", E_ST_NO_XLT_RELATIVE);
+        table("an infinite relative position is refused",
+              joint + "relativepos = inf 0 0\n", E_ST_NO_XLT_RELATIVE);
+
+        table("a relative rotation that is no key it knows is refused",
+              joint + "relativerot = lastkey\n", E_ST_NO_XLT_RELATIVE);
+        table("a relative rotation with no value is refused",
+              joint + "relativerot = \n", E_ST_NO_XLT_RELATIVE);
+
+        table("an outname with no name is refused",
+              joint + "outname = \n", E_ST_NO_XLT_OUTNAME);
+
+        table("a frame matrix with three numbers is refused",
+              joint + "frame = 1 0 0\n", E_ST_NO_XLT_MATRIX);
+        table("an offset matrix with six is refused",
+              joint + "offset = 1 0 0, 0 1 0\n", E_ST_NO_XLT_MATRIX);
+        table("a matrix with no commas in it is refused",
+              joint + "frame = 1 0 0 0 1 0 0 0 1\n", E_ST_NO_XLT_MATRIX);
+
+        table("a mergeparent with no name is refused",
+              joint + "mergeparent = \n", E_ST_NO_XLT_MERGEPARENT);
+        table("a mergechild with no name is refused",
+              joint + "mergechild = \n", E_ST_NO_XLT_MERGECHILD);
+
+        table("a joint priority that is not a number is refused",
+              joint + "priority = x\n", E_ST_NO_XLT_PRIORITY);
+    }
+
+    template<> template<>
+    void llbvhloader_object::test<13>()
+    {
+        // The keys that change the keyframes rather than the joint. Each is
+        // read against the same animation built without it, because what they
+        // do is only visible as a difference.
+        const std::string header = "Translations 1.0\n";
+        const std::vector<std::string> lines = moving_lines();
+        const WrittenAnimation plain = build(header, lines);
+        ensure_equals("the animation to compare against has two joints", plain.mNumJoints, 2u);
+        ensure("and keys to compare", !plain.mRotKeys[1].empty() && !plain.mPosKeys[0].empty());
+
+        {
+            // Every position key is moved by this, and five metres is as far
+            // as a position key goes, so a hundred puts them all at the end.
+            WrittenAnimation written = build(header + "[hip]\nrelativepos = 100 0 0\n", lines);
+            ensure("a relative position moves the position keys",
+                   written.mPosKeys[0] != plain.mPosKeys[0]);
+            ensure("as far as they go", written.mPosKeys[0][1] == 0);
+            ensure("the plain one is nowhere near there", plain.mPosKeys[0][1] > 30000);
+            ensure("and the rotations are left alone",
+                   written.mRotKeys[0] == plain.mRotKeys[0]);
+        }
+        {
+            WrittenAnimation written = build(header + "[abdomen]\nrelativerot = firstkey\n", lines);
+            ensure("a rotation taken from the first key moves the rotation keys",
+                   written.mRotKeys[1] != plain.mRotKeys[1]);
+            ensure("and leaves the other joint alone",
+                   written.mRotKeys[0] == plain.mRotKeys[0]);
+        }
+        {
+            WrittenAnimation written = build(
+                header + "[abdomen]\nframe = 1 0 0, 0 1 0, 0 0 1\n", lines);
+            ensure("a frame matrix moves the rotation keys",
+                   written.mRotKeys[1] != plain.mRotKeys[1]);
+            ensure("and leaves the other joint alone",
+                   written.mRotKeys[0] == plain.mRotKeys[0]);
+        }
+        {
+            WrittenAnimation written = build(
+                header + "[abdomen]\noffset = 0 1 0, 0 0 1, 1 0 0\n", lines);
+            ensure("an offset matrix moves the rotation keys",
+                   written.mRotKeys[1] != plain.mRotKeys[1]);
+        }
+    }
+
+    template<> template<>
+    void llbvhloader_object::test<14>()
+    {
+        // The merge keys, which name another joint whose rotation is folded
+        // into this one. Nothing filled these in before, so the arm of the
+        // writer that reads them had never run.
+        const std::string header = "Translations 1.0\n";
+        const std::vector<std::string> lines = moving_lines();
+        const WrittenAnimation plain = build(header, lines);
+
+        {
+            WrittenAnimation written = build(header + "[abdomen]\nmergeparent = hip\n", lines);
+            ensure("a merged parent moves the rotation keys",
+                   written.mRotKeys[1] != plain.mRotKeys[1]);
+            ensure("and leaves the parent alone",
+                   written.mRotKeys[0] == plain.mRotKeys[0]);
+        }
+        {
+            WrittenAnimation written = build(header + "[hip]\nmergechild = abdomen\n", lines);
+            ensure("a merged child moves the rotation keys",
+                   written.mRotKeys[0] != plain.mRotKeys[0]);
+        }
+        {
+            // A name that is nobody is nobody, rather than an error: the table
+            // is written once and the files come and go.
+            WrittenAnimation written = build(header + "[abdomen]\nmergeparent = elbow\n", lines);
+            ensure("a merge with a joint the file does not have changes nothing",
+                   written.mRotKeys[1] == plain.mRotKeys[1]);
+        }
+
+        // The merged joint is read one frame behind, and the first frame of a
+        // single frame animation has no frame behind it. This pins the answer
+        // -- a merge with nothing to merge is no merge -- rather than the read
+        // that used to go looking for it.
+        {
+            std::vector<std::string> single = moving_lines();
+            single[LINE_FRAMES] = "Frames: 1";
+            single.resize(LINE_FIRST_FRAME + 1);
+
+            const WrittenAnimation one_frame = build(header, single);
+            ensure_equals("a single frame animation is written", one_frame.mNumJoints, 2u);
+            ensure_equals("with one rotation key", one_frame.mNumRotKeys[1], 1);
+
+            WrittenAnimation merged = build(header + "[abdomen]\nmergeparent = hip\n", single);
+            ensure("a merge with no frame behind it is no merge",
+                   merged.mRotKeys[1] == one_frame.mRotKeys[1]);
         }
     }
 }
