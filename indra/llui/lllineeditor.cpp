@@ -2145,6 +2145,18 @@ void LLLineEditor::draw()
         }
     }
 
+    // Name the text about to be drawn. These buffers cannot compare the text
+    // they are handed, and they are also asked for widths through textWidth()
+    // against whatever mText holds at the time -- which is not always this
+    // string. A password field has just swapped mText for bullets above, so
+    // outside draw() they measure the password and inside it they draw the
+    // bullets: two strings through one cache, and the width slots are keyed on
+    // the span rather than the bytes.
+    const U32 text_generation = mText.getGeneration();
+    mFontBufferPreSelection.setSource(&mText, text_generation);
+    mFontBufferSelection.setSource(&mText, text_generation);
+    mFontBufferPostSelection.setSource(&mText, text_generation);
+
     S32 rendered_text = 0;
     F32 rendered_pixels_right = (F32)mTextLeftEdge;
 
