@@ -1044,6 +1044,11 @@ void LLPanelEditWearable::onColorSwatchCommit(const LLUICtrl* ctrl)
                         if (old_color != new_color)
                         {
                                 getWearable()->setClothesColor(entry->mTextureIndex, new_color);
+                                // The colour is three parameters on the wearable,
+                                // and the layer set that tints from them reads the
+                                // avatar's copy of them.
+                                getWearable()->writeToAvatar(gAgentAvatarp);
+                                gAgentAvatarp->updateVisualParams();
                                 LLVisualParamHint::requestHintUpdates();
                                 gAgentAvatarp->wearableUpdated(getWearable()->getType());
                         }
@@ -1160,6 +1165,11 @@ void LLPanelEditWearable::revertChanges()
         }
 
         mWearablePtr->revertValues();
+        if (isAgentAvatarValid())
+        {
+                mWearablePtr->writeToAvatar(gAgentAvatarp);
+                gAgentAvatarp->updateVisualParams();
+        }
         mNameEditor->setText(mWearableItem->getName());
         updatePanelPickerControls(mWearablePtr->getType());
         updateTypeSpecificControls(mWearablePtr->getType());

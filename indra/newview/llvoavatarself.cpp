@@ -860,15 +860,26 @@ void LLVOAvatarSelf::writeWearablesToAvatar()
 /*virtual*/
 void LLVOAvatarSelf::idleUpdateAppearanceAnimation()
 {
-    // Animate all top-level wearable visual parameters
-    gAgentWearables.animateAllWearableParams(calcMorphAmount());
+    // Only a morph gives either of these anything to do. animateAllWearableParams
+    // moves nothing unless a parameter is animating, and the push after it was
+    // writing weights the avatar already had -- measured at none changed, every
+    // frame, once an appearance had settled.
+    //
+    // Everything that changes a worn wearable outside a morph pushes it itself:
+    // the sliders and the shape importer in the appearance editor, reverting an
+    // edit, a clothing colour, the morph tool, an outfit change, and wearing or
+    // changing a single wearable, which all arrive at LLAgentWearables::wearableUpdated.
+    if (mAppearanceAnimating)
+    {
+        // Animate all top-level wearable visual parameters
+        gAgentWearables.animateAllWearableParams(calcMorphAmount());
 
-    // Apply wearable visual params to avatar
-    writeWearablesToAvatar();
+        // Apply wearable visual params to avatar
+        writeWearablesToAvatar();
+    }
 
     //allow avatar to process updates
     LLVOAvatar::idleUpdateAppearanceAnimation();
-
 }
 
 // virtual

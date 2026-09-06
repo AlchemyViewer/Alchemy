@@ -653,6 +653,15 @@ void LLAgentWearables::wearableUpdated(LLWearable *wearable, bool removed)
 
     LLWearableData::wearableUpdated(wearable, removed);
 
+    // Every wear, and every change to something already worn, arrives here.
+    // What the wearable says has to reach the avatar, and after the line above
+    // has settled the values it takes from its neighbours.
+    if (!removed && isAgentAvatarValid())
+    {
+        wearable->writeToAvatar(gAgentAvatarp);
+        gAgentAvatarp->updateVisualParams();
+    }
+
     if (!removed)
     {
         LLViewerWearable* viewer_wearable = dynamic_cast<LLViewerWearable*>(wearable);
