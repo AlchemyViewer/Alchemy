@@ -175,9 +175,25 @@ LLMotion::LLMotionInitStatus LLWalkAdjustMotion::onInitialize(LLCharacter *chara
 //-----------------------------------------------------------------------------
 bool LLWalkAdjustMotion::onActivate()
 {
-    mAnimSpeed = 0.f;
-    mAdjustedSpeed = 0.f;
+    // One is this servo's idea of no adjustment at all: the animation plays at
+    // the rate it was authored for, which is what the standing case below damps
+    // back towards. Nought is not a neutral starting guess, it is "do not play
+    // the animation", and the rate at which it is allowed to climb out of that
+    // is half a second of a walk that barely moves.
+    //
+    // Which would only cost the first half second of a walk, except that this
+    // servo is stopped and started again for reasons that have nothing to do
+    // with walking -- the avatar being taken for airborne is one, and standing
+    // on a prim above the ground is enough for that. Started again mid-stride,
+    // it dropped the walk back to a crawl every time.
+    mAnimSpeed = 1.f;
+    mAdjustedSpeed = 1.f;
     mRelativeDir = 1.f;
+    // The time handed to onUpdate starts again from this activation, so the
+    // clock it is measured against has to as well, or the first frame's
+    // interval comes out negative and is clamped to a thousandth of a second
+    // -- which is then divided into a foot's travel.
+    mLastTime = 0.f;
     mPelvisState->setPosition(LLVector3::zero);
     // store ankle positions for next frame
     mLastLeftFootGlobalPos = mCharacter->getPosGlobalFromAgent(mLeftAnkleJoint->getWorldPosition());
@@ -337,7 +353,8 @@ bool LLWalkAdjustMotion::onUpdate(F32 time, U8* joint_mask)
     else
     {   // standing/turning
 
-        // damp out speed adjustment to 0
+        // damp the speed adjustment back to one, which is the animation
+        // playing at the rate it was authored for
         mAnimSpeed = LLSmoothInterpolation::lerp(mAnimSpeed, 1.f, 0.2f);
         //mPelvisOffset = lerp(mPelvisOffset, LLVector3::zero, LLSmoothInterpolation::getInterpolant(0.2f));
     }
