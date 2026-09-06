@@ -320,9 +320,13 @@ public:
         std::vector<T>      mValues;
     };
 
-    typedef KeyCurve<LLVector3>     ScaleCurve;
-    typedef KeyCurve<LLQuaternion>  RotationCurve;
-    typedef KeyCurve<LLVector3>     PositionCurve;
+    // Held in the vector forms, which is what a joint state takes: a sample
+    // goes from the curve into a joint state once per channel per joint per
+    // playing motion per frame, and through the scalar types that was a store
+    // on the way out of the blend and a load on the way into the state.
+    typedef KeyCurve<LLVector4a>    ScaleCurve;
+    typedef KeyCurve<LLQuaternion2> RotationCurve;
+    typedef KeyCurve<LLVector4a>    PositionCurve;
 
     //-------------------------------------------------------------------------
     // KeyCursors

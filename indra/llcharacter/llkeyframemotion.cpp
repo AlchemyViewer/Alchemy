@@ -99,23 +99,23 @@ U32 LLKeyframeMotion::JointMotionList::dumpDiagInfo()
         if (joint_motion_p->mUsage & LLJointState::SCALE)
         {
             LL_INFOS() << "\t" << joint_motion_p->mScaleCurve.getNumKeys() << " scale keys at "
-            << joint_motion_p->mScaleCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector3)) << " bytes" << LL_ENDL;
+            << joint_motion_p->mScaleCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector4a)) << " bytes" << LL_ENDL;
 
-            total_size += joint_motion_p->mScaleCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector3));
+            total_size += joint_motion_p->mScaleCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector4a));
         }
         if (joint_motion_p->mUsage & LLJointState::ROT)
         {
             LL_INFOS() << "\t" << joint_motion_p->mRotationCurve.getNumKeys() << " rotation keys at "
-            << joint_motion_p->mRotationCurve.getNumKeys() * (sizeof(F32) + sizeof(LLQuaternion)) << " bytes" << LL_ENDL;
+            << joint_motion_p->mRotationCurve.getNumKeys() * (sizeof(F32) + sizeof(LLQuaternion2)) << " bytes" << LL_ENDL;
 
-            total_size += joint_motion_p->mRotationCurve.getNumKeys() * (sizeof(F32) + sizeof(LLQuaternion));
+            total_size += joint_motion_p->mRotationCurve.getNumKeys() * (sizeof(F32) + sizeof(LLQuaternion2));
         }
         if (joint_motion_p->mUsage & LLJointState::POS)
         {
             LL_INFOS() << "\t" << joint_motion_p->mPositionCurve.getNumKeys() << " position keys at "
-            << joint_motion_p->mPositionCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector3)) << " bytes" << LL_ENDL;
+            << joint_motion_p->mPositionCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector4a)) << " bytes" << LL_ENDL;
 
-            total_size += joint_motion_p->mPositionCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector3));
+            total_size += joint_motion_p->mPositionCurve.getNumKeys() * (sizeof(F32) + sizeof(LLVector4a));
         }
     }
     LL_INFOS() << "Size: " << total_size << " bytes" << LL_ENDL;
@@ -131,28 +131,38 @@ U32 LLKeyframeMotion::JointMotionList::dumpDiagInfo()
 
 namespace
 {
-    LLVector3 blend_keys(F32 u, const LLVector3& before, const LLVector3& after)
+    LLVector4a blend_keys(F32 u, const LLVector4a& before, const LLVector4a& after)
     {
-        return lerp(before, after, u);
+        LLVector4a blended;
+        blended.setLerp(before, after, u);
+        return blended;
     }
 
-    LLQuaternion blend_keys(F32 u, const LLQuaternion& before, const LLQuaternion& after)
+    LLQuaternion2 blend_keys(F32 u, const LLQuaternion2& before, const LLQuaternion2& after)
     {
         // A normalized lerp for every pair. The free nlerp() hands the pairs
         // more than a half turn apart to slerp, which costs an arc cosine and
         // three sines, and this is sampled once per rotation channel per joint
         // per playing motion per frame.
-        LLQuaternion2 from;
-        from = before;
-        LLQuaternion2 to;
-        to = after;
-
         LLQuaternion2 blended;
-        blended.setLerp(from, to, u);
+        blended.setLerp(before, after, u);
+        return blended;
+    }
 
-        LLQuaternion result;
-        blended.store(result);
-        return result;
+    // What a curve with no keys in it answers with. The vector types default
+    // to whatever was in the memory, so this cannot be T().
+    template <typename T> T empty_curve_value();
+
+    template <> LLVector4a empty_curve_value<LLVector4a>()
+    {
+        LLVector4a zero;
+        zero.clear();
+        return zero;
+    }
+
+    template <> LLQuaternion2 empty_curve_value<LLQuaternion2>()
+    {
+        return LLQuaternion2::identity();
     }
 }
 
@@ -224,7 +234,7 @@ T LLKeyframeMotion::KeyCurve<T>::getValue(F32 time, U32& cursor) const
     const U32 count = getNumKeys();
     if (count == 0)
     {
-        return T();
+        return empty_curve_value<T>();
     }
 
     const U32 right = findKey(time, cursor);
@@ -248,8 +258,8 @@ T LLKeyframeMotion::KeyCurve<T>::getValue(F32 time, U32& cursor) const
     return blend_keys(u, mValues[right - 1], mValues[right]);
 }
 
-template class LLKeyframeMotion::KeyCurve<LLVector3>;
-template class LLKeyframeMotion::KeyCurve<LLQuaternion>;
+template class LLKeyframeMotion::KeyCurve<LLVector4a>;
+template class LLKeyframeMotion::KeyCurve<LLQuaternion2>;
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -1542,7 +1552,7 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
                 return false;
             }
 
-            rCurve->setKey(time, rotation);
+            rCurve->setKey(time, LLQuaternion2(rotation));
         }
 
         if (static_cast<U32>(num_rot_keys) > rCurve->getNumKeys())
@@ -1653,7 +1663,9 @@ bool LLKeyframeMotion::deserialize(LLDataPacker& dp, const LLUUID& asset_id, boo
                 return false;
             }
 
-            pCurve->setKey(time, position);
+            LLVector4a key_position;
+            key_position.load3(position.mV);
+            pCurve->setKey(time, key_position);
 
             if (is_pelvis)
             {
@@ -1977,7 +1989,9 @@ bool LLKeyframeMotion::serialize(LLDataPacker& dp) const
             U16 time_short = F32_to_U16(key_time, 0.f, mJointMotionList->mDuration);
             success &= dp.packU16(time_short, "time");
 
-            LLVector3 rot_angles = rot_curve.getKeyValue(k).packToVector3();
+            LLQuaternion key_rotation;
+            rot_curve.getKeyValue(k).store(key_rotation);
+            LLVector3 rot_angles = key_rotation.packToVector3();
 
             U16 x, y, z;
             rot_angles.quantize16(-1.f, 1.f, -1.f, 1.f);
@@ -1999,7 +2013,7 @@ bool LLKeyframeMotion::serialize(LLDataPacker& dp) const
             success &= dp.packU16(time_short, "time");
 
             U16 x, y, z;
-            LLVector3 position = pos_curve.getKeyValue(k);
+            LLVector3 position(pos_curve.getKeyValue(k).getF32ptr());
             position.quantize16(-LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET, -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
             x = F32_to_U16(position.mV[VX], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);
             y = F32_to_U16(position.mV[VY], -LL_MAX_PELVIS_OFFSET, LL_MAX_PELVIS_OFFSET);

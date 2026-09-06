@@ -46,6 +46,58 @@ namespace
     typedef LLKeyframeMotion::PositionCurve PositionCurve;
     typedef LLKeyframeMotion::RotationCurve RotationCurve;
 
+    // The curve holds LLVector4a and LLQuaternion2; the reference below is
+    // built and read in the scalar types, so that what it is compared against
+    // is a second implementation rather than the same one seen twice. These
+    // four are the whole of the boundary between them.
+    void set_key(PositionCurve& curve, F32 time, const LLVector3& value)
+    {
+        LLVector4a stored;
+        stored.load3(value.mV);
+        curve.setKey(time, stored);
+    }
+
+    void set_key(RotationCurve& curve, F32 time, const LLQuaternion& value)
+    {
+        curve.setKey(time, LLQuaternion2(value));
+    }
+
+    LLVector3 key_value(const PositionCurve& curve, U32 index)
+    {
+        return LLVector3(curve.getKeyValue(index).getF32ptr());
+    }
+
+    LLQuaternion key_value(const RotationCurve& curve, U32 index)
+    {
+        LLQuaternion value;
+        curve.getKeyValue(index).store(value);
+        return value;
+    }
+
+    LLVector3 sample(const PositionCurve& curve, F32 time)
+    {
+        return LLVector3(curve.getValue(time).getF32ptr());
+    }
+
+    LLVector3 sample(const PositionCurve& curve, F32 time, U32& cursor)
+    {
+        return LLVector3(curve.getValue(time, cursor).getF32ptr());
+    }
+
+    LLQuaternion sample(const RotationCurve& curve, F32 time)
+    {
+        LLQuaternion value;
+        curve.getValue(time).store(value);
+        return value;
+    }
+
+    LLQuaternion sample(const RotationCurve& curve, F32 time, U32& cursor)
+    {
+        LLQuaternion value;
+        curve.getValue(time, cursor).store(value);
+        return value;
+    }
+
     LLVector3 blend_reference(F32 u, const LLVector3& before, const LLVector3& after)
     {
         return lerp(before, after, u);
@@ -153,8 +205,8 @@ namespace
     // The same keys into both curves. The times are random, so the spacing is
     // uneven; a few are repeated, so the last value at a time has to win; and
     // one sits on the origin.
-    template <typename T>
-    void build(Rng& rng, LLKeyframeMotion::KeyCurve<T>& curve, MapCurve<T>& reference, InterpolationType type)
+    template <typename CurveT, typename T>
+    void build(Rng& rng, CurveT& curve, MapCurve<T>& reference, InterpolationType type)
     {
         std::vector<F32> times;
         for (U32 i = 0; i < KEY_COUNT; ++i)
@@ -167,7 +219,7 @@ namespace
         for (F32 time : times)
         {
             const T value = random_value<T>(rng);
-            curve.setKey(time, value);
+            set_key(curve, time, value);
             reference.mKeys[time] = value;
         }
         curve.mInterpolationType = type;
@@ -197,22 +249,22 @@ namespace
 
     // Every way of sampling a curve without a cursor: far outside the keys,
     // random within them, and exactly on each one and a step either side.
-    template <typename T>
-    void ensure_stateless_parity(const char* what, Rng& rng, const LLKeyframeMotion::KeyCurve<T>& curve, const MapCurve<T>& reference)
+    template <typename CurveT, typename T>
+    void ensure_stateless_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference)
     {
         for (U32 i = 0; i < 2000; ++i)
         {
             const F32 time = rng.uniform(-0.5f, DURATION + 0.5f);
-            ensure_same_value(what, time, curve.getValue(time), reference.getValue(time));
+            ensure_same_value(what, time, sample(curve, time), reference.getValue(time));
         }
         for (U32 k = 0; k < curve.getNumKeys(); ++k)
         {
             const F32 time = curve.getKeyTime(k);
             const F32 above = std::nextafter(time, DURATION * 2.f);
             const F32 below = std::nextafter(time, -DURATION);
-            ensure_same_value(what, time, curve.getValue(time), reference.getValue(time));
-            ensure_same_value(what, above, curve.getValue(above), reference.getValue(above));
-            ensure_same_value(what, below, curve.getValue(below), reference.getValue(below));
+            ensure_same_value(what, time, sample(curve, time), reference.getValue(time));
+            ensure_same_value(what, above, sample(curve, above), reference.getValue(above));
+            ensure_same_value(what, below, sample(curve, below), reference.getValue(below));
         }
     }
 
@@ -220,8 +272,8 @@ namespace
     // max_step], until it passes the end and wraps to the start the way a
     // looping motion does. Every sample must match the map, and the cursor
     // must be exactly where the map's search would have landed.
-    template <typename T>
-    U32 ensure_playback_parity(const char* what, Rng& rng, const LLKeyframeMotion::KeyCurve<T>& curve, const MapCurve<T>& reference,
+    template <typename CurveT, typename T>
+    U32 ensure_playback_parity(const char* what, Rng& rng, const CurveT& curve, const MapCurve<T>& reference,
                                F32 min_step, F32 max_step, U32 samples)
     {
         U32 cursor = 0;
@@ -235,7 +287,7 @@ namespace
                 time -= DURATION;
                 ++wraps;
             }
-            ensure_same_value(what, time, curve.getValue(time, cursor), reference.getValue(time));
+            ensure_same_value(what, time, sample(curve, time, cursor), reference.getValue(time));
             tut::ensure_equals(std::string(what) + " cursor at t=" + std::to_string(time), cursor, reference.lowerBound(time));
         }
         return wraps;
@@ -362,6 +414,16 @@ namespace tut
             motion.setCharacter(&mCharacter);
             return motion.deserialize(reader, motion.getID());
         }
+
+        // Runs the motion's own sampling at `time` and hands back the joint
+        // state it wrote, which is the only way from outside to see what the
+        // curves are holding.
+        LLJointState* sampleAt(LLKeyframeMotion& motion, F32 time, const char* joint_name)
+        {
+            U8 mask[LL_CHARACTER_MAX_ANIMATED_JOINTS] = {};
+            motion.onUpdate(time, mask);
+            return motion.getPose()->findJointState(std::string(joint_name));
+        }
     };
     typedef test_group<llkeyframemotion_data> llkeyframemotion_test;
     typedef llkeyframemotion_test::object llkeyframemotion_object;
@@ -374,15 +436,15 @@ namespace tut
         // repeat. The curve keeps them sorted and unique, the last value at a
         // time winning, which is what the map did.
         PositionCurve curve;
-        curve.setKey(2.f, LLVector3(2.f, 0.f, 0.f));
-        curve.setKey(1.f, LLVector3(1.f, 0.f, 0.f));
-        curve.setKey(3.f, LLVector3(3.f, 0.f, 0.f));
-        curve.setKey(2.f, LLVector3(0.f, 2.f, 0.f));
+        set_key(curve, 2.f, LLVector3(2.f, 0.f, 0.f));
+        set_key(curve, 1.f, LLVector3(1.f, 0.f, 0.f));
+        set_key(curve, 3.f, LLVector3(3.f, 0.f, 0.f));
+        set_key(curve, 2.f, LLVector3(0.f, 2.f, 0.f));
         ensure_equals("a repeated time does not add a key", curve.getNumKeys(), 3u);
         ensure_equals("keys are sorted: first", curve.getKeyTime(0), 1.f);
         ensure_equals("keys are sorted: second", curve.getKeyTime(1), 2.f);
         ensure_equals("keys are sorted: third", curve.getKeyTime(2), 3.f);
-        ensure("the last value at a time wins", curve.getKeyValue(1) == LLVector3(0.f, 2.f, 0.f));
+        ensure("the last value at a time wins", key_value(curve, 1) == LLVector3(0.f, 2.f, 0.f));
 
         Rng rng;
         RotationCurve rotations;
@@ -393,7 +455,7 @@ namespace tut
         for (const auto& key : reference.mKeys)
         {
             ensure_equals("random keys: time matches the map", rotations.getKeyTime(k), key.first);
-            ensure("random keys: value matches the map", rotations.getKeyValue(k) == key.second);
+            ensure("random keys: value matches the map", key_value(rotations, k) == key.second);
             ++k;
         }
     }
@@ -477,12 +539,12 @@ namespace tut
             for (U32 hint : hints)
             {
                 U32 cursor = hint;
-                ensure_same_value("exact key under any cursor", time, curve.getValue(time, cursor), reference.getValue(time));
+                ensure_same_value("exact key under any cursor", time, sample(curve, time, cursor), reference.getValue(time));
                 ensure_equals("exact key leaves the cursor on the key", cursor, k);
 
                 cursor = hint;
                 const F32 above = std::nextafter(time, DURATION * 2.f);
-                ensure_same_value("just past a key under any cursor", above, curve.getValue(above, cursor), reference.getValue(above));
+                ensure_same_value("just past a key under any cursor", above, sample(curve, above, cursor), reference.getValue(above));
                 ensure_equals("just past a key leaves the cursor after it", cursor, k + 1);
             }
         }
@@ -493,22 +555,25 @@ namespace tut
     {
         // No keys: the identity of the channel. One key: that key, wherever
         // the sample falls, with the cursor before or after it.
+        // The vector types do not zero themselves, so a curve with no keys
+        // has to say what it answers with rather than handing back whatever
+        // was in the memory.
         PositionCurve no_positions;
-        ensure("an empty position curve is the zero vector", no_positions.getValue(1.f) == LLVector3());
+        ensure("an empty position curve is the zero vector", sample(no_positions, 1.f) == LLVector3());
         RotationCurve no_rotations;
-        ensure("an empty rotation curve is the identity", no_rotations.getValue(1.f) == LLQuaternion());
+        ensure("an empty rotation curve is the identity", sample(no_rotations, 1.f) == LLQuaternion());
 
         RotationCurve one;
         const LLQuaternion key(0.5f, LLVector3(0.f, 1.f, 0.f));
-        one.setKey(1.f, key);
+        set_key(one, 1.f, key);
         U32 cursor = 0;
-        ensure("before the only key", one.getValue(0.f, cursor) == key);
+        ensure("before the only key", sample(one, 0.f, cursor) == key);
         ensure_equals("before the only key: cursor", cursor, 0u);
-        ensure("on the only key", one.getValue(1.f, cursor) == key);
+        ensure("on the only key", sample(one, 1.f, cursor) == key);
         ensure_equals("on the only key: cursor", cursor, 0u);
-        ensure("after the only key", one.getValue(2.f, cursor) == key);
+        ensure("after the only key", sample(one, 2.f, cursor) == key);
         ensure_equals("after the only key: cursor", cursor, 1u);
-        ensure("back before the only key", one.getValue(0.5f, cursor) == key);
+        ensure("back before the only key", sample(one, 0.5f, cursor) == key);
         ensure_equals("back before the only key: cursor", cursor, 0u);
     }
 
@@ -542,6 +607,35 @@ namespace tut
         ensure_equals("the torso carries rotation only", torso_state->getUsage(), (U32)LLJointState::ROT);
         ensure_equals("the torso keeps its own priority",
                       (S32)torso_state->getPriority(), anim.mJoints[1].mPriority);
+
+        // and the keys hold what the file held. The format quantizes both
+        // channels to sixteen bits, positions over five metres either way and
+        // rotations over a packed vector, so this is close rather than equal.
+        for (const auto& key : anim.mJoints[0].mPositions)
+        {
+            LLJointState* sampled = sampleAt(motion, key.first, "mPelvis");
+            ensure("the pelvis is sampled", sampled != nullptr);
+            const LLVector3 got = sampled->getPosition();
+            for (S32 i = 0; i < 3; ++i)
+            {
+                ensure_approximately_equals_range("position key survived the parse",
+                                                  got.mV[i], key.second.mV[i], 1e-3f);
+            }
+        }
+
+        for (const auto& key : anim.mJoints[0].mRotations)
+        {
+            LLJointState* sampled = sampleAt(motion, key.first, "mPelvis");
+            ensure("the pelvis is sampled", sampled != nullptr);
+            ensure_approximately_equals_range("rotation key survived the parse",
+                                              fabsf(dot(sampled->getRotation(), key.second)), 1.f, 1e-3f);
+        }
+
+        LLJointState* torso_sample = sampleAt(motion, anim.mJoints[1].mRotations[0].first, "mTorso");
+        ensure("the torso is sampled", torso_sample != nullptr);
+        ensure_approximately_equals_range("the torso's one key survived the parse",
+                                          fabsf(dot(torso_sample->getRotation(), anim.mJoints[1].mRotations[0].second)),
+                                          1.f, 1e-3f);
     }
 
     template<> template<>
@@ -579,6 +673,35 @@ namespace tut
             ensure("joint survived the round trip", a != nullptr && b != nullptr);
             ensure_equals("same usage", b->getUsage(), a->getUsage());
             ensure_equals("same priority", (S32)b->getPriority(), (S32)a->getPriority());
+        }
+
+        // The keys themselves, sampled the way playback samples them. Without
+        // this the round trip could write a joint's name and another joint's
+        // curve and nothing here would notice.
+        for (F32 time = 0.f; time < 2.f; time += 0.25f)
+        {
+            for (const char* name : { "mPelvis", "mTorso" })
+            {
+                LLJointState* a = sampleAt(first, time, name);
+                LLJointState* b = sampleAt(second, time, name);
+                ensure("joint sampled on both sides", a != nullptr && b != nullptr);
+
+                const LLQuaternion rot_a = a->getRotation();
+                const LLQuaternion rot_b = b->getRotation();
+                ensure_approximately_equals_range("same rotation after the round trip",
+                                                  fabsf(dot(rot_a, rot_b)), 1.f, 1e-4f);
+
+                if (a->getUsage() & LLJointState::POS)
+                {
+                    const LLVector3 pos_a = a->getPosition();
+                    const LLVector3 pos_b = b->getPosition();
+                    for (S32 i = 0; i < 3; ++i)
+                    {
+                        ensure_approximately_equals_range("same position after the round trip",
+                                                          pos_b.mV[i], pos_a.mV[i], 1e-4f);
+                    }
+                }
+            }
         }
     }
 }

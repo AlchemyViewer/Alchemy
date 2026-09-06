@@ -343,15 +343,15 @@ void FSPosingMotion::getJointStateAtTime(std::string jointPoseName, F32 timeToLo
 
         *hasRotation = (jm->mRotationCurve.getNumKeys() > 0);
         if (hasRotation)
-            jointRotation->set(jm->mRotationCurve.getValue(timeToLoadAt));
+            jm->mRotationCurve.getValue(timeToLoadAt).store(*jointRotation);
 
         *hasPosition = (jm->mPositionCurve.getNumKeys() > 0);
         if (hasPosition)
-            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt));
+            jointPosition->set(jm->mPositionCurve.getValue(timeToLoadAt).getF32ptr());
 
         *hasScale = (jm->mScaleCurve.getNumKeys() > 0);
         if (hasScale)
-            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt));
+            jointScale->set(jm->mScaleCurve.getValue(timeToLoadAt).getF32ptr());
 
         return;
     }
