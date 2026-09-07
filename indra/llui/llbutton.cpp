@@ -200,7 +200,7 @@ LLButton::LLButton(const LLButton::Params& p)
     }
 
     static LLUICachedControl<S32> llbutton_orig_h_pad ("UIButtonOrigHPad", 0);
-    static Params default_params(LLUICtrlFactory::getDefaultParams<LLButton>());
+    const Params& default_params = LLUICtrlFactory::getDefaultParams<LLButton>();
 
     if (!p.label_selected.isProvided())
     {

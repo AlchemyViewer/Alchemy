@@ -30,3 +30,12 @@ LLHeteroMap::~LLHeteroMap()
         pair.second.first = nullptr;
     }
 }
+
+void LLHeteroMap::clear()
+{
+    for (TypeMap::value_type& pair : mMap)
+    {
+        (pair.second.second)(pair.second.first);
+    }
+    mMap.clear();
+}

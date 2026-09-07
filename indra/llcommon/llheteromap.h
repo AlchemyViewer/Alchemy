@@ -64,6 +64,9 @@ public:
         return *(static_cast<T*>(found->second.first));
     }
 
+    /// destroy every object; the next obtain() of each type creates it afresh
+    void clear();
+
 private:
     template <class T>
     static

@@ -71,6 +71,14 @@ class LLWidgetNameRegistry
     LLSINGLETON_EMPTY_CTOR(LLWidgetNameRegistry);
 };
 
+// lookup a widget's tag by its view type; a class registered under no tag
+// is looked up through its bases by LLUICtrlFactory::widgetTag
+class LLWidgetTagRegistry
+:   public LLRegistrySingleton<const ALViewType*, std::string, LLWidgetTagRegistry>
+{
+    LLSINGLETON_EMPTY_CTOR(LLWidgetTagRegistry);
+};
+
 // lookup function for generating empty param block by widget type
 // this is used for schema generation
 //typedef const LLInitParam::BaseBlock& (*empty_param_block_func_t)();
@@ -131,6 +139,16 @@ public:
     std::string getCurFileName();
     void pushFileName(const std::string& name);
     void popFileName();
+
+    // Forget every widget's cached defaults, so the next widget of each
+    // type reads its template again. A skin or language switch needs this:
+    // the cache is keyed by parameter block type, not by where the
+    // template came from.
+    void flushDefaults();
+
+    // The tag a view type is built from, or the nearest base's, or null
+    // when no base is registered either.
+    static const std::string* widgetTag(const ALViewType* type);
 
     // For a caller building many widgets from one template: merge the defaults
     // into the template once and come here, rather than have create() derive
@@ -221,6 +239,7 @@ private:
 
     // helper function for adding widget type info to various registries
     static void registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& tag);
+    static void registerWidgetTag(const ALViewType* type, const std::string& tag);
 
     static void loadWidgetTemplate(const std::string& widget_tag, LLInitParam::BaseBlock& block);
 
@@ -357,6 +376,11 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
     }
     // add this widget to various registries
     LLUICtrlFactory::instance().registerWidget(typeid(T), typeid(typename T::Params), tag);
+    // A class that declared no type of its own would register its base's
+    if constexpr (ALViewTypeOf<T>::declared)
+    {
+        LLUICtrlFactory::registerWidgetTag(&T::sViewType, tag);
+    }
 
     // since registry_t depends on T, do this in line here
     // TODO: uncomment this for schema generation
