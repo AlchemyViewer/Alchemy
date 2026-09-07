@@ -54,26 +54,9 @@
 	<string name="simplifying">
 		Simplifying...
 	</string>
-	<text name="name_label">
-		Name:
-	</text>
 	<text name="lod_label">
 		Preview:
 	</text>
-	<combo_box name="preview_lod_combo" tool_tip="LOD to view in preview render">
-		<combo_item name="high">
-			Level of Detail: High
-		</combo_item>
-		<combo_item name="medium">
-			Level of Detail: Medium
-		</combo_item>
-		<combo_item name="low">
-			Level of Detail: Low
-		</combo_item>
-		<combo_item name="lowest">
-			Level of Detail: Lowest
-		</combo_item>
-	</combo_box>
 	<panel>
 		<text name="streaming cost">
 			Resource Cost: [COST]
@@ -88,144 +71,173 @@
 	<text name="status">
 		[STATUS]
 	</text>
-	<button label="Defaults" name="reset_btn" tool_tip="Reset to defaults"/>
-	<button label="Upload" name="ok_btn" tool_tip="Upload to simulator"/>
-	<button label="Cancel" name="cancel_btn"/>
-	<tab_container name="import_tab">
-		<panel label="Level of Detail" name="lod_panel">
-			<text name="lod_table_header">
-				Select Level of Detail:
-			</text>
-			<text name="high_label" value="High"/>
-			<text name="high_triangles" value="0"/>
-			<text name="high_vertices" value="0"/>
-			<text name="medium_label" value="Medium"/>
-			<text name="medium_triangles" value="0"/>
-			<text name="medium_vertices" value="0"/>
-			<text name="low_label" value="Low"/>
-			<text name="low_triangles" value="0"/>
-			<text name="low_vertices" value="0"/>
-			<text name="lowest_label" value="Lowest"/>
-			<text name="lowest_triangles" value="0"/>
-			<text name="lowest_vertices" value="0"/>
-			<text name="lod_table_footer">
-				Level of Detail: [DETAIL]
-			</text>
-			<radio_group name="lod_file_or_limit" value="lod_from_file">
-				<radio_item label="Load from file" name="lod_from_file"/>
-				<radio_item label="Auto generate" name="lod_auto_generate"/>
-				<radio_item label="None" name="lod_none"/>
-			</radio_group>
-			<button label="Browse..." name="lod_browse"/>
-			<combo_box name="lod_mode">
-				<combo_item name="triangle_limit">
-					Triangle Limit
-				</combo_item>
-				<combo_item name="error_threshold">
-					Error Threshold
-				</combo_item>
-			</combo_box>
-			<text name="build_operator_text">
-				Build Operator:
-			</text>
-			<text name="queue_mode_text">
-				Queue Mode:
-			</text>
-			<combo_box name="build_operator">
-				<combo_item name="edge_collapse">
-					Edge Collapse
-				</combo_item>
-				<combo_item name="half_edge_collapse">
-					Half Edge Collapse
-				</combo_item>
-			</combo_box>
-			<combo_box name="queue_mode">
-				<combo_item name="greedy">
-					Greedy
-				</combo_item>
-				<combo_item name="lazy">
-					Lazy
-				</combo_item>
-				<combo_item name="independent">
-					Independent
-				</combo_item>
-			</combo_box>
-			<text name="border_mode_text">
-				Border Mode:
-			</text>
-			<text name="share_tolderance_text">
-				Share Tolerance:
-			</text>
-			<combo_box name="border_mode">
-				<combo_item name="border_unlock">
-					Unlock
-				</combo_item>
-				<combo_item name="border_lock">
-					Lock
-				</combo_item>
-			</combo_box>
-			<text name="crease_label">
-				Crease Angle:
-			</text>
-			<spinner name="crease_angle" value="75"/>
+	<panel name="right_panel">
+		<combo_box name="preview_lod_combo" tool_tip="LOD to view in preview render">
+			<combo_item name="high">
+				Level of Detail: High
+			</combo_item>
+			<combo_item name="medium">
+				Level of Detail: Medium
+			</combo_item>
+			<combo_item name="low">
+				Level of Detail: Low
+			</combo_item>
+			<combo_item name="lowest">
+				Level of Detail: Lowest
+			</combo_item>
+		</combo_box>
+	</panel>
+	<panel name="left_panel">
+		<panel name="weights_and_warning_panel">
+			<button label="Defaults" name="reset_btn" tool_tip="Reset to defaults"/>
+			<button label="Upload" name="ok_btn" tool_tip="Upload to simulator"/>
+			<button label="Cancel" name="cancel_btn"/>
 		</panel>
-		<panel label="Physics" name="physics_panel">
-			<panel name="physics geometry">
-				<radio_group name="physics_load_radio" value="physics_load_from_file">
-					<radio_item label="File:" name="physics_load_from_file"/>
-					<radio_item label="Use Level of Detail:" name="physics_use_lod"/>
+		<tab_container name="import_tab">
+			<panel label="Level of Detail" name="lod_panel">
+				<text name="lod_table_header">
+					Select Level of Detail:
+				</text>
+				<text name="high_label" value="High"/>
+				<text name="high_triangles" value="0"/>
+				<text name="high_vertices" value="0"/>
+				<text name="medium_label" value="Medium"/>
+				<text name="medium_triangles" value="0"/>
+				<text name="medium_vertices" value="0"/>
+				<text name="low_label" value="Low"/>
+				<text name="low_triangles" value="0"/>
+				<text name="low_vertices" value="0"/>
+				<text name="lowest_label" value="Lowest"/>
+				<text name="lowest_triangles" value="0"/>
+				<text name="lowest_vertices" value="0"/>
+				<text name="lod_table_footer">
+					Level of Detail: [DETAIL]
+				</text>
+				<radio_group name="lod_file_or_limit" value="lod_from_file">
+					<radio_item label="Load from file" name="lod_from_file"/>
+					<radio_item label="Auto generate" name="lod_auto_generate"/>
+					<radio_item label="None" name="lod_none"/>
 				</radio_group>
-				<combo_box name="physics_lod_combo" tool_tip="LOD to use for physics shape">
-					<combo_item name="physics_lowest">
-						Lowest
+				<button label="Browse..." name="lod_browse"/>
+				<combo_box name="lod_mode">
+					<combo_item name="triangle_limit">
+						Triangle Limit
 					</combo_item>
-					<combo_item name="physics_low">
-						Low
-					</combo_item>
-					<combo_item name="physics_medium">
-						Medium
-					</combo_item>
-					<combo_item name="physics_high">
-						High
+					<combo_item name="error_threshold">
+						Error Threshold
 					</combo_item>
 				</combo_box>
-				<button label="Browse..." name="physics_browse"/>
+				<text name="build_operator_text">
+					Build Operator:
+				</text>
+				<text name="queue_mode_text">
+					Queue Mode:
+				</text>
+				<combo_box name="build_operator">
+					<combo_item name="edge_collapse">
+						Edge Collapse
+					</combo_item>
+					<combo_item name="half_edge_collapse">
+						Half Edge Collapse
+					</combo_item>
+				</combo_box>
+				<combo_box name="queue_mode">
+					<combo_item name="greedy">
+						Greedy
+					</combo_item>
+					<combo_item name="lazy">
+						Lazy
+					</combo_item>
+					<combo_item name="independent">
+						Independent
+					</combo_item>
+				</combo_box>
+				<text name="border_mode_text">
+					Border Mode:
+				</text>
+				<text name="share_tolderance_text">
+					Share Tolerance:
+				</text>
+				<combo_box name="border_mode">
+					<combo_item name="border_unlock">
+						Unlock
+					</combo_item>
+					<combo_item name="border_lock">
+						Lock
+					</combo_item>
+				</combo_box>
+				<text name="crease_label">
+					Crease Angle:
+				</text>
+				<spinner name="crease_angle" value="75"/>
 			</panel>
-			<panel name="physics analysis">
-				<slider label="Smooth:" name="Smooth"/>
-				<check_box label="Close Holes (slow)" name="Close Holes (Slow)"/>
-				<button label="Analyze" name="Decompose"/>
-				<button label="Cancel" name="decompose_cancel"/>
-			</panel>
-			<panel name="physics simplification">
-				<slider label="Passes:" name="Combine Quality"/>
-				<slider label="Detail Scale:" name="Detail Scale"/>
-				<slider label="Retain:" name="Retain%"/>
-				<button label="Simplify" name="Simplify"/>
-				<button label="Cancel" name="simplify_cancel"/>
-			</panel>
-			<panel name="physics info">
-				<slider label="Preview Spread:" name="physics_explode"/>
-				<text name="physics_triangles">
+			<panel label="Physics" name="physics_panel">
+				<panel name="physics geometry">
+					<radio_group name="physics_load_radio" value="physics_load_from_file">
+						<radio_item label="File:" name="physics_load_from_file"/>
+						<radio_item label="Use Level of Detail:" name="physics_use_lod"/>
+					</radio_group>
+					<combo_box name="physics_lod_combo" tool_tip="LOD to use for physics shape">
+						<combo_item name="physics_lowest">
+						Lowest
+					</combo_item>
+						<combo_item name="physics_low">
+						Low
+					</combo_item>
+						<combo_item name="physics_medium">
+						Medium
+					</combo_item>
+						<combo_item name="physics_high">
+						High
+					</combo_item>
+					</combo_box>
+					<button label="Browse..." name="physics_browse"/>
+				</panel>
+				<panel name="physics analysis">
+					<slider label="Smooth:" name="Smooth"/>
+				</panel>
+				<panel name="physics simplification">
+					<slider label="Passes:" name="Combine Quality"/>
+					<slider label="Detail Scale:" name="Detail Scale"/>
+					<slider label="Retain:" name="Retain%"/>
+					<button label="Simplify" name="Simplify"/>
+					<button label="Cancel" name="simplify_cancel"/>
+				</panel>
+				<panel name="physics info">
+					<slider label="Preview Spread:" name="physics_explode"/>
+					<text name="physics_triangles">
 					Triangles: [TRIANGLES]
 				</text>
-				<text name="physics_points">
+					<text name="physics_points">
 					Vertices: [POINTS]
 				</text>
-				<text name="physics_hulls">
+					<text name="physics_hulls">
 					Hulls: [HULLS]
 				</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Cancel" name="decompose_cancel"/>
+					<button label="Analyze" name="Decompose"/>
+					<check_box label="Close Holes (slow)" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
-		</panel>
-		<panel label="Modifiers" name="modifiers_panel">
-			<spinner name="import_scale" value="1.0"/>
-			<text name="import_dimensions">
+			<panel label="Modifiers" name="modifiers_panel">
+				<spinner name="import_scale" value="1.0"/>
+				<text name="import_dimensions">
 				[X] x [Y] x [Z] m
 			</text>
-			<check_box label="Textures" name="upload_textures"/>
-			<check_box label="Skin weight" name="upload_skin"/>
-			<check_box label="Joint positions" name="upload_joints"/>
-			<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Textures" name="upload_textures"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Joint positions" name="upload_joints"/>
+				<check_box label="Skin weight" name="upload_skin"/>
+			</panel>
+		</tab_container>
+		<panel name="model_name_representation_panel">
+			<text name="name_label">
+		Name:
+	</text>
 		</panel>
-	</tab_container>
+	</panel>
 </floater>

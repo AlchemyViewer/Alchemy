@@ -25,10 +25,6 @@
 	<text name="Web:">
 		Web:
 	</text>
-	<radio_group name="use_external_browser">
-		<radio_item label="Benyt min browser(IE, Firefox, Safari)" name="external" tool_tip="Brug systemets standard web browser til hjælp, web links, m.v. Ikke anbefalet hvis du kører i fuld-skærm." value="true"/>
-		<radio_item label="Benyt den indbyggede browser" name="internal" tool_tip="Brug den indbyggede web browser til hjælp, web links m.v. Denne browser åbner et nyt vindue i [APP_NAME]." value=""/>
-	</radio_group>
 	<check_box initial_value="true" label="Aktivér plugins" name="browser_plugins_enabled"/>
 	<check_box initial_value="true" label="Acceptér cookies" name="cookies_enabled"/>
 	<check_box initial_value="true" label="Aktivér Javascript" name="browser_javascript_enabled"/>
@@ -53,4 +49,8 @@
 		<combo_box.item label="Kan ikke gå i dvale, kan slukke skærmen" name="cant_hibernate"/>
 		<combo_box.item label="Kan ikke gå i dvale, kan ikke slukke skærmen" name="cant_hibernate_screen"/>
 	</combo_box>
+	<radio_group name="preferred_browser_behavior">
+		<radio_item label="Benyt min browser(IE, Firefox, Safari)" name="external" tool_tip="Brug systemets standard web browser til hjælp, web links, m.v. Ikke anbefalet hvis du kører i fuld-skærm." value="true"/>
+		<radio_item label="Benyt den indbyggede browser" name="internal" tool_tip="Brug den indbyggede web browser til hjælp, web links m.v. Denne browser åbner et nyt vindue i [APP_NAME]." value=""/>
+	</radio_group>
 </panel>

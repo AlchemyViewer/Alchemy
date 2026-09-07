@@ -3,6 +3,7 @@
 	<menu label="Mig" name="File">
 		<menu_item_call label="Indstillinger" name="Preferences..."/>
 		<menu_item_call label="Afslut [APP_NAME]" name="Quit"/>
+		<menu_item_check label="Vis gitter vælger" name="Show Grid Picker"/>
 	</menu>
 	<menu label="Hjælp" name="Help">
 		<menu_item_call label="[SECOND_LIFE] hjælp" name="Second Life Help"/>
@@ -18,7 +19,6 @@
 		<menu_item_call label="Vis vigtig besked" name="Critical"/>
 		<menu_item_call label="Media Browser Test" name="Web Browser Test"/>
 		<menu_item_call label="Web Content Floater Test" name="Web Content Floater Test"/>
-		<menu_item_check label="Vis gitter vælger" name="Show Grid Picker"/>
 		<menu_item_call label="Vis notifikationskonsol" name="Show Notifications Console"/>
 	</menu>
 </menu_bar>

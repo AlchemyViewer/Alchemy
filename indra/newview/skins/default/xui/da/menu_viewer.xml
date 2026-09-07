@@ -5,22 +5,20 @@
 		<menu_item_call label="Mit instrumentpanel" name="Manage My Account"/>
 		<menu_item_call label="Køb L$" name="Buy and Sell L$"/>
 		<menu_item_call label="Profil" name="Profile"/>
-		<menu_item_call label="Udseende" name="ChangeOutfit"/>
 		<menu_item_check label="Beholdning" name="Inventory"/>
 		<menu_item_check label="Min beholdning" name="ShowSidetrayInventory"/>
-		<menu_item_check label="Mine bevægelser" name="Gestures"/>
 		<menu_item_check label="Min stemme" name="ShowVoice"/>
 		<menu label="Bevægelser" name="Movement">
 			<menu_item_call label="Sid ned" name="Sit Down Here"/>
 			<menu_item_check label="Flyv" name="Fly"/>
-			<menu_item_check label="Løb altid" name="Always Run"/>
-			<menu_item_call label="Stop animering" name="Stop Animating My Avatar"/>
 		</menu>
 		<menu label="Min status" name="Status">
 			<menu_item_call label="Væk" name="Set Away"/>
 			<menu_item_call label="Optaget" name="Set Busy"/>
 		</menu>
 		<menu_item_call label="Afslut [APP_NAME]" name="Quit"/>
+		<menu_item_check label="Vis HUD vedhæftninger" name="Show HUD Attachments"/>
+		<menu_item_check label="Kontroller" name="Camera Controls"/>
 	</menu>
 	<menu label="Kommunikér" name="Communicate">
 		<menu_item_call label="Venner" name="My Friends"/>
@@ -28,6 +26,7 @@
 		<menu_item_check label="Chat i nærheden" name="Nearby Chat"/>
 		<menu_item_check label="Chat-meddelelser..." name="Chat Alerts"/>
 		<menu_item_call label="Personer tæt på" name="Active Speakers"/>
+		<menu_item_check label="Mine bevægelser" name="Gestures"/>
 	</menu>
 	<menu label="Verden" name="World">
 		<menu_item_check label="Mini-kort" name="Mini-Map"/>
@@ -35,7 +34,6 @@
 		<menu_item_check label="Søg" name="Search"/>
 		<menu_item_call label="Foto" name="Take Snapshot"/>
 		<menu_item_call label="Opret landemærke for dette sted" name="Create Landmark Here"/>
-		<menu_item_separator/>
 		<menu_item_call label="Profil for sted" name="Place Profile"/>
 		<menu_item_call label="Om land" name="About Land"/>
 		<menu_item_call label="Region/Estate" name="RegionEstate"/>
@@ -43,7 +41,6 @@
 		<menu_item_call label="Mit land" name="My Land"/>
 		<menu label="Vis" name="LandShow">
 			<menu_item_check label="Bevægelses kontrol" name="Movement Controls"/>
-			<menu_item_check label="Kontroller" name="Camera Controls"/>
 			<menu_item_check label="&apos;Ingen adgang&apos; markering" name="Ban Lines"/>
 			<menu_item_check label="Pejlelys" name="beacons"/>
 			<menu_item_check label="Parcel skel" name="Property Lines"/>
@@ -55,12 +52,19 @@
 		<menu_item_call label="Teleport hjem" name="Teleport Home"/>
 		<menu_item_call label="Sæt dette sted som &apos;Hjem&apos;" name="Set Home to Here"/>
 		<menu label="Sol" name="Sun">
-			<menu_item_call label="Solopgang" name="Sunrise"/>
-			<menu_item_call label="Middag" name="Noon"/>
-			<menu_item_call label="Solnedgang" name="Sunset"/>
-			<menu_item_call label="Midnat" name="Midnight"/>
 			<menu_item_call label="Estate tid" name="Revert to Region Default"/>
 			<menu_item_call label="Redigering af omgivelser" name="Environment Editor"/>
+		</menu>
+		<menu name="Environment">
+			<menu_item_call label="Midnat" name="Midnight"/>
+			<menu_item_call label="Solnedgang" name="Sunset"/>
+			<menu_item_call label="Middag" name="Noon"/>
+			<menu_item_call label="Solopgang" name="Sunrise"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Zoom ind" name="Zoom In"/>
+			<menu_item_call label="Zoom standard" name="Zoom Default"/>
+			<menu_item_call label="Zoom ud" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="Byg" name="BuildTools">
@@ -111,6 +115,7 @@
 			<menu_item_call label="Ret XY for objekt ind til gitter" name="Snap Object XY to Grid"/>
 			<menu_item_call label="Benyt valgte som grundlag for gitter" name="Use Selection for Grid"/>
 			<menu_item_call label="Gitter indstillinger" name="Grid Options"/>
+			<menu_item_check label="Fremhæv gennemsigtigt" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Send" name="Upload">
 			<menu_item_call label="Billede (L$[COST])..." name="Upload Image"/>
@@ -149,8 +154,6 @@
 			<menu_item_check label="Pejlelys blink effekt" name="Cheesy Beacon"/>
 			<menu_item_check label="Skjul partikler" name="Hide Particles"/>
 			<menu_item_check label="Skjul valgte" name="Hide Selected"/>
-			<menu_item_check label="Fremhæv gennemsigtigt" name="Highlight Transparent"/>
-			<menu_item_check label="Vis HUD vedhæftninger" name="Show HUD Attachments"/>
 			<menu_item_check label="Vis muse-sigte" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="Gengivelsestyper" name="Rendering Types">
@@ -181,7 +184,6 @@
 		<menu_item_call label="Tøm gruppe cache" name="ClearGroupCache"/>
 		<menu_item_check label="Muse udjævning" name="Mouse Smoothing"/>
 		<menu label="Shortcuts" name="Shortcuts">
-			<menu_item_call label="Frigør taster" name="Release Keys"/>
 			<menu_item_check label="Vis avanceret menu (gammel genvej)" name="Show Advanced Menu - legacy shortcut"/>
 			<menu_item_call label="Luk vindue" name="Close Window"/>
 			<menu_item_call label="Luk alle vinduer" name="Close All Windows"/>
@@ -190,12 +192,10 @@
 			<menu_item_check label="&quot;Joystick Flycam&quot;" name="Joystick Flycam"/>
 			<menu_item_call label="Nulstil udsyn" name="Reset View"/>
 			<menu_item_call label="Se på den sidste der chattede" name="Look at Last Chatter"/>
-			<menu_item_call label="Zoom ind" name="Zoom In"/>
-			<menu_item_call label="Zoom standard" name="Zoom Default"/>
-			<menu_item_call label="Zoom ud" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Vis debug valg" name="Debug Settings"/>
 		<menu_item_check label="Vis udviklingsmenu" name="Debug Mode"/>
+		<menu_item_call label="Frigør taster" name="Release Keys"/>
 	</menu>
 	<menu label="Udvikling" name="Develop">
 		<menu label="Konsoller" name="Consoles">
@@ -210,6 +210,7 @@
 			<menu_item_check label="Kamera" name="Camera"/>
 			<menu_item_check label="Vind" name="Wind"/>
 			<menu_item_check label="Badge" name="Badge"/>
+			<menu_item_check label="Debug konsol for region" name="Region Debug Console"/>
 		</menu>
 		<menu label="Vis info" name="Display Info">
 			<menu_item_check label="Vis tid" name="Show Time"/>
@@ -273,7 +274,6 @@
 			<menu_item_call label="Browser med webindhold" name="Web Content Browser"/>
 			<menu_item_call label="Print info om valgt objekt" name="Print Selected Object Info"/>
 			<menu_item_call label="Hukommelse statistik" name="Memory Stats"/>
-			<menu_item_check label="Debug konsol for region" name="Region Debug Console"/>
 			<menu_item_check label="Debug klik" name="Debug Clicks"/>
 			<menu_item_check label="Debug muse-hændelser" name="Debug Mouse Events"/>
 		</menu>
@@ -298,11 +298,13 @@
 			</menu>
 			<menu_item_call label="Tving værdier til standard" name="Force Params to Default"/>
 			<menu_item_check label="Animationsinfo" name="Animation Info"/>
-			<menu_item_check label="Slow motion animationer" name="Slow Motion Animations"/>
 			<menu_item_check label="Slå &quot;Level Of Detail&quot; fra" name="Disable LOD"/>
 			<menu_item_check label="Vis kollision skelet" name="Show Collision Skeleton"/>
 			<menu_item_check label="Vis avatar center" name="Display Agent Target"/>
 			<menu_item_call label="Debug avatar teksturer" name="Debug Avatar Textures"/>
+			<menu name="Animation Speed">
+				<menu_item_check label="Slow motion animationer" name="Slow Motion Animations"/>
+			</menu>
 		</menu>
 		<menu_item_check label="HTTP teksturer" name="HTTP Textures"/>
 		<menu_item_check label="HTTP Inventory" name="HTTP Inventory"/>
@@ -334,5 +336,10 @@
 		<menu label="Take Off Clothing" name="Take Off Clothing">
 			<menu_item_call label="Fysik" name="Physics"/>
 		</menu>
+	</menu>
+	<menu name="Avatar">
+		<menu_item_check label="Løb altid" name="Always Run"/>
+		<menu_item_call label="Stop animering" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Udseende" name="ChangeOutfit"/>
 	</menu>
 </menu_bar>

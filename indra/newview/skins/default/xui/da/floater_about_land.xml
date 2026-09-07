@@ -450,9 +450,11 @@ Kun større parceller kan vises i søgning.
 			</combo_box>
 			<spinner label="Pris i L$:" name="PriceSpin"/>
 			<spinner label="Timers adgang:" name="HoursSpin"/>
-			<panel name="Allowed_layout_panel">
-				<name_list name="AccessList" tool_tip="([LISTED] vist, [MAX] maks.)"/>
-			</panel>
+			<layout_stack name="access_stack">
+				<panel name="Allowed_layout_panel">
+					<name_list name="AccessList" tool_tip="([LISTED] vist, [MAX] maks.)"/>
+				</panel>
+			</layout_stack>
 		</panel>
 	</tab_container>
 </floater>

@@ -22,8 +22,14 @@ klik på deres navne.
 				<name_list.columns label="Doneret leje" name="donated"/>
 				<name_list.columns label="Status" name="online"/>
 			</name_list>
-			<button label="Invitér nyt medlem" name="member_invite"/>
-			<button label="Udmeld" name="member_eject"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="eject_btn_lp">
+					<button label="Udmeld" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="Invitér nyt medlem" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="ROLLER" name="roles_sub_tab">
 			<panel.string name="help_text">
@@ -79,15 +85,12 @@ ting i denne gruppe. Der er en bred vifte af rettigheder.
 		<text name="static">
 			Rolle navn
 		</text>
-		<line_editor name="role_name"/>
 		<text name="static3">
 			Rolle titel
 		</text>
-		<line_editor name="role_title"/>
 		<text name="static2">
 			Beskrivelse
 		</text>
-		<text_editor name="role_description"/>
 		<text name="static4">
 			Tildelte roller
 		</text>

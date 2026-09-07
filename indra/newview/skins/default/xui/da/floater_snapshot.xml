@@ -60,16 +60,18 @@
 	<spinner label="Højde" name="snapshot_height"/>
 	<check_box label="Fasthold proportioner" name="keep_aspect_check"/>
 	<slider label="Billedkvalitet" name="image_quality_slider"/>
-	<text name="layer_type_label">
+	<check_box label="Behold åben efter gem" name="keep_open_check"/>
+	<panel name="advanced_options_panel">
+		<check_box label="Auto-optegn" name="auto_snapshot_check"/>
+		<check_box label="Frys billede (fuld skærm)" name="freeze_frame_check"/>
+		<check_box label="HUDs" name="hud_check"/>
+		<check_box label="Snitflade" name="ui_check"/>
+		<combo_box label="Billedlag" name="layer_types">
+			<combo_box.item label="Farver" name="Colors"/>
+			<combo_box.item label="Dybde" name="Depth"/>
+		</combo_box>
+		<text name="layer_type_label">
 		Indfang:
 	</text>
-	<combo_box label="Billedlag" name="layer_types">
-		<combo_box.item label="Farver" name="Colors"/>
-		<combo_box.item label="Dybde" name="Depth"/>
-	</combo_box>
-	<check_box label="Snitflade" name="ui_check"/>
-	<check_box label="HUDs" name="hud_check"/>
-	<check_box label="Behold åben efter gem" name="keep_open_check"/>
-	<check_box label="Frys billede (fuld skærm)" name="freeze_frame_check"/>
-	<check_box label="Auto-optegn" name="auto_snapshot_check"/>
+	</panel>
 </floater>

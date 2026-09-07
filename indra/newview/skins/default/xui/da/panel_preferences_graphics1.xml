@@ -55,10 +55,6 @@
 		<text name="AvatarPhysicsDetailText">
 			Lav
 		</text>
-		<slider label="Maks. visnings-afstand:" name="DrawDistance"/>
-		<text name="DrawDistanceMeterText2">
-			m
-		</text>
 		<slider label="Maks. antal partikler:" name="MaxParticleCount"/>
 		<slider label="Maks. antal mini-avatarer:" name="MaxNumberAvatarDrawn"/>
 		<slider label="Efterbehandlingskvalitet:" name="RenderPostProcess"/>
@@ -111,4 +107,8 @@
 	<button label="Nulstil" name="Defaults"/>
 	<button label="Avanceret" name="Advanced"/>
 	<button label="Hardware" label_selected="Hardware" name="GraphicsHardwareButton"/>
+	<text name="DrawDistanceMeterText2">
+			m
+		</text>
+	<slider label="Maks. visnings-afstand:" name="DrawDistance"/>
 </panel>

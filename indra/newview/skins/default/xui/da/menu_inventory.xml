@@ -9,30 +9,6 @@
 	<menu_item_call label="Slet" name="Task Remove"/>
 	<menu_item_call label="Tøm papirkurv" name="Empty Trash"/>
 	<menu_item_call label="Tøm &apos;Lost and found&apos;" name="Empty Lost And Found"/>
-	<menu_item_call label="Ny mappe" name="New Folder"/>
-	<menu_item_call label="Nyt script" name="New Script"/>
-	<menu_item_call label="Ny note" name="New Note"/>
-	<menu_item_call label="Ny bevægelse" name="New Gesture"/>
-	<menu label="Nyt tøj" name="New Clothes">
-		<menu_item_call label="Ny trøje" name="New Shirt"/>
-		<menu_item_call label="Nye bukser" name="New Pants"/>
-		<menu_item_call label="Nye sko" name="New Shoes"/>
-		<menu_item_call label="Nye strømper" name="New Socks"/>
-		<menu_item_call label="Ny jakke" name="New Jacket"/>
-		<menu_item_call label="Ny nederdel" name="New Skirt"/>
-		<menu_item_call label="Nye handsker" name="New Gloves"/>
-		<menu_item_call label="Ny undertrøje" name="New Undershirt"/>
-		<menu_item_call label="Nye underbukser" name="New Underpants"/>
-		<menu_item_call label="Nyt alpha lag" name="New Alpha Mask"/>
-		<menu_item_call label="Ny tatovering" name="New Tattoo"/>
-		<menu_item_call label="Ny fysik" name="New Physics"/>
-	</menu>
-	<menu label="Nye kropsdele" name="New Body Parts">
-		<menu_item_call label="Ny figur" name="New Shape"/>
-		<menu_item_call label="Nyt hud" name="New Skin"/>
-		<menu_item_call label="Nyt hår" name="New Hair"/>
-		<menu_item_call label="Nye øjne" name="New Eyes"/>
-	</menu>
 	<menu label="Ændre type" name="Change Type">
 		<menu_item_call label="Standard" name="Default"/>
 		<menu_item_call label="Handsker" name="Gloves"/>
@@ -83,4 +59,30 @@
 	<menu_item_call label="Tilføj" name="Wearable Add"/>
 	<menu_item_call label="Tag af" name="Take Off"/>
 	<menu_item_call label="--ingen valg--" name="--no options--"/>
+	<menu name="create_new">
+		<menu label="Nye kropsdele" name="New Body Parts">
+			<menu_item_call label="Ny figur" name="New Shape"/>
+			<menu_item_call label="Nyt hud" name="New Skin"/>
+			<menu_item_call label="Nyt hår" name="New Hair"/>
+			<menu_item_call label="Nye øjne" name="New Eyes"/>
+		</menu>
+		<menu label="Nyt tøj" name="New Clothes">
+			<menu_item_call label="Ny trøje" name="New Shirt"/>
+			<menu_item_call label="Nye bukser" name="New Pants"/>
+			<menu_item_call label="Nye sko" name="New Shoes"/>
+			<menu_item_call label="Nye strømper" name="New Socks"/>
+			<menu_item_call label="Ny jakke" name="New Jacket"/>
+			<menu_item_call label="Ny nederdel" name="New Skirt"/>
+			<menu_item_call label="Nye handsker" name="New Gloves"/>
+			<menu_item_call label="Ny undertrøje" name="New Undershirt"/>
+			<menu_item_call label="Nye underbukser" name="New Underpants"/>
+			<menu_item_call label="Nyt alpha lag" name="New Alpha Mask"/>
+			<menu_item_call label="Ny tatovering" name="New Tattoo"/>
+			<menu_item_call label="Ny fysik" name="New Physics"/>
+		</menu>
+		<menu_item_call label="Ny bevægelse" name="New Gesture"/>
+		<menu_item_call label="Ny note" name="New Note"/>
+		<menu_item_call label="Nyt script" name="New Script"/>
+		<menu_item_call label="Ny mappe" name="New Folder"/>
+	</menu>
 </menu>

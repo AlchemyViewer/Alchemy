@@ -31,8 +31,48 @@
 			<text name="LabelItemNameTitle">
 				Navn:
 			</text>
+		</panel>
+	</scroll_container>
+	<panel name="button_panel">
+		<button label="Annullér" name="cancel_btn"/>
+	</panel>
+	<layout_stack name="main_stack">
+		<layout_panel name="layout_item_permissions_sale">
+			<spinner label="Pris: L$" name="Edit Cost"/>
+			<combo_box name="ComboBoxSaleType">
+				<combo_box.item label="Original" name="Original"/>
+				<combo_box.item label="Kopi" name="Copy"/>
+			</combo_box>
+			<check_box label="Til salg" name="CheckPurchase"/>
+			<check_box label="Overfør" name="CheckNextOwnerTransfer" tool_tip="Næste ejer kan give dette objekt væk"/>
+			<check_box label="Kopiere" name="CheckNextOwnerCopy"/>
+			<check_box label="Redigér" name="CheckNextOwnerModify"/>
+			<text name="NextOwnerLabel">
+					Næste ejer:
+				</text>
+			<check_box label="Del" name="CheckShareWithGroup" tool_tip="Tillader alle medlermmer af valgte gruppe at dele dine redigeringsrettigheder for dette objekt. Du skal vælge dedikere for at tildele rollerettigheder."/>
+			<text name="GroupLabel">
+					Gruppe:
+				</text>
+			<check_box label="Kopi" name="CheckEveryoneCopy"/>
+			<text name="AnyoneLabel">
+					Enhver:
+				</text>
+			<check_box label="Overføre" name="CheckOwnerTransfer"/>
+			<check_box label="Kopi" name="CheckOwnerCopy"/>
+			<check_box label="Redigere" name="CheckOwnerModify"/>
+			<text name="perm_modify">
+					Du kan:
+				</text>
+		</layout_panel>
+		<layout_panel name="layout_item_description">
 			<text name="LabelItemDescTitle">
 				Beskrivelse:
+			</text>
+		</layout_panel>
+		<layout_panel name="layout_item_details">
+			<text name="LabelAcquiredTitle">
+				Anskaffet:
 			</text>
 			<text name="LabelCreatorTitle">
 				Skaber:
@@ -40,40 +80,6 @@
 			<text name="LabelOwnerTitle">
 				Ejer:
 			</text>
-			<text name="LabelAcquiredTitle">
-				Anskaffet:
-			</text>
-			<panel name="perms_inv">
-				<text name="perm_modify">
-					Du kan:
-				</text>
-				<check_box label="Redigere" name="CheckOwnerModify"/>
-				<check_box label="Kopi" name="CheckOwnerCopy"/>
-				<check_box label="Overføre" name="CheckOwnerTransfer"/>
-				<text name="AnyoneLabel">
-					Enhver:
-				</text>
-				<check_box label="Kopi" name="CheckEveryoneCopy"/>
-				<text name="GroupLabel">
-					Gruppe:
-				</text>
-				<check_box label="Del" name="CheckShareWithGroup" tool_tip="Tillader alle medlermmer af valgte gruppe at dele dine redigeringsrettigheder for dette objekt. Du skal vælge dedikere for at tildele rollerettigheder."/>
-				<text name="NextOwnerLabel">
-					Næste ejer:
-				</text>
-				<check_box label="Redigér" name="CheckNextOwnerModify"/>
-				<check_box label="Kopiere" name="CheckNextOwnerCopy"/>
-				<check_box label="Overfør" name="CheckNextOwnerTransfer" tool_tip="Næste ejer kan give dette objekt væk"/>
-			</panel>
-			<check_box label="Til salg" name="CheckPurchase"/>
-			<combo_box name="combobox sale copy">
-				<combo_box.item label="Kopi" name="Copy"/>
-				<combo_box.item label="Original" name="Original"/>
-			</combo_box>
-			<spinner label="Pris: L$" name="Edit Cost"/>
-		</panel>
-	</scroll_container>
-	<panel name="button_panel">
-		<button label="Annullér" name="cancel_btn"/>
-	</panel>
+		</layout_panel>
+	</layout_stack>
 </panel>
