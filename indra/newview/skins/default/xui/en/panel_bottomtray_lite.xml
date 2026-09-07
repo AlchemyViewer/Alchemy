@@ -59,20 +59,6 @@
          top_delta="0"
          min_width="52"
          name="gesture_panel">
-            <gesture_combo_list
-             follows="left|right"
-             height="23"
-             label="Gesture"
-             layout="topleft"
-             name="Gesture"
-             left="0"
-             top="5"
-             width="82"
-             tool_tip="Shows/hides gestures">
-                <gesture_combo_list.combo_button
-                 pad_right="10"
-                 use_ellipses="true" />
-            </gesture_combo_list>
         </layout_panel>
         <layout_panel
          auto_resize="false"
