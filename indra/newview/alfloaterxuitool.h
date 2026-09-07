@@ -26,6 +26,7 @@
 
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
+#include "alxuioverlay.h"
 #include "alxuiselection.h"
 #include "alxuisourcemap.h"
 #include "alxuitreemodel.h"
@@ -96,6 +97,7 @@ private:
         LLView*                                     root = nullptr;
         LLXMLNodePtr                                node;
         ALXUISourceMap                              sourceMap;
+        ALXUIOverlay                                overlay;
         std::string                                 skin;
         std::string                                 language;
         std::vector<std::unique_ptr<ALXUILiveFile>> liveFiles;
@@ -163,6 +165,7 @@ private:
     void onToggleSecondary();
 
     static LLSD row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells);
+    std::string layerLabel(S32 which, S32 layer) const;
 
     ALXUICatalog        mCatalog;
     ALXUISelection      mSelection;

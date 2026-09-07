@@ -110,6 +110,7 @@ target_sources(llui
     llxuiparser.cpp
     alxuicatalog.cpp
     alxuidiagnostics.cpp
+    alxuioverlay.cpp
     alxuiselection.cpp
     alxuishellbuild.cpp
     alxuisourcemap.cpp
@@ -241,6 +242,7 @@ target_sources(llui
     llxuiparser.h
     alxuicatalog.h
     alxuidiagnostics.h
+    alxuioverlay.h
     alxuiselection.h
     alxuishellbuild.h
     alxuisourcemap.h

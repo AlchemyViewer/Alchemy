@@ -27,6 +27,7 @@
 #include "alfloaterxuitool.h"
 
 #include "alxmldocument.h"
+#include "alxmllayermerge.h"
 #include "alxuishellbuild.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
@@ -905,6 +906,7 @@ void ALFloaterXUITool::closePreview(S32 which)
     pv.root = nullptr;
     pv.node = nullptr;
     pv.sourceMap.clear();
+    pv.overlay.clear();
     pv.liveFiles.clear();
     pv.diagnostics.clear();
     if (which == PRIMARY)
@@ -934,6 +936,7 @@ void ALFloaterXUITool::hostClosed(S32 which)
     pv.root = nullptr;
     pv.node = nullptr;
     pv.sourceMap.clear();
+    pv.overlay.clear();
     pv.liveFiles.clear();
     if (which == PRIMARY)
     {
@@ -998,9 +1001,20 @@ LLView* ALFloaterXUITool::buildRoot(S32 which, const ALXUICatalog::Entry& entry,
             return nullptr;
         }
     }
-    else if (!LLUICtrlFactory::getLayeredXMLNode(file, node))
+    else
     {
-        return nullptr;
+        // The viewer's own layers in the viewer's own order, merged by
+        // its own call, with the tool's observer recording what each
+        // layer wrote and what it dropped.
+        std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, file);
+        if (paths.empty())
+        {
+            paths.push_back(file);
+        }
+        if (!ALXmlLayerMerge::load(paths, node, &mPreviews[which].overlay))
+        {
+            return nullptr;
+        }
     }
 
     LLView* root = nullptr;
@@ -1540,11 +1554,26 @@ void ALFloaterXUITool::fillDiagnostics()
         {
             where = file + ": " + where;
         }
-        mDiagnostics->addElement(row(e.line, {
+        LLSD id;
+        id["line"] = e.line;
+        mDiagnostics->addElement(row(id, {
             { "kind", ALXUIDiagnostics::kindName(e.kind) },
             { "line", e.line > 0 ? std::to_string(e.line) : std::string() },
             { "path", where },
             { "message", e.message } }));
+    }
+
+    // What the merge dropped from each layer, with the layer it was in;
+    // the line is that layer's, so a double-click goes by the path.
+    for (const ALXUIOverlay::Drop& d : pv.overlay.drops())
+    {
+        LLSD id;
+        id["path"] = d.path;
+        mDiagnostics->addElement(row(id, {
+            { "kind", "overlay drop" },
+            { "line", d.line > 0 ? std::to_string(d.line) : std::string() },
+            { "path", layerLabel(PRIMARY, d.layer) + ": " + d.path },
+            { "message", d.what + ": " + d.why } }));
     }
 }
 
@@ -1555,9 +1584,14 @@ void ALFloaterXUITool::onDiagnosticSelected()
     {
         return;
     }
-    const S32 line = item->getValue().asInteger();
+    const LLSD id = item->getValue();
     const Preview& pv = mPreviews[PRIMARY];
-    const LLView* view = pv.sourceMap.viewAtLine(line);
+    if (id.has("path"))
+    {
+        mSelection.select(ALXUISelection::fromString(id["path"].asString()));
+        return;
+    }
+    const LLView* view = pv.sourceMap.viewAtLine(id["line"].asInteger());
     ALXUISelection::path_t path;
     if (view && ALXUISelection::pathOf(view, pv.root, path))
     {
@@ -1742,36 +1776,60 @@ void ALFloaterXUITool::refreshAttributes(LLView* view)
         return;
     }
 
-    // Which layer last wrote each attribute: the language file when it
-    // carries the attribute, else the base file.
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    std::vector<const ALXUICatalog::Layer*> layers = entry ? mCatalog.layersFor(*entry, pv.skin, pv.language)
-                                                           : std::vector<const ALXUICatalog::Layer*>();
-    std::vector<pugi::xml_node> elements;
-    for (const ALXUICatalog::Layer* layer : layers)
-    {
-        elements.push_back(ALXUICatalog::resolve(layer->root(), mSelection.selection()));
-    }
-
+    // Which layer last wrote each attribute, and the line in that layer's
+    // file, as the merge's observer recorded it; the base wrote the rest.
     for (const auto& [name_entry, attribute] : origin->node->mAttributes)
     {
         const char* name = name_entry->mString;
-        std::string from;
-        for (size_t i = elements.size(); i-- > 0;)
-        {
-            if (elements[i] && elements[i].attribute(name))
-            {
-                from = layers[i]->skin + "/" + layers[i]->language;
-                break;
-            }
-        }
-        const S32 line = attribute->getLineNumber();
+        const ALXUIOverlay::Origin* from = pv.overlay.originOf(attribute.get());
+        const S32 line = from ? from->line : attribute->getLineNumber();
         mAttributes->addElement(row(name, {
             { "attribute", name },
             { "value", attribute->getValue() },
-            { "layer", from },
+            { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
             { "line", line > 0 ? std::to_string(line) : std::string() } }));
     }
+    if (origin->node->hasTextContents())
+    {
+        const ALXUIOverlay::Origin* from = pv.overlay.originOf(origin->node.get());
+        const S32 line = from ? from->line : origin->line;
+        mAttributes->addElement(row("text()", {
+            { "attribute", "(text)" },
+            { "value", origin->node->getTextContents() },
+            { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
+            { "line", line > 0 ? std::to_string(line) : std::string() } }));
+    }
+}
+
+// A layer's skin and language, read off its path: the segments around
+// the xui directory.
+std::string ALFloaterXUITool::layerLabel(S32 which, S32 layer) const
+{
+    const std::string& path = mPreviews[which].overlay.layerPath(layer);
+    if (path.empty())
+    {
+        return std::string();
+    }
+    std::vector<std::string> segments;
+    size_t start = 0;
+    while (start <= path.size())
+    {
+        const size_t end = path.find_first_of("/\\", start);
+        segments.push_back(path.substr(start, end == std::string::npos ? std::string::npos : end - start));
+        if (end == std::string::npos)
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    for (size_t i = 1; i + 1 < segments.size(); ++i)
+    {
+        if (segments[i] == "xui")
+        {
+            return segments[i - 1] + "/" + segments[i + 1];
+        }
+    }
+    return path;
 }
 
 void ALFloaterXUITool::refreshLayout(LLView* view)
