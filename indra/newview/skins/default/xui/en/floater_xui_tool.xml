@@ -1,0 +1,500 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ legacy_header_height="18"
+ can_resize="true"
+ height="760"
+ layout="topleft"
+ min_height="480"
+ min_width="900"
+ name="xui_tool"
+ help_topic="xui_tool"
+ save_rect="true"
+ single_instance="true"
+ title="XUI Tool"
+ translate="false"
+ width="1180">
+    <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
+    <floater.string name="NoFile">Select a file.</floater.string>
+    <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
+    <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] diagnostics, [SKIN]/[LANG]</floater.string>
+    <floater.string name="BuildFailed">Could not build [FILE]: see the diagnostics.</floater.string>
+    <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
+    <floater.string name="NoResults">No matches.</floater.string>
+    <floater.string name="LayerMissing">-</floater.string>
+
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="skin_label"
+     top="24"
+     width="30">Skin</text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="2"
+     name="skin_combo"
+     top_delta="-3"
+     width="90" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left_pad="10"
+     name="language_label"
+     top_delta="3"
+     width="58">Language</text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="2"
+     name="language_combo"
+     top_delta="-3"
+     width="56" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Second"
+     layout="topleft"
+     left_pad="10"
+     name="secondary_check"
+     tool_tip="Show a second preview in another language beside the first"
+     top_delta="3"
+     width="66" />
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="0"
+     name="language_combo_2"
+     top_delta="-3"
+     width="56" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Show"
+     layout="topleft"
+     left_pad="12"
+     name="show_btn"
+     tool_tip="Build and show the selected file"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Hide"
+     layout="topleft"
+     left_pad="4"
+     name="hide_btn"
+     tool_tip="Close the previews"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Reload"
+     layout="topleft"
+     left_pad="4"
+     name="reload_btn"
+     tool_tip="Read the catalog and the previews again"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Edit"
+     layout="topleft"
+     left_pad="4"
+     name="edit_btn"
+     tool_tip="Open the selected element's file in the external editor at its line"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Gallery"
+     layout="topleft"
+     left_pad="12"
+     name="gallery_btn"
+     tool_tip="Every registered widget with its template defaults, in the chosen skin"
+     top_delta="0"
+     width="70" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Hover highlight"
+     layout="topleft"
+     left_pad="14"
+     name="hover_check"
+     tool_tip="Draw the element under the mouse on the preview"
+     top_delta="3"
+     width="120" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Code-built rows"
+     layout="topleft"
+     left_pad="6"
+     name="code_built_check"
+     tool_tip="Show the views a widget builds for itself, which the file does not describe"
+     top_delta="0"
+     width="130" />
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="686"
+     layout="topleft"
+     left="8"
+     name="main_stack"
+     orientation="horizontal"
+     top="50"
+     width="1164">
+
+        <layout_panel
+         auto_resize="false"
+         height="686"
+         layout="topleft"
+         min_dim="200"
+         name="catalog_panel"
+         user_resize="true"
+         width="300">
+            <filter_editor
+             follows="left|top|right"
+             height="22"
+             label="Filter files"
+             layout="topleft"
+             left="0"
+             name="catalog_filter"
+             top="0"
+             width="300" />
+            <scroll_list
+             column_padding="0"
+             draw_heading="true"
+             follows="all"
+             height="420"
+             layout="topleft"
+             left="0"
+             name="file_list"
+             top_pad="4"
+             width="300">
+                <scroll_list.columns
+                 label="Kind"
+                 name="kind"
+                 width="58" />
+                <scroll_list.columns
+                 dynamic_width="true"
+                 label="File"
+                 name="name" />
+                <scroll_list.columns
+                 label="L"
+                 name="lang"
+                 tool_tip="The chosen language has a file"
+                 width="20" />
+                <scroll_list.columns
+                 label="S"
+                 name="skin"
+                 tool_tip="The chosen skin has a file"
+                 width="20" />
+            </scroll_list>
+            <text
+             follows="left|bottom"
+             height="16"
+             layout="topleft"
+             left="0"
+             name="find_label"
+             top_pad="8"
+             width="34">Find</text>
+            <combo_box
+             follows="left|bottom"
+             height="22"
+             layout="topleft"
+             left_pad="2"
+             name="find_field"
+             top_delta="-3"
+             width="84">
+                <combo_box.item label="Any" name="any" value="any" />
+                <combo_box.item label="Tag" name="tag" value="tag" />
+                <combo_box.item label="Attribute" name="attribute" value="attribute" />
+                <combo_box.item label="Value" name="value" value="value" />
+                <combo_box.item label="Name" name="name" value="name" />
+                <combo_box.item label="Text" name="text" value="text" />
+            </combo_box>
+            <line_editor
+             follows="left|right|bottom"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="find_query"
+             tool_tip="Search every file and layer; Enter runs it"
+             top_delta="0"
+             width="176" />
+            <scroll_list
+             column_padding="0"
+             draw_heading="true"
+             follows="left|right|bottom"
+             height="180"
+             layout="topleft"
+             left="0"
+             name="find_results"
+             top_pad="4"
+             width="300">
+                <scroll_list.columns
+                 label="File"
+                 name="file"
+                 width="110" />
+                <scroll_list.columns
+                 label="Line"
+                 name="line"
+                 width="36" />
+                <scroll_list.columns
+                 label="Layer"
+                 name="layer"
+                 width="60" />
+                <scroll_list.columns
+                 dynamic_width="true"
+                 label="Match"
+                 name="snippet" />
+            </scroll_list>
+        </layout_panel>
+
+        <layout_panel
+         auto_resize="false"
+         height="686"
+         layout="topleft"
+         min_dim="220"
+         name="tree_panel"
+         user_resize="true"
+         width="360">
+            <filter_editor
+             follows="left|top|right"
+             height="22"
+             label="Filter by name or tag"
+             layout="topleft"
+             left="0"
+             name="tree_filter"
+             top="0"
+             width="360" />
+            <panel
+             follows="all"
+             height="440"
+             layout="topleft"
+             left="0"
+             name="tree_host"
+             top_pad="4"
+             width="360" />
+            <panel
+             follows="left|right|bottom"
+             height="22"
+             layout="topleft"
+             left="0"
+             name="breadcrumb"
+             top_pad="4"
+             width="360" />
+            <scroll_list
+             column_padding="0"
+             draw_heading="true"
+             follows="left|right|bottom"
+             height="170"
+             layout="topleft"
+             left="0"
+             name="diagnostics"
+             tool_tip="What the parser and the factory reported while building; double-click selects the element"
+             top_pad="4"
+             width="360">
+                <scroll_list.columns
+                 label="Kind"
+                 name="kind"
+                 width="104" />
+                <scroll_list.columns
+                 label="Line"
+                 name="line"
+                 width="36" />
+                <scroll_list.columns
+                 label="Where"
+                 name="path"
+                 width="110" />
+                <scroll_list.columns
+                 dynamic_width="true"
+                 label="What"
+                 name="message" />
+            </scroll_list>
+        </layout_panel>
+
+        <layout_panel
+         auto_resize="true"
+         height="686"
+         layout="topleft"
+         min_dim="320"
+         name="inspector_panel"
+         width="480">
+            <tab_container
+             follows="all"
+             height="686"
+             layout="topleft"
+             left="0"
+             name="inspector_tabs"
+             tab_min_width="60"
+             tab_position="top"
+             top="0"
+             width="480">
+                <panel
+                 label="Attributes"
+                 layout="topleft"
+                 name="attributes_tab">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="640"
+                     layout="topleft"
+                     left="0"
+                     name="attributes"
+                     top="0"
+                     width="476">
+                        <scroll_list.columns
+                         label="Attribute"
+                         name="attribute"
+                         width="140" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Value"
+                         name="value" />
+                        <scroll_list.columns
+                         label="Layer"
+                         name="layer"
+                         width="80" />
+                        <scroll_list.columns
+                         label="Line"
+                         name="line"
+                         width="40" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Layout"
+                 layout="topleft"
+                 name="layout_tab">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="640"
+                     layout="topleft"
+                     left="0"
+                     name="layout"
+                     top="0"
+                     width="476">
+                        <scroll_list.columns
+                         label="Property"
+                         name="property"
+                         width="160" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Value"
+                         name="value" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Source"
+                 layout="topleft"
+                 name="source_tab">
+                    <text
+                     follows="left|top|right"
+                     height="16"
+                     layout="topleft"
+                     left="2"
+                     name="source_layers"
+                     top="4"
+                     use_ellipses="true"
+                     width="380" />
+                    <button
+                     follows="top|right"
+                     height="20"
+                     label="Open in editor"
+                     layout="topleft"
+                     left_pad="4"
+                     name="jump_btn"
+                     top_delta="-2"
+                     width="90" />
+                    <text_editor
+                     follows="all"
+                     font="Monospace"
+                     height="612"
+                     ignore_tab="false"
+                     layout="topleft"
+                     left="0"
+                     name="source_text"
+                     read_only="true"
+                     top_pad="4"
+                     width="476"
+                     word_wrap="false" />
+                </panel>
+                <panel
+                 label="Bindings"
+                 layout="topleft"
+                 name="bindings_tab">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="640"
+                     layout="topleft"
+                     left="0"
+                     name="bindings"
+                     top="0"
+                     width="476">
+                        <scroll_list.columns
+                         label="Kind"
+                         name="kind"
+                         width="130" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Name"
+                         name="name" />
+                        <scroll_list.columns
+                         label="Status"
+                         name="status"
+                         width="120" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="State"
+                 layout="topleft"
+                 name="state_tab">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="640"
+                     layout="topleft"
+                     left="0"
+                     name="state"
+                     top="0"
+                     width="476">
+                        <scroll_list.columns
+                         label="Property"
+                         name="property"
+                         width="130" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Value"
+                         name="value" />
+                    </scroll_list>
+                </panel>
+            </tab_container>
+        </layout_panel>
+    </layout_stack>
+
+    <text
+     follows="left|right|bottom"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="status"
+     top_pad="4"
+     use_ellipses="true"
+     width="1164" />
+</floater>

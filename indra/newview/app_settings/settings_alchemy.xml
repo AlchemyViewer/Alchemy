@@ -233,6 +233,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALXUIToolState</key>
+        <map>
+            <key>Comment</key>
+            <string>XUI Tool: the last file, skin, languages, inspector tab and switches, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
         <key>NumpadControl</key>
         <map>
             <key>Comment</key>

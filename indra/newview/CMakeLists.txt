@@ -188,6 +188,7 @@ set(viewer_SOURCE_FILES
     alscopedata.cpp
     alxuibaseline.cpp
     alfloaterwebprofile.cpp
+    alfloaterxuitool.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
@@ -474,7 +475,6 @@ set(viewer_SOURCE_FILES
     llfloatertos.cpp
     llfloatertoybox.cpp
     llfloatertranslationsettings.cpp
-    llfloateruipreview.cpp
     llfloaterurlentry.cpp
     llfloatervoicevolume.cpp
     llfloaterwebcontent.cpp
@@ -973,6 +973,7 @@ set(viewer_HEADER_FILES
     altexturetable.h
     alxuibaseline.h
     alfloaterwebprofile.h
+    alfloaterxuitool.h
     algradehistory.h
     allegacynotificationwellwindow.h
     alobjectproperties.h
@@ -1266,7 +1267,6 @@ set(viewer_HEADER_FILES
     llfloatertos.h
     llfloatertoybox.h
     llfloatertranslationsettings.h
-    llfloateruipreview.h
     llfloaterurlentry.h
     llfloatervoicevolume.h
     llfloaterwebcontent.h

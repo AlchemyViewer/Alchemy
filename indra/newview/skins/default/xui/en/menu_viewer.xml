@@ -4506,7 +4506,7 @@ function="World.EnvPreset"
          name="XUI"
          tear_off="true">
             <menu_item_call
-             label="XUI Preview Tool"
+             label="XUI Tool"
              name="UI Preview Tool">
              <menu_item_call.on_click
               function="Floater.Toggle"
