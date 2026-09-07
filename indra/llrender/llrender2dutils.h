@@ -183,6 +183,7 @@ public:
 
     LLPointer<LLUIImage> getUIImageByID(const LLUUID& image_id, S32 priority = 0);
     LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0);
+    bool hasUIImage(std::string_view name) const;
 
 protected:
     // since LLRender2D has no control of image provider's lifecycle
@@ -203,6 +204,12 @@ public:
     virtual LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority) = 0;
     virtual LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) = 0;
     virtual void cleanUp() = 0;
+
+    // Whether a name is one the provider knows, asked without loading
+    // anything: getUIImage treats an unknown name as a file to fetch, so
+    // it cannot answer this. A provider that cannot say answers yes, and
+    // a caller checking a name for a mistake finds none.
+    virtual bool hasUIImage(std::string_view name) const { return true; }
 
     // to notify holders when pointer gets deleted
     typedef void(*callback_t)();

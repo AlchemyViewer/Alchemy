@@ -323,6 +323,8 @@ public:
         { return LLRender2D::getInstance()->getUIImageByID(image_id, priority); }
     static LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority = 0)
         { return LLRender2D::getInstance()->getUIImage(name, priority); }
+    static bool hasUIImage(std::string_view name)
+        { return LLRender2D::getInstance()->hasUIImage(name); }
 
     //
     // Data

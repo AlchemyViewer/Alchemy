@@ -267,6 +267,9 @@ public:
     // LLImageProviderInterface
     /*virtual*/ LLPointer<LLUIImage> getUIImageByID(const LLUUID& id, S32 priority) override;
     /*virtual*/ LLPointer<LLUIImage> getUIImage(std::string_view name, S32 priority) override;
+    // Every name textures.xml declares is preloaded into the map, whether
+    // its file is fetched now or later, so membership is the answer.
+    bool hasUIImage(std::string_view name) const override { return mUIImages.find(name) != mUIImages.end(); }
     void cleanUp() override;
 
     bool initFromFile();

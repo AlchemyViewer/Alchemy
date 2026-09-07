@@ -2012,6 +2012,11 @@ LLPointer<LLUIImage> LLRender2D::getUIImageByID(const LLUUID& image_id, S32 prio
     }
 }
 
+bool LLRender2D::hasUIImage(std::string_view name) const
+{
+    return !mImageProvider || mImageProvider->hasUIImage(name);
+}
+
 LLPointer<LLUIImage> LLRender2D::getUIImage(std::string_view name, S32 priority)
 {
     if (!name.empty() && mImageProvider)
