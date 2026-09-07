@@ -39,6 +39,7 @@
 					<icon name="media_whitelist_flag" tool_tip="Whitelist aktiviert"/>
 				</layout_panel>
 			</layout_stack>
+			<icon name="media_secure_lock_flag" tool_tip="Sicheres Surfen"/>
 		</layout_panel>
 		<layout_panel name="media_play_position">
 			<slider_bar initial_value="0.5" name="media_play_slider" tool_tip="Fortschritt der Filmwiedergabe"/>
@@ -62,6 +63,5 @@
 		<layout_panel name="new_window">
 			<button name="new_window_btn" tool_tip="URL in Browser öffnen"/>
 		</layout_panel>
-		<icon name="media_secure_lock_flag" tool_tip="Sicheres Surfen"/>
 	</layout_stack>
 </panel>

@@ -2,26 +2,19 @@
 <menu_bar name="Main Menu">
 	<menu label="Ich" name="Me">
 		<menu_item_call label="Profil..." name="Profile"/>
-		<menu_item_call label="Aussehen..." name="ChangeOutfit"/>
 		<menu_item_call label="Avatar auswählen..." name="Avatar Picker"/>
 		<menu_item_check label="Inventar..." name="Inventory"/>
 		<menu_item_call label="Neues Inventarfenster" name="NewInventoryWindow"/>
 		<menu_item_call label="Orte..." name="Places"/>
 		<menu_item_call label="Auswahlen..." name="Picks"/>
 		<menu_item_call label="Erlebnisse..." name="Experiences"/>
-		<menu_item_call label="Meine Skripte..." name="MyScripts"/>
 		<menu_item_call label="Kamerasteuerungen..." name="Camera Controls"/>
 		<menu label="Bewegung" name="Movement">
 			<menu_item_call label="Hinsetzen" name="Sit Down Here"/>
 			<menu_item_call label="Aufstehen" name="Stand up"/>
 			<menu_item_check label="Fliegen" name="Fly"/>
-			<menu_item_check label="Immer rennen" name="Always Run"/>
-			<menu_item_call label="Animation meines Avatars stoppen" name="Stop Animating My Avatar"/>
-			<menu_item_call label="Gehen/Rennen/Fliegen..." name="WalkRunFly"/>
 		</menu>
 		<menu label="Status" name="Status">
-			<menu_item_check label="Abwesend" name="Away"/>
-			<menu_item_check label="Nicht stören" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="L$ kaufen..." name="Buy and Sell L$"/>
 		<menu_item_call label="Marktplatz-Auflistungen..." name="MarketplaceListings"/>
@@ -33,6 +26,8 @@
 		<menu_item_call label="Alle Steuerelemente ausblenden" name="Hide UI"/>
 		<menu_item_check label="HUD-Anhänge anzeigen" name="Show HUD Attachments"/>
 		<menu_item_call label="[APP_NAME] schließen" name="Quit"/>
+		<menu_item_check label="Nicht stören" name="Do Not Disturb"/>
+		<menu_item_check label="Abwesend" name="Away"/>
 	</menu>
 	<menu label="Unterhalten" name="Communicate">
 		<menu_item_check label="Unterhaltungen..." name="Conversations"/>
@@ -83,6 +78,11 @@
 			<menu_item_call label="Meine Umgebungen..." name="my_environs"/>
 			<menu_item_call label="Persönliche Beleuchtung..." name="adjustment_tool"/>
 			<menu_item_check label="Wolken pausieren" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Hineinzoomen" name="Zoom In"/>
+			<menu_item_call label="Zoom-Standard" name="Zoom Default"/>
+			<menu_item_call label="Wegzoomen" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="Bauen" name="BuildTools">
@@ -142,6 +142,7 @@
 			<menu_item_call label="Auswahl für Raster verwenden" name="Use Selection for Grid"/>
 			<menu_item_call label="Rasteroptionen..." name="Grid Options"/>
 			<menu_item_call label="Standard-Berechtigungen einstellen..." name="Set default permissions"/>
+			<menu_item_check label="Durchsichtig hervorheben" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Hochladen" name="Upload">
 			<menu_item_call label="Bild ([COST] L$)..." name="Upload Image"/>
@@ -209,7 +210,6 @@
 			<menu_item_check label="Pulsierender Strahl" name="Cheesy Beacon"/>
 			<menu_item_check label="Partikel ausblenden" name="Hide Particles"/>
 			<menu_item_check label="Auswahl ausblenden" name="Hide Selected"/>
-			<menu_item_check label="Durchsichtig hervorheben" name="Highlight Transparent"/>
 			<menu_item_check label="Fadenkreuz für Mouselook anzeigen" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="Darstellungstypen" name="Rendering Types">
@@ -250,9 +250,6 @@
 			<menu_item_check label="Joystick-Flycam" name="Joystick Flycam"/>
 			<menu_item_call label="Ansicht zurücksetzen" name="Reset View"/>
 			<menu_item_call label="Letzten Chatter ansehen" name="Look at Last Chatter"/>
-			<menu_item_call label="Hineinzoomen" name="Zoom In"/>
-			<menu_item_call label="Zoom-Standard" name="Zoom Default"/>
-			<menu_item_call label="Wegzoomen" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Debug-Einstellungen anzeigen" name="Debug Settings"/>
 		<menu_item_check label="Menü „Entwickler“ anzeigen" name="Debug Mode"/>
@@ -284,6 +281,7 @@
 			<menu_item_check label="Farbe unter Cursor anzeigen" name="Show Color Under Cursor"/>
 			<menu_item_check label="Speicher anzeigen" name="Show Memory"/>
 			<menu_item_check label="Akutalisierungen an Objekten anzeigen" name="Show Updates"/>
+			<menu_item_check name="Show Avatar Render Info" label="Avatar-Renderinfo anzeigen"/>
 		</menu>
 		<menu label="Fehler erzwingen" name="Force Errors">
 			<menu_item_call label="Haltepunkt erzwingen" name="Force Breakpoint"/>
@@ -394,6 +392,7 @@
 			<menu_item_check label="Fehler in Maus-Events beseitigen" name="Debug Mouse Events"/>
 			<menu_item_check label="Fehler in Keys beseitigen" name="Debug Keys"/>
 			<menu_item_check label="Fehler in WindowProc beseitigen" name="Debug WindowProc"/>
+			<menu_item_call name="FB Connect Test" label="FB-Verbindungsprüfung"/>
 		</menu>
 		<menu label="XUI" name="XUI">
 			<menu_item_call label="Farbeinstellungen neu laden" name="Reload Color Settings"/>
@@ -430,6 +429,12 @@
 			<menu_item_call label="Anhänge ausgeben" name="Dump Attachments"/>
 			<menu_item_call label="Fehler in Avatar-Texturen beseitigen" name="Debug Avatar Textures"/>
 			<menu_item_call label="Lokale Texturen ausgeben" name="Dump Local Textures"/>
+			<menu name="Animation Speed" label="Animationsgeschwindigkeit">
+				<menu_item_check name="Slow Motion Animations" label="Zeitlupen-Animationen"/>
+				<menu_item_call name="Reset All Animation Speed" label="Alle Animationsgeschwindigkeiten zurücksetzen"/>
+				<menu_item_call name="All Animations 10 Slower" label="Alle Animationen 10% langsamer"/>
+				<menu_item_call name="All Animations 10 Faster" label="Alle Animationen 10 % schneller"/>
+			</menu>
 		</menu>
 		<menu_item_check label="HTTP-Texturen" name="HTTP Textures"/>
 		<menu_item_call label="Bilder komprimieren" name="Compress Images"/>
@@ -446,15 +451,9 @@
 		<menu_item_call label="Admin-Status anfordern" name="Request Admin Options"/>
 		<menu_item_call label="Admin-Status verlassen" name="Leave Admin Options"/>
 		<menu_item_check label="Admin-Menü anzeigen" name="View Admin Options"/>
-		<menu_item_call name="All Animations 10 Slower" label="Alle Animationen 10% langsamer"/>
-		<menu_item_check name="Show Avatar Render Info" label="Avatar-Renderinfo anzeigen"/>
-		<menu_item_call name="All Animations 10 Faster" label="Alle Animationen 10 % schneller"/>
 		<menu_item_call name="Playback event recording" label="Eventaufzeichnung wiedergeben"/>
-		<menu_item_call name="FB Connect Test" label="FB-Verbindungsprüfung"/>
 		<menu_item_call name="Stop event recording" label="Eventaufzeichnung anhalten"/>
-		<menu_item_call name="Reset All Animation Speed" label="Alle Animationsgeschwindigkeiten zurücksetzen"/>
 		<menu_item_call name="Start event recording" label="Eventaufzeichnung starten"/>
-		<menu_item_check name="Slow Motion Animations" label="Zeitlupen-Animationen"/>
 	</menu>
 	<menu label="Admin" name="Admin">
 		<menu label="Objekt" name="AdminObject">
@@ -507,5 +506,11 @@
 			</menu>
 		</menu>
 	</menu>
-	<menu name="Animation Speed" label="Animationsgeschwindigkeit"/>
+	<menu name="Avatar">
+		<menu_item_call label="Meine Skripte..." name="MyScripts"/>
+		<menu_item_check label="Immer rennen" name="Always Run"/>
+		<menu_item_call label="Gehen/Rennen/Fliegen..." name="WalkRunFly"/>
+		<menu_item_call label="Animation meines Avatars stoppen" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Aussehen..." name="ChangeOutfit"/>
+	</menu>
 </menu_bar>

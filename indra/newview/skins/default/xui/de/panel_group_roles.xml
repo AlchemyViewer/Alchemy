@@ -15,9 +15,17 @@ um mehrere Mitglieder auszuwählen.</panel.string>
 				<name_list.columns label="Status" name="online"/>
 				<name_list.columns label="Titel" name="title"/>
 			</name_list>
-			<button label="Einladen" name="member_invite"/>
-			<button label="Hinauswerfen" name="member_eject"/>
-			<button label="Mitglied(er) verbannen" name="member_ban"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="ban_btn_lp">
+					<button label="Mitglied(er) verbannen" name="member_ban"/>
+				</layout_panel>
+				<layout_panel name="eject_btn_lp">
+					<button label="Hinauswerfen" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="Einladen" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="ROLLEN" name="roles_sub_tab">
 			<panel.string name="help_text">Rollen haben einen Titel und umfassen bestimmte
@@ -36,6 +44,7 @@ um mehrere Mitglieder auszuwählen.</panel.string>
 			</scroll_list>
 			<button label="Neue Rolle" name="role_create"/>
 			<button label="Rolle löschen" name="role_delete"/>
+			<button name="role_copy" label="Rolle kopieren"/>
 		</panel>
 		<panel label="FÄHIGKEITEN" name="actions_sub_tab" tool_tip="Sie können eine Beschreibung der Fähigkeit anzeigen und welche Rollen bzw. Mitglieder über diese Fähigkeit verfügen.">
 			<panel.string name="help_text">Fähigkeiten verleihen Mitgliedern in Rollen bestimmte
@@ -56,7 +65,6 @@ um mehrere Mitglieder auszuwählen.</panel.string>
 			<button label="Verbannung(en) entfernen" name="ban_delete" tool_tip="Verbannung für bestimmte Einwohner in Ihrer Gruppe aufheben"/>
 			<button name="ban_refresh" tool_tip="Bannliste aktualisieren"/>
 		</panel>
-		<button name="role_copy" label="Rolle kopieren"/>
 	</tab_container>
 	<panel name="members_footer">
 		<text name="static">Rollen</text>
@@ -74,11 +82,8 @@ um mehrere Mitglieder auszuwählen.</panel.string>
 	</panel>
 	<panel name="roles_footer">
 		<text name="static">Rolle:</text>
-		<line_editor name="role_name"/>
 		<text name="static3">Rollentitel</text>
-		<line_editor name="role_title"/>
 		<text name="static2">Beschreibung</text>
-		<text_editor name="role_description"/>
 		<text name="static4">Mitglieder in Rolle</text>
 		<check_box label="Mitglieder anzeigen" name="role_visible_in_list" tool_tip="Festlegen, ob Mitglieder in dieser Rolle auf der Registerkarte  'Allgemein ' für Personen außerhalb der Gruppe sichtbar sind."/>
 		<text name="static5" tool_tip="Eine Liste der Fähigkeiten der aktuell ausgewählten Rolle.">Zulässige Fähigkeiten</text>

@@ -5,25 +5,6 @@
 	<floater.string name="move_tooltip">Kamera nach oben, unten, links und rechts bewegen</floater.string>
 	<floater.string name="free_mode_title">Objekt ansehen</floater.string>
 	<panel name="controls">
-		<panel name="preset_views_list">
-			<panel_camera_item name="front_view" tool_tip="Vorderansicht">
-				<panel_camera_item.text name="front_view_text">Vorderansicht</panel_camera_item.text>
-			</panel_camera_item>
-			<panel_camera_item name="group_view" tool_tip="Seitenansicht">
-				<panel_camera_item.text name="side_view_text">Seitenansicht</panel_camera_item.text>
-			</panel_camera_item>
-			<panel_camera_item name="rear_view" tool_tip="Rückansicht">
-				<panel_camera_item.text name="rear_view_text">Hinteransicht</panel_camera_item.text>
-			</panel_camera_item>
-		</panel>
-		<panel name="camera_modes_list">
-			<panel_camera_item name="object_view" tool_tip="Objektansicht">
-				<panel_camera_item.text name="object_view_text">Objektansicht</panel_camera_item.text>
-			</panel_camera_item>
-			<panel_camera_item name="mouselook_view" tool_tip="Mouselook-Ansicht">
-				<panel_camera_item.text name="mouselook_view_text">Mouselook</panel_camera_item.text>
-			</panel_camera_item>
-		</panel>
 		<panel name="zoom" tool_tip="Kamera auf Fokus zoomen">
 			<joystick_rotate name="cam_rotate_stick" tool_tip="Kamera um Fokus kreisen"/>
 			<slider_bar name="zoom_slider" tool_tip="Kamera auf Fokus zoomen"/>
@@ -39,7 +20,23 @@
 	<panel name="buttons_panel">
 		<button name="gear_btn" tool_tip="Meine Kameravoreinstellungen"/>
 		<button name="save_preset_btn" label="Als Voreinstellung speichern..."/>
-		<combo_box.item name="Use preset" label="Voreinstellung verwenden"/>
+		<combo_box name="preset_combo">
+			<combo_box.item name="Use preset" label="Voreinstellung verwenden"/>
+		</combo_box>
+		<panel_camera_item name="mouselook_view" tool_tip="Mouselook-Ansicht">
+			<panel_camera_item.text name="mouselook_view_text">Mouselook</panel_camera_item.text>
+		</panel_camera_item>
+		<panel_camera_item name="object_view" tool_tip="Objektansicht">
+			<panel_camera_item.text name="object_view_text">Objektansicht</panel_camera_item.text>
+		</panel_camera_item>
+		<panel_camera_item name="rear_view" tool_tip="Rückansicht">
+			<panel_camera_item.text name="rear_view_text">Hinteransicht</panel_camera_item.text>
+		</panel_camera_item>
+		<panel_camera_item name="group_view" tool_tip="Seitenansicht">
+			<panel_camera_item.text name="side_view_text">Seitenansicht</panel_camera_item.text>
+		</panel_camera_item>
+		<panel_camera_item name="front_view" tool_tip="Vorderansicht">
+			<panel_camera_item.text name="front_view_text">Vorderansicht</panel_camera_item.text>
+		</panel_camera_item>
 	</panel>
-	<combo_box name="preset_combo"/>
 </floater>

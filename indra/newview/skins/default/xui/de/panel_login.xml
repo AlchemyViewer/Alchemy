@@ -2,21 +2,31 @@
 <panel name="panel_login">
 	<panel.string name="forgot_password_url">http://secondlife.com/account/request.php?lang=de</panel.string>
 	<panel.string name="sign_up_url">https://join.secondlife.com/</panel.string>
-	<layout_stack name="ui_stack">
-		<layout_panel name="ui_container">
-			<combo_box label="Benutzername" name="username_combo" tool_tip="Bei der Registrierung gewählter Benutzername wie „berndschmidt12“ oder „Liebe Sonne“"/>
-			<line_editor label="Kennwort" name="password_edit"/>
-			<combo_box label="Meine Lieblingsorte" name="start_location_combo">
-				<combo_box.item label="Mein letzter Standort" name="MyLastLocation"/>
-				<combo_box.item label="Mein Zuhause" name="MyHome"/>
-			</combo_box>
-			<button label="Anmelden" name="connect_btn"/>
-			<check_box label="Details speichern" name="remember_check"/>
-			<text name="forgot_password_text">Kennwort vergessen</text>
-			<combo_box label="Grid auswählen" name="server_combo"/>
-			<text name="sign_up_text">Registrieren</text>
+	<layout_stack name="main_stack">
+		<layout_panel name="center_stage">
+			<layout_stack name="ui_stack">
+				<layout_panel name="ui_container">
+					<combo_box label="Benutzername" name="username_combo" tool_tip="Bei der Registrierung gewählter Benutzername wie „berndschmidt12“ oder „Liebe Sonne“"/>
+					<line_editor label="Kennwort" name="password_edit"/>
+					<combo_box label="Meine Lieblingsorte" name="start_location_combo">
+						<combo_box.item label="Mein letzter Standort" name="MyLastLocation"/>
+						<combo_box.item label="Mein Zuhause" name="MyHome"/>
+					</combo_box>
+					<check_box label="Details speichern" name="remember_check"/>
+					<text name="sign_up_text">Registrieren</text>
+					<layout_stack name="login_stack">
+						<layout_panel name="login_panel">
+							<text name="forgot_password_text">Kennwort vergessen</text>
+							<button label="Anmelden" name="connect_btn"/>
+						</layout_panel>
+						<layout_panel name="grid_panel">
+							<combo_box label="Grid auswählen" name="server_combo"/>
+						</layout_panel>
+					</layout_stack>
+					<check_box name="remember_password" label="Kennwort speichern"/>
+					<check_box name="remember_name" label="An mich erinnern" tool_tip="Bereits gespeicherte Benutzer können über Ich > Präferenzen > Erweitert > Gespeicherte Benutzernamen vergessen werden."/>
+				</layout_panel>
+			</layout_stack>
 		</layout_panel>
-		<check_box name="remember_name" label="An mich erinnern" tool_tip="Bereits gespeicherte Benutzer können über Ich &gt; Präferenzen &gt; Erweitert &gt; Gespeicherte Benutzernamen vergessen werden."/>
-		<check_box name="remember_password" label="Kennwort speichern"/>
 	</layout_stack>
 </panel>

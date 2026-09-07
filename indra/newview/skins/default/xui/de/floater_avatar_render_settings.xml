@@ -3,10 +3,12 @@
 	<string name="av_never_render" value="Nie"/>
 	<string name="av_always_render" value="Immer"/>
 	<filter_editor label="Nach Personen filtern" name="people_filter_input"/>
-	<menu_button name="plus_btn" tool_tip="Aktionen für ausgewählte Person"/>
 	<name_list name="render_settings_list">
 		<name_list.columns label="Name" name="name"/>
 		<name_list.columns label="Darstellungseinstellung" name="setting"/>
 		<name_list.columns label="Hinzugefügt am" name="timestamp"/>
 	</name_list>
+	<panel name="add_subpanel">
+		<menu_button name="plus_btn" tool_tip="Aktionen für ausgewählte Person"/>
+	</panel>
 </floater>

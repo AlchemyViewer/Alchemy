@@ -41,7 +41,6 @@
 			<text name="For Sale:">Zum Verkauf:</text>
 			<text name="Not for sale.">Nicht zu verkaufen</text>
 			<text name="For Sale: Price L$[PRICE].">Preis: [PRICE] L$ ([PRICE_PER_SQM]L$/m²)</text>
-			<text name="SalePending"/>
 			<button label="Land verkaufen" label_selected="Land verkaufen..." name="Sell Land..."/>
 			<text name="For sale to">Zum Verkauf an: [BUYER]</text>
 			<text name="Sell with landowners objects in parcel.">Objekte sind im Verkauf eingeschlossen</text>
@@ -109,7 +108,6 @@ werden.</text>
 			<text name="Selected / sat upon:">Ausgewählt/gesessen auf:</text>
 			<text name="selected_objects_text">[COUNT]</text>
 			<text name="Autoreturn">Objekte anderer Einwohner automatisch zurückgeben (Minuten, 0 für aus):</text>
-			<line_editor name="clean other time"/>
 			<text name="Object Owners:">Objekteigentümer:</text>
 			<button label="Liste aktualisieren" label_selected="Liste aktualisieren" name="Refresh List" tool_tip="Objektliste aktualisieren"/>
 			<button label="Objekte zurückgeben" label_selected="Objekte zurückgeben..." name="Return objects..."/>
@@ -222,21 +220,23 @@ Nur große Parzellen können in der Suche aufgeführt werden.</panel.string>
 			<spinner label="Preis in L$:" name="PriceSpin"/>
 			<spinner label="Online-Zeit:" name="HoursSpin"/>
 			<text name="OwnerLimited">(Der Grundbesitzer kann diese Auswahl eingeschränkt haben)</text>
-			<panel name="Allowed_layout_panel">
-				<text label="Immer erlauben" name="AllowedText">Immer zulässig ([COUNT], max. [MAX])</text>
-				<name_list name="AccessList" tool_tip="([LISTED] aufgeführt, [MAX] max)"/>
-				<button label="Hinzufügen" name="add_allowed"/>
-				<button label="Entfernen" label_selected="Entfernen" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="Verbannen" name="BanCheck">Verbannt ([COUNT], max. [MAX])</text>
-				<name_list name="BannedList" tool_tip="([LISTED] aufgeführt, [MAX] max)">
-					<columns label="Name" name="name"/>
-					<columns label="Dauer" name="duration"/>
-				</name_list>
-				<button label="Hinzufügen" name="add_banned"/>
-				<button label="Entfernen" label_selected="Entfernen" name="remove_banned"/>
-			</panel>
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="Verbannen" name="BanCheck">Verbannt ([COUNT], max. [MAX])</text>
+					<name_list name="BannedList" tool_tip="([LISTED] aufgeführt, [MAX] max)">
+						<columns label="Name" name="name"/>
+						<columns label="Dauer" name="duration"/>
+					</name_list>
+					<button label="Hinzufügen" name="add_banned"/>
+					<button label="Entfernen" label_selected="Entfernen" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="Immer erlauben" name="AllowedText">Immer zulässig ([COUNT], max. [MAX])</text>
+					<name_list name="AccessList" tool_tip="([LISTED] aufgeführt, [MAX] max)"/>
+					<button label="Hinzufügen" name="add_allowed"/>
+					<button label="Entfernen" label_selected="Entfernen" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="ERLEBNISSE" name="land_experiences_panel"/>
 		<panel name="land_environment_panel" label="UMGEBUNG"/>

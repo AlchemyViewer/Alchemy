@@ -27,7 +27,6 @@
 						<layout_panel name="pnl_environment_length">
 							<text name="lbl_apparent_time">[HH]:[MM][AP] ([PRC]%)</text>
 						</layout_panel>
-						<layout_panel name="pnl_environment_buttons"/>
 					</layout_stack>
 				</layout_panel>
 				<layout_panel name="pnl_environment_altitudes">
@@ -69,8 +68,10 @@
 			</layout_stack>
 		</layout_panel>
 	</layout_stack>
-	<layout_panel name="pnl_environment_region_msg">
-		<text name="region_text_lbl">Region:</text>
-		<text name="region_text">unbekannt</text>
-	</layout_panel>
+	<layout_stack name="ls_main">
+		<layout_panel name="pnl_environment_region_msg">
+			<text name="region_text_lbl">Region:</text>
+			<text name="region_text">unbekannt</text>
+		</layout_panel>
+	</layout_stack>
 </panel>

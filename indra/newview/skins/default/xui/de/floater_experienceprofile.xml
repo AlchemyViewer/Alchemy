@@ -17,30 +17,7 @@
 		<panel name="panel_experience_info">
 			<scroll_container name="xp_scroll">
 				<panel name="scrolling_panel">
-					<layout_stack>
-						<layout_panel name="top panel">
-							<button label="Bearbeiten" name="edit_btn"/>
-						</layout_panel>
-						<layout_panel name="maturity panel">
-							<text name="ContentRating">
-								Einstufung:
-							</text>
-						</layout_panel>
-						<layout_panel name="location panel">
-							<text name="Location">
-								Standort:
-							</text>
-						</layout_panel>
-						<layout_panel>
-							<text name="Owner">
-								Eigentümer:
-							</text>
-						</layout_panel>
-						<layout_panel name="group_panel">
-							<text name="Group">
-								Gruppe:
-							</text>
-						</layout_panel>
+					<layout_stack name="ls1">
 						<layout_panel name="perm panel">
 							<button label="Zulassen" name="allow_btn"/>
 							<button label="Vergessen" name="forget_btn"/>
@@ -49,6 +26,29 @@
 								Dieses Erlebnis ist für alle Einwohner aktiviert.
 							</text>
 							<button label="Missbrauch melden" name="report_btn"/>
+						</layout_panel>
+						<layout_panel name="group_panel">
+							<text name="Group">
+								Gruppe:
+							</text>
+						</layout_panel>
+						<layout_panel name="owner panel">
+							<text name="Owner">
+								Eigentümer:
+							</text>
+						</layout_panel>
+						<layout_panel name="location panel">
+							<text name="Location">
+								Standort:
+							</text>
+						</layout_panel>
+						<layout_panel name="maturity panel">
+							<text name="ContentRating">
+								Einstufung:
+							</text>
+						</layout_panel>
+						<layout_panel name="top panel">
+							<button label="Bearbeiten" name="edit_btn"/>
 						</layout_panel>
 					</layout_stack>
 				</panel>
