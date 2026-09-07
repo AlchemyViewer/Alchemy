@@ -60,7 +60,7 @@ set_target_properties(xui_overlay_check
     FOLDER "Utils"
     )
 
-# The translation repair over a whole language, which is the XUI tool's
+# The translation repair over a whole language, which is XUI Studio's
 # own action from a console: a repair pass is then a command and the diff
 # it leaves.
 add_executable(xui_translate_repair xui_translate_repair.cpp)

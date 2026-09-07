@@ -79,7 +79,6 @@ class LLWidgetTagRegistry
     LLSINGLETON_EMPTY_CTOR(LLWidgetTagRegistry);
 };
 
-#if !LL_RELEASE_FOR_DOWNLOAD
 // A block's parameter table is built by constructing one, so a widget type
 // nothing has ever created has an empty table. The schema wants every tag,
 // including the ones a session never reached, and this is how it gets them:
@@ -99,7 +98,6 @@ class LLWidgetBlockRegistry
 {
     LLSINGLETON_EMPTY_CTOR(LLWidgetBlockRegistry);
 };
-#endif
 
 // Build time optimization, generate this once in .cpp file
 #ifndef LLUICTRLFACTORY_CPP
@@ -395,7 +393,6 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
         LLUICtrlFactory::registerWidgetTag(&T::sViewType, tag);
     }
 
-#if !LL_RELEASE_FOR_DOWNLOAD
     // What the schema reads: the block a tag builds from, and the tags that
     // may appear below it. Both depend on T, so both are recorded here,
     // which is the last place T is known. A widget registered under more
@@ -407,7 +404,6 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
         LLWidgetBlockRegistry::instance().defaultRegistrar().add(tag, &get_empty_param_block<typename T::Params>);
         LLChildRegistryRegistry::instance().defaultRegistrar().add(tag, &registry_t::instance());
     }
-#endif
 }
 
 #endif //LLUICTRLFACTORY_H

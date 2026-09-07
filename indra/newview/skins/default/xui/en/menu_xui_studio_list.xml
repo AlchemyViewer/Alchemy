@@ -1,35 +1,35 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <context_menu
  layout="topleft"
- name="menu_xui_tool_list">
+ name="menu_xui_studio_list">
     <menu_item_call
      label="Copy Cell"
      name="copy_cell">
         <menu_item_call.on_click
-         function="XUITool.List"
+         function="XUIStudio.List"
          parameter="copy_cell" />
         <menu_item_call.on_enable
-         function="XUITool.ListEnabled"
+         function="XUIStudio.ListEnabled"
          parameter="copy_cell" />
     </menu_item_call>
     <menu_item_call
      label="Copy Rows"
      name="copy">
         <menu_item_call.on_click
-         function="XUITool.List"
+         function="XUIStudio.List"
          parameter="copy" />
         <menu_item_call.on_enable
-         function="XUITool.ListEnabled"
+         function="XUIStudio.ListEnabled"
          parameter="copy" />
     </menu_item_call>
     <menu_item_call
      label="Copy All Rows"
      name="copy_all">
         <menu_item_call.on_click
-         function="XUITool.List"
+         function="XUIStudio.List"
          parameter="copy_all" />
         <menu_item_call.on_enable
-         function="XUITool.ListEnabled"
+         function="XUIStudio.ListEnabled"
          parameter="copy_all" />
     </menu_item_call>
     <menu_item_separator />
@@ -37,10 +37,10 @@
      label="Select All"
      name="select_all">
         <menu_item_call.on_click
-         function="XUITool.List"
+         function="XUIStudio.List"
          parameter="select_all" />
         <menu_item_call.on_enable
-         function="XUITool.ListEnabled"
+         function="XUIStudio.ListEnabled"
          parameter="select_all" />
     </menu_item_call>
 </context_menu>

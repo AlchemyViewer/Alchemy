@@ -1,6 +1,6 @@
 /**
- * @file alfloaterxuitool.h
- * @brief The XUI tool: catalog, preview, hierarchy, inspectors and diagnostics for XUI files.
+ * @file alfloaterxuistudio.h
+ * @brief The XUI Studio: catalog, preview, hierarchy, inspectors and diagnostics for XUI files.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -66,11 +66,11 @@ class LLTextEditor;
 // diagnostics, and the inspectors. The previews are floaters of their own
 // in the floater view, built from the file's layered document in the
 // chosen skin and language, and drawn over with the hover and selection.
-class ALFloaterXUITool final : public LLFloater
+class ALFloaterXUIStudio final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
-    AL_VIEW_TYPE(ALFloaterXUITool, LLFloater);
+    AL_VIEW_TYPE(ALFloaterXUIStudio, LLFloater);
 
     static constexpr S32 PRIMARY = 0;
     static constexpr S32 SECONDARY = 1;
@@ -109,8 +109,8 @@ public:
     void reloadAll();
 
 private:
-    ALFloaterXUITool(const LLSD& key);
-    ~ALFloaterXUITool() override;
+    ALFloaterXUIStudio(const LLSD& key);
+    ~ALFloaterXUIStudio() override;
 
     struct Preview
     {

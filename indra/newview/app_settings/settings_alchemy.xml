@@ -233,10 +233,10 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>ALXUIToolState</key>
+        <key>ALXUIStudioState</key>
         <map>
             <key>Comment</key>
-            <string>XUI Tool: the last file, skin, languages, inspector tab and switches, restored when it opens.</string>
+            <string>XUI Studio: the last file, skin, languages, inspector tab and switches, restored when it opens.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

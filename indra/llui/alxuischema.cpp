@@ -246,7 +246,6 @@ const ALXUISchema& ALXUISchema::get()
 
 void ALXUISchema::build()
 {
-#if !LL_RELEASE_FOR_DOWNLOAD
     const LLWidgetBlockRegistry& blocks = LLWidgetBlockRegistry::instance();
     for (auto it = blocks.defaultRegistrar().beginItems(); it != blocks.defaultRegistrar().endItems(); ++it)
     {
@@ -298,7 +297,6 @@ void ALXUISchema::build()
     {
         mIndex[mTags[i].name] = i;
     }
-#endif
 }
 
 const ALXUISchema::Tag* ALXUISchema::tag(std::string_view name) const
@@ -330,7 +328,7 @@ std::string ALXUISchema::asXSD() const
     out << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
         << "<!--\n"
         << "  The widget vocabulary of XUI, written out of the viewer's own\n"
-        << "  registries by the XUI tool. Do not edit: regenerate it.\n"
+        << "  registries by XUI Studio. Do not edit: regenerate it.\n"
         << "\n"
         << "  It is permissive on purpose. A parameter may be written as an\n"
         << "  attribute or as a nested element, a value may be a name or the\n"

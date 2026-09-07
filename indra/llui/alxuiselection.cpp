@@ -1,6 +1,6 @@
 /**
  * @file alxuiselection.cpp
- * @brief The one selection every pane of the XUI tool agrees about, keyed by name path.
+ * @brief The one selection every pane of XUI Studio agrees about, keyed by name path.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code

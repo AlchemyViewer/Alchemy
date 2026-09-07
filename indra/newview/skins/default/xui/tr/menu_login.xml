@@ -21,7 +21,6 @@
 	<menu_item_check label="Hata Ayıklama Menüsünü Göster" name="Show Debug Menu"/>
 	<menu label="Hata ayıkla" name="Debug">
 		<menu_item_call label="Hata Ayıklama Ayarlarını Göster" name="Debug Settings"/>
-		<menu_item_call label="XKA Önizleme Aracı" name="UI Preview Tool"/>
 		<menu label="KA Testleri" name="UI Tests"/>
 		<menu_item_call label="Pencere Büyüklüğünü Ayarla..." name="Set Window Size..."/>
 		<menu_item_call label="Hizmet Şartlarını Göster" name="TOS"/>

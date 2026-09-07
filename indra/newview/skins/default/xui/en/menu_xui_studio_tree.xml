@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <menu
  layout="topleft"
- name="menu_xui_tool_tree">
+ name="menu_xui_studio_tree">
     <menu_item_call
      label="Reveal in File"
      name="reveal">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="reveal" />
         <menu_item_call.on_enable
-         function="XUITool.TreeEnabled"
+         function="XUIStudio.TreeEnabled"
          parameter="reveal" />
     </menu_item_call>
     <menu_item_call
      label="Copy Name Path"
      name="copy_path">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="copy_path" />
     </menu_item_call>
     <menu_item_call
      label="Copy getChild Line"
      name="copy_getchild">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="copy_getchild" />
     </menu_item_call>
     <menu_item_separator />
@@ -31,7 +31,7 @@
      label="Toggle Visible"
      name="toggle_visible">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="toggle_visible" />
     </menu_item_call>
     <menu_item_separator />
@@ -39,14 +39,14 @@
      label="Expand All"
      name="expand_all">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="expand_all" />
     </menu_item_call>
     <menu_item_call
      label="Collapse All"
      name="collapse_all">
         <menu_item_call.on_click
-         function="XUITool.Tree"
+         function="XUIStudio.Tree"
          parameter="collapse_all" />
     </menu_item_call>
 </menu>

@@ -149,12 +149,12 @@
         </menu_item_call>
         <menu_item_separator />
         <menu_item_call
-         label="XUI Tool"
-         name="UI Preview Tool"
+         label="XUI Studio"
+         name="XUI Studio"
          shortcut="control|T">
             <menu_item_call.on_click
              function="Floater.Toggle"
-             parameter="ui_preview" />
+             parameter="xui_studio" />
         </menu_item_call>
         <menu_item_call
          label="XUI Baseline Census"

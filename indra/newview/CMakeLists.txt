@@ -188,7 +188,7 @@ set(viewer_SOURCE_FILES
     alscopedata.cpp
     alxuibaseline.cpp
     alfloaterwebprofile.cpp
-    alfloaterxuitool.cpp
+    alfloaterxuistudio.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
@@ -973,7 +973,7 @@ set(viewer_HEADER_FILES
     altexturetable.h
     alxuibaseline.h
     alfloaterwebprofile.h
-    alfloaterxuitool.h
+    alfloaterxuistudio.h
     algradehistory.h
     allegacynotificationwellwindow.h
     alobjectproperties.h

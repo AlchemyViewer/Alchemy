@@ -1,6 +1,6 @@
 /**
- * @file alfloaterxuitool.cpp
- * @brief The XUI tool: catalog, preview, hierarchy, inspectors and diagnostics for XUI files.
+ * @file alfloaterxuistudio.cpp
+ * @brief The XUI Studio: catalog, preview, hierarchy, inspectors and diagnostics for XUI files.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -24,7 +24,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterxuitool.h"
+#include "alfloaterxuistudio.h"
 
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
@@ -113,7 +113,7 @@ private:
 class ALXUILiveFile final : public LLLiveFile
 {
 public:
-    ALXUILiveFile(const std::string& path, ALFloaterXUITool* tool)
+    ALXUILiveFile(const std::string& path, ALFloaterXUIStudio* tool)
     :   LLLiveFile(path, 1.f),
         mTool(tool)
     {
@@ -132,7 +132,7 @@ protected:
     }
 
 private:
-    ALFloaterXUITool*   mTool;
+    ALFloaterXUIStudio*   mTool;
     bool                mPrimed = false;
 };
 
@@ -145,7 +145,7 @@ class ALXUIPreviewHost final : public LLFloater
 public:
     AL_VIEW_TYPE(ALXUIPreviewHost, LLFloater);
 
-    ALXUIPreviewHost(ALFloaterXUITool* tool, S32 which, const LLFloater::Params& p)
+    ALXUIPreviewHost(ALFloaterXUIStudio* tool, S32 which, const LLFloater::Params& p)
     :   LLFloater(LLSD(), p),
         mTool(tool),
         mWhich(which)
@@ -216,7 +216,7 @@ public:
 
     bool handleKeyHere(KEY key, MASK mask) override
     {
-        if (mTool && mWhich == ALFloaterXUITool::PRIMARY)
+        if (mTool && mWhich == ALFloaterXUIStudio::PRIMARY)
         {
             if (key == 'Z' && mask == MASK_CONTROL && mTool->undoEdit())
             {
@@ -343,7 +343,7 @@ private:
     // same file, shown beside the first and not written to.
     bool editable(const LLView* view) const
     {
-        return view && view != this && mWhich == ALFloaterXUITool::PRIMARY;
+        return view && view != this && mWhich == ALFloaterXUIStudio::PRIMARY;
     }
 
     bool dragging() const
@@ -710,7 +710,7 @@ private:
         }
     }
 
-    ALFloaterXUITool*   mTool;
+    ALFloaterXUIStudio*   mTool;
     LLView*             mRoot = nullptr;
     S32                 mWhich;
 
@@ -957,23 +957,23 @@ namespace
 }
 
 // ===========================================================================
-// ALFloaterXUITool
+// ALFloaterXUIStudio
 // ===========================================================================
-ALFloaterXUITool::ALFloaterXUITool(const LLSD& key)
+ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
 :   LLFloater(key)
 {
-    mCommitCallbackRegistrar.add("XUITool.Tree", boost::bind(&ALFloaterXUITool::onTreeAction, this, _2));
-    mEnableCallbackRegistrar.add("XUITool.TreeEnabled", boost::bind(&ALFloaterXUITool::onTreeActionEnabled, this, _2));
-    mCommitCallbackRegistrar.add("XUITool.List", boost::bind(&ALFloaterXUITool::onListAction, this, _2));
-    mEnableCallbackRegistrar.add("XUITool.ListEnabled", boost::bind(&ALFloaterXUITool::onListActionEnabled, this, _2));
+    mCommitCallbackRegistrar.add("XUIStudio.Tree", boost::bind(&ALFloaterXUIStudio::onTreeAction, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
+    mCommitCallbackRegistrar.add("XUIStudio.List", boost::bind(&ALFloaterXUIStudio::onListAction, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.ListEnabled", boost::bind(&ALFloaterXUIStudio::onListActionEnabled, this, _2));
 }
 
-ALFloaterXUITool::~ALFloaterXUITool()
+ALFloaterXUIStudio::~ALFloaterXUIStudio()
 {
     closePreviews();
 }
 
-bool ALFloaterXUITool::postBuild()
+bool ALFloaterXUIStudio::postBuild()
 {
     mCatalogFilter = getChild<LLFilterEditor>("catalog_filter");
     mFileList = getChild<LLScrollListCtrl>("file_list");
@@ -1010,18 +1010,18 @@ bool ALFloaterXUITool::postBuild()
     loadState();
     scanCatalog();
 
-    mCatalogFilter->setCommitCallback(boost::bind(&ALFloaterXUITool::onCatalogFilter, this));
-    mFileList->setCommitCallback(boost::bind(&ALFloaterXUITool::onFileSelected, this));
+    mCatalogFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onCatalogFilter, this));
+    mFileList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFileSelected, this));
     mFileList->setCommitOnSelectionChange(true);
-    mSkinCombo->setCommitCallback(boost::bind(&ALFloaterXUITool::onSkinOrLanguage, this));
-    mLanguageCombo->setCommitCallback(boost::bind(&ALFloaterXUITool::onSkinOrLanguage, this));
-    mLanguageCombo2->setCommitCallback(boost::bind(&ALFloaterXUITool::onSkinOrLanguage, this));
-    mSecondaryCheck->setCommitCallback(boost::bind(&ALFloaterXUITool::onToggleSecondary, this));
-    mFindQuery->setCommitCallback(boost::bind(&ALFloaterXUITool::onFind, this));
-    mFindField->setCommitCallback(boost::bind(&ALFloaterXUITool::onFind, this));
-    mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindResult, this));
-    mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUITool::onTreeFilter, this));
-    mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindingSelected, this));
+    mSkinCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mLanguageCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mLanguageCombo2->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
+    mSecondaryCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleSecondary, this));
+    mFindQuery->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFind, this));
+    mFindField->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFind, this));
+    mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindResult, this));
+    mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTreeFilter, this));
+    mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
 
     // Every table in the tool copies the same way.
     for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mAttributes,
@@ -1029,47 +1029,47 @@ bool ALFloaterXUITool::postBuild()
     {
         watchList(list);
     }
-    mInspectors->setCommitCallback(boost::bind(&ALFloaterXUITool::refreshInspectors, this));
-    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUITool::fillTranslation, this));
-    mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationLanguage, this));
+    mInspectors->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshInspectors, this));
+    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillTranslation, this));
+    mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
     mTranslateList->setCommitOnSelectionChange(true);
-    mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationSelected, this));
-    mTranslateValue->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationWrite, this));
-    getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUITool::onTranslationWrite, this));
-    getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairFile, this));
-    getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUITool::startRepairAll, this));
-    getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairRoots, this));
-    getChild<LLButton>("census_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startCensus, this));
-    getChild<LLButton>("schema_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onExportSchema, this));
+    mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationSelected, this));
+    mTranslateValue->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
+    getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
+    getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
+    getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
+    getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
+    getChild<LLButton>("census_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startCensus, this));
+    getChild<LLButton>("schema_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onExportSchema, this));
 
-    getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
-    getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::closePreviews, this));
-    getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::reloadAll, this));
-    getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
-    getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
-    getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showGallery, this));
-    getChild<LLButton>("lint_all_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startLintAll, this));
-    getChild<LLButton>("capture_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::capturePreview, this));
+    getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showPreviews, this));
+    getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::closePreviews, this));
+    getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::reloadAll, this));
+    getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
+    getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
+    getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
+    getChild<LLButton>("lint_all_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startLintAll, this));
+    getChild<LLButton>("capture_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::capturePreview, this));
 
     LLCheckBoxCtrl* hover = getChild<LLCheckBoxCtrl>("hover_check");
     hover->setValue(mHoverHighlight);
-    hover->setCommitCallback(boost::bind(&ALFloaterXUITool::onToggleHover, this));
+    hover->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleHover, this));
     mSnapCheck->setValue(mSnap);
-    mSnapCheck->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+    mSnapCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
     mRulersCheck->setValue(mRulers);
-    mRulersCheck->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+    mRulersCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
     mGridCombo->setValue(mGrid);
-    mGridCombo->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+    mGridCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
 
     LLCheckBoxCtrl* code_built = getChild<LLCheckBoxCtrl>("code_built_check");
     code_built->setValue(mShowCodeBuilt);
-    code_built->setCommitCallback(boost::bind(&ALFloaterXUITool::onToggleCodeBuilt, this));
+    code_built->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCodeBuilt, this));
     mSecondaryCheck->setValue(mShowSecondary);
     mLanguageCombo2->setEnabled(mShowSecondary);
 
-    mSelection.onSelectionChanged(boost::bind(&ALFloaterXUITool::onSelectionChanged, this));
-    mSelection.onHoverChanged(boost::bind(&ALFloaterXUITool::onHoverChanged, this));
-    mModel.setHoverHandler(boost::bind(&ALFloaterXUITool::onTreeHover, this, _1));
+    mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
+    mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
+    mModel.setHoverHandler(boost::bind(&ALFloaterXUIStudio::onTreeHover, this, _1));
     mModel.setBadgeProvider([this](const ALXUISelection::path_t& path)
                             { return mPreviews[PRIMARY].lint.countUnder(path); });
     mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
@@ -1086,13 +1086,13 @@ bool ALFloaterXUITool::postBuild()
     return true;
 }
 
-void ALFloaterXUITool::onClose(bool app_quitting)
+void ALFloaterXUIStudio::onClose(bool app_quitting)
 {
     saveState();
     closePreviews();
 }
 
-void ALFloaterXUITool::draw()
+void ALFloaterXUIStudio::draw()
 {
     if (!mLintQueue.empty())
     {
@@ -1159,7 +1159,7 @@ void ALFloaterXUITool::draw()
     LLFloater::draw();
 }
 
-bool ALFloaterXUITool::handleKeyHere(KEY key, MASK mask)
+bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
 {
     if (key == 'F' && mask == MASK_CONTROL)
     {
@@ -1194,14 +1194,14 @@ bool ALFloaterXUITool::handleKeyHere(KEY key, MASK mask)
 // ---------------------------------------------------------------------------
 // The catalog pane
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::scanCatalog()
+void ALFloaterXUIStudio::scanCatalog()
 {
     mCatalog.scan(gDirUtilp->getSkinBaseDir());
     fillSkinsAndLanguages();
     fillCatalog();
 }
 
-void ALFloaterXUITool::fillSkinsAndLanguages()
+void ALFloaterXUIStudio::fillSkinsAndLanguages()
 {
     mSkinCombo->removeall();
     for (const std::string& skin : mCatalog.skins())
@@ -1237,7 +1237,7 @@ void ALFloaterXUITool::fillSkinsAndLanguages()
 }
 
 // static
-LLSD ALFloaterXUITool::row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells)
+LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells)
 {
     LLSD r;
     r["id"] = id;
@@ -1251,7 +1251,7 @@ LLSD ALFloaterXUITool::row(const LLSD& id, std::initializer_list<std::pair<const
     return r;
 }
 
-void ALFloaterXUITool::fillCatalog()
+void ALFloaterXUIStudio::fillCatalog()
 {
     const std::string filter = utf8str_tolower(mCatalogFilter->getText());
     mFileList->deleteAllItems();
@@ -1281,12 +1281,12 @@ void ALFloaterXUITool::fillCatalog()
     }
 }
 
-void ALFloaterXUITool::onCatalogFilter()
+void ALFloaterXUIStudio::onCatalogFilter()
 {
     fillCatalog();
 }
 
-void ALFloaterXUITool::onFileSelected()
+void ALFloaterXUIStudio::onFileSelected()
 {
     const std::string file = mFileList->getSelectedValue().asString();
     if (file.empty() || file == mFile)
@@ -1299,7 +1299,7 @@ void ALFloaterXUITool::onFileSelected()
     showPreviews();
 }
 
-void ALFloaterXUITool::onSkinOrLanguage()
+void ALFloaterXUIStudio::onSkinOrLanguage()
 {
     mSkin = mSkinCombo->getValue().asString();
     mLanguage = mLanguageCombo->getValue().asString();
@@ -1312,7 +1312,7 @@ void ALFloaterXUITool::onSkinOrLanguage()
     }
 }
 
-void ALFloaterXUITool::onFind()
+void ALFloaterXUIStudio::onFind()
 {
     const std::string query = mFindQuery->getText();
     mFindResults->deleteAllItems();
@@ -1344,7 +1344,7 @@ void ALFloaterXUITool::onFind()
               + (hits.size() > (size_t)MAX_FIND_ROWS ? ", the first " + std::to_string(MAX_FIND_ROWS) + " listed" : ""));
 }
 
-void ALFloaterXUITool::onFindResult()
+void ALFloaterXUIStudio::onFindResult()
 {
     LLScrollListItem* item = mFindResults->getFirstSelected();
     if (!item)
@@ -1382,7 +1382,7 @@ void ALFloaterXUITool::onFindResult()
 // ---------------------------------------------------------------------------
 // Previews
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::closePreview(S32 which)
+void ALFloaterXUIStudio::closePreview(S32 which)
 {
     Preview& pv = mPreviews[which];
     if (LLFloater* host = pv.host.get())
@@ -1410,7 +1410,7 @@ void ALFloaterXUITool::closePreview(S32 which)
     }
 }
 
-void ALFloaterXUITool::closePreviews()
+void ALFloaterXUIStudio::closePreviews()
 {
     for (S32 i = 0; i < PREVIEWS; ++i)
     {
@@ -1418,7 +1418,7 @@ void ALFloaterXUITool::closePreviews()
     }
 }
 
-void ALFloaterXUITool::hostClosed(S32 which)
+void ALFloaterXUIStudio::hostClosed(S32 which)
 {
     Preview& pv = mPreviews[which];
     if (which == PRIMARY && pv.root)
@@ -1441,7 +1441,7 @@ void ALFloaterXUITool::hostClosed(S32 which)
     }
 }
 
-void ALFloaterXUITool::showPreviews()
+void ALFloaterXUIStudio::showPreviews()
 {
     showPreview(PRIMARY);
     if (mShowSecondary)
@@ -1457,7 +1457,7 @@ void ALFloaterXUITool::showPreviews()
 // A preview opens beside the tool, since the two are read together. A
 // rebuild is not an opening: a preview someone has moved stays where they
 // moved it.
-void ALFloaterXUITool::placeHost(S32 which, LLFloater* host)
+void ALFloaterXUIStudio::placeHost(S32 which, LLFloater* host)
 {
     const LLRect tool = calcScreenRect();
     if (which == PRIMARY)
@@ -1483,7 +1483,7 @@ void ALFloaterXUITool::placeHost(S32 which, LLFloater* host)
     gFloaterView->adjustToFitScreen(host, false);
 }
 
-LLView* ALFloaterXUITool::buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr& node)
+LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr& node)
 {
     LLUICtrlFactory& factory = LLUICtrlFactory::instance();
     const std::string& file = entry.name;
@@ -1520,7 +1520,7 @@ LLView* ALFloaterXUITool::buildRoot(S32 which, const ALXUICatalog::Entry& entry,
 
 // The node as a view, by the kind of file it is. A floater is the host
 // itself; everything else is hosted by it.
-LLView* ALFloaterXUITool::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node)
+LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node)
 {
     LLUICtrlFactory& factory = LLUICtrlFactory::instance();
     const std::string& file = entry.name;
@@ -1620,7 +1620,7 @@ LLView* ALFloaterXUITool::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIP
     return root;
 }
 
-void ALFloaterXUITool::showPreview(S32 which)
+void ALFloaterXUIStudio::showPreview(S32 which)
 {
     closePreview(which);
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -1729,7 +1729,7 @@ void ALFloaterXUITool::showPreview(S32 which)
     }
 }
 
-void ALFloaterXUITool::watchFiles(const ALXUICatalog::Entry& entry)
+void ALFloaterXUIStudio::watchFiles(const ALXUICatalog::Entry& entry)
 {
     Preview& pv = mPreviews[PRIMARY];
     pv.liveFiles.clear();
@@ -1747,7 +1747,7 @@ void ALFloaterXUITool::watchFiles(const ALXUICatalog::Entry& entry)
 // than the whole tree. The watchers are made afresh by the rebuild and
 // prime themselves on what they find, which is why the tool's own writes
 // need no special case here.
-void ALFloaterXUITool::fileChanged()
+void ALFloaterXUIStudio::fileChanged()
 {
     // The check runs from a timer; the rebuild waits for the next frame.
     mReloadEntryOnly = true;
@@ -1755,14 +1755,14 @@ void ALFloaterXUITool::fileChanged()
     mReloadPending = true;
 }
 
-void ALFloaterXUITool::reloadAll()
+void ALFloaterXUIStudio::reloadAll()
 {
     mReloadEntryOnly = false;
     mReloadFromDisk = true;
     mReloadPending = true;
 }
 
-void ALFloaterXUITool::showGallery()
+void ALFloaterXUIStudio::showGallery()
 {
     ALXUIPreviewHost* host = nullptr;
     LLScrollContainer* scroller = nullptr;
@@ -1857,7 +1857,7 @@ void ALFloaterXUITool::showGallery()
 // ---------------------------------------------------------------------------
 // The canvas
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::canvasHover(S32 which, const LLView* view)
+void ALFloaterXUIStudio::canvasHover(S32 which, const LLView* view)
 {
     ALXUISelection::path_t path;
     if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
@@ -1870,7 +1870,7 @@ void ALFloaterXUITool::canvasHover(S32 which, const LLView* view)
     }
 }
 
-void ALFloaterXUITool::canvasSelect(S32 which, const LLView* view)
+void ALFloaterXUIStudio::canvasSelect(S32 which, const LLView* view)
 {
     ALXUISelection::path_t path;
     if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
@@ -1882,7 +1882,7 @@ void ALFloaterXUITool::canvasSelect(S32 which, const LLView* view)
 // ---------------------------------------------------------------------------
 // The tree pane
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::clearTree()
+void ALFloaterXUIStudio::clearTree()
 {
     mRows.clear();
     mModel.setCanvasHover(nullptr);
@@ -1894,7 +1894,7 @@ void ALFloaterXUITool::clearTree()
     }
 }
 
-void ALFloaterXUITool::rebuildTree()
+void ALFloaterXUIStudio::rebuildTree()
 {
     clearTree();
     Preview& pv = mPreviews[PRIMARY];
@@ -1913,7 +1913,7 @@ void ALFloaterXUITool::rebuildTree()
     p.view_model = &mModel;
     p.root = nullptr;
     p.use_ellipses = true;
-    p.options_menu = "menu_xui_tool_tree.xml";
+    p.options_menu = "menu_xui_studio_tree.xml";
     mTree = LLUICtrlFactory::create<LLFolderView>(p);
     mTree->setCallbackRegistrar(&mCommitCallbackRegistrar);
     mTree->setEnableRegistrar(&mEnableCallbackRegistrar);
@@ -1928,7 +1928,7 @@ void ALFloaterXUITool::rebuildTree()
     mTree->setScrollContainer(scroller);
     mTree->setFollowsAll();
     mTree->addChild(mTree->mStatusTextBox);
-    mTree->setSelectCallback(boost::bind(&ALFloaterXUITool::onTreeSelection, this, _1, _2));
+    mTree->setSelectCallback(boost::bind(&ALFloaterXUIStudio::onTreeSelection, this, _1, _2));
     mModel.setFolderView(mTree);
 
     createRows(root_item, mTree);
@@ -1937,7 +1937,7 @@ void ALFloaterXUITool::rebuildTree()
     mModel.getFilter().setModified();
 }
 
-void ALFloaterXUITool::createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
+void ALFloaterXUIStudio::createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
 {
     static const LLUIColor from_xml_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
     static const LLUIColor code_built_color = LLUIColorTable::instance().getColor("MenuItemDisabledColor", LLColor4::grey);
@@ -1975,12 +1975,12 @@ void ALFloaterXUITool::createRows(ALXUITreeItem* item, LLFolderViewFolder* paren
     }
 }
 
-void ALFloaterXUITool::onTreeFilter()
+void ALFloaterXUIStudio::onTreeFilter()
 {
     mModel.getFilter().setFilterSubString(mTreeFilter->getText());
 }
 
-void ALFloaterXUITool::onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action)
+void ALFloaterXUIStudio::onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action)
 {
     if (mSyncingTree || items.empty() || !items.front())
     {
@@ -1996,7 +1996,7 @@ void ALFloaterXUITool::onTreeSelection(const std::deque<LLFolderViewItem*>& item
     mSyncingTree = false;
 }
 
-void ALFloaterXUITool::onTreeHover(const ALXUITreeItem* item)
+void ALFloaterXUIStudio::onTreeHover(const ALXUITreeItem* item)
 {
     if (item)
     {
@@ -2008,12 +2008,12 @@ void ALFloaterXUITool::onTreeHover(const ALXUITreeItem* item)
     }
 }
 
-ALXUITreeItem* ALFloaterXUITool::selectedItem() const
+ALXUITreeItem* ALFloaterXUIStudio::selectedItem() const
 {
     return mSelection.hasSelection() ? mModel.itemFor(mSelection.selection()) : nullptr;
 }
 
-bool ALFloaterXUITool::onTreeActionEnabled(const LLSD& param)
+bool ALFloaterXUIStudio::onTreeActionEnabled(const LLSD& param)
 {
     const std::string action = param.asString();
     if (action == "reveal")
@@ -2024,7 +2024,7 @@ bool ALFloaterXUITool::onTreeActionEnabled(const LLSD& param)
     return true;
 }
 
-void ALFloaterXUITool::onTreeAction(const LLSD& param)
+void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
 {
     const std::string action = param.asString();
     ALXUITreeItem* item = selectedItem();
@@ -2065,7 +2065,7 @@ void ALFloaterXUITool::onTreeAction(const LLSD& param)
 // The preview as it stands on screen, cropped out of a snapshot of the
 // window with the UI drawn. The preview is brought to the front first,
 // since what is over it is what would be captured.
-void ALFloaterXUITool::capturePreview()
+void ALFloaterXUIStudio::capturePreview()
 {
     LLFloater* host = mPreviews[PRIMARY].host.get();
     if (!host)
@@ -2126,11 +2126,11 @@ void ALFloaterXUITool::capturePreview()
         }
     }
     name += "_" + mPreviews[PRIMARY].skin + "_" + mPreviews[PRIMARY].language + ".png";
-    LLFilePickerReplyThread::startPicker(boost::bind(&ALFloaterXUITool::writeCapture, this, _1),
+    LLFilePickerReplyThread::startPicker(boost::bind(&ALFloaterXUIStudio::writeCapture, this, _1),
                                          LLFilePicker::FFSAVE_ALL, name);
 }
 
-void ALFloaterXUITool::writeCapture(const std::vector<std::string>& filenames)
+void ALFloaterXUIStudio::writeCapture(const std::vector<std::string>& filenames)
 {
     if (filenames.empty() || mCapture.isNull())
     {
@@ -2177,7 +2177,7 @@ void ALFloaterXUITool::writeCapture(const std::vector<std::string>& filenames)
 // Every file in the catalog, checked a few per frame. The status line
 // counts down and the report lands beside the log, which is the form an
 // author can read a whole tree's worth of findings in.
-void ALFloaterXUITool::startLintAll()
+void ALFloaterXUIStudio::startLintAll()
 {
     if (!mLintQueue.empty())
     {
@@ -2206,7 +2206,7 @@ void ALFloaterXUITool::startLintAll()
     setStatus("Lint all: " + std::to_string(mLintTotal) + " files...");
 }
 
-void ALFloaterXUITool::stepLintAll()
+void ALFloaterXUIStudio::stepLintAll()
 {
     // A budget per frame rather than a count of files: the largest file
     // takes as long as twenty small ones.
@@ -2234,7 +2234,7 @@ void ALFloaterXUITool::stepLintAll()
     }
 }
 
-S32 ALFloaterXUITool::lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines)
+S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines)
 {
     std::string widget_tag;
     if (entry.kind == ALXUICatalog::Kind::Widget)
@@ -2327,7 +2327,7 @@ S32 ALFloaterXUITool::lintOneFile(const ALXUICatalog::Entry& entry, std::vector<
     return found;
 }
 
-void ALFloaterXUITool::finishLintAll()
+void ALFloaterXUIStudio::finishLintAll()
 {
     const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_lint.txt");
     llofstream out(path, std::ios::binary);
@@ -2345,7 +2345,7 @@ void ALFloaterXUITool::finishLintAll()
 
     setStatus("Lint all: " + std::to_string(mLintFindings) + " findings over " + std::to_string(mLintFiles)
               + " files; the report is " + path);
-    LL_INFOS("XUITool") << "lint all: " << mLintFindings << " findings over " << mLintFiles
+    LL_INFOS("XUIStudio") << "lint all: " << mLintFindings << " findings over " << mLintFiles
                         << " files, report at " << path << LL_ENDL;
 }
 
@@ -2383,15 +2383,15 @@ namespace
     }
 }
 
-void ALFloaterXUITool::watchList(LLScrollListCtrl* list)
+void ALFloaterXUIStudio::watchList(LLScrollListCtrl* list)
 {
-    list->setRightMouseDownCallback(boost::bind(&ALFloaterXUITool::onListRightClick, this, _1, _2, _3, _4));
+    list->setRightMouseDownCallback(boost::bind(&ALFloaterXUIStudio::onListRightClick, this, _1, _2, _3, _4));
     mLists.push_back(list);
 }
 
 // Control+C over a list copies what the menu's Copy would, rather than the
 // comma-separated rows the edit menu would reach.
-LLScrollListCtrl* ALFloaterXUITool::focusedList() const
+LLScrollListCtrl* ALFloaterXUIStudio::focusedList() const
 {
     for (LLScrollListCtrl* list : mLists)
     {
@@ -2403,7 +2403,7 @@ LLScrollListCtrl* ALFloaterXUITool::focusedList() const
     return nullptr;
 }
 
-std::string ALFloaterXUITool::listCaption(const LLScrollListCtrl* list) const
+std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
 {
     if (list == mFileList)
     {
@@ -2440,7 +2440,7 @@ std::string ALFloaterXUITool::listCaption(const LLScrollListCtrl* list) const
     return what + " in " + where;
 }
 
-std::string ALFloaterXUITool::listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
+std::string ALFloaterXUIStudio::listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
 {
     const S32 columns = list->getNumColumns();
     if (columns <= 0 || rows.empty())
@@ -2541,7 +2541,7 @@ std::string ALFloaterXUITool::listAsText(LLScrollListCtrl* list, const std::vect
     return text;
 }
 
-void ALFloaterXUITool::copyList(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
+void ALFloaterXUIStudio::copyList(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
 {
     const std::string text = listAsText(list, rows);
     if (!text.empty())
@@ -2550,7 +2550,7 @@ void ALFloaterXUITool::copyList(LLScrollListCtrl* list, const std::vector<LLScro
     }
 }
 
-void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
+void ALFloaterXUIStudio::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
 {
     mMenuList = ctrl ? ctrl->as<LLScrollListCtrl>() : nullptr;
     if (!mMenuList)
@@ -2588,7 +2588,7 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
         mCommitCallbackRegistrar.pushScope();
         mEnableCallbackRegistrar.pushScope();
         menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
-            "menu_xui_tool_list.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
+            "menu_xui_studio_list.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
         mEnableCallbackRegistrar.popScope();
         mCommitCallbackRegistrar.popScope();
         if (!menu)
@@ -2604,7 +2604,7 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
     LLMenuGL::showPopup(mMenuList, menu, x, y);
 }
 
-bool ALFloaterXUITool::onListActionEnabled(const LLSD& param)
+bool ALFloaterXUIStudio::onListActionEnabled(const LLSD& param)
 {
     if (!mMenuList)
     {
@@ -2622,7 +2622,7 @@ bool ALFloaterXUITool::onListActionEnabled(const LLSD& param)
     return mMenuList->getFirstSelected() != nullptr;
 }
 
-void ALFloaterXUITool::onListAction(const LLSD& param)
+void ALFloaterXUIStudio::onListAction(const LLSD& param)
 {
     if (!mMenuList)
     {
@@ -2650,7 +2650,7 @@ void ALFloaterXUITool::onListAction(const LLSD& param)
 // ---------------------------------------------------------------------------
 // The translation table
 // ---------------------------------------------------------------------------
-const ALXUICatalog::Layer* ALFloaterXUITool::overlayLayer(const ALXUICatalog::Entry& entry,
+const ALXUICatalog::Layer* ALFloaterXUIStudio::overlayLayer(const ALXUICatalog::Entry& entry,
                                                           const std::string& language) const
 {
     // The language's own file in the chosen skin, or in the default skin,
@@ -2665,7 +2665,7 @@ const ALXUICatalog::Layer* ALFloaterXUITool::overlayLayer(const ALXUICatalog::En
 // Where a translation for this language goes when the language has no
 // file for it yet: beside the base file, under the language's directory,
 // with a root the merge will match.
-bool ALFloaterXUITool::overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
+bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
                                    std::string& path, bool& created, std::string& error) const
 {
     created = false;
@@ -2735,7 +2735,7 @@ bool ALFloaterXUITool::overlayPath(const ALXUICatalog::Entry& entry, const std::
 // One row per unit: where it is, which field it is, the English, the
 // language's own, what the merge does with it, and whether it fits in the
 // second preview, which is the language this table is about.
-void ALFloaterXUITool::fillTranslation()
+void ALFloaterXUIStudio::fillTranslation()
 {
     mTranslateList->deleteAllItems();
     mTranslateValue->setText(LLStringUtil::null);
@@ -2826,7 +2826,7 @@ void ALFloaterXUITool::fillTranslation()
     mTranslateCounts->setText(getString("TranslateCounts", args));
 }
 
-void ALFloaterXUITool::onTranslationSelected()
+void ALFloaterXUIStudio::onTranslationSelected()
 {
     LLScrollListItem* item = mTranslateList->getFirstSelected();
     if (!item)
@@ -2846,7 +2846,7 @@ void ALFloaterXUITool::onTranslationSelected()
     }
 }
 
-void ALFloaterXUITool::onTranslationWrite()
+void ALFloaterXUIStudio::onTranslationWrite()
 {
     LLScrollListItem* item = mTranslateList->getFirstSelected();
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -2925,7 +2925,7 @@ void ALFloaterXUITool::onTranslationWrite()
 
 // The language this table is about is the one the second preview shows,
 // so choosing it here turns that preview on.
-void ALFloaterXUITool::onTranslationLanguage()
+void ALFloaterXUIStudio::onTranslationLanguage()
 {
     mLanguage2 = mTranslateLanguage->getValue().asString();
     mLanguageCombo2->setValue(mLanguage2);
@@ -2943,7 +2943,7 @@ void ALFloaterXUITool::onTranslationLanguage()
 // Every value this file writes at a path the base has moved on from,
 // moved to where the base has it. Nothing else is touched: the value is
 // the language's own, written back where it will be read.
-S32 ALFloaterXUITool::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error)
+S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error)
 {
     std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
     const ALXUICatalog::Layer* overlay_layer = overlayLayer(entry, language);
@@ -2967,7 +2967,7 @@ S32 ALFloaterXUITool::repairFile(const ALXUICatalog::Entry& entry, const std::st
     return done;
 }
 
-void ALFloaterXUITool::onRepairFile()
+void ALFloaterXUIStudio::onRepairFile()
 {
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
     const std::string language = mTranslateLanguage->getValue().asString();
@@ -2992,7 +2992,7 @@ void ALFloaterXUITool::onRepairFile()
 // A file whose root carries another name, or none, is repaired by giving
 // it the base's -- when the file is this file under that name, which is
 // what its own values say.
-void ALFloaterXUITool::onRepairRoots()
+void ALFloaterXUIStudio::onRepairRoots()
 {
     const std::string language = mTranslateLanguage->getValue().asString();
     if (language.empty() || language == mLanguage)
@@ -3026,7 +3026,7 @@ void ALFloaterXUITool::onRepairRoots()
         units.scan(base, overlay->root());
         if (!units.sameFileRenamed(over_root))
         {
-            LL_INFOS("XUITool") << language << "/" << entry.name << ": left the root \"" << over_root
+            LL_INFOS("XUIStudio") << language << "/" << entry.name << ": left the root \"" << over_root
                                 << "\" alone; almost nothing in it names what the base has" << LL_ENDL;
             ++left;
             continue;
@@ -3039,7 +3039,7 @@ void ALFloaterXUITool::onRepairRoots()
             setStatus(edit.error());
             return;
         }
-        LL_INFOS("XUITool") << language << "/" << entry.name << ": root \"" << over_root
+        LL_INFOS("XUIStudio") << language << "/" << entry.name << ": root \"" << over_root
                             << "\" -> \"" << base_root << "\"" << LL_ENDL;
         ++named;
     }
@@ -3062,7 +3062,7 @@ void ALFloaterXUITool::onRepairRoots()
 // What the merge does with every overlay of every language, counted: the
 // same instrument the console check gates on, run from here over the
 // catalog the tool already holds.
-void ALFloaterXUITool::startCensus()
+void ALFloaterXUIStudio::startCensus()
 {
     mCensusQueue.clear();
     mCensus.clear();
@@ -3074,7 +3074,7 @@ void ALFloaterXUITool::startCensus()
     setStatus(getString("CensusStarted"));
 }
 
-void ALFloaterXUITool::stepCensus()
+void ALFloaterXUIStudio::stepCensus()
 {
     LLTimer timer;
     while (!mCensusQueue.empty() && timer.getElapsedTimeF32() < 0.015f)
@@ -3151,7 +3151,7 @@ void ALFloaterXUITool::stepCensus()
     }
 }
 
-void ALFloaterXUITool::finishCensus()
+void ALFloaterXUIStudio::finishCensus()
 {
     // The columns every language has a number for, in the order they read
     // best: what arrived, what did not, and why not.
@@ -3198,7 +3198,7 @@ void ALFloaterXUITool::finishCensus()
     for (const std::string& line : lines)
     {
         out << line << "\n";
-        LL_INFOS("XUITool") << line << LL_ENDL;
+        LL_INFOS("XUIStudio") << line << LL_ENDL;
     }
     out.close();
 
@@ -3216,7 +3216,7 @@ void ALFloaterXUITool::finishCensus()
 // The viewer is the only place the whole vocabulary exists: llui's console
 // utility can only see the widgets llui itself registers, and the rest are
 // registered by static registrars in the viewer's own translation units.
-void ALFloaterXUITool::onExportSchema()
+void ALFloaterXUIStudio::onExportSchema()
 {
     const ALXUISchema& schema = ALXUISchema::get();
     const std::string path = gDirUtilp->getSkinBaseDir() + gDirUtilp->getDirDelimiter() + "xui.xsd";
@@ -3238,7 +3238,7 @@ void ALFloaterXUITool::onExportSchema()
 
 // The same over every file the language has, a few per frame so the
 // viewer keeps drawing.
-void ALFloaterXUITool::startRepairAll()
+void ALFloaterXUIStudio::startRepairAll()
 {
     const std::string language = mTranslateLanguage->getValue().asString();
     if (language.empty() || language == mLanguage)
@@ -3257,7 +3257,7 @@ void ALFloaterXUITool::startRepairAll()
     }
 }
 
-void ALFloaterXUITool::stepRepairAll()
+void ALFloaterXUIStudio::stepRepairAll()
 {
     const std::string language = mTranslateLanguage->getValue().asString();
     LLTimer timer;
@@ -3285,13 +3285,13 @@ void ALFloaterXUITool::stepRepairAll()
     setStatus(getString("TranslateRepairedAll", args));
     if (mRepairQueue.empty())
     {
-        LL_INFOS("XUITool") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
+        LL_INFOS("XUIStudio") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
                             << mRepairFiles << " files" << LL_ENDL;
         fillTranslation();
     }
 }
 
-void ALFloaterXUITool::runLint()
+void ALFloaterXUIStudio::runLint()
 {
     Preview& pv = mPreviews[PRIMARY];
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -3321,7 +3321,7 @@ void ALFloaterXUITool::runLint()
 // One row per finding: the severity and rule, where it is, and what it
 // says. The path is what a double-click selects by, since a finding from
 // a layer carries that layer's line and not the base's.
-void ALFloaterXUITool::fillFindings()
+void ALFloaterXUIStudio::fillFindings()
 {
     mFindings->deleteAllItems();
     const Preview& pv = mPreviews[PRIMARY];
@@ -3354,7 +3354,7 @@ void ALFloaterXUITool::fillFindings()
     }
 }
 
-void ALFloaterXUITool::onFindingSelected()
+void ALFloaterXUIStudio::onFindingSelected()
 {
     LLScrollListItem* item = mFindings->getFirstSelected();
     if (!item)
@@ -3378,7 +3378,7 @@ void ALFloaterXUITool::onFindingSelected()
 }
 
 // The findings on the selected element and everything below it.
-void ALFloaterXUITool::refreshSelectionFindings()
+void ALFloaterXUIStudio::refreshSelectionFindings()
 {
     mSelectionFindings->deleteAllItems();
     if (!mSelection.hasSelection())
@@ -3403,7 +3403,7 @@ void ALFloaterXUITool::refreshSelectionFindings()
     }
 }
 
-void ALFloaterXUITool::refreshBreadcrumb()
+void ALFloaterXUIStudio::refreshBreadcrumb()
 {
     mBreadcrumb->deleteAllChildren();
     const Preview& pv = mPreviews[PRIMARY];
@@ -3477,7 +3477,7 @@ void ALFloaterXUITool::refreshBreadcrumb()
 // ---------------------------------------------------------------------------
 // The selection
 // ---------------------------------------------------------------------------
-LLView* ALFloaterXUITool::selectedView() const
+LLView* ALFloaterXUIStudio::selectedView() const
 {
     const Preview& pv = mPreviews[PRIMARY];
     if (!pv.root || !mSelection.hasSelection())
@@ -3497,7 +3497,7 @@ LLView* ALFloaterXUITool::selectedView() const
 // the element, since that is the one whose numbers are on screen, and the
 // first that has the element at all when none of them positions it, since
 // that is where a position has to be written.
-const ALXUICatalog::Layer* ALFloaterXUITool::editTarget() const
+const ALXUICatalog::Layer* ALFloaterXUIStudio::editTarget() const
 {
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
     if (!entry || !mSelection.hasSelection())
@@ -3530,7 +3530,7 @@ const ALXUICatalog::Layer* ALFloaterXUITool::editTarget() const
     return target ? target : base;
 }
 
-void ALFloaterXUITool::refreshEditTarget()
+void ALFloaterXUIStudio::refreshEditTarget()
 {
     if (!mEditTarget)
     {
@@ -3551,7 +3551,7 @@ void ALFloaterXUITool::refreshEditTarget()
 // A move or a resize as the movement of the four edges. The near edges
 // are the move, since they are what the file positions from, and what is
 // left over is the size.
-bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
+bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
 {
     if (!dl && !db && !dr && !dt)
     {
@@ -3656,7 +3656,7 @@ bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
 
 // The file as it was before the last write. One step, because one drag or
 // one key is one write, and a stray one should cost nothing to take back.
-bool ALFloaterXUITool::undoEdit()
+bool ALFloaterXUIStudio::undoEdit()
 {
     if (mUndoPath.empty())
     {
@@ -3679,7 +3679,7 @@ bool ALFloaterXUITool::undoEdit()
     return true;
 }
 
-void ALFloaterXUITool::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
+void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
 {
     if (which == PRIMARY)
     {
@@ -3687,7 +3687,7 @@ void ALFloaterXUITool::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
     }
 }
 
-bool ALFloaterXUITool::nudge(KEY key, MASK mask)
+bool ALFloaterXUIStudio::nudge(KEY key, MASK mask)
 {
     if (mask & (MASK_CONTROL | MASK_ALT))
     {
@@ -3707,7 +3707,7 @@ bool ALFloaterXUITool::nudge(KEY key, MASK mask)
     return applyEdges(dx, dy, dx, dy);
 }
 
-pugi::xml_node ALFloaterXUITool::authoredElement(const ALXUICatalog::Layer*& layer) const
+pugi::xml_node ALFloaterXUIStudio::authoredElement(const ALXUICatalog::Layer*& layer) const
 {
     layer = nullptr;
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -3728,7 +3728,7 @@ pugi::xml_node ALFloaterXUITool::authoredElement(const ALXUICatalog::Layer*& lay
     return pugi::xml_node();
 }
 
-void ALFloaterXUITool::onSelectionChanged()
+void ALFloaterXUIStudio::onSelectionChanged()
 {
     if (mTree && !mSyncingTree)
     {
@@ -3750,7 +3750,7 @@ void ALFloaterXUITool::onSelectionChanged()
     refreshInspectors();
 }
 
-void ALFloaterXUITool::onHoverChanged()
+void ALFloaterXUIStudio::onHoverChanged()
 {
     mModel.setCanvasHover(mSelection.hasHover() ? mModel.itemFor(mSelection.hover()) : nullptr);
 }
@@ -3758,7 +3758,7 @@ void ALFloaterXUITool::onHoverChanged()
 // ---------------------------------------------------------------------------
 // The inspectors
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::refreshInspectors()
+void ALFloaterXUIStudio::refreshInspectors()
 {
     LLView* view = selectedView();
     LLPanel* current = mInspectors->getCurrentPanel();
@@ -3789,7 +3789,7 @@ void ALFloaterXUITool::refreshInspectors()
     }
 }
 
-void ALFloaterXUITool::refreshAttributes(LLView* view)
+void ALFloaterXUIStudio::refreshAttributes(LLView* view)
 {
     mAttributes->deleteAllItems();
     if (!view)
@@ -3840,7 +3840,7 @@ void ALFloaterXUITool::refreshAttributes(LLView* view)
 
 // A layer's skin and language, read off its path: the segments around
 // the xui directory.
-std::string ALFloaterXUITool::layerLabel(S32 which, S32 layer) const
+std::string ALFloaterXUIStudio::layerLabel(S32 which, S32 layer) const
 {
     const std::string& path = mPreviews[which].overlay.layerPath(layer);
     if (path.empty())
@@ -3869,7 +3869,7 @@ std::string ALFloaterXUITool::layerLabel(S32 which, S32 layer) const
     return path;
 }
 
-void ALFloaterXUITool::refreshLayout(LLView* view)
+void ALFloaterXUIStudio::refreshLayout(LLView* view)
 {
     mLayout->deleteAllItems();
     if (!view)
@@ -3942,7 +3942,7 @@ void ALFloaterXUITool::refreshLayout(LLView* view)
     }
 }
 
-void ALFloaterXUITool::refreshSource(LLView* view)
+void ALFloaterXUIStudio::refreshSource(LLView* view)
 {
     mSourceLayers->setText(std::string());
     mSourceText->setText(std::string());
@@ -3986,7 +3986,7 @@ void ALFloaterXUITool::refreshSource(LLView* view)
     mSourceText->setText(text);
 }
 
-void ALFloaterXUITool::refreshBindings(LLView* view)
+void ALFloaterXUIStudio::refreshBindings(LLView* view)
 {
     mBindings->deleteAllItems();
     if (!view)
@@ -4067,7 +4067,7 @@ void ALFloaterXUITool::refreshBindings(LLView* view)
     }
 }
 
-void ALFloaterXUITool::refreshState(LLView* view)
+void ALFloaterXUIStudio::refreshState(LLView* view)
 {
     // Rebuilt on a timer while the tab shows; the scroll position is kept.
     const S32 scroll = mState->getScrollPos();
@@ -4119,7 +4119,7 @@ void ALFloaterXUITool::refreshState(LLView* view)
     mState->setScrollPos(scroll);
 }
 
-void ALFloaterXUITool::onJumpToSource()
+void ALFloaterXUIStudio::onJumpToSource()
 {
     if (mSourcePath.empty())
     {
@@ -4142,7 +4142,7 @@ void ALFloaterXUITool::onJumpToSource()
     }
 }
 
-void ALFloaterXUITool::openInEditor(const std::string& path, S32 line)
+void ALFloaterXUIStudio::openInEditor(const std::string& path, S32 line)
 {
     if (path.empty())
     {
@@ -4168,12 +4168,12 @@ void ALFloaterXUITool::openInEditor(const std::string& path, S32 line)
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-void ALFloaterXUITool::setStatus(const std::string& text)
+void ALFloaterXUIStudio::setStatus(const std::string& text)
 {
     mStatus->setText(text);
 }
 
-void ALFloaterXUITool::onGridChanged()
+void ALFloaterXUIStudio::onGridChanged()
 {
     mSnap = mSnapCheck->getValue().asBoolean();
     mRulers = mRulersCheck->getValue().asBoolean();
@@ -4181,20 +4181,20 @@ void ALFloaterXUITool::onGridChanged()
     saveState();
 }
 
-void ALFloaterXUITool::onToggleHover()
+void ALFloaterXUIStudio::onToggleHover()
 {
     mHoverHighlight = getChild<LLCheckBoxCtrl>("hover_check")->getValue().asBoolean();
     saveState();
 }
 
-void ALFloaterXUITool::onToggleCodeBuilt()
+void ALFloaterXUIStudio::onToggleCodeBuilt()
 {
     mShowCodeBuilt = getChild<LLCheckBoxCtrl>("code_built_check")->getValue().asBoolean();
     mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
     saveState();
 }
 
-void ALFloaterXUITool::onToggleSecondary()
+void ALFloaterXUIStudio::onToggleSecondary()
 {
     mShowSecondary = mSecondaryCheck->getValue().asBoolean();
     mLanguageCombo2->setEnabled(mShowSecondary);
@@ -4212,7 +4212,7 @@ void ALFloaterXUITool::onToggleSecondary()
     }
 }
 
-void ALFloaterXUITool::saveState()
+void ALFloaterXUIStudio::saveState()
 {
     LLSD state;
     state["file"] = mFile;
@@ -4229,12 +4229,12 @@ void ALFloaterXUITool::saveState()
     {
         state["tab"] = current->getName();
     }
-    gSavedSettings.setLLSD("ALXUIToolState", state);
+    gSavedSettings.setLLSD("ALXUIStudioState", state);
 }
 
-void ALFloaterXUITool::loadState()
+void ALFloaterXUIStudio::loadState()
 {
-    const LLSD state = gSavedSettings.getLLSD("ALXUIToolState");
+    const LLSD state = gSavedSettings.getLLSD("ALXUIStudioState");
     if (!state.isMap())
     {
         return;

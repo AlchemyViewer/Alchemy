@@ -185,7 +185,7 @@
 #include "llfloatertos.h"
 #include "llfloatertoybox.h"
 #include "llfloatertranslationsettings.h"
-#include "alfloaterxuitool.h"
+#include "alfloaterxuistudio.h"
 #include "llfloaterwebcontent.h"
 #include "llfloatervoicevolume.h"
 #include "llfloaterwhitelistentry.h"
@@ -567,7 +567,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("profile", "floater_profile.xml",(LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterProfile>);
     LLFloaterReg::add("slapp_test", "floater_test_slapp.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSLappTest>);
 
-    LLFloaterReg::add("ui_preview", "floater_xui_tool.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUITool>);
+    LLFloaterReg::add("xui_studio", "floater_xui_studio.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUIStudio>);
     LLFloaterReg::add("upload_anim_bvh", "floater_animation_bvh_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBvhPreview>, "upload");
     LLFloaterReg::add("upload_anim_anim", "floater_animation_anim_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAnimPreview>, "upload");
     LLFloaterReg::add("upload_image", "floater_image_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterImagePreview>, "upload");

@@ -6,11 +6,11 @@
  layout="topleft"
  min_height="480"
  min_width="900"
- name="xui_tool"
- help_topic="xui_tool"
+ name="xui_studio"
+ help_topic="xui_studio"
  save_rect="true"
  single_instance="true"
- title="XUI Tool"
+ title="XUI Studio"
  translate="false"
  width="1180">
     <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>

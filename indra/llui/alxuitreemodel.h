@@ -1,6 +1,6 @@
 /**
  * @file alxuitreemodel.h
- * @brief Folder-view model over a built view tree for the XUI tool's hierarchy pane.
+ * @brief Folder-view model over a built view tree for XUI Studio's hierarchy pane.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code

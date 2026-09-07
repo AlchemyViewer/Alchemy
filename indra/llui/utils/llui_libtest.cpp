@@ -286,7 +286,7 @@ int main(int argc, char** argv)
     // "--schema" writes the XSD for the widgets llui itself registers, which
     // is the part of the vocabulary a test in this library can diff. The
     // committed one covers the viewer's widgets too and is written from the
-    // XUI tool. "--attributes <dir>" asks the same model about every
+    // XUI Studio. "--attributes <dir>" asks the same model about every
     // attribute the files under a directory write.
     for (int i = 1; i < argc; ++i)
     {

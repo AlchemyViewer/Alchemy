@@ -4506,11 +4506,11 @@ function="World.EnvPreset"
          name="XUI"
          tear_off="true">
             <menu_item_call
-             label="XUI Tool"
-             name="UI Preview Tool">
+             label="XUI Studio"
+             name="XUI Studio">
              <menu_item_call.on_click
               function="Floater.Toggle"
-              parameter="ui_preview" />
+              parameter="xui_studio" />
             </menu_item_call>
             <menu_item_call
              label="XUI Baseline Census"

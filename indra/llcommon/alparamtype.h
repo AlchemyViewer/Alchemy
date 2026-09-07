@@ -38,11 +38,15 @@
 // record is the type: only the template that declares the parameter knows T,
 // and by the time a descriptor exists T is gone.
 //
-// This is that type, kept beside the table rather than in it. A shipped
-// viewer carries neither the entries nor the code that fills them, which is
-// the whole of what putting a pointer back on every descriptor would cost.
-// The readers are developer things: the schema the XUI tool exports, and the
-// lint rule that asks whether an attribute exists.
+// This is that type, kept beside the table rather than in it: one flat map
+// keyed by descriptor, rather than a pointer on each of them. It is built in
+// every configuration, because XUI Studio runs in every configuration -- a
+// skin author is not asked to build the viewer first. What it costs is the
+// map, about 39 KB against the tables' own 43 KB, and the inserts that fill
+// it while the blocks first construct.
+//
+// The readers are the schema XUI Studio exports and the lint rule that asks
+// whether an attribute exists.
 
 namespace LLInitParam
 {
@@ -106,8 +110,6 @@ public:
     static size_t bytes();
 };
 
-#if !LL_RELEASE_FOR_DOWNLOAD
-
 // The names a lookup accepts, flattened out of the map its own type keys.
 template <typename NAMED_VALUE>
 std::vector<std::string> alParamValueNames()
@@ -141,8 +143,6 @@ ALParamType::names_func_t alParamValueNamesFunc()
         return nullptr;
     }
 }
-
-#endif // !LL_RELEASE_FOR_DOWNLOAD
 
 // Which of the few types a schema can name this one is.
 template <typename VALUE_T>
@@ -182,14 +182,12 @@ struct ALParamNoNames
 };
 
 // Says what a parameter just added to a block's table is. Called from the
-// four templates that declare one, which are the last place T is known;
-// compiled away entirely where nothing will read the answer.
+// four templates that declare one, which are the last place T is known.
 template <typename VALUE_T, typename NAMED_VALUE>
-inline void alRecordParamType([[maybe_unused]] const LLInitParam::ParamDescriptor* param,
-                              [[maybe_unused]] ALParamType::EKind kind,
-                              [[maybe_unused]] LLInitParam::BlockDescriptor* block = nullptr)
+inline void alRecordParamType(const LLInitParam::ParamDescriptor* param,
+                              ALParamType::EKind kind,
+                              LLInitParam::BlockDescriptor* block = nullptr)
 {
-#if !LL_RELEASE_FOR_DOWNLOAD
     ALParamType type;
     type.mKind = kind;
     type.mValue = alParamValueKind<VALUE_T>();
@@ -197,5 +195,4 @@ inline void alRecordParamType([[maybe_unused]] const LLInitParam::ParamDescripto
     type.mBlock = block;
     type.mValueNames = alParamValueNamesFunc<NAMED_VALUE>();
     ALParamTypes::record(param, type);
-#endif
 }
