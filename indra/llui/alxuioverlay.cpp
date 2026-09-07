@@ -104,13 +104,19 @@ void ALXUIOverlay::layerSkipped(S32 layer, const std::string& path, const std::s
     d.why = "did not parse: " + reason;
 }
 
-void ALXUIOverlay::rootRefused(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+void ALXUIOverlay::rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
     std::string base_name;
     std::string overlay_name;
     base->getAttributeString("name", base_name);
     overlay->getAttributeString("name", overlay_name);
-    drop(layer, overlay, "the whole file", "root name \"" + overlay_name + "\" is not the base's \"" + base_name + "\"");
+    drop(layer, overlay, "the root's name", "\"" + overlay_name + "\" where the base says \"" + base_name + "\"; merged all the same");
+}
+
+void ALXUIOverlay::rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    drop(layer, overlay, "the root's tag",
+         std::string("<") + overlay->getName()->mString + "> where the base says <" + base->getName()->mString + ">; merged all the same");
 }
 
 void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why)

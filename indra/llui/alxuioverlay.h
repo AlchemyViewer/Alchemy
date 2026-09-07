@@ -69,7 +69,8 @@ public:
     // ALXmlMergeObserver
     void layerParsed(S32 layer, const std::string& path) override;
     void layerSkipped(S32 layer, const std::string& path, const std::string& reason, S32 line) override;
-    void rootRefused(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
+    void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
+    void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
     void childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why) override;
     void textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
     void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;

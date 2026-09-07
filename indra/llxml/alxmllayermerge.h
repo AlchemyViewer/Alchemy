@@ -51,9 +51,12 @@ public:
     virtual void layerParsed(S32 layer, const std::string& path) {}
     virtual void layerSkipped(S32 layer, const std::string& path, const std::string& reason, S32 line) {}
 
-    // The overlay's root against the base's.
+    // The overlay's root against the base's: always merged, since the
+    // file name binds the two, with a word when the name or the tag
+    // differs from the base's.
     virtual void rootMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
-    virtual void rootRefused(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
+    virtual void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
+    virtual void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
 
     // An overlay child against the base element's children.
     virtual void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
@@ -76,8 +79,10 @@ namespace ALXmlLayerMerge
 {
     // The first path is parsed as the base and each later one is parsed
     // and merged over it in turn, as layers 1, 2, ... A path that is empty
-    // or the same as the first is passed over. False when the base does
-    // not parse, or a later layer does not.
+    // or the same as the first is passed over. Every layer is merged: the
+    // file name binds it to the base, and a root name or tag that differs
+    // is a change the layer never heard of, not another file. False when
+    // the base does not parse, or a later layer does not.
     bool load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer = nullptr);
 
     // One overlay element over one base element, and their subtrees. The
@@ -86,7 +91,8 @@ namespace ALXmlLayerMerge
     // one and wraps once; on a match, text the overlay has replaces the
     // base's and text it lacks leaves the base's alone; a value attribute
     // where the base carries its text in the body is that text; every
-    // other attribute present in both is overwritten; an attribute the
-    // base lacks is dropped; a child that matches nothing is dropped.
+    // other attribute present in both is overwritten, except the name,
+    // which is the key and is never written; an attribute the base lacks
+    // is dropped; a child that matches nothing is dropped.
     void merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer = 1, ALXmlMergeObserver* observer = nullptr);
 }

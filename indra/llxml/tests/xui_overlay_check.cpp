@@ -27,9 +27,10 @@
 // For every skin under the directory and every language under its xui
 // directory, every file is merged over its base by the same call the
 // viewer makes, with an observer that counts each decision: layers that
-// did not parse, roots refused, children that applied to nothing and why,
-// attributes dropped, text blanked, and the translation checks a merged
-// pair allows, placeholders that differ and text under translate="false".
+// did not parse, roots whose name or tag differs, children that applied
+// to nothing and why, attributes dropped, text blanked, and the
+// translation checks a merged pair allows, placeholders that differ and
+// text under translate="false".
 // The census is printed by language. With a baseline file, the gated
 // counts are compared with it and the exit code says whether any grew;
 // --write-baseline writes the counts as the new baseline.
@@ -68,9 +69,9 @@ namespace
 
     // The counts, in the order they print. The first four are the gate.
     const char* const KEYS[] = {
-        "root_mismatch", "unmatched", "value_dropped", "text_blanked",
-        "files", "orphan_file", "parse_error", "misnested", "misnested_unique", "misnested_outside",
-        "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
+        "unmatched", "value_dropped", "text_blanked", "parse_error",
+        "files", "orphan_file", "root_name_differs", "root_tag_differs", "misnested", "misnested_unique",
+        "misnested_outside", "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
         "attr_not_in_base", "layout_attr_overridden", "layout_attr_dropped", "placeholder_mismatch",
         "translated_despite_translate_false", "covered", "text_kept", "value_as_text"
     };
@@ -262,10 +263,16 @@ namespace
             element(base, overlay);
         }
 
-        void rootRefused(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
+        void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
         {
-            ++mCounts["root_mismatch"];
-            example("root_mismatch", "overlay root " + pathOf(overlay) + " vs base " + pathOf(base));
+            ++mCounts["root_name_differs"];
+            example("root_name_differs", "overlay root " + pathOf(overlay) + " vs base " + pathOf(base));
+        }
+
+        void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
+        {
+            ++mCounts["root_tag_differs"];
+            example("root_tag_differs", "overlay root " + pathOf(overlay) + " vs base " + pathOf(base));
         }
 
         void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override

@@ -50,7 +50,8 @@ namespace tut
         S32 kept = 0;
         S32 valueAsText = 0;
         S32 roots = 0;
-        S32 refused = 0;
+        S32 renamed = 0;
+        S32 retagged = 0;
         S32 parsed = 0;
         S32 skipped = 0;
         S32 skippedLine = 0;
@@ -79,7 +80,8 @@ namespace tut
             events.push_back("skipped " + std::to_string(layer));
         }
         void rootMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++roots; add("root", layer, base); }
-        void rootRefused(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++refused; add("refused", layer, overlay); }
+        void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++renamed; add("renamed", layer, overlay); }
+        void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++retagged; add("retagged", layer, overlay); }
         void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++matched; add("match", layer, base); }
         void childUnmatched(S32 layer, LLXMLNode* parent, LLXMLNode* overlay, Miss why) override
         {
@@ -269,8 +271,10 @@ namespace tut
         ensure_equals("matches", rec.matched, 8);
         ensure("the second button matched the second base button", rec.has("match 1 button[b]"));
         ensure_equals("texts applied: t", rec.text, 1);
-        // name on f, p, b, b, t, u, w, c; title; label on b, b; font on w; value and label on the item.
-        ensure_equals("attributes applied", rec.applied, 14);
+        // title; label on b, b; font on w; value and label on the item.
+        // Names are keys, and are not written.
+        ensure_equals("attributes applied", rec.applied, 6);
+        ensure("the name is never written", !rec.has("attr 1 name=f"));
     }
 
     // With no observer the tree comes out the same: a rule that changes
@@ -292,26 +296,32 @@ namespace tut
     }
 
     // Loading: the base and each layer in turn; a layer whose root name
-    // differs is refused whole; a layer that does not parse fails the
-    // load, as it does today; an empty path is passed over.
+    // or tag differs is merged all the same and said so; a layer that
+    // does not parse fails the load, as it does today; an empty path is
+    // passed over.
     template<> template<>
     void alxmllayermerge_object::test<3>()
     {
         const std::string base = write("base.xml", BASE);
         const std::string overlay = write("overlay.xml", OVERLAY);
-        const std::string other = write("other.xml", "<floater name=\"g\" title=\"Other\"/>\n");
+        const std::string renamed = write("renamed.xml", "<floater name=\"g\" title=\"Renamed\"><panel name=\"p\" width=\"7\"/></floater>\n");
+        const std::string retagged = write("retagged.xml", "<panel name=\"f\" title=\"Retagged\"/>\n");
         const std::string broken = write("broken.xml", "<floater name=\"f\">\n<panel>\n");
 
         {
             RecordingObserver rec;
             LLXMLNodePtr root;
-            ensure("loads", ALXmlLayerMerge::load({ base, "", overlay, other }, root, &rec));
-            ensure_equals("title from the overlay", attr(root, "", "title"), std::string("Titel"));
-            ensure_equals("layers parsed: base, overlay, other", rec.parsed, 3);
-            ensure_equals("one root matched", rec.roots, 1);
-            ensure("at layer 2, after the empty path", rec.has("root 2 floater[f]"));
-            ensure_equals("one root refused", rec.refused, 1);
-            ensure("the other file, at layer 3", rec.has("refused 3 floater[g]"));
+            ensure("loads", ALXmlLayerMerge::load({ base, "", overlay, renamed, retagged }, root, &rec));
+            ensure_equals("layers parsed: base, overlay, renamed, retagged", rec.parsed, 4);
+            ensure_equals("three roots matched", rec.roots, 3);
+            ensure("the overlay at layer 2, after the empty path", rec.has("root 2 floater[f]"));
+            ensure_equals("one root said to differ in name", rec.renamed, 1);
+            ensure("at layer 3", rec.has("renamed 3 floater[g]"));
+            ensure_equals("the base keeps its name", attr(root, "", "name"), std::string("f"));
+            ensure_equals("its child matched by name all the same", attr(root, "p", "width"), std::string("7"));
+            ensure_equals("one root said to differ in tag", rec.retagged, 1);
+            ensure("at layer 4", rec.has("retagged 4 panel[f]"));
+            ensure_equals("and its title applied all the same", attr(root, "", "title"), std::string("Retagged"));
         }
         {
             RecordingObserver rec;

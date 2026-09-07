@@ -102,9 +102,17 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
         observer->textKept(layer, base, overlay);
     }
 
-    // Every attribute the base has too.
+    // Every attribute the base has too, except the name: it is the key
+    // the element was matched by, equal by construction below the root,
+    // and at the root a rename the layer never heard of must not travel
+    // into the tree, where the name is what the viewer knows it by.
+    static const LLStringTableEntry* name_entry = gStringTable.addStringEntry("name");
     for (auto& [name, overlay_attribute] : overlay->mAttributes)
     {
+        if (name == name_entry)
+        {
+            continue;
+        }
         LLXMLNodePtr base_attribute;
         base->getAttribute(name, base_attribute, false);
         if (base_attribute)
@@ -216,22 +224,27 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
             observer->layerParsed(layer, layer_path);
         }
 
-        std::string base_name;
-        std::string overlay_name;
-        overlay->getAttributeString("name", overlay_name);
-        root->getAttributeString("name", base_name);
-        if (overlay_name == base_name)
+        // The file name binds the layer to the base. A root name or tag
+        // that differs is a change the layer never heard of, a rename or a
+        // widget that became another, and the children still match by
+        // their own names.
+        if (observer)
         {
-            if (observer)
+            std::string base_name;
+            std::string overlay_name;
+            overlay->getAttributeString("name", overlay_name);
+            root->getAttributeString("name", base_name);
+            if (overlay_name != base_name)
             {
-                observer->rootMatched(layer, root, overlay);
+                observer->rootNameDiffers(layer, root, overlay);
             }
-            merge(root, overlay, layer, observer);
+            if (overlay->getName() != root->getName())
+            {
+                observer->rootTagDiffers(layer, root, overlay);
+            }
+            observer->rootMatched(layer, root, overlay);
         }
-        else if (observer)
-        {
-            observer->rootRefused(layer, root, overlay);
-        }
+        merge(root, overlay, layer, observer);
     }
 
     return true;
