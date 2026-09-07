@@ -1873,18 +1873,30 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
         return;
     }
 
-    LLView* menu = mListMenu.get();
+    LLContextMenu* menu = static_cast<LLContextMenu*>(mListMenu.get());
     if (!menu)
     {
+        // The floater's registrars are its own scope, active while it
+        // builds itself and not a moment longer; a menu built later finds
+        // the names in them only if that scope is pushed for the build,
+        // which is what the hierarchy's own menu does.
+        mCommitCallbackRegistrar.pushScope();
+        mEnableCallbackRegistrar.pushScope();
         menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
             "menu_xui_tool_list.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
+        mEnableCallbackRegistrar.popScope();
+        mCommitCallbackRegistrar.popScope();
         if (!menu)
         {
             return;
         }
         mListMenu = menu->getHandle();
     }
-    LLMenuGL::showPopup(mMenuList, static_cast<LLContextMenu*>(menu), x, y);
+
+    // A context menu places itself; the popup puts it in front and takes
+    // the mouse. Both, in that order, as every other list here does.
+    menu->show(x, y);
+    LLMenuGL::showPopup(mMenuList, menu, x, y);
 }
 
 bool ALFloaterXUITool::onListActionEnabled(const LLSD& param)
