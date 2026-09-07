@@ -62,6 +62,12 @@ public:
         Mandatory<std::string>  name;
         Mandatory<std::string>  value;
 
+        // Swallowed for the same reason LLView swallows it: translate="false"
+        // is a cue for translation tools, and 642 strings in the default
+        // skin's English carry it. LLView's copy does not reach here, since
+        // a string is not a view.
+        Ignored                 needs_translate;
+
         LocalizedString();
     };
 

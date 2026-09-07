@@ -56,7 +56,7 @@ namespace tut
         // Nothing here measures text: the headless fixture has no glyphs.
         static constexpr const char* XUI =
             "<floater name=\"f\" width=\"200\" height=\"100\" bogus_top=\"1\">"
-            "<floater.string name=\"s\" bogus_nested=\"1\">text</floater.string>"
+            "<floater.string name=\"s\" bogus_nested=\"1\" translate=\"false\">text</floater.string>"
             "<panel name=\"inner\" width=\"10\" height=\"10\"/>"
             "<panel.string name=\"p\">text</panel.string>"
             "<nonesuch name=\"n\"/>"
@@ -144,6 +144,11 @@ namespace tut
                    has(sink, ALXUIDiagnostics::Kind::MisScopedElement, 1, "panel.string"));
             ensure("an element that is not a widget is reported by the factory",
                    has(sink, ALXUIDiagnostics::Kind::CreateFailed, 0, "nonesuch"));
+            // translate is a cue for translation tools, carried by 642
+            // strings in the default skin; the string block swallows it
+            // as LLView does, so it is not a finding.
+            ensure("translate on a string is not an unknown attribute",
+                   !has(sink, ALXUIDiagnostics::Kind::UnknownAttribute, 1, "string.translate"));
 
             // The parser names the file it was handed. The factory names its
             // current file as the skin resolves it, and a file that is not on

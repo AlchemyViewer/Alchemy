@@ -61,7 +61,8 @@ template class LLPanel* LLView::getChild<class LLPanel>(
 
 LLPanel::LocalizedString::LocalizedString()
 :   name("name"),
-    value("value")
+    value("value"),
+    needs_translate("translate")
 {}
 
 const LLPanel::Params& LLPanel::getDefaultParams()
