@@ -4,9 +4,15 @@
 	<text name="Tell everyone about your favorite places in Second Life.">
 		Second Life&apos;ta favori yerlerinizi herkese anlatın!
 	</text>
-	<button label="Yeni..." name="new_btn"/>
-	<button label="Sil..." name="delete_btn"/>
-	<text name="picks_panel_text">
+	<layout_stack name="main_stack">
+		<layout_panel name="main_body">
+			<text name="picks_panel_text">
 		Yükleniyor...
 	</text>
+		</layout_panel>
+		<layout_panel name="buttons_header">
+			<button label="Sil..." name="delete_btn"/>
+			<button label="Yeni..." name="new_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

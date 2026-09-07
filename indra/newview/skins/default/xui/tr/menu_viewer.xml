@@ -2,26 +2,19 @@
 <menu_bar name="Main Menu">
 	<menu label="Ben" name="Me">
 		<menu_item_call label="Profil..." name="Profile"/>
-		<menu_item_call label="Görünüm..." name="ChangeOutfit"/>
 		<menu_item_call label="Bir avatar seçin..." name="Avatar Picker"/>
 		<menu_item_check label="Envanter..." name="Inventory"/>
 		<menu_item_call label="Yeni Envanter Penceresi" name="NewInventoryWindow"/>
 		<menu_item_call label="Yerler..." name="Places"/>
 		<menu_item_call label="Favoriler..." name="Picks"/>
 		<menu_item_call label="Deneyimler..." name="Experiences"/>
-		<menu_item_call label="Komut Dosyalarım..." name="MyScripts"/>
 		<menu_item_call label="Kamera Denetimleri..." name="Camera Controls"/>
 		<menu label="Hareket" name="Movement">
 			<menu_item_call label="Otur" name="Sit Down Here"/>
 			<menu_item_call label="Kalk" name="Stand up"/>
 			<menu_item_check label="Uç" name="Fly"/>
-			<menu_item_check label="Daima Koş" name="Always Run"/>
-			<menu_item_call label="Beni Anime Etmeyi Durdur" name="Stop Animating My Avatar"/>
-			<menu_item_call label="Yürü / koş / uç..." name="WalkRunFly"/>
 		</menu>
 		<menu label="Durum" name="Status">
-			<menu_item_check label="Uzakta" name="Away"/>
-			<menu_item_check label="Rahatsız Etme" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="L$ Satın Al..." name="Buy and Sell L$"/>
 		<menu_item_call label="Pazaryeri ilanları..." name="MarketplaceListings"/>
@@ -31,6 +24,8 @@
 		<menu_item_call label="Tüm denetimleri sakla" name="Hide UI"/>
 		<menu_item_check label="BÜG Aksesuarlarını Göster" name="Show HUD Attachments"/>
 		<menu_item_call label="[APP_NAME]&apos;den Çık" name="Quit"/>
+		<menu_item_check label="Rahatsız Etme" name="Do Not Disturb"/>
+		<menu_item_check label="Uzakta" name="Away"/>
 	</menu>
 	<menu label="İletişim Kur" name="Communicate">
 		<menu_item_check label="Sohbetler..." name="Conversations"/>
@@ -81,6 +76,11 @@
 			<menu_item_call label="Ortamlarım..." name="my_environs"/>
 			<menu_item_call label="Kişisel Aydınlatma..." name="adjustment_tool"/>
 			<menu_item_check label="Bulutları Duraklat" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Yakınlaştır" name="Zoom In"/>
+			<menu_item_call label="Varsayılan Yakınlaştırma" name="Zoom Default"/>
+			<menu_item_call label="Uzaklaştırma" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="İnşa Et" name="BuildTools">
@@ -140,6 +140,7 @@
 			<menu_item_call label="Ağ İçin Seçimi Kullan" name="Use Selection for Grid"/>
 			<menu_item_call label="Ağ Seçenekleri..." name="Grid Options"/>
 			<menu_item_call label="Varsayılan İzinleri Ayarla..." name="Set default permissions"/>
+			<menu_item_check label="Saydamı Vurgula" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Karşıya Yükle" name="Upload">
 			<menu_item_call label="Görüntü (L$[COST])..." name="Upload Image"/>
@@ -183,7 +184,6 @@
 			<menu_item_check label="Yanıp Sönen İşaret" name="Cheesy Beacon"/>
 			<menu_item_check label="Parçacıkları Gizle" name="Hide Particles"/>
 			<menu_item_check label="Seçilenleri Gizle" name="Hide Selected"/>
-			<menu_item_check label="Saydamı Vurgula" name="Highlight Transparent"/>
 			<menu_item_check label="Fare Üzerinden Görünüm Artı İşaretini Göster" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="İşleme Türleri" name="Rendering Types">
@@ -224,9 +224,6 @@
 			<menu_item_check label="Oyun Çubuğu Flycam" name="Joystick Flycam"/>
 			<menu_item_call label="Görünümü Sıfırla" name="Reset View"/>
 			<menu_item_call label="Son Sohbet Edene Bak" name="Look at Last Chatter"/>
-			<menu_item_call label="Yakınlaştır" name="Zoom In"/>
-			<menu_item_call label="Varsayılan Yakınlaştırma" name="Zoom Default"/>
-			<menu_item_call label="Uzaklaştırma" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Hata Ayıklama Ayarlarını Göster" name="Debug Settings"/>
 		<menu_item_check label="Geliştirme Menüsünü Göster" name="Debug Mode"/>
@@ -477,5 +474,12 @@
 				<menu_item_call label="Soru ve Yanıt Wiki Sayfası" name="QA Wiki"/>
 			</menu>
 		</menu>
+	</menu>
+	<menu name="Avatar">
+		<menu_item_call label="Komut Dosyalarım..." name="MyScripts"/>
+		<menu_item_check label="Daima Koş" name="Always Run"/>
+		<menu_item_call label="Yürü / koş / uç..." name="WalkRunFly"/>
+		<menu_item_call label="Beni Anime Etmeyi Durdur" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Görünüm..." name="ChangeOutfit"/>
 	</menu>
 </menu_bar>

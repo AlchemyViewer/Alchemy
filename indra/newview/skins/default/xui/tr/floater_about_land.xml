@@ -453,25 +453,27 @@ Sadece büyük parseller aramada görünür.
 			<text name="OwnerLimited">
 				(Gayrimenkul sahibi, bu seçimleri kısıtlamış olabilir)
 			</text>
-			<panel name="Allowed_layout_panel">
-				<text label="Her Zaman İzin Ver" name="AllowedText">
-					Her zaman izin verilen ([COUNT], maks. [MAX])
-				</text>
-				<name_list name="AccessList" tool_tip="([LISTED] listeli, [MAX] maksimum)"/>
-				<button label="Ekle" name="add_allowed"/>
-				<button label="Kaldır" label_selected="Kaldır" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="Yasakla" name="BanCheck">
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="Yasakla" name="BanCheck">
 					Engellenen ([COUNT], maks. [MAX])
 				</text>
-				<name_list name="BannedList" tool_tip="([LISTED] listeli, [MAX] maksimum)">
-					<columns label="Ad" name="name"/>
-					<columns label="Süre" name="duration"/>
-				</name_list>
-				<button label="Ekle" name="add_banned"/>
-				<button label="Kaldır" label_selected="Kaldır" name="remove_banned"/>
-			</panel>
+					<name_list name="BannedList" tool_tip="([LISTED] listeli, [MAX] maksimum)">
+						<columns label="Ad" name="name"/>
+						<columns label="Süre" name="duration"/>
+					</name_list>
+					<button label="Ekle" name="add_banned"/>
+					<button label="Kaldır" label_selected="Kaldır" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="Her Zaman İzin Ver" name="AllowedText">
+					Her zaman izin verilen ([COUNT], maks. [MAX])
+				</text>
+					<name_list name="AccessList" tool_tip="([LISTED] listeli, [MAX] maksimum)"/>
+					<button label="Ekle" name="add_allowed"/>
+					<button label="Kaldır" label_selected="Kaldır" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="DENEYİMLER" name="land_experiences_panel"/>
 		<panel label="ORTAM" name="land_environment_panel"/>

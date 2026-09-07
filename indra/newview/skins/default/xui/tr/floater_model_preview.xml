@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="MODELİ KARŞIYA YÜKLE">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Hata: Tarih ayrıştırma sorunu - ayrıntılar için günlüğe bakın.
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="Gözat..." name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						2. Adım: Çözümle
-					</text>
-					<text name="analysis_method_label">
-						Yöntem:
-					</text>
-					<text name="quality_label">
-						Kalite:
-					</text>
-					<text name="smooth_method_label">
-						Düzeltme:
-					</text>
-					<check_box label="Delikleri Kapat" name="Close Holes (Slow)"/>
-					<button label="Çözümle" name="Decompose"/>
-					<button label="İptal" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						3. Adım: Basitleştir
@@ -230,6 +212,25 @@
 						Gövdeler: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Düzeltme:
+					</text>
+					<text name="quality_label">
+						Kalite:
+					</text>
+					<text name="analysis_method_label">
+						Yöntem:
+					</text>
+					<text name="method_label">
+						2. Adım: Çözümle
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="İptal" name="decompose_cancel"/>
+					<button label="Çözümle" name="Decompose"/>
+					<check_box label="Delikleri Kapat" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Karşıya yükleme seçenekleri" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					Sadece avatar modelleri için:
 				</text>
-				<check_box label="Dış katman ağırlığını dahil et" name="upload_skin"/>
-				<check_box label="Eklem konumlarını dahil et" name="upload_joints"/>
-				<check_box label="Eklem konumu tanımlandıysa ölçeği kilitle" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Z kayması (avatarı kaldırmak veya indirmek için):
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Eklem konumu tanımlandıysa ölçeği kilitle" name="lock_scale_if_joint_position"/>
+				<check_box label="Eklem konumlarını dahil et" name="upload_joints"/>
+				<check_box label="Dış katman ağırlığını dahil et" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

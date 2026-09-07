@@ -12,7 +12,9 @@
 	<menu_item_call label="Harita" name="map"/>
 	<menu_item_call label="Paylaş" name="share"/>
 	<menu_item_call label="Öde" name="pay"/>
-	<menu_item_check label="Engelle/Engeli Kaldır" name="block_unblock"/>
-	<menu_item_call label="Dondur" name="freeze"/>
-	<menu_item_call label="Çıkar" name="eject"/>
+	<context_menu name="manage_menu">
+		<menu_item_call label="Çıkar" name="eject"/>
+		<menu_item_call label="Dondur" name="freeze"/>
+		<menu_item_check label="Engelle/Engeli Kaldır" name="block_unblock"/>
+	</context_menu>
 </context_menu>

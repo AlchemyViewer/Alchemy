@@ -6,23 +6,33 @@
 	<panel.string name="sign_up_url">
 		https://join.secondlife.com/
 	</panel.string>
-	<layout_stack name="ui_stack">
-		<layout_panel name="ui_container">
-			<combo_box label="Kullanıcı Adı" name="username_combo" tool_tip="Kaydolduğunuzda seçtiğiniz kullanıcı adı, örn. mustafayalcin12 veya Faruk Gungoren"/>
-			<line_editor label="Parola" name="password_edit"/>
-			<combo_box label="Sık kullandığım yerler" name="start_location_combo">
-				<combo_box.item label="Son konumum" name="MyLastLocation"/>
-				<combo_box.item label="Ana konumum" name="MyHome"/>
-			</combo_box>
-			<button label="Oturum Aç" name="connect_btn"/>
-			<check_box label="Beni hatırla" name="remember_check"/>
-			<text name="forgot_password_text">
+	<layout_stack name="main_stack">
+		<layout_panel name="center_stage">
+			<layout_stack name="ui_stack">
+				<layout_panel name="ui_container">
+					<combo_box label="Kullanıcı Adı" name="username_combo" tool_tip="Kaydolduğunuzda seçtiğiniz kullanıcı adı, örn. mustafayalcin12 veya Faruk Gungoren"/>
+					<line_editor label="Parola" name="password_edit"/>
+					<combo_box label="Sık kullandığım yerler" name="start_location_combo">
+						<combo_box.item label="Son konumum" name="MyLastLocation"/>
+						<combo_box.item label="Ana konumum" name="MyHome"/>
+					</combo_box>
+					<check_box label="Beni hatırla" name="remember_check"/>
+					<text name="sign_up_text">
+						Kaydol
+					</text>
+					<layout_stack name="login_stack">
+						<layout_panel name="login_panel">
+							<text name="forgot_password_text">
 				Parolamı unuttum
 			</text>
-			<combo_box label="Ağ seç" name="server_combo"/>
-			<text name="sign_up_text">
-				Kaydol
-			</text>
+							<button label="Oturum Aç" name="connect_btn"/>
+						</layout_panel>
+						<layout_panel name="grid_panel">
+							<combo_box label="Ağ seç" name="server_combo"/>
+						</layout_panel>
+					</layout_stack>
+				</layout_panel>
+			</layout_stack>
 		</layout_panel>
 	</layout_stack>
 </panel>

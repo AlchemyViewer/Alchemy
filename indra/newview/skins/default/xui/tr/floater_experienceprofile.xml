@@ -17,30 +17,7 @@
 		<panel name="panel_experience_info">
 			<scroll_container name="xp_scroll">
 				<panel name="scrolling_panel">
-					<layout_stack>
-						<layout_panel name="top panel">
-							<button label="Düzenle" name="edit_btn"/>
-						</layout_panel>
-						<layout_panel name="maturity panel">
-							<text name="ContentRating">
-								Seviye:
-							</text>
-						</layout_panel>
-						<layout_panel name="location panel">
-							<text name="Location">
-								Konum:
-							</text>
-						</layout_panel>
-						<layout_panel>
-							<text name="Owner">
-								Sahibi:
-							</text>
-						</layout_panel>
-						<layout_panel name="group_panel">
-							<text name="Group">
-								Grup:
-							</text>
-						</layout_panel>
+					<layout_stack name="ls1">
 						<layout_panel name="perm panel">
 							<button label="İzin Ver" name="allow_btn"/>
 							<button label="Unut" name="forget_btn"/>
@@ -49,6 +26,29 @@
 								Bu deneyim tüm sakinler için etkindir.
 							</text>
 							<button label="Kötüye Kullanımı Bildir" name="report_btn"/>
+						</layout_panel>
+						<layout_panel name="group_panel">
+							<text name="Group">
+								Grup:
+							</text>
+						</layout_panel>
+						<layout_panel name="owner panel">
+							<text name="Owner">
+								Sahibi:
+							</text>
+						</layout_panel>
+						<layout_panel name="location panel">
+							<text name="Location">
+								Konum:
+							</text>
+						</layout_panel>
+						<layout_panel name="maturity panel">
+							<text name="ContentRating">
+								Seviye:
+							</text>
+						</layout_panel>
+						<layout_panel name="top panel">
+							<button label="Düzenle" name="edit_btn"/>
 						</layout_panel>
 					</layout_stack>
 				</panel>

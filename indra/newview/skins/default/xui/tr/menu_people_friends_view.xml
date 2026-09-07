@@ -3,7 +3,9 @@
 	<menu_item_check label="Ada Göre Sırala" name="sort_name"/>
 	<menu_item_check label="Duruma Göre Sırala" name="sort_status"/>
 	<menu_item_check label="Kişi Simgelerini Göster" name="view_icons"/>
-	<menu_item_check label="Verilen İzinleri Göster" name="view_permissions"/>
 	<menu_item_check label="Kullanıcı adlarını gizle" name="view_usernames"/>
 	<menu_item_check label="Sohbet Günlüğünü Göster..." name="view_conversation"/>
+	<context_menu name="People Show Permissions">
+		<menu_item_check label="Verilen İzinleri Göster" name="view_permissions"/>
+	</context_menu>
 </toggleable_menu>
