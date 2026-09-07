@@ -82,6 +82,11 @@ public:
 
 namespace ALXmlLayerMerge
 {
+    // The observer a load uses when its caller passes none, which is what
+    // the viewer does everywhere. Null until something installs one.
+    void setDefaultObserver(ALXmlMergeObserver* observer);
+    ALXmlMergeObserver* defaultObserver();
+
     // The first path is parsed as the base and each later one is parsed
     // and merged over it in turn, as layers 1, 2, ... A path that is empty
     // or the same as the first is passed over, and so is a layer that

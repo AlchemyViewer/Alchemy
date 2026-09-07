@@ -356,5 +356,21 @@ namespace tut
             ensure("a broken base fails the load", !ALXmlLayerMerge::load({ broken, overlay }, root));
             ensure("nothing loads from nothing", !ALXmlLayerMerge::load({}, root));
         }
+
+        // A caller that passes no observer gets the installed one, which
+        // is how the viewer's own loads reach the log.
+        {
+            RecordingObserver installed;
+            ALXmlLayerMerge::setDefaultObserver(&installed);
+            LLXMLNodePtr root;
+            ensure("loads", ALXmlLayerMerge::load({ base, overlay }, root));
+            ensure("the default observer heard it", installed.roots == 1);
+            ALXmlLayerMerge::setDefaultObserver(nullptr);
+
+            RecordingObserver silent;
+            LLXMLNodePtr again;
+            ensure("loads", ALXmlLayerMerge::load({ base, overlay }, again));
+            ensure("and hears nothing once it is gone", silent.roots == 0);
+        }
     }
 }

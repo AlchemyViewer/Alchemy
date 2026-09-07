@@ -6,6 +6,7 @@ target_sources(llxml
     PRIVATE
     alxmldocument.cpp
     alxmllayermerge.cpp
+    alxmlmergelog.cpp
     llcontrol.cpp
     llxmlnode.cpp
     llxmltree.cpp
@@ -17,6 +18,7 @@ target_sources(llxml
     FILES
     alxmldocument.h
     alxmllayermerge.h
+    alxmlmergelog.h
     llcontrol.h
     llxmlnode.h
     llxmltree.h

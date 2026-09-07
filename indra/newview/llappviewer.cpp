@@ -132,6 +132,7 @@
 
 // Linden library includes
 #include "llavatarnamecache.h"
+#include "alxmlmergelog.h"
 #include "lldiriterator.h"
 #include "llexperiencecache.h"
 #include "llimagej2c.h"
@@ -804,6 +805,10 @@ bool LLAppViewer::init()
     // set skin search path to default, will be overridden later
     // this allows simple skinned file lookups to work
     gDirUtilp->setSkinFolder("default", "en");
+
+    // Say what a localized or skinned file fails to apply, from the first
+    // file read onwards. Nothing in a build for download.
+    ALXmlMergeLog::install();
 
 //  initLoggingAndGetLastDuration();
 

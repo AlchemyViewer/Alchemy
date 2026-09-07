@@ -240,6 +240,21 @@ void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeO
 
 } // namespace
 
+namespace
+{
+    ALXmlMergeObserver* sDefaultObserver = nullptr;
+}
+
+void ALXmlLayerMerge::setDefaultObserver(ALXmlMergeObserver* observer)
+{
+    sDefaultObserver = observer;
+}
+
+ALXmlMergeObserver* ALXmlLayerMerge::defaultObserver()
+{
+    return sDefaultObserver;
+}
+
 void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer)
 {
     claimed_t claimed;
@@ -251,6 +266,11 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
     if (paths.empty())
     {
         return false;
+    }
+
+    if (!observer)
+    {
+        observer = sDefaultObserver;
     }
 
     const std::string& base_path = paths.front();
