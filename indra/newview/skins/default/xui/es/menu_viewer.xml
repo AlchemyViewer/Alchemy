@@ -15,7 +15,6 @@
 			<menu_item_check label="Volar" name="Fly"/>
 		</menu>
 		<menu label="Estado" name="Status">
-			<menu_item_check label="No molestar" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="Comprar L$..." name="Buy and Sell L$"/>
 		<menu_item_call label="Artículos del Mercado..." name="MarketplaceListings"/>
@@ -28,6 +27,7 @@
 		<menu_item_check label="Mostrar los HUD anexados" name="Show HUD Attachments"/>
 		<menu_item_call label="Salir de [APP_NAME]" name="Quit"/>
 		<menu_item_check label="Ausente" name="Away"/>
+		<menu_item_check label="No molestar" name="Do Not Disturb"/>
 	</menu>
 	<menu label="Comunicarme" name="Communicate">
 		<menu_item_check label="Conversaciones..." name="Conversations"/>
