@@ -39,6 +39,7 @@
 #include <utility>
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include "alparamtype.h"
 #include "llerror.h"
 #include "llstl.h"
 #include "llpredicate.h"
@@ -669,8 +670,10 @@ namespace LLInitParam
 
 
         // Builds a descriptor owned by this block and files it under `name`,
-        // or among the unnamed parameters when `name` is empty.
-        void addParam(param_handle_t handle,
+        // or among the unnamed parameters when `name` is empty. Returns it,
+        // so the template that knows the parameter's type can say what it is
+        // while T is still in scope.
+        ParamDescriptor* addParam(param_handle_t handle,
                       ParamDescriptor::merge_func_t merge_func,
                       ParamDescriptor::deserialize_func_t deserialize_func,
                       ParamDescriptor::serialize_func_t serialize_func,
@@ -1262,13 +1265,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            block_descriptor.addParam(
-                block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-                &mergeWith,
-                &deserializeParam,
-                &serializeParam,
-                validate_func,
-                min_count, max_count, name);
+            alRecordParamType<value_t, named_value_t>(
+                block_descriptor.addParam(
+                    block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
+                    &mergeWith,
+                    &deserializeParam,
+                    &serializeParam,
+                    validate_func,
+                    min_count, max_count, name),
+                ALParamType::SCALAR);
         }
     };
 
@@ -1436,13 +1441,16 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            block_descriptor.addParam(
-                block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-                &mergeWith,
-                &deserializeParam,
-                &serializeParam,
-                validate_func,
-                min_count, max_count, name);
+            alRecordParamType<value_t, named_value_t>(
+                block_descriptor.addParam(
+                    block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
+                    &mergeWith,
+                    &deserializeParam,
+                    &serializeParam,
+                    validate_func,
+                    min_count, max_count, name),
+                ALParamType::BLOCK,
+                &param_value_t::getBlockDescriptor());
         }
     };
 
@@ -1674,13 +1682,15 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            block_descriptor.addParam(
-                block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-                &mergeWith,
-                &deserializeParam,
-                &serializeParam,
-                validate_func,
-                min_count, max_count, name);
+            alRecordParamType<value_t, named_value_t>(
+                block_descriptor.addParam(
+                    block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
+                    &mergeWith,
+                    &deserializeParam,
+                    &serializeParam,
+                    validate_func,
+                    min_count, max_count, name),
+                ALParamType::MULTIPLE_SCALAR);
         }
     };
 
@@ -1924,13 +1934,16 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            block_descriptor.addParam(
-                block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
-                &mergeWith,
-                &deserializeParam,
-                &serializeParam,
-                validate_func,
-                min_count, max_count, name);
+            alRecordParamType<value_t, named_value_t>(
+                block_descriptor.addParam(
+                    block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
+                    &mergeWith,
+                    &deserializeParam,
+                    &serializeParam,
+                    validate_func,
+                    min_count, max_count, name),
+                ALParamType::MULTIPLE_BLOCK,
+                &param_value_t::getBlockDescriptor());
         }
     };
 
@@ -2289,13 +2302,15 @@ namespace LLInitParam
                 BlockDescriptor& block_descriptor = DERIVED_BLOCK::getBlockDescriptor();
                 if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
                 {
-                    block_descriptor.addParam(
+                    alRecordParamType<void, ALParamNoNames>(
+                        block_descriptor.addParam(
                                                     block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                                                     NULL,
                                                     &deserializeParam,
                                                     NULL,
                                                     NULL,
-                                                    0, S32_MAX, name);
+                                                    0, S32_MAX, name),
+                        ALParamType::IGNORED);
                 }
             }
 

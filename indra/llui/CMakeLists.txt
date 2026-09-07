@@ -113,6 +113,7 @@ target_sources(llui
     alxuiedit.cpp
     alxuilint.cpp
     alxuioverlay.cpp
+    alxuischema.cpp
     alxuiselection.cpp
     alxuishellbuild.cpp
     alxuisourcemap.cpp
@@ -248,6 +249,7 @@ target_sources(llui
     alxuiedit.h
     alxuilint.h
     alxuioverlay.h
+    alxuischema.h
     alxuiselection.h
     alxuishellbuild.h
     alxuisourcemap.h
@@ -353,6 +355,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(alxuilint "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiedit "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuitranslate "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuischema "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiselection "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuisourcemap "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuitreemodel "" "${test_libs}" "${test_project}")
@@ -361,7 +364,7 @@ if(BUILD_TESTING)
   # tree's skins and fonts; this is where it is.
   foreach(ui_test lllayoutstack llfloater alviewtype alxuidiagnostics alxuishellbuild
                   alxuicatalog alxuiselection alxuisourcemap alxuitreemodel alxuilint
-                  alxuiedit)
+                  alxuiedit alxuischema)
     if (TARGET INTEGRATION_TEST_${ui_test})
       target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
           "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")

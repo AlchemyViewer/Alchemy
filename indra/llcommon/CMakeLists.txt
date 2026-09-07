@@ -28,6 +28,7 @@ endif()
 
 target_sources(llcommon
     PRIVATE
+    alparamtype.cpp
     apply.cpp
     commoncontrol.cpp
     indra_constants.cpp
@@ -124,6 +125,7 @@ target_sources(llcommon
     PUBLIC
     FILE_SET HEADERS
     FILES
+    alparamtype.h
     always_return.h
     apply.h
     chrono.h

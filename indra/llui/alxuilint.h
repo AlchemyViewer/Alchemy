@@ -59,6 +59,7 @@ public:
         EmptyRect,              // a shown widget with no width or no height
         Truncation,             // a label wider than the box it is in
         TemplateRootMismatch,   // a widgets/ file whose root is not the tag it configures
+        UnknownAttribute,       // an attribute the widget's parameter block has no name for
         DanglingImage,          // an image name textures.xml does not declare
         DanglingColor,          // a colour name colors.xml does not declare
         DanglingFont,           // a font name the font registry does not know

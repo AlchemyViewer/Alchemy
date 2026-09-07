@@ -28,6 +28,7 @@
 
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
+#include "alxuischema.h"
 #include "alxuishellbuild.h"
 #include "alxuitranslate.h"
 #include "llbutton.h"
@@ -1039,6 +1040,7 @@ bool ALFloaterXUITool::postBuild()
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUITool::startRepairAll, this));
     getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairRoots, this));
     getChild<LLButton>("census_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startCensus, this));
+    getChild<LLButton>("schema_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onExportSchema, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::closePreviews, this));
@@ -3207,6 +3209,33 @@ void ALFloaterXUITool::finishCensus()
     setStatus(getString("CensusDone", args));
 }
 
+// ---------------------------------------------------------------------------
+// The schema
+// ---------------------------------------------------------------------------
+// Every widget the viewer registers, and what a file may write under it.
+// The viewer is the only place the whole vocabulary exists: llui's console
+// utility can only see the widgets llui itself registers, and the rest are
+// registered by static registrars in the viewer's own translation units.
+void ALFloaterXUITool::onExportSchema()
+{
+    const ALXUISchema& schema = ALXUISchema::get();
+    const std::string path = gDirUtilp->getSkinBaseDir() + gDirUtilp->getDirDelimiter() + "xui.xsd";
+
+    llofstream out(path);
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = path;
+    if (!out.is_open())
+    {
+        setStatus(getString("SchemaFailed", args));
+        return;
+    }
+    out << schema.asXSD();
+    out.close();
+
+    args["[SUMMARY]"] = schema.summary();
+    setStatus(getString("SchemaWritten", args));
+}
+
 // The same over every file the language has, a few per frame so the
 // viewer keeps drawing.
 void ALFloaterXUITool::startRepairAll()
@@ -3774,6 +3803,11 @@ void ALFloaterXUITool::refreshAttributes(LLView* view)
         return;
     }
 
+    // What the widget answers to, which is the class that was built and not
+    // the tag the file wrote: <panel class="foo"> is foo's parameters.
+    const std::string* tag = LLUICtrlFactory::widgetTag(view->viewType());
+    const ALXUISchema& schema = ALXUISchema::get();
+
     // Which layer last wrote each attribute, and the line in that layer's
     // file, as the merge's observer recorded it; the base wrote the rest.
     for (const auto& [name_entry, attribute] : origin->node->mAttributes)
@@ -3781,9 +3815,12 @@ void ALFloaterXUITool::refreshAttributes(LLView* view)
         const char* name = name_entry->mString;
         const ALXUIOverlay::Origin* from = pv.overlay.originOf(attribute.get());
         const S32 line = from ? from->line : attribute->getLineNumber();
+        const ALXUISchema::Attribute* declared = tag ? schema.attribute(*tag, name) : nullptr;
         mAttributes->addElement(row(name, {
             { "attribute", name },
             { "value", attribute->getValue() },
+            { "type", declared ? declared->type
+                               : (tag && schema.tag(*tag) ? getString("AttributeUnknown") : std::string()) },
             { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
             { "line", line > 0 ? std::to_string(line) : std::string() } }));
     }
@@ -3791,9 +3828,11 @@ void ALFloaterXUITool::refreshAttributes(LLView* view)
     {
         const ALXUIOverlay::Origin* from = pv.overlay.originOf(origin->node.get());
         const S32 line = from ? from->line : origin->line;
+        const ALXUISchema::Tag* declared = tag ? schema.tag(*tag) : nullptr;
         mAttributes->addElement(row("text()", {
             { "attribute", "(text)" },
             { "value", origin->node->getTextContents() },
+            { "type", declared && !declared->text ? getString("AttributeUnknown") : std::string() },
             { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
             { "line", line > 0 ? std::to_string(line) : std::string() } }));
     }

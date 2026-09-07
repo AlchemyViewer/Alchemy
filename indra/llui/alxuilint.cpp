@@ -29,6 +29,7 @@
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
 #include "alxuioverlay.h"
+#include "alxuischema.h"
 #include "alxuisourcemap.h"
 #include "llbutton.h"
 #include "lldraghandle.h"
@@ -39,6 +40,7 @@
 #include "lltextbox.h"
 #include "llui.h"
 #include "lluicolortable.h"
+#include "lluictrlfactory.h"
 #include "lluictrl.h"
 #include "llview.h"
 #include "llviewborder.h"
@@ -157,6 +159,7 @@ const char* ALXUILint::ruleName(Rule rule)
     case Rule::EmptyRect:               return "empty rect";
     case Rule::Truncation:              return "truncation";
     case Rule::TemplateRootMismatch:    return "template root";
+    case Rule::UnknownAttribute:        return "unknown attribute";
     case Rule::DanglingImage:           return "dangling image";
     case Rule::DanglingColor:           return "dangling colour";
     case Rule::DanglingFont:            return "dangling font";
@@ -450,11 +453,25 @@ void ALXUILint::checkChildren(const Input& input, LLView* view, const ALXUISelec
 void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISelection::path_t& path,
                                 const LLXMLNode* node)
 {
+    // What the widget answers to. The element's own tag is not the question:
+    // <panel class="foo"> builds foo, and foo's parameters are what the
+    // attributes here were parsed against. A class the schema does not know
+    // is a class no registry names, and nothing here can be said about it.
+    const std::string* tag = LLUICtrlFactory::widgetTag(view->viewType());
+    const ALXUISchema::Tag* schema = tag ? ALXUISchema::get().tag(*tag) : nullptr;
+
     for (const auto& [name_entry, attribute] : node->mAttributes)
     {
         const std::string name = name_entry->mString;
         const std::string value = attribute->getValue();
         const S32 line = attribute->getLineNumber() > 0 ? attribute->getLineNumber() : node->getLineNumber();
+
+        if (schema && !ALXUISchema::get().accepts(schema->name, name))
+        {
+            add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
+                "<" + schema->name + "> has no parameter named \"" + name + "\"");
+        }
+
         if (!looksLikeName(value))
         {
             continue;

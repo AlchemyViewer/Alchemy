@@ -203,6 +203,10 @@ private:
     void stepCensus();
     void finishCensus();
 
+    // The widget vocabulary as an XSD, written into the skins directory the
+    // catalog was read from, which is the source tree in a developer build.
+    void onExportSchema();
+
     // --- edits ---------------------------------------------------------------
     // A move or a resize of the selected element, as the movement of its
     // four edges, written into the layer that positions it.

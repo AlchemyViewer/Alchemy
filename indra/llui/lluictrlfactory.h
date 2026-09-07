@@ -79,14 +79,27 @@ class LLWidgetTagRegistry
     LLSINGLETON_EMPTY_CTOR(LLWidgetTagRegistry);
 };
 
-// lookup function for generating empty param block by widget type
-// this is used for schema generation
-//typedef const LLInitParam::BaseBlock& (*empty_param_block_func_t)();
-//class LLDefaultParamBlockRegistry
-//: public LLRegistrySingleton<std::type_index, empty_param_block_func_t, LLDefaultParamBlockRegistry>
-//{
-//  LLSINGLETON(LLDefaultParamBlockRegistry);
-//};
+#if !LL_RELEASE_FOR_DOWNLOAD
+// A block's parameter table is built by constructing one, so a widget type
+// nothing has ever created has an empty table. The schema wants every tag,
+// including the ones a session never reached, and this is how it gets them:
+// the default block, built the first time it is asked for.
+typedef const LLInitParam::BaseBlock& (*empty_param_block_func_t)();
+
+template <typename PARAM_BLOCK>
+const LLInitParam::BaseBlock& get_empty_param_block()
+{
+    static const PARAM_BLOCK sBlock;
+    return sBlock;
+}
+
+// lookup a widget's default parameter block by its tag
+class LLWidgetBlockRegistry
+:   public LLRegistrySingleton<std::string, empty_param_block_func_t, LLWidgetBlockRegistry>
+{
+    LLSINGLETON_EMPTY_CTOR(LLWidgetBlockRegistry);
+};
+#endif
 
 // Build time optimization, generate this once in .cpp file
 #ifndef LLUICTRLFACTORY_CPP
@@ -382,10 +395,19 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
         LLUICtrlFactory::registerWidgetTag(&T::sViewType, tag);
     }
 
-    // since registry_t depends on T, do this in line here
-    // TODO: uncomment this for schema generation
-    //typedef typename T::child_registry_t registry_t;
-    //LLChildRegistryRegistry::instance().defaultRegistrar().add(typeid(T), registry_t::instance());
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // What the schema reads: the block a tag builds from, and the tags that
+    // may appear below it. Both depend on T, so both are recorded here,
+    // which is the last place T is known. A widget registered under more
+    // than one registry answers to the same tag each time, so the first
+    // registration is the one that stands.
+    typedef typename T::child_registry_t registry_t;
+    if (!LLWidgetBlockRegistry::instance().exists(tag))
+    {
+        LLWidgetBlockRegistry::instance().defaultRegistrar().add(tag, &get_empty_param_block<typename T::Params>);
+        LLChildRegistryRegistry::instance().defaultRegistrar().add(tag, &registry_t::instance());
+    }
+#endif
 }
 
 #endif //LLUICTRLFACTORY_H

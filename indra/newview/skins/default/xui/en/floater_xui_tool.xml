@@ -39,6 +39,9 @@
     <floater.string name="CensusStarted">Counting what every language's overlay does...</floater.string>
     <floater.string name="CensusProgress">Counted [DONE] of [TOTAL] files</floater.string>
     <floater.string name="CensusDone">[COVERED] values arrive, [NOTHING] apply to nothing; table written to [FILE]</floater.string>
+    <floater.string name="AttributeUnknown">no such parameter</floater.string>
+    <floater.string name="SchemaWritten">[SUMMARY]; written to [FILE]</floater.string>
+    <floater.string name="SchemaFailed">Could not write [FILE]</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <text
@@ -159,6 +162,16 @@
      left_pad="4"
      name="census_btn"
      tool_tip="Count what every language's overlay does to every file, and write the table beside the log"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Schema"
+     layout="topleft"
+     left_pad="4"
+     name="schema_btn"
+     tool_tip="Write xui.xsd from the registered widgets, into the skins directory"
      top_delta="0"
      width="60" />
     <button
@@ -518,19 +531,23 @@
                         <scroll_list.columns
                          label="Attribute"
                          name="attribute"
-                         width="140" />
+                         width="130" />
                         <scroll_list.columns
                          dynamic_width="true"
                          label="Value"
                          name="value" />
                         <scroll_list.columns
+                         label="Type"
+                         name="type"
+                         width="100" />
+                        <scroll_list.columns
                          label="Layer"
                          name="layer"
-                         width="80" />
+                         width="70" />
                         <scroll_list.columns
                          label="Line"
                          name="line"
-                         width="40" />
+                         width="36" />
                     </scroll_list>
                 </panel>
                 <panel

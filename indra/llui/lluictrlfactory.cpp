@@ -236,13 +236,6 @@ void LLUICtrlFactory::setCtrlParent(LLView* view, LLView* parent, S32 tab_group)
     parent->addChild(view, tab_group);
 }
 
-template<typename T>
-const LLInitParam::BaseBlock& get_empty_param_block()
-{
-    static typename T::Params params;
-    return params;
-}
-
 // adds a widget and its param block to various registries
 //static
 void LLUICtrlFactory::registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& name)
@@ -267,8 +260,6 @@ void LLUICtrlFactory::registerWidget(std::type_index widget_type, std::type_inde
 
     LLWidgetNameRegistry::instance().defaultRegistrar().add(param_block_type, name);
     LLWidgetTypeRegistry::instance().defaultRegistrar().add(name, widget_type);
-    //FIXME: comment this in when working on schema generation
-    //LLDefaultParamBlockRegistry::instance().defaultRegistrar().add(widget_type, &get_empty_param_block<T>);
 }
 
 //static

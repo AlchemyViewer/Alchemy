@@ -50,8 +50,12 @@ typedef std::function<LLView* (LLXMLNodePtr node, LLView *parent)> LLWidgetCreat
 
 typedef LLRegistry<std::string, LLWidgetCreatorFunc> widget_registry_t;
 
+// lookup the registry of tags valid below a widget, by that widget's tag.
+// Held by pointer: a registry fills as its widgets' static registrars run,
+// and a copy taken at registration time would be a snapshot of whatever had
+// run so far.
 class LLChildRegistryRegistry
-: public LLRegistrySingleton<std::type_index, widget_registry_t, LLChildRegistryRegistry>
+: public LLRegistrySingleton<std::string, const widget_registry_t*, LLChildRegistryRegistry>
 {
     LLSINGLETON_EMPTY_CTOR(LLChildRegistryRegistry);
 };

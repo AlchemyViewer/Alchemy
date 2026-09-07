@@ -29,6 +29,7 @@
 
 // project includes
 #include "alparamfingerprint.h"
+#include "alxuischema.h"
 #include "llwidgetreg.h"
 
 // linden library includes
@@ -44,7 +45,11 @@
 #include "llui.h"
 #include "lluictrlfactory.h"
 
+#include <pugixml.hpp>
+
+#include <filesystem>
 #include <iostream>
+#include <map>
 
 // *TODO: switch to using TUT
 // *TODO: teach Parabuild about this program, run automatically after full builds
@@ -185,6 +190,79 @@ void init_llui()
     gFloaterView = LLUICtrlFactory::create<LLFloaterView> (fvparams);
 }
 
+// Every attribute of every element of every XUI file under a directory,
+// asked of the schema. A tag llui does not register is skipped -- most of
+// the viewer's own widgets are, and a parameter element is not a tag at all
+// -- so this says what the model gets wrong about the widgets it does know,
+// which is the question a schema has to answer before anything relies on it.
+namespace
+{
+    void checkAttributes(const std::string& root)
+    {
+        const ALXUISchema& schema = ALXUISchema::get();
+        std::map<std::string, size_t> unknown;
+        size_t files = 0;
+        size_t checked = 0;
+        size_t elements = 0;
+
+        std::error_code code;
+        for (std::filesystem::recursive_directory_iterator it(root, code), end;
+             it != end; it.increment(code))
+        {
+            if (code || !it->is_regular_file() || it->path().extension() != ".xml")
+            {
+                continue;
+            }
+
+            pugi::xml_document document;
+            if (!document.load_file(it->path().c_str()))
+            {
+                continue;
+            }
+            ++files;
+
+            std::vector<pugi::xml_node> stack{ document.document_element() };
+            while (!stack.empty())
+            {
+                const pugi::xml_node node = stack.back();
+                stack.pop_back();
+                for (pugi::xml_node child : node.children())
+                {
+                    if (child.type() == pugi::node_element)
+                    {
+                        stack.push_back(child);
+                    }
+                }
+
+                ++elements;
+                const ALXUISchema::Tag* tag = schema.tag(node.name());
+                if (!tag)
+                {
+                    continue;
+                }
+                for (const pugi::xml_attribute attribute : node.attributes())
+                {
+                    ++checked;
+                    if (!schema.accepts(tag->name, attribute.name()))
+                    {
+                        ++unknown[std::string(node.name()) + " " + attribute.name()];
+                    }
+                }
+            }
+        }
+
+        std::cout << "XUI attributes under " << root << "\n"
+                  << "  files            : " << files << "\n"
+                  << "  elements         : " << elements << "\n"
+                  << "  attributes asked : " << checked << "\n"
+                  << "  names unanswered : " << unknown.size() << "\n";
+        for (const auto& entry : unknown)
+        {
+            std::cout << "    " << entry.first << " : " << entry.second << "\n";
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     // Must init LLError for llerrs to actually cause errors.
@@ -204,6 +282,12 @@ int main(int argc, char** argv)
     // instance of each block costs, and "--bench" what building one costs.
     // All three are *expected* to move -- shrinking them is the point --
     // which is why none of them shares a stream with the gate above.
+    //
+    // "--schema" writes the XSD for the widgets llui itself registers, which
+    // is the part of the vocabulary a test in this library can diff. The
+    // committed one covers the viewer's widgets too and is written from the
+    // XUI tool. "--attributes <dir>" asks the same model about every
+    // attribute the files under a directory write.
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg(argv[i]);
@@ -222,6 +306,14 @@ int main(int argc, char** argv)
         else if (arg == "--bench")
         {
             std::cout << ALParamFingerprint::bench();
+        }
+        else if (arg == "--schema")
+        {
+            std::cout << ALXUISchema::get().asXSD();
+        }
+        else if (arg == "--attributes" && i + 1 < argc)
+        {
+            checkAttributes(argv[++i]);
         }
     }
 

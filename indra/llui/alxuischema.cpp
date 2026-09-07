@@ -1,0 +1,432 @@
+/**
+ * @file alxuischema.cpp
+ * @brief What a XUI file may say, read out of the widget registries.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alxuischema.h"
+
+#include "llinitparam.h"
+#include "lluictrlfactory.h"
+#include "llxuiparser.h"
+
+#include <algorithm>
+#include <cstring>
+#include <optional>
+#include <sstream>
+
+namespace
+{
+    // How far a nested block's names are followed. A parameter written
+    // a.b.c is three levels; past that the forms a file actually uses run
+    // out, and the count of attributes stops being worth what it says.
+    constexpr S32 MAX_NESTING = 2;
+
+    // What a block reads when a file writes it as one value rather than as
+    // an element, or nothing where it reads only its own parts.
+    //
+    // Two blocks do. One has an unnamed scalar parameter, which is the
+    // fallback its own deserialization ends at: that is how text_color=
+    // "LtGray" and font="SansSerif" are written where both are blocks. The
+    // other declares no parameters at all and reads whatever it is given by
+    // hand, which is what LLSD does, and LLSD is the type behind value,
+    // initial_value and a callback's parameter.
+    std::optional<ALParamType> directValue(const LLInitParam::BlockDescriptor& block)
+    {
+        for (const LLInitParam::ParamDescriptorPtr descriptor : block.mUnnamedParams)
+        {
+            const ALParamType* type = ALParamTypes::find(descriptor);
+            if (type && type->mKind == ALParamType::SCALAR)
+            {
+                return *type;
+            }
+        }
+
+        if (block.mUnnamedParams.empty() && block.namedParams().empty())
+        {
+            return ALParamType();
+        }
+        return std::nullopt;
+    }
+
+    // typeid spells a type the way a compiler does. This takes off the parts
+    // that are the spelling rather than the type, and leaves the rest alone:
+    // where it is a mangled name there is nothing to take off, and a mangled
+    // name still says more than "value" does.
+    std::string readableType(const char* name)
+    {
+        std::string out(name ? name : "");
+        for (const char* prefix : { "class ", "struct ", "enum " })
+        {
+            if (out.compare(0, std::strlen(prefix), prefix) == 0)
+            {
+                out.erase(0, std::strlen(prefix));
+            }
+        }
+        for (size_t at = out.find(" __ptr64"); at != std::string::npos; at = out.find(" __ptr64"))
+        {
+            out.erase(at, 8);
+        }
+        return out;
+    }
+
+    std::string typeWord(const ALParamType& type, const std::vector<std::string>& values)
+    {
+        if (!values.empty())
+        {
+            std::string joined;
+            for (const std::string& value : values)
+            {
+                joined += joined.empty() ? "" : "|";
+                joined += value;
+            }
+            return joined;
+        }
+        switch (type.mValue)
+        {
+        case ALParamType::BOOLEAN:  return "bool";
+        case ALParamType::INTEGER:  return "integer";
+        case ALParamType::UNSIGNED: return "unsigned";
+        case ALParamType::REAL:     return "real";
+        case ALParamType::STRING:   return "string";
+        default:                    return readableType(type.mTypeName);
+        }
+    }
+
+    void addAttribute(ALXUISchema::Tag& tag, std::string name, const ALParamType& type, bool required)
+    {
+        ALXUISchema::Attribute attribute;
+        attribute.name = std::move(name);
+        attribute.value = type.mValue;
+        attribute.required = required;
+        // A type that takes a name or any string besides names no closed set,
+        // so only a C++ enumeration is written as one.
+        if (type.mValueNames && type.mValue == ALParamType::OTHER)
+        {
+            attribute.values = type.mValueNames();
+        }
+        attribute.type = typeWord(type, attribute.values);
+        tag.attributes.push_back(std::move(attribute));
+    }
+
+    void flatten(const LLInitParam::BlockDescriptor& block,
+                 const std::string& prefix,
+                 S32 depth,
+                 ALXUISchema::Tag& tag)
+    {
+        for (const auto& named : block.namedParams())
+        {
+            const std::string name = prefix.empty()
+                ? std::string(named.first)
+                : prefix + "." + std::string(named.first);
+            const ALParamType* type = ALParamTypes::find(named.second);
+            if (!type)
+            {
+                continue;
+            }
+
+            switch (type->mKind)
+            {
+            case ALParamType::SCALAR:
+            case ALParamType::IGNORED:
+                addAttribute(tag, name, *type, prefix.empty() && named.second->mMinCount > 0);
+                break;
+
+            case ALParamType::MULTIPLE_SCALAR:
+                tag.elements.push_back({ tag.name + "." + name,
+                                         named.second->mMinCount, named.second->mMaxCount });
+                break;
+
+            case ALParamType::BLOCK:
+            case ALParamType::MULTIPLE_BLOCK:
+                if (prefix.empty())
+                {
+                    tag.elements.push_back({ tag.name + "." + name,
+                                             named.second->mMinCount, named.second->mMaxCount });
+                }
+                if (type->mBlock)
+                {
+                    if (const std::optional<ALParamType> direct = directValue(*type->mBlock))
+                    {
+                        addAttribute(tag, name, *direct, false);
+                    }
+                    if (depth > 0)
+                    {
+                        flatten(*type->mBlock, name, depth - 1, tag);
+                    }
+                }
+                break;
+            }
+        }
+
+        // An unnamed block carries its own names at this level, with nothing
+        // in front of them: LLView keeps its rect that way, which is why
+        // left and width are attributes of every widget there is.
+        for (const LLInitParam::ParamDescriptorPtr descriptor : block.mUnnamedParams)
+        {
+            const ALParamType* type = ALParamTypes::find(descriptor);
+            if (type && type->mBlock && depth > 0)
+            {
+                flatten(*type->mBlock, prefix, depth - 1, tag);
+            }
+        }
+    }
+
+    std::string escaped(std::string_view text)
+    {
+        std::string out;
+        out.reserve(text.size());
+        for (const char c : text)
+        {
+            switch (c)
+            {
+            case '&':  out += "&amp;";  break;
+            case '<':  out += "&lt;";   break;
+            case '>':  out += "&gt;";   break;
+            case '"':  out += "&quot;"; break;
+            default:   out += c;        break;
+            }
+        }
+        return out;
+    }
+
+    const char* xsdType(ALParamType::EValue value)
+    {
+        switch (value)
+        {
+        case ALParamType::BOOLEAN:  return "xs:boolean";
+        case ALParamType::INTEGER:  return "xs:integer";
+        case ALParamType::UNSIGNED: return "xs:nonNegativeInteger";
+        case ALParamType::REAL:     return "xs:decimal";
+        default:                    return "xs:string";
+        }
+    }
+
+    // XSD names an element after its tag, and a XUI tag is already a legal
+    // one; a parameter element carries a dot, which is legal too.
+    std::string typeName(std::string_view tag)
+    {
+        std::string name(tag);
+        std::replace(name.begin(), name.end(), '.', '_');
+        return name + "_t";
+    }
+}
+
+//static
+const ALXUISchema& ALXUISchema::get()
+{
+    static const ALXUISchema sSchema = []
+    {
+        ALXUISchema schema;
+        schema.build();
+        return schema;
+    }();
+    return sSchema;
+}
+
+void ALXUISchema::build()
+{
+#if !LL_RELEASE_FOR_DOWNLOAD
+    const LLWidgetBlockRegistry& blocks = LLWidgetBlockRegistry::instance();
+    for (auto it = blocks.defaultRegistrar().beginItems(); it != blocks.defaultRegistrar().endItems(); ++it)
+    {
+        Tag tag;
+        tag.name = it->first;
+
+        // Asking for the block is what builds its table.
+        const LLInitParam::BaseBlock& block = (*it->second)();
+        const LLInitParam::BlockDescriptor& descriptor = block.mostDerivedBlockDescriptor();
+
+        flatten(descriptor, std::string(), MAX_NESTING, tag);
+        tag.text = descriptor.findNamedParam("value") != nullptr;
+
+        if (const widget_registry_t* const* children =
+                LLChildRegistryRegistry::instance().getValue(tag.name))
+        {
+            if (*children)
+            {
+                for (auto child = (*children)->defaultRegistrar().beginItems();
+                     child != (*children)->defaultRegistrar().endItems(); ++child)
+                {
+                    tag.children.push_back(child->first);
+                }
+            }
+        }
+
+        // A block that names the same parameter twice -- a synonym, or a
+        // derived block shadowing a base's -- reaches here once per name,
+        // and a nested block reached down two paths repeats a leaf.
+        std::sort(tag.attributes.begin(), tag.attributes.end(),
+                  [](const Attribute& a, const Attribute& b) { return a.name < b.name; });
+        tag.attributes.erase(std::unique(tag.attributes.begin(), tag.attributes.end(),
+                                         [](const Attribute& a, const Attribute& b)
+                                         { return a.name == b.name; }),
+                             tag.attributes.end());
+        std::sort(tag.elements.begin(), tag.elements.end(),
+                  [](const Element& a, const Element& b) { return a.name < b.name; });
+        tag.elements.erase(std::unique(tag.elements.begin(), tag.elements.end(),
+                                       [](const Element& a, const Element& b)
+                                       { return a.name == b.name; }),
+                           tag.elements.end());
+        std::sort(tag.children.begin(), tag.children.end());
+
+        mTags.push_back(std::move(tag));
+    }
+
+    std::sort(mTags.begin(), mTags.end(), [](const Tag& a, const Tag& b) { return a.name < b.name; });
+    for (size_t i = 0; i < mTags.size(); ++i)
+    {
+        mIndex[mTags[i].name] = i;
+    }
+#endif
+}
+
+const ALXUISchema::Tag* ALXUISchema::tag(std::string_view name) const
+{
+    const auto found = mIndex.find(name);
+    return found == mIndex.end() ? nullptr : &mTags[found->second];
+}
+
+const ALXUISchema::Attribute* ALXUISchema::attribute(std::string_view name, std::string_view attribute_name) const
+{
+    const Tag* found = tag(name);
+    if (!found)
+    {
+        return nullptr;
+    }
+    const auto it = std::lower_bound(found->attributes.begin(), found->attributes.end(), attribute_name,
+                                     [](const Attribute& a, std::string_view b) { return a.name < b; });
+    return it != found->attributes.end() && it->name == attribute_name ? &*it : nullptr;
+}
+
+bool ALXUISchema::accepts(std::string_view name, std::string_view attribute_name) const
+{
+    return attribute(name, attribute_name) != nullptr;
+}
+
+std::string ALXUISchema::asXSD() const
+{
+    std::ostringstream out;
+    out << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        << "<!--\n"
+        << "  The widget vocabulary of XUI, written out of the viewer's own\n"
+        << "  registries by the XUI tool. Do not edit: regenerate it.\n"
+        << "\n"
+        << "  It is permissive on purpose. A parameter may be written as an\n"
+        << "  attribute or as a nested element, a value may be a name or the\n"
+        << "  thing it names, and a colour, image, font or setting is a string\n"
+        << "  whose vocabulary lives in another file. Nothing here can say\n"
+        << "  \"one of these two spellings\", so nothing here tries; the tool's\n"
+        << "  lint is where those are checked.\n"
+        << "-->\n"
+        << "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\""
+        << " elementFormDefault=\"qualified\">\n"
+        << "\n  <!-- A parameter element: its own leaves are the attributes of\n"
+        << "       the tag that owns it, written with dots, so there is nothing\n"
+        << "       left here to check. -->\n"
+        << "  <xs:complexType name=\"al_any\" mixed=\"true\">\n"
+        << "    <xs:sequence>\n"
+        << "      <xs:any minOccurs=\"0\" maxOccurs=\"unbounded\" processContents=\"skip\"/>\n"
+        << "    </xs:sequence>\n"
+        << "    <xs:anyAttribute processContents=\"skip\"/>\n"
+        << "  </xs:complexType>\n";
+
+    for (const Tag& tag : mTags)
+    {
+        out << "\n  <xs:element name=\"" << escaped(tag.name)
+            << "\" type=\"" << typeName(tag.name) << "\"/>\n";
+    }
+
+    for (const Tag& tag : mTags)
+    {
+        out << "\n  <xs:complexType name=\"" << typeName(tag.name) << "\"";
+        if (tag.text)
+        {
+            out << " mixed=\"true\"";
+        }
+        out << ">\n";
+
+        if (!tag.children.empty() || !tag.elements.empty())
+        {
+            out << "    <xs:choice minOccurs=\"0\" maxOccurs=\"unbounded\">\n";
+            for (const std::string& child : tag.children)
+            {
+                if (mIndex.find(child) != mIndex.end())
+                {
+                    out << "      <xs:element ref=\"" << escaped(child) << "\"/>\n";
+                }
+            }
+            for (const Element& element : tag.elements)
+            {
+                out << "      <xs:element name=\"" << escaped(element.name)
+                    << "\" type=\"al_any\"/>\n";
+            }
+            out << "    </xs:choice>\n";
+        }
+
+        for (const Attribute& attribute : tag.attributes)
+        {
+            out << "    <xs:attribute name=\"" << escaped(attribute.name) << "\"";
+            if (attribute.required)
+            {
+                out << " use=\"required\"";
+            }
+            if (attribute.values.empty())
+            {
+                out << " type=\"" << xsdType(attribute.value) << "\"/>\n";
+            }
+            else
+            {
+                out << ">\n      <xs:simpleType>\n"
+                    << "        <xs:restriction base=\"xs:string\">\n";
+                for (const std::string& value : attribute.values)
+                {
+                    out << "          <xs:enumeration value=\"" << escaped(value) << "\"/>\n";
+                }
+                out << "        </xs:restriction>\n      </xs:simpleType>\n"
+                    << "    </xs:attribute>\n";
+            }
+        }
+
+        out << "  </xs:complexType>\n";
+    }
+
+    out << "</xs:schema>\n";
+    return out.str();
+}
+
+std::string ALXUISchema::summary() const
+{
+    size_t attributes = 0;
+    size_t elements = 0;
+    for (const Tag& tag : mTags)
+    {
+        attributes += tag.attributes.size();
+        elements += tag.elements.size();
+    }
+
+    std::ostringstream out;
+    out << mTags.size() << " tags, " << attributes << " attributes, "
+        << elements << " parameter elements";
+    return out.str();
+}

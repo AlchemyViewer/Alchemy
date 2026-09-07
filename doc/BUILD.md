@@ -378,6 +378,22 @@ ctest --test-dir <build-dir> --output-on-failure
 
 Unit tests live alongside the library they cover in `indra/<library>/tests/`, written against the TUT (Template Unit Test) framework. Integration tests are in `indra/integration_tests/`.
 
+## Editing XUI
+
+`indra/newview/skins/xui.xsd` is the widget vocabulary: every registered tag, the attributes its parameter block answers to, the parameter elements it takes and the tags valid below it. Point an XML editor at it and a XUI file gets completion and a warning on a name no widget has.
+
+The file is written out of the viewer's own registries, since the viewer is the only place all of them exist: run a developer build, open the XUI tool (Advanced &gt; XUI / Colors &gt; XUI Tool) and press **Schema**. `llui_libtest --schema` writes the same thing for the widgets `llui` registers, which is the part a test in that library can check.
+
+VS Code, with the Red Hat XML extension:
+
+```json
+"xml.fileAssociations": [
+  { "pattern": "**/skins/**/xui/**/*.xml", "systemId": "indra/newview/skins/xui.xsd" }
+]
+```
+
+It is regenerated rather than edited, and it is permissive where XUI is ambiguous. A parameter may be written as an attribute or as a nested element, and a colour, image, font or setting name is a string whose vocabulary lives in another file. Those are for the tool's lint to check, not a schema.
+
 ## Packaging
 
 Release packages are produced by [Velopack](https://velopack.io). The packaging step runs automatically after a successful build when `PACKAGE=ON` (the default). To skip it during development:

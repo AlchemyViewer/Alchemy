@@ -30,7 +30,11 @@ if (USE_KDU)
     target_link_libraries(llui_libtest llkdu)
 endif (USE_KDU)
 
-set_target_properties(llui_libtest PROPERTIES FOLDER "Utils")
+set_target_properties(llui_libtest
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
+    FOLDER "Utils"
+    )
 
 # The app-data directory used to be reached with a relative path guessed from
 # the executable's location, which stopped matching the build layout long ago.
