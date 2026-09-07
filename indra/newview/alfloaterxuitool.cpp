@@ -37,6 +37,7 @@
 #include "llexternaleditor.h"
 #include "llfile.h"
 #include "llfiltereditor.h"
+#include "llfocusmgr.h"
 #include "llimagebmp.h"
 #include "llimagej2c.h"
 #include "llimagejpeg.h"
@@ -184,8 +185,28 @@ public:
                 {
                     drawGuides(view);
                 }
+                const LLRect r = localRectOf(view);
+                drawGrips(r);
+                if (mGrip != GRIP_NONE)
+                {
+                    LLRect dragged(r);
+                    dragged.mLeft += mDelta[EDGE_L];
+                    dragged.mBottom += mDelta[EDGE_B];
+                    dragged.mRight += mDelta[EDGE_R];
+                    dragged.mTop += mDelta[EDGE_T];
+                    gl_rect_2d(dragged, LLColor4::white, false);
+                }
             }
         }
+    }
+
+    bool handleKeyHere(KEY key, MASK mask) override
+    {
+        if (mTool && mTool->nudge(key, mask))
+        {
+            return true;
+        }
+        return LLFloater::handleKeyHere(key, mask);
     }
 
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
@@ -193,18 +214,72 @@ public:
         if (mTool && mRoot && (mask & MASK_CONTROL))
         {
             mTool->canvasSelect(mWhich, hitTest(x, y));
+            setFocus(true);
             return true;
+        }
+
+        // A handle answers before the widget under it does: a button in a
+        // preview is a picture of a button, and its corner is a corner.
+        if (mTool && mRoot)
+        {
+            if (LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
+            {
+                const S32 grip = gripAt(x, y, localRectOf(view), mask);
+                if (grip != GRIP_NONE)
+                {
+                    mGrip = grip;
+                    mDragX = x;
+                    mDragY = y;
+                    for (S32& d : mDelta)
+                    {
+                        d = 0;
+                    }
+                    gFocusMgr.setMouseCapture(this);
+                    setFocus(true);
+                    return true;
+                }
+            }
         }
         return LLFloater::handleMouseDown(x, y, mask);
     }
 
     bool handleHover(S32 x, S32 y, MASK mask) override
     {
+        if (mGrip != GRIP_NONE && hasMouseCapture())
+        {
+            track(x, y);
+            return true;
+        }
         if (mTool && mRoot)
         {
             mTool->canvasHover(mWhich, hitTest(x, y));
         }
         return LLFloater::handleHover(x, y, mask);
+    }
+
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override
+    {
+        if (mGrip != GRIP_NONE && hasMouseCapture())
+        {
+            track(x, y);
+            const S32 grip = mGrip;
+            mGrip = GRIP_NONE;
+            gFocusMgr.setMouseCapture(nullptr);
+            if (mTool && grip != GRIP_NONE)
+            {
+                // One operation for the whole drag, written when the
+                // button comes up rather than on every pixel of it.
+                mTool->canvasDrag(mWhich, mDelta[EDGE_L], mDelta[EDGE_B], mDelta[EDGE_R], mDelta[EDGE_T]);
+            }
+            return true;
+        }
+        return LLFloater::handleMouseUp(x, y, mask);
+    }
+
+    void onMouseCaptureLost() override
+    {
+        mGrip = GRIP_NONE;
+        LLFloater::onMouseCaptureLost();
     }
 
     void onMouseLeave(S32 x, S32 y, MASK mask) override
@@ -217,6 +292,89 @@ public:
     }
 
 private:
+    // The four edges, and the grips that move them: one per edge, one per
+    // corner, and the whole rect while Alt is held, which is also the
+    // modifier that shows what the numbers in the file mean.
+    enum Edge : S32 { EDGE_L, EDGE_B, EDGE_R, EDGE_T, EDGE_COUNT };
+    static constexpr S32 GRIP_NONE = -1;
+    static constexpr S32 GRIP_MOVE = -2;
+
+    static constexpr S32 GRIP_SIZE = 7;
+
+    // The eight squares, as rects in this floater's space.
+    static void gripRects(const LLRect& r, LLRect (&out)[8])
+    {
+        const S32 h = GRIP_SIZE / 2;
+        const S32 mid_x = (r.mLeft + r.mRight) / 2;
+        const S32 mid_y = (r.mBottom + r.mTop) / 2;
+        const S32 xs[8] = { r.mLeft, mid_x, r.mRight, r.mLeft, r.mRight, r.mLeft, mid_x, r.mRight };
+        const S32 ys[8] = { r.mBottom, r.mBottom, r.mBottom, mid_y, mid_y, r.mTop, r.mTop, r.mTop };
+        for (S32 i = 0; i < 8; ++i)
+        {
+            out[i] = LLRect(xs[i] - h, ys[i] + h, xs[i] + h, ys[i] - h);
+        }
+    }
+
+    // Which edges each of the eight moves, in the order gripRects builds
+    // them: the corners move two.
+    static void gripEdges(S32 index, bool (&edges)[EDGE_COUNT])
+    {
+        static const bool table[8][EDGE_COUNT] = {
+            { true,  true,  false, false },     // bottom left
+            { false, true,  false, false },     // bottom
+            { false, true,  true,  false },     // bottom right
+            { true,  false, false, false },     // left
+            { false, false, true,  false },     // right
+            { true,  false, false, true  },     // top left
+            { false, false, false, true  },     // top
+            { false, false, true,  true  },     // top right
+        };
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            edges[i] = table[index][i];
+        }
+    }
+
+    void drawGrips(const LLRect& r) const
+    {
+        LLRect grips[8];
+        gripRects(r, grips);
+        for (const LLRect& grip : grips)
+        {
+            gl_rect_2d(grip, LLColor4::white, true);
+            gl_rect_2d(grip, LLColor4::black, false);
+        }
+    }
+
+    S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
+    {
+        LLRect grips[8];
+        gripRects(r, grips);
+        for (S32 i = 0; i < 8; ++i)
+        {
+            if (grips[i].pointInRect(x, y))
+            {
+                return i;
+            }
+        }
+        return (mask & MASK_ALT) && r.pointInRect(x, y) ? GRIP_MOVE : GRIP_NONE;
+    }
+
+    void track(S32 x, S32 y)
+    {
+        const S32 dx = x - mDragX;
+        const S32 dy = y - mDragY;
+        bool edges[EDGE_COUNT] = { true, true, true, true };
+        if (mGrip != GRIP_MOVE)
+        {
+            gripEdges(mGrip, edges);
+        }
+        mDelta[EDGE_L] = edges[EDGE_L] ? dx : 0;
+        mDelta[EDGE_R] = edges[EDGE_R] ? dx : 0;
+        mDelta[EDGE_B] = edges[EDGE_B] ? dy : 0;
+        mDelta[EDGE_T] = edges[EDGE_T] ? dy : 0;
+    }
+
     // The deepest visible view under a point in this floater's space, and
     // then the nearest one the file describes, since a widget's own
     // children are not what an author is pointing at.
@@ -341,6 +499,11 @@ private:
     ALFloaterXUITool*   mTool;
     LLView*             mRoot = nullptr;
     S32                 mWhich;
+
+    S32                 mGrip = GRIP_NONE;      // the handle the button went down on
+    S32                 mDragX = 0;
+    S32                 mDragY = 0;
+    S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
 };
 
 namespace
@@ -619,6 +782,7 @@ bool ALFloaterXUITool::postBuild()
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
+    mEditTarget = getChild<LLTextBox>("edit_target");
     mStatus = getChild<LLTextBox>("status");
 
     loadState();
@@ -697,9 +861,19 @@ void ALFloaterXUITool::draw()
     if (mReloadPending)
     {
         mReloadPending = false;
-        scanCatalog();
-        showPreviews();
-        setStatus(getString("Reloaded"));
+        if (mReloadEntryOnly)
+        {
+            // The tool wrote one file; the rest of the tree is as it was.
+            mReloadEntryOnly = false;
+            mCatalog.reload(mFile);
+            showPreviews();
+        }
+        else
+        {
+            scanCatalog();
+            showPreviews();
+            setStatus(getString("Reloaded"));
+        }
     }
     if (mTree)
     {
@@ -728,6 +902,16 @@ bool ALFloaterXUITool::handleKeyHere(KEY key, MASK mask)
             copyList(list, list->getAllSelected());
             return true;
         }
+    }
+    // The panes keep their own keys: the hierarchy walks itself with the
+    // arrows and a list scrolls with them, and a list that happens to
+    // ignore one is not asking for a file to be written. The arrows move
+    // the element when the tool itself holds the keyboard, and when the
+    // preview does, which is where they are wanted.
+    const LLFocusableElement* focus = gFocusMgr.getKeyboardFocus();
+    if ((!focus || focus == static_cast<const LLFocusableElement*>(this)) && nudge(key, mask))
+    {
+        return true;
     }
     return LLFloater::handleKeyHere(key, mask);
 }
@@ -1274,6 +1458,13 @@ void ALFloaterXUITool::watchFiles(const ALXUICatalog::Entry& entry)
 
 void ALFloaterXUITool::fileChanged()
 {
+    // The watcher notices the tool's own write too, and that one is
+    // already in hand.
+    if (mSelfWrite)
+    {
+        mSelfWrite = false;
+        return;
+    }
     // The check runs from a timer; the rebuild waits for the next frame.
     mReloadPending = true;
 }
@@ -2361,6 +2552,174 @@ LLView* ALFloaterXUITool::selectedView() const
 
 // The element the selection names, in the most specific layer that has
 // it, which is the one whose values the built view shows.
+// ---------------------------------------------------------------------------
+// Edits
+// ---------------------------------------------------------------------------
+
+// The layer a move is written into: the most specific one that positions
+// the element, since that is the one whose numbers are on screen, and the
+// first that has the element at all when none of them positions it, since
+// that is where a position has to be written.
+const ALXUICatalog::Layer* ALFloaterXUITool::editTarget() const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mSelection.hasSelection())
+    {
+        return nullptr;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    const ALXUICatalog::Layer* base = nullptr;
+    const ALXUICatalog::Layer* target = nullptr;
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+    {
+        const pugi::xml_node node = ALXUICatalog::resolve(layer->root(), mSelection.selection());
+        if (!node)
+        {
+            continue;
+        }
+        if (!base)
+        {
+            base = layer;
+        }
+        for (pugi::xml_attribute attribute : node.attributes())
+        {
+            if (ALXUIEdit::isGeometryAttribute(attribute.name()))
+            {
+                target = layer;
+                break;
+            }
+        }
+    }
+    return target ? target : base;
+}
+
+void ALFloaterXUITool::refreshEditTarget()
+{
+    if (!mEditTarget)
+    {
+        return;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        mEditTarget->setText(getString("EditNoTarget"));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    mEditTarget->setText(getString("EditTarget", args));
+}
+
+// A move or a resize as the movement of the four edges. The near edges
+// are the move, since they are what the file positions from, and what is
+// left over is the size.
+bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
+{
+    if (!dl && !db && !dr && !dt)
+    {
+        return false;
+    }
+    LLView* view = selectedView();
+    if (!view || !view->getParent())
+    {
+        setStatus(getString("EditNoSelection"));
+        return false;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return false;
+    }
+
+    const LLRect& rect = view->getRect();
+    ALXUIEdit::Anchor now;
+    now.left = rect.mLeft;
+    now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+    now.bottom = rect.mBottom;
+    now.width = rect.getWidth();
+    now.height = rect.getHeight();
+    now.topLeft = view->isLayoutTopLeft();
+
+    ALXUIEdit edit;
+    if (!edit.loadFile(layer->path))
+    {
+        setStatus(edit.error());
+        return false;
+    }
+
+    const ALXUISelection::path_t& path = mSelection.selection();
+    const S32 dx = dl;
+    const S32 dy = now.topLeft ? dt : db;
+    const S32 dw = dr - dl;
+    const S32 dh = dt - db;
+    std::vector<std::string> written;
+    if ((dx || dy) && !edit.translate(path, dx, dy, now))
+    {
+        setStatus(edit.error());
+        return false;
+    }
+    written = edit.lastWritten();
+    if ((dw || dh) && !edit.resize(path, dw, dh, now))
+    {
+        setStatus(edit.error());
+        return false;
+    }
+    written.insert(written.end(), edit.lastWritten().begin(), edit.lastWritten().end());
+    if (written.empty() || !edit.save())
+    {
+        setStatus(edit.error());
+        return false;
+    }
+
+    // The rebuild waits for the next frame: this can be the tail of a
+    // mouse-up in the very floater it would take down.
+    mSelfWrite = true;
+    mReloadEntryOnly = true;
+    mReloadPending = true;
+
+    std::string names;
+    for (const std::string& name : written)
+    {
+        names += names.empty() ? name : ", " + name;
+    }
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = names;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    setStatus(getString("EditWrote", args));
+    return true;
+}
+
+void ALFloaterXUITool::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
+{
+    if (which == PRIMARY)
+    {
+        applyEdges(dl, db, dr, dt);
+    }
+}
+
+bool ALFloaterXUITool::nudge(KEY key, MASK mask)
+{
+    if (mask & (MASK_CONTROL | MASK_ALT))
+    {
+        return false;
+    }
+    const S32 step = (mask & MASK_SHIFT) ? 10 : 1;
+    S32 dx = 0;
+    S32 dy = 0;
+    switch (key)
+    {
+    case KEY_LEFT:  dx = -step; break;
+    case KEY_RIGHT: dx = step;  break;
+    case KEY_DOWN:  dy = -step; break;
+    case KEY_UP:    dy = step;  break;
+    default:        return false;
+    }
+    return applyEdges(dx, dy, dx, dy);
+}
+
 pugi::xml_node ALFloaterXUITool::authoredElement(const ALXUICatalog::Layer*& layer) const
 {
     layer = nullptr;
@@ -2400,6 +2759,7 @@ void ALFloaterXUITool::onSelectionChanged()
         mSyncingTree = false;
     }
     refreshBreadcrumb();
+    refreshEditTarget();
     refreshInspectors();
 }
 

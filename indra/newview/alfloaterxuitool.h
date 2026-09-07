@@ -26,6 +26,7 @@
 
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
+#include "alxuiedit.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
 #include "alxuiselection.h"
@@ -80,10 +81,14 @@ public:
     bool handleKeyHere(KEY key, MASK mask) override;
 
     // What a preview host reports: the view under the mouse, a modifier
-    // click, and its own closing.
+    // click, a handle dragged, and its own closing.
     void canvasHover(S32 which, const LLView* view);
     void canvasSelect(S32 which, const LLView* view);
+    void canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt);
     void hostClosed(S32 which);
+
+    // An arrow key moves the selection by a pixel, ten with shift.
+    bool nudge(KEY key, MASK mask);
     bool hoverHighlight() const { return mHoverHighlight; }
     const ALXUISelection& selection() const { return mSelection; }
     LLView* previewRoot(S32 which) const { return mPreviews[which].root; }
@@ -160,6 +165,13 @@ private:
     void capturePreview();
     void writeCapture(const std::vector<std::string>& filenames);
 
+    // --- edits ---------------------------------------------------------------
+    // A move or a resize of the selected element, as the movement of its
+    // four edges, written into the layer that positions it.
+    bool applyEdges(S32 dl, S32 db, S32 dr, S32 dt);
+    const ALXUICatalog::Layer* editTarget() const;
+    void refreshEditTarget();
+
     // --- the selection -------------------------------------------------------
     void onSelectionChanged();
     void onHoverChanged();
@@ -216,6 +228,8 @@ private:
     bool                mShowCodeBuilt = true;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;
+    bool                mReloadEntryOnly = false;   // the tool wrote the file itself
+    bool                mSelfWrite = false;         // and the watcher's notice is that write
     S32                 mLastX = -1;
     S32                 mLastY = -1;
     LLFrameTimer        mStateTimer;
@@ -257,6 +271,7 @@ private:
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
+    LLTextBox*          mEditTarget = nullptr;
     LLTextBox*          mStatus = nullptr;
 
     boost::unordered_map<std::string, LLFolderViewItem*> mRows;

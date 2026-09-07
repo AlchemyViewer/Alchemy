@@ -194,6 +194,31 @@ void ALXUICatalog::scan(const std::string& skins_dir)
               [](const Entry& a, const Entry& b) { return a.name < b.name; });
 }
 
+bool ALXUICatalog::reload(std::string_view name)
+{
+    for (Entry& entry : mEntries)
+    {
+        if (entry.name != name)
+        {
+            continue;
+        }
+        for (Layer& layer : entry.layers)
+        {
+            layer.error.clear();
+            layer.errorLine = 0;
+            layer.doc = std::make_unique<ALXmlDocument>();
+            if (!layer.doc->loadFile(layer.path))
+            {
+                layer.error = layer.doc->errorDescription();
+                layer.errorLine = layer.doc->errorLine();
+                layer.doc.reset();
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 void ALXUICatalog::scanLanguage(const std::string& skin, const std::string& language,
                                 const std::string& dir, const std::string& prefix)
 {

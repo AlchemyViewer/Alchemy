@@ -89,6 +89,10 @@ public:
     void scan(const std::string& skins_dir);
     void clear();
 
+    // Re-read the files of one entry, for when they were written from
+    // here and the whole tree need not be walked again.
+    bool reload(std::string_view name);
+
     const std::vector<Entry>& entries() const { return mEntries; }
     const Entry* find(std::string_view name) const;
 

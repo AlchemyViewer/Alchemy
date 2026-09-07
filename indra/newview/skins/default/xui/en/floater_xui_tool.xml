@@ -21,6 +21,10 @@
     <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>
     <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
     <floater.string name="NoResults">No matches.</floater.string>
+    <floater.string name="EditTarget">Moves write to [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditNoTarget">Select an element to move it.</floater.string>
+    <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
+    <floater.string name="EditWrote">Wrote [ATTRS] to [FILE] in [LAYER]</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <text
@@ -401,6 +405,22 @@
                      name="breadcrumb"
                      top="0"
                      width="360" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="18"
+                 layout="topleft"
+                 name="edit_target_row">
+                    <text
+                     follows="left|top|right"
+                     height="16"
+                     layout="topleft"
+                     left="0"
+                     name="edit_target"
+                     text_color="LabelDisabledColor"
+                     tool_tip="Arrows move the selection a pixel, shift ten; the handles on it resize it and Alt-drag moves it"
+                     top="0"
+                     width="360">Select an element to move it.</text>
                 </layout_panel>
             </layout_stack>
         </layout_panel>
