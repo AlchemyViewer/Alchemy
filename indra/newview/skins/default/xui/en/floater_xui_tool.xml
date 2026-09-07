@@ -28,6 +28,13 @@
     <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
     <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
     <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
+    <floater.string name="TranslateCounts">[TRANSLATED] translated, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
+    <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
+    <floater.string name="TranslateWrote">Wrote [FIELD] into [FILE]</floater.string>
+    <floater.string name="TranslateRepaired">Moved [MOVES] values into place in [FILE]</floater.string>
+    <floater.string name="TranslateRepairedAll">Moved [MOVES] values into place across [FILES] files in [LANG]</floater.string>
+    <floater.string name="TranslateNothingToRepair">Nothing in [FILE] is written at a path the base has moved on from.</floater.string>
+    <floater.string name="TranslateSameLanguage">Choose a language other than the base to translate into.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <text
@@ -639,40 +646,165 @@
          min_dim="60"
          name="findings_area"
          user_resize="true">
-            <scroll_list
-             column_padding="0"
-             draw_heading="true"
-             multi_select="true"
+            <tab_container
              follows="all"
              height="200"
              layout="topleft"
              left="0"
-             name="findings"
-             tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+             name="bottom_tabs"
+             tab_height="20"
+             tab_position="top"
              top="0"
              width="1164">
-                <scroll_list.columns
-                 label=""
-                 name="severity"
-                 tool_tip="error, warning or note"
-                 width="52" />
-                <scroll_list.columns
-                 label="Rule"
-                 name="rule"
-                 width="110" />
-                <scroll_list.columns
-                 label="Line"
-                 name="line"
-                 width="44" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="Where"
-                 name="where" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="What"
-                 name="message" />
-            </scroll_list>
+                <panel
+                 label="Findings"
+                 layout="topleft"
+                 name="findings_pane">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="174"
+                     layout="topleft"
+                     left="0"
+                     name="findings"
+                     tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+                     top="0"
+                     width="1164">
+                        <scroll_list.columns
+                         label=""
+                         name="severity"
+                         tool_tip="error, warning or note"
+                         width="52" />
+                        <scroll_list.columns
+                         label="Rule"
+                         name="rule"
+                         width="110" />
+                        <scroll_list.columns
+                         label="Line"
+                         name="line"
+                         width="44" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Where"
+                         name="where" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="What"
+                         name="message" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Translation"
+                 layout="topleft"
+                 name="translation_pane">
+                    <text
+                     follows="left|top"
+                     height="16"
+                     layout="topleft"
+                     left="0"
+                     name="translate_label"
+                     top="4"
+                     width="58">Language</text>
+                    <combo_box
+                     follows="left|top"
+                     height="22"
+                     layout="topleft"
+                     left_pad="2"
+                     name="translate_language"
+                     tool_tip="The language this table is about, which the second preview shows"
+                     top_delta="-3"
+                     width="56" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Repair file"
+                     layout="topleft"
+                     left_pad="12"
+                     name="translate_repair_file"
+                     tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
+                     top_delta="0"
+                     width="80" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Repair language"
+                     layout="topleft"
+                     left_pad="4"
+                     name="translate_repair_all"
+                     tool_tip="The same over every file this language has"
+                     top_delta="0"
+                     width="110" />
+                    <text
+                     follows="left|top|right"
+                     height="16"
+                     layout="topleft"
+                     left_pad="12"
+                     name="translate_counts"
+                     top_delta="3"
+                     use_ellipses="true"
+                     width="760" />
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     multi_select="true"
+                     follows="all"
+                     height="120"
+                     layout="topleft"
+                     left="0"
+                     name="translate_list"
+                     tool_tip="One row per field a translator writes; double-click selects the element"
+                     top="28"
+                     width="1164">
+                        <scroll_list.columns
+                         label="Where"
+                         name="path"
+                         width="200" />
+                        <scroll_list.columns
+                         label="Field"
+                         name="field"
+                         width="90" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="English"
+                         name="english" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Translation"
+                         name="translation" />
+                        <scroll_list.columns
+                         label="State"
+                         name="state"
+                         width="150" />
+                        <scroll_list.columns
+                         label="Fits"
+                         name="fits"
+                         tool_tip="Whether the translation fits its widget in the second preview"
+                         width="40" />
+                    </scroll_list>
+                    <line_editor
+                     follows="left|right|bottom"
+                     height="22"
+                     layout="topleft"
+                     left="0"
+                     name="translate_value"
+                     select_on_focus="true"
+                     tool_tip="The translation for the selected row; Return writes it into the language's file"
+                     top="152"
+                     width="1080" />
+                    <button
+                     follows="right|bottom"
+                     height="22"
+                     label="Write"
+                     layout="topleft"
+                     left_pad="4"
+                     name="translate_write"
+                     tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
+                     top_delta="0"
+                     width="80" />
+                </panel>
+            </tab_container>
         </layout_panel>
 
     </layout_stack>

@@ -29,6 +29,7 @@
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
 #include "alxuishellbuild.h"
+#include "alxuitranslate.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
@@ -871,6 +872,11 @@ bool ALFloaterXUITool::postBuild()
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
+    mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
+    mTranslateLanguage = getChild<LLComboBox>("translate_language");
+    mTranslateList = getChild<LLScrollListCtrl>("translate_list");
+    mTranslateValue = getChild<LLLineEditor>("translate_value");
+    mTranslateCounts = getChild<LLTextBox>("translate_counts");
     mEditTarget = getChild<LLTextBox>("edit_target");
     mStatus = getChild<LLTextBox>("status");
 
@@ -892,11 +898,19 @@ bool ALFloaterXUITool::postBuild()
 
     // Every table in the tool copies the same way.
     for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mAttributes,
-                                    mLayout, mBindings, mState, mSelectionFindings })
+                                    mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
     {
         watchList(list);
     }
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUITool::refreshInspectors, this));
+    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUITool::fillTranslation, this));
+    mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationLanguage, this));
+    mTranslateList->setCommitOnSelectionChange(true);
+    mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationSelected, this));
+    mTranslateValue->setCommitCallback(boost::bind(&ALFloaterXUITool::onTranslationWrite, this));
+    getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUITool::onTranslationWrite, this));
+    getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairFile, this));
+    getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUITool::startRepairAll, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::closePreviews, this));
@@ -946,6 +960,10 @@ void ALFloaterXUITool::draw()
     if (!mLintQueue.empty())
     {
         stepLintAll();
+    }
+    if (!mRepairQueue.empty())
+    {
+        stepRepairAll();
     }
     if (mReloadPending)
     {
@@ -1043,7 +1061,7 @@ void ALFloaterXUITool::fillSkinsAndLanguages()
     }
     mSkinCombo->setValue(mSkin);
 
-    for (LLComboBox* combo : { mLanguageCombo, mLanguageCombo2 })
+    for (LLComboBox* combo : { mLanguageCombo, mLanguageCombo2, mTranslateLanguage })
     {
         combo->removeall();
         for (const std::string& language : mCatalog.languages())
@@ -1062,6 +1080,7 @@ void ALFloaterXUITool::fillSkinsAndLanguages()
     }
     mLanguageCombo->setValue(mLanguage);
     mLanguageCombo2->setValue(mLanguage2);
+    mTranslateLanguage->setValue(mLanguage2);
 }
 
 // static
@@ -1551,6 +1570,7 @@ void ALFloaterXUITool::showPreview(S32 which)
         args["[SKIN]"] = pv.skin;
         args["[LANG]"] = pv.language;
         setStatus(getString("Built", args));
+        fillTranslation();
         // The selection is a path; it may name something in the new tree.
         onSelectionChanged();
     }
@@ -2471,6 +2491,432 @@ void ALFloaterXUITool::onListAction(const LLSD& param)
     else if (action == "select_all")
     {
         mMenuList->selectAll();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The translation table
+// ---------------------------------------------------------------------------
+const ALXUICatalog::Layer* ALFloaterXUITool::overlayLayer(const ALXUICatalog::Entry& entry,
+                                                          const std::string& language) const
+{
+    // The language's own file in the chosen skin, or in the default skin,
+    // which is the order the merge reads them in.
+    if (const ALXUICatalog::Layer* layer = entry.layer(mSkin, language))
+    {
+        return layer;
+    }
+    return entry.layer("default", language);
+}
+
+// Where a translation for this language goes when the language has no
+// file for it yet: beside the base file, under the language's directory,
+// with a root the merge will match.
+bool ALFloaterXUITool::overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
+                                   std::string& path, bool& created, std::string& error) const
+{
+    created = false;
+    if (const ALXUICatalog::Layer* layer = overlayLayer(entry, language))
+    {
+        path = layer->path;
+        return true;
+    }
+    created = true;
+
+    const ALXUICatalog::Layer* base = entry.layer(mSkin, "en");
+    if (!base)
+    {
+        base = entry.layer("default", "en");
+    }
+    if (!base)
+    {
+        error = "there is no base file to translate";
+        return false;
+    }
+
+    // <skins>/<skin>/xui/<lang>/<name>, which is the base's path with the
+    // language directory changed.
+    const std::string delim = gDirUtilp->getDirDelimiter();
+    const size_t file_at = base->path.find_last_of("/\\");
+    if (file_at == std::string::npos)
+    {
+        error = "the base file is in no directory";
+        return false;
+    }
+    std::string dir = base->path.substr(0, file_at);
+    const std::string tail = base->path.substr(file_at + 1);
+    std::string prefix;
+    if (const size_t widgets_at = dir.find_last_of("/\\"); widgets_at != std::string::npos
+        && dir.substr(widgets_at + 1) == "widgets")
+    {
+        prefix = "widgets";
+        dir = dir.substr(0, widgets_at);
+    }
+    const size_t lang_at = dir.find_last_of("/\\");
+    if (lang_at == std::string::npos)
+    {
+        error = "the base file is in no language directory";
+        return false;
+    }
+    dir = dir.substr(0, lang_at) + delim + language;
+    if (!prefix.empty())
+    {
+        dir += delim + prefix;
+    }
+    if (LLFile::mkdir(dir) != 0 && !gDirUtilp->fileExists(dir))
+    {
+        error = "could not make " + dir;
+        return false;
+    }
+
+    // A file with nothing in it but the root the base names, which is
+    // what the merge matches the whole file on.
+    const pugi::xml_node root = base->root();
+    const std::string text = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>\n<"
+                           + std::string(root.name()) + " name=\"" + root.attribute("name").as_string()
+                           + "\">\n</" + std::string(root.name()) + ">\n";
+    path = dir + delim + tail;
+    return ALXUIEdit::writeFile(path, text, error);
+}
+
+// One row per unit: where it is, which field it is, the English, the
+// language's own, what the merge does with it, and whether it fits in the
+// second preview, which is the language this table is about.
+void ALFloaterXUITool::fillTranslation()
+{
+    mTranslateList->deleteAllItems();
+    mTranslateValue->setText(LLStringUtil::null);
+    mTranslate.clear();
+
+    const std::string language = mTranslateLanguage->getValue().asString();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || language.empty())
+    {
+        mTranslateCounts->setText(getString("TranslateNoFile"));
+        return;
+    }
+    if (language == mLanguage)
+    {
+        mTranslateCounts->setText(getString("TranslateSameLanguage"));
+        return;
+    }
+
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+    if (base_layers.empty())
+    {
+        mTranslateCounts->setText(getString("TranslateNoFile"));
+        return;
+    }
+    const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+    mTranslate.scan(base_layers.front()->root(), overlay ? overlay->root() : pugi::xml_node());
+
+    // What does not fit is known from the second preview, when it is the
+    // language this table is about.
+    const Preview& second = mPreviews[SECONDARY];
+    const bool measured = mShowSecondary && second.root && second.language == language;
+
+    S32 index = 0;
+    for (const ALXUITranslate::Unit& unit : mTranslate.units())
+    {
+        std::string where = ALXUISelection::toString(unit.path);
+        if (where.empty())
+        {
+            where = entry->rootTag;
+        }
+        std::string state;
+        switch (unit.state)
+        {
+        case ALXUITranslate::State::Translated:   state = "translated"; break;
+        case ALXUITranslate::State::Missing:      state = "missing"; break;
+        case ALXUITranslate::State::Placeholders: state = "placeholders differ"; break;
+        case ALXUITranslate::State::Forbidden:    state = "translate=\"false\""; break;
+        case ALXUITranslate::State::NotApplied:
+            switch (unit.miss)
+            {
+            case ALXUITranslate::Miss::Moved:           state = "applies to nothing: moved"; break;
+            case ALXUITranslate::Miss::Absent:          state = "applies to nothing: absent"; break;
+            case ALXUITranslate::Miss::Unnamed:         state = "applies to nothing: unnamed"; break;
+            case ALXUITranslate::Miss::Ambiguous:       state = "applies to nothing: ambiguous"; break;
+            case ALXUITranslate::Miss::AttributeAbsent: state = "applies to nothing: no such field"; break;
+            default:                                    state = "applies to nothing"; break;
+            }
+            break;
+        }
+        std::string fits;
+        if (measured && unit.applies())
+        {
+            fits = "yes";
+            for (const ALXUILint::Finding& f : second.lint.findings())
+            {
+                if (f.rule == ALXUILint::Rule::Truncation && f.path == unit.path)
+                {
+                    fits = "no";
+                    break;
+                }
+            }
+        }
+        mTranslateList->addElement(row(index++, {
+            { "path", where },
+            { "field", unit.field.empty() ? std::string("text") : unit.field },
+            { "english", unit.english },
+            { "translation", unit.translation },
+            { "state", state },
+            { "fits", fits } }));
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[TRANSLATED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Translated));
+    args["[MISSING]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Missing));
+    args["[NOTAPPLIED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::NotApplied));
+    args["[PLACEHOLDERS]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Placeholders));
+    args["[FORBIDDEN]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Forbidden));
+    mTranslateCounts->setText(getString("TranslateCounts", args));
+}
+
+void ALFloaterXUITool::onTranslationSelected()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit& unit = mTranslate.units()[index];
+    mTranslateValue->setText(unit.translation.empty() ? unit.english : unit.translation);
+    if (!unit.path.empty())
+    {
+        mSelection.select(unit.path);
+    }
+}
+
+void ALFloaterXUITool::onTranslationWrite()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit unit = mTranslate.units()[index];
+    const std::string language = mTranslateLanguage->getValue().asString();
+
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+    if (base_layers.empty())
+    {
+        return;
+    }
+
+    std::string path;
+    std::string error;
+    bool created = false;
+    if (!overlayPath(*entry, language, path, created, error))
+    {
+        setStatus(error);
+        return;
+    }
+
+    ALXUIEdit overlay;
+    if (!overlay.loadFile(path))
+    {
+        setStatus(overlay.error());
+        return;
+    }
+    const std::string before = overlay.text();
+    if (!ALXUITranslate::write(overlay, base_layers.front()->root(), unit, mTranslateValue->getText(), error))
+    {
+        setStatus(error);
+        return;
+    }
+    if (!overlay.save())
+    {
+        setStatus(overlay.error());
+        return;
+    }
+
+    mUndoPath = path;
+    mUndoText = before;
+    LLStringUtil::format_map_t args;
+    args["[FIELD]"] = unit.field.empty() ? std::string("the text") : unit.field;
+    args["[FILE]"] = language + "/" + mFile;
+    mPendingStatus = getString("TranslateWrote", args);
+    setStatus(mPendingStatus);
+    if (created)
+    {
+        // A file that did not exist a moment ago is not in the catalog,
+        // and reloading an entry re-reads the layers it already knows:
+        // the second write into a new language would create the file
+        // again over the first.
+        scanCatalog();
+    }
+    else
+    {
+        mCatalog.reload(mFile);
+    }
+    fillTranslation();
+    // The second preview is this language, so it shows what was written.
+    if (mShowSecondary && mLanguage2 == language)
+    {
+        mReloadEntryOnly = true;
+        mReloadPending = true;
+    }
+}
+
+// The language this table is about is the one the second preview shows,
+// so choosing it here turns that preview on.
+void ALFloaterXUITool::onTranslationLanguage()
+{
+    mLanguage2 = mTranslateLanguage->getValue().asString();
+    mLanguageCombo2->setValue(mLanguage2);
+    if (!mShowSecondary && mLanguage2 != mLanguage)
+    {
+        mShowSecondary = true;
+        mSecondaryCheck->setValue(true);
+        mLanguageCombo2->setEnabled(true);
+    }
+    saveState();
+    showPreviews();
+    fillTranslation();
+}
+
+// Every value this file writes at a path the base has moved on from,
+// moved to where the base has it. Nothing else is touched: the value is
+// the language's own, written back where it will be read.
+S32 ALFloaterXUITool::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error)
+{
+    std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+    const ALXUICatalog::Layer* overlay_layer = overlayLayer(entry, language);
+    if (base_layers.empty() || !overlay_layer || !overlay_layer->root())
+    {
+        return 0;
+    }
+
+    ALXUITranslate units;
+    units.scan(base_layers.front()->root(), overlay_layer->root());
+
+    std::vector<ALXUITranslate::Unit> moved;
+    for (const ALXUITranslate::Unit& unit : units.units())
+    {
+        if (unit.state == ALXUITranslate::State::NotApplied && unit.miss == ALXUITranslate::Miss::Moved
+            && !unit.translation.empty() && !unit.path.empty())
+        {
+            moved.push_back(unit);
+        }
+    }
+    if (moved.empty())
+    {
+        return 0;
+    }
+
+    ALXUIEdit overlay;
+    if (!overlay.loadFile(overlay_layer->path))
+    {
+        error = overlay.error();
+        return 0;
+    }
+    S32 done = 0;
+    for (const ALXUITranslate::Unit& unit : moved)
+    {
+        std::string why;
+        if (ALXUITranslate::write(overlay, base_layers.front()->root(), unit, unit.translation, why))
+        {
+            ++done;
+        }
+        else if (error.empty())
+        {
+            error = why;
+        }
+    }
+    if (done && !overlay.save())
+    {
+        error = overlay.error();
+        return 0;
+    }
+    return done;
+}
+
+void ALFloaterXUITool::onRepairFile()
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (!entry || language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    std::string error;
+    const S32 moves = repairFile(*entry, language, error);
+    LLStringUtil::format_map_t args;
+    args["[MOVES]"] = std::to_string(moves);
+    args["[FILE]"] = language + "/" + mFile;
+    setStatus(moves ? getString("TranslateRepaired", args)
+                    : (error.empty() ? getString("TranslateNothingToRepair", args) : error));
+    if (moves)
+    {
+        mCatalog.reload(mFile);
+        fillTranslation();
+    }
+}
+
+// The same over every file the language has, a few per frame so the
+// viewer keeps drawing.
+void ALFloaterXUITool::startRepairAll()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    mRepairQueue.clear();
+    mRepairFiles = 0;
+    mRepairMoves = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        if (overlayLayer(entry, language))
+        {
+            mRepairQueue.push_back(entry.name);
+        }
+    }
+}
+
+void ALFloaterXUITool::stepRepairAll()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    LLTimer timer;
+    while (!mRepairQueue.empty() && timer.getElapsedTimeF32() < 0.015f)
+    {
+        const std::string name = mRepairQueue.front();
+        mRepairQueue.pop_front();
+        if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
+        {
+            std::string error;
+            const S32 moves = repairFile(*entry, language, error);
+            if (moves)
+            {
+                ++mRepairFiles;
+                mRepairMoves += moves;
+                mCatalog.reload(name);
+            }
+        }
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[MOVES]"] = std::to_string(mRepairMoves);
+    args["[FILES]"] = std::to_string(mRepairFiles);
+    args["[LANG]"] = language;
+    setStatus(getString("TranslateRepairedAll", args));
+    if (mRepairQueue.empty())
+    {
+        LL_INFOS("XUITool") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
+                            << mRepairFiles << " files" << LL_ENDL;
+        fillTranslation();
     }
 }
 

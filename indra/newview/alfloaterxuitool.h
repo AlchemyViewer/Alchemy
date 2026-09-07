@@ -31,6 +31,7 @@
 #include "alxuioverlay.h"
 #include "alxuiselection.h"
 #include "alxuisourcemap.h"
+#include "alxuitranslate.h"
 #include "alxuitreemodel.h"
 #include "llfloater.h"
 #include "llframetimer.h"
@@ -170,6 +171,22 @@ private:
     void capturePreview();
     void writeCapture(const std::vector<std::string>& filenames);
 
+    // --- the translation table -----------------------------------------------
+    // One row per field a translator writes, with what the language has
+    // for it and what the merge does with that. Writing a row puts the
+    // value where the merge looks, which is the whole point of the table.
+    void fillTranslation();
+    void onTranslationSelected();
+    void onTranslationWrite();
+    void onTranslationLanguage();
+    const ALXUICatalog::Layer* overlayLayer(const ALXUICatalog::Entry& entry, const std::string& language) const;
+    bool overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
+                     std::string& path, bool& created, std::string& error) const;
+    S32 repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error);
+    void onRepairFile();
+    void startRepairAll();
+    void stepRepairAll();
+
     // --- edits ---------------------------------------------------------------
     // A move or a resize of the selected element, as the movement of its
     // four edges, written into the layer that positions it.
@@ -220,6 +237,7 @@ private:
     LLScrollListCtrl* focusedList() const;
 
     ALXUICatalog        mCatalog;
+    ALXUITranslate      mTranslate;
     ALXUISelection      mSelection;
     ALXUITreeModel      mModel;
     Preview             mPreviews[PREVIEWS];
@@ -251,6 +269,10 @@ private:
     LLHandle<LLView>                mListMenu;
     std::vector<LLScrollListCtrl*>  mLists;
 
+    std::deque<std::string>         mRepairQueue;   // files still to repair
+    S32                             mRepairFiles = 0;
+    S32                             mRepairMoves = 0;
+
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;
     std::map<std::string, S32>      mLintByRule;
@@ -280,6 +302,11 @@ private:
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
+    LLTabContainer*     mBottomTabs = nullptr;
+    LLComboBox*         mTranslateLanguage = nullptr;
+    LLScrollListCtrl*   mTranslateList = nullptr;
+    LLLineEditor*       mTranslateValue = nullptr;
+    LLTextBox*          mTranslateCounts = nullptr;
     LLTextBox*          mEditTarget = nullptr;
     LLTextBox*          mStatus = nullptr;
 
