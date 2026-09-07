@@ -29,6 +29,7 @@
 #include "llxuiparser.h"
 
 #include "alxmldocument.h"
+#include "alxuidiagnostics.h"
 
 #include "llxmlnode.h"
 #include "llfasttimer.h"
@@ -190,16 +191,16 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
         {
             // check for proper nesting against the leading token
             const std::string_view head = child_name.substr(0, first_dot);
-            if (mNameStack.empty())
+            const bool in_scope = mNameStack.empty() ? head == mRootNodeName : mNameStack.back().first == head;
+            if (!in_scope)
             {
-                if (head != mRootNodeName)
+                // Left in the tree for the factory, which will fail to build
+                // it as a widget; a listening sink hears why first.
+                if (ALXUIDiagnostics* sink = ALXUIDiagnostics::active())
                 {
-                    childp = childp->getNextSibling();
-                    continue;
+                    sink->report(ALXUIDiagnostics::Kind::MisScopedElement, mCurReadDepth, mCurFileName,
+                                 childp->getLineNumber(), child_name, mNameStack.empty() ? mRootNodeName : std::string(mNameStack.back().first));
                 }
-            }
-            else if (mNameStack.back().first != head)
-            {
                 childp = childp->getNextSibling();
                 continue;
             }
@@ -279,10 +280,30 @@ S32 LLXUIParser::pushNameTokens(const char* name)
     return pushDottedName(mNameStack, name);
 }
 
+// The name stack as the dotted path a reader can find in the file.
+static std::string name_stack_path(const LLInitParam::Parser::name_stack_t& stack)
+{
+    std::string path;
+    for (const auto& [name, is_new] : stack)
+    {
+        if (!path.empty())
+        {
+            path += '.';
+        }
+        path += name;
+    }
+    return path;
+}
+
 bool LLXUIParser::readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
 {
     bool any_parsed = false;
     bool silent = mCurReadDepth > 0;
+    // With a sink listening, every miss is reported to it with its path and
+    // depth instead of being logged or, past the root, dropped: a miss under
+    // a nested element is the parser's own silence, and a miss under a
+    // child widget is the child's to parse again, and the path says which.
+    ALXUIDiagnostics* sink = ALXUIDiagnostics::active();
 
     for (const auto& [name_entry, attribute_node] : nodep->mAttributes)
     {
@@ -292,7 +313,14 @@ bool LLXUIParser::readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& blo
         S32 num_tokens_pushed = pushNameTokens(attribute_name);
 
         // child nodes are not necessarily valid attributes, so don't complain once we've recursed
-        any_parsed |= block.submitValue(mNameStack, *this, silent);
+        const bool parsed = block.submitValue(mNameStack, *this, silent || sink != nullptr);
+        any_parsed |= parsed;
+        if (!parsed && sink)
+        {
+            const S32 line = attribute_node->getLineNumber() >= 0 ? attribute_node->getLineNumber() : nodep->getLineNumber();
+            sink->report(ALXUIDiagnostics::Kind::UnknownAttribute, mCurReadDepth, mCurFileName, line,
+                         name_stack_path(mNameStack), attribute_name);
+        }
 
         while(num_tokens_pushed-- > 0)
         {
@@ -761,12 +789,24 @@ bool LLXUIParser::writeSDValue(Parser& parser, const void* val_ptr, name_stack_t
 
 void LLXUIParser::parserWarning(const std::string& message)
 {
+    if (ALXUIDiagnostics* sink = ALXUIDiagnostics::active())
+    {
+        sink->report(ALXUIDiagnostics::Kind::ParseWarning, mCurReadDepth, mCurFileName,
+                     mCurReadNode.notNull() ? mCurReadNode->getLineNumber() : -1, name_stack_path(mNameStack), message);
+        return;
+    }
     std::string warning_msg = llformat("%s:\t%s(%d)", message.c_str(), mCurFileName.c_str(), mCurReadNode->getLineNumber());
     Parser::parserWarning(warning_msg);
 }
 
 void LLXUIParser::parserError(const std::string& message)
 {
+    if (ALXUIDiagnostics* sink = ALXUIDiagnostics::active())
+    {
+        sink->report(ALXUIDiagnostics::Kind::ParseError, mCurReadDepth, mCurFileName,
+                     mCurReadNode.notNull() ? mCurReadNode->getLineNumber() : -1, name_stack_path(mNameStack), message);
+        return;
+    }
     std::string error_msg = llformat("%s:\t%s(%d)", message.c_str(), mCurFileName.c_str(), mCurReadNode->getLineNumber());
     Parser::parserError(error_msg);
 }

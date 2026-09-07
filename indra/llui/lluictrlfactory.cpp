@@ -29,6 +29,8 @@
 #define LLUICTRLFACTORY_CPP
 #include "lluictrlfactory.h"
 
+#include "alxuidiagnostics.h"
+
 #include "llxmlnode.h"
 
 #include <fstream>
@@ -128,7 +130,13 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
         {
             // child_node is not a valid child for the current parent
             std::string child_name = std::string(child_node->getName()->mString);
-            if (LLDefaultChildRegistry::instance().getValue(child_name))
+            const bool known_elsewhere = LLDefaultChildRegistry::instance().getValue(child_name) != nullptr;
+            if (ALXUIDiagnostics* sink = ALXUIDiagnostics::active())
+            {
+                sink->report(known_elsewhere ? ALXUIDiagnostics::Kind::InvalidChild : ALXUIDiagnostics::Kind::CreateFailed,
+                             0, instance().getCurFileName(), child_node->getLineNumber(), child_name, node->getName()->mString);
+            }
+            else if (known_elsewhere)
             {
                 // This means that the registry assocaited with the parent widget does not have an entry
                 // for the child widget
