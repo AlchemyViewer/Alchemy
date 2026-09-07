@@ -47,7 +47,8 @@ namespace tut
         S32 applied = 0;
         S32 dropped = 0;
         S32 text = 0;
-        S32 blanked = 0;
+        S32 kept = 0;
+        S32 valueAsText = 0;
         S32 roots = 0;
         S32 refused = 0;
         S32 parsed = 0;
@@ -86,7 +87,12 @@ namespace tut
             add(why == Miss::Unnamed ? "unnamed" : "nosibling", layer, overlay);
         }
         void textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++text; add("text", layer, base); }
-        void textBlanked(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++blanked; add("blanked", layer, base); }
+        void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++kept; add("kept", layer, base); }
+        void valueAppliedAsText(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute) override
+        {
+            ++valueAsText;
+            add("value-as-text", layer, base);
+        }
         void attributeApplied(S32 layer, LLXMLNode* base_attribute, LLXMLNode* overlay_attribute) override
         {
             ++applied;
@@ -106,7 +112,7 @@ namespace tut
 
     struct alxmllayermerge_data
     {
-        // The base: a repeated name among siblings, an element with body
+        // The base: a repeated name among siblings, elements with body
         // text, an unnamed child, and items matched by value.
         static constexpr const char* BASE =
             "<floater name=\"f\" title=\"Title\" width=\"100\">\n"
@@ -115,14 +121,16 @@ namespace tut
             "    <button name=\"b\" label=\"Second\"/>\n"
             "    <text name=\"t\">Base text</text>\n"
             "    <text name=\"u\">Keep me</text>\n"
+            "    <text name=\"w\" font=\"Sans\">Keep me too</text>\n"
             "    <item/>\n"
             "    <combo_box name=\"c\"><item value=\"v1\" label=\"One\"/><item value=\"v2\" label=\"Two\"/></combo_box>\n"
             "  </panel>\n"
             "</floater>\n";
 
         // The overlay: a title, an attribute the base lacks, both repeated
-        // names, text, a value= where the base has body text, a child the
-        // base has nowhere, a child with no name, and one item by value.
+        // names, text, a value= where the base has body text, an element
+        // with an attribute and no text where the base has text, a child
+        // the base has nowhere, a child with no name, and one item by value.
         static constexpr const char* OVERLAY =
             "<floater name=\"f\" title=\"Titel\" extra=\"x\">\n"
             "  <panel name=\"p\">\n"
@@ -130,6 +138,7 @@ namespace tut
             "    <button name=\"b\" label=\"Zweite\"/>\n"
             "    <text name=\"t\">Text</text>\n"
             "    <text name=\"u\" value=\"Wert\"/>\n"
+            "    <text name=\"w\" font=\"Serif\"/>\n"
             "    <text name=\"missing\">Nirgends</text>\n"
             "    <text>Ohne Namen</text>\n"
             "    <combo_box name=\"c\"><item value=\"v2\" label=\"Zwei\"/></combo_box>\n"
@@ -221,10 +230,10 @@ namespace tut
     typedef alxmllayermerge_test::object     alxmllayermerge_object;
     tut::alxmllayermerge_test alxmllayermerge_testgroup("alxmllayermerge");
 
-    // The rules as shipped, one event per decision: repeated names in
-    // order, text overwritten, an attribute the base lacks dropped, a
-    // value= against body text dropped and the text blanked, and two
-    // children that match nothing.
+    // One event per decision: repeated names in order, text overwritten
+    // where the overlay has text and kept where it has none, a value=
+    // against body text applied as the text, an attribute the base lacks
+    // dropped, and two children that match nothing.
     template<> template<>
     void alxmllayermerge_object::test<1>()
     {
@@ -242,23 +251,26 @@ namespace tut
         ensure_equals("text", attr(base, "p/t", "text()"), std::string("Text"));
         ensure_equals("an item by value", attr(base, "p/c/v2", "label"), std::string("Zwei"));
         ensure_equals("the other item is untouched", attr(base, "p/c/v1", "label"), std::string("One"));
-        ensure_equals("value= against body text is dropped", attr(base, "p/u", "value"), std::string("<none>"));
-        ensure_equals("and the text is blanked", attr(base, "p/u", "text()"), std::string(""));
+        ensure_equals("value= against body text becomes the text", attr(base, "p/u", "text()"), std::string("Wert"));
+        ensure_equals("and no value attribute appears", attr(base, "p/u", "value"), std::string("<none>"));
+        ensure_equals("an overlay without text leaves the base's text", attr(base, "p/w", "text()"), std::string("Keep me too"));
+        ensure_equals("while its attribute applies", attr(base, "p/w", "font"), std::string("Serif"));
 
         ensure("the extra attribute was reported dropped", rec.has("dropped 1 extra=x"));
-        ensure("the value= was reported dropped", rec.has("dropped 1 value=Wert"));
-        ensure_equals("two attributes dropped", rec.dropped, 2);
-        ensure("the blanked text was reported", rec.has("blanked 1 text[u]"));
-        ensure_equals("one text blanked", rec.blanked, 1);
+        ensure_equals("one attribute dropped", rec.dropped, 1);
+        ensure("the value= was reported applied as text", rec.has("value-as-text 1 text[u]"));
+        ensure_equals("once", rec.valueAsText, 1);
+        ensure("the kept text was reported", rec.has("kept 1 text[w]"));
+        ensure_equals("one text kept", rec.kept, 1);
         ensure("the missing child was reported", rec.has("nosibling 1 text[missing]"));
         ensure("the unnamed child was reported", rec.has("unnamed 1 text[]"));
         ensure_equals("two children unmatched", rec.unmatched, 2);
-        // p, b, b, t, u, c, and the item: seven matches.
-        ensure_equals("matches", rec.matched, 7);
+        // p, b, b, t, u, w, c, and the item: eight matches.
+        ensure_equals("matches", rec.matched, 8);
         ensure("the second button matched the second base button", rec.has("match 1 button[b]"));
         ensure_equals("texts applied: t", rec.text, 1);
-        // name on f, p, b, b, t, u, c; title; label on b, b; value and label on the item.
-        ensure_equals("attributes applied", rec.applied, 12);
+        // name on f, p, b, b, t, u, w, c; title; label on b, b; font on w; value and label on the item.
+        ensure_equals("attributes applied", rec.applied, 14);
     }
 
     // With no observer the tree comes out the same: a rule that changes

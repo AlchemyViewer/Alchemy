@@ -1,4 +1,4 @@
 root_mismatch 101
 unmatched 5621
-value_dropped 32
-text_blanked 24
+value_dropped 12
+text_blanked 0

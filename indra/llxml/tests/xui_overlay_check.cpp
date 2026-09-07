@@ -72,7 +72,7 @@ namespace
         "files", "orphan_file", "parse_error", "misnested", "misnested_unique", "misnested_outside",
         "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
         "attr_not_in_base", "layout_attr_overridden", "layout_attr_dropped", "placeholder_mismatch",
-        "translated_despite_translate_false", "covered"
+        "translated_despite_translate_false", "covered", "text_kept", "value_as_text"
     };
     constexpr size_t GATED = 4;
 
@@ -319,13 +319,26 @@ namespace
             }
         }
 
-        void textBlanked(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
+        void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
         {
             if (overlay->getFirstChild().isNull())
             {
-                ++mCounts["text_blanked"];
-                std::string value;
-                example("text_blanked", pathOf(base) + (overlay->getAttributeString("value", value) ? " (value= dropped)" : ""));
+                ++mCounts["text_kept"];
+            }
+        }
+
+        void valueAppliedAsText(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute) override
+        {
+            ++mCounts["value_as_text"];
+            if (!mBaseText.empty() && !translateOff(base))
+            {
+                ++mCounts["covered"];
+                if (placeholders(mBaseText) != placeholders(overlay_attribute->getValue()))
+                {
+                    ++mCounts["placeholder_mismatch"];
+                    example("placeholder_mismatch", pathOf(base) + " value: " + trimmed(mBaseText).substr(0, 40)
+                            + " -> " + overlay_attribute->getValue().substr(0, 40));
+                }
             }
         }
 
@@ -481,7 +494,7 @@ namespace
 
     bool writeBaseline(const std::string& path, const counts_t& totals)
     {
-        llofstream out(path);
+        llofstream out(path, std::ios::binary);
         if (!out)
         {
             return false;

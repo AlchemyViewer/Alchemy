@@ -59,10 +59,12 @@ public:
     virtual void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
     virtual void childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why) {}
 
-    // Text: applied from the overlay, or the base's text overwritten by
-    // an overlay that had none.
+    // Text: applied from the overlay; kept from the base when the overlay
+    // has none; or applied from an overlay's value attribute where the
+    // base carries its text in the body.
     virtual void textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
-    virtual void textBlanked(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
+    virtual void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
+    virtual void valueAppliedAsText(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute) {}
 
     // An attribute: applied over the base's, or dropped because the base
     // element has no attribute of that name.
@@ -81,8 +83,10 @@ namespace ALXmlLayerMerge
     // One overlay element over one base element, and their subtrees. The
     // rules: children match by name, or by value when they have no name,
     // and never by tag; the search for a match resumes after the previous
-    // one and wraps once; on a match the text is overwritten and every
-    // attribute present in both is overwritten; an attribute the base
-    // lacks is dropped; a child that matches nothing is dropped.
+    // one and wraps once; on a match, text the overlay has replaces the
+    // base's and text it lacks leaves the base's alone; a value attribute
+    // where the base carries its text in the body is that text; every
+    // other attribute present in both is overwritten; an attribute the
+    // base lacks is dropped; a child that matches nothing is dropped.
     void merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer = 1, ALXmlMergeObserver* observer = nullptr);
 }

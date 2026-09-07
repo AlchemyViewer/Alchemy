@@ -69,19 +69,38 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
         return;
     }
 
-    // The text, whatever the overlay has.
-    if (observer)
+    // The text. What the overlay has in its body replaces the base's. A
+    // value attribute against a base that carries its text in the body is
+    // that text: the two forms say the same thing, and a translator writes
+    // whichever the file had when the translation was made. Text the
+    // overlay lacks in either form leaves the base's alone, since an
+    // element written for its attributes or its children says nothing
+    // about the text.
+    static const LLStringTableEntry* value_entry = gStringTable.addStringEntry("value");
+    LLXMLNodePtr overlay_value;
+    overlay->getAttribute(value_entry, overlay_value, false);
+    const bool text_in_body = hasText(base) && !base->mAttributes.count(value_entry);
+    const bool value_as_text = !hasText(overlay) && text_in_body && overlay_value.notNull() && hasText(overlay_value);
+    if (hasText(overlay))
     {
-        if (hasText(overlay))
+        if (observer)
         {
             observer->textApplied(layer, base, overlay);
         }
-        else if (hasText(base))
-        {
-            observer->textBlanked(layer, base, overlay);
-        }
+        base->setValue(overlay->getValue());
     }
-    base->setValue(overlay->getValue());
+    else if (value_as_text)
+    {
+        if (observer)
+        {
+            observer->valueAppliedAsText(layer, base, overlay_value);
+        }
+        base->setValue(overlay_value->getValue());
+    }
+    else if (hasText(base) && observer)
+    {
+        observer->textKept(layer, base, overlay);
+    }
 
     // Every attribute the base has too.
     for (auto& [name, overlay_attribute] : overlay->mAttributes)
@@ -96,7 +115,7 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
                 observer->attributeApplied(layer, base_attribute, overlay_attribute);
             }
         }
-        else if (observer)
+        else if (observer && !(value_as_text && name == value_entry))
         {
             observer->attributeDropped(layer, base, overlay_attribute);
         }
