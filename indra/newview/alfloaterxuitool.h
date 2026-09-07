@@ -188,6 +188,14 @@ private:
     static LLSD row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells);
     std::string layerLabel(S32 which, S32 layer) const;
 
+    // Every list in the tool is a table someone will want in a message or
+    // a bug report: shift and control extend the selection, and the right
+    // button copies it.
+    void watchList(LLScrollListCtrl* list);
+    void onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask);
+    void onListAction(const LLSD& param);
+    bool onListActionEnabled(const LLSD& param);
+
     ALXUICatalog        mCatalog;
     ALXUISelection      mSelection;
     ALXUITreeModel      mModel;
@@ -209,6 +217,8 @@ private:
     S32                 mSourceLine = 0;
 
     LLPointer<LLImageRaw>           mCapture;       // taken before the picker opens
+    LLScrollListCtrl*               mMenuList = nullptr;    // the list the right button was over
+    LLHandle<LLView>                mListMenu;
 
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;

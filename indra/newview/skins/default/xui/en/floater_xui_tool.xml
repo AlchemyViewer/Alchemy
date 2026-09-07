@@ -217,6 +217,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="426"
                      layout="topleft"
@@ -292,6 +293,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="200"
                      layout="topleft"
@@ -392,6 +394,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="178"
                      layout="topleft"
@@ -450,6 +453,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="640"
                      layout="topleft"
@@ -482,6 +486,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="640"
                      layout="topleft"
@@ -541,6 +546,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="640"
                      layout="topleft"
@@ -569,6 +575,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="640"
                      layout="topleft"
@@ -593,6 +600,7 @@
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
+                     multi_select="true"
                      follows="all"
                      height="640"
                      layout="topleft"

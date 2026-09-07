@@ -586,6 +586,8 @@ ALFloaterXUITool::ALFloaterXUITool(const LLSD& key)
 {
     mCommitCallbackRegistrar.add("XUITool.Tree", boost::bind(&ALFloaterXUITool::onTreeAction, this, _2));
     mEnableCallbackRegistrar.add("XUITool.TreeEnabled", boost::bind(&ALFloaterXUITool::onTreeActionEnabled, this, _2));
+    mCommitCallbackRegistrar.add("XUITool.List", boost::bind(&ALFloaterXUITool::onListAction, this, _2));
+    mEnableCallbackRegistrar.add("XUITool.ListEnabled", boost::bind(&ALFloaterXUITool::onListActionEnabled, this, _2));
 }
 
 ALFloaterXUITool::~ALFloaterXUITool()
@@ -633,6 +635,13 @@ bool ALFloaterXUITool::postBuild()
     mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindResult, this));
     mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUITool::onTreeFilter, this));
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindingSelected, this));
+
+    // Every table in the tool copies the same way.
+    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mAttributes,
+                                    mLayout, mBindings, mState, mSelectionFindings })
+    {
+        watchList(list);
+    }
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUITool::refreshInspectors, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
@@ -1845,6 +1854,68 @@ void ALFloaterXUITool::finishLintAll()
               + " files; the report is " + path);
     LL_INFOS("XUITool") << "lint all: " << mLintFindings << " findings over " << mLintFiles
                         << " files, report at " << path << LL_ENDL;
+}
+
+// A list's rows are a table, and a table is worth copying: the right
+// button offers the selection, all of it, or a way to select all of it.
+// The list itself already knows how to write its rows as comma-separated
+// text, and Control+C reaches the same code through the edit menu.
+void ALFloaterXUITool::watchList(LLScrollListCtrl* list)
+{
+    list->setRightMouseDownCallback(boost::bind(&ALFloaterXUITool::onListRightClick, this, _1, _2, _3, _4));
+}
+
+void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
+{
+    mMenuList = ctrl ? ctrl->as<LLScrollListCtrl>() : nullptr;
+    if (!mMenuList)
+    {
+        return;
+    }
+
+    LLView* menu = mListMenu.get();
+    if (!menu)
+    {
+        menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
+            "menu_xui_tool_list.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
+        if (!menu)
+        {
+            return;
+        }
+        mListMenu = menu->getHandle();
+    }
+    LLMenuGL::showPopup(mMenuList, static_cast<LLContextMenu*>(menu), x, y);
+}
+
+bool ALFloaterXUITool::onListActionEnabled(const LLSD& param)
+{
+    return mMenuList && mMenuList->getFirstSelected() != nullptr;
+}
+
+void ALFloaterXUITool::onListAction(const LLSD& param)
+{
+    if (!mMenuList)
+    {
+        return;
+    }
+    const std::string action = param.asString();
+    if (action == "copy")
+    {
+        mMenuList->copy();
+    }
+    else if (action == "select_all")
+    {
+        mMenuList->selectAll();
+    }
+    else if (action == "copy_all")
+    {
+        std::string text;
+        for (const LLScrollListItem* item : mMenuList->getAllData())
+        {
+            text += item->getContentsCSV() + "\n";
+        }
+        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
+    }
 }
 
 void ALFloaterXUITool::runLint()
