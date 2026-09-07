@@ -33,6 +33,7 @@
 #include "llbutton.h"
 #include "lldraghandle.h"
 #include "llfontgl.h"
+#include "llfontregistry.h"
 #include "llresizebar.h"
 #include "llresizehandle.h"
 #include "lltextbox.h"
@@ -461,7 +462,12 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
 
         if (name == "font")
         {
-            if (!LLFontGL::getFontByName(value))
+            // The two steps the font parameter takes, in its order: the
+            // four legacy names, then the registry by descriptor, which
+            // is what every name in fonts.xml answers to. Asking only the
+            // first calls every shipped font dangling.
+            if (!LLFontGL::getFontByName(value)
+                && !LLFontGL::getFont(LLFontDescriptor(value, LLStringUtil::null, 0)))
             {
                 add(Rule::DanglingFont, Severity::Warning, path, input.file, line, name,
                     "no font is named \"" + value + "\"");

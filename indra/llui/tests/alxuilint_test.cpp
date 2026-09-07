@@ -260,6 +260,17 @@ namespace tut
             ensure_equals("dangling font: " + run.describe(), run.count(ALXUILint::Rule::DanglingFont), 1);
         }
         {
+            // The names every shipped file uses answer to the registry
+            // rather than to the four legacy ones.
+            Run run;
+            ensure("builds", run.build(
+                "  <panel name=\"a\" font=\"SansSerif\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>\n"
+                "  <panel name=\"b\" font=\"SansSerifSmall\" left=\"0\" top=\"30\" width=\"90\" height=\"20\"/>\n"
+                "  <panel name=\"c\" font=\"Monospace\" left=\"0\" top=\"60\" width=\"90\" height=\"20\"/>"));
+            ensure_equals("a font fonts.xml declares is not dangling: " + run.describe(),
+                          run.count(ALXUILint::Rule::DanglingFont), 0);
+        }
+        {
             Run run;
             ensure("builds", run.build(
                 "  <panel name=\"a\" bg_opaque_color=\"NoSuchColour\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>"));
