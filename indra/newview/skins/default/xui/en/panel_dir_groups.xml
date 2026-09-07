@@ -110,7 +110,7 @@
      width="336">
         <column label="" name="icon" width="24" sort="score" sort_ascending="false" />
         <column label="" name="type" width="-1" />
-        <column label="Name" name="name" dynamicwidth="true" />
+        <column label="Name" name="name" dynamic_width="true" />
         <column label="Members" name="members" width="100" halign="left" sort_ascending="false" />
         <column label="" name="score" width="-1"/>
     </scroll_list>

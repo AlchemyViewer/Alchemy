@@ -21,7 +21,7 @@
          search_column="0"
          right="-10"
          bottom="140">
-            <scroll_list.columns dynamicwidth="true" name="text" label="text" />
+            <scroll_list.columns dynamic_width="true" name="text" label="text" />
             <scroll_list.columns name="state" label="state" width="35" />
         </scroll_list>
         <combo_box

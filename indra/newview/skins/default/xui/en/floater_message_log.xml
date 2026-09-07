@@ -54,7 +54,7 @@
        search_column="0"
        right="-10"
        height="100">
-        <scroll_list.columns dynamicwidth="true" name="text" label="text" />
+        <scroll_list.columns dynamic_width="true" name="text" label="text" />
         <scroll_list.columns name="icon0" label="icon0" width="12" />
         <scroll_list.columns name="icon1" label="icon1" width="12" />
         <scroll_list.columns name="icon2" label="icon2" width="12" />

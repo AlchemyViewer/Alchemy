@@ -33,7 +33,7 @@
    right="-4"
    bottom="-50">
     <column name="time" width="50" label="Time" />
-    <column name="name" dynamicwidth="true" label="Name" />
+    <column name="name" dynamic_width="true" label="Name" />
     <column name="amount" width="70" label="Amount" />
   </scroll_list>
     <text
