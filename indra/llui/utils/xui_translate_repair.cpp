@@ -29,7 +29,10 @@
 // and listed, because a machine cannot know which one was meant.
 //
 //   xui_translate_repair <skins_dir> <language> [--skin default] [--dry-run]
-//                        [--file <name>] [--quiet]
+//                        [--file <name>] [--quiet] [--report]
+//
+// --report lists what it leaves behind and why, which is the list of
+// things the base has to be fixed for.
 
 #include "linden_common.h"
 
@@ -62,7 +65,18 @@ namespace
         std::string file;
         bool dry_run = false;
         bool quiet = false;
+        bool report = false;
     };
+
+    std::string joined(const std::vector<std::string>& path)
+    {
+        std::string text;
+        for (const std::string& step : path)
+        {
+            text += text.empty() ? step : "/" + step;
+        }
+        return text;
+    }
 
     // What the repair leaves behind for a person: a name the base has at
     // more than one path, and a name it repeats among siblings, which an
@@ -109,6 +123,7 @@ int main(int argc, char** argv)
         const std::string arg = argv[i];
         if (arg == "--dry-run")         { options.dry_run = true; }
         else if (arg == "--quiet")      { options.quiet = true; }
+        else if (arg == "--report")     { options.report = true; }
         else if (arg == "--skin" && i + 1 < argc)   { options.skin = argv[++i]; }
         else if (arg == "--base" && i + 1 < argc)   { options.base = argv[++i]; }
         else if (arg == "--file" && i + 1 < argc)   { options.file = argv[++i]; }
@@ -157,6 +172,35 @@ int main(int argc, char** argv)
         ALXUITranslate units;
         units.scan(base, overlay_layer->root());
         ambiguous += countByHand(units);
+
+        if (options.report)
+        {
+            for (const ALXUITranslate::Unit& unit : units.units())
+            {
+                if (unit.state != ALXUITranslate::State::NotApplied)
+                {
+                    continue;
+                }
+                const bool repeats = joined(unit.path).find('#') != std::string::npos;
+                if (unit.miss == ALXUITranslate::Miss::Ambiguous)
+                {
+                    std::cout << "  ambiguous  " << entry.name << ": " << joined(unit.path)
+                              << " @" << (unit.field.empty() ? "text" : unit.field)
+                              << " (the base has that name at more than one path)\n";
+                }
+                else if (unit.miss == ALXUITranslate::Miss::Moved && repeats)
+                {
+                    std::cout << "  repeated   " << entry.name << ": " << joined(unit.path)
+                              << " @" << (unit.field.empty() ? "text" : unit.field)
+                              << " (the base repeats that name among siblings)\n";
+                }
+                else if (unit.miss == ALXUITranslate::Miss::Unnamed)
+                {
+                    std::cout << "  unnamed    " << entry.name << ": " << unit.where
+                              << " @" << (unit.field.empty() ? "text" : unit.field) << "\n";
+                }
+            }
+        }
 
         ALXUIEdit overlay;
         if (!overlay.loadFile(overlay_layer->path))

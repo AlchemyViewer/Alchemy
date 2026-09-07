@@ -205,6 +205,55 @@ namespace
     }
 }
 
+// Where the language put an element, looked for under the deepest
+// ancestor of its path that the file actually has, and only then wider.
+// A name like "2" on a combo box item, or "message" in a notification,
+// means one thing under its parent and a dozen things across a file: a
+// search that starts at the root calls those ambiguous and gives up,
+// when the answer was one level down all along.
+static pugi::xml_node findFor(const ALXUIEdit& overlay, pugi::xml_node base,
+                              const std::vector<std::string>& path,
+                              std::string_view name, bool& ambiguous, bool& claimed)
+{
+    ambiguous = false;
+    claimed = false;
+    if (name.empty())
+    {
+        return pugi::xml_node();
+    }
+    for (size_t depth = path.size(); depth-- > 0;)
+    {
+        const std::vector<std::string> ancestor(path.begin(), path.begin() + depth);
+        const pugi::xml_node under = ancestor.empty() ? overlay.root() : overlay.resolve(ancestor);
+        if (!under)
+        {
+            continue;
+        }
+        bool several = false;
+        pugi::xml_node found = findByName(under, name, several);
+        if (several)
+        {
+            ambiguous = true;
+            return pugi::xml_node();
+        }
+        if (!found)
+        {
+            continue;
+        }
+        // A name that means one thing here can mean another somewhere
+        // else: an element already sitting where the base has one of that
+        // name is that one, and taking it would be a theft and not a
+        // repair.
+        if (base && ALXUICatalog::resolve(base, ALXUICatalog::namePath(found, /*any_tag=*/true), /*any_tag=*/true))
+        {
+            claimed = true;
+            return pugi::xml_node();
+        }
+        return found;
+    }
+    return pugi::xml_node();
+}
+
 // static
 bool ALXUITranslate::isTranslatableField(std::string_view name)
 {
@@ -500,7 +549,7 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
 // or it is not there at all.
 // static
 bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& unit,
-                           const std::string& text, std::string& error)
+                           const std::string& text, std::string& error, bool create_when_absent)
 {
     if (text.empty())
     {
@@ -542,10 +591,25 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
     if (!unit.path.empty() && !overlay.resolve(unit.path))
     {
         bool ambiguous = false;
-        pugi::xml_node moved = name.empty() ? pugi::xml_node() : findByName(overlay.root(), name, ambiguous);
-        if (moved && ambiguous)
+        bool claimed = false;
+        pugi::xml_node moved = findFor(overlay, base, unit.path, name, ambiguous, claimed);
+        if (ambiguous)
         {
             error = "the language writes " + name + " at more than one path; move it by hand";
+            return false;
+        }
+        if (claimed)
+        {
+            error = "the base has " + name + " at more than one path and the language has one of them"
+                    "; which it meant is a person's to say";
+            return false;
+        }
+        if (!moved && !create_when_absent)
+        {
+            // A repair moves what the language wrote. When it cannot be
+            // found, writing it again would put a second copy of a value
+            // the file already has somewhere into it.
+            error = "could not find what the language wrote for " + name;
             return false;
         }
         // The path is read before the chain is written: the insertion
@@ -648,7 +712,7 @@ S32 ALXUITranslate::movePass(ALXUIEdit& overlay, pugi::xml_node base, std::strin
     for (const Unit& unit : moved)
     {
         std::string why;
-        if (write(overlay, base, unit, unit.translation, why))
+        if (write(overlay, base, unit, unit.translation, why, /*create_when_absent=*/false))
         {
             ++done;
         }
@@ -751,9 +815,9 @@ bool ALXUITranslate::ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const 
         // the merge has to guess about, which is the thing this repair
         // exists to stop.
         bool ambiguous = false;
-        pugi::xml_node elsewhere = name.empty() ? pugi::xml_node()
-                                                : findByName(overlay.root(), name, ambiguous);
-        if (elsewhere && ambiguous)
+        bool claimed = false;
+        pugi::xml_node elsewhere = findFor(overlay, base, so_far, name, ambiguous, claimed);
+        if (ambiguous)
         {
             error = "the language names " + name + " more than once; move it by hand";
             return false;

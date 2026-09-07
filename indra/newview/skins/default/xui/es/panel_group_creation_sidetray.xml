@@ -28,11 +28,13 @@
 				<check_box name="check_enrollment_fee" label="Costo para unirse" tool_tip="Establece si debe solicitar un costo para el unirse al grupo"/>
 				<check_box name="open_enrollement" label="Cualquiera se puede unir" tool_tip="Establece si este grupo permite que se unan nuevos miembros sin ser invitados."/>
 			</panel>
+			<panel name="group_info_top">
+				<text_editor name="charter">Reglas del grupo</text_editor>
+				<texture_picker name="insignia" tool_tip="Haz click para seleccionar una fotografía"/>
+			</panel>
 		</layout_panel>
 	</layout_stack>
 	<panel name="group_info_top">
 		<line_editor name="group_name_editor" label="Escribe el nuevo nombre de tu grupo aquí"/>
-		<text_editor name="charter">Reglas del grupo</text_editor>
-		<texture_picker name="insignia" tool_tip="Haz click para seleccionar una fotografía"/>
 	</panel>
 </panel>

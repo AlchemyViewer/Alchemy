@@ -115,8 +115,12 @@ public:
     // It writes no layout attribute, no attribute the base element does
     // not carry, nothing under translate="false" and no empty text: the
     // four ways an overlay is broken by writing it.
+    // create_when_absent is what a person typing a translation wants and
+    // what a repair must not do: a repair moves what the language wrote,
+    // and writing it again where it cannot be found puts a second copy of
+    // it into the file.
     static bool write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& unit,
-                      const std::string& text, std::string& error);
+                      const std::string& text, std::string& error, bool create_when_absent = true);
 
     // Every value the language writes at a path the base has moved on
     // from, moved to where the base has it, with its own text unchanged.
