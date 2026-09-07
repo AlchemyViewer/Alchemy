@@ -104,6 +104,7 @@ namespace ll_test
             LLUI::settings_map_t settings;
             settings["config"] = &mConfig;
             settings["floater"] = &mConfig;
+            settings["account"] = &mConfig;
             settings["ignores"] = &mConfig;
             LLUI::createInstance(settings, nullptr, nullptr, nullptr);
 
