@@ -152,6 +152,10 @@ private:
     void finishLintAll();
     S32 lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines);
 
+    // The preview as a PNG, which is what a review of a translation
+    // needs without the viewer.
+    void capturePreview();
+
     // --- the selection -------------------------------------------------------
     void onSelectionChanged();
     void onHoverChanged();

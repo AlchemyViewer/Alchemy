@@ -133,6 +133,16 @@
      tool_tip="Check every file in the catalog, a few per frame, and write a report beside the log"
      top_delta="0"
      width="66" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Capture"
+     layout="topleft"
+     left_pad="4"
+     name="capture_btn"
+     tool_tip="Write the preview to a PNG beside the log, as it stands on screen"
+     top_delta="0"
+     width="66" />
     <check_box
      follows="left|top"
      height="16"

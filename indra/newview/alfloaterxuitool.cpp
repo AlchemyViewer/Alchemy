@@ -37,6 +37,7 @@
 #include "llexternaleditor.h"
 #include "llfile.h"
 #include "llfiltereditor.h"
+#include "llimagepng.h"
 #include "llfolderview.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -52,6 +53,7 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+#include "llviewerwindow.h"
 
 #include <algorithm>
 #include <set>
@@ -635,6 +637,7 @@ bool ALFloaterXUITool::postBuild()
     getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
     getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showGallery, this));
     getChild<LLButton>("lint_all_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startLintAll, this));
+    getChild<LLButton>("capture_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::capturePreview, this));
 
     LLCheckBoxCtrl* hover = getChild<LLCheckBoxCtrl>("hover_check");
     hover->setValue(mHoverHighlight);
@@ -1550,6 +1553,77 @@ void ALFloaterXUITool::onTreeAction(const LLSD& param)
     {
         item->toggleShown();
     }
+}
+
+// The preview as it stands on screen, cropped out of a snapshot of the
+// window with the UI drawn. The preview is brought to the front first,
+// since what is over it is what would be captured.
+void ALFloaterXUITool::capturePreview()
+{
+    LLFloater* host = mPreviews[PRIMARY].host.get();
+    if (!host)
+    {
+        setStatus(getString("NoFile"));
+        return;
+    }
+    host->setFrontmost(false);
+
+    const S32 window_width = gViewerWindow->getWindowWidthRaw();
+    const S32 window_height = gViewerWindow->getWindowHeightRaw();
+    LLPointer<LLImageRaw> shot = new LLImageRaw;
+    if (!gViewerWindow->rawSnapshot(shot, window_width, window_height, /*keep_window_aspect=*/true,
+                                    /*is_texture=*/false, /*show_ui=*/true, /*show_hud=*/false))
+    {
+        setStatus("The window would not give a snapshot.");
+        return;
+    }
+
+    // The floater's rect in the window, in the snapshot's own scale: a
+    // snapshot may come back at a different size than the window.
+    const LLRect screen = host->calcScreenRect();
+    const F32 scale_x = (F32)shot->getWidth() / (F32)llmax(1, gViewerWindow->getWindowWidthScaled());
+    const F32 scale_y = (F32)shot->getHeight() / (F32)llmax(1, gViewerWindow->getWindowHeightScaled());
+    const S32 left = llclamp((S32)(screen.mLeft * scale_x), 0, shot->getWidth());
+    const S32 right = llclamp((S32)(screen.mRight * scale_x), left, shot->getWidth());
+    const S32 bottom = llclamp((S32)(screen.mBottom * scale_y), 0, shot->getHeight());
+    const S32 top = llclamp((S32)(screen.mTop * scale_y), bottom, shot->getHeight());
+    const S32 width = right - left;
+    const S32 height = top - bottom;
+    if (width <= 0 || height <= 0)
+    {
+        setStatus("The preview is off screen.");
+        return;
+    }
+
+    // Row zero of the snapshot is the bottom of the window, which is
+    // where the rect's bottom is too.
+    const U8 components = shot->getComponents();
+    LLPointer<LLImageRaw> cropped = new LLImageRaw(width, height, components);
+    for (S32 row = 0; row < height; ++row)
+    {
+        memcpy(cropped->getData() + (size_t)row * width * components,
+               shot->getData() + ((size_t)(bottom + row) * shot->getWidth() + left) * components,
+               (size_t)width * components);
+    }
+
+    std::string name = mFile;
+    for (char& c : name)
+    {
+        if (c == '/' || c == '\\' || c == '.')
+        {
+            c = '_';
+        }
+    }
+    const std::string path = gDirUtilp->getExpandedFilename(
+        LL_PATH_LOGS, name + "_" + mPreviews[PRIMARY].skin + "_" + mPreviews[PRIMARY].language + ".png");
+
+    LLPointer<LLImagePNG> png = new LLImagePNG;
+    if (!png->encode(cropped, 0.f) || !png->save(path))
+    {
+        setStatus("Could not write " + path);
+        return;
+    }
+    setStatus("Captured " + std::to_string(width) + " by " + std::to_string(height) + " to " + path);
 }
 
 // Every file in the catalog, checked a few per frame. The status line
