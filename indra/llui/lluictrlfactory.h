@@ -99,6 +99,30 @@ class LLWidgetBlockRegistry
     LLSINGLETON_EMPTY_CTOR(LLWidgetBlockRegistry);
 };
 
+// The two things the schema reads about a tag: the block it builds from and
+// the tags valid below it. A widget in a child registry records them where
+// it registers. A root has no such moment -- a floater is never below
+// anything, so no child registry names it -- and says so here instead.
+template <typename T>
+void registerWidgetSchema(const char* tag)
+{
+    if (!LLWidgetBlockRegistry::instance().exists(tag))
+    {
+        LLWidgetBlockRegistry::instance().defaultRegistrar()
+            .add(tag, &get_empty_param_block<typename T::Params>);
+        LLChildRegistryRegistry::instance().defaultRegistrar()
+            .add(tag, &T::child_registry_t::instance());
+    }
+}
+
+// One of these as a file-scope static is how a root tag registers.
+template <typename T>
+class LLWidgetSchemaRegistrar
+{
+public:
+    explicit LLWidgetSchemaRegistrar(const char* tag) { registerWidgetSchema<T>(tag); }
+};
+
 // Build time optimization, generate this once in .cpp file
 #ifndef LLUICTRLFACTORY_CPP
 extern template class LLUICtrlFactory* LLSimpleton<class LLUICtrlFactory>::getInstance();
@@ -393,17 +417,11 @@ LLChildRegistry<DERIVED>::Register<T>::Register(const char* tag, LLWidgetCreator
         LLUICtrlFactory::registerWidgetTag(&T::sViewType, tag);
     }
 
-    // What the schema reads: the block a tag builds from, and the tags that
-    // may appear below it. Both depend on T, so both are recorded here,
-    // which is the last place T is known. A widget registered under more
-    // than one registry answers to the same tag each time, so the first
-    // registration is the one that stands.
-    typedef typename T::child_registry_t registry_t;
-    if (!LLWidgetBlockRegistry::instance().exists(tag))
-    {
-        LLWidgetBlockRegistry::instance().defaultRegistrar().add(tag, &get_empty_param_block<typename T::Params>);
-        LLChildRegistryRegistry::instance().defaultRegistrar().add(tag, &registry_t::instance());
-    }
+    // What the schema reads, recorded here because this is the last place T
+    // is known. A widget registered under more than one registry answers to
+    // the same tag each time, so the first registration is the one that
+    // stands.
+    registerWidgetSchema<T>(tag);
 }
 
 #endif //LLUICTRLFACTORY_H

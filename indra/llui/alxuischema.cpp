@@ -129,6 +129,21 @@ namespace
         tag.attributes.push_back(std::move(attribute));
     }
 
+    // The two spellings of a parameter written as an element. Under <panel>,
+    // <panel.string> says which block the name belongs to; <string> is read
+    // the same way, because a child whose tag is not a widget is taken for a
+    // parameter of the element it is under. Both are legal, so both are here.
+    void addElements(ALXUISchema::Tag& tag, const std::string& name,
+                     const LLInitParam::ParamDescriptor& descriptor, bool top_level)
+    {
+        if (!top_level)
+        {
+            return;
+        }
+        tag.elements.push_back({ tag.name + "." + name, descriptor.mMinCount, descriptor.mMaxCount });
+        tag.elements.push_back({ name, descriptor.mMinCount, descriptor.mMaxCount });
+    }
+
     void flatten(const LLInitParam::BlockDescriptor& block,
                  const std::string& prefix,
                  S32 depth,
@@ -153,17 +168,12 @@ namespace
                 break;
 
             case ALParamType::MULTIPLE_SCALAR:
-                tag.elements.push_back({ tag.name + "." + name,
-                                         named.second->mMinCount, named.second->mMaxCount });
+                addElements(tag, name, *named.second, prefix.empty());
                 break;
 
             case ALParamType::BLOCK:
             case ALParamType::MULTIPLE_BLOCK:
-                if (prefix.empty())
-                {
-                    tag.elements.push_back({ tag.name + "." + name,
-                                             named.second->mMinCount, named.second->mMaxCount });
-                }
+                addElements(tag, name, *named.second, prefix.empty());
                 if (type->mBlock)
                 {
                     if (const std::optional<ALParamType> direct = directValue(*type->mBlock))
@@ -217,7 +227,7 @@ namespace
         case ALParamType::BOOLEAN:  return "xs:boolean";
         case ALParamType::INTEGER:  return "xs:integer";
         case ALParamType::UNSIGNED: return "xs:nonNegativeInteger";
-        case ALParamType::REAL:     return "xs:decimal";
+        case ALParamType::REAL:     return "al_real";
         default:                    return "xs:string";
         }
     }
@@ -246,14 +256,14 @@ const ALXUISchema& ALXUISchema::get()
 
 void ALXUISchema::build()
 {
-    const LLWidgetBlockRegistry& blocks = LLWidgetBlockRegistry::instance();
-    for (auto it = blocks.defaultRegistrar().beginItems(); it != blocks.defaultRegistrar().endItems(); ++it)
+    LLWidgetBlockRegistry::instance().forEachItem(
+        [this](const std::string& name, empty_param_block_func_t defaults)
     {
         Tag tag;
-        tag.name = it->first;
+        tag.name = name;
 
         // Asking for the block is what builds its table.
-        const LLInitParam::BaseBlock& block = (*it->second)();
+        const LLInitParam::BaseBlock& block = (*defaults)();
         const LLInitParam::BlockDescriptor& descriptor = block.mostDerivedBlockDescriptor();
 
         flatten(descriptor, std::string(), MAX_NESTING, tag);
@@ -264,11 +274,10 @@ void ALXUISchema::build()
         {
             if (*children)
             {
-                for (auto child = (*children)->defaultRegistrar().beginItems();
-                     child != (*children)->defaultRegistrar().endItems(); ++child)
+                (*children)->forEachItem([&tag](const std::string& child, const LLWidgetCreatorFunc&)
                 {
-                    tag.children.push_back(child->first);
-                }
+                    tag.children.push_back(child);
+                });
             }
         }
 
@@ -289,8 +298,20 @@ void ALXUISchema::build()
                            tag.elements.end());
         std::sort(tag.children.begin(), tag.children.end());
 
+        // A name that is both a tag and a parameter is read as the parameter,
+        // since the parser only takes a child for a widget once the block has
+        // refused it. The element form is the permissive one, so it wins.
+        tag.children.erase(std::remove_if(tag.children.begin(), tag.children.end(),
+                                          [&tag](const std::string& child)
+                                          {
+                                              return std::any_of(tag.elements.begin(), tag.elements.end(),
+                                                                 [&child](const Element& e)
+                                                                 { return e.name == child; });
+                                          }),
+                           tag.children.end());
+
         mTags.push_back(std::move(tag));
-    }
+    });
 
     std::sort(mTags.begin(), mTags.end(), [](const Tag& a, const Tag& b) { return a.name < b.name; });
     for (size_t i = 0; i < mTags.size(); ++i)
@@ -336,12 +357,23 @@ std::string ALXUISchema::asXSD() const
         << "  whose vocabulary lives in another file. Nothing here can say\n"
         << "  \"one of these two spellings\", so nothing here tries; the tool's\n"
         << "  lint is where those are checked.\n"
+        << "\n"
+        << "  Nothing is required, not even a parameter the block declares\n"
+        << "  Mandatory: a widget's template in widgets/ supplies values the\n"
+        << "  file then leaves out, and no schema can see that layer.\n"
         << "-->\n"
         << "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\""
         << " elementFormDefault=\"qualified\">\n"
         << "\n  <!-- A parameter element: its own leaves are the attributes of\n"
         << "       the tag that owns it, written with dots, so there is nothing\n"
         << "       left here to check. -->\n"
+        << "\n  <!-- A number as XUI writes one, which is as C writes one: the\n"
+        << "       literals carry a float suffix, bar_max=\"100.f\". -->\n"
+        << "  <xs:simpleType name=\"al_real\">\n"
+        << "    <xs:restriction base=\"xs:string\">\n"
+        << "      <xs:pattern value=\"[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?[fF]?\"/>\n"
+        << "    </xs:restriction>\n"
+        << "  </xs:simpleType>\n"
         << "  <xs:complexType name=\"al_any\" mixed=\"true\">\n"
         << "    <xs:sequence>\n"
         << "      <xs:any minOccurs=\"0\" maxOccurs=\"unbounded\" processContents=\"skip\"/>\n"
@@ -385,10 +417,6 @@ std::string ALXUISchema::asXSD() const
         for (const Attribute& attribute : tag.attributes)
         {
             out << "    <xs:attribute name=\"" << escaped(attribute.name) << "\"";
-            if (attribute.required)
-            {
-                out << " use=\"required\"";
-            }
             if (attribute.values.empty())
             {
                 out << " type=\"" << xsdType(attribute.value) << "\"/>\n";

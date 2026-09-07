@@ -30,6 +30,7 @@
 // it, so the tags below are in the schema this binary builds.
 #include "../llbutton.h"
 #include "../llcombobox.h"
+#include "../llfloater.h"
 #include "../lllineeditor.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
@@ -63,12 +64,25 @@ namespace tut
         {
             LLButton::Params button;
             LLComboBox::Params combo;
+            LLFloater::Params floater;
             LLLineEditor::Params line;
             LLPanel::Params panel;
             (void)button.name;
             (void)combo.name;
+            (void)floater.name;
             (void)line.name;
             (void)panel.name;
+        }
+
+        static bool hasElement(const ALXUISchema::Tag& tag, const char* name)
+        {
+            return std::any_of(tag.elements.begin(), tag.elements.end(),
+                               [name](const ALXUISchema::Element& e) { return e.name == name; });
+        }
+
+        static bool hasChild(const ALXUISchema::Tag& tag, const char* name)
+        {
+            return std::find(tag.children.begin(), tag.children.end(), name) != tag.children.end();
         }
 
         const ALXUISchema& schema() { return ALXUISchema::get(); }
@@ -230,5 +244,90 @@ namespace tut
                    schema().tag(child.attribute("name").as_string()) != nullptr);
         }
         ensure_equals("one global element per tag", elements, schema().tags().size());
+    }
+
+    // A registry of widgets valid below a tag is filled by static registrars,
+    // and each of those files into a scope of the registry's own rather than
+    // into its default registrar. Reading only the default registrar said
+    // every widget in the tree may contain nothing at all.
+    template<> template<>
+    void alxuischema_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const ALXUISchema::Tag* panel = schema().tag("panel");
+        ensure("panel", panel != nullptr);
+        ensure("a panel takes a button", hasChild(*panel, "button"));
+        ensure("and a panel", hasChild(*panel, "panel"));
+    }
+
+    // A floater is the root of its file and never a child of anything, so no
+    // child registry names it: without a registration of its own the schema
+    // would not know the tag at all, and a third of the tree is floaters.
+    template<> template<>
+    void alxuischema_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const ALXUISchema::Tag* floater = schema().tag("floater");
+        ensure("floater", floater != nullptr);
+        ensure("with the widgets a floater holds", hasChild(*floater, "button"));
+        ensure("it is a view, so it has a rect", has(*floater, "left"));
+        ensure("and the tag it shares its block with", schema().tag("multi_floater") != nullptr);
+    }
+
+    // Both spellings of a parameter written as an element. A child whose tag
+    // is not a widget is read as a parameter of the element it is under, so
+    // <panel><string> is <panel.string>, and shipped files write both.
+    template<> template<>
+    void alxuischema_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const ALXUISchema::Tag* panel = schema().tag("panel");
+        ensure("panel", panel != nullptr);
+        ensure("under the tag that owns it", hasElement(*panel, "panel.string"));
+        ensure("and on its own", hasElement(*panel, "string"));
+
+        // A name that is both a tag and a parameter is read as the parameter,
+        // since a child is only taken for a widget once the block refuses it.
+        const ALXUISchema::Tag* button = schema().tag("button");
+        ensure("button", button != nullptr);
+        ensure("badge is a parameter of a button", hasElement(*button, "badge"));
+        ensure("so it is not offered as a widget below one", !hasChild(*button, "badge"));
+    }
+
+    // Nothing is required, and a number is written the way C writes one.
+    template<> template<>
+    void alxuischema_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const std::string xsd = schema().asXSD();
+        ensure("a widget template supplies what a file leaves out, so nothing is required",
+               xsd.find("use=\"required\"") == std::string::npos);
+
+        pugi::xml_document document;
+        ensure("the schema parses", document.load_string(xsd.c_str()).status == pugi::status_ok);
+
+        // stat_bar writes bar_max="100.f", and xs:decimal refuses the suffix.
+        bool found = false;
+        for (pugi::xml_node type : document.document_element().children("xs:simpleType"))
+        {
+            found = found || std::string_view(type.attribute("name").as_string()) == "al_real";
+        }
+        ensure("a real is a type of its own", found);
+
+        const ALXUISchema::Attribute* alpha = find(*schema().tag("panel"), "bg_alpha_color.alpha");
+        ensure("a colour component is a real", alpha != nullptr);
+        ensure_equals("and reads as one", (int)alpha->value, (int)ALParamType::REAL);
     }
 }

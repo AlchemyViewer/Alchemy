@@ -266,6 +266,13 @@ void LLFloater::initClass()
 // defaults for floater param block pulled from widgets/floater.xml
 static LLWidgetNameRegistry::StaticRegistrar sRegisterFloaterParams(typeid(LLFloater::Params), "floater");
 
+// A floater is the root of its file and never a child of anything, so no
+// child registry names it and the schema would not know the tag exists.
+// Both tags are read into this block: initFloaterXML tells them apart only
+// to decide whether the floater hosts the children it then builds.
+static LLWidgetSchemaRegistrar<LLFloater> sFloaterSchema("floater");
+static LLWidgetSchemaRegistrar<LLFloater> sMultiFloaterSchema("multi_floater");
+
 LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
 :   LLPanel(),  // intentionally do not pass params here, see initFromParams
     mDragHandle(NULL),
