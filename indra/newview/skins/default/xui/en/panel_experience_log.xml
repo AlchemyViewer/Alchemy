@@ -42,22 +42,18 @@
         name="experience_log_list">
         <columns
           width="100"
-          user_resize="true"
           name="time"
           label="Time"/>
         <columns
           width="100"
-          user_resize="true"
           name="event"
           label="Event"/>
         <columns
           width="100"
-          user_resize="true"
           name="experience_name"
           label="Experience"/>
         <columns
           width="100"
-          user_resize="true"
           name="object_name"
           label="Object"/>
       </scroll_list>
