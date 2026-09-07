@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="CHARGEMENT DU MODELE">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Erreur : Problème d&apos;analyse de fichier .dae ; reportez-vous au journal pour plus de détails.
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="Parcourir..." name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Étape 2 : Analyser
-					</text>
-					<text name="analysis_method_label">
-						Moyen :
-					</text>
-					<text name="quality_label">
-						Qualité :
-					</text>
-					<text name="smooth_method_label">
-						Lissage :
-					</text>
-					<check_box label="Fermer les trous" name="Close Holes (Slow)"/>
-					<button label="Analyser" name="Decompose"/>
-					<button label="Annuler" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						Étape 3 : Simplifier
@@ -230,6 +212,25 @@
 						Enveloppes : [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Lissage :
+					</text>
+					<text name="quality_label">
+						Qualité :
+					</text>
+					<text name="analysis_method_label">
+						Moyen :
+					</text>
+					<text name="method_label">
+						Étape 2 : Analyser
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Annuler" name="decompose_cancel"/>
+					<button label="Analyser" name="Decompose"/>
+					<check_box label="Fermer les trous" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Option de chargement" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					Modèles d&apos;avatar uniquement :
 				</text>
-				<check_box label="Inclure pondération de la peau :" name="upload_skin"/>
-				<check_box label="Inclure position des articulations :" name="upload_joints"/>
-				<check_box label="Verrouiller l’échelle si la position des articulations est définie" name="lock_scale_if_joint_position"/>
-				<text name="pelvis_offset_label">
-					Décalage Z (élever/abaisser l&apos;avatar) :
-				</text>
+			</panel>
+			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>
+				<text name="pelvis_offset_label">
+					Décalage Z (élever/abaisser l'avatar) :
+				</text>
+				<check_box label="Verrouiller l’échelle si la position des articulations est définie" name="lock_scale_if_joint_position"/>
+				<check_box label="Inclure position des articulations :" name="upload_joints"/>
+				<check_box label="Inclure pondération de la peau :" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

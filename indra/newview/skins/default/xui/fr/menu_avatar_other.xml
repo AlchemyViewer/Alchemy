@@ -6,21 +6,27 @@
 	<menu_item_call label="IM" name="Send IM..."/>
 	<menu_item_call label="Appeler" name="Call"/>
 	<menu_item_call label="Inviter dans le groupe" name="Invite..."/>
-	<menu_item_call label="Réinitialiser le squelette" name="Reset Skeleton"/>
-	<menu_item_call label="Réinitialiser le squelette et les animations" name="Reset Skeleton And Animations"/>
-	<menu_item_call label="Ignorer" name="Avatar Mute"/>
-	<menu_item_call label="Signaler" name="abuse"/>
-	<menu_item_call label="Figer" name="Freeze..."/>
-	<menu_item_call label="Expulser" name="Eject..."/>
-	<menu_item_call label="Déboguer les textures" name="Debug..."/>
-	<menu_item_call label="Dump XML" name="Dump XML"/>
 	<menu_item_call label="Zoomer en avant" name="Zoom In"/>
 	<menu_item_call label="Payer" name="Pay..."/>
 	<context_menu label="Effectuer le rendu de l’avatar" name="Render Avatar">
-		<menu_item_check label="Valeur par défaut" name="RenderNormally"/>
-		<menu_item_check label="Toujours" name="AlwaysRenderFully"/>
-		<menu_item_check label="Jamais" name="DoNotRender"/>
-		<menu_item_call label="Exceptions..." name="RenderExceptions"/>
 	</context_menu>
-	<menu_item_call label="Ignorer le propriétaire des particules" name="Mute Particle"/>
+	<context_menu name="Avatar Manage">
+		<menu_item_call label="Expulser" name="Eject..."/>
+		<menu_item_call label="Figer" name="Freeze..."/>
+		<menu_item_call label="Signaler" name="abuse"/>
+		<menu_item_call label="Ignorer le propriétaire des particules" name="Mute Particle"/>
+		<menu_item_call label="Ignorer" name="Avatar Mute"/>
+	</context_menu>
+	<context_menu name="Utilities">
+		<menu_item_call label="Dump XML" name="Dump XML"/>
+		<menu_item_call label="Déboguer les textures" name="Debug..."/>
+	</context_menu>
+	<context_menu name="Appearance">
+		<menu_item_call label="Exceptions..." name="RenderExceptions"/>
+		<menu_item_check label="Jamais" name="DoNotRender"/>
+		<menu_item_check label="Toujours" name="AlwaysRenderFully"/>
+		<menu_item_check label="Valeur par défaut" name="RenderNormally"/>
+		<menu_item_call label="Réinitialiser le squelette et les animations" name="Reset Skeleton And Animations"/>
+		<menu_item_call label="Réinitialiser le squelette" name="Reset Skeleton"/>
+	</context_menu>
 </context_menu>

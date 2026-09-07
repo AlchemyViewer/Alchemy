@@ -3,11 +3,31 @@
 	<panel.string name="location_notice">
 		(mise à jour après enregistrement)
 	</panel.string>
-	<line_editor name="pick_location">
+	<layout_stack name="main_pick_stack">
+		<layout_panel name="save_changes_lp">
+			<layout_stack name="save_changes_stack">
+				<layout_panel name="save_btn_lp">
+					<button label="Enregistrer les favoris" name="save_changes_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="util_buttons_lp">
+			<layout_stack name="util_buttons_stack">
+				<layout_panel name="set_to_curr_location_btn_lp">
+					<button label="Définir l'emplacement" name="set_to_curr_location_btn" tool_tip="Définir sur l’emplacement actuel"/>
+				</layout_panel>
+				<layout_panel name="tp_btn_lp">
+					<button label="Téléportation" name="teleport_btn"/>
+				</layout_panel>
+				<layout_panel name="map_btn_lp">
+					<button label="Voir sur la carte" name="show_on_map_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="main_pick_lp">
+			<line_editor name="pick_location">
 		En cours de chargement...
 	</line_editor>
-	<button label="Téléportation" name="teleport_btn"/>
-	<button label="Voir sur la carte" name="show_on_map_btn"/>
-	<button label="Définir l&apos;emplacement" name="set_to_curr_location_btn" tool_tip="Définir sur l’emplacement actuel"/>
-	<button label="Enregistrer les favoris" name="save_changes_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

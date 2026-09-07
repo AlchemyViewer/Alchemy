@@ -12,7 +12,9 @@
 	<menu_item_call label="Carte" name="map"/>
 	<menu_item_call label="Partager" name="share"/>
 	<menu_item_call label="Payer" name="pay"/>
-	<menu_item_check label="Ignorer/Ne plus ignorer" name="block_unblock"/>
-	<menu_item_call label="Figer" name="freeze"/>
-	<menu_item_call label="Expulser" name="eject"/>
+	<context_menu name="manage_menu">
+		<menu_item_call label="Expulser" name="eject"/>
+		<menu_item_call label="Figer" name="freeze"/>
+		<menu_item_check label="Ignorer/Ne plus ignorer" name="block_unblock"/>
+	</context_menu>
 </context_menu>

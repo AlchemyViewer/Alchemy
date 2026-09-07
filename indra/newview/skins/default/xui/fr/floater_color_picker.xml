@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="ColorPicker" title="SÉLECTEUR DE COULEURS">
-	<text name="r_val_text">
-		Rouge :
-	</text>
-	<text name="g_val_text">
-		Vert :
-	</text>
-	<text name="b_val_text">
-		Bleu :
-	</text>
 	<text name="h_val_text">
 		Teinte :
 	</text>
@@ -28,4 +19,17 @@
 	<text name="(Drag below to save.)">
 		Enr. : faire glisser dessous
 	</text>
+	<tab_container name="color_type_container">
+		<panel name="RGB">
+			<text name="b_val_text">
+		Bleu :
+	</text>
+			<text name="g_val_text">
+		Vert :
+	</text>
+			<text name="r_val_text">
+		Rouge :
+	</text>
+		</panel>
+	</tab_container>
 </floater>

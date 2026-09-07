@@ -15,5 +15,9 @@
 		</text>
 		<button label="" name="edit_outfit_btn" tool_tip="Modifier cette tenue"/>
 	</panel>
-	<filter_editor label="Filtrer les tenues" name="Filter"/>
+	<layout_stack name="top_menu_panel">
+		<layout_panel name="filter_panel">
+			<filter_editor label="Filtrer les tenues" name="Filter"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

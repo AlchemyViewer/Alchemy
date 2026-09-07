@@ -14,9 +14,17 @@ Pour sélectionner plusieurs membres, cliquez sur leurs noms en maintenant la to
 				<name_list.columns label="Statut" name="online"/>
 				<name_list.columns label="Titre" name="title"/>
 			</name_list>
-			<button label="Inviter" name="member_invite"/>
-			<button label="Expulser" name="member_eject"/>
-			<button label="Bannir un ou plusieurs membres" name="member_ban"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="ban_btn_lp">
+					<button label="Bannir un ou plusieurs membres" name="member_ban"/>
+				</layout_panel>
+				<layout_panel name="eject_btn_lp">
+					<button label="Expulser" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="Inviter" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="RÔLES" name="roles_sub_tab">
 			<panel.string name="help_text">Chaque rôle possède un titre et des
@@ -35,6 +43,7 @@ Pour sélectionner plusieurs membres, cliquez sur leurs noms en maintenant la to
 			</scroll_list>
 			<button label="Nouveau rôle" name="role_create"/>
 			<button label="Supprimer le rôle" name="role_delete"/>
+			<button name="role_copy" label="Copier rôle"/>
 		</panel>
 		<panel height="148" label="POUVOIRS" name="actions_sub_tab" tool_tip="Vous pouvez afficher une description du pouvoir et voir quels membres et rôles peuvent s'en servir.">
 			<panel.string name="help_text">Les pouvoirs déterminent les facultés de chaque membre
@@ -55,7 +64,6 @@ Pour sélectionner plusieurs membres, cliquez sur leurs noms en maintenant la to
 			<button label="Annuler le bannissement d'un ou plusieurs membres" name="ban_delete" tool_tip="Annuler le bannissement de certains résidents de votre groupe"/>
 			<button name="ban_refresh" tool_tip="Actualiser la liste des résidents bannis"/>
 		</panel>
-		<button name="role_copy" label="Copier rôle"/>
 	</tab_container>
 	<panel name="members_footer">
 		<text name="static">Rôles assignés</text>
@@ -73,11 +81,8 @@ Pour sélectionner plusieurs membres, cliquez sur leurs noms en maintenant la to
 	</panel>
 	<panel name="roles_footer">
 		<text name="static">Nom du rôle</text>
-		<line_editor name="role_name"/>
 		<text name="static3">Titre du rôle</text>
-		<line_editor name="role_title"/>
 		<text name="static2">Description</text>
-		<text_editor name="role_description"/>
 		<text name="static4">Membres assignés</text>
 		<check_box label="Afficher les membres" name="role_visible_in_list" tool_tip="Détermine si les personnes n'appartenant pas au groupe peuvent voir les membres de ce rôle dans l'onglet Général."/>
 		<text name="static5" tool_tip="Une liste des pouvoirs auquel le rôle sélectionné a accès.">Pouvoirs attribués</text>

@@ -2,26 +2,19 @@
 <menu_bar name="Main Menu">
 	<menu label="Moi" name="Me">
 		<menu_item_call label="Profil..." name="Profile"/>
-		<menu_item_call label="Apparence..." name="ChangeOutfit"/>
 		<menu_item_call label="Choisir un avatar..." name="Avatar Picker"/>
 		<menu_item_check label="Inventaire..." name="Inventory"/>
 		<menu_item_call label="Nouvelle fenêtre d'inventaire" name="NewInventoryWindow"/>
 		<menu_item_call label="Endroits..." name="Places"/>
 		<menu_item_call label="Favoris..." name="Picks"/>
 		<menu_item_call label="Expériences..." name="Experiences"/>
-		<menu_item_call label="Mes scripts..." name="MyScripts"/>
 		<menu_item_call label="Contrôles de la caméra..." name="Camera Controls"/>
 		<menu label="Déplacement" name="Movement">
 			<menu_item_call label="M'asseoir" name="Sit Down Here"/>
 			<menu_item_call label="Se lever" name="Stand up"/>
 			<menu_item_check label="Voler" name="Fly"/>
-			<menu_item_check label="Toujours courir" name="Always Run"/>
-			<menu_item_call label="Arrêter mon animation" name="Stop Animating My Avatar"/>
-			<menu_item_call label="Marcher / Courir / Voler..." name="WalkRunFly"/>
 		</menu>
 		<menu label="Statut" name="Status">
-			<menu_item_check label="Absent" name="Away"/>
-			<menu_item_check label="Ne pas déranger" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="Acheter des L$..." name="Buy and Sell L$"/>
 		<menu_item_call label="Annonces de Place du marché..." name="MarketplaceListings"/>
@@ -33,6 +26,8 @@
 		<menu_item_call label="Masquer tous les contrôles" name="Hide UI"/>
 		<menu_item_check label="Afficher les éléments HUD" name="Show HUD Attachments"/>
 		<menu_item_call label="Quitter [APP_NAME]" name="Quit"/>
+		<menu_item_check label="Ne pas déranger" name="Do Not Disturb"/>
+		<menu_item_check label="Absent" name="Away"/>
 	</menu>
 	<menu label="Communiquer" name="Communicate">
 		<menu_item_check label="Conversations..." name="Conversations"/>
@@ -89,6 +84,11 @@
 			<menu_item_call label="Mes environnements..." name="my_environs"/>
 			<menu_item_call label="Éclairage personnel..." name="adjustment_tool"/>
 			<menu_item_check label="Pause des nuages" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Zoomer en avant" name="Zoom In"/>
+			<menu_item_call label="Zoom par défaut" name="Zoom Default"/>
+			<menu_item_call label="Zoomer en arrière" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="Construire" name="BuildTools">
@@ -148,6 +148,7 @@
 			<menu_item_call label="Utiliser la sélection pour la grille" name="Use Selection for Grid"/>
 			<menu_item_call label="Options de la grille..." name="Grid Options"/>
 			<menu_item_call label="Définir les permissions par défaut..." name="Set default permissions"/>
+			<menu_item_check label="Mettre la transparence en surbrillance" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Charger" name="Upload">
 			<menu_item_call label="Image ([COST] L$)..." name="Upload Image"/>
@@ -191,7 +192,6 @@
 			<menu_item_check label="Balise animée" name="Cheesy Beacon"/>
 			<menu_item_check label="Masquer les particules" name="Hide Particles"/>
 			<menu_item_check label="Masquer la sélection" name="Hide Selected"/>
-			<menu_item_check label="Mettre la transparence en surbrillance" name="Highlight Transparent"/>
 			<menu_item_check label="Afficher le réticule de la vue subjective" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="Types de rendu" name="Rendering Types">
@@ -232,9 +232,6 @@
 			<menu_item_check label="Joystick Flycam" name="Joystick Flycam"/>
 			<menu_item_call label="Réinitialiser la vue" name="Reset View"/>
 			<menu_item_call label="Regarder la dernière conversation" name="Look at Last Chatter"/>
-			<menu_item_call label="Zoomer en avant" name="Zoom In"/>
-			<menu_item_call label="Zoom par défaut" name="Zoom Default"/>
-			<menu_item_call label="Zoomer en arrière" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Afficher les paramètres de débogage" name="Debug Settings"/>
 		<menu_item_check label="Afficher le menu Développeurs" name="Debug Mode"/>
@@ -266,6 +263,7 @@
 			<menu_item_check label="Afficher la couleur sous le curseur" name="Show Color Under Cursor"/>
 			<menu_item_check label="Afficher la mémoire" name="Show Memory"/>
 			<menu_item_check label="Afficher les mises à jour des objets" name="Show Updates"/>
+			<menu_item_check name="Show Avatar Render Info" label="Afficher les informations de rendu de l'avatar"/>
 		</menu>
 		<menu label="Forcer une erreur" name="Force Errors">
 			<menu_item_call label="Forcer le point de rupture" name="Force Breakpoint"/>
@@ -376,6 +374,7 @@
 			<menu_item_check label="Débogage des événements de souris" name="Debug Mouse Events"/>
 			<menu_item_check label="Débogage touches" name="Debug Keys"/>
 			<menu_item_check label="Débogage WindowProc" name="Debug WindowProc"/>
+			<menu_item_call name="FB Connect Test" label="Test de connexion FB"/>
 		</menu>
 		<menu label="XUI" name="XUI">
 			<menu_item_call label="Recharger les paramètres de couleurs" name="Reload Color Settings"/>
@@ -434,9 +433,7 @@
 		<menu_item_call label="Demander le statut Admin" name="Request Admin Options"/>
 		<menu_item_call label="Quitter le statut Admin" name="Leave Admin Options"/>
 		<menu_item_check label="Afficher le menu Admin" name="View Admin Options"/>
-		<menu_item_check name="Show Avatar Render Info" label="Afficher les informations de rendu de l'avatar"/>
 		<menu_item_call name="Playback event recording" label="Enregistrement des événements en lecture"/>
-		<menu_item_call name="FB Connect Test" label="Test de connexion FB"/>
 		<menu_item_call name="Stop event recording" label="Arrêt de l'enregistrement des événements"/>
 		<menu_item_call name="Start event recording" label="Démarrer l'enregistrement de l'événement"/>
 	</menu>
@@ -490,5 +487,12 @@
 				<menu_item_call label="Wiki sur l'Assurance Qualité" name="QA Wiki"/>
 			</menu>
 		</menu>
+	</menu>
+	<menu name="Avatar">
+		<menu_item_call label="Mes scripts..." name="MyScripts"/>
+		<menu_item_check label="Toujours courir" name="Always Run"/>
+		<menu_item_call label="Marcher / Courir / Voler..." name="WalkRunFly"/>
+		<menu_item_call label="Arrêter mon animation" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Apparence..." name="ChangeOutfit"/>
 	</menu>
 </menu_bar>

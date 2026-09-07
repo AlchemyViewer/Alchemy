@@ -795,8 +795,12 @@ void ALXUITranslate::prune(ALXUIEdit& overlay)
                 }
                 if (overlay.removeElement(path))
                 {
-                    // Every node of that parse is gone with it.
+                    // The removal reparses, and every node of the parse
+                    // this is walking is freed with it: the walk starts
+                    // again rather than stepping to a sibling that is no
+                    // longer there.
                     again = true;
+                    break;
                 }
             }
         }

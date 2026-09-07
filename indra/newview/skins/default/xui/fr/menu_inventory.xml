@@ -17,36 +17,6 @@
 	<menu_item_call label="Supprimer" name="Task Remove"/>
 	<menu_item_call label="Vider la corbeille" name="Empty Trash"/>
 	<menu_item_call label="Vider les objets trouvés" name="Empty Lost And Found"/>
-	<menu_item_call label="Nouveau dossier" name="New Folder"/>
-	<menu_item_call label="Nouveau script" name="New Script"/>
-	<menu_item_call label="Nouvelle note" name="New Note"/>
-	<menu_item_call label="Nouveau geste" name="New Gesture"/>
-	<menu label="Nouveaux habits" name="New Clothes">
-		<menu_item_call label="Nouvelle chemise" name="New Shirt"/>
-		<menu_item_call label="Nouveau pantalon" name="New Pants"/>
-		<menu_item_call label="Nouvelles chaussures" name="New Shoes"/>
-		<menu_item_call label="Nouvelles chaussettes" name="New Socks"/>
-		<menu_item_call label="Nouvelle veste" name="New Jacket"/>
-		<menu_item_call label="Nouvelle jupe" name="New Skirt"/>
-		<menu_item_call label="Nouveaux gants" name="New Gloves"/>
-		<menu_item_call label="Nouveau débardeur" name="New Undershirt"/>
-		<menu_item_call label="Nouveau caleçon" name="New Underpants"/>
-		<menu_item_call label="Nouveau masque alpha" name="New Alpha Mask"/>
-		<menu_item_call label="Nouveau tatouage" name="New Tattoo"/>
-		<menu_item_call label="Nouvel environnement universel" name="New Universal"/>
-		<menu_item_call label="Nouvelles propriétés physiques" name="New Physics"/>
-	</menu>
-	<menu label="Nouvelles parties du corps" name="New Body Parts">
-		<menu_item_call label="Nouvelle silhouette" name="New Shape"/>
-		<menu_item_call label="Nouvelle peau" name="New Skin"/>
-		<menu_item_call label="Nouveaux cheveux" name="New Hair"/>
-		<menu_item_call label="Nouveaux yeux" name="New Eyes"/>
-	</menu>
-	<menu label="Nouveaux paramètres" name="New Settings">
-		<menu_item_call label="Nouveau ciel" name="New Sky"/>
-		<menu_item_call label="Nouvelle eau" name="New Water"/>
-		<menu_item_call label="Nouveau cycle du jour" name="New Day Cycle"/>
-	</menu>
 	<menu label="Utiliser comme défaut pour" name="upload_def">
 		<menu_item_call label="Chargements d’images" name="Image uploads"/>
 		<menu_item_call label="Chargements de sons" name="Sound uploads"/>
@@ -114,4 +84,36 @@
 	<menu_item_call label="Copier dans les annonces Place du marché" name="Marketplace Copy"/>
 	<menu_item_call label="Déplacer dans les annonces Place du marché" name="Marketplace Move"/>
 	<menu_item_call label="--aucune option--" name="--no options--"/>
+	<menu name="create_new">
+		<menu label="Nouveaux paramètres" name="New Settings">
+			<menu_item_call label="Nouveau ciel" name="New Sky"/>
+			<menu_item_call label="Nouvelle eau" name="New Water"/>
+			<menu_item_call label="Nouveau cycle du jour" name="New Day Cycle"/>
+		</menu>
+		<menu label="Nouvelles parties du corps" name="New Body Parts">
+			<menu_item_call label="Nouvelle silhouette" name="New Shape"/>
+			<menu_item_call label="Nouvelle peau" name="New Skin"/>
+			<menu_item_call label="Nouveaux cheveux" name="New Hair"/>
+			<menu_item_call label="Nouveaux yeux" name="New Eyes"/>
+		</menu>
+		<menu label="Nouveaux habits" name="New Clothes">
+			<menu_item_call label="Nouvelle chemise" name="New Shirt"/>
+			<menu_item_call label="Nouveau pantalon" name="New Pants"/>
+			<menu_item_call label="Nouvelles chaussures" name="New Shoes"/>
+			<menu_item_call label="Nouvelles chaussettes" name="New Socks"/>
+			<menu_item_call label="Nouvelle veste" name="New Jacket"/>
+			<menu_item_call label="Nouvelle jupe" name="New Skirt"/>
+			<menu_item_call label="Nouveaux gants" name="New Gloves"/>
+			<menu_item_call label="Nouveau débardeur" name="New Undershirt"/>
+			<menu_item_call label="Nouveau caleçon" name="New Underpants"/>
+			<menu_item_call label="Nouveau masque alpha" name="New Alpha Mask"/>
+			<menu_item_call label="Nouveau tatouage" name="New Tattoo"/>
+			<menu_item_call label="Nouvel environnement universel" name="New Universal"/>
+			<menu_item_call label="Nouvelles propriétés physiques" name="New Physics"/>
+		</menu>
+		<menu_item_call label="Nouveau geste" name="New Gesture"/>
+		<menu_item_call label="Nouvelle note" name="New Note"/>
+		<menu_item_call label="Nouveau script" name="New Script"/>
+		<menu_item_call label="Nouveau dossier" name="New Folder"/>
+	</menu>
 </menu>
