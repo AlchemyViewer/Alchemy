@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel label="Komunikacja" name="im">
-	<button label="Wyczyść historię" tool_tip="Wyczyść zapisane obrazy, ostatnią lokalizację, historię teleportów, bufor stron internetowych i bufor danych tekstur" name="clear_cache" />
-	<text name="cache_size_label_l">
-		(Miejsca, obrazy, strony web, historia wyszukiwarki)
-	</text>
-	<check_box label="Pokaż mój profil w wynikach wyszukiwarki" name="online_searchresults" />
-	<check_box label="Mój status online dostępny tylko dla znajomych i grup" name="online_visibility" />
-	<check_box label="Wyłącz mikrofon po zakończeniu rozmowy głosowej" name="auto_disengage_mic_check" />
-	<button label="Lista zablokowanych" name="block_list" />
-	<text name="inventory_header">
-		Inventory:
-	</text>
-	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory" />
-	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory" />
-	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory" />
-	<text name="block_list_label">
+	<tab_container name="privacy_tab_container">
+		<panel name="privacy_preferences_general">
+			<text name="block_list_label">
 		(Ludzie oraz/lub obiekty zablokowane przez Ciebie)
 	</text>
+			<button label="Lista zablokowanych" name="block_list" />
+			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory" />
+			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory" />
+			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory" />
+			<text name="inventory_header">
+		Inventory:
+	</text>
+			<check_box label="Wyłącz mikrofon po zakończeniu rozmowy głosowej" name="auto_disengage_mic_check" />
+			<check_box label="Mój status online dostępny tylko dla znajomych i grup" name="online_visibility" />
+			<check_box label="Pokaż mój profil w wynikach wyszukiwarki" name="online_searchresults" />
+			<text name="cache_size_label_l">
+		(Miejsca, obrazy, strony web, historia wyszukiwarki)
+	</text>
+			<button label="Wyczyść historię" tool_tip="Wyczyść zapisane obrazy, ostatnią lokalizację, historię teleportów, bufor stron internetowych i bufor danych tekstur" name="clear_cache" />
+		</panel>
+	</tab_container>
 </panel>

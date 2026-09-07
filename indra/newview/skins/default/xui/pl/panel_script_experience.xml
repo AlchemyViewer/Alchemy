@@ -18,6 +18,8 @@
 			</text>
 		</layout_panel>
 		<layout_panel>
+		</layout_panel>
+		<layout_panel name="xp_choose_panel">
 			<combo_box label="Wybierz przygodę..." name="Experiences..." />
 		</layout_panel>
 	</layout_stack>

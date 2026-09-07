@@ -150,23 +150,6 @@
 					<check_box name="physics_optimize" label="Optymalizuj" />
 					<check_box name="physics_use_hull" label="Użyj powłoki wypukłej" />
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Krok 2: Analiza
-					</text>
-					<text name="analysis_method_label">
-						Metoda:
-					</text>
-					<text name="quality_label">
-						Jakość:
-					</text>
-					<text name="smooth_method_label">
-						Wygładź:
-					</text>
-					<check_box label="Domknij otwory" name="Close Holes (Slow)" />
-					<button label="Analizuj" name="Decompose" />
-					<button label="Anuluj" name="decompose_cancel" />
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						Krok 3: Upraszczanie
@@ -200,6 +183,25 @@
 						Powłoki: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Wygładź:
+					</text>
+					<text name="quality_label">
+						Jakość:
+					</text>
+					<text name="analysis_method_label">
+						Metoda:
+					</text>
+					<text name="method_label">
+						Krok 2: Analiza
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Anuluj" name="decompose_cancel" />
+					<button label="Analizuj" name="Decompose" />
+					<check_box label="Domknij otwory" name="Close Holes (Slow)" />
+				</panel>
 			</panel>
 			<panel label="Opcje ładowania" name="modifiers_panel">
 				<text name="scale_label">
@@ -212,11 +214,13 @@
 				<text name="include_label">
 					Tylko dla modeli awatarów:
 				</text>
-				<check_box label="Dołącz wagę skórki" name="upload_skin" />
-				<check_box label="Dołącz pozycje stawów" name="upload_joints" />
+			</panel>
+			<panel name="rigging_panel">
 				<text name="pelvis_offset_label">
 					Przesunięcie Z (podnieś/obniż awatara):
 				</text>
+				<check_box label="Dołącz pozycje stawów" name="upload_joints" />
+				<check_box label="Dołącz wagę skórki" name="upload_skin" />
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

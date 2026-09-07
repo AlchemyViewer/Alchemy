@@ -1,41 +1,47 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <panel label="Kolory" name="colors_panel">
-	<text name="effects_color_textbox">
-		Efekty wyboru (wiązka cząstek):
-	</text>
-	<color_swatch name="effect_color_swatch" tool_tip="Kliknij, aby wybrać kolor" />
-	<text name="font_colors">
-		Wiadomości czatu:
-	</text>
-	<text name="text_box1">
-		Mój tekst
-	</text>
-	<text name="text_box2">
-		Inni
-	</text>
-	<text name="text_box3">
-		Obiekty
-	</text>
-	<text name="text_box5">
-		Błędy
-	</text>
-	<text name="text_box10">
-		Bezpośrednie
-	</text>
-	<text name="text_box7">
-		Właściciel
-	</text>
-	<text name="text_box9">
+	<tab_container name="color_tab_container">
+		<panel name="chat_colors">
+			<text name="text_box9">
 		URLe
 	</text>
-	<text name="bubble_chat">
-		Tło tagów imion i czatu chmurkowego:
+			<text name="text_box7">
+		Właściciel
 	</text>
-	<color_swatch name="background" tool_tip="Wybierz kolor tła imienia (taga)" />
-	<slider label="Przezrocz.:" name="bubble_chat_opacity" tool_tip="Wybierz przezroczystość tła tagów imion" />
-	<text name="floater_opacity">
+			<text name="text_box10">
+		Bezpośrednie
+	</text>
+			<text name="text_box5">
+		Błędy
+	</text>
+			<text name="text_box3">
+		Obiekty
+	</text>
+			<text name="text_box2">
+		Inni
+	</text>
+			<text name="text_box1">
+		Mój tekst
+	</text>
+			<text name="font_colors">
+		Wiadomości czatu:
+	</text>
+		</panel>
+		<panel name="general_colors">
+			<slider label="Nieaktywne:" name="inactive" />
+			<slider label="Aktywne:" name="active" />
+			<text name="floater_opacity">
 		Przezroczystość okna:
 	</text>
-	<slider label="Aktywne:" name="active" />
-	<slider label="Nieaktywne:" name="inactive" />
+			<slider label="Przezrocz.:" name="bubble_chat_opacity" tool_tip="Wybierz przezroczystość tła tagów imion" />
+			<color_swatch name="background" tool_tip="Wybierz kolor tła imienia (taga)" />
+			<text name="bubble_chat">
+		Tło tagów imion i czatu chmurkowego:
+	</text>
+			<color_swatch name="effect_color_swatch" tool_tip="Kliknij, aby wybrać kolor" />
+			<text name="effects_color_textbox">
+		Efekty wyboru (wiązka cząstek):
+	</text>
+		</panel>
+	</tab_container>
 </panel>

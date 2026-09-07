@@ -82,8 +82,6 @@
 		<combo_box.item label="Minimalne" name="0" />
 		<combo_box.item label="Teren i drzewa" name="1" />
 		<combo_box.item label="Wszystkie obiekty statyczne" name="2" />
-		<combo_box.item label="Wszystkie awatary i obiekty" name="3" />
-		<combo_box.item label="Wszystko" name="4" />
 	</combo_box>
 	<check_box label="Shadery atmosfery" name="WindLightUseAtmosShaders" />
 	<slider label="Niebo:" name="SkyMeshDetail" />
@@ -104,4 +102,8 @@
 	</combo_box>
 	<button label="Zresetuj wartości ustawień grafiki" name="Defaults" />
 	<button label="Anuluj" label_selected="Anuluj" name="Cancel" />
+	<combo_box name="TonemapType">
+		<combo_box.item label="Wszystko" name="4" />
+		<combo_box.item label="Wszystkie awatary i obiekty" name="3" />
+	</combo_box>
 </floater>

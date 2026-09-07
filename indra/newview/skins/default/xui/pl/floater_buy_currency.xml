@@ -3,54 +3,66 @@
 	<floater.string name="buy_currency">
 		Kup [LINDENS] L$ za [LOCALAMOUNT]
 	</floater.string>
-	<text name="info_need_more">
-		Potrzebujesz więcej L$
-	</text>
-	<text name="contacting">
-		Kontaktowanie z LindeX...
-	</text>
-	<text name="info_buying">
-		Kup L$
-	</text>
-	<text name="balance_label">
-		Obecnie posiadam
-	</text>
-	<text name="balance_amount">
-		[AMT]L$
-	</text>
-	<text name="currency_action">
-		Chcę kupić
-	</text>
 	<text name="buying_label">
 		Cena
-	</text>
-	<text name="currency_est">
-		za [LOCALAMOUNT]
-	</text>
-	<text name="getting_data">
-		Kalkulowanie...
-	</text>
-	<text name="total_label">
-		Mój nowy stan konta
-	</text>
-	<text name="total_amount">
-		[AMT]L$
 	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php metoda płatności] | [http://www.secondlife.com/my/account/currency.php waluta]
 	</text>
-	<text name="exchange_rate_note">
-		Wpisz ponownie kwotę aby zobaczyć ostatni kurs wymiany.
-	</text>
-	<text name="purchase_warning_repurchase">
-		Potwierdzasz zakup L$, nie obiektu.
-	</text>
 	<text name="purchase_warning_notenough">
 		Nie zakupiono wystarczającej ilości L$. Proszę zwiększyć kwotę.
 	</text>
-	<button label="Kup teraz" name="buy_btn" />
-	<button label="Anuluj" name="cancel_btn" />
 	<floater.string name="info_cannot_buy">
 		Nie można kupić
 	</floater.string>
+	<layout_stack name="outer_stack">
+		<layout_panel name="layout_panel_buttons">
+			<button label="Anuluj" name="cancel_btn" />
+			<button label="Kup teraz" name="buy_btn" />
+			<text name="contacting">
+		Kontaktowanie z LindeX...
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_msg">
+			<text name="purchase_warning_repurchase">
+		Potwierdzasz zakup L$, nie obiektu.
+	</text>
+			<text name="exchange_rate_note">
+		Wpisz ponownie kwotę aby zobaczyć ostatni kurs wymiany.
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_action">
+			<text name="total_amount">
+		[AMT]L$
+	</text>
+			<text name="total_label">
+		Mój nowy stan konta
+	</text>
+			<text name="getting_data">
+		Kalkulowanie...
+	</text>
+			<text name="currency_est">
+		za [LOCALAMOUNT]
+	</text>
+			<text name="currency_action">
+		Chcę kupić
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_balance">
+			<text name="balance_amount">
+		[AMT]L$
+	</text>
+			<text name="balance_label">
+		Obecnie posiadam
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_title">
+			<text name="info_buying">
+		Kup L$
+	</text>
+			<text name="info_need_more">
+		Potrzebujesz więcej L$
+	</text>
+		</layout_panel>
+	</layout_stack>
 </floater>

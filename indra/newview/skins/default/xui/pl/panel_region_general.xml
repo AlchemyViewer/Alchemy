@@ -18,7 +18,6 @@
 	<check_box label="Zablokuj zmiany terenu" name="block_terraform_check" />
 	<check_box label="Zablokuj latanie" name="block_fly_check" />
 	<check_box label="Blokuj przelot ponad działką" name="block_fly_over_check" tool_tip="Rozszerz sprawdzanie jeszcze wyżej, aby zapobiec lataniu ponad działką" />
-	<check_box label="Uszkodzenia dozwolone" name="allow_damage_check" />
 	<check_box label="Zablokuj popychanie" name="restrict_pushobject" />
 	<check_box label="Odsprzedaż dozwolona" name="allow_land_resell_check" />
 	<check_box label="Łączenie/dzielenie dozwolone" name="allow_parcel_changes_check" />
@@ -33,4 +32,7 @@
 	<button label="Teleportuj do Startu wszystkich Rezydentów" name="kick_all_btn" />
 	<button label="Wyślij wiadomość do Regionu" name="im_btn" />
 	<button label="Obsługa teleportera" name="manage_telehub_btn" />
+	<panel name="Combat">
+		<check_box label="Uszkodzenia dozwolone" name="allow_damage_check" />
+	</panel>
 </panel>

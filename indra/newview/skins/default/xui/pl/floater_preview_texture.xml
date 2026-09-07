@@ -12,7 +12,15 @@
 	<text name="aspect_ratio">
 		Podgląd proporcji
 	</text>
-	<combo_box name="combo_aspect_ratio" tool_tip="Wyświetl w stałych proporcjach" />
-	<button label="Wyrzuć" name="Discard" />
-	<button label="Zapisz jako" name="save_tex_btn" />
+	<layout_stack name="button_row_ls">
+		<layout_panel name="aspect_combo_lp">
+			<combo_box name="combo_aspect_ratio" tool_tip="Wyświetl w stałych proporcjach" />
+		</layout_panel>
+		<layout_panel name="btn_save_lp">
+			<button label="Zapisz jako" name="save_tex_btn" />
+		</layout_panel>
+		<layout_panel name="btn_discard_lp">
+			<button label="Wyrzuć" name="Discard" />
+		</layout_panel>
+	</layout_stack>
 </floater>

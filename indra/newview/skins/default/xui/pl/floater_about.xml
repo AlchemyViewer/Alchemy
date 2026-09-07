@@ -5,10 +5,16 @@
 			<button label="Kopiuj do schowka" name="copy_btn" />
 		</panel>
 		<panel label="Podziękowania"  name="credits_panel">
-			<text name="linden_intro">
+			<accordion name="credits_accordion">
+				<accordion_tab name="sl_credits_tab">
+					<panel name="sl_credits_panel">
+						<text name="linden_intro">
 Second Life zostało dla Ciebie stworzone przez Lindenów, 
 z wkładem open source od:
 			</text>
+					</panel>
+				</accordion_tab>
+			</accordion>
 		</panel>
 		<panel label="Licencje" name="licenses_panel" />
 	</tab_container>
