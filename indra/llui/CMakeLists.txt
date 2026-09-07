@@ -108,8 +108,12 @@ target_sources(llui
     llvirtualtrackball.cpp
     llwindowshade.cpp
     llxuiparser.cpp
+    alxuicatalog.cpp
     alxuidiagnostics.cpp
+    alxuiselection.cpp
     alxuishellbuild.cpp
+    alxuisourcemap.cpp
+    alxuitreemodel.cpp
     llxyvector.cpp
 
     PUBLIC
@@ -235,8 +239,12 @@ target_sources(llui
     llvirtualtrackball.h
     llwindowshade.h
     llxuiparser.h
+    alxuicatalog.h
     alxuidiagnostics.h
+    alxuiselection.h
     alxuishellbuild.h
+    alxuisourcemap.h
+    alxuitreemodel.h
     llxyvector.h
     )
 
@@ -326,10 +334,15 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(alviewtype "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuidiagnostics "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuishellbuild "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuicatalog "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuiselection "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuisourcemap "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuitreemodel "" "${test_libs}" "${test_project}")
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
-  foreach(ui_test lllayoutstack llfloater alviewtype alxuidiagnostics alxuishellbuild)
+  foreach(ui_test lllayoutstack llfloater alviewtype alxuidiagnostics alxuishellbuild
+                  alxuicatalog alxuiselection alxuisourcemap alxuitreemodel)
     if (TARGET INTEGRATION_TEST_${ui_test})
       target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
           "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")
