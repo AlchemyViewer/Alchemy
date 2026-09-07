@@ -236,7 +236,7 @@
          height="14"
          layout="topleft"
          left="20"
-         name="mylookat"
+         name="mylookat_label"
          top_pad="8"
          width="200">
             My LookAt:
@@ -267,7 +267,7 @@
          label="Limit Look At Distance"
          layout="topleft"
          left="30"
-         name="privatelookat"
+         name="limitlookat"
          tool_tip="Allows cosmetic features like eye and head movement but will point at nothing specific if beyond the set distance."
          width="200" />
          <slider

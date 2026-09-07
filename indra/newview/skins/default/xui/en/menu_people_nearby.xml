@@ -137,7 +137,7 @@
              function="Avatar.EnableItem"
              parameter="can_freeze_eject" />
         </menu_item_call>
-        <menu_item_separator name="freeze_separator">
+        <menu_item_separator name="estate_separator">
             <menu_item_separator.on_visible
             function="Avatar.EnableItem"
             parameter="can_manage_estate" />

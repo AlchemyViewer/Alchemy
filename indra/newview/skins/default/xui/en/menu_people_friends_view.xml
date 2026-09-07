@@ -46,7 +46,7 @@
        parameter="view_permissions_never" />
     </menu_item_check>
     <menu_item_check
-     name="view_permissions"
+     name="view_permissions_on_hover"
      label="On hover">
       <menu_item_check.on_click
        function="People.Friends.ViewSort.Action"
@@ -56,7 +56,7 @@
        parameter="view_permissions_hover" />
     </menu_item_check>
     <menu_item_check
-     name="view_permissions"
+     name="view_permissions_per_user"
      label="Per user">
       <menu_item_check.on_click
        function="People.Friends.ViewSort.Action"

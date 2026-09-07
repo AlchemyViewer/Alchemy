@@ -152,7 +152,7 @@
    label="Show Position and Health in Mouselook"
    layout="topleft"
    left_delta="0"
-   name="alchemy_mlook_iff"
+   name="alchemy_mlook_position"
    tool_tip="Shows user's current position and health in mouselook overlay."
    top_pad="0"
    width="256" />

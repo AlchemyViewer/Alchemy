@@ -50,11 +50,11 @@
 		計算機
 	</text>
 	<!--Resync Anims-->
-	<text name="calc_txt">
+	<text name="resync_txt">
 		アニメーションを再同期
 	</text>
 	<!--Set Channel-->
-	<text name="calc_txt">
+	<text name="channel_txt">
 		近くのチャットのチャンネルをセット
 	</text>
 	<!--rezplat-->

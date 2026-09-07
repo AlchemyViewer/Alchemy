@@ -228,7 +228,7 @@
 			ムービー（flv）
 		</label>
 	</mimetype>
-	<mimetype name="application/octet-stream">
+	<mimetype name="video/octet-stream">
 		<label name="video/octet-stream">
 			ムービー
 		</label>

@@ -10,7 +10,7 @@
 	<text name="focus_offset_lbl" width="158">
 		フォーカスのオフセット値：
 	</text>
-	<button name="reset_offset_rear" tool_tip="カメラのフォーカスをデフォルトの値にリセットします。"/>
+	<button name="reset_focus_offset" tool_tip="カメラのフォーカスをデフォルトの値にリセットします。"/>
 	<spinner label="Ｘ" name="focus_x"/>
 	<spinner label="Ｙ" name="focus_y"/>
 	<spinner label="Ｚ" name="focus_z"/>
@@ -18,15 +18,15 @@
 		カメラのオフセット倍率：
 	</text>
 	<button name="reset_offset_scale" tool_tip="カメラのオフセット倍率をデフォルトの値にリセットします。"/>
-	<text name="offset_scale_lbl">
+	<text name="camera_angle_lbl">
 		カメラの視野角：
 	</text>
 	<button name="reset_angle" tool_tip="カメラの視野角をデフォルトの値にリセットします。"/>
-	<text name="offset_scale_lbl">
+	<text name="zoom_speed_lbl">
 		ズーム速度：
 	</text>
 	<button name="reset_zoom_time" tool_tip="カメラのズーム速度をデフォルトの値にリセットします。"/>
-	<text name="offset_scale_lbl">
+	<text name="position_smoothing_lbl">
 		位置のスムージング：
 	</text>
 	<button name="cam_pos_reset" tool_tip="カメラ位置のスムージングをデフォルトの値にします。"/>

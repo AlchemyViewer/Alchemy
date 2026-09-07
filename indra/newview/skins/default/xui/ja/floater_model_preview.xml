@@ -324,7 +324,7 @@
 					<text name="analysis_method_label">
 						フィルモード：
 					</text>
-					<text name="quality_label">
+					<text name="hulls_per_mesh_label">
 						解像度：
 					</text>
 					<text name="quality_label">

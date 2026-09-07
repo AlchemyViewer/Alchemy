@@ -27,7 +27,7 @@
       userdata="!StartPingCheck !CompletePingCheck !PacketAck !SimulatorViewerTimeMessage !SimStats !AgentUpdate !AgentAnimation !AvatarAnimation !ObjectAnimation !ViewerEffect !CoarseLocationUpdate !LayerData !CameraConstraint !ObjectUpdateCached !RequestMultipleObjects !ObjectUpdate !ObjectUpdateCompressed !ImprovedTerseObjectUpdate !KillObject !ImagePacket !SendXferPacket !ConfirmXferPacket !TransferPacket !SoundTrigger !AttachedSound !AttachedSoundGainChange !PreloadSound !ViewerAsset"/>
   </menu_item_call>
 	<menu_item_call 
-     name="less_spam_no_sound" 
+     name="less_spam_no_sound_no_map" 
      label="Fewer spammy messages (minus sound and map)">
         <menu_item_call.on_click 
          function="MessageLog.Filter.Action"
