@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<floater name="Save Pref Preset" title="TERCİHLİ ÖN AYAR OLARAK KAYDET">
+<floater name="save_pref_preset" title="TERCİHLİ ÖN AYAR OLARAK KAYDET">
 	<string name="title_graphic">
 		Grafik Ön Ayarı Olarak Kaydet
 	</string>

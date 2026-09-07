@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Comunicación" name="im">
+<panel label="Comunicación" name="Privacy panel">
 	<check_box label="Sólo pueden llamarme o mandarme un MI mis amigos y grupos" name="voice_call_friends_only_check"/>
 	<check_box label="Mostrar mis Hitos favoritos al Inicio de sesión (menú desplegable &quot;Empezar  en&quot;)" name="favorites_on_login_check" top_pad="15"/>
 	<text name="Logs:">

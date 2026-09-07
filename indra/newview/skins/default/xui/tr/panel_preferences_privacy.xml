@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="İletişim" name="im">
+<panel label="İletişim" name="Privacy panel">
 	<check_box label="Sadece arkadaşlar ve gruplar beni arasın veya Aİ göndersin" name="voice_call_friends_only_check"/>
 	<check_box label="Oturum Açarken Favori Yer İmlerimi Göster (&apos;Buradan başla&apos; menüsünden)" name="favorites_on_login_check"/>
 	<text name="Logs:">

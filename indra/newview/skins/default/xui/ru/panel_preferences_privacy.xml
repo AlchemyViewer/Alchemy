@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Коммуникация" name="im">
+<panel label="Коммуникация" name="Privacy panel">
 	<check_box label="Только друзья и группы могут звонить мне и отправлять IM" name="voice_call_friends_only_check"/>
 	<check_box label="Показывать любимые закладки при входе (в меню «Место старта»)" name="favorites_on_login_check"/>
 	<text name="Logs:">

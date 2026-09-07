@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!-- *NOTE: See also menu_avatar_other.xml -->
-<context_menu name="Avatar Pie">
+<context_menu name="Avatar Attachment Pie">
 	<menu_item_call label="Ver el perfil" name="Profile..."/>
 	<menu_item_call label="Añadir como amigo" name="Add Friend"/>
 	<menu_item_call label="MI" name="Send IM..."/>

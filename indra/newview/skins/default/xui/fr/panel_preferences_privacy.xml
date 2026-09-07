@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Communication" name="im">
+<panel label="Communication" name="Privacy panel">
 	<check_box label="Seuls mes amis et groupes peuvent m&apos;appeler ou m&apos;envoyer un IM" name="voice_call_friends_only_check"/>
 	<check_box label="Afficher mes repères favoris à la connexion (liste déroulante Lieu de départ)" name="favorites_on_login_check"/>
 	<text name="Logs:">

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="溝通" name="im">
+<panel label="溝通" name="Privacy panel">
 	<check_box label="只有我的朋友和群組可以 IM 或與我通話。" name="voice_call_friends_only_check"/>
 	<check_box label="登入時顯示我最愛的地標位置（經由 &apos;開始於&apos; 的下拉式選單）" name="favorites_on_login_check"/>
 	<text name="Logs:">

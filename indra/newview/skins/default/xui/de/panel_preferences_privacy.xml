@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Kommunikation" name="im">
+<panel label="Kommunikation" name="Privacy panel">
 	<check_box label="Nur Freunde und Gruppen können mich anrufen oder mir eine IM schicken" name="voice_call_friends_only_check"/>
 	<check_box label="Meine Lieblingslandmarken bei Anmeldung anzeigen (im Dropdown-Menü  „Hier anfangen“)" name="favorites_on_login_check" top_pad="15"/>
 	<text name="Logs:">

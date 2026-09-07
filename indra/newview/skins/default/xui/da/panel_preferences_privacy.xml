@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<panel label="Kommunikation" name="im">
+<panel label="Kommunikation" name="Privacy panel">
 	<check_box label="Kun venner og grupper kan sende besked til mig" name="voice_call_friends_only_check"/>
 	<check_box label="Vis mine favorit landemærker ved login (via &quot;Start ved&quot; menuen)" name="favorites_on_login_check"/>
 	<text name="Logs:">
