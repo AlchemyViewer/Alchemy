@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="ColorPicker" title="DESTAQUE DE COR">
-	<text name="r_val_text">
-		Vermelho:
-	</text>
-	<text name="g_val_text">
-		Verde:
-	</text>
-	<text name="b_val_text">
-		Azul:
-	</text>
 	<text name="h_val_text">
 		Matiz:
 	</text>
@@ -28,4 +19,17 @@
 	<text name="(Drag below to save.)">
 		(Arrastar abaixo para salvar)
 	</text>
+	<tab_container name="color_type_container">
+		<panel name="RGB">
+			<text name="b_val_text">
+		Azul:
+	</text>
+			<text name="g_val_text">
+		Verde:
+	</text>
+			<text name="r_val_text">
+		Vermelho:
+	</text>
+		</panel>
+	</tab_container>
 </floater>

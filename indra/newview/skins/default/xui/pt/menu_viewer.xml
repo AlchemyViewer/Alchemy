@@ -2,26 +2,19 @@
 <menu_bar name="Main Menu">
 	<menu label="Eu" name="Me">
 		<menu_item_call label="Perfil..." name="Profile"/>
-		<menu_item_call label="Aparência..." name="ChangeOutfit"/>
 		<menu_item_call label="Selecione um avatar..." name="Avatar Picker"/>
 		<menu_item_check label="Inventário..." name="Inventory"/>
 		<menu_item_call label="Nova janela de inventário" name="NewInventoryWindow"/>
 		<menu_item_call label="Lugares..." name="Places"/>
 		<menu_item_call label="Destaques..." name="Picks"/>
 		<menu_item_call label="Experiências..." name="Experiences"/>
-		<menu_item_call label="Meus Scripts..." name="MyScripts"/>
 		<menu_item_call label="Controles da câmera..." name="Camera Controls"/>
 		<menu label="Movimentos" name="Movement">
 			<menu_item_call label="Sentar" name="Sit Down Here"/>
 			<menu_item_call label="Ficar de pé" name="Stand up"/>
 			<menu_item_check label="Voar" name="Fly"/>
-			<menu_item_check label="Correr sempre" name="Always Run"/>
-			<menu_item_call label="Parar minha animação" name="Stop Animating My Avatar"/>
-			<menu_item_call label="Andar/correr/voar..." name="WalkRunFly"/>
 		</menu>
 		<menu label="Status" name="Status">
-			<menu_item_check label="Ausente" name="Away"/>
-			<menu_item_check label="Não perturbe" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="Comprar L$..." name="Buy and Sell L$"/>
 		<menu_item_call label="Listagens do Marketplace..." name="MarketplaceListings"/>
@@ -33,6 +26,8 @@
 		<menu_item_call label="Ocultar todos os controles" name="Hide UI"/>
 		<menu_item_check label="Exibir anexos de HUD" name="Show HUD Attachments"/>
 		<menu_item_call label="Sair do [APP_NAME]" name="Quit"/>
+		<menu_item_check label="Não perturbe" name="Do Not Disturb"/>
+		<menu_item_check label="Ausente" name="Away"/>
 	</menu>
 	<menu label="Comunicar" name="Communicate">
 		<menu_item_check label="Conversas..." name="Conversations"/>
@@ -83,6 +78,11 @@
 			<menu_item_call label="Meu ambiente..." name="my_environs"/>
 			<menu_item_call label="Iluminação pessoal..." name="adjustment_tool"/>
 			<menu_item_check label="Pausar as nuvens" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="Mais zoom" name="Zoom In"/>
+			<menu_item_call label="Zoom padrão" name="Zoom Default"/>
+			<menu_item_call label="Menos zoom" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="Construir" name="BuildTools">
@@ -142,6 +142,7 @@
 			<menu_item_call label="Usar seleção em grade" name="Use Selection for Grid"/>
 			<menu_item_call label="Opções de grade..." name="Grid Options"/>
 			<menu_item_call label="Definir permissões padrão..." name="Set default permissions"/>
+			<menu_item_check label="Realçar transparentes" name="Highlight Transparent"/>
 		</menu>
 		<menu label="Upload" name="Upload">
 			<menu_item_call label="Imagem (L$[COST])..." name="Upload Image"/>
@@ -185,7 +186,6 @@
 			<menu_item_check label="Efeito baliza piscando" name="Cheesy Beacon"/>
 			<menu_item_check label="Esconder partículas" name="Hide Particles"/>
 			<menu_item_check label="Ocultar seleções" name="Hide Selected"/>
-			<menu_item_check label="Realçar transparentes" name="Highlight Transparent"/>
 			<menu_item_check label="Mostrar retículo na vista subjetiva" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="Tipos de renderização" name="Rendering Types">
@@ -211,6 +211,7 @@
 			<menu_item_check label="Sombras nos pés" name="Foot Shadows"/>
 			<menu_item_check label="Neblina" name="Fog"/>
 			<menu_item_check label="Objetos flexíveis" name="Flexible Objects"/>
+			<menu_item_check name="Test FRInfo" label="Testar InfoFR"/>
 		</menu>
 		<menu_item_check label="Usar plugin de leitura de threads" name="Use Plugin Read Thread"/>
 		<menu_item_call label="Limpar cache de grupo" name="ClearGroupCache"/>
@@ -225,13 +226,9 @@
 			<menu_item_check label="Flycam Joystick" name="Joystick Flycam"/>
 			<menu_item_call label="Visão padrão" name="Reset View"/>
 			<menu_item_call label="Olhar para quem fala por último" name="Look at Last Chatter"/>
-			<menu_item_call label="Mais zoom" name="Zoom In"/>
-			<menu_item_call label="Zoom padrão" name="Zoom Default"/>
-			<menu_item_call label="Menos zoom" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="Mostrar configurações de depuração" name="Debug Settings"/>
 		<menu_item_check label="Show Develop Menu" name="Debug Mode"/>
-		<menu_item_check name="Test FRInfo" label="Testar InfoFR"/>
 	</menu>
 	<menu label="Desenvolver" name="Develop">
 		<menu label="Painéis" name="Consoles">
@@ -247,6 +244,9 @@
 			<menu_item_check label="Câmera:" name="Camera"/>
 			<menu_item_check label="Vento" name="Wind"/>
 			<menu_item_check label="Crachá" name="Badge"/>
+			<menu_item_check name="FOV" label="Campo de Visão"/>
+			<menu_item_call name="Capabilities Info to Debug Console" label="Informações de Capacidade para o Console de Depuração"/>
+			<menu_item_call name="Group Info to Debug Console" label="Informações do Grupo para o Painel de Depuração"/>
 		</menu>
 		<menu label="Show Info" name="Display Info">
 			<menu_item_check label="Mostrar hora" name="Show Time"/>
@@ -256,6 +256,8 @@
 			<menu_item_check label="Mostrar cor sob o cursor" name="Show Color Under Cursor"/>
 			<menu_item_check label="Mostrar memória" name="Show Memory"/>
 			<menu_item_check label="Mostrar mudanças a objetos" name="Show Updates"/>
+			<menu_item_check name="Show Matrices" label="Mostrar Matrizes"/>
+			<menu_item_check name="Show Avatar Render Info" label="Mostrar Informações de Renderização do Avatar"/>
 		</menu>
 		<menu label="Force an Error" name="Force Errors">
 			<menu_item_call label="Force Breakpoint" name="Force Breakpoint"/>
@@ -273,6 +275,7 @@
 			<menu_item_check label="Frame Test" name="Frame Test"/>
 			<menu_item_call label="Perfil do quadro" name="Frame Profile"/>
 			<menu_item_call label="Benchmark" name="Benchmark"/>
+			<menu_item_check name="Periodic Slow Frame" label="Câmera Lenta Periódica"/>
 		</menu>
 		<menu label="Render Metadata" name="Render Metadata">
 			<menu_item_check label="Normais" name="Normals"/>
@@ -291,6 +294,18 @@
 				<menu_item_check label="Desejada" name="Desired"/>
 				<menu_item_check label="Completa" name="Full"/>
 			</menu>
+			<menu_item_check name="Raycast" label="Raycast"/>
+			<menu_item_check name="Collision Skeleton" label="Esqueleto de Colisão"/>
+			<menu_item_check name="Lights" label="Luzes"/>
+			<menu_item_check name="Face Area" label="Área Facial"/>
+			<menu_item_check name="Texture Area" label="Área da Textura"/>
+			<menu_item_check name="Texture Priority" label="Prioridade da Textura"/>
+			<menu_item_check name="Texture Anim" label="Animação de Textura"/>
+			<menu_item_check name="Render Batches" label="Renderizar Lotes"/>
+			<menu_item_check name="Occlusion" label="Oclusão"/>
+			<menu_item_check name="Shadow Frusta" label="Tronco de Sombra"/>
+			<menu_item_check name="Octree" label="Octree"/>
+			<menu_item_check name="Bounding Boxes" label="Campos de Limitação"/>
 		</menu>
 		<menu label="Rendering" name="Rendering">
 			<menu_item_check label="Axes" name="Axes"/>
@@ -310,10 +325,20 @@
 			<menu_item_check label="Render Attached Particles" name="Render Attached Particles"/>
 			<menu_item_check label="Objetos iridescentes" name="Hover Glow Objects"/>
 			<menu_item_call label="Limpar cache imediatamente" name="Cache Clear"/>
+			<menu_item_check name="Rull Res Textures" label="Texturas de Resolução Máxima"/>
+			<menu_item_check name="Debug Pipeline" label="Pipeline de Depuração"/>
+			<menu_item_check name="Debug GL" label="Depurar GL"/>
+			<menu_item_check name="Object-Object Occlusion" label="Oclusão Objeto-Objeto"/>
+			<menu_item_call name="Selected Texture Info Basis" label="Base de Informações da Textura Selecionada"/>
+			<menu_item_check name="Tangent Basis" label="Base da Tangente"/>
 		</menu>
 		<menu label="Rede" name="Network">
 			<menu_item_check label="Pausar avatar" name="AgentPause"/>
 			<menu_item_call label="Drop a Packet" name="Drop a Packet"/>
+			<menu_item_check name="Ping Interpolate Object Positions" label="Rastrear Posições de Objetos Interpolados"/>
+			<menu_item_check name="Velocity Interpolate Objects" label="Velocidade de Objetos Interpolados"/>
+			<menu_item_call name="Disable Message Log" label="Desabilitar Registro de Mensagens"/>
+			<menu_item_call name="Enable Message Log" label="Habilitar Registro de Mensagens"/>
 		</menu>
 		<menu label="Mundo" name="DevelopWorld">
 			<menu_item_check label="Impor sobre sol de simulação" name="Sim Sun Override"/>
@@ -325,6 +350,16 @@
 			<menu_item_call label="Print Selected Object Info" name="Print Selected Object Info"/>
 			<menu_item_check label="Debug Clicks" name="Debug Clicks"/>
 			<menu_item_check label="Debug Mouse Events" name="Debug Mouse Events"/>
+			<menu_item_check name="Debug WindowProc" label="Depurar WindowProc"/>
+			<menu_item_check name="Debug Keys" label="Depurar Chaves"/>
+			<menu_item_check name="Debug Name Tooltips" label="Depurar Nomear Dicas de Contexto"/>
+			<menu_item_check name="Debug Views" label="Depurar Visões"/>
+			<menu_item_check name="Debug SelectMgr" label="Depurar SelectMgr"/>
+			<menu_item_call name="Print Agent Info" label="Imprimir Informações do Agente"/>
+			<menu_item_call name="Dump Focus Holder" label="Apagar Detentor de Foco"/>
+			<menu_item_call name="Dump Inventory" label="Apagar Inventário"/>
+			<menu_item_call name="Dump SelectMgr" label="Apagar SelectMgr"/>
+			<menu_item_call name="FB Connect Test" label="Teste do Facebook Connect"/>
 		</menu>
 		<menu label="XUI" name="XUI">
 			<menu_item_call label="Recarregar cores" name="Reload Color Settings"/>
@@ -344,6 +379,9 @@
 			<menu label="Testes de personagem" name="Character Tests">
 				<menu_item_call label="Toggle Character Geometry" name="Toggle Character Geometry"/>
 				<menu_item_check label="Allow Select Avatar" name="Allow Select Avatar"/>
+				<menu_item_call name="Test Female" label="Testar Mulher"/>
+				<menu_item_call name="Test Male" label="Testar Homem"/>
+				<menu_item_call name="Appearance To XML" label="Aparência ao XML"/>
 			</menu>
 			<menu label="Velocidade de animação" name="Animation Speed">
 				<menu_item_call label="Todas as animações 10% mais rápidas" name="All Animations 10 Faster"/>
@@ -359,6 +397,11 @@
 			<menu_item_check label="Display Agent Target" name="Display Agent Target"/>
 			<menu_item_check label="Mostrar as extensões do impostor" name="Show Impostor Extents"/>
 			<menu_item_call label="Depurar texturas do avatar" name="Debug Avatar Textures"/>
+			<menu_item_call name="Dump Local Textures" label="Apagar Texturas Locais"/>
+			<menu_item_call name="Dump Attachments" label="Apagar Anexos"/>
+			<menu_item_check name="Debug Character Vis" label="Depurar Visibilidade do Personagem"/>
+			<menu_item_check name="Show Point At" label="Mostrar Apontar Para"/>
+			<menu_item_check name="Show Look At" label="Mostrar Olhar Para"/>
 		</menu>
 		<menu_item_check label="Texturas HTTP" name="HTTP Textures"/>
 		<menu_item_call label="Habilitar Visual Leak Detector" name="Enable Visual Leak Detector"/>
@@ -373,64 +416,20 @@
 		<menu_item_call label="Request Admin Status" name="Request Admin Options"/>
 		<menu_item_call label="Sair do modo admin" name="Leave Admin Options"/>
 		<menu_item_check label="Mostrar menu admin" name="View Admin Options"/>
-		<menu_item_check name="Texture Area" label="Área da Textura"/>
-		<menu_item_call name="Print Agent Info" label="Imprimir Informações do Agente"/>
-		<menu_item_call name="Test Male" label="Testar Homem"/>
-		<menu_item_check name="Shadow Frusta" label="Tronco de Sombra"/>
-		<menu_item_check name="Debug GL" label="Depurar GL"/>
-		<menu_item_call name="Capabilities Info to Debug Console" label="Informações de Capacidade para o Console de Depuração"/>
-		<menu_item_check name="Face Area" label="Área Facial"/>
-		<menu_item_check name="Debug Pipeline" label="Pipeline de Depuração"/>
 		<menu_item_call name="Dump Scripted Camera" label="Apagar Câmera com Script"/>
-		<menu_item_check name="Show Avatar Render Info" label="Mostrar Informações de Renderização do Avatar"/>
-		<menu_item_check name="Bounding Boxes" label="Campos de Limitação"/>
-		<menu_item_call name="Start Playback" label="Começar Reprodução"/>
-		<menu_item_call name="Dump Attachments" label="Apagar Anexos"/>
-		<menu_item_check name="Debug Views" label="Depurar Visões"/>
-		<menu_item_call name="Stop Record" label="Parar Gravação"/>
-		<menu_item_call name="Appearance To XML" label="Aparência ao XML"/>
-		<menu_item_check name="Raycast" label="Raycast"/>
-		<menu_item_call name="Dump Focus Holder" label="Apagar Detentor de Foco"/>
 		<menu_item_call name="Playback event recording" label="Reproduzir gravação de evento"/>
-		<menu_item_call name="Disable Message Log" label="Desabilitar Registro de Mensagens"/>
-		<menu_item_call name="Selected Texture Info Basis" label="Base de Informações da Textura Selecionada"/>
-		<menu_item_check name="Object-Object Occlusion" label="Oclusão Objeto-Objeto"/>
 		<menu_item_check name="Output Debug Minidump" label="Produzir Depuração de Tela Azul"/>
-		<menu_item_check name="Debug Keys" label="Depurar Chaves"/>
-		<menu_item_check name="Texture Anim" label="Animação de Textura"/>
-		<menu_item_call name="FB Connect Test" label="Teste do Facebook Connect"/>
 		<menu_item_call name="Dump Timers" label="Apagar Cronômetros"/>
-		<menu_item_check name="Rull Res Textures" label="Texturas de Resolução Máxima"/>
-		<menu_item_call name="Dump Local Textures" label="Apagar Texturas Locais"/>
-		<menu_item_check name="Ping Interpolate Object Positions" label="Rastrear Posições de Objetos Interpolados"/>
-		<menu_item_check name="Show Look At" label="Mostrar Olhar Para"/>
-		<menu_item_check name="Velocity Interpolate Objects" label="Velocidade de Objetos Interpolados"/>
-		<menu_item_call name="Test Female" label="Testar Mulher"/>
-		<menu_item_check name="FOV" label="Campo de Visão"/>
-		<menu_item_check name="Debug SelectMgr" label="Depurar SelectMgr"/>
 		<menu_item_call name="Stop event recording" label="Parar gravação do evento"/>
-		<menu_item_check name="Debug WindowProc" label="Depurar WindowProc"/>
-		<menu_item_check name="Render Batches" label="Renderizar Lotes"/>
-		<menu_item_check name="Lights" label="Luzes"/>
-		<menu_item_call name="Start Record" label="Começar Gravação"/>
-		<menu_item_check name="Collision Skeleton" label="Esqueleto de Colisão"/>
-		<menu_item_check name="Octree" label="Octree"/>
-		<menu_item_check name="Show Matrices" label="Mostrar Matrizes"/>
-		<menu_item_call name="Stop Playback" label="Parar Reprodução"/>
-		<menu_item_check name="Debug Name Tooltips" label="Depurar Nomear Dicas de Contexto"/>
-		<menu_item_call name="Dump Inventory" label="Apagar Inventário"/>
-		<menu_item_call name="Dump SelectMgr" label="Apagar SelectMgr"/>
-		<menu_item_call name="Group Info to Debug Console" label="Informações do Grupo para o Painel de Depuração"/>
-		<menu_item_check name="Texture Priority" label="Prioridade da Textura"/>
-		<menu_item_check name="Loop Playback" label="Reprodução em Loop"/>
-		<menu_item_check name="Occlusion" label="Oclusão"/>
-		<menu_item_check name="Debug Character Vis" label="Depurar Visibilidade do Personagem"/>
-		<menu_item_check name="Periodic Slow Frame" label="Câmera Lenta Periódica"/>
 		<menu_item_call name="Start event recording" label="Começar gravação de evento"/>
 		<menu_item_call name="Compress Images" label="Comprimir Imagens"/>
-		<menu_item_check name="Tangent Basis" label="Base da Tangente"/>
-		<menu_item_call name="Enable Message Log" label="Habilitar Registro de Mensagens"/>
-		<menu_item_check name="Show Point At" label="Mostrar Apontar Para"/>
+		<menu name="Recorder" label="Registrador">
+			<menu_item_call name="Stop Record" label="Parar Gravação"/>
+			<menu_item_call name="Start Record" label="Começar Gravação"/>
+			<menu_item_check name="Loop Playback" label="Reprodução em Loop"/>
+			<menu_item_call name="Stop Playback" label="Parar Reprodução"/>
+			<menu_item_call name="Start Playback" label="Começar Reprodução"/>
+		</menu>
 	</menu>
 	<menu label="Admin" name="Admin">
 		<menu label="Objeto" name="AdminObject">
@@ -456,6 +455,18 @@
 		<menu label="Take Off Clothing" name="Take Off Clothing">
 			<menu_item_call label="Universal" name="Universal"/>
 			<menu_item_call label="Físico" name="Physics"/>
+			<menu_item_call name="All Clothes" label="Todas as Roupas"/>
+			<menu_item_call name="Tattoo" label="Tatuagem"/>
+			<menu_item_call name="Alpha" label="Alpha"/>
+			<menu_item_call name="Skirt" label="Saia"/>
+			<menu_item_call name="Menu Underpants" label="Roupa Íntima"/>
+			<menu_item_call name="Menu Undershirt" label="Camisa de Baixo"/>
+			<menu_item_call name="Gloves" label="Luvas"/>
+			<menu_item_call name="Jacket" label="Jaqueta"/>
+			<menu_item_call name="Socks" label="Meias"/>
+			<menu_item_call name="Shoes" label="Sapatos"/>
+			<menu_item_call name="Pants" label="Calça"/>
+			<menu_item_call name="Shirt" label="Camisa"/>
 		</menu>
 		<menu label="Ajuda" name="DeprecatedHelp">
 			<menu_item_call label="Blog oficial da Linden" name="Official Linden Blog"/>
@@ -469,23 +480,13 @@
 			</menu>
 		</menu>
 		<menu name="Attach Object" label="Anexar Objeto"/>
-		<menu_item_call name="Tattoo" label="Tatuagem"/>
-		<menu_item_call name="Alpha" label="Alpha"/>
 		<menu name="Detach Object" label="Desanexar Objeto"/>
-		<menu_item_call name="Menu Underpants" label="Roupa Íntima"/>
-		<menu_item_call name="Menu Undershirt" label="Camisa de Baixo"/>
 	</menu>
-	<menu name="Clothes &gt;"/>
-	<menu name="Take Off &gt;"/>
 	<menu name="Avatar">
-		<menu_item_call name="Gloves" label="Luvas"/>
-		<menu_item_call name="All Clothes" label="Todas as Roupas"/>
-		<menu_item_call name="Skirt" label="Saia"/>
-		<menu_item_call name="Jacket" label="Jaqueta"/>
-		<menu_item_call name="Pants" label="Calça"/>
-		<menu_item_call name="Shirt" label="Camisa"/>
-		<menu_item_call name="Socks" label="Meias"/>
-		<menu_item_call name="Shoes" label="Sapatos"/>
+		<menu_item_call label="Meus Scripts..." name="MyScripts"/>
+		<menu_item_check label="Correr sempre" name="Always Run"/>
+		<menu_item_call label="Andar/correr/voar..." name="WalkRunFly"/>
+		<menu_item_call label="Parar minha animação" name="Stop Animating My Avatar"/>
+		<menu_item_call label="Aparência..." name="ChangeOutfit"/>
 	</menu>
-	<menu name="Recorder" label="Registrador"/>
 </menu_bar>

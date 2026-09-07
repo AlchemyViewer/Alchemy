@@ -41,6 +41,7 @@
 					<icon name="media_whitelist_flag" tool_tip="Lista de aceitação ativada"/>
 				</layout_panel>
 			</layout_stack>
+			<icon name="media_secure_lock_flag" tool_tip="Navegador Seguro"/>
 		</layout_panel>
 		<layout_panel name="media_play_position">
 			<slider_bar initial_value="0.5" name="media_play_slider" tool_tip="Andamento do vídeo"/>
@@ -64,6 +65,5 @@
 		<layout_panel name="new_window">
 			<button name="new_window_btn" tool_tip="Abrir URL em navegador"/>
 		</layout_panel>
-		<icon name="media_secure_lock_flag" tool_tip="Navegador Seguro"/>
 	</layout_stack>
 </panel>

@@ -25,9 +25,9 @@
 				<text name="notes_label" value="Minhas notas:"/>
 				<text name="folder_label" value="Localização do marco:"/>
 			</panel>
+			<expandable_text name="description" value="Du waltz die spritz"/>
+			<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
 		</panel>
-		<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
-		<expandable_text name="description" value="Du waltz die spritz"/>
 		<text name="region_title" value="SampleRegion"/>
 	</scroll_container>
 </panel>

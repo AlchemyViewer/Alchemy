@@ -18,9 +18,10 @@
 			<check_box label="Sempre abrir no meu Navegador de Web" left_delta="201" name="open_always"/>
 			<button label="Fechar" name="close"/>
 		</layout_panel>
-		<button name="seek" label="avançar"/>
-		<button name="rewind" label="voltar"/>
-		<button name="stop" label="parar"/>
+		<layout_panel name="time_controls">
+			<button name="seek" label="avançar"/>
+			<button name="stop" label="parar"/>
+			<button name="rewind" label="voltar"/>
+		</layout_panel>
 	</layout_stack>
-	<layout_panel name="time_controls"/>
 </floater>

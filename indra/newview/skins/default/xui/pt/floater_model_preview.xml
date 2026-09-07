@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="CARREGAR MODELO">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Erro: Problema ao analisar .dae - consulte log para obter detalhes.
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="Procurar..." name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Etapa 2: Analisar
-					</text>
-					<text name="analysis_method_label">
-						Método:
-					</text>
-					<text name="quality_label">
-						Qualidade:
-					</text>
-					<text name="smooth_method_label">
-						Liso:
-					</text>
-					<check_box label="Fechar orifícios" name="Close Holes (Slow)"/>
-					<button label="Analisar" name="Decompose"/>
-					<button label="Cancelar" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						Etapa 3: Simplificar
@@ -230,6 +212,25 @@
 						Corpos: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Liso:
+					</text>
+					<text name="quality_label">
+						Qualidade:
+					</text>
+					<text name="analysis_method_label">
+						Método:
+					</text>
+					<text name="method_label">
+						Etapa 2: Analisar
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Cancelar" name="decompose_cancel"/>
+					<button label="Analisar" name="Decompose"/>
+					<check_box label="Fechar orifícios" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Carregar opções" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					Somente para modelos de avatar:
 				</text>
-				<check_box label="Incluir peso da pele" name="upload_skin"/>
-				<check_box label="Incluir posições de junções" name="upload_joints"/>
-				<check_box label="Travar escala se posição de articulação estiver definida" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Desvio Z (subir ou baixar avatar):
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Travar escala se posição de articulação estiver definida" name="lock_scale_if_joint_position"/>
+				<check_box label="Incluir posições de junções" name="upload_joints"/>
+				<check_box label="Incluir peso da pele" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

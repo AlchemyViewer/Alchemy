@@ -56,13 +56,13 @@
 						<multi_slider initial_value="0" name="WLTimeSlider"/>
 						<multi_slider initial_value="0" name="WLDayCycleFrames"/>
 						<text name="current_time" value="[PRCNT]%[DSC]"/>
-						<layout_stack>
-							<layout_panel>
-								<button label="Clonar Rastreio de" name="copy_track"/>
-								<button label="Carregar rastreio de" name="load_track"/>
-								<button label="Limpar rastreio" name="clear_track"/>
+						<layout_stack name="track_options_ls">
+							<layout_panel name="frames_lp">
+								<button label="Excluir [FRAME]" name="delete_frame"/>
+								<button label="Carregar [FRAME]" name="btn_load_frame"/>
+								<button label="Adicionar [FRAME]" name="add_frame"/>
 							</layout_panel>
-							<layout_panel>
+							<layout_panel name="track_progress_lp">
 								<layout_stack name="progress_control">
 									<layout_panel name="skip_back">
 										<button name="skip_back_btn" tool_tip="Passo para trás"/>
@@ -72,10 +72,10 @@
 									</layout_panel>
 								</layout_stack>
 							</layout_panel>
-							<layout_panel>
-								<button label="Adicionar [FRAME]" name="add_frame"/>
-								<button label="Carregar [FRAME]" name="btn_load_frame"/>
-								<button label="Excluir [FRAME]" name="delete_frame"/>
+							<layout_panel name="track_options_lp">
+								<button label="Limpar rastreio" name="clear_track"/>
+								<button label="Carregar rastreio de" name="load_track"/>
+								<button label="Clonar Rastreio de" name="copy_track"/>
 							</layout_panel>
 						</layout_stack>
 					</panel>
