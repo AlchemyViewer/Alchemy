@@ -54,6 +54,7 @@ class LLFolderViewFolder;
 class LLFolderViewItem;
 class LLLineEditor;
 class LLScrollListCtrl;
+class LLScrollListItem;
 class LLTabContainer;
 class LLTextBox;
 class LLTextEditor;
@@ -190,11 +191,16 @@ private:
 
     // Every list in the tool is a table someone will want in a message or
     // a bug report: shift and control extend the selection, and the right
-    // button copies it.
+    // button copies it as a table with a heading and a line saying what it
+    // is about, or copies the one cell it was over.
     void watchList(LLScrollListCtrl* list);
     void onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask);
     void onListAction(const LLSD& param);
     bool onListActionEnabled(const LLSD& param);
+    std::string listCaption(const LLScrollListCtrl* list) const;
+    std::string listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const;
+    void copyList(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const;
+    LLScrollListCtrl* focusedList() const;
 
     ALXUICatalog        mCatalog;
     ALXUISelection      mSelection;
@@ -218,7 +224,9 @@ private:
 
     LLPointer<LLImageRaw>           mCapture;       // taken before the picker opens
     LLScrollListCtrl*               mMenuList = nullptr;    // the list the right button was over
+    std::string                     mMenuCell;      // the cell it was over
     LLHandle<LLView>                mListMenu;
+    std::vector<LLScrollListCtrl*>  mLists;
 
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;

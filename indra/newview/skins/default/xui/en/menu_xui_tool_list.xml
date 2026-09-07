@@ -3,7 +3,17 @@
  layout="topleft"
  name="menu_xui_tool_list">
     <menu_item_call
-     label="Copy"
+     label="Copy Cell"
+     name="copy_cell">
+        <menu_item_call.on_click
+         function="XUITool.List"
+         parameter="copy_cell" />
+        <menu_item_call.on_enable
+         function="XUITool.ListEnabled"
+         parameter="copy_cell" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Rows"
      name="copy">
         <menu_item_call.on_click
          function="XUITool.List"
@@ -13,10 +23,13 @@
          parameter="copy" />
     </menu_item_call>
     <menu_item_call
-     label="Copy All"
+     label="Copy All Rows"
      name="copy_all">
         <menu_item_call.on_click
          function="XUITool.List"
+         parameter="copy_all" />
+        <menu_item_call.on_enable
+         function="XUITool.ListEnabled"
          parameter="copy_all" />
     </menu_item_call>
     <menu_item_separator />
@@ -25,6 +38,9 @@
      name="select_all">
         <menu_item_call.on_click
          function="XUITool.List"
+         parameter="select_all" />
+        <menu_item_call.on_enable
+         function="XUITool.ListEnabled"
          parameter="select_all" />
     </menu_item_call>
 </context_menu>

@@ -61,6 +61,7 @@
 #include "llviewerwindow.h"
 
 #include <algorithm>
+#include <cctype>
 #include <set>
 
 // ===========================================================================
@@ -719,6 +720,14 @@ bool ALFloaterXUITool::handleKeyHere(KEY key, MASK mask)
     {
         mTreeFilter->setFocus(true);
         return true;
+    }
+    if (key == 'C' && mask == MASK_CONTROL)
+    {
+        if (LLScrollListCtrl* list = focusedList())
+        {
+            copyList(list, list->getAllSelected());
+            return true;
+        }
     }
     return LLFloater::handleKeyHere(key, mask);
 }
@@ -1856,13 +1865,205 @@ void ALFloaterXUITool::finishLintAll()
                         << " files, report at " << path << LL_ENDL;
 }
 
-// A list's rows are a table, and a table is worth copying: the right
-// button offers the selection, all of it, or a way to select all of it.
-// The list itself already knows how to write its rows as comma-separated
-// text, and Control+C reaches the same code through the edit menu.
+// A list's rows are a table, and where a copied table is going is a bug
+// report or a message: it carries a line saying which file and which
+// element it is about, a heading naming its columns, and its columns lined
+// up. An empty column is left out, since a heading over nothing tells no
+// one anything.
+namespace
+{
+    // Widths count characters and not bytes, since these tables carry
+    // translated text.
+    S32 xui_display_width(const std::string& text)
+    {
+        S32 count = 0;
+        for (const char c : text)
+        {
+            count += ((U8)c & 0xC0) != 0x80;
+        }
+        return count;
+    }
+
+    // A cell with a newline or a tab in it would break the table it is
+    // being written into.
+    std::string xui_one_line(std::string text)
+    {
+        for (char& c : text)
+        {
+            if (c == '\n' || c == '\r' || c == '\t')
+            {
+                c = ' ';
+            }
+        }
+        return text;
+    }
+}
+
 void ALFloaterXUITool::watchList(LLScrollListCtrl* list)
 {
     list->setRightMouseDownCallback(boost::bind(&ALFloaterXUITool::onListRightClick, this, _1, _2, _3, _4));
+    mLists.push_back(list);
+}
+
+// Control+C over a list copies what the menu's Copy would, rather than the
+// comma-separated rows the edit menu would reach.
+LLScrollListCtrl* ALFloaterXUITool::focusedList() const
+{
+    for (LLScrollListCtrl* list : mLists)
+    {
+        if (list->hasFocus())
+        {
+            return list;
+        }
+    }
+    return nullptr;
+}
+
+std::string ALFloaterXUITool::listCaption(const LLScrollListCtrl* list) const
+{
+    if (list == mFileList)
+    {
+        const std::string filter = mCatalogFilter->getText();
+        return filter.empty() ? "XUI files" : "XUI files matching \"" + filter + "\"";
+    }
+    if (list == mFindResults)
+    {
+        return "Search for \"" + mFindQuery->getText() + "\" in "
+             + utf8str_tolower(mFindField->getSelectedItemLabel()) + ", " + mSkin + "/" + mLanguage;
+    }
+
+    const Preview& pv = mPreviews[PRIMARY];
+    std::string where = mFile.empty() ? std::string("no file") : mFile;
+    if (!pv.skin.empty())
+    {
+        where += " (" + pv.skin + "/" + pv.language + ")";
+    }
+    if (list == mFindings)
+    {
+        return "Findings in " + where;
+    }
+
+    std::string what = "Rows";
+    if (list == mAttributes)              { what = "Attributes"; }
+    else if (list == mLayout)             { what = "Layout"; }
+    else if (list == mBindings)           { what = "Bindings"; }
+    else if (list == mState)              { what = "State"; }
+    else if (list == mSelectionFindings)  { what = "Findings"; }
+    if (mSelection.hasSelection())
+    {
+        what += " of " + ALXUISelection::toString(mSelection.selection());
+    }
+    return what + " in " + where;
+}
+
+std::string ALFloaterXUITool::listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
+{
+    const S32 columns = list->getNumColumns();
+    if (columns <= 0 || rows.empty())
+    {
+        return std::string();
+    }
+
+    // A column draws no heading when it needs none, which leaves its name
+    // to stand for it here.
+    std::vector<std::string> heading((size_t)columns);
+    for (S32 i = 0; i < columns; ++i)
+    {
+        const LLScrollListColumn* column = list->getColumn(i);
+        if (!column)
+        {
+            continue;
+        }
+        heading[i] = column->mLabel.getString();
+        if (heading[i].empty())
+        {
+            heading[i] = column->mName;
+            if (!heading[i].empty())
+            {
+                heading[i][0] = (char)toupper((U8)heading[i][0]);
+            }
+        }
+    }
+
+    std::vector<std::vector<std::string>> cells;
+    std::vector<bool> used((size_t)columns, false);
+    cells.reserve(rows.size());
+    for (const LLScrollListItem* item : rows)
+    {
+        std::vector<std::string> line((size_t)columns);
+        for (S32 i = 0; i < columns; ++i)
+        {
+            const LLScrollListCell* cell = item->getColumn(i);
+            if (!cell)
+            {
+                continue;
+            }
+            line[i] = xui_one_line(cell->getValue().asString());
+            used[i] = used[i] || !line[i].empty();
+        }
+        cells.push_back(std::move(line));
+    }
+
+    S32 last = -1;
+    std::vector<S32> width((size_t)columns, 0);
+    for (S32 i = 0; i < columns; ++i)
+    {
+        if (!used[i])
+        {
+            continue;
+        }
+        last = i;
+        width[i] = xui_display_width(heading[i]);
+        for (const std::vector<std::string>& line : cells)
+        {
+            width[i] = llmax(width[i], xui_display_width(line[i]));
+        }
+        // One long value -- a tool tip, a translated label -- would push
+        // every other row's remaining columns out past reading distance,
+        // so it is the one that steps out of line instead.
+        width[i] = llmin(width[i], 48);
+    }
+    if (last < 0)
+    {
+        return std::string();
+    }
+
+    std::string text = listCaption(list);
+    if (!text.empty())
+    {
+        text += "\n\n";
+    }
+    auto append = [&](const std::vector<std::string>& line)
+    {
+        for (S32 i = 0; i <= last; ++i)
+        {
+            if (!used[i])
+            {
+                continue;
+            }
+            text += line[i];
+            if (i != last)
+            {
+                text.append((size_t)llmax(0, width[i] - xui_display_width(line[i])) + 2, ' ');
+            }
+        }
+        text += '\n';
+    };
+    append(heading);
+    for (const std::vector<std::string>& line : cells)
+    {
+        append(line);
+    }
+    return text;
+}
+
+void ALFloaterXUITool::copyList(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
+{
+    const std::string text = listAsText(list, rows);
+    if (!text.empty())
+    {
+        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
+    }
 }
 
 void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
@@ -1873,12 +2074,24 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
         return;
     }
 
-    // The right button does not select, so Copy would have nothing on the
-    // first click. Take the row under it, unless the click landed inside a
-    // selection someone has already made.
-    if (!mMenuList->getFirstSelected())
+    // The right button does not select, so Copy would have the wrong rows,
+    // or none at all on the first click. Take the row under it, unless the
+    // click landed inside a selection someone has already made.
+    LLScrollListItem* hit = mMenuList->hitItem(x, y);
+    if (hit && !hit->getSelected())
     {
         mMenuList->selectItemAt(x, y, MASK_NONE);
+    }
+
+    // The one cell under the pointer, for the copy that is meant to be
+    // pasted into a line of code and not read.
+    mMenuCell.clear();
+    if (hit)
+    {
+        if (const LLScrollListCell* cell = hit->getColumn(mMenuList->getColumnIndexFromOffset(x)))
+        {
+            mMenuCell = cell->getValue().asString();
+        }
     }
 
     LLContextMenu* menu = static_cast<LLContextMenu*>(mListMenu.get());
@@ -1909,7 +2122,20 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
 
 bool ALFloaterXUITool::onListActionEnabled(const LLSD& param)
 {
-    return mMenuList && mMenuList->getFirstSelected() != nullptr;
+    if (!mMenuList)
+    {
+        return false;
+    }
+    const std::string action = param.asString();
+    if (action == "copy_cell")
+    {
+        return !mMenuCell.empty();
+    }
+    if (action == "copy_all" || action == "select_all")
+    {
+        return mMenuList->getFirstData() != nullptr;
+    }
+    return mMenuList->getFirstSelected() != nullptr;
 }
 
 void ALFloaterXUITool::onListAction(const LLSD& param)
@@ -1919,22 +2145,21 @@ void ALFloaterXUITool::onListAction(const LLSD& param)
         return;
     }
     const std::string action = param.asString();
-    if (action == "copy")
+    if (action == "copy_cell")
     {
-        mMenuList->copy();
+        LLClipboard::instance().copyToClipboard(mMenuCell, 0, (S32)mMenuCell.size());
+    }
+    else if (action == "copy")
+    {
+        copyList(mMenuList, mMenuList->getAllSelected());
+    }
+    else if (action == "copy_all")
+    {
+        copyList(mMenuList, mMenuList->getAllData());
     }
     else if (action == "select_all")
     {
         mMenuList->selectAll();
-    }
-    else if (action == "copy_all")
-    {
-        std::string text;
-        for (const LLScrollListItem* item : mMenuList->getAllData())
-        {
-            text += item->getContentsCSV() + "\n";
-        }
-        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
     }
 }
 
