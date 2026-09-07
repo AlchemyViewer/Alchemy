@@ -60,6 +60,7 @@
 #include "llviewercontrol.h"
 #include "llviewermenufile.h"
 #include "llviewerwindow.h"
+#include "llwindow.h"
 
 #include <algorithm>
 #include <cctype>
@@ -185,16 +186,19 @@ public:
                 {
                     drawGuides(view);
                 }
-                const LLRect r = localRectOf(view);
-                drawGrips(r);
-                if (mGrip != GRIP_NONE)
+                if (editable(view))
                 {
-                    LLRect dragged(r);
-                    dragged.mLeft += mDelta[EDGE_L];
-                    dragged.mBottom += mDelta[EDGE_B];
-                    dragged.mRight += mDelta[EDGE_R];
-                    dragged.mTop += mDelta[EDGE_T];
-                    gl_rect_2d(dragged, LLColor4::white, false);
+                    const LLRect r = localRectOf(view);
+                    drawGrips(r);
+                    if (dragging())
+                    {
+                        LLRect dragged(r);
+                        dragged.mLeft += mDelta[EDGE_L];
+                        dragged.mBottom += mDelta[EDGE_B];
+                        dragged.mRight += mDelta[EDGE_R];
+                        dragged.mTop += mDelta[EDGE_T];
+                        gl_rect_2d(dragged, LLColor4::white, false);
+                    }
                 }
             }
         }
@@ -202,43 +206,53 @@ public:
 
     bool handleKeyHere(KEY key, MASK mask) override
     {
-        if (mTool && mTool->nudge(key, mask))
+        if (mTool && mWhich == ALFloaterXUITool::PRIMARY)
         {
-            return true;
+            if (key == 'Z' && mask == MASK_CONTROL && mTool->undoEdit())
+            {
+                return true;
+            }
+            if (mTool->nudge(key, mask))
+            {
+                return true;
+            }
         }
         return LLFloater::handleKeyHere(key, mask);
     }
 
+    // A plain click belongs to the preview: its tabs turn and its lists
+    // scroll, which is half of what a preview is for. Control selects the
+    // element under the pointer, and held through a drag it moves what it
+    // selected.
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
-        if (mTool && mRoot && (mask & MASK_CONTROL))
+        if (!mTool || !mRoot)
         {
-            mTool->canvasSelect(mWhich, hitTest(x, y));
-            setFocus(true);
-            return true;
+            return LLFloater::handleMouseDown(x, y, mask);
         }
 
-        // A handle answers before the widget under it does: a button in a
-        // preview is a picture of a button, and its corner is a corner.
-        if (mTool && mRoot)
+        // A handle answers before the widget under it does, with or
+        // without the modifier: a button in a preview is a picture of a
+        // button, and the handle on its corner is a handle.
+        LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+        if (editable(selected))
         {
-            if (LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
+            const S32 grip = gripAt(x, y, localRectOf(selected), mask);
+            if (grip != GRIP_NONE)
             {
-                const S32 grip = gripAt(x, y, localRectOf(view), mask);
-                if (grip != GRIP_NONE)
-                {
-                    mGrip = grip;
-                    mDragX = x;
-                    mDragY = y;
-                    for (S32& d : mDelta)
-                    {
-                        d = 0;
-                    }
-                    gFocusMgr.setMouseCapture(this);
-                    setFocus(true);
-                    return true;
-                }
+                return beginDrag(grip, x, y);
             }
+        }
+        if (mask & MASK_CONTROL)
+        {
+            LLView* view = hitTest(x, y);
+            mTool->canvasSelect(mWhich, view);
+            if (editable(view))
+            {
+                return beginDrag(GRIP_MOVE, x, y);
+            }
+            setFocus(true);
+            return true;
         }
         return LLFloater::handleMouseDown(x, y, mask);
     }
@@ -248,11 +262,22 @@ public:
         if (mGrip != GRIP_NONE && hasMouseCapture())
         {
             track(x, y);
+            setGripCursor(mGrip);
             return true;
         }
         if (mTool && mRoot)
         {
             mTool->canvasHover(mWhich, hitTest(x, y));
+            LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+            if (editable(selected))
+            {
+                const S32 grip = gripAt(x, y, localRectOf(selected), mask);
+                if (grip != GRIP_NONE)
+                {
+                    setGripCursor(grip);
+                    return true;
+                }
+            }
         }
         return LLFloater::handleHover(x, y, mask);
     }
@@ -292,14 +317,43 @@ public:
     }
 
 private:
-    // The four edges, and the grips that move them: one per edge, one per
-    // corner, and the whole rect while Alt is held, which is also the
-    // modifier that shows what the numbers in the file mean.
+    // The four edges, the eight grips that move them, and the ninth in the
+    // middle that moves all four at once.
     enum Edge : S32 { EDGE_L, EDGE_B, EDGE_R, EDGE_T, EDGE_COUNT };
     static constexpr S32 GRIP_NONE = -1;
     static constexpr S32 GRIP_MOVE = -2;
 
     static constexpr S32 GRIP_SIZE = 7;
+    static constexpr S32 MOVE_GRIP_SIZE = 13;
+    static constexpr S32 DEAD_ZONE = 3;      // a click is not a drag
+
+    // The root of a floater preview is the preview window: its corners
+    // are the window's own, and dragging its bar is how the window is
+    // moved out of the way. The second preview is another language of the
+    // same file, shown beside the first and not written to.
+    bool editable(const LLView* view) const
+    {
+        return view && view != this && mWhich == ALFloaterXUITool::PRIMARY;
+    }
+
+    bool dragging() const
+    {
+        return mDelta[EDGE_L] || mDelta[EDGE_B] || mDelta[EDGE_R] || mDelta[EDGE_T];
+    }
+
+    bool beginDrag(S32 grip, S32 x, S32 y)
+    {
+        mGrip = grip;
+        mDragX = x;
+        mDragY = y;
+        for (S32& d : mDelta)
+        {
+            d = 0;
+        }
+        gFocusMgr.setMouseCapture(this);
+        setFocus(true);
+        return true;
+    }
 
     // The eight squares, as rects in this floater's space.
     static void gripRects(const LLRect& r, LLRect (&out)[8])
@@ -313,6 +367,33 @@ private:
         {
             out[i] = LLRect(xs[i] - h, ys[i] + h, xs[i] + h, ys[i] - h);
         }
+    }
+
+    // The middle of the part of the element that is inside the window,
+    // since an element that hangs over the edge is drawn there but the
+    // mouse never reaches past it, and that element is the one most in
+    // need of being dragged back.
+    LLRect moveGripRect(const LLRect& r) const
+    {
+        LLRect visible(r);
+        visible.intersectWith(getLocalRect());
+        if (visible.isEmpty())
+        {
+            visible = r;
+        }
+        const S32 h = MOVE_GRIP_SIZE / 2;
+        const S32 mid_x = (visible.mLeft + visible.mRight) / 2;
+        const S32 mid_y = (visible.mBottom + visible.mTop) / 2;
+        return LLRect(mid_x - h, mid_y + h, mid_x + h, mid_y - h);
+    }
+
+    void setGripCursor(S32 grip) const
+    {
+        static const ECursorType cursors[8] = {
+            UI_CURSOR_SIZENESW, UI_CURSOR_SIZENS, UI_CURSOR_SIZENWSE,
+            UI_CURSOR_SIZEWE,                     UI_CURSOR_SIZEWE,
+            UI_CURSOR_SIZENWSE, UI_CURSOR_SIZENS, UI_CURSOR_SIZENESW };
+        getWindow()->setCursor(grip >= 0 && grip < 8 ? cursors[grip] : UI_CURSOR_SIZEALL);
     }
 
     // Which edges each of the eight moves, in the order gripRects builds
@@ -344,6 +425,16 @@ private:
             gl_rect_2d(grip, LLColor4::white, true);
             gl_rect_2d(grip, LLColor4::black, false);
         }
+
+        // The one in the middle moves the element, and says so with the
+        // four arrows a move cursor has.
+        const LLRect move = moveGripRect(r);
+        gl_rect_2d(move, LLColor4::white, true);
+        gl_rect_2d(move, LLColor4::black, false);
+        const S32 mid_x = (move.mLeft + move.mRight) / 2;
+        const S32 mid_y = (move.mBottom + move.mTop) / 2;
+        gl_line_2d(move.mLeft + 2, mid_y, move.mRight - 2, mid_y, LLColor4::black);
+        gl_line_2d(mid_x, move.mBottom + 2, mid_x, move.mTop - 2, LLColor4::black);
     }
 
     S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
@@ -357,13 +448,24 @@ private:
                 return i;
             }
         }
+        if (moveGripRect(r).pointInRect(x, y))
+        {
+            return GRIP_MOVE;
+        }
         return (mask & MASK_ALT) && r.pointInRect(x, y) ? GRIP_MOVE : GRIP_NONE;
     }
 
     void track(S32 x, S32 y)
     {
-        const S32 dx = x - mDragX;
-        const S32 dy = y - mDragY;
+        S32 dx = x - mDragX;
+        S32 dy = y - mDragY;
+        if (!dragging() && llabs(dx) < DEAD_ZONE && llabs(dy) < DEAD_ZONE)
+        {
+            // The hand moves a little on the way down; a click that
+            // selects an element is not a move of it.
+            dx = 0;
+            dy = 0;
+        }
         bool edges[EDGE_COUNT] = { true, true, true, true };
         if (mGrip != GRIP_MOVE)
         {
@@ -375,50 +477,37 @@ private:
         mDelta[EDGE_T] = edges[EDGE_T] ? dy : 0;
     }
 
-    // The deepest visible view under a point in this floater's space, and
-    // then the nearest one the file describes, since a widget's own
-    // children are not what an author is pointing at.
+    // The topmost view drawn over a point, taking the deepest before its
+    // parent. Drawing is not clipped to a parent's rect: a widget
+    // positioned outside its panel is drawn outside it, and that is
+    // exactly the widget someone opens this tool to drag back, so the
+    // search is over what is on screen rather than over what contains
+    // what.
+    static LLView* pickDrawn(LLView* view, S32 screen_x, S32 screen_y)
+    {
+        if (!view->getVisible())
+        {
+            return nullptr;
+        }
+        for (LLView* child : *view->getChildList())
+        {
+            if (LLView* hit = pickDrawn(child, screen_x, screen_y))
+            {
+                return hit;
+            }
+        }
+        return view->calcScreenRect().pointInRect(screen_x, screen_y) ? view : nullptr;
+    }
+
+    // What was hit, and then the nearest view above it that the file
+    // describes, since a widget's own children are not what an author is
+    // pointing at.
     LLView* hitTest(S32 x, S32 y)
     {
-        LLView* deepest = mRoot == this ? this : nullptr;
-        LLView* start = mRoot == this ? this : mRoot;
-        S32 px = x;
-        S32 py = y;
-        if (start != this)
-        {
-            // The point in the root's parent's space.
-            LLRect screen;
-            localRectToScreen(LLRect(x, y, x, y), &screen);
-            LLRect in_parent;
-            start->getParent()->screenRectToLocal(screen, &in_parent);
-            px = in_parent.mLeft;
-            py = in_parent.mBottom;
-            if (!start->getVisible() || !start->pointInView(px - start->getRect().mLeft, py - start->getRect().mBottom))
-            {
-                return nullptr;
-            }
-            deepest = start;
-            px -= start->getRect().mLeft;
-            py -= start->getRect().mBottom;
-        }
-        for (bool found = true; found;)
-        {
-            found = false;
-            for (LLView* child : *deepest->getChildList())
-            {
-                const LLRect& r = child->getRect();
-                if (child->getVisible() && child->pointInView(px - r.mLeft, py - r.mBottom))
-                {
-                    deepest = child;
-                    px -= r.mLeft;
-                    py -= r.mBottom;
-                    found = true;
-                    break;
-                }
-            }
-        }
+        LLRect screen;
+        localRectToScreen(LLRect(x, y, x, y), &screen);
+        LLView* view = mRoot ? pickDrawn(mRoot, screen.mLeft, screen.mBottom) : nullptr;
         const ALXUISourceMap& map = mTool->sourceMap(mWhich);
-        LLView* view = deepest;
         while (view && view != mRoot && !map.isFromXML(view))
         {
             view = view->getParent();
@@ -811,7 +900,7 @@ bool ALFloaterXUITool::postBuild()
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::closePreviews, this));
-    getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::fileChanged, this));
+    getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::reloadAll, this));
     getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
     getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
     getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showGallery, this));
@@ -863,17 +952,28 @@ void ALFloaterXUITool::draw()
         mReloadPending = false;
         if (mReloadEntryOnly)
         {
-            // The tool wrote one file; the rest of the tree is as it was.
-            mReloadEntryOnly = false;
+            // One file changed; the rest of the tree is as it was.
             mCatalog.reload(mFile);
-            showPreviews();
         }
         else
         {
             scanCatalog();
-            showPreviews();
+        }
+        mReloadEntryOnly = false;
+        // A rebuild is not a new preview: it stays where it was put.
+        mKeepPlace = true;
+        showPreviews();
+        mKeepPlace = false;
+        if (mReloadFromDisk)
+        {
             setStatus(getString("Reloaded"));
         }
+        else if (!mPendingStatus.empty())
+        {
+            setStatus(mPendingStatus);
+        }
+        mReloadFromDisk = false;
+        mPendingStatus.clear();
     }
     if (mTree)
     {
@@ -902,6 +1002,10 @@ bool ALFloaterXUITool::handleKeyHere(KEY key, MASK mask)
             copyList(list, list->getAllSelected());
             return true;
         }
+    }
+    if (key == 'Z' && mask == MASK_CONTROL && undoEdit())
+    {
+        return true;
     }
     // The panes keep their own keys: the hierarchy walks itself with the
     // arrows and a list scrolls with them, and a list that happens to
@@ -1178,17 +1282,21 @@ void ALFloaterXUITool::showPreviews()
     }
 }
 
+// A preview opens beside the tool, since the two are read together. A
+// rebuild is not an opening: a preview someone has moved stays where they
+// moved it.
 void ALFloaterXUITool::placeHost(S32 which, LLFloater* host)
 {
+    const LLRect tool = calcScreenRect();
     if (which == PRIMARY)
     {
-        if (mLastX >= 0)
+        if (mKeepPlace && mLastX >= 0)
         {
             host->setOrigin(mLastX, mLastY);
         }
         else
         {
-            host->center();
+            host->setOrigin(tool.mRight + 8, tool.mTop - host->getRect().getHeight());
         }
     }
     else if (LLFloater* primary = mPreviews[PRIMARY].host.get())
@@ -1198,7 +1306,7 @@ void ALFloaterXUITool::placeHost(S32 which, LLFloater* host)
     }
     else
     {
-        host->center();
+        host->setOrigin(tool.mRight + 8, tool.mTop - host->getRect().getHeight());
     }
     gFloaterView->adjustToFitScreen(host, false);
 }
@@ -1268,6 +1376,11 @@ LLView* ALFloaterXUITool::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIP
             panel->updateBoundingRect();
             LLRect fit = panel->getRect();
             fit.unionWith(panel->getBoundingRect());
+            // A child positioned past its parent's edge is drawn past it,
+            // so the window starts where the drawing does and not where
+            // the panel says it does.
+            panel->setOrigin(2 + llmax(0, panel->getRect().mLeft - fit.mLeft),
+                             2 + llmax(0, panel->getRect().mBottom - fit.mBottom));
             panel->reshape(fit.getWidth(), fit.getHeight());
             host->reshape(fit.getWidth() + 4, fit.getHeight() + 4 + LLFloater::getDefaultParams().header_height);
             host->setCanResize(true);
@@ -1456,16 +1569,23 @@ void ALFloaterXUITool::watchFiles(const ALXUICatalog::Entry& entry)
     }
 }
 
+// Only the layers of the previewed file are watched, so a change on disk
+// is a change to what is on screen: that one entry is read again rather
+// than the whole tree. The watchers are made afresh by the rebuild and
+// prime themselves on what they find, which is why the tool's own writes
+// need no special case here.
 void ALFloaterXUITool::fileChanged()
 {
-    // The watcher notices the tool's own write too, and that one is
-    // already in hand.
-    if (mSelfWrite)
-    {
-        mSelfWrite = false;
-        return;
-    }
     // The check runs from a timer; the rebuild waits for the next frame.
+    mReloadEntryOnly = true;
+    mReloadFromDisk = true;
+    mReloadPending = true;
+}
+
+void ALFloaterXUITool::reloadAll()
+{
+    mReloadEntryOnly = false;
+    mReloadFromDisk = true;
     mReloadPending = true;
 }
 
@@ -2648,12 +2768,30 @@ bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
         setStatus(edit.error());
         return false;
     }
+    const std::string before = edit.text();
 
     const ALXUISelection::path_t& path = mSelection.selection();
-    const S32 dx = dl;
-    const S32 dy = now.topLeft ? dt : db;
+    S32 dx = dl;
+    S32 dy = now.topLeft ? dt : db;
     const S32 dw = dr - dl;
     const S32 dh = dt - db;
+
+    // The root sits where the tool put it: a floater preview is placed
+    // beside this window and a panel preview is placed in its host, so
+    // the numbers a move would write are the tool's and not the file's.
+    // Its size is the file's, and that is still editable.
+    bool root_move = false;
+    if (view == mPreviews[PRIMARY].root && (dx || dy))
+    {
+        dx = 0;
+        dy = 0;
+        root_move = true;
+        if (!dw && !dh)
+        {
+            setStatus(getString("EditRootMove"));
+            return false;
+        }
+    }
     std::vector<std::string> written;
     if ((dx || dy) && !edit.translate(path, dx, dy, now))
     {
@@ -2673,9 +2811,14 @@ bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
         return false;
     }
 
+    // One step back, which is the whole file as it was: an edit is one
+    // write and a stray drag is one write to undo. The stack arrives with
+    // the rest of the operations.
+    mUndoPath = layer->path;
+    mUndoText = before;
+
     // The rebuild waits for the next frame: this can be the tail of a
     // mouse-up in the very floater it would take down.
-    mSelfWrite = true;
     mReloadEntryOnly = true;
     mReloadPending = true;
 
@@ -2688,7 +2831,34 @@ bool ALFloaterXUITool::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     args["[ATTRS]"] = names;
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
-    setStatus(getString("EditWrote", args));
+    // The rebuild says what it built; this has to come after it.
+    mPendingStatus = getString(root_move ? "EditWroteNotMoved" : "EditWrote", args);
+    setStatus(mPendingStatus);
+    return true;
+}
+
+// The file as it was before the last write. One step, because one drag or
+// one key is one write, and a stray one should cost nothing to take back.
+bool ALFloaterXUITool::undoEdit()
+{
+    if (mUndoPath.empty())
+    {
+        return false;
+    }
+    std::string error;
+    if (!ALXUIEdit::writeFile(mUndoPath, mUndoText, error))
+    {
+        setStatus(error);
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mUndoPath.substr(mUndoPath.find_last_of("/\\") + 1);
+    mPendingStatus = getString("EditUndone", args);
+    setStatus(mPendingStatus);
+    mUndoPath.clear();
+    mUndoText.clear();
+    mReloadEntryOnly = true;
+    mReloadPending = true;
     return true;
 }
 

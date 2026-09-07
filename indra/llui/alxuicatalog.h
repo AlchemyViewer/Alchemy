@@ -156,6 +156,7 @@ private:
     void scanLanguage(const std::string& skin, const std::string& language,
                       const std::string& dir, const std::string& prefix);
     Entry& entryFor(const std::string& name);
+    static void describe(Entry& entry, const Layer& layer);
 
     std::vector<Entry>          mEntries;
     std::vector<std::string>    mSkins;

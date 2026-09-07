@@ -212,6 +212,12 @@ bool ALXUICatalog::reload(std::string_view name)
                 layer.error = layer.doc->errorDescription();
                 layer.errorLine = layer.doc->errorLine();
                 layer.doc.reset();
+                continue;
+            }
+            // What the file says it is can have changed with it.
+            if (layer.skin == "default" && layer.language == "en")
+            {
+                describe(entry, layer);
             }
         }
         return true;
@@ -240,18 +246,24 @@ void ALXUICatalog::scanLanguage(const std::string& skin, const std::string& lang
         }
         // The base language of the default skin describes the file; any
         // other layer only until that one is read.
-        const bool describes = skin == "default" && language == "en";
-        if (entry.rootTag.empty() || describes)
+        if (entry.rootTag.empty() || (skin == "default" && language == "en"))
         {
-            const pugi::xml_node root = layer.root();
-            entry.rootTag = root.name();
-            entry.kind = kindOf(entry.rootTag, entry.name);
-            entry.title = root.attribute("title").as_string();
-            if (entry.title.empty())
-            {
-                entry.title = root.attribute("label").as_string();
-            }
+            describe(entry, layer);
         }
+    }
+}
+
+// What the file is, taken from its root: the tag decides the kind and the
+// title is what a list of files reads best by.
+void ALXUICatalog::describe(Entry& entry, const Layer& layer)
+{
+    const pugi::xml_node root = layer.root();
+    entry.rootTag = root.name();
+    entry.kind = kindOf(entry.rootTag, entry.name);
+    entry.title = root.attribute("title").as_string();
+    if (entry.title.empty())
+    {
+        entry.title = root.attribute("label").as_string();
     }
 }
 

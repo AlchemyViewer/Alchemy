@@ -121,11 +121,11 @@ bool ALXUIEdit::save()
     return saveAs(mPath);
 }
 
-bool ALXUIEdit::saveAs(const std::string& path)
+bool ALXUIEdit::writeFile(const std::string& path, std::string_view text, std::string& error)
 {
     if (path.empty())
     {
-        mError = "no file to write";
+        error = "no file to write";
         return false;
     }
 
@@ -133,14 +133,23 @@ bool ALXUIEdit::saveAs(const std::string& path)
     llofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out.good())
     {
-        mError = "could not open " + path;
+        error = "could not open " + path;
         return false;
     }
-    out.write(mText.data(), (std::streamsize)mText.size());
+    out.write(text.data(), (std::streamsize)text.size());
     out.close();
     if (!out.good())
     {
-        mError = "could not write " + path;
+        error = "could not write " + path;
+        return false;
+    }
+    return true;
+}
+
+bool ALXUIEdit::saveAs(const std::string& path)
+{
+    if (!writeFile(path, mText, mError))
+    {
         return false;
     }
     mPath = path;

@@ -87,8 +87,10 @@ public:
     void canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt);
     void hostClosed(S32 which);
 
-    // An arrow key moves the selection by a pixel, ten with shift.
+    // An arrow key moves the selection by a pixel, ten with shift, and
+    // Control+Z puts the last write back the way it was.
     bool nudge(KEY key, MASK mask);
+    bool undoEdit();
     bool hoverHighlight() const { return mHoverHighlight; }
     const ALXUISelection& selection() const { return mSelection; }
     LLView* previewRoot(S32 which) const { return mPreviews[which].root; }
@@ -96,6 +98,9 @@ public:
 
     // A file of the primary preview changed on disk.
     void fileChanged();
+
+    // Read the catalog and the previews again, for the button that says so.
+    void reloadAll();
 
 private:
     ALFloaterXUITool(const LLSD& key);
@@ -228,8 +233,12 @@ private:
     bool                mShowCodeBuilt = true;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;
-    bool                mReloadEntryOnly = false;   // the tool wrote the file itself
-    bool                mSelfWrite = false;         // and the watcher's notice is that write
+    bool                mReloadEntryOnly = false;   // one file changed, not the tree
+    bool                mReloadFromDisk = false;    // and someone else changed it
+    bool                mKeepPlace = false;         // a rebuild leaves the preview where it is
+    std::string         mPendingStatus;             // what to say once the rebuild is done
+    std::string         mUndoPath;                  // the file the last write went to
+    std::string         mUndoText;                  // and what it held before it
     S32                 mLastX = -1;
     S32                 mLastY = -1;
     LLFrameTimer        mStateTimer;

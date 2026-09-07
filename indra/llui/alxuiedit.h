@@ -110,6 +110,10 @@ public:
     // Which of these an element carries decides what a move writes.
     static bool isGeometryAttribute(std::string_view name);
 
+    // Bytes to a file, as they are: what save writes with, and what a
+    // caller holding an earlier text of its own puts back.
+    static bool writeFile(const std::string& path, std::string_view text, std::string& error);
+
 private:
     struct Span
     {
