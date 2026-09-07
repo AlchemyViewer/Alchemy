@@ -6,9 +6,15 @@
 			<button label="Проверить наличие обновлений" name="update_btn"/>
 		</panel>
 		<panel label="Создатели" name="credits_panel">
-			<text name="linden_intro">Игра Second Life разработана лабораторией Lindens, 
+			<accordion name="credits_accordion">
+				<accordion_tab name="sl_credits_tab">
+					<panel name="sl_credits_panel">
+						<text_editor name="contrib_names">Псевдо-имя изменено при запуске</text_editor>
+						<text name="linden_intro">Игра Second Life разработана лабораторией Lindens, 
 в написании открытого кода участвовали:</text>
-			<text_editor name="contrib_names">Псевдо-имя изменено при запуске</text_editor>
+					</panel>
+				</accordion_tab>
+			</accordion>
 		</panel>
 		<panel label="Лицензии" name="licenses_panel">
 			<text_editor name="licenses_editor">3Dconnexion SDK (C) 1992-2009 3Dconnexion

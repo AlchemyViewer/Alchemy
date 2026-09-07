@@ -4,9 +4,15 @@
 	<text name="Tell everyone about your favorite places in Second Life.">
 		Сообщить всем о ваших избранных службах в Second Life.
 	</text>
-	<button label="Новый..." name="new_btn"/>
-	<button label="Удалить..." name="delete_btn"/>
-	<text name="picks_panel_text">
+	<layout_stack name="main_stack">
+		<layout_panel name="main_body">
+			<text name="picks_panel_text">
 		Загрузка...
 	</text>
+		</layout_panel>
+		<layout_panel name="buttons_header">
+			<button label="Удалить..." name="delete_btn"/>
+			<button label="Новый..." name="new_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

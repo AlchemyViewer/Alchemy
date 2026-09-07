@@ -3,63 +3,75 @@
 	<floater.string name="buy_currency">
 		Купить L$ [LINDENS] примерно за [LOCALAMOUNT]
 	</floater.string>
-	<text name="info_need_more">
-		Вам нужно больше L$
-	</text>
-	<text name="contacting">
-		Соединение с LindeX...
-	</text>
-	<text name="info_buying">
-		Купить L$
-	</text>
-	<text name="balance_label">
-		У меня есть
-	</text>
-	<text name="balance_amount">
-		L$ [AMT]
-	</text>
-	<text name="currency_action">
-		Я хочу купить
-	</text>
-	<text name="currency_label">
-		L$
-	</text>
-	<line_editor label="L$" name="currency_amt">
-		1234
-	</line_editor>
 	<text name="buying_label">
 		По цене
-	</text>
-	<text name="currency_est">
-		примерно [LOCALAMOUNT]
-	</text>
-	<text name="getting_data">
-		Подсчет...
 	</text>
 	<text name="buy_action">
 		[ACTION]
 	</text>
-	<text name="total_label">
-		Мой новый баланс будет
-	</text>
-	<text name="total_amount">
-		L$ [AMT]
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php способ оплаты] | [http://www.secondlife.com/my/account/currency.php деньги]
-	</text>
-	<text name="exchange_rate_note">
-		Повторно введите сумму, чтобы увидеть новый обменный курс.
-	</text>
-	<text name="purchase_warning_repurchase">
-		Подтверждение этой сделки приведет к покупке L$, а не объектов.
 	</text>
 	<text name="purchase_warning_notenough">
 		Вы не приобрели достаточного количества L$. Увеличьте количество.
 	</text>
-	<button label="Приобрести" name="buy_btn"/>
-	<button label="Отмена" name="cancel_btn"/>
 	<floater.string name="info_cannot_buy">
 		Нельзя купить
 	</floater.string>
+	<layout_stack name="outer_stack">
+		<layout_panel name="layout_panel_buttons">
+			<button label="Отмена" name="cancel_btn"/>
+			<button label="Приобрести" name="buy_btn"/>
+			<text name="contacting">
+		Соединение с LindeX...
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_msg">
+			<text name="purchase_warning_repurchase">
+		Подтверждение этой сделки приведет к покупке L$, а не объектов.
+	</text>
+			<text name="exchange_rate_note">
+		Повторно введите сумму, чтобы увидеть новый обменный курс.
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_action">
+			<text name="total_amount">
+		L$ [AMT]
+	</text>
+			<text name="total_label">
+		Мой новый баланс будет
+	</text>
+			<text name="getting_data">
+		Подсчет...
+	</text>
+			<text name="currency_est">
+		примерно [LOCALAMOUNT]
+	</text>
+			<line_editor label="L$" name="currency_amt">
+				1234
+			</line_editor>
+			<text name="currency_label">
+		L$
+	</text>
+			<text name="currency_action">
+		Я хочу купить
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_balance">
+			<text name="balance_amount">
+		L$ [AMT]
+	</text>
+			<text name="balance_label">
+		У меня есть
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_title">
+			<text name="info_buying">
+		Купить L$
+	</text>
+			<text name="info_need_more">
+		Вам нужно больше L$
+	</text>
+		</layout_panel>
+	</layout_stack>
 </floater>

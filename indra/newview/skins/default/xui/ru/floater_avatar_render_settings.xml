@@ -3,10 +3,12 @@
 	<string name="av_never_render" value="Никогда"/>
 	<string name="av_always_render" value="Всегда"/>
 	<filter_editor label="Фильтр для людей" name="people_filter_input"/>
-	<menu_button name="plus_btn" tool_tip="Действия с выбранным жителем"/>
 	<name_list name="render_settings_list">
 		<name_list.columns label="Имя" name="name"/>
 		<name_list.columns label="Настройка отрисовки" name="setting"/>
 		<name_list.columns label="Дата добавлена" name="timestamp"/>
 	</name_list>
+	<panel name="add_subpanel">
+		<menu_button name="plus_btn" tool_tip="Действия с выбранным жителем"/>
+	</panel>
 </floater>

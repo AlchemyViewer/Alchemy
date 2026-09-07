@@ -12,7 +12,9 @@
 	<menu_item_call label="Карта" name="map"/>
 	<menu_item_call label="Поделиться" name="share"/>
 	<menu_item_call label="Заплатить" name="pay"/>
-	<menu_item_check label="Черный список" name="block_unblock"/>
-	<menu_item_call label="Заморозить" name="freeze"/>
-	<menu_item_call label="Выкинуть" name="eject"/>
+	<context_menu name="manage_menu">
+		<menu_item_call label="Выкинуть" name="eject"/>
+		<menu_item_call label="Заморозить" name="freeze"/>
+		<menu_item_check label="Черный список" name="block_unblock"/>
+	</context_menu>
 </context_menu>

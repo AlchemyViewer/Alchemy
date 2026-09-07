@@ -49,10 +49,6 @@
 	</text>
 	<combo_box label="Сглаживание" name="fsaa">
 		<combo_box.item label="Выключено" name="FSAADisabled"/>
-		<combo_box.item label="2x" name="2x"/>
-		<combo_box.item label="4x" name="4x"/>
-		<combo_box.item label="8x" name="8x"/>
-		<combo_box.item label="16x" name="16x"/>
 	</combo_box>
 	<text name="antialiasing restart">
 		(требуется перезапуск)
@@ -95,8 +91,6 @@
 		<combo_box.item label="Минимум" name="0"/>
 		<combo_box.item label="Ландшафт и деревья" name="1"/>
 		<combo_box.item label="Все статичные объекты" name="2"/>
-		<combo_box.item label="Все аватары и объекты" name="3"/>
-		<combo_box.item label="Все" name="4"/>
 	</combo_box>
 	<check_box initial_value="true" label="Атмосферные шейдеры" name="WindLightUseAtmosShaders"/>
 	<slider label="Небо:" name="SkyMeshDetail"/>
@@ -119,4 +113,14 @@
 	<button label="Отмена" label_selected="Отмена" name="Cancel"/>
 	<check_box label="RenderAvatarMaxComplexity (Отрисовка аватара макс. сложности)" name="RenderAvatarMaxComplexity"/>
 	<check_box label="RenderAvatarMaxNonImpostors (Отрисовка макс. кол-ва 3-D аватаров)" name="RenderAvatarMaxNonImpostors"/>
+	<combo_box name="TonemapType">
+		<combo_box.item label="Все" name="4"/>
+		<combo_box.item label="Все аватары и объекты" name="3"/>
+	</combo_box>
+	<combo_box name="anisotropic_filter">
+		<combo_box.item label="16x" name="16x"/>
+		<combo_box.item label="8x" name="8x"/>
+		<combo_box.item label="4x" name="4x"/>
+		<combo_box.item label="2x" name="2x"/>
+	</combo_box>
 </floater>

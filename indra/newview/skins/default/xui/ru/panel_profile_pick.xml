@@ -3,11 +3,31 @@
 	<panel.string name="location_notice">
 		(будет обновлено после сохранения)
 	</panel.string>
-	<line_editor name="pick_location">
+	<layout_stack name="main_pick_stack">
+		<layout_panel name="save_changes_lp">
+			<layout_stack name="save_changes_stack">
+				<layout_panel name="save_btn_lp">
+					<button label="Сохранить подборку" name="save_changes_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="util_buttons_lp">
+			<layout_stack name="util_buttons_stack">
+				<layout_panel name="set_to_curr_location_btn_lp">
+					<button label="Указать местоположение" name="set_to_curr_location_btn" tool_tip="Установить в текущее местоположение"/>
+				</layout_panel>
+				<layout_panel name="tp_btn_lp">
+					<button label="Телепорт" name="teleport_btn"/>
+				</layout_panel>
+				<layout_panel name="map_btn_lp">
+					<button label="Показать на карте" name="show_on_map_btn"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="main_pick_lp">
+			<line_editor name="pick_location">
 		Загрузка...
 	</line_editor>
-	<button label="Телепорт" name="teleport_btn"/>
-	<button label="Показать на карте" name="show_on_map_btn"/>
-	<button label="Указать местоположение" name="set_to_curr_location_btn" tool_tip="Установить в текущее местоположение"/>
-	<button label="Сохранить подборку" name="save_changes_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

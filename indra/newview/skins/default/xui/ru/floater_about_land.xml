@@ -453,25 +453,27 @@
 			<text name="OwnerLimited">
 				(Владелец собственности может ограничить этот выбор)
 			</text>
-			<panel name="Allowed_layout_panel">
-				<text label="Всегда разрешено" name="AllowedText">
-					Всегда разрешено ([COUNT], макс. [MAX])
-				</text>
-				<name_list name="AccessList" tool_tip="([LISTED] в списке, [MAX] максимум)"/>
-				<button label="Добавить" name="add_allowed"/>
-				<button label="Удалить" label_selected="Удалить" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="Бан" name="BanCheck">
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="Бан" name="BanCheck">
 					Заблокировано ([COUNT], макс. [MAX])
 				</text>
-				<name_list name="BannedList" tool_tip="([LISTED] в списке, [MAX] максимум)">
-					<columns label="Имя" name="name"/>
-					<columns label="Продолжительность" name="duration"/>
-				</name_list>
-				<button label="Добавить" name="add_banned"/>
-				<button label="Удалить" label_selected="Удалить" name="remove_banned"/>
-			</panel>
+					<name_list name="BannedList" tool_tip="([LISTED] в списке, [MAX] максимум)">
+						<columns label="Имя" name="name"/>
+						<columns label="Продолжительность" name="duration"/>
+					</name_list>
+					<button label="Добавить" name="add_banned"/>
+					<button label="Удалить" label_selected="Удалить" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="Всегда разрешено" name="AllowedText">
+					Всегда разрешено ([COUNT], макс. [MAX])
+				</text>
+					<name_list name="AccessList" tool_tip="([LISTED] в списке, [MAX] максимум)"/>
+					<button label="Добавить" name="add_allowed"/>
+					<button label="Удалить" label_selected="Удалить" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="ПРИКЛЮЧЕНИЯ" name="land_experiences_panel"/>
 		<panel label="ОКРУЖАЮЩАЯ СРЕДА" name="land_environment_panel"/>
