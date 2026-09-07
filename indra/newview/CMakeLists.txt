@@ -186,6 +186,7 @@ set(viewer_SOURCE_FILES
     alfloatertransactionlog.cpp
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
+    alxuibaseline.cpp
     alfloaterwebprofile.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
@@ -970,6 +971,7 @@ set(viewer_HEADER_FILES
     alsceneexplorerpredicate.h
     alscopedata.h
     altexturetable.h
+    alxuibaseline.h
     alfloaterwebprofile.h
     algradehistory.h
     allegacynotificationwellwindow.h

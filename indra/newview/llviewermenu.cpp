@@ -28,6 +28,8 @@
 
 #include "llviewermenu.h"
 
+#include "alxuibaseline.h"
+
 // linden library includes
 #include "llavatarnamecache.h"  // IDEVO (I Are Not Men!)
 #include "llcombobox.h"
@@ -1880,6 +1882,15 @@ class LLAdvancedToggleXUINames : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         toggle_show_xui_names();
+        return true;
+    }
+};
+
+class ALAdvancedXUIBaseline : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        ALXUIBaseline::run();
         return true;
     }
 };
@@ -10690,6 +10701,7 @@ void initialize_menus()
     commit.add("Advanced.ReloadColorSettings", boost::bind(&LLUIColorTable::loadFromSettings, LLUIColorTable::getInstance()));
     view_listener_t::addMenu(new LLAdvancedToggleXUINames(), "Advanced.ToggleXUINames");
     view_listener_t::addMenu(new LLAdvancedCheckXUINames(), "Advanced.CheckXUINames");
+    view_listener_t::addMenu(new ALAdvancedXUIBaseline(), "Advanced.XUIBaseline");
     view_listener_t::addMenu(new LLAdvancedSendTestIms(), "Advanced.SendTestIMs");
     commit.add("Advanced.FlushNameCaches", boost::bind(&handle_flush_name_caches));
 
