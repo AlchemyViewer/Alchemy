@@ -569,19 +569,24 @@ std::vector<ALXUILint::Finding> ALXUILint::checkCatalog(const ALXUICatalog& cata
         {
             continue;
         }
-        // widgets/button.xml is read as the defaults for <button>, by
-        // that name; a root of any other tag is read by nothing.
+        // widgets/button.xml is read as the defaults for <button>, found
+        // by that file name. The parser takes the root's attributes
+        // whatever the root is called, so a root of another tag still
+        // applies; what it does is describe a widget that is not the one
+        // being configured, and its dotted children hang off that name
+        // rather than the widget's.
         std::string tag = entry.name.substr(entry.name.rfind('/') + 1);
         tag = tag.substr(0, tag.size() - 4);
         if (tag != entry.rootTag)
         {
             Finding& f = findings.emplace_back();
             f.rule = Rule::TemplateRootMismatch;
-            f.severity = Severity::Error;
+            f.severity = Severity::Note;
             f.file = entry.layers.empty() ? entry.name : entry.layers.front().path;
             f.line = 1;
             f.what = entry.rootTag;
-            f.message = "a template for <" + tag + "> has a root of <" + entry.rootTag + ">, so nothing reads it";
+            f.message = "the defaults for <" + tag + "> are written under <" + entry.rootTag
+                      + ">, which the parser does not check and a reader cannot tell from a mistake";
         }
     }
     return findings;

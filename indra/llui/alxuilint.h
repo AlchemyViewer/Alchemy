@@ -58,7 +58,7 @@ public:
         NameCollision,          // two siblings of one name; getChild answers the first
         EmptyRect,              // a shown widget with no width or no height
         Truncation,             // a label wider than the box it is in
-        TemplateRootMismatch,   // a widgets/ file whose root is not its file name
+        TemplateRootMismatch,   // a widgets/ file whose root is not the tag it configures
         DanglingImage,          // an image name textures.xml does not declare
         DanglingColor,          // a colour name colors.xml does not declare
         DanglingFont,           // a font name the font registry does not know
@@ -121,9 +121,9 @@ public:
     S32 countUnder(const ALXUISelection::path_t& path) const;
     S32 count(Severity severity) const;
 
-    // The rule that needs no build: a file under widgets/ describes the
-    // widget its file name names, and a root tag that is not that name is
-    // read by nothing.
+    // The rules that need no build: a layer that did not parse, and a
+    // file under widgets/ whose root tag is not the tag its file name
+    // says it configures.
     static std::vector<Finding> checkCatalog(const ALXUICatalog& catalog);
 
     static const char* ruleName(Rule rule);

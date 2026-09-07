@@ -26,6 +26,7 @@
 
 #include "../alxuilint.h"
 
+#include "../alxuicatalog.h"
 #include "../alxuisourcemap.h"
 #include "../llpanel.h"
 #include "../lluicolortable.h"
@@ -34,6 +35,9 @@
 #include "alheadlessui_fixture.h"
 
 #include "alxmldocument.h"
+
+#include "lldir.h"
+#include "llfile.h"
 
 #include "../test/lltut.h"
 
@@ -324,5 +328,60 @@ namespace tut
         ensure_equals("on its parent", run.lint.countUnder(ALXUISelection::fromString("outer")), 1);
         ensure_equals("and on the root", run.lint.countUnder(ALXUISelection::path_t()), 1);
         ensure_equals("nowhere else", run.lint.countUnder(ALXUISelection::fromString("nobody")), 0);
+    }
+
+    // The rules that read the catalog rather than a build: a template
+    // written under a root that is not the tag it configures, and a layer
+    // that did not parse.
+    template<> template<>
+    void alxuilint_object::test<6>()
+    {
+        const std::string skins = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuilint_catalog_test");
+        gDirUtilp->deleteDirAndContents(skins);
+        auto write = [&](const std::string& relative, const std::string& text)
+        {
+            std::string dir = skins;
+            LLFile::mkdir(dir);
+            size_t start = 0;
+            while (true)
+            {
+                const size_t slash = relative.find('/', start);
+                if (slash == std::string::npos)
+                {
+                    break;
+                }
+                dir = gDirUtilp->add(dir, relative.substr(start, slash - start));
+                LLFile::mkdir(dir);
+                start = slash + 1;
+            }
+            llofstream out(gDirUtilp->add(dir, relative.substr(start)), std::ios::binary);
+            out << text;
+        };
+        write("default/xui/en/widgets/button.xml", "<button name=\"button\"/>\n");
+        write("default/xui/en/widgets/check_box.xml", "<checkbox name=\"check_box\"/>\n");
+        write("default/xui/en/broken.xml", "<panel name=\"b\">\n<panel>\n");
+
+        ALXUICatalog catalog;
+        catalog.scan(skins);
+        const std::vector<ALXUILint::Finding> findings = ALXUILint::checkCatalog(catalog);
+
+        S32 mismatches = 0;
+        S32 parse_errors = 0;
+        for (const ALXUILint::Finding& f : findings)
+        {
+            mismatches += f.rule == ALXUILint::Rule::TemplateRootMismatch;
+            parse_errors += f.rule == ALXUILint::Rule::ParseError;
+            if (f.rule == ALXUILint::Rule::TemplateRootMismatch)
+            {
+                ensure_equals("the root that was written", f.what, std::string("checkbox"));
+                // The parser reads the root's attributes whatever it is
+                // called, so this is worth a look and not a defect.
+                ensure_equals("a note", (int)f.severity, (int)ALXUILint::Severity::Note);
+            }
+        }
+        ensure_equals("one template written under another tag", mismatches, 1);
+        ensure_equals("and one layer that did not parse", parse_errors, 1);
+
+        gDirUtilp->deleteDirAndContents(skins);
     }
 }
