@@ -77,6 +77,17 @@ public:
     bool setAttribute(const path_t& path, const std::string& name, const std::string& value);
     bool removeAttribute(const path_t& path, const std::string& name);
 
+    // The element operations. Text is written into the element that holds
+    // it, opening a self-closing tag when it has none; an element arrives
+    // as the last child of its parent, on its own line, indented the way
+    // the children already there are; a move is a removal and an
+    // insertion, re-indented for where it lands; a removal takes the
+    // whole of the element and the line it sat on.
+    bool setText(const path_t& path, const std::string& text);
+    bool insertElement(const path_t& parent, const std::string& xml);
+    bool moveElement(const path_t& path, const path_t& parent);
+    bool removeElement(const path_t& path);
+
     // An attribute's value as the file writes it, entity spellings and
     // all, which is not always what the parser read it as. False when the
     // element does not carry the attribute.
@@ -123,6 +134,26 @@ private:
 
     bool parse();
     void splice(const Span& span, std::string_view text);
+
+    // The whole of an element in the text, from its '<' through the '>'
+    // that closes it, and with the whitespace of the line it sits on.
+    bool extentOf(pugi::xml_node node, Span& body, Span& whole) const;
+
+    // From the '<' of a tag to the '>' that ends it, with the quoted
+    // values passed over, since an angle bracket inside one is text.
+    size_t endOfTag(size_t at, bool& self_closing) const;
+
+    // The indentation of the line an offset sits on.
+    std::string indentAt(size_t offset) const;
+
+    // The bytes a tag that closes itself ends with, and the whitespace
+    // before them.
+    Span selfCloseSpan(size_t after_tag) const;
+
+    // Where a child of this element would go, how many bytes it replaces
+    // there, the indentation its children carry, and whether the tag has
+    // to be opened first.
+    bool contentPoint(pugi::xml_node node, size_t& offset, size_t& length, std::string& indent, bool& opens) const;
 
     // The spans of one attribute of an element: the value between its
     // quotes, and the attribute with the whitespace that precedes it.

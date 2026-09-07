@@ -116,6 +116,7 @@ target_sources(llui
     alxuiselection.cpp
     alxuishellbuild.cpp
     alxuisourcemap.cpp
+    alxuitranslate.cpp
     alxuitreemodel.cpp
     llxyvector.cpp
 
@@ -250,6 +251,7 @@ target_sources(llui
     alxuiselection.h
     alxuishellbuild.h
     alxuisourcemap.h
+    alxuitranslate.h
     alxuitreemodel.h
     llxyvector.h
     )
@@ -343,6 +345,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(alxuicatalog "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuilint "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiedit "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuitranslate "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiselection "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuisourcemap "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuitreemodel "" "${test_libs}" "${test_project}")

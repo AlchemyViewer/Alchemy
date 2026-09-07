@@ -41,6 +41,20 @@ namespace
         return c == ' ' || c == '\t' || c == '\r' || c == '\n';
     }
 
+    // The two characters text cannot carry as itself.
+    std::string escapeText(std::string_view text)
+    {
+        std::string out;
+        out.reserve(text.size());
+        for (const char c : text)
+        {
+            if (c == '&')       { out += "&amp;"; }
+            else if (c == '<')  { out += "&lt;"; }
+            else                { out += c; }
+        }
+        return out;
+    }
+
     // The three characters an attribute value cannot carry as itself, the
     // delimiter it is written between included.
     std::string escapeValue(std::string_view value, char quote)
@@ -295,6 +309,355 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
     mText.replace(span.offset, span.length, text);
     mDirty = true;
     parse();
+}
+
+// From the '<' of a tag to the '>' that ends it. An angle bracket inside
+// a quoted value is text, and passing over the values is what tells the
+// two apart.
+size_t ALXUIEdit::endOfTag(size_t at, bool& self_closing) const
+{
+    self_closing = false;
+    for (size_t i = at; i < mText.size(); ++i)
+    {
+        const char c = mText[i];
+        if (c == '"' || c == '\'')
+        {
+            const char quote = c;
+            while (++i < mText.size() && mText[i] != quote)
+            {
+            }
+            if (i >= mText.size())
+            {
+                return std::string::npos;
+            }
+        }
+        else if (c == '>')
+        {
+            self_closing = i > at && mText[i - 1] == '/';
+            return i + 1;
+        }
+    }
+    return std::string::npos;
+}
+
+// The whole of an element: its open tag, everything under it and its
+// close tag, plus the whitespace of the line it sits on, so that removing
+// it removes the line. Comments, CDATA and processing instructions are
+// passed over, since a close tag written inside one closes nothing.
+bool ALXUIEdit::extentOf(pugi::xml_node node, Span& body, Span& whole) const
+{
+    const ptrdiff_t named = node.offset_debug();
+    if (named < 1)
+    {
+        return false;
+    }
+    const size_t start = (size_t)named - 1;      // the '<'
+    bool self_closing = false;
+    size_t i = endOfTag(start, self_closing);
+    if (i == std::string::npos)
+    {
+        return false;
+    }
+
+    size_t end = i;
+    if (!self_closing)
+    {
+        const size_t content = i;
+        S32 depth = 1;
+        while (i < mText.size() && depth > 0)
+        {
+            if (mText[i] != '<')
+            {
+                ++i;
+                continue;
+            }
+            if (mText.compare(i, 4, "<!--") == 0)
+            {
+                const size_t close = mText.find("-->", i + 4);
+                i = close == std::string::npos ? mText.size() : close + 3;
+            }
+            else if (mText.compare(i, 9, "<![CDATA[") == 0)
+            {
+                const size_t close = mText.find("]]>", i + 9);
+                i = close == std::string::npos ? mText.size() : close + 3;
+            }
+            else if (mText.compare(i, 2, "<?") == 0)
+            {
+                const size_t close = mText.find("?>", i + 2);
+                i = close == std::string::npos ? mText.size() : close + 2;
+            }
+            else
+            {
+                const bool closing = mText.compare(i, 2, "</") == 0;
+                bool child_self_closing = false;
+                const size_t after = endOfTag(i, child_self_closing);
+                if (after == std::string::npos)
+                {
+                    return false;
+                }
+                depth += closing ? -1 : (child_self_closing ? 0 : 1);
+                i = after;
+            }
+        }
+        if (depth > 0)
+        {
+            return false;
+        }
+        end = i;
+        // The body is what sits between the tags.
+        body = { content, mText.rfind('<', end - 1) - content };
+    }
+    else
+    {
+        body = { end, 0 };
+    }
+
+    // The whitespace before it belongs to it when nothing else shares the
+    // line, which is how these files are written.
+    size_t first = start;
+    while (first > 0 && (mText[first - 1] == ' ' || mText[first - 1] == '\t'))
+    {
+        --first;
+    }
+    if (first > 0 && mText[first - 1] == '\n')
+    {
+        --first;
+        if (first > 0 && mText[first - 1] == '\r')
+        {
+            --first;
+        }
+    }
+    else
+    {
+        first = start;
+    }
+    whole = { first, end - first };
+    return true;
+}
+
+// The bytes a tag that closes itself ends with, back through the
+// whitespace someone wrote before them: opening the tag takes the space
+// with it, so that <text name="b" /> opens as <text name="b">.
+ALXUIEdit::Span ALXUIEdit::selfCloseSpan(size_t after_tag) const
+{
+    size_t first = after_tag - 2;        // the '/'
+    while (first > 0 && (mText[first - 1] == ' ' || mText[first - 1] == '\t'))
+    {
+        --first;
+    }
+    return { first, after_tag - first };
+}
+
+// The indentation of the line an offset sits on.
+std::string ALXUIEdit::indentAt(size_t offset) const
+{
+    size_t line = offset ? mText.rfind('\n', offset - 1) : std::string::npos;
+    line = line == std::string::npos ? 0 : line + 1;
+    const size_t first = mText.find_first_not_of(" \t", line);
+    return std::string(mText, line, (first == std::string::npos ? line : llmin(first, offset)) - line);
+}
+
+// Where a child of this element goes: after the last one it has, at the
+// end of its content otherwise, with the indentation its children carry
+// and a note of whether the tag has to be opened for them.
+bool ALXUIEdit::contentPoint(pugi::xml_node node, size_t& offset, size_t& length, std::string& indent, bool& opens) const
+{
+    const ptrdiff_t named = node.offset_debug();
+    if (named < 1)
+    {
+        return false;
+    }
+    const size_t start = (size_t)named - 1;
+    bool self_closing = false;
+    const size_t after_tag = endOfTag(start, self_closing);
+    if (after_tag == std::string::npos)
+    {
+        return false;
+    }
+
+    // A child is written one step further in than the element itself, in
+    // whichever character the file indents with.
+    const std::string own = indentAt(start);
+    const std::string step = own.find('\t') != std::string::npos ? "\t" : "    ";
+
+    opens = self_closing;
+    if (self_closing)
+    {
+        const Span close = selfCloseSpan(after_tag);
+        offset = close.offset;
+        length = close.length;
+        indent = own + step;
+        return true;
+    }
+    length = 0;
+
+    Span body;
+    Span whole;
+    if (!extentOf(node, body, whole))
+    {
+        return false;
+    }
+
+    // After the last child element, if it has one: its own line says how
+    // the children of this element are indented.
+    pugi::xml_node last;
+    for (pugi::xml_node child : node.children())
+    {
+        if (child.type() == pugi::node_element)
+        {
+            last = child;
+        }
+    }
+    if (last)
+    {
+        Span child_body;
+        Span child_whole;
+        if (!extentOf(last, child_body, child_whole))
+        {
+            return false;
+        }
+        offset = child_whole.offset + child_whole.length;
+        indent = indentAt((size_t)last.offset_debug() - 1);
+        if (indent.find_first_not_of(" \t") != std::string::npos)
+        {
+            indent = own + step;
+        }
+        return true;
+    }
+
+    // With no children, the content is the whitespace between the tags,
+    // and the first child goes at the front of it: what was there stays
+    // behind the new element and closes the tag on its own line, as it
+    // did when there was nothing between them.
+    offset = body.offset;
+    indent = own + step;
+    return true;
+}
+
+bool ALXUIEdit::setText(const path_t& path, const std::string& text)
+{
+    mError.clear();
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+    for (pugi::xml_node child : node.children())
+    {
+        if (child.type() == pugi::node_element)
+        {
+            mError = std::string("the text of ") + node.name() + " is written around its children";
+            return false;
+        }
+    }
+
+    Span body;
+    Span whole;
+    if (!extentOf(node, body, whole))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+
+    bool self_closing = false;
+    const size_t after_tag = endOfTag((size_t)node.offset_debug() - 1, self_closing);
+    if (self_closing)
+    {
+        // A tag that closes itself has nowhere to put text, so it opens.
+        splice(selfCloseSpan(after_tag), ">" + escapeText(text) + "</" + std::string(node.name()) + ">");
+        return true;
+    }
+    splice(body, escapeText(text));
+    return true;
+}
+
+bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
+{
+    mError.clear();
+    pugi::xml_node node = resolve(parent);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+
+    size_t at = 0;
+    size_t length = 0;
+    std::string indent;
+    bool opens = false;
+    if (!contentPoint(node, at, length, indent, opens))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+
+    const std::string eol = mText.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+    if (opens)
+    {
+        // The parent closed itself, so it opens for its first child and
+        // closes on a line of its own.
+        const std::string own = indentAt((size_t)node.offset_debug() - 1);
+        splice({ at, length }, ">" + eol + indent + xml + eol + own + "</" + std::string(node.name()) + ">");
+        return true;
+    }
+    splice({ at, 0 }, eol + indent + xml);
+    return true;
+}
+
+bool ALXUIEdit::removeElement(const path_t& path)
+{
+    mError.clear();
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+    Span body;
+    Span whole;
+    if (!extentOf(node, body, whole))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+    splice(whole, std::string_view());
+    return true;
+}
+
+// A move is the two operations, and the element carries its own text
+// between them with the indentation of its old home taken off: the
+// insertion puts back the one its new home asks for.
+bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
+{
+    mError.clear();
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+    Span body;
+    Span whole;
+    if (!extentOf(node, body, whole))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+
+    const size_t start = (size_t)node.offset_debug() - 1;
+    const std::string own = indentAt(start);
+    std::string xml(mText, start, whole.offset + whole.length - start);
+    if (!own.empty())
+    {
+        const std::string from = "\n" + own;
+        for (size_t at = xml.find(from); at != std::string::npos; at = xml.find(from, at + 1))
+        {
+            xml.erase(at + 1, own.size());
+        }
+    }
+
+    return removeElement(path) && insertElement(parent, xml);
 }
 
 bool ALXUIEdit::valueText(pugi::xml_node node, std::string_view name, std::string& out) const

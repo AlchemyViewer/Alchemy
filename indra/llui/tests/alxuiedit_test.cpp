@@ -307,6 +307,137 @@ namespace tut
         ensure("an attribute that is not there is not an edit", !edit.removeAttribute({ "target" }, "top"));
     }
 
+    // Text is written into the element that has it, and into one that has
+    // none by opening the tag that was closing itself.
+    template<> template<>
+    void alxuiedit_object::test<9>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <text name=\"a\">Hello</text>\n"
+            "    <text name=\"b\" />\n"
+            "</panel>\n";
+        {
+            ALXUIEdit edit;
+            ensure("loads", edit.loadBuffer(source));
+            ensure("sets", edit.setText({ "a" }, "Bonjour"));
+            ensure_equals("the text and nothing else", edit.text(), replaced(source, ">Hello<", ">Bonjour<"));
+        }
+        {
+            ALXUIEdit edit;
+            ensure("loads", edit.loadBuffer(source));
+            ensure("sets", edit.setText({ "b" }, "Bonjour"));
+            ensure_equals("the tag opens for it", edit.text(),
+                          replaced(source, "<text name=\"b\" />", "<text name=\"b\">Bonjour</text>"));
+        }
+        {
+            // What XML spells differently is spelled that way.
+            ALXUIEdit edit;
+            ensure("loads", edit.loadBuffer(source));
+            ensure("sets", edit.setText({ "a" }, "Salt & Pepper"));
+            ensure_equals("escaped", edit.text(), replaced(source, ">Hello<", ">Salt &amp; Pepper<"));
+        }
+    }
+
+    // An element is written as the last child of its parent, on its own
+    // line, indented the way the children already there are.
+    template<> template<>
+    void alxuiedit_object::test<10>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "\t<panel name=\"inner\">\n"
+            "\t\t<text name=\"a\">Hello</text>\n"
+            "\t</panel>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("inserts", edit.insertElement({ "inner" }, "<text name=\"b\">Bonjour</text>"));
+        ensure_equals("beside its sibling, indented like it", edit.text(),
+                      replaced(source, "</text>\n\t</panel>",
+                                       "</text>\n\t\t<text name=\"b\">Bonjour</text>\n\t</panel>"));
+
+        // Into a parent with no children at all, which is where an
+        // ancestor chain ends.
+        const std::string bare =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\"/>\n"
+            "</panel>\n";
+        ALXUIEdit second;
+        ensure("loads", second.loadBuffer(bare));
+        ensure("inserts", second.insertElement({ "inner" }, "<text name=\"b\"/>"));
+        ensure_equals("the tag opens for it", second.text(),
+                      replaced(bare, "<panel name=\"inner\"/>",
+                                     "<panel name=\"inner\">\n        <text name=\"b\"/>\n    </panel>"));
+    }
+
+    // An element moved under another parent leaves the rest of the file
+    // as it was, and arrives indented for where it lands.
+    template<> template<>
+    void alxuiedit_object::test<11>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <text name=\"a\">Hello</text>\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"c\">Here</text>\n"
+            "    </panel>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("moves", edit.moveElement({ "a" }, { "inner" }));
+        ensure_equals("under its new parent, and gone from where it was", edit.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"c\">Here</text>\n"
+            "        <text name=\"a\">Hello</text>\n"
+            "    </panel>\n"
+            "</panel>\n");
+    }
+
+    // An element removed takes its own line with it, and its children.
+    template<> template<>
+    void alxuiedit_object::test<12>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"c\">Here</text>\n"
+            "    </panel>\n"
+            "    <text name=\"a\">Hello</text>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("removes", edit.removeElement({ "inner" }));
+        ensure_equals("with everything under it", edit.text(),
+            "<panel name=\"root\">\n"
+            "    <text name=\"a\">Hello</text>\n"
+            "</panel>\n");
+        ensure("an element that is not there is not an edit", !edit.removeElement({ "inner" }));
+    }
+
+    // The extent of an element is the whole of it: a comment, a quoted
+    // angle bracket and a child of the same tag are all inside it.
+    template<> template<>
+    void alxuiedit_object::test<13>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"a\" tool_tip=\"1 &gt; 0\">\n"
+            "        <!-- </panel> is not the end of anything -->\n"
+            "        <panel name=\"b\"/>\n"
+            "    </panel>\n"
+            "    <text name=\"z\">End</text>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("removes", edit.removeElement({ "a" }));
+        ensure_equals("all of it and no more", edit.text(),
+            "<panel name=\"root\">\n"
+            "    <text name=\"z\">End</text>\n"
+            "</panel>\n");
+    }
+
     // The scan that finds an attribute's bytes, against every attribute of
     // every file the viewer ships: an offset off by one anywhere would
     // write over the wrong text.
