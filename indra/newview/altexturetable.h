@@ -111,6 +111,32 @@ public:
         return true;
     }
 
+    // Finds the item under key or, on a miss, calls make() for one and
+    // inserts it, so a miss costs one probe: the key's slot is held open
+    // across the call, and make() must not touch the table. A null from
+    // make(), or an item already in a table, leaves the table unchanged and
+    // returns null.
+    template <typename Make>
+    T* findOrInsert(const Key& key, Make&& make)
+    {
+        llassert(!mVisiting);
+        auto [it, added] = mIndex.try_emplace(key, nullptr);
+        if (!added)
+        {
+            return it->second;
+        }
+        T* item = make();
+        if (!item || item->getListIndex() >= 0)
+        {
+            mIndex.erase(it);
+            return nullptr;
+        }
+        it->second = item;
+        item->setListIndex(static_cast<S32>(mItems.size()));
+        mItems.emplace_back(item);
+        return item;
+    }
+
     // Removes the item under key and hands its reference to the caller, so
     // the caller decides when the last reference drops. Null when absent.
     item_t erase(const Key& key)

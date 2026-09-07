@@ -33,6 +33,7 @@
 #include "llviewertexture.h"
 #include "altexturetable.h"
 #include "llui.h"
+#include <deque>
 #include <list>
 #include <boost/unordered_set.hpp>
 #include "lluiimage.h"
@@ -231,7 +232,9 @@ public:
     image_queue_t mDownScaleQueue;
 
     image_list_t mCallbackList;
-    image_list_t mFastCacheList;
+
+    // new textures waiting for their first look in the fast cache, oldest first
+    std::deque<LLPointer<LLViewerFetchedTexture>> mFastCacheList;
 
     bool mForceResetTextureStats;
 

@@ -408,4 +408,40 @@ namespace tut
         ensure_equals("reserved size", reserved.size(), (size_t)100);
         ensure("reserved consistent", reserved.consistent());
     }
+
+    // --- find-or-insert ------------------------------------------------------
+
+    // A hit hands back the existing item without calling the maker; a miss
+    // calls it once and takes one reference to what it made; a maker that
+    // returns nothing, or an item already in a table, leaves no trace.
+    template<> template<>
+    void texturetable_object::test<17>()
+    {
+        std::vector<Item*> items = fill(2);
+
+        U32 made = 0;
+        Item* hit = mTable.findOrInsert(key(2), [&]() { ++made; return new Item(99); });
+        ensure("hit returns existing", hit == items[1]);
+        ensure_equals("maker not called on hit", made, 0u);
+
+        Item* fresh = mTable.findOrInsert(key(3), [&]() { ++made; return new Item(3); });
+        ensure("miss inserts", fresh != nullptr && fresh->mId == 3);
+        ensure_equals("maker called once", made, 1u);
+        ensure_equals("one ref from the table", fresh->getNumRefs(), 1);
+        ensure_equals("position", fresh->getListIndex(), 2);
+        ensure("found afterwards", mTable.find(key(3)) == fresh);
+        ensure_equals("size", mTable.size(), (size_t)3);
+
+        Item* none = mTable.findOrInsert(key(4), [&]() -> Item* { ++made; return nullptr; });
+        ensure("null maker yields null", none == nullptr);
+        ensure("null maker leaves no key", !mTable.contains(key(4)));
+        ensure_equals("size after null maker", mTable.size(), (size_t)3);
+
+        LLPointer<Item> other = new Item(5);
+        mTable.insert(key(5), other);
+        Item* dup = mTable.findOrInsert(key(6), [&]() { return other.get(); });
+        ensure("item already in a table refused", dup == nullptr);
+        ensure("refused key absent", !mTable.contains(key(6)));
+        ensure("consistent", mTable.consistent());
+    }
 }

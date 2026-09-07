@@ -465,9 +465,56 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
         new_id.generate(url);
     }
 
-    LLPointer<LLViewerFetchedTexture> imagep = findImage(new_id, get_element_type(boost_priority));
+    const ETexListType tex_type = get_element_type(boost_priority);
+    ++sFindCount;
 
-    if (!imagep.isNull())
+    // made keeps the new texture alive from construction until the table has
+    // taken its own reference
+    LLPointer<LLViewerFetchedTexture> made;
+    LLPointer<LLViewerFetchedTexture> imagep = mImages.findOrInsert(LLTextureKey(new_id, tex_type), [&]() -> LLViewerFetchedTexture*
+    {
+        ++sFindMissCount;
+        switch(texture_type)
+        {
+        case LLViewerTexture::FETCHED_TEXTURE:
+            made = new LLViewerFetchedTexture(url, f_type, new_id, usemipmaps);
+            break ;
+        case LLViewerTexture::LOD_TEXTURE:
+            made = new LLViewerLODTexture(url, f_type, new_id, usemipmaps);
+            break ;
+        default:
+            LL_ERRS() << "Invalid texture type " << texture_type << LL_ENDL ;
+        }
+
+        if (internal_format && primary_format)
+        {
+            made->setExplicitFormat(internal_format, primary_format);
+        }
+
+        made->setTextureListType(tex_type);
+        sNumImages++;
+
+        if (boost_priority != 0)
+        {
+            if (boost_priority == LLViewerFetchedTexture::BOOST_UI)
+            {
+                made->dontDiscard();
+            }
+            if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
+                || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
+            {
+                // Agent and group Icons are downloadable content, nothing manages
+                // icon deletion yet, so they should not persist
+                made->dontDiscard();
+                made->forceActive();
+            }
+            made->setBoostLevel(boost_priority);
+        }
+        return made.get();
+    });
+    llassert(imagep.notNull());
+
+    if (made.isNull())
     {
         LLViewerFetchedTexture *texture = imagep.get();
         if (texture->getUrl().empty())
@@ -481,45 +528,6 @@ LLViewerFetchedTexture* LLViewerTextureList::getImageFromUrl(const std::string& 
             LL_DEBUGS("Avatar") << "Requested texture " << new_id
                                 << " already exists with a different url, requested: " << url
                                 << " current: " << texture->getUrl() << LL_ENDL;
-        }
-
-    }
-    if (imagep.isNull())
-    {
-        switch(texture_type)
-        {
-        case LLViewerTexture::FETCHED_TEXTURE:
-            imagep = new LLViewerFetchedTexture(url, f_type, new_id, usemipmaps);
-            break ;
-        case LLViewerTexture::LOD_TEXTURE:
-            imagep = new LLViewerLODTexture(url, f_type, new_id, usemipmaps);
-            break ;
-        default:
-            LL_ERRS() << "Invalid texture type " << texture_type << LL_ENDL ;
-        }
-
-        if (internal_format && primary_format)
-        {
-            imagep->setExplicitFormat(internal_format, primary_format);
-        }
-
-        addImage(imagep, get_element_type(boost_priority));
-
-        if (boost_priority != 0)
-        {
-            if (boost_priority == LLViewerFetchedTexture::BOOST_UI)
-            {
-                imagep->dontDiscard();
-            }
-            if (boost_priority == LLViewerFetchedTexture::BOOST_ICON
-                || boost_priority == LLViewerFetchedTexture::BOOST_THUMBNAIL)
-            {
-                // Agent and group Icons are downloadable content, nothing manages
-                // icon deletion yet, so they should not persist
-                imagep->dontDiscard();
-                imagep->forceActive();
-            }
-            imagep->setBoostLevel(boost_priority);
         }
     }
 
@@ -586,8 +594,20 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
         return (LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT, FTT_DEFAULT, true, LLGLTexture::BOOST_UI));
     }
 
-    LLPointer<LLViewerFetchedTexture> imagep = findImage(image_id, get_element_type(boost_priority));
-    if (!imagep.isNull())
+    ++sFindCount;
+
+    // made keeps the new texture alive from construction until the table has
+    // taken its own reference
+    LLPointer<LLViewerFetchedTexture> made;
+    LLPointer<LLViewerFetchedTexture> imagep = mImages.findOrInsert(LLTextureKey(image_id, get_element_type(boost_priority)), [&]() -> LLViewerFetchedTexture*
+    {
+        ++sFindMissCount;
+        made = createImage(image_id, f_type, usemipmaps, boost_priority, texture_type, internal_format, primary_format, request_from_host);
+        return made.get();
+    });
+    llassert(imagep.notNull());
+
+    if (made.isNull())
     {
         LLViewerFetchedTexture *texture = imagep.get();
         if (request_from_host.isOk() &&
@@ -606,11 +626,6 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
         {
             LL_WARNS() << "FTType mismatch: requested " << f_type << " image has " << imagep->getFTType() << LL_ENDL;
         }
-
-    }
-    if (imagep.isNull())
-    {
-        imagep = createImage(image_id, f_type, usemipmaps, boost_priority, texture_type, internal_format, primary_format, request_from_host) ;
     }
 
     imagep->setGLTextureCreated(true);
@@ -618,7 +633,8 @@ LLViewerFetchedTexture* LLViewerTextureList::getImage(const LLUUID &image_id,
     return imagep;
 }
 
-//when this function is called, there is no such texture in the gTextureList with image_id.
+// Builds a texture for getImage to insert; the caller owns the reference and
+// the table entry, so this touches neither.
 LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
                                                    FTType f_type,
                                                    bool usemipmaps,
@@ -649,7 +665,8 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
         imagep->setExplicitFormat(internal_format, primary_format);
     }
 
-    addImage(imagep, get_element_type(boost_priority));
+    imagep->setTextureListType(get_element_type(boost_priority));
+    sNumImages++;
 
     if (boost_priority != 0)
     {
@@ -675,8 +692,8 @@ LLViewerFetchedTexture* LLViewerTextureList::createImage(const LLUUID &image_id,
         imagep->forceActive() ;
     }
 
-        mFastCacheList.insert(imagep);
-        imagep->setInFastCacheList(true);
+    mFastCacheList.push_back(imagep);
+    imagep->setInFastCacheList(true);
 
     return imagep ;
 }
@@ -1236,7 +1253,7 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
     //
 
     LLTimer timer;
-    image_list_t::iterator enditer = mFastCacheList.begin();
+    size_t loaded = 0;
     {
         // Prelock fast cache mutex to avoid waiting multiple times.
         LLMutexTrylock fast_cache_lock(LLAppViewer::getTextureCache()->getFastCacheMutex());
@@ -1250,18 +1267,16 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
             // But some variant of a timed try lock for 0.1ms or less might be optimal.
             return 0.0f;
         }
-        for (image_list_t::iterator iter = mFastCacheList.begin();
-            iter != mFastCacheList.end();)
+        // oldest first; the ones not reached wait at the front for the next call
+        for (const LLPointer<LLViewerFetchedTexture>& imagep : mFastCacheList)
         {
-            image_list_t::iterator curiter = iter++;
-            enditer = iter;
-            LLViewerFetchedTexture* imagep = *curiter;
             imagep->loadFromFastCache();
+            ++loaded;
             if (timer.getElapsedTimeF32() > max_time)
                 break;
         }
     }
-    mFastCacheList.erase(mFastCacheList.begin(), enditer);
+    mFastCacheList.erase(mFastCacheList.begin(), mFastCacheList.begin() + loaded);
     return timer.getElapsedTimeF32();
 }
 
