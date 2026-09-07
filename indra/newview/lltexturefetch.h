@@ -30,6 +30,8 @@
 #include <vector>
 #include <map>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include "lldir.h"
 #include "llimage.h"
 #include "lluuid.h"
@@ -324,8 +326,11 @@ private:
 
     LLTextureCache* mTextureCache;
 
-    // Map of all requests by UUID
-    typedef std::map<LLUUID,LLTextureFetchWorker*> map_t;
+    // All requests by UUID. An open-addressing flat map, reserved at
+    // construction: a lookup under the lock is one probe whatever the size.
+    // A rehash moves every entry, so nothing holds a pointer or iterator
+    // into it across an unlock.
+    typedef boost::unordered_flat_map<LLUUID, LLTextureFetchWorker*> map_t;
     map_t mRequestMap;                                                  // Mfq
 
     // Set of requests that require network data

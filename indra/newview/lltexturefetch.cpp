@@ -2469,6 +2469,7 @@ LLTextureFetch::LLTextureFetch(LLTextureCache* cache, bool threaded, bool qa_mod
       mOriginFetchSource(LLTextureFetch::FROM_ALL),
       mTextureInfoMainThread(false)
 {
+    mRequestMap.reserve(4096);
     mMaxBandwidth = LLViewerThrottle::getMaxBandwidthKbps();
     mTextureInfo.setLogging(true);
 
@@ -2761,7 +2762,6 @@ U32 LLTextureFetch::getTotalNumHTTPRequests()
 // Locks:  Mfq
 LLTextureFetchWorker* LLTextureFetch::getWorkerAfterLock(const LLUUID& id)
 {
-    LL_PROFILE_ZONE_SCOPED;
     LLTextureFetchWorker* res = NULL;
     map_t::iterator iter = mRequestMap.find(id);
     if (iter != mRequestMap.end())
