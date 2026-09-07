@@ -2,21 +2,31 @@
 <panel name="panel_login">
 	<panel.string name="forgot_password_url">http://secondlife.com/account/request.php?lang=it</panel.string>
 	<panel.string name="sign_up_url">http://join.secondlife.com/</panel.string>
-	<layout_stack name="ui_stack">
-		<layout_panel name="ui_container">
-			<combo_box label="Nome utente" name="username_combo" tool_tip="Il nome utente che hai scelto durante la registrazione, come roby12 o Stella Solare"/>
-			<line_editor label="Password" name="password_edit"/>
-			<combo_box label="I miei luoghi preferiti" name="start_location_combo">
-				<combo_box.item label="La mia ultima ubicazione" name="MyLastLocation"/>
-				<combo_box.item label="Casa mia" name="MyHome"/>
-			</combo_box>
-			<button label="Accedi" name="connect_btn"/>
-			<check_box label="Ricordami" name="remember_check"/>
-			<text name="forgot_password_text">Password dimenticata</text>
-			<combo_box label="Seleziona griglia" name="server_combo"/>
-			<text name="sign_up_text">Registrati</text>
+	<layout_stack name="main_stack">
+		<layout_panel name="center_stage">
+			<layout_stack name="ui_stack">
+				<layout_panel name="ui_container">
+					<combo_box label="Nome utente" name="username_combo" tool_tip="Il nome utente che hai scelto durante la registrazione, come roby12 o Stella Solare"/>
+					<line_editor label="Password" name="password_edit"/>
+					<combo_box label="I miei luoghi preferiti" name="start_location_combo">
+						<combo_box.item label="La mia ultima ubicazione" name="MyLastLocation"/>
+						<combo_box.item label="Casa mia" name="MyHome"/>
+					</combo_box>
+					<check_box label="Ricordami" name="remember_check"/>
+					<text name="sign_up_text">Registrati</text>
+					<layout_stack name="login_stack">
+						<layout_panel name="login_panel">
+							<text name="forgot_password_text">Password dimenticata</text>
+							<button label="Accedi" name="connect_btn"/>
+						</layout_panel>
+						<layout_panel name="grid_panel">
+							<combo_box label="Seleziona griglia" name="server_combo"/>
+						</layout_panel>
+					</layout_stack>
+					<check_box name="remember_password" label="Ricorda la password"/>
+					<check_box name="remember_name" label="Ricordati di me" tool_tip="Gli utenti memorizzati possono essere dimenticati da Me > Preferenze > Avanzate > Nomi utente memorizzati."/>
+				</layout_panel>
+			</layout_stack>
 		</layout_panel>
-		<check_box name="remember_name" label="Ricordati di me" tool_tip="Gli utenti memorizzati possono essere dimenticati da Me &gt; Preferenze &gt; Avanzate &gt; Nomi utente memorizzati."/>
-		<check_box name="remember_password" label="Ricorda la password"/>
 	</layout_stack>
 </panel>

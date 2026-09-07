@@ -91,18 +91,18 @@
 						<stat_bar label="IO pompa" name="simpumpiomsec"/>
 					</stat_view>
 				</stat_view>
+				<stat_bar name="simpendinguploads" label="Upload in sospeso"/>
+				<stat_bar name="simpendingdownloads" label="Download in attesa"/>
+				<stat_bar name="simoutpps" label="Packets Out"/>
+				<stat_bar name="siminpps" label="Packets In"/>
+				<stat_bar name="simscripteps" label="Eventi di script"/>
+				<stat_bar name="simactivescripts" label="Script attivi"/>
+				<stat_bar name="simactiveobjects" label="Oggetti attivi"/>
+				<stat_bar name="simobjects" label="Oggetti"/>
+				<stat_bar name="simchildagents" label="Agenti per bambini"/>
+				<stat_bar name="simmainagents" label="Agenti principali"/>
+				<stat_bar name="simagentups" label="Aggiornamenti/Sec  Agente"/>
 			</stat_view>
 		</container_view>
-		<stat_bar name="simpendinguploads" label="Upload in sospeso"/>
-		<stat_bar name="simpendingdownloads" label="Download in attesa"/>
-		<stat_bar name="simchildagents" label="Agenti per bambini"/>
-		<stat_bar name="simagentups" label="Aggiornamenti/Sec  Agente"/>
-		<stat_bar name="simscripteps" label="Eventi di script"/>
-		<stat_bar name="simmainagents" label="Agenti principali"/>
-		<stat_bar name="simactivescripts" label="Script attivi"/>
-		<stat_bar name="simactiveobjects" label="Oggetti attivi"/>
-		<stat_bar name="simobjects" label="Oggetti"/>
-		<stat_bar name="siminpps" label="Packets In"/>
-		<stat_bar name="simoutpps" label="Packets Out"/>
 	</scroll_container>
 </floater>

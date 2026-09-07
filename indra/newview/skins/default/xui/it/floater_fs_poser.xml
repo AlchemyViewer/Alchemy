@@ -215,11 +215,13 @@
 					</panel>
 				</tab_container>
 			</panel>
-			<panel name="trackball_panel">
-				<text name="rotation_label">
-					Rotazione:
-				</text>
-				<fs_virtual_trackpad name="limb_rotation" tool_tip="Cambia la rotazione delle parti del corpo attualmente selezionate. Tieni premuto Ctrl per muoverti lentamente. Usa la rotellina del mouse per regolare il terzo asse. Usa Maiusc o Alt per cambiare le rotazioni da modificare" />
+			<panel name="poses_loadSave">
+				<scroll_list tool_tip="Carica una posa per l'avatar o l'animesh che stai animando" name="poses_scroll">
+					<scroll_list.columns label="Nome posa" name="name" />
+				</scroll_list>
+				<line_editor label="Inserisci il nome della posa da salvare..." name="pose_save_name" />
+			</panel>
+			<panel name="joint_manipulation_panel">
 				<panel name="trackball_button_panel">
 					<button name="undo_change" tool_tip="Annulla l'ultima modifica della rotazione" />
 					<button name="button_redo_change" tool_tip="Ripristina l'ultima modifica annullata" />
@@ -228,38 +230,6 @@
 					<button label="Spec." name="button_toggleMirrorRotation" tool_tip="Cambia la giuntura opposta, come in uno specchio" />
 					<button label="Simp." name="button_toggleSympatheticRotation" tool_tip="Cambia la giuntura opposta, ma nello stesso modo" />
 				</panel>
-				<text name="limb_pitch_label">
-					Su / Giù:
-				</text>
-				<text name="limb_yaw_label">
-					Sinistra / Destra:
-				</text>
-				<text name="limb_roll_label">
-					Rotolamento:
-				</text>
-			</panel>
-			<panel name="poses_loadSave">
-				<scroll_list tool_tip="Carica una posa per l'avatar o l'animesh che stai animando" name="poses_scroll">
-					<scroll_list.columns label="Nome posa" name="name" />
-				</scroll_list>
-				<line_editor label="Inserisci il nome della posa da salvare..." name="pose_save_name" />
-			</panel>
-		</layout_panel>
-		<layout_panel name="button_controls_layout">
-			<panel name="button_controls_panel">
-				<button name="toggleAdvancedPanel" tool_tip="Mostra / Nascondi le impostazioni avanzate" />
-				<button name="FlipPose_avatar" tool_tip="Capovolgi l'intera posa a sinistra / destra" />
-				<button name="FlipJoint_avatar" tool_tip="Specchia le parti del corpo selezionate a sinistra / destra" />
-				<button label="Ricatt." name="button_RecaptureParts" tool_tip="Se le parti del corpo selezionate sono disattivate, ricattura ciò che quelle parti del corpo stanno facendo in questo momento" />
-				<button label="Attiv./Dis. parti" name="toggle_PosingSelectedBones" tool_tip="Attiva / Disattiva il Poser per le parti del corpo selezionate. Quando è disattivata, quella parte del corpo si anima normalmente (con il tuo AO o una poseball)" />
-				<button label="Le mie pose" name="toggleLoadSavePanel" tool_tip="Carica, salva e gestisci le pose che crei" />
-				<button tool_tip="Apri la cartella con le tue pose" name="open_poseDir_button" />
-				<menu_button label="Carica posa" tool_tip="Carica la posa attualmente selezionata" name="load_poses_button" />
-				<button label="Salva diff." tool_tip="Salva le modifiche a una posa esistente. Inizia da una posa a T per salvare un nuovo lavoro" name="save_poses_button" />
-			</panel>
-		</layout_panel>
-		<layout_panel name="advanced_controls_layout">
-			<panel name="advanced_parent_panel">
 				<tab_container name="modifier_tabs">
 					<panel title="Posizione parti del corpo" name="position_panel">
 						<slider label="Posizione X:" name="Advanced_Position_X" />
@@ -277,7 +247,35 @@
 						<button label="Rifai dimens." name="redo_scale_change" tool_tip="Ripristina l'ultima modifica delle dimensioni annullata" />
 						<button label="Reset dimens." name="reset_scales" tool_tip="Fai doppio clic per ripristinare le dimensioni originali" />
 					</panel>
+					<panel name="trackball_panel">
+						<text name="rotation_label">
+							Rotazione:
+						</text>
+						<fs_virtual_trackpad name="limb_rotation" tool_tip="Cambia la rotazione delle parti del corpo attualmente selezionate. Tieni premuto Ctrl per muoverti lentamente. Usa la rotellina del mouse per regolare il terzo asse. Usa Maiusc o Alt per cambiare le rotazioni da modificare" />
+						<text name="limb_pitch_label">
+					Su / Giù:
+				</text>
+						<text name="limb_yaw_label">
+					Sinistra / Destra:
+				</text>
+						<text name="limb_roll_label">
+					Rotolamento:
+				</text>
+					</panel>
 				</tab_container>
+			</panel>
+		</layout_panel>
+		<layout_panel name="button_controls_layout">
+			<panel name="button_controls_panel">
+				<button name="toggleAdvancedPanel" tool_tip="Mostra / Nascondi le impostazioni avanzate" />
+				<button name="FlipPose_avatar" tool_tip="Capovolgi l'intera posa a sinistra / destra" />
+				<button name="FlipJoint_avatar" tool_tip="Specchia le parti del corpo selezionate a sinistra / destra" />
+				<button label="Ricatt." name="button_RecaptureParts" tool_tip="Se le parti del corpo selezionate sono disattivate, ricattura ciò che quelle parti del corpo stanno facendo in questo momento" />
+				<button label="Attiv./Dis. parti" name="toggle_PosingSelectedBones" tool_tip="Attiva / Disattiva il Poser per le parti del corpo selezionate. Quando è disattivata, quella parte del corpo si anima normalmente (con il tuo AO o una poseball)" />
+				<button label="Le mie pose" name="toggleLoadSavePanel" tool_tip="Carica, salva e gestisci le pose che crei" />
+				<button tool_tip="Apri la cartella con le tue pose" name="open_poseDir_button" />
+				<menu_button label="Carica posa" tool_tip="Carica la posa attualmente selezionata" name="load_poses_button" />
+				<button label="Salva diff." tool_tip="Salva le modifiche a una posa esistente. Inizia da una posa a T per salvare un nuovo lavoro" name="save_poses_button" />
 			</panel>
 		</layout_panel>
 	</layout_stack>

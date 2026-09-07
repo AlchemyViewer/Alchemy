@@ -38,23 +38,23 @@ Texture</text>
 				<texture_picker label="Tattuaggio inferiore" name="lower_tattoo"/>
 				<texture_picker label="Gonna" name="skirt-baked"/>
 				<texture_picker label="Gonna" name="skirt"/>
+				<texture_picker name="aux3_tattoo" label="Tatuaggio AUX 3"/>
+				<texture_picker name="aux3-baked" label="AUX 3"/>
+				<texture_picker name="aux2_tattoo" label="Tatuaggio AUX 2 "/>
+				<texture_picker name="aux2-baked" label="AUX 2"/>
+				<texture_picker name="aux1_tattoo" label="Tatuaggio AUX 1 "/>
+				<texture_picker name="aux1-baked" label="AUX 1"/>
+				<texture_picker name="leftleg_tattoo" label="Tatuaggio gamba sinistra"/>
+				<texture_picker name="leftleg-baked" label="Gamba sinistra"/>
+				<texture_picker name="leftarm_tattoo" label="Tatuaggio braccio sinistro"/>
+				<texture_picker name="leftarm-baked" label="Braccio Sinistro"/>
+				<texture_picker name="skirt_tattoo" label="Gonna a Tatuaggio"/>
+				<texture_picker name="lower_universal_tattoo" label="Tatuaggio Unv inferiore"/>
+				<texture_picker name="upper_universal_tattoo" label="Tatuaggio Unv superiore"/>
+				<texture_picker name="eyes_tattoo" label="Tatuaggio degli occhi"/>
+				<texture_picker name="head_universal_tattoo" label="Tatuaggio Unv della testa"/>
+				<texture_picker name="hair_tattoo" label="Tatuaggio dei capelli"/>
 			</panel>
 		</panel>
-		<texture_picker name="upper_universal_tattoo" label="Tatuaggio Unv superiore"/>
-		<texture_picker name="aux1_tattoo" label="Tatuaggio AUX 1 "/>
-		<texture_picker name="leftarm-baked" label="Braccio Sinistro"/>
-		<texture_picker name="aux1-baked" label="AUX 1"/>
-		<texture_picker name="skirt_tattoo" label="Gonna a Tatuaggio"/>
-		<texture_picker name="aux2_tattoo" label="Tatuaggio AUX 2 "/>
-		<texture_picker name="eyes_tattoo" label="Tatuaggio degli occhi"/>
-		<texture_picker name="head_universal_tattoo" label="Tatuaggio Unv della testa"/>
-		<texture_picker name="leftleg_tattoo" label="Tatuaggio gamba sinistra"/>
-		<texture_picker name="aux3-baked" label="AUX 3"/>
-		<texture_picker name="hair_tattoo" label="Tatuaggio dei capelli"/>
-		<texture_picker name="leftleg-baked" label="Gamba sinistra"/>
-		<texture_picker name="aux2-baked" label="AUX 2"/>
-		<texture_picker name="aux3_tattoo" label="Tatuaggio AUX 3"/>
-		<texture_picker name="leftarm_tattoo" label="Tatuaggio braccio sinistro"/>
-		<texture_picker name="lower_universal_tattoo" label="Tatuaggio Unv inferiore"/>
 	</scroll_container>
 </floater>

@@ -15,9 +15,17 @@ cliccando sui loro nomi.</panel.string>
 				<name_list.columns label="Stato" name="online"/>
 				<name_list.columns label="Titolo" name="title"/>
 			</name_list>
-			<button label="Invita" name="member_invite"/>
-			<button label="Espelli" name="member_eject"/>
-			<button label="Espelli membri" name="member_ban"/>
+			<layout_stack name="button_row_ls">
+				<layout_panel name="ban_btn_lp">
+					<button label="Espelli membri" name="member_ban"/>
+				</layout_panel>
+				<layout_panel name="eject_btn_lp">
+					<button label="Espelli" name="member_eject"/>
+				</layout_panel>
+				<layout_panel name="btn_invite_lp">
+					<button label="Invita" name="member_invite"/>
+				</layout_panel>
+			</layout_stack>
 		</panel>
 		<panel label="RUOLI" name="roles_sub_tab">
 			<panel.string name="help_text">I ruoli hanno un titolo con un elenco di abilità permesse
@@ -34,6 +42,7 @@ cliccando sui loro nomi.</panel.string>
 			</scroll_list>
 			<button label="Crea nuovo ruolo" name="role_create"/>
 			<button label="Elimina ruolo" name="role_delete"/>
+			<button name="role_copy" label="Copia Ruolo"/>
 		</panel>
 		<panel height="148" label="ABILITÀ" name="actions_sub_tab" tool_tip="Puoi vedere la descrizione dell'abilità e quali ruoli o membri possono eseguirla.">
 			<panel.string name="help_text">Le abilità consentono ai membri nei ruoli di eseguire specifiche
@@ -52,7 +61,6 @@ cliccando sui loro nomi.</panel.string>
 			<button label="Annulla espulsioni" name="ban_delete" tool_tip="Annulla l'espulsione dal gruppo per i residenti selezionati"/>
 			<button name="ban_refresh" tool_tip="Aggiorna la lista espulsi"/>
 		</panel>
-		<button name="role_copy" label="Copia Ruolo"/>
 	</tab_container>
 	<panel name="members_footer">
 		<text name="static">Ruoli assegnati</text>
@@ -64,11 +72,8 @@ cliccando sui loro nomi.</panel.string>
 	</panel>
 	<panel name="roles_footer">
 		<text name="static">Nome del ruolo</text>
-		<line_editor name="role_name"/>
 		<text name="static3">Titolo del ruolo</text>
-		<line_editor name="role_title"/>
 		<text name="static2">Descrizione</text>
-		<text_editor name="role_description"/>
 		<text name="static4">Ruoli assegnati</text>
 		<check_box label="Visualizza membri" name="role_visible_in_list" tool_tip="Imposta nella scheda Generale se i membri con questo ruolo possono essere visti dai residenti esterni a questo gruppo."/>
 		<text name="static5" tool_tip="Una lista delle abilità che il ruolo ora selezionato può eseguire.">Abilità permesse</text>

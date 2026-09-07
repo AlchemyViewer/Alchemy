@@ -18,9 +18,10 @@
 			<check_box label="Apri sempre nel web browser" name="open_always"/>
 			<button label="Chiudi" name="close"/>
 		</layout_panel>
-		<button name="seek" label="avanti"/>
-		<button name="rewind" label="Riavvolgi"/>
-		<button name="stop" label="stop"/>
+		<layout_panel name="time_controls">
+			<button name="seek" label="avanti"/>
+			<button name="stop" label="stop"/>
+			<button name="rewind" label="Riavvolgi"/>
+		</layout_panel>
 	</layout_stack>
-	<layout_panel name="time_controls"/>
 </floater>

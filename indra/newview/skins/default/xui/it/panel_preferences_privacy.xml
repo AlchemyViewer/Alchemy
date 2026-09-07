@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Comunicazione" name="im">
-	<panel.string name="log_in_to_change">
-		accedi per cambiare
-	</panel.string>
-	<button label="Pulisci la cronologia" name="clear_cache" tool_tip="Elimina immagine login, ultimo luogo, cronologia teletrasporto, cache web e texture"/>
-	<text name="cache_size_label_l">
-		(Luoghi, immagini, web, cronologia ricerche)
-	</text>
-	<check_box label="Mostra il mio profilo nei risultati delle ricerche" name="online_searchresults"/>
-	<check_box label="Solo amici e gruppi mi vedono online" name="online_visibility"/>
 	<check_box label="Solo amici e gruppi possono chiamarmi o mandarmi IM" name="voice_call_friends_only_check"/>
-	<check_box label="Spegnere il microfono alla chiusura delle chiamate" name="auto_disengage_mic_check"/>
 	<check_box label="Mostra i miei punti di riferimento preferiti all&apos;accesso (nel menu a discesa &apos;Inizia da&apos;)" name="favorites_on_login_check"/>
 	<text name="Logs:">
 		Registri chat:
@@ -24,14 +14,28 @@
 	</text>
 	<line_editor left="288" name="log_path_string" right="-20"/>
 	<button label="Sfoglia" label_selected="Sfoglia" name="log_path_button" width="130"/>
-	<button label="Lista dei bloccati" name="block_list"/>
-	<text name="inventory_header">
-		Inventory:
-	</text>
-	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
-	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
-	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
-	<text name="block_list_label">
+	<tab_container name="privacy_tab_container">
+		<panel name="privacy_preferences_general">
+			<text name="block_list_label">
 		(Persone e/o Oggetti bloccati)
 	</text>
+			<button label="Lista dei bloccati" name="block_list"/>
+			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
+			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+			<text name="inventory_header">
+		Inventory:
+	</text>
+			<check_box label="Spegnere il microfono alla chiusura delle chiamate" name="auto_disengage_mic_check"/>
+			<check_box label="Solo amici e gruppi mi vedono online" name="online_visibility"/>
+			<check_box label="Mostra il mio profilo nei risultati delle ricerche" name="online_searchresults"/>
+			<text name="cache_size_label_l">
+		(Luoghi, immagini, web, cronologia ricerche)
+	</text>
+			<button label="Pulisci la cronologia" name="clear_cache" tool_tip="Elimina immagine login, ultimo luogo, cronologia teletrasporto, cache web e texture"/>
+			<panel.string name="log_in_to_change">
+		accedi per cambiare
+	</panel.string>
+		</panel>
+	</tab_container>
 </panel>

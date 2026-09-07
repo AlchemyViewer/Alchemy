@@ -17,36 +17,6 @@
 	<menu_item_call label="Elimina" name="Task Remove"/>
 	<menu_item_call label="Svuota il Cestino" name="Empty Trash"/>
 	<menu_item_call label="Svuota gli oggetti persi e ritrovati" name="Empty Lost And Found"/>
-	<menu_item_call label="Nuova cartella" name="New Folder"/>
-	<menu_item_call label="Nuovo script" name="New Script"/>
-	<menu_item_call label="Nuovo biglietto" name="New Note"/>
-	<menu_item_call label="Nuova gesture" name="New Gesture"/>
-	<menu label="Maglietta intima" name="New Clothes">
-		<menu_item_call label="Nuova maglietta" name="New Shirt"/>
-		<menu_item_call label="Nuovi pantaloni" name="New Pants"/>
-		<menu_item_call label="Nuove scarpe" name="New Shoes"/>
-		<menu_item_call label="Nuove calze" name="New Socks"/>
-		<menu_item_call label="Nuova giacca" name="New Jacket"/>
-		<menu_item_call label="Nuova gonna" name="New Skirt"/>
-		<menu_item_call label="Nuovi guanti" name="New Gloves"/>
-		<menu_item_call label="Nuova canottiera" name="New Undershirt"/>
-		<menu_item_call label="Nuove mutande" name="New Underpants"/>
-		<menu_item_call label="Nuovo Alfa Mask" name="New Alpha Mask"/>
-		<menu_item_call label="Nuovo tatuaggio" name="New Tattoo"/>
-		<menu_item_call label="Nuovo Universale" name="New Universal"/>
-		<menu_item_call label="Nuova fisica" name="New Physics"/>
-	</menu>
-	<menu label="Nuove parti del corpo" name="New Body Parts">
-		<menu_item_call label="Nuova forma del corpo" name="New Shape"/>
-		<menu_item_call label="Nuova pelle" name="New Skin"/>
-		<menu_item_call label="Nuovi capelli" name="New Hair"/>
-		<menu_item_call label="Nuovi occhi" name="New Eyes"/>
-	</menu>
-	<menu label="Nuove impostazioni" name="New Settings">
-		<menu_item_call label="Nuovo cielo" name="New Sky"/>
-		<menu_item_call label="Nuova acqua" name="New Water"/>
-		<menu_item_call label="Nuovo ciclo giornata" name="New Day Cycle"/>
-	</menu>
 	<menu label="Usa come impostazione predefinita per" name="upload_def">
 		<menu_item_call label="Caricamenti immagini" name="Image uploads"/>
 		<menu_item_call label="Caricamenti suoni" name="Sound uploads"/>
@@ -114,4 +84,36 @@
 	<menu_item_call label="Copia negli annunci Marketplace" name="Marketplace Copy"/>
 	<menu_item_call label="Sposta negli annunci Marketplace" name="Marketplace Move"/>
 	<menu_item_call label="--nessuna opzione--" name="--no options--"/>
+	<menu name="create_new">
+		<menu label="Nuove impostazioni" name="New Settings">
+			<menu_item_call label="Nuovo cielo" name="New Sky"/>
+			<menu_item_call label="Nuova acqua" name="New Water"/>
+			<menu_item_call label="Nuovo ciclo giornata" name="New Day Cycle"/>
+		</menu>
+		<menu label="Nuove parti del corpo" name="New Body Parts">
+			<menu_item_call label="Nuova forma del corpo" name="New Shape"/>
+			<menu_item_call label="Nuova pelle" name="New Skin"/>
+			<menu_item_call label="Nuovi capelli" name="New Hair"/>
+			<menu_item_call label="Nuovi occhi" name="New Eyes"/>
+		</menu>
+		<menu label="Maglietta intima" name="New Clothes">
+			<menu_item_call label="Nuova maglietta" name="New Shirt"/>
+			<menu_item_call label="Nuovi pantaloni" name="New Pants"/>
+			<menu_item_call label="Nuove scarpe" name="New Shoes"/>
+			<menu_item_call label="Nuove calze" name="New Socks"/>
+			<menu_item_call label="Nuova giacca" name="New Jacket"/>
+			<menu_item_call label="Nuova gonna" name="New Skirt"/>
+			<menu_item_call label="Nuovi guanti" name="New Gloves"/>
+			<menu_item_call label="Nuova canottiera" name="New Undershirt"/>
+			<menu_item_call label="Nuove mutande" name="New Underpants"/>
+			<menu_item_call label="Nuovo Alfa Mask" name="New Alpha Mask"/>
+			<menu_item_call label="Nuovo tatuaggio" name="New Tattoo"/>
+			<menu_item_call label="Nuovo Universale" name="New Universal"/>
+			<menu_item_call label="Nuova fisica" name="New Physics"/>
+		</menu>
+		<menu_item_call label="Nuova gesture" name="New Gesture"/>
+		<menu_item_call label="Nuovo biglietto" name="New Note"/>
+		<menu_item_call label="Nuovo script" name="New Script"/>
+		<menu_item_call label="Nuova cartella" name="New Folder"/>
+	</menu>
 </menu>

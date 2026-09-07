@@ -277,7 +277,6 @@ o suddivisa.
 			<text name="Autoreturn">
 				Restituzione automatica degli oggetti di altri residenti (minuti, 0 per disattivarla):
 			</text>
-			<line_editor name="clean other time"/>
 			<text name="Object Owners:">
 				Proprietari degli oggetti:
 			</text>
@@ -463,25 +462,27 @@ Media:
 			<text name="OwnerLimited">
 				(Può essere che il proprietario immobiliare abbia limitato queste scelte)
 			</text>
-			<panel name="Allowed_layout_panel">
-				<text label="Consenti sempre" name="AllowedText">
-					Sempre consentiti ([COUNT], max [MAX])
-				</text>
-				<name_list name="AccessList" tool_tip="([LISTED] in lista, [MAX] max)"/>
-				<button label="Aggiungi" name="add_allowed"/>
-				<button label="Rimuovi" label_selected="Rimuovi" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="Espelli" name="BanCheck">
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="Espelli" name="BanCheck">
 					Espulsi ([COUNT], max [MAX])
 				</text>
-				<name_list name="BannedList" tool_tip="([LISTED] in lista, [MAX] max)">
-					<columns label="Nome" name="name"/>
-					<columns label="Durata" name="duration"/>
-				</name_list>
-				<button label="Aggiungi" name="add_banned"/>
-				<button label="Rimuovi" label_selected="Rimuovi" name="remove_banned"/>
-			</panel>
+					<name_list name="BannedList" tool_tip="([LISTED] in lista, [MAX] max)">
+						<columns label="Nome" name="name"/>
+						<columns label="Durata" name="duration"/>
+					</name_list>
+					<button label="Aggiungi" name="add_banned"/>
+					<button label="Rimuovi" label_selected="Rimuovi" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="Consenti sempre" name="AllowedText">
+					Sempre consentiti ([COUNT], max [MAX])
+				</text>
+					<name_list name="AccessList" tool_tip="([LISTED] in lista, [MAX] max)"/>
+					<button label="Aggiungi" name="add_allowed"/>
+					<button label="Rimuovi" label_selected="Rimuovi" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="ESPERIENZE" name="land_experiences_panel"/>
 		<panel label="AMBIENTE" name="land_environment_panel"/>

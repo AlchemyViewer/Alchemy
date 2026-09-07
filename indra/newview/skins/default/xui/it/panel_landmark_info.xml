@@ -25,9 +25,9 @@
 				<text name="notes_label" value="Le mie note:"/>
 				<text name="folder_label" value="Ubicazione punto di riferimento:"/>
 			</panel>
+			<expandable_text name="description" value="Si balla il valzer con lo spritz"/>
+			<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
 		</panel>
-		<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
-		<expandable_text name="description" value="Si balla il valzer con lo spritz"/>
 		<text name="region_title" value="CampioneRegione"/>
 	</scroll_container>
 </panel>

@@ -91,9 +91,9 @@
 					</panel>
 				</accordion_tab>
 			</accordion>
+			<expandable_text name="description" value="Du waltz die spritz"/>
+			<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
 		</panel>
-		<text name="parcel_title" value="SampleParcel, Name Long (145, 228, 26)"/>
 		<text name="region_title" value="SampleRegion"/>
-		<expandable_text name="description" value="Du waltz die spritz"/>
 	</scroll_container>
 </panel>

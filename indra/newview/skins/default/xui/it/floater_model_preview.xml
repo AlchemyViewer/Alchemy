@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="CARICAMENTO MODELLO">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Errore: Errore elaborazione Dae - vedere il registro per informazioni dettagliate.
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="Sfoglia..." name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Passaggio 2: Analizza
-					</text>
-					<text name="analysis_method_label">
-						Metodo:
-					</text>
-					<text name="quality_label">
-						Qualità:
-					</text>
-					<text name="smooth_method_label">
-						Liscia:
-					</text>
-					<check_box label="Chiudi fori" name="Close Holes (Slow)"/>
-					<button label="Analizza" name="Decompose"/>
-					<button label="Annulla" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						Passaggio 3: Semplifica
@@ -230,6 +212,25 @@
 						Scafi: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Liscia:
+					</text>
+					<text name="quality_label">
+						Qualità:
+					</text>
+					<text name="analysis_method_label">
+						Metodo:
+					</text>
+					<text name="method_label">
+						Passaggio 2: Analizza
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Annulla" name="decompose_cancel"/>
+					<button label="Analizza" name="Decompose"/>
+					<check_box label="Chiudi fori" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Carica opzioni" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					Solo per modelli avatar:
 				</text>
-				<check_box label="Includi peso pelle" name="upload_skin"/>
-				<check_box label="Includi posizioni giunti" name="upload_joints"/>
-				<check_box label="Blocca scala se è definita la posizione dei giunti" name="lock_scale_if_joint_position"/>
-				<text name="pelvis_offset_label">
-					Spostamento Z (sposta l&apos;avatar in alto o in basso):
-				</text>
+			</panel>
+			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>
+				<text name="pelvis_offset_label">
+					Spostamento Z (sposta l'avatar in alto o in basso):
+				</text>
+				<check_box label="Blocca scala se è definita la posizione dei giunti" name="lock_scale_if_joint_position"/>
+				<check_box label="Includi posizioni giunti" name="upload_joints"/>
+				<check_box label="Includi peso pelle" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

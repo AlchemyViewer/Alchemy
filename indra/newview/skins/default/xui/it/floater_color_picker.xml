@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="ColorPicker" title="SELETTORE DI COLORE">
-	<text name="r_val_text">
-		Rosso:
-	</text>
 	<spinner left="84" name="rspin" width="47"/>
-	<text name="g_val_text">
-		Verde:
-	</text>
 	<spinner left="84" name="gspin" width="47"/>
-	<text name="b_val_text">
-		Blu:
-	</text>
 	<spinner left="84" name="bspin" width="47"/>
 	<text name="h_val_text">
 		Tonalità:
@@ -34,4 +25,17 @@
 	<text name="(Drag below to save.)">
 		(Trascina sotto per salvare)
 	</text>
+	<tab_container name="color_type_container">
+		<panel name="RGB">
+			<text name="b_val_text">
+		Blu:
+	</text>
+			<text name="g_val_text">
+		Verde:
+	</text>
+			<text name="r_val_text">
+		Rosso:
+	</text>
+		</panel>
+	</tab_container>
 </floater>

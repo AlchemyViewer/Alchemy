@@ -3,7 +3,9 @@
 	<menu_item_check label="Ordina in base al nome" name="sort_name"/>
 	<menu_item_check label="Ordina in base allo stato" name="sort_status"/>
 	<menu_item_check label="Mostra le icone delle persone" name="view_icons"/>
-	<menu_item_check label="Mostra le autorizzazioni concesse" name="view_permissions"/>
 	<menu_item_check label="Nascondi nomi utenti" name="view_usernames"/>
 	<menu_item_check label="Mostra il registro conversazioni..." name="view_conversation"/>
+	<context_menu name="People Show Permissions">
+		<menu_item_check label="Mostra le autorizzazioni concesse" name="view_permissions"/>
+	</context_menu>
 </toggleable_menu>
