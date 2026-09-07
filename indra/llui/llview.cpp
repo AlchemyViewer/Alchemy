@@ -67,10 +67,6 @@ bool    LLView::sDebugKeys = false;
 bool    LLView::sDebugMouseHandling = false;
 std::string LLView::sMouseHandlerMessage;
 bool    LLView::sForceReshape = false;
-std::set<LLView*> LLView::sPreviewHighlightedElements;
-bool LLView::sHighlightingDiffs = false;
-LLView* LLView::sPreviewClickedElement = nullptr;
-bool    LLView::sDrawPreviewHighlights = false;
 std::vector<LLViewDrawContext*> LLViewDrawContext::sDrawContextStack;
 
 // Empty until a test installs one; see LLView::TemporaryDrilldownFunc. The
@@ -1420,8 +1416,6 @@ void LLView::dirtyRect()
 //Draw a box for debugging.
 void LLView::drawDebugRect()
 {
-    const bool is_previewed = sPreviewHighlightedElements.count(this) != 0;
-
     LLUI::pushMatrix();
     {
         // drawing solids requires texturing be disabled
@@ -1436,22 +1430,7 @@ void LLView::drawDebugRect()
 
         // draw red rectangle for the border
         LLColor4 border_color(0.25f, 0.25f, 0.25f, 1.f);
-        if (is_previewed)
-        {
-            if(LLView::sPreviewClickedElement && this == sPreviewClickedElement)
-            {
-                border_color = LLColor4::red;
-            }
-            else
-            {
-                static LLUIColor scroll_highlighted_color = LLUIColorTable::instance().getColor("ScrollHighlightedColor");
-                border_color = scroll_highlighted_color;
-            }
-        }
-        else
-        {
-            border_color.mV[sDepth%3] = 1.f;
-        }
+        border_color.mV[sDepth%3] = 1.f;
 
         gGL.color4fv( border_color.mV );
 
@@ -1469,9 +1448,8 @@ void LLView::drawDebugRect()
             gGL.vertex2i(0, debug_rect.getHeight() - 1);
         gGL.end();
 
-        // Draw the name if it's not a leaf node or not in editing or preview mode
+        // Draw the name if it's not a leaf node
         if (getChildCount()
-            && !is_previewed
             && sDebugRectsShowNames)
         {
             S32 x, y;

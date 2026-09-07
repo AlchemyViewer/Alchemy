@@ -826,10 +826,6 @@ public:
     static bool sDebugKeys;
     static bool sDebugMouseHandling;
     static std::string sMouseHandlerMessage;
-    static std::set<LLView*> sPreviewHighlightedElements;   // DEV-16869
-    static bool sHighlightingDiffs;                         // DEV-16869
-    static LLView* sPreviewClickedElement;                  // DEV-16869
-    static bool sDrawPreviewHighlights;
     static bool sForceReshape;
 };
 
