@@ -170,14 +170,32 @@
      height="682"
      layout="topleft"
      left="8"
+     name="outer_stack"
+     orientation="vertical"
+     top="50"
+     width="1164">
+
+    <layout_panel
+     auto_resize="true"
+     height="474"
+     layout="topleft"
+     min_dim="200"
+     name="panes">
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="474"
+     layout="topleft"
+     left="0"
      name="main_stack"
      orientation="horizontal"
-     top="50"
+     top="0"
      width="1164">
 
         <layout_panel
          auto_resize="false"
-         height="682"
+         height="474"
          layout="topleft"
          min_dim="200"
          name="catalog_panel"
@@ -186,7 +204,7 @@
             <layout_stack
              animate="false"
              follows="all"
-             height="682"
+             height="474"
              layout="topleft"
              left="0"
              name="catalog_stack"
@@ -210,7 +228,7 @@
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"
-                 height="426"
+                 height="244"
                  layout="topleft"
                  min_dim="120"
                  name="file_list_area">
@@ -219,7 +237,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="426"
+                     height="244"
                      layout="topleft"
                      left="0"
                      name="file_list"
@@ -285,7 +303,7 @@
                 </layout_panel>
                 <layout_panel
                  auto_resize="false"
-                 height="200"
+                 height="150"
                  layout="topleft"
                  min_dim="60"
                  name="find_results_area"
@@ -295,7 +313,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="200"
+                     height="150"
                      layout="topleft"
                      left="0"
                      name="find_results"
@@ -324,7 +342,7 @@
 
         <layout_panel
          auto_resize="false"
-         height="682"
+         height="474"
          layout="topleft"
          min_dim="220"
          name="tree_panel"
@@ -333,7 +351,7 @@
             <layout_stack
              animate="false"
              follows="all"
-             height="682"
+             height="474"
              layout="topleft"
              left="0"
              name="tree_stack"
@@ -357,13 +375,13 @@
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"
-                 height="452"
+                 height="406"
                  layout="topleft"
                  min_dim="150"
                  name="tree_area">
                     <panel
                      follows="all"
-                     height="452"
+                     height="406"
                      layout="topleft"
                      left="0"
                      name="tree_host"
@@ -384,61 +402,19 @@
                      top="0"
                      width="360" />
                 </layout_panel>
-                <layout_panel
-                 auto_resize="false"
-                 height="178"
-                 layout="topleft"
-                 min_dim="60"
-                 name="findings_area"
-                 user_resize="true">
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     multi_select="true"
-                     follows="all"
-                     height="178"
-                     layout="topleft"
-                     left="0"
-                     name="findings"
-                     tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
-                     top="0"
-                     width="360">
-                        <scroll_list.columns
-                         label=""
-                         name="severity"
-                         tool_tip="error, warning or note"
-                         width="52" />
-                        <scroll_list.columns
-                         label="Rule"
-                         name="rule"
-                         width="90" />
-                        <scroll_list.columns
-                         label="Line"
-                         name="line"
-                         width="36" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Where"
-                         name="where" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="What"
-                         name="message" />
-                    </scroll_list>
-                </layout_panel>
             </layout_stack>
         </layout_panel>
 
         <layout_panel
          auto_resize="true"
-         height="682"
+         height="474"
          layout="topleft"
          min_dim="320"
          name="inspector_panel"
          width="480">
             <tab_container
              follows="all"
-             height="682"
+             height="474"
              layout="topleft"
              left="0"
              name="inspector_tabs"
@@ -455,7 +431,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="640"
+                     height="430"
                      layout="topleft"
                      left="0"
                      name="attributes"
@@ -488,7 +464,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="640"
+                     height="430"
                      layout="topleft"
                      left="0"
                      name="layout"
@@ -529,7 +505,7 @@
                     <text_editor
                      follows="all"
                      font="Monospace"
-                     height="612"
+                     height="400"
                      ignore_tab="false"
                      layout="topleft"
                      left="0"
@@ -548,7 +524,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="640"
+                     height="430"
                      layout="topleft"
                      left="0"
                      name="bindings"
@@ -577,7 +553,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="640"
+                     height="430"
                      layout="topleft"
                      left="0"
                      name="state"
@@ -602,7 +578,7 @@
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="640"
+                     height="430"
                      layout="topleft"
                      left="0"
                      name="selection_findings"
@@ -629,6 +605,53 @@
                 </panel>
             </tab_container>
         </layout_panel>
+    </layout_stack>
+
+    </layout_panel>
+
+        <layout_panel
+         auto_resize="false"
+         height="200"
+         layout="topleft"
+         min_dim="60"
+         name="findings_area"
+         user_resize="true">
+            <scroll_list
+             column_padding="0"
+             draw_heading="true"
+             multi_select="true"
+             follows="all"
+             height="200"
+             layout="topleft"
+             left="0"
+             name="findings"
+             tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+             top="0"
+             width="1164">
+                <scroll_list.columns
+                 label=""
+                 name="severity"
+                 tool_tip="error, warning or note"
+                 width="52" />
+                <scroll_list.columns
+                 label="Rule"
+                 name="rule"
+                 width="110" />
+                <scroll_list.columns
+                 label="Line"
+                 name="line"
+                 width="44" />
+                <scroll_list.columns
+                 dynamic_width="true"
+                 label="Where"
+                 name="where" />
+                <scroll_list.columns
+                 dynamic_width="true"
+                 label="What"
+                 name="message" />
+            </scroll_list>
+        </layout_panel>
+
     </layout_stack>
 
     <text
