@@ -44,13 +44,172 @@
     <floater.string name="SchemaFailed">Could not write [FILE]</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
+    <menu_bar
+     bg_visible="false"
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="4"
+     mouse_opaque="false"
+     name="studio_menu"
+     top="20"
+     width="600">
+        <menu
+         label="File"
+         layout="topleft"
+         mouse_opaque="false"
+         name="file"
+         tear_off="false"
+         width="200">
+            <menu_item_call
+             label="Reload Catalog"
+             layout="topleft"
+             name="reload">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="reload" />
+            </menu_item_call>
+            <menu_item_call
+             label="Open in External Editor"
+             layout="topleft"
+             name="edit">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="edit" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Capture Preview..."
+             layout="topleft"
+             name="capture">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="capture" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="View"
+         layout="topleft"
+         mouse_opaque="false"
+         name="view"
+         tear_off="false"
+         width="200">
+            <menu_item_call
+             label="Show Preview"
+             layout="topleft"
+             name="show">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="show" />
+            </menu_item_call>
+            <menu_item_call
+             label="Hide Previews"
+             layout="topleft"
+             name="hide">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="hide" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Hover Highlight"
+             layout="topleft"
+             name="hover">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="hover" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="hover" />
+            </menu_item_check>
+            <menu_item_check
+             label="Rulers"
+             layout="topleft"
+             name="rulers">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="rulers" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="rulers" />
+            </menu_item_check>
+            <menu_item_check
+             label="Snap to Grid"
+             layout="topleft"
+             name="snap">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="snap" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="snap" />
+            </menu_item_check>
+            <menu
+             label="Grid Size"
+             layout="topleft"
+             mouse_opaque="false"
+             name="grid"
+             tear_off="false"
+             width="100">
+                <menu_item_check label="2" layout="topleft" name="grid_2">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:2" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:2" />
+                </menu_item_check>
+                <menu_item_check label="4" layout="topleft" name="grid_4">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:4" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:4" />
+                </menu_item_check>
+                <menu_item_check label="8" layout="topleft" name="grid_8">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:8" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:8" />
+                </menu_item_check>
+                <menu_item_check label="16" layout="topleft" name="grid_16">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:16" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:16" />
+                </menu_item_check>
+            </menu>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Code-built Rows"
+             layout="topleft"
+             name="code_built">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="code_built" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="code_built" />
+            </menu_item_check>
+        </menu>
+        <menu
+         label="Tools"
+         layout="topleft"
+         mouse_opaque="false"
+         name="tools"
+         tear_off="false"
+         width="220">
+            <menu_item_call
+             label="Widget Gallery"
+             layout="topleft"
+             name="gallery">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="gallery" />
+            </menu_item_call>
+            <menu_item_call
+             label="Lint All Files"
+             layout="topleft"
+             name="lint_all">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="lint_all" />
+            </menu_item_call>
+            <menu_item_call
+             label="Overlay Census"
+             layout="topleft"
+             name="census">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="census" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Export Schema"
+             layout="topleft"
+             name="schema">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="schema" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Repair Roots"
+             layout="topleft"
+             name="repair_roots">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="repair_roots" />
+            </menu_item_call>
+            <menu_item_call
+             label="Repair Language"
+             layout="topleft"
+             name="repair_all">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="repair_all" />
+            </menu_item_call>
+        </menu>
+    </menu_bar>
+
     <text
      follows="left|top"
      height="16"
      layout="topleft"
      left="8"
      name="skin_label"
-     top="24"
+     top="44"
      width="30">Skin</text>
     <combo_box
      follows="left|top"
@@ -134,120 +293,16 @@
      tool_tip="Open the selected element's file in the external editor at its line"
      top_delta="0"
      width="60" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Gallery"
-     layout="topleft"
-     left_pad="12"
-     name="gallery_btn"
-     tool_tip="Every registered widget with its template defaults, in the chosen skin"
-     top_delta="0"
-     width="70" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Lint all"
-     layout="topleft"
-     left_pad="4"
-     name="lint_all_btn"
-     tool_tip="Check every file in the catalog, a few per frame, and write a report beside the log"
-     top_delta="0"
-     width="66" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Census"
-     layout="topleft"
-     left_pad="4"
-     name="census_btn"
-     tool_tip="Count what every language's overlay does to every file, and write the table beside the log"
-     top_delta="0"
-     width="60" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Schema"
-     layout="topleft"
-     left_pad="4"
-     name="schema_btn"
-     tool_tip="Write xui.xsd from the registered widgets, into the skins directory"
-     top_delta="0"
-     width="60" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Capture"
-     layout="topleft"
-     left_pad="4"
-     name="capture_btn"
-     tool_tip="Write the preview to an image file, as it stands on screen; the extension chooses the format"
-     top_delta="0"
-     width="66" />
-    <check_box
-     follows="left|top"
-     height="16"
-     label="Hover highlight"
-     layout="topleft"
-     left_pad="14"
-     name="hover_check"
-     tool_tip="Draw the element under the mouse on the preview"
-     top_delta="3"
-     width="120" />
-    <check_box
-     follows="left|top"
-     height="16"
-     label="Snap"
-     layout="topleft"
-     left_pad="6"
-     name="snap_check"
-     tool_tip="Drags land on the grid, counted in the element's own coordinates"
-     top_delta="0"
-     width="52" />
-    <combo_box
-     follows="left|top"
-     height="22"
-     layout="topleft"
-     left_pad="0"
-     name="grid_combo"
-     tool_tip="How far apart the grid lines are"
-     top_delta="-3"
-     width="48">
-        <combo_box.item label="2" name="2" value="2" />
-        <combo_box.item label="4" name="4" value="4" />
-        <combo_box.item label="8" name="8" value="8" />
-        <combo_box.item label="16" name="16" value="16" />
-    </combo_box>
-    <check_box
-     follows="left|top"
-     height="16"
-     label="Rulers"
-     layout="topleft"
-     left_pad="6"
-     name="rulers_check"
-     tool_tip="Rules along the top and left of the preview, counting from the file's own origin"
-     top_delta="3"
-     width="58" />
-    <check_box
-     follows="left|top"
-     height="16"
-     label="Code-built rows"
-     layout="topleft"
-     left_pad="6"
-     name="code_built_check"
-     tool_tip="Show the views a widget builds for itself, which the file does not describe"
-     top_delta="0"
-     width="130" />
 
     <layout_stack
      animate="false"
      follows="all"
-     height="682"
+     height="662"
      layout="topleft"
      left="8"
      name="outer_stack"
      orientation="vertical"
-     top="50"
+     top="70"
      width="1164">
 
     <layout_panel

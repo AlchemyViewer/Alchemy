@@ -236,9 +236,9 @@ private:
     void setStatus(const std::string& text);
     void saveState();
     void loadState();
-    void onToggleHover();
-    void onGridChanged();
-    void onToggleCodeBuilt();
+    // The menu bar: an action by name, and whether a switch is on.
+    void onMenuAction(const LLSD& param);
+    bool onMenuCheck(const LLSD& param);
     void onToggleSecondary();
 
     static LLSD row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells);
@@ -314,9 +314,6 @@ private:
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
-    LLCheckBoxCtrl*     mSnapCheck = nullptr;
-    LLCheckBoxCtrl*     mRulersCheck = nullptr;
-    LLComboBox*         mGridCombo = nullptr;
     LLLineEditor*       mFindQuery = nullptr;
     LLComboBox*         mFindField = nullptr;
     LLScrollListCtrl*   mFindResults = nullptr;

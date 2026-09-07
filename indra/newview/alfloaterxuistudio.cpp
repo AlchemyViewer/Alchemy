@@ -966,6 +966,8 @@ ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
     mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
     mCommitCallbackRegistrar.add("XUIStudio.List", boost::bind(&ALFloaterXUIStudio::onListAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.ListEnabled", boost::bind(&ALFloaterXUIStudio::onListActionEnabled, this, _2));
+    mCommitCallbackRegistrar.add("XUIStudio.Menu", boost::bind(&ALFloaterXUIStudio::onMenuAction, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.MenuCheck", boost::bind(&ALFloaterXUIStudio::onMenuCheck, this, _2));
 }
 
 ALFloaterXUIStudio::~ALFloaterXUIStudio()
@@ -981,9 +983,6 @@ bool ALFloaterXUIStudio::postBuild()
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
     mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
-    mSnapCheck = getChild<LLCheckBoxCtrl>("snap_check");
-    mRulersCheck = getChild<LLCheckBoxCtrl>("rulers_check");
-    mGridCombo = getChild<LLComboBox>("grid_combo");
     mFindQuery = getChild<LLLineEditor>("find_query");
     mFindField = getChild<LLComboBox>("find_field");
     mFindResults = getChild<LLScrollListCtrl>("find_results");
@@ -1039,31 +1038,13 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
     getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
-    getChild<LLButton>("census_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startCensus, this));
-    getChild<LLButton>("schema_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onExportSchema, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::closePreviews, this));
     getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::reloadAll, this));
     getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
     getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onJumpToSource, this));
-    getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
-    getChild<LLButton>("lint_all_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startLintAll, this));
-    getChild<LLButton>("capture_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::capturePreview, this));
 
-    LLCheckBoxCtrl* hover = getChild<LLCheckBoxCtrl>("hover_check");
-    hover->setValue(mHoverHighlight);
-    hover->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleHover, this));
-    mSnapCheck->setValue(mSnap);
-    mSnapCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
-    mRulersCheck->setValue(mRulers);
-    mRulersCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
-    mGridCombo->setValue(mGrid);
-    mGridCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onGridChanged, this));
-
-    LLCheckBoxCtrl* code_built = getChild<LLCheckBoxCtrl>("code_built_check");
-    code_built->setValue(mShowCodeBuilt);
-    code_built->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCodeBuilt, this));
     mSecondaryCheck->setValue(mShowSecondary);
     mLanguageCombo2->setEnabled(mShowSecondary);
 
@@ -4173,25 +4154,54 @@ void ALFloaterXUIStudio::setStatus(const std::string& text)
     mStatus->setText(text);
 }
 
-void ALFloaterXUIStudio::onGridChanged()
+// Everything the menu bar does, by the name the item carries. The actions
+// are the methods the toolbar's own buttons call; the switches are the
+// members the drawing and the tree already read, so a menu item is the whole
+// of the control rather than a second copy of the state.
+void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
 {
-    mSnap = mSnapCheck->getValue().asBoolean();
-    mRulers = mRulersCheck->getValue().asBoolean();
-    mGrid = llmax(1, mGridCombo->getValue().asInteger());
-    saveState();
+    const std::string action = param.asString();
+
+    if (action == "show")               { showPreviews(); }
+    else if (action == "hide")          { closePreviews(); }
+    else if (action == "reload")        { reloadAll(); }
+    else if (action == "edit")          { onJumpToSource(); }
+    else if (action == "capture")       { capturePreview(); }
+    else if (action == "gallery")       { showGallery(); }
+    else if (action == "lint_all")      { startLintAll(); }
+    else if (action == "census")        { startCensus(); }
+    else if (action == "schema")        { onExportSchema(); }
+    else if (action == "repair_roots")  { onRepairRoots(); }
+    else if (action == "repair_all")    { startRepairAll(); }
+    else if (action == "hover")         { mHoverHighlight = !mHoverHighlight; saveState(); }
+    else if (action == "rulers")        { mRulers = !mRulers; saveState(); }
+    else if (action == "snap")          { mSnap = !mSnap; saveState(); }
+    else if (action == "code_built")
+    {
+        mShowCodeBuilt = !mShowCodeBuilt;
+        mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
+        saveState();
+    }
+    else if (action.compare(0, 5, "grid:") == 0)
+    {
+        mGrid = llmax(1, std::atoi(action.c_str() + 5));
+        saveState();
+    }
 }
 
-void ALFloaterXUIStudio::onToggleHover()
+bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
 {
-    mHoverHighlight = getChild<LLCheckBoxCtrl>("hover_check")->getValue().asBoolean();
-    saveState();
-}
+    const std::string flag = param.asString();
 
-void ALFloaterXUIStudio::onToggleCodeBuilt()
-{
-    mShowCodeBuilt = getChild<LLCheckBoxCtrl>("code_built_check")->getValue().asBoolean();
-    mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
-    saveState();
+    if (flag == "hover")        { return mHoverHighlight; }
+    if (flag == "rulers")       { return mRulers; }
+    if (flag == "snap")         { return mSnap; }
+    if (flag == "code_built")   { return mShowCodeBuilt; }
+    if (flag.compare(0, 5, "grid:") == 0)
+    {
+        return mGrid == std::atoi(flag.c_str() + 5);
+    }
+    return false;
 }
 
 void ALFloaterXUIStudio::onToggleSecondary()
