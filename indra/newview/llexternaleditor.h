@@ -70,9 +70,11 @@ public:
      * Run the editor with the given file.
      *
      * @param file_path File to edit.
+     * @param line      Line to open at, substituted for the line marker
+     *                  when the command carries one; 0 for none.
      * @return EC_SUCCESS on success, error code on error.
      */
-    EErrorCode run(const std::string& file_path);
+    EErrorCode run(const std::string& file_path, S32 line = 0);
 
     /**
      * Get a meaningful error message for the given status code.
@@ -91,6 +93,12 @@ private:
      * Filename placeholder that gets replaced with an actual file name.
      */
     static const std::string sFilenameMarker;
+
+    /**
+     * Line placeholder that gets replaced with a line number, so that
+     * "-g %s:%L" opens an editor at the line.
+     */
+    static const std::string sLineMarker;
 
     /**
      * Setting that can specify the editor command.

@@ -35,6 +35,7 @@
 
 // static
 const std::string LLExternalEditor::sFilenameMarker = "%s";
+const std::string LLExternalEditor::sLineMarker = "%L";
 
 // static
 const std::string LLExternalEditor::sSetting = "ExternalEditor";
@@ -95,7 +96,7 @@ LLExternalEditor::EErrorCode LLExternalEditor::setCommand(const std::string& env
     return EC_SUCCESS;
 }
 
-LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path)
+LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path, S32 line)
 {
     if (std::string(mProcessParams.executable).empty() || mProcessParams.args.empty())
     {
@@ -103,15 +104,19 @@ LLExternalEditor::EErrorCode LLExternalEditor::run(const std::string& file_path)
         return EC_NOT_SPECIFIED;
     }
 
-    // Copy params block so we can replace sFilenameMarker
+    // Copy params block so we can replace the markers
     LLProcess::Params params;
     params.executable = mProcessParams.executable;
 
-    // Substitute the filename marker in the command with the actual passed file name.
+    // Substitute the filename marker in the command with the actual passed
+    // file name, and the line marker with the line, or its first line when
+    // none was asked for.
+    const std::string line_text = std::to_string(line > 0 ? line : 1);
     for (const std::string& arg : mProcessParams.args)
     {
         std::string fixed(arg);
         LLStringUtil::replaceString(fixed, sFilenameMarker, file_path);
+        LLStringUtil::replaceString(fixed, sLineMarker, line_text);
         params.args.add(fixed);
     }
 
