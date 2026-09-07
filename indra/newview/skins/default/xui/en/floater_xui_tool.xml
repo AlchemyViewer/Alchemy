@@ -140,7 +140,7 @@
      layout="topleft"
      left_pad="4"
      name="capture_btn"
-     tool_tip="Write the preview to a PNG beside the log, as it stands on screen"
+     tool_tip="Write the preview to an image file, as it stands on screen; the extension chooses the format"
      top_delta="0"
      width="66" />
     <check_box

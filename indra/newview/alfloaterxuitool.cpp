@@ -37,7 +37,11 @@
 #include "llexternaleditor.h"
 #include "llfile.h"
 #include "llfiltereditor.h"
+#include "llimagebmp.h"
+#include "llimagej2c.h"
+#include "llimagejpeg.h"
 #include "llimagepng.h"
+#include "llimagetga.h"
 #include "llfolderview.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -53,6 +57,7 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+#include "llviewermenufile.h"
 #include "llviewerwindow.h"
 
 #include <algorithm>
@@ -1606,6 +1611,10 @@ void ALFloaterXUITool::capturePreview()
                (size_t)width * components);
     }
 
+    mCapture = cropped;
+
+    // The file and the format are one question: the extension the author
+    // types is what the image is written as.
     std::string name = mFile;
     for (char& c : name)
     {
@@ -1614,16 +1623,53 @@ void ALFloaterXUITool::capturePreview()
             c = '_';
         }
     }
-    const std::string path = gDirUtilp->getExpandedFilename(
-        LL_PATH_LOGS, name + "_" + mPreviews[PRIMARY].skin + "_" + mPreviews[PRIMARY].language + ".png");
+    name += "_" + mPreviews[PRIMARY].skin + "_" + mPreviews[PRIMARY].language + ".png";
+    LLFilePickerReplyThread::startPicker(boost::bind(&ALFloaterXUITool::writeCapture, this, _1),
+                                         LLFilePicker::FFSAVE_ALL, name);
+}
 
-    LLPointer<LLImagePNG> png = new LLImagePNG;
-    if (!png->encode(cropped, 0.f) || !png->save(path))
+void ALFloaterXUITool::writeCapture(const std::vector<std::string>& filenames)
+{
+    if (filenames.empty() || mCapture.isNull())
+    {
+        return;
+    }
+    const std::string path = filenames.front();
+
+    std::string extension = gDirUtilp->getExtension(path);
+    LLStringUtil::toLower(extension);
+    LLPointer<LLImageFormatted> image;
+    if (extension == "jpg" || extension == "jpeg")
+    {
+        image = new LLImageJPEG(gSavedSettings.getS32("SnapshotQuality"));
+    }
+    else if (extension == "bmp")
+    {
+        image = new LLImageBMP;
+    }
+    else if (extension == "tga")
+    {
+        image = new LLImageTGA;
+    }
+    else if (extension == "j2c" || extension == "jp2")
+    {
+        image = new LLImageJ2C;
+    }
+    else
+    {
+        // Including no extension at all: a picture of a floater is a PNG
+        // unless the author says otherwise.
+        image = new LLImagePNG;
+    }
+
+    if (!image->encode(mCapture, 0.f) || !image->save(path))
     {
         setStatus("Could not write " + path);
         return;
     }
-    setStatus("Captured " + std::to_string(width) + " by " + std::to_string(height) + " to " + path);
+    setStatus("Captured " + std::to_string(mCapture->getWidth()) + " by "
+              + std::to_string(mCapture->getHeight()) + " to " + path);
+    mCapture = nullptr;
 }
 
 // Every file in the catalog, checked a few per frame. The status line

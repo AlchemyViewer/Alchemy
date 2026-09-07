@@ -47,6 +47,7 @@ class ALXUILiveFile;
 class ALXUIPreviewHost;
 class LLCheckBoxCtrl;
 class LLComboBox;
+class LLImageRaw;
 class LLFilterEditor;
 class LLFolderView;
 class LLFolderViewFolder;
@@ -152,9 +153,11 @@ private:
     void finishLintAll();
     S32 lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines);
 
-    // The preview as a PNG, which is what a review of a translation
-    // needs without the viewer.
+    // The preview as an image, which is what a review of a translation
+    // needs without the viewer. The picker names the file and its
+    // extension chooses the format.
     void capturePreview();
+    void writeCapture(const std::vector<std::string>& filenames);
 
     // --- the selection -------------------------------------------------------
     void onSelectionChanged();
@@ -204,6 +207,8 @@ private:
     LLFrameTimer        mStateTimer;
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;
+
+    LLPointer<LLImageRaw>           mCapture;       // taken before the picker opens
 
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;
