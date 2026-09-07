@@ -419,13 +419,9 @@ pugi::xml_node ALXUICatalog::resolve(pugi::xml_node root, const std::vector<std:
     pugi::xml_node cur = root;
     for (const std::string& step : path)
     {
-        std::string_view name(step);
+        std::string_view name;
         S32 wanted = 0;
-        if (const size_t hash = name.rfind('#'); hash != std::string_view::npos)
-        {
-            wanted = (S32)std::atoi(step.c_str() + hash + 1);
-            name = name.substr(0, hash);
-        }
+        ALXUISelection::splitOrdinal(step, name, wanted);
         pugi::xml_node found;
         S32 seen = 0;
         for (pugi::xml_node child = cur.first_child(); child; child = child.next_sibling())

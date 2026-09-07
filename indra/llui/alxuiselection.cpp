@@ -29,6 +29,7 @@
 #include "llview.h"
 
 #include <algorithm>
+#include <cctype>
 
 // static
 std::string ALXUISelection::step(std::string_view name, S32 ordinal)
@@ -40,6 +41,28 @@ std::string ALXUISelection::step(std::string_view name, S32 ordinal)
         text += std::to_string(ordinal);
     }
     return text;
+}
+
+// static
+bool ALXUISelection::splitOrdinal(std::string_view step, std::string_view& name, S32& ordinal)
+{
+    name = step;
+    ordinal = 0;
+    const size_t hash = step.rfind('#');
+    if (hash == std::string_view::npos || hash + 1 == step.size())
+    {
+        return false;
+    }
+    for (size_t i = hash + 1; i < step.size(); ++i)
+    {
+        if (!std::isdigit((U8)step[i]))
+        {
+            return false;
+        }
+    }
+    ordinal = std::atoi(std::string(step.substr(hash + 1)).c_str());
+    name = step.substr(0, hash);
+    return true;
 }
 
 // static
@@ -82,13 +105,9 @@ LLView* ALXUISelection::resolve(LLView* root, const path_t& path)
         {
             return nullptr;
         }
-        std::string_view name(s);
+        std::string_view name;
         S32 wanted = 0;
-        if (const size_t hash = name.rfind('#'); hash != std::string_view::npos)
-        {
-            wanted = (S32)std::atoi(s.c_str() + hash + 1);
-            name = name.substr(0, hash);
-        }
+        splitOrdinal(s, name, wanted);
         LLView* found = nullptr;
         S32 seen = 0;
         const LLView::child_list_t& children = *cur->getChildList();

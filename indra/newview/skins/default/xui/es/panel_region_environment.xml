@@ -14,21 +14,14 @@
 		<layout_panel name="pnl_environment_disabled">
 			<text name="txt_environment_disabled">...</text>
 		</layout_panel>
+	</layout_stack>
+	<layout_stack name="ls_main">
+		<layout_panel name="pnl_environment_region_msg">
+			<text name="region_text_lbl">Región:</text>
+			<text name="region_text">desconocido</text>
+		</layout_panel>
 		<layout_panel name="pnl_environment_config">
-			<layout_stack>
-				<layout_panel name="pnl_environment_config">
-					<layout_stack>
-						<layout_panel name="pnl_environment_current">
-							<button label="[USEDEFAULT]" name="btn_usedefault"/>
-							<button label="Usar Inventario" name="btn_select_inventory"/>
-							<button label="Personalizar" name="btn_edit"/>
-							<check_box label="Los propietarios de parcelas pueden borrar el entorno" name="chk_allow_override"/>
-						</layout_panel>
-						<layout_panel name="pnl_environment_length">
-							<text name="lbl_apparent_time">[HH]:[MM][AP] ([PRC]%)</text>
-						</layout_panel>
-					</layout_stack>
-				</layout_panel>
+			<layout_stack name="ls_environment_config">
 				<layout_panel name="pnl_environment_altitudes">
 					<panel name="pnl_alt1">
 						<text name="txt_alt1">Cielo [INDEX]
@@ -65,13 +58,22 @@
 					</panel>
 					<button label="Restablecer" name="btn_rst_altitudes" tool_tip="Restablecer altitudes predeterminadas"/>
 				</layout_panel>
+				<layout_panel name="pnl_environment_day">
+					<layout_stack>
+						<layout_panel name="pnl_environment_length">
+							<text name="lbl_apparent_time">[HH]:[MM][AP] ([PRC]%)</text>
+						</layout_panel>
+					</layout_stack>
+					<layout_stack name="ls_environment_current">
+						<layout_panel name="pnl_environment_current">
+							<button label="[USEDEFAULT]" name="btn_usedefault"/>
+							<button label="Usar Inventario" name="btn_select_inventory"/>
+							<button label="Personalizar" name="btn_edit"/>
+							<check_box label="Los propietarios de parcelas pueden borrar el entorno" name="chk_allow_override"/>
+						</layout_panel>
+					</layout_stack>
+				</layout_panel>
 			</layout_stack>
-		</layout_panel>
-	</layout_stack>
-	<layout_stack name="ls_main">
-		<layout_panel name="pnl_environment_region_msg">
-			<text name="region_text_lbl">Región:</text>
-			<text name="region_text">desconocido</text>
 		</layout_panel>
 	</layout_stack>
 </panel>

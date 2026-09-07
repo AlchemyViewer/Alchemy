@@ -28,6 +28,7 @@
 
 #include "alxuicatalog.h"
 #include "alxuiedit.h"
+#include "alxuiselection.h"
 
 #include <algorithm>
 #include <cctype>
@@ -148,7 +149,9 @@ namespace
     {
         for (const std::string& step : path)
         {
-            if (step.find('#') != std::string::npos)
+            std::string_view name;
+            S32 ordinal = 0;
+            if (ALXUISelection::splitOrdinal(step, name, ordinal))
             {
                 return true;
             }

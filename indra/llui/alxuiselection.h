@@ -48,6 +48,12 @@ public:
     // that name after the first, counting in creation order.
     static std::string step(std::string_view name, S32 ordinal);
 
+    // A step read back: the name it carries, and which of the siblings of
+    // that name it means. A name can carry a '#' of its own -- the menu
+    // item "Forbid Give to #RLV" does -- so only digits after the last one
+    // are the ordinal this writes, and a step is otherwise all name.
+    static bool splitOrdinal(std::string_view step, std::string_view& name, S32& ordinal);
+
     // The path of a view under a root; false when it is not under it. The
     // root's own path is empty.
     static bool pathOf(const LLView* view, const LLView* root, path_t& path);

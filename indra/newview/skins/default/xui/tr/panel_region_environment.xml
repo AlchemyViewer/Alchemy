@@ -36,24 +36,10 @@
 				...
 			</text>
 		</layout_panel>
+	</layout_stack>
+	<layout_stack name="ls_main">
 		<layout_panel name="pnl_environment_config">
-			<layout_stack>
-				<layout_panel name="pnl_environment_config">
-					<layout_stack>
-						<layout_panel name="pnl_environment_current">
-							<button label="[USEDEFAULT]" name="btn_usedefault"/>
-							<button label="Envanteri Kullan" name="btn_select_inventory"/>
-							<button label="Özelleştir" name="btn_edit"/>
-							<check_box label="Parsel Sahipleri Ortamı Geçersiz Kılabilir" name="chk_allow_override"/>
-						</layout_panel>
-						<layout_panel name="pnl_environment_length">
-							<text name="lbl_apparent_time">
-								[HH]:[MM][AP] (% [PRC])
-							</text>
-						</layout_panel>
-						<layout_panel name="pnl_environment_buttons"/>
-					</layout_stack>
-				</layout_panel>
+			<layout_stack name="ls_environment_config">
 				<layout_panel name="pnl_environment_altitudes">
 					<panel name="pnl_alt1">
 						<text name="txt_alt1">
@@ -109,6 +95,23 @@
 						<settings_drop_target name="sdt_water" tool_tip="Geçerli su olarak seçmek için Envanterden bir ayarı bu hedef kutuya sürükleyin."/>
 					</panel>
 					<button label="Sıfırla" name="btn_rst_altitudes" tool_tip="Varsayılan irtifalara sıfırla"/>
+				</layout_panel>
+				<layout_panel name="pnl_environment_day">
+					<layout_stack>
+						<layout_panel name="pnl_environment_length">
+							<text name="lbl_apparent_time">
+								[HH]:[MM][AP] (% [PRC])
+							</text>
+						</layout_panel>
+					</layout_stack>
+					<layout_stack name="ls_environment_current">
+						<layout_panel name="pnl_environment_current">
+							<button label="[USEDEFAULT]" name="btn_usedefault"/>
+							<button label="Envanteri Kullan" name="btn_select_inventory"/>
+							<button label="Özelleştir" name="btn_edit"/>
+							<check_box label="Parsel Sahipleri Ortamı Geçersiz Kılabilir" name="chk_allow_override"/>
+						</layout_panel>
+					</layout_stack>
 				</layout_panel>
 			</layout_stack>
 		</layout_panel>
