@@ -2045,6 +2045,18 @@ bool LLViewerFetchedTexture::updateFetch()
     S32 desired_discard = getDesiredDiscardLevel();
     F32 decode_priority = mMaxVirtualSize;
 
+    // what the running request reports, into the fields the texture console reads
+    auto apply_status = [this](const LLTextureFetch::FetchStatus& status)
+    {
+        mFetchState = status.mState;
+        mDownloadProgress = status.mDataProgress;
+        mRequestedDownloadPriority = status.mRequestedPriority;
+        mFetchPriority = status.mFetchPriority;
+        mFetchDeltaTime = status.mFetchDeltaTime;
+        mRequestDeltaTime = status.mRequestDeltaTime;
+        mCanUseHTTP = status.mCanUseHTTP;
+    };
+
     if (mIsFetching)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - is fetching");
@@ -2054,8 +2066,10 @@ bool LLViewerFetchedTexture::updateFetch()
         if (mRawImage.notNull()) sRawCount--;
         if (mAuxRawImage.notNull()) sAuxCount--;
         // keep in mind that fetcher still might need raw image, don't modify original
+        LLTextureFetch::FetchStatus status;
+        status.mCanUseHTTP = mCanUseHTTP; // stands when the worker has no work to report on
         bool finished = LLAppViewer::getTextureFetch()->getRequestFinished(getID(), fetch_discard, mFetchState, mRawImage, mAuxRawImage,
-            mLastHttpGetStatus);
+            mLastHttpGetStatus, status);
         if (mRawImage.notNull()) sRawCount++;
         if (mAuxRawImage.notNull())
         {
@@ -2070,8 +2084,7 @@ bool LLViewerFetchedTexture::updateFetch()
         }
         else
         {
-            mFetchState = LLAppViewer::getTextureFetch()->getFetchState(mID, mDownloadProgress, mRequestedDownloadPriority,
-                mFetchPriority, mFetchDeltaTime, mRequestDeltaTime, mCanUseHTTP);
+            apply_status(status);
         }
 
         if (!processFetchResults(desired_discard, current_discard, fetch_discard, decode_priority))
@@ -2156,8 +2169,9 @@ bool LLViewerFetchedTexture::updateFetch()
         // bypass texturefetch directly by pulling from LLTextureCache
         S32 fetch_request_response = -1;
         S32 worker_discard = -1;
+        LLTextureFetch::FetchStatus status;
         fetch_request_response = LLAppViewer::getTextureFetch()->createRequest(mFTType, mUrl, getID(), getTargetHost(), decode_priority,
-            w, h, c, desired_discard, needsAux(), mCanUseHTTP);
+            w, h, c, desired_discard, needsAux(), mCanUseHTTP, status);
 
         if (fetch_request_response >= 0) // positive values and 0 are discard values
         {
@@ -2168,8 +2182,7 @@ bool LLViewerFetchedTexture::updateFetch()
             // in some cases createRequest can modify discard, as an example
             // bake textures are always at discard 0
             mRequestedDiscardLevel = llmin(desired_discard, fetch_request_response);
-            mFetchState = LLAppViewer::getTextureFetch()->getFetchState(mID, mDownloadProgress, mRequestedDownloadPriority,
-                mFetchPriority, mFetchDeltaTime, mRequestDeltaTime, mCanUseHTTP);
+            apply_status(status);
         }
         else if (fetch_request_response == LLTextureFetch::CREATE_REQUEST_ERROR_TRANSITION)
         {
