@@ -88,8 +88,9 @@ namespace ALXmlLayerMerge
 
     // One overlay element over one base element, and their subtrees. The
     // rules: children match by name, or by value when they have no name,
-    // and never by tag; the search for a match resumes after the previous
-    // one and wraps once; on a match, text the overlay has replaces the
+    // and never by tag; a child matches the first base child of its name
+    // in document order that no earlier child took; on a match, text the
+    // overlay has replaces the
     // base's and text it lacks leaves the base's alone; a value attribute
     // where the base carries its text in the body is that text; every
     // other attribute present in both is overwritten, except the name,

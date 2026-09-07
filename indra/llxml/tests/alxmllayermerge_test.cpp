@@ -295,6 +295,22 @@ namespace tut
         ensure("and the observer saw something", !rec.events.empty());
     }
 
+    // A repeated name matches in document order whatever lies between:
+    // the second overlay child of a name takes the second base child of
+    // it, never the first again.
+    template<> template<>
+    void alxmllayermerge_object::test<4>()
+    {
+        LLXMLNodePtr base = parse(
+            "<panel name=\"p\"><button name=\"b\" label=\"1\"/><button name=\"b\" label=\"2\"/><text name=\"x\">X</text></panel>");
+        LLXMLNodePtr overlay = parse(
+            "<panel name=\"p\"><button name=\"b\" label=\"A\"/><text name=\"x\">Y</text><button name=\"b\" label=\"B\"/></panel>");
+        ALXmlLayerMerge::merge(base, overlay);
+        ensure_equals("the first b", attr(base, "b", "label"), std::string("A"));
+        ensure_equals("the second b, with a match between them", attr(base, "b#1", "label"), std::string("B"));
+        ensure_equals("and the one between", attr(base, "x", "text()"), std::string("Y"));
+    }
+
     // Loading: the base and each layer in turn; a layer whose root name
     // or tag differs is merged all the same and said so; a layer that
     // does not parse is passed over and the layers after it still apply;

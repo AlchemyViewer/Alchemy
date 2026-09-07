@@ -70,8 +70,8 @@ namespace
     // The counts, in the order they print. The first four are the gate.
     const char* const KEYS[] = {
         "unmatched", "value_dropped", "text_blanked", "parse_error",
-        "files", "orphan_file", "root_name_differs", "root_tag_differs", "misnested", "misnested_unique",
-        "misnested_outside", "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
+        "files", "orphan_file", "root_name_differs", "root_tag_differs", "duplicate_name", "misnested",
+        "misnested_unique", "misnested_outside", "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
         "attr_not_in_base", "layout_attr_overridden", "layout_attr_dropped", "placeholder_mismatch",
         "translated_despite_translate_false", "covered", "text_kept", "value_as_text"
     };
@@ -294,6 +294,13 @@ namespace
                 ++mCounts["unmatched_no_name"];
                 example("unmatched_no_name", pathOf(overlay));
             }
+            else if (isDuplicate(parent, overlay, key))
+            {
+                // More children of this name here than the base has: the
+                // ones past the base's count applied to nothing.
+                ++mCounts["duplicate_name"];
+                example("duplicate_name", pathOf(overlay));
+            }
             else if (mNames.count(key))
             {
                 ++mCounts["misnested"];
@@ -392,6 +399,28 @@ namespace
         }
 
     private:
+        // Whether this overlay child is one of more children of its name
+        // than the base element has: those past the base's count match
+        // nothing, since a base child is matched at most once.
+        static bool isDuplicate(const LLXMLNode* parent, const LLXMLNode* overlay, const std::string& key)
+        {
+            S32 in_base = 0;
+            for (LLXMLNodePtr child = parent->getFirstChild(); child.notNull(); child = child->getNextSibling())
+            {
+                in_base += matchKey(child) == key;
+            }
+            if (in_base == 0)
+            {
+                return false;
+            }
+            S32 before = 0;
+            for (const LLXMLNode* sibling = overlay->mPrev.get(); sibling; sibling = sibling->mPrev.get())
+            {
+                before += !sibling->mIsAttribute && matchKey(sibling) == key;
+            }
+            return before >= in_base;
+        }
+
         // What the base element held before the merge overwrites it: the
         // text and the translatable attributes, for the checks that compare.
         void element(LLXMLNode* base, LLXMLNode* overlay)

@@ -28,6 +28,9 @@
 
 #include "alxmldocument.h"
 
+#include <algorithm>
+#include <vector>
+
 namespace
 {
     // The name a child is matched by: its name attribute, or its value
@@ -129,46 +132,37 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
         }
     }
 
-    // Each overlay child against the base's children by name, from where
-    // the last match left off, around once.
-    LLXMLNodePtr child = base->getFirstChild();
-    LLXMLNodePtr last_child = child;
+    // Each overlay child against the first base child of that name, in
+    // document order, that no earlier overlay child took: a repeated name
+    // matches in order, and an element matched once is not matched again.
+    std::vector<const LLXMLNode*> taken;
     for (LLXMLNodePtr overlay_child = overlay->getFirstChild(); overlay_child.notNull();
          overlay_child = overlay_child->getNextSibling())
     {
         const std::string overlay_key = matchKey(overlay_child);
-        bool matched = false;
-        while (child.notNull())
+        LLXMLNodePtr match;
+        if (!overlay_key.empty())
         {
-            const std::string base_key = matchKey(child);
-            if (!base_key.empty() && overlay_key == base_key)
+            for (LLXMLNodePtr child = base->getFirstChild(); child.notNull(); child = child->getNextSibling())
             {
-                if (observer)
+                if (matchKey(child) == overlay_key
+                    && std::find(taken.begin(), taken.end(), child.get()) == taken.end())
                 {
-                    observer->childMatched(layer, child, overlay_child);
+                    match = child;
+                    break;
                 }
-                merge(child, overlay_child, layer, observer);
-                matched = true;
-                last_child = child;
-                child = child->getNextSibling();
-                if (child.isNull())
-                {
-                    child = base->getFirstChild();
-                }
-                break;
-            }
-
-            child = child->getNextSibling();
-            if (child.isNull())
-            {
-                child = base->getFirstChild();
-            }
-            if (child == last_child)
-            {
-                break;
             }
         }
-        if (!matched && observer)
+        if (match.notNull())
+        {
+            taken.push_back(match.get());
+            if (observer)
+            {
+                observer->childMatched(layer, match, overlay_child);
+            }
+            merge(match, overlay_child, layer, observer);
+        }
+        else if (observer)
         {
             observer->childUnmatched(layer, base, overlay_child,
                                      overlay_key.empty() ? ALXmlMergeObserver::Miss::Unnamed
