@@ -147,7 +147,7 @@
     <layout_stack
      animate="false"
      follows="all"
-     height="686"
+     height="682"
      layout="topleft"
      left="8"
      name="main_stack"
@@ -157,184 +157,260 @@
 
         <layout_panel
          auto_resize="false"
-         height="686"
+         height="682"
          layout="topleft"
          min_dim="200"
          name="catalog_panel"
          user_resize="true"
          width="300">
-            <filter_editor
-             follows="left|top|right"
-             height="22"
-             label="Filter files"
-             layout="topleft"
-             left="0"
-             name="catalog_filter"
-             top="0"
-             width="300" />
-            <scroll_list
-             column_padding="0"
-             draw_heading="true"
+            <layout_stack
+             animate="false"
              follows="all"
-             height="420"
+             height="682"
              layout="topleft"
              left="0"
-             name="file_list"
-             top_pad="4"
+             name="catalog_stack"
+             orientation="vertical"
+             top="0"
              width="300">
-                <scroll_list.columns
-                 label="Kind"
-                 name="kind"
-                 width="58" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="File"
-                 name="name" />
-                <scroll_list.columns
-                 label="L"
-                 name="lang"
-                 tool_tip="The chosen language has a file"
-                 width="20" />
-                <scroll_list.columns
-                 label="S"
-                 name="skin"
-                 tool_tip="The chosen skin has a file"
-                 width="20" />
-            </scroll_list>
-            <text
-             follows="left|bottom"
-             height="16"
-             layout="topleft"
-             left="0"
-             name="find_label"
-             top_pad="8"
-             width="34">Find</text>
-            <combo_box
-             follows="left|bottom"
-             height="22"
-             layout="topleft"
-             left_pad="2"
-             name="find_field"
-             top_delta="-3"
-             width="84">
-                <combo_box.item label="Any" name="any" value="any" />
-                <combo_box.item label="Tag" name="tag" value="tag" />
-                <combo_box.item label="Attribute" name="attribute" value="attribute" />
-                <combo_box.item label="Value" name="value" value="value" />
-                <combo_box.item label="Name" name="name" value="name" />
-                <combo_box.item label="Text" name="text" value="text" />
-            </combo_box>
-            <line_editor
-             follows="left|right|bottom"
-             height="22"
-             layout="topleft"
-             left_pad="4"
-             name="find_query"
-             tool_tip="Search every file and layer; Enter runs it"
-             top_delta="0"
-             width="176" />
-            <scroll_list
-             column_padding="0"
-             draw_heading="true"
-             follows="left|right|bottom"
-             height="180"
-             layout="topleft"
-             left="0"
-             name="find_results"
-             top_pad="4"
-             width="300">
-                <scroll_list.columns
-                 label="File"
-                 name="file"
-                 width="110" />
-                <scroll_list.columns
-                 label="Line"
-                 name="line"
-                 width="36" />
-                <scroll_list.columns
-                 label="Layer"
-                 name="layer"
-                 width="60" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="Match"
-                 name="snippet" />
-            </scroll_list>
+                <layout_panel
+                 auto_resize="false"
+                 height="26"
+                 layout="topleft"
+                 name="catalog_filter_row">
+                    <filter_editor
+                     follows="left|top|right"
+                     height="22"
+                     label="Filter files"
+                     layout="topleft"
+                     left="0"
+                     name="catalog_filter"
+                     top="0"
+                     width="300" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="426"
+                 layout="topleft"
+                 min_dim="120"
+                 name="file_list_area">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="426"
+                     layout="topleft"
+                     left="0"
+                     name="file_list"
+                     top="0"
+                     width="300">
+                        <scroll_list.columns
+                         label="Kind"
+                         name="kind"
+                         width="58" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="File"
+                         name="name" />
+                        <scroll_list.columns
+                         label="L"
+                         name="lang"
+                         tool_tip="The chosen language has a file"
+                         width="20" />
+                        <scroll_list.columns
+                         label="S"
+                         name="skin"
+                         tool_tip="The chosen skin has a file"
+                         width="20" />
+                    </scroll_list>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="30"
+                 layout="topleft"
+                 name="find_row">
+                    <text
+                     follows="left|top"
+                     height="16"
+                     layout="topleft"
+                     left="0"
+                     name="find_label"
+                     top="7"
+                     width="34">Find</text>
+                    <combo_box
+                     follows="left|top"
+                     height="22"
+                     layout="topleft"
+                     left_pad="2"
+                     name="find_field"
+                     top_delta="-3"
+                     width="84">
+                        <combo_box.item label="Any" name="any" value="any" />
+                        <combo_box.item label="Tag" name="tag" value="tag" />
+                        <combo_box.item label="Attribute" name="attribute" value="attribute" />
+                        <combo_box.item label="Value" name="value" value="value" />
+                        <combo_box.item label="Name" name="name" value="name" />
+                        <combo_box.item label="Text" name="text" value="text" />
+                    </combo_box>
+                    <line_editor
+                     follows="left|top|right"
+                     height="22"
+                     layout="topleft"
+                     left_pad="4"
+                     name="find_query"
+                     tool_tip="Search every file and layer; Enter runs it"
+                     top_delta="0"
+                     width="176" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="200"
+                 layout="topleft"
+                 min_dim="60"
+                 name="find_results_area"
+                 user_resize="true">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="200"
+                     layout="topleft"
+                     left="0"
+                     name="find_results"
+                     top="0"
+                     width="300">
+                        <scroll_list.columns
+                         label="File"
+                         name="file"
+                         width="110" />
+                        <scroll_list.columns
+                         label="Line"
+                         name="line"
+                         width="36" />
+                        <scroll_list.columns
+                         label="Layer"
+                         name="layer"
+                         width="60" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Match"
+                         name="snippet" />
+                    </scroll_list>
+                </layout_panel>
+            </layout_stack>
         </layout_panel>
 
         <layout_panel
          auto_resize="false"
-         height="686"
+         height="682"
          layout="topleft"
          min_dim="220"
          name="tree_panel"
          user_resize="true"
          width="360">
-            <filter_editor
-             follows="left|top|right"
-             height="22"
-             label="Filter by name or tag"
-             layout="topleft"
-             left="0"
-             name="tree_filter"
-             top="0"
-             width="360" />
-            <panel
+            <layout_stack
+             animate="false"
              follows="all"
-             height="440"
+             height="682"
              layout="topleft"
              left="0"
-             name="tree_host"
-             top_pad="4"
-             width="360" />
-            <panel
-             follows="left|right|bottom"
-             height="22"
-             layout="topleft"
-             left="0"
-             name="breadcrumb"
-             top_pad="4"
-             width="360" />
-            <scroll_list
-             column_padding="0"
-             draw_heading="true"
-             follows="left|right|bottom"
-             height="170"
-             layout="topleft"
-             left="0"
-             name="diagnostics"
-             tool_tip="What the parser and the factory reported while building; double-click selects the element"
-             top_pad="4"
+             name="tree_stack"
+             orientation="vertical"
+             top="0"
              width="360">
-                <scroll_list.columns
-                 label="Kind"
-                 name="kind"
-                 width="100" />
-                <scroll_list.columns
-                 label="Line"
-                 name="line"
-                 width="36" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="Where"
-                 name="path" />
-                <scroll_list.columns
-                 dynamic_width="true"
-                 label="What"
-                 name="message" />
-            </scroll_list>
+                <layout_panel
+                 auto_resize="false"
+                 height="26"
+                 layout="topleft"
+                 name="tree_filter_row">
+                    <filter_editor
+                     follows="left|top|right"
+                     height="22"
+                     label="Filter by name or tag"
+                     layout="topleft"
+                     left="0"
+                     name="tree_filter"
+                     top="0"
+                     width="360" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="452"
+                 layout="topleft"
+                 min_dim="150"
+                 name="tree_area">
+                    <panel
+                     follows="all"
+                     height="452"
+                     layout="topleft"
+                     left="0"
+                     name="tree_host"
+                     top="0"
+                     width="360" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="26"
+                 layout="topleft"
+                 name="breadcrumb_row">
+                    <panel
+                     follows="left|top|right"
+                     height="22"
+                     layout="topleft"
+                     left="0"
+                     name="breadcrumb"
+                     top="0"
+                     width="360" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="178"
+                 layout="topleft"
+                 min_dim="60"
+                 name="diagnostics_area"
+                 user_resize="true">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="178"
+                     layout="topleft"
+                     left="0"
+                     name="diagnostics"
+                     tool_tip="What the parser, the factory and the layer merge reported while building; double-click selects the element"
+                     top="0"
+                     width="360">
+                        <scroll_list.columns
+                         label="Kind"
+                         name="kind"
+                         width="100" />
+                        <scroll_list.columns
+                         label="Line"
+                         name="line"
+                         width="36" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Where"
+                         name="path" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="What"
+                         name="message" />
+                    </scroll_list>
+                </layout_panel>
+            </layout_stack>
         </layout_panel>
 
         <layout_panel
          auto_resize="true"
-         height="686"
+         height="682"
          layout="topleft"
          min_dim="320"
          name="inspector_panel"
          width="480">
             <tab_container
              follows="all"
-             height="686"
+             height="682"
              layout="topleft"
              left="0"
              name="inspector_tabs"
@@ -495,7 +571,7 @@
      layout="topleft"
      left="8"
      name="status"
-     top_pad="4"
+     top_pad="6"
      use_ellipses="true"
      width="1164" />
 </floater>
