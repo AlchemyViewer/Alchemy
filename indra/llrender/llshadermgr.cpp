@@ -2095,6 +2095,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uCrossChromatic");
     mReservedUniforms.push_back("uCrossPassScale");
     mReservedUniforms.push_back("uCrossStrength");
+    mReservedUniforms.push_back("uCrossRegion");
+    mReservedUniforms.push_back("uCrossClamp");
 
     mReservedUniforms.push_back("uBokehSpherical");
     mReservedUniforms.push_back("uBokehFieldStretch");

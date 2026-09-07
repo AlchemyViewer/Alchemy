@@ -853,14 +853,13 @@ public:
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
 
-        // Cross-screen filter ping-pong. Allocated on the first frame the
-        // effect is actually on and released again when it is switched off, so
-        // the strength control can stay a live slider -- wiring a slider to a
-        // reallocation handler would fire on every mouse-move.
-        LLRenderTarget              crossFilter[3];
-        // The height the targets were last (re)built for -- kept even when
-        // the build FAILED, so an impossible size is not retried every frame;
-        // pair it with isComplete() to tell the two states apart.
+        // Cross-screen filter state for this frame. The three streak buffers
+        // own no memory: they are quadrants of mWaterDis, which is idle from
+        // the water pass to the next frame -- see generateBloomHDR. What
+        // colorCorrect needs to know is whether streaks were drawn this frame
+        // and at what size, to find the accumulator's quadrant.
+        bool                        crossFilterReady = false;
+        U32                         crossFilterWidth = 0;
         U32                         crossFilterHeight = 0;
     };
 

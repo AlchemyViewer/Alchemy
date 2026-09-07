@@ -580,6 +580,8 @@ public:
         CROSS_CHROMATIC,                    //  "uCrossChromatic"
         CROSS_PASS_SCALE,                   //  "uCrossPassScale"      1, 4, 16 across the passes
         CROSS_STRENGTH,                     //  "uCrossStrength"       1.0 until the final composite
+        CROSS_REGION,                       //  "uCrossRegion"         xy origin, zw scale of the source inside its texture
+        CROSS_CLAMP,                        //  "uCrossClamp"          half a source texel in region units; 0 for a whole texture
 
         // Lens aberrations -- bokeh shape contributed by the glass rather than
         // by the iris, so these sit alongside the aperture controls above

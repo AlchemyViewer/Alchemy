@@ -38,9 +38,8 @@
 /*[EXTRA_CODE_HERE]*/
 
 // Alpha is written explicitly rather than left to a vec3 output, and zero is
-// the deliberate value: every target in the chain is R11F_G11F_B10F and has no
-// alpha to keep, so the write is discarded. Declaring vec4 keeps the output
-// shape stable if a future target ever does carry one.
+// the deliberate value: the streaks carry no alpha payload, and the borrowed
+// target they are drawn into is rewritten before anything reads its alpha.
 out vec4 frag_color;
 
 uniform sampler2D diffuseMap;
@@ -51,6 +50,18 @@ uniform float uCrossLength;       // base step in texels; around 1 keeps the cha
 uniform float uCrossFalloff;      // per-step attenuation; > 1 decays faster
 uniform float uCrossChromatic;    // 0 = white streaks, 1 = full dispersion
 uniform float uCrossPassScale;    // 1, TAPS, TAPS^2 across the three iterations
+
+// The source need not be a texture of its own. From the second pass on it is
+// a quadrant of a larger borrowed target (see generateBloomHDR), so a
+// region-relative coordinate is mapped into the texture through uCrossRegion
+// (xy origin, zw scale) -- and clamped first to the region's texel-centre
+// range, which is exactly what CLAMP_TO_EDGE did at the edge of a dedicated
+// target and what stops a tap near the edge reading the neighbouring
+// quadrant. A whole texture is region (0,0,1,1) with a clamp of 0, where the
+// sampler's own edge clamp still applies. Verified texel for texel against
+// the dedicated-target chain before it shipped.
+uniform vec4  uCrossRegion;
+uniform vec2  uCrossClamp;
 
 in vec2 vary_texcoord0;
 
@@ -138,7 +149,8 @@ void main()
             tint = mix(vec3(1.0), sp, uCrossChromatic * t);
         }
 
-        accum   += texture(diffuseMap, vary_texcoord0 + offset).rgb * weight * tint;
+        vec2 tc  = clamp(vary_texcoord0 + offset, uCrossClamp, vec2(1.0) - uCrossClamp);
+        accum   += texture(diffuseMap, uCrossRegion.xy + tc * uCrossRegion.zw).rgb * weight * tint;
         total_w += weight;
     }
 
