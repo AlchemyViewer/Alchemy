@@ -17,30 +17,7 @@
 		<panel name="panel_experience_info">
 			<scroll_container name="xp_scroll">
 				<panel name="scrolling_panel">
-					<layout_stack>
-						<layout_panel name="top panel">
-							<button label="編輯" name="edit_btn"/>
-						</layout_panel>
-						<layout_panel name="maturity panel">
-							<text name="ContentRating">
-								分級：
-							</text>
-						</layout_panel>
-						<layout_panel name="location panel">
-							<text name="Location">
-								位置：
-							</text>
-						</layout_panel>
-						<layout_panel>
-							<text name="Owner">
-								所有人：
-							</text>
-						</layout_panel>
-						<layout_panel name="group_panel">
-							<text name="Group">
-								群組：
-							</text>
-						</layout_panel>
+					<layout_stack name="ls1">
 						<layout_panel name="perm panel">
 							<button label="允許" name="allow_btn"/>
 							<button label="忘記" name="forget_btn"/>
@@ -49,6 +26,29 @@
 								所有居民均可使用這個體驗。
 							</text>
 							<button label="違規舉報" name="report_btn"/>
+						</layout_panel>
+						<layout_panel name="group_panel">
+							<text name="Group">
+								群組：
+							</text>
+						</layout_panel>
+						<layout_panel name="owner panel">
+							<text name="Owner">
+								所有人：
+							</text>
+						</layout_panel>
+						<layout_panel name="location panel">
+							<text name="Location">
+								位置：
+							</text>
+						</layout_panel>
+						<layout_panel name="maturity panel">
+							<text name="ContentRating">
+								分級：
+							</text>
+						</layout_panel>
+						<layout_panel name="top panel">
+							<button label="編輯" name="edit_btn"/>
 						</layout_panel>
 					</layout_stack>
 				</panel>

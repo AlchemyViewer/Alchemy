@@ -6,9 +6,15 @@
 			<button label="查詢是否有更新版" name="update_btn"/>
 		</panel>
 		<panel label="貸記" name="credits_panel">
-			<text name="linden_intro">Second Life 由以下的 Linden 家族帶給你： 
+			<accordion name="credits_accordion">
+				<accordion_tab name="sl_credits_tab">
+					<panel name="sl_credits_panel">
+						<text_editor name="contrib_names">執行時期被取代的假名稱</text_editor>
+						<text name="linden_intro">Second Life 由以下的 Linden 家族帶給你： 
 這些人士做了開放源碼的貢獻：</text>
-			<text_editor name="contrib_names">執行時期被取代的假名稱</text_editor>
+					</panel>
+				</accordion_tab>
+			</accordion>
 		</panel>
 		<panel label="許可" name="licenses_panel">
 			<text_editor name="licenses_editor">3Dconnexion SDK Copyright (C) 1992-2009 3Dconnexion

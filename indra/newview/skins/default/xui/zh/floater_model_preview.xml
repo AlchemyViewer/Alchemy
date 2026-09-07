@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="上傳模型">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		錯誤：剖析 dae 時出錯，詳見記錄檔。
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="瀏覽…" name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						步驟 2：分析
-					</text>
-					<text name="analysis_method_label">
-						方法：
-					</text>
-					<text name="quality_label">
-						品質：
-					</text>
-					<text name="smooth_method_label">
-						平滑：
-					</text>
-					<check_box label="關閉洞口" name="Close Holes (Slow)"/>
-					<button label="分析" name="Decompose"/>
-					<button label="取消" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						步驟 3：簡化
@@ -230,6 +212,25 @@
 						殼面：[HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						平滑：
+					</text>
+					<text name="quality_label">
+						品質：
+					</text>
+					<text name="analysis_method_label">
+						方法：
+					</text>
+					<text name="method_label">
+						步驟 2：分析
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="取消" name="decompose_cancel"/>
+					<button label="分析" name="Decompose"/>
+					<check_box label="關閉洞口" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="上傳選項" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					僅限化身模型：
 				</text>
-				<check_box label="包含表皮重量" name="upload_skin"/>
-				<check_box label="包含接點位置" name="upload_joints"/>
-				<check_box label="若接點位置已定義，就鎖住比例" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Z 偏距（升高或降低化身）：
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="若接點位置已定義，就鎖住比例" name="lock_scale_if_joint_position"/>
+				<check_box label="包含接點位置" name="upload_joints"/>
+				<check_box label="包含表皮重量" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

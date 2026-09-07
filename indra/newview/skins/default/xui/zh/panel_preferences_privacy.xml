@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="溝通" name="im">
-	<panel.string name="log_in_to_change">
-		登入以改變
-	</panel.string>
-	<button label="清除歷史紀錄" name="clear_cache" tool_tip="清除登入圖像、最後位置、瞬間傳送紀錄、網頁及材質快取"/>
-	<text name="cache_size_label_l">
-		（位置、圖像、網頁、搜尋的歷史紀錄）
-	</text>
-	<check_box label="將我的個人小檔案顯示在搜尋結果中" name="online_searchresults"/>
-	<check_box label="只有我的朋友和群組知道我上線" name="online_visibility"/>
 	<check_box label="只有我的朋友和群組可以 IM 或與我通話。" name="voice_call_friends_only_check"/>
-	<check_box label="當通話結束時關閉麥克風" name="auto_disengage_mic_check"/>
 	<check_box label="登入時顯示我最愛的地標位置（經由 &apos;開始於&apos; 的下拉式選單）" name="favorites_on_login_check"/>
 	<text name="Logs:">
 		聊天紀錄：
@@ -23,14 +13,28 @@
 		位置紀錄：
 	</text>
 	<button label="瀏覽" label_selected="瀏覽" name="log_path_button"/>
-	<button label="封鎖清單" name="block_list"/>
-	<text name="inventory_header">
-		Inventory:
-	</text>
-	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
-	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
-	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
-	<text name="block_list_label">
+	<tab_container name="privacy_tab_container">
+		<panel name="privacy_preferences_general">
+			<text name="block_list_label">
 		（你所封鎖的人 及/或 物件）
 	</text>
+			<button label="封鎖清單" name="block_list"/>
+			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
+			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+			<text name="inventory_header">
+		Inventory:
+	</text>
+			<check_box label="當通話結束時關閉麥克風" name="auto_disengage_mic_check"/>
+			<check_box label="只有我的朋友和群組知道我上線" name="online_visibility"/>
+			<check_box label="將我的個人小檔案顯示在搜尋結果中" name="online_searchresults"/>
+			<text name="cache_size_label_l">
+		（位置、圖像、網頁、搜尋的歷史紀錄）
+	</text>
+			<button label="清除歷史紀錄" name="clear_cache" tool_tip="清除登入圖像、最後位置、瞬間傳送紀錄、網頁及材質快取"/>
+			<panel.string name="log_in_to_change">
+		登入以改變
+	</panel.string>
+		</panel>
+	</tab_container>
 </panel>

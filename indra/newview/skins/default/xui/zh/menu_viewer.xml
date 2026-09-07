@@ -2,26 +2,19 @@
 <menu_bar name="Main Menu">
 	<menu label="我自己" name="Me">
 		<menu_item_call label="檔案..." name="Profile"/>
-		<menu_item_call label="外觀…" name="ChangeOutfit"/>
 		<menu_item_call label="選擇一個化身…" name="Avatar Picker"/>
 		<menu_item_check label="收納區…" name="Inventory"/>
 		<menu_item_call label="新收納區視窗" name="NewInventoryWindow"/>
 		<menu_item_call label="地點…" name="Places"/>
 		<menu_item_call label="精選地點…" name="Picks"/>
 		<menu_item_call label="體驗…" name="Experiences"/>
-		<menu_item_call label="我的腳本…" name="MyScripts"/>
 		<menu_item_call label="攝影機控制…" name="Camera Controls"/>
 		<menu label="動作" name="Movement">
 			<menu_item_call label="坐下" name="Sit Down Here"/>
 			<menu_item_call label="起立" name="Stand up"/>
 			<menu_item_check label="飛行" name="Fly"/>
-			<menu_item_check label="以跑代步" name="Always Run"/>
-			<menu_item_call label="停止我身上的動作" name="Stop Animating My Avatar"/>
-			<menu_item_call label="行走 / 跑步 / 飛行…" name="WalkRunFly"/>
 		</menu>
 		<menu label="狀態" name="Status">
-			<menu_item_check label="離開" name="Away"/>
-			<menu_item_check label="請勿打擾" name="Do Not Disturb"/>
 		</menu>
 		<menu_item_call label="購買 L$…" name="Buy and Sell L$"/>
 		<menu_item_call label="Marketplace 刊登…" name="MarketplaceListings"/>
@@ -31,6 +24,8 @@
 		<menu_item_call label="隱藏所有控制" name="Hide UI"/>
 		<menu_item_check label="顯示 HUD 附件" name="Show HUD Attachments"/>
 		<menu_item_call label="退出 [APP_NAME]" name="Quit"/>
+		<menu_item_check label="請勿打擾" name="Do Not Disturb"/>
+		<menu_item_check label="離開" name="Away"/>
 	</menu>
 	<menu label="溝通" name="Communicate">
 		<menu_item_check label="交談……" name="Conversations"/>
@@ -81,6 +76,11 @@
 			<menu_item_call label="我的環境…" name="my_environs"/>
 			<menu_item_call label="個人照明⋯" name="adjustment_tool"/>
 			<menu_item_check label="暫停雲彩" name="pause_clouds"/>
+		</menu>
+		<menu name="Zoom menu">
+			<menu_item_call label="放大" name="Zoom In"/>
+			<menu_item_call label="縮放恢復預設" name="Zoom Default"/>
+			<menu_item_call label="縮小" name="Zoom Out"/>
 		</menu>
 	</menu>
 	<menu label="建造" name="BuildTools">
@@ -140,6 +140,7 @@
 			<menu_item_call label="以所選擇作為格線" name="Use Selection for Grid"/>
 			<menu_item_call label="格線選項…" name="Grid Options"/>
 			<menu_item_call label="設定預設權限…" name="Set default permissions"/>
+			<menu_item_check label="高亮顯示透明物件" name="Highlight Transparent"/>
 		</menu>
 		<menu label="上傳" name="Upload">
 			<menu_item_call label="圖像（L$[COST]）..." name="Upload Image"/>
@@ -183,7 +184,6 @@
 			<menu_item_check label="Cheesy 指標" name="Cheesy Beacon"/>
 			<menu_item_check label="隱藏粒子效果" name="Hide Particles"/>
 			<menu_item_check label="隱藏所選擇的" name="Hide Selected"/>
-			<menu_item_check label="高亮顯示透明物件" name="Highlight Transparent"/>
 			<menu_item_check label="顯示第一人稱視角準星" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="呈像類型" name="Rendering Types">
@@ -224,9 +224,6 @@
 			<menu_item_check label="搖桿移動攝影機" name="Joystick Flycam"/>
 			<menu_item_call label="重設視角" name="Reset View"/>
 			<menu_item_call label="注視上一位聊天者" name="Look at Last Chatter"/>
-			<menu_item_call label="放大" name="Zoom In"/>
-			<menu_item_call label="縮放恢復預設" name="Zoom Default"/>
-			<menu_item_call label="縮小" name="Zoom Out"/>
 		</menu>
 		<menu_item_call label="顯示除錯設定" name="Debug Settings"/>
 		<menu_item_check label="顯示開發選單" name="Debug Mode"/>
@@ -477,5 +474,12 @@
 				<menu_item_call label="品管維基" name="QA Wiki"/>
 			</menu>
 		</menu>
+	</menu>
+	<menu name="Avatar">
+		<menu_item_call label="我的腳本…" name="MyScripts"/>
+		<menu_item_check label="以跑代步" name="Always Run"/>
+		<menu_item_call label="行走 / 跑步 / 飛行…" name="WalkRunFly"/>
+		<menu_item_call label="停止我身上的動作" name="Stop Animating My Avatar"/>
+		<menu_item_call label="外觀…" name="ChangeOutfit"/>
 	</menu>
 </menu_bar>

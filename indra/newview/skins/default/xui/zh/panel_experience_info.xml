@@ -4,8 +4,30 @@
 	<scroll_container name="xp_scroll">
 		<panel name="scrolling_panel">
 			<layout_stack>
-				<layout_panel>
-					<text name="experience_title" value="Kyle&apos;s Superhero RPG"/>
+				<layout_panel name="marketplace panel">
+					<text name="Location">
+						第二人生購物市集商店：
+					</text>
+					<text name="LocationTextText">
+						某某地點
+					</text>
+				</layout_panel>
+			</layout_stack>
+			<layout_stack name="ls1">
+				<layout_panel name="details panel">
+					<button label="編輯" name="edit_btn"/>
+					<text name="OwnerText">
+						Kyle
+					</text>
+					<text name="Owner">
+						所有人：
+					</text>
+					<text name="ContentRatingText">
+						完全成人
+					</text>
+					<text name="ContentRating">
+						分級：
+					</text>
 				</layout_panel>
 				<layout_panel name="location panel">
 					<text name="Location">
@@ -17,28 +39,8 @@
 					<button label="瞬間傳送" name="teleport_btn"/>
 					<button label="地圖" name="map_btn"/>
 				</layout_panel>
-				<layout_panel name="marketplace panel">
-					<text name="Location">
-						第二人生購物市集商店：
-					</text>
-					<text name="LocationTextText">
-						某某地點
-					</text>
-				</layout_panel>
-				<layout_panel>
-					<text name="ContentRating">
-						分級：
-					</text>
-					<text name="ContentRatingText">
-						完全成人
-					</text>
-					<text name="Owner">
-						所有人：
-					</text>
-					<text name="OwnerText">
-						Kyle
-					</text>
-					<button label="編輯" name="edit_btn"/>
+				<layout_panel name="title panel">
+					<text name="experience_title" value="Kyle's Superhero RPG"/>
 				</layout_panel>
 			</layout_stack>
 		</panel>

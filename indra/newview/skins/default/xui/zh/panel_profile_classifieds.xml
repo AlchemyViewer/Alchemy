@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="分類廣告" name="panel_profile_classifieds">
 	<string name="no_classifieds" value="禁止個人廣告"/>
-	<button label="新增…" name="new_btn"/>
-	<button label="刪除…" name="delete_btn"/>
-	<text name="classifieds_panel_text">
+	<layout_stack name="main_stack">
+		<layout_panel name="main_body">
+			<text name="classifieds_panel_text">
 		載入中…
 	</text>
+		</layout_panel>
+		<layout_panel name="buttons_header">
+			<button label="刪除…" name="delete_btn"/>
+			<button label="新增…" name="new_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

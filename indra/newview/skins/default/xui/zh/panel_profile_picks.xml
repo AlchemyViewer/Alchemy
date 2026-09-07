@@ -4,9 +4,15 @@
 	<text name="Tell everyone about your favorite places in Second Life.">
 		告訴大家你在Second Life中最愛的去處。
 	</text>
-	<button label="新增…" name="new_btn"/>
-	<button label="刪除…" name="delete_btn"/>
-	<text name="picks_panel_text">
+	<layout_stack name="main_stack">
+		<layout_panel name="main_body">
+			<text name="picks_panel_text">
 		載入中…
 	</text>
+		</layout_panel>
+		<layout_panel name="buttons_header">
+			<button label="刪除…" name="delete_btn"/>
+			<button label="新增…" name="new_btn"/>
+		</layout_panel>
+	</layout_stack>
 </panel>

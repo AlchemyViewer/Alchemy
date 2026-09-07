@@ -453,25 +453,27 @@
 			<text name="OwnerLimited">
 				（領地所有人可能對這些選項設限）
 			</text>
-			<panel name="Allowed_layout_panel">
-				<text label="永遠允許" name="AllowedText">
-					永久允許（[COUNT]，最多[MAX]）
-				</text>
-				<name_list name="AccessList" tool_tip="（已列入 [LISTED]，最多可列 [MAX]）"/>
-				<button label="添加" name="add_allowed"/>
-				<button label="移除" label_selected="移除" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="禁止" name="BanCheck">
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="禁止" name="BanCheck">
 					被封鎖（[COUNT]，最多[MAX]）
 				</text>
-				<name_list name="BannedList" tool_tip="（已列入 [LISTED]，最多可列 [MAX]）">
-					<columns label="名稱" name="name"/>
-					<columns label="歷時" name="duration"/>
-				</name_list>
-				<button label="添加" name="add_banned"/>
-				<button label="移除" label_selected="移除" name="remove_banned"/>
-			</panel>
+					<name_list name="BannedList" tool_tip="（已列入 [LISTED]，最多可列 [MAX]）">
+						<columns label="名稱" name="name"/>
+						<columns label="歷時" name="duration"/>
+					</name_list>
+					<button label="添加" name="add_banned"/>
+					<button label="移除" label_selected="移除" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="永遠允許" name="AllowedText">
+					永久允許（[COUNT]，最多[MAX]）
+				</text>
+					<name_list name="AccessList" tool_tip="（已列入 [LISTED]，最多可列 [MAX]）"/>
+					<button label="添加" name="add_allowed"/>
+					<button label="移除" label_selected="移除" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="體驗" name="land_experiences_panel"/>
 		<panel label="環境" name="land_environment_panel"/>

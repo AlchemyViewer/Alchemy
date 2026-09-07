@@ -6,21 +6,27 @@
 	<menu_item_call label="IM" name="Send IM..."/>
 	<menu_item_call label="通話" name="Call"/>
 	<menu_item_call label="邀請加入群組" name="Invite..."/>
-	<menu_item_call label="重設骨架" name="Reset Skeleton"/>
-	<menu_item_call label="重設骨架和動作" name="Reset Skeleton And Animations"/>
-	<menu_item_call label="封鎖" name="Avatar Mute"/>
-	<menu_item_call label="回報" name="abuse"/>
-	<menu_item_call label="凍結" name="Freeze..."/>
-	<menu_item_call label="踢出" name="Eject..."/>
-	<menu_item_call label="材質除錯" name="Debug..."/>
-	<menu_item_call label="傾印 XML" name="Dump XML"/>
 	<menu_item_call label="放大" name="Zoom In"/>
 	<menu_item_call label="支付" name="Pay..."/>
 	<context_menu label="呈現化身" name="Render Avatar">
-		<menu_item_check label="預設" name="RenderNormally"/>
-		<menu_item_check label="永遠" name="AlwaysRenderFully"/>
-		<menu_item_check label="絕不" name="DoNotRender"/>
-		<menu_item_call label="例外…" name="RenderExceptions"/>
 	</context_menu>
-	<menu_item_call label="封鎖粒子所有人" name="Mute Particle"/>
+	<context_menu name="Avatar Manage">
+		<menu_item_call label="踢出" name="Eject..."/>
+		<menu_item_call label="凍結" name="Freeze..."/>
+		<menu_item_call label="回報" name="abuse"/>
+		<menu_item_call label="封鎖粒子所有人" name="Mute Particle"/>
+		<menu_item_call label="封鎖" name="Avatar Mute"/>
+	</context_menu>
+	<context_menu name="Utilities">
+		<menu_item_call label="傾印 XML" name="Dump XML"/>
+		<menu_item_call label="材質除錯" name="Debug..."/>
+	</context_menu>
+	<context_menu name="Appearance">
+		<menu_item_call label="例外…" name="RenderExceptions"/>
+		<menu_item_check label="絕不" name="DoNotRender"/>
+		<menu_item_check label="永遠" name="AlwaysRenderFully"/>
+		<menu_item_check label="預設" name="RenderNormally"/>
+		<menu_item_call label="重設骨架和動作" name="Reset Skeleton And Animations"/>
+		<menu_item_call label="重設骨架" name="Reset Skeleton"/>
+	</context_menu>
 </context_menu>
