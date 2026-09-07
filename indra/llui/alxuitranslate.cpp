@@ -191,16 +191,17 @@ namespace
                     continue;
                 }
                 stack.push_back(child);
-                if (std::string_view(child.attribute("name").as_string()) == name)
+                if (std::string_view(child.attribute("name").as_string()) != name)
                 {
-                    if (found)
-                    {
-                        ambiguous = true;
-                    }
-                    else
-                    {
-                        found = child;
-                    }
+                    continue;
+                }
+                if (found)
+                {
+                    ambiguous = true;
+                }
+                else
+                {
+                    found = child;
                 }
             }
         }
@@ -245,11 +246,18 @@ static pugi::xml_node findFor(pugi::xml_node overlay_root, pugi::xml_node base,
         {
             continue;
         }
-        // A name that means one thing here can mean another somewhere
-        // else: an element already sitting where the base has one of that
-        // name is that one, and taking it would be a theft and not a
-        // repair.
-        if (base && ALXUICatalog::resolve(base, ALXUICatalog::namePath(found, /*any_tag=*/true), /*any_tag=*/true))
+        // An element already sitting where the base has one of that name
+        // is that one, and taking it would be a theft and not a repair.
+        //
+        // Skipping it and taking the next answer instead is not the fix
+        // it looks like: where the base names three elements the same --
+        // floater_world_map.xml names three events_label -- one unclaimed
+        // element is not evidence for which of them it belongs to, and
+        // pairing them off by name loses one translation and duplicates
+        // another. Telling them apart wants an assignment between the two
+        // files, not a search, and until there is one this refuses.
+        if (base && ALXUICatalog::resolve(base, ALXUICatalog::namePath(found, /*any_tag=*/true),
+                                          /*any_tag=*/true))
         {
             claimed = true;
             return pugi::xml_node();
@@ -341,6 +349,46 @@ S32 ALXUITranslate::count(State state) const
         n += unit.state == state;
     }
     return n;
+}
+
+void ALXUITranslate::weigh(S32& arrives, S32& absent) const
+{
+    arrives = 0;
+    absent = 0;
+    for (const Unit& unit : mUnits)
+    {
+        switch (unit.state)
+        {
+        case State::Translated:
+        case State::Placeholders:
+            ++arrives;
+            break;
+        case State::NotApplied:
+            if (unit.miss == Miss::Absent || unit.miss == Miss::Unnamed)
+            {
+                ++absent;
+            }
+            else
+            {
+                ++arrives;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+bool ALXUITranslate::sameFileRenamed(std::string_view overlay_root) const
+{
+    if (overlay_root.empty())
+    {
+        return true;
+    }
+    S32 arrives = 0;
+    S32 absent = 0;
+    weigh(arrives, absent);
+    return arrives > absent;
 }
 
 void ALXUITranslate::scan(pugi::xml_node base, pugi::xml_node overlay)
@@ -645,6 +693,14 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
             {
                 error = overlay.error();
                 return false;
+            }
+            if (!create_when_absent)
+            {
+                // A repair moves the element, and the element carries its
+                // own translation: writing the one this was asked for
+                // over it would put one element's text on another when
+                // the two searches did not land on the same element.
+                return true;
             }
         }
         else

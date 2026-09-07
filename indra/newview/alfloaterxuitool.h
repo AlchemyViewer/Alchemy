@@ -187,6 +187,17 @@ private:
     void startRepairAll();
     void stepRepairAll();
 
+    // The root name is the one thing a whole file is matched on, so a
+    // file that disagrees about it is repaired before anything in it is.
+    void onRepairRoots();
+
+    // The overlay census over every file and language, which is the
+    // instrument every repair pass is measured with: a few files per
+    // frame, a table beside the log.
+    void startCensus();
+    void stepCensus();
+    void finishCensus();
+
     // --- edits ---------------------------------------------------------------
     // A move or a resize of the selected element, as the movement of its
     // four edges, written into the layer that positions it.
@@ -272,6 +283,10 @@ private:
     std::deque<std::string>         mRepairQueue;   // files still to repair
     S32                             mRepairFiles = 0;
     S32                             mRepairMoves = 0;
+
+    std::deque<std::string>         mCensusQueue;   // files still to count
+    boost::unordered_map<std::string, std::map<std::string, S32>> mCensus;
+    S32                             mCensusFiles = 0;
 
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;

@@ -122,6 +122,20 @@ public:
     static bool write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& unit,
                       const std::string& text, std::string& error, bool create_when_absent = true);
 
+    // What a file would say if the merge read it. A value the base has a
+    // place for arrives -- at its path already, or after a move -- and a
+    // value naming something the base has nowhere is what the file has
+    // outlived.
+    void weigh(S32& arrives, S32& absent) const;
+
+    // Whether an overlay whose root carries another name is this file
+    // under that name. A root with no name at all is an omission. A root
+    // with a name of its own is the same file when more of what it says
+    // names something the base has than does not; when almost none of it
+    // does, it is a translation of something else and renaming it would
+    // only move its contents into the count of what applies to nothing.
+    bool sameFileRenamed(std::string_view overlay_root) const;
+
     // Every value the language writes at a path the base has moved on
     // from, moved to where the base has it, with its own text unchanged.
     // Nothing else is touched, and what the base has at more than one

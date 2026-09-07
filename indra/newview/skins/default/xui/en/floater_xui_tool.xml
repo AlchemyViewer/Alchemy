@@ -35,6 +35,10 @@
     <floater.string name="TranslateRepairedAll">Moved [MOVES] values into place across [FILES] files in [LANG]</floater.string>
     <floater.string name="TranslateNothingToRepair">Nothing in [FILE] is written at a path the base has moved on from.</floater.string>
     <floater.string name="TranslateSameLanguage">Choose a language other than the base to translate into.</floater.string>
+    <floater.string name="TranslateRoots">Gave [FILES] files in [LANG] the base's root name; [LEFT] left alone as translations of something else</floater.string>
+    <floater.string name="CensusStarted">Counting what every language's overlay does...</floater.string>
+    <floater.string name="CensusProgress">Counted [DONE] of [TOTAL] files</floater.string>
+    <floater.string name="CensusDone">[COVERED] values arrive, [NOTHING] apply to nothing; table written to [FILE]</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <text
@@ -147,6 +151,16 @@
      tool_tip="Check every file in the catalog, a few per frame, and write a report beside the log"
      top_delta="0"
      width="66" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Census"
+     layout="topleft"
+     left_pad="4"
+     name="census_btn"
+     tool_tip="Count what every language's overlay does to every file, and write the table beside the log"
+     top_delta="0"
+     width="60" />
     <button
      follows="left|top"
      height="22"
@@ -736,6 +750,16 @@
                      tool_tip="The same over every file this language has"
                      top_delta="0"
                      width="110" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Repair roots"
+                     layout="topleft"
+                     left_pad="4"
+                     name="translate_repair_roots"
+                     tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
+                     top_delta="0"
+                     width="92" />
                     <text
                      follows="left|top|right"
                      height="16"
@@ -744,7 +768,7 @@
                      name="translate_counts"
                      top_delta="3"
                      use_ellipses="true"
-                     width="760" />
+                     width="660" />
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"

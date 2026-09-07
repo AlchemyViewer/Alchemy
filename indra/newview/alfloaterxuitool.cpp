@@ -911,6 +911,8 @@ bool ALFloaterXUITool::postBuild()
     getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUITool::onTranslationWrite, this));
     getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairFile, this));
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUITool::startRepairAll, this));
+    getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUITool::onRepairRoots, this));
+    getChild<LLButton>("census_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startCensus, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::closePreviews, this));
@@ -964,6 +966,10 @@ void ALFloaterXUITool::draw()
     if (!mRepairQueue.empty())
     {
         stepRepairAll();
+    }
+    if (!mCensusQueue.empty())
+    {
+        stepCensus();
     }
     if (mReloadPending)
     {
@@ -2834,6 +2840,226 @@ void ALFloaterXUITool::onRepairFile()
         mCatalog.reload(mFile);
         fillTranslation();
     }
+}
+
+// A file whose root carries another name, or none, is repaired by giving
+// it the base's -- when the file is this file under that name, which is
+// what its own values say.
+void ALFloaterXUITool::onRepairRoots()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+
+    S32 named = 0;
+    S32 left = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        const ALXUICatalog::Layer* overlay = overlayLayer(entry, language);
+        if (!overlay || !overlay->root())
+        {
+            continue;
+        }
+        std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+        if (base_layers.empty() || !base_layers.front()->root())
+        {
+            continue;
+        }
+        const pugi::xml_node base = base_layers.front()->root();
+        const std::string over_root = overlay->root().attribute("name").as_string();
+        const std::string base_root = base.attribute("name").as_string();
+        if (over_root == base_root)
+        {
+            continue;
+        }
+
+        ALXUITranslate units;
+        units.scan(base, overlay->root());
+        if (!units.sameFileRenamed(over_root))
+        {
+            LL_INFOS("XUITool") << language << "/" << entry.name << ": left the root \"" << over_root
+                                << "\" alone; almost nothing in it names what the base has" << LL_ENDL;
+            ++left;
+            continue;
+        }
+
+        ALXUIEdit edit;
+        std::string error;
+        if (!edit.loadFile(overlay->path) || !edit.setAttribute({}, "name", base_root) || !edit.save())
+        {
+            setStatus(edit.error());
+            return;
+        }
+        LL_INFOS("XUITool") << language << "/" << entry.name << ": root \"" << over_root
+                            << "\" -> \"" << base_root << "\"" << LL_ENDL;
+        ++named;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[FILES]"] = std::to_string(named);
+    args["[LEFT]"] = std::to_string(left);
+    args["[LANG]"] = language;
+    setStatus(getString("TranslateRoots", args));
+    if (named)
+    {
+        scanCatalog();
+        fillTranslation();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The census
+// ---------------------------------------------------------------------------
+// What the merge does with every overlay of every language, counted: the
+// same instrument the console check gates on, run from here over the
+// catalog the tool already holds.
+void ALFloaterXUITool::startCensus()
+{
+    mCensusQueue.clear();
+    mCensus.clear();
+    mCensusFiles = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        mCensusQueue.push_back(entry.name);
+    }
+    setStatus(getString("CensusStarted"));
+}
+
+void ALFloaterXUITool::stepCensus()
+{
+    LLTimer timer;
+    while (!mCensusQueue.empty() && timer.getElapsedTimeF32() < 0.015f)
+    {
+        const std::string name = mCensusQueue.front();
+        mCensusQueue.pop_front();
+        const ALXUICatalog::Entry* entry = mCatalog.find(name);
+        if (!entry)
+        {
+            continue;
+        }
+        for (const std::string& language : mCatalog.languages())
+        {
+            if (language == mLanguage)
+            {
+                continue;
+            }
+            const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+            if (!overlay || !overlay->root())
+            {
+                continue;
+            }
+            std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+            if (base_layers.empty() || !base_layers.front()->root())
+            {
+                ++mCensus[language]["orphan_file"];
+                continue;
+            }
+            const pugi::xml_node base = base_layers.front()->root();
+
+            std::map<std::string, S32>& counts = mCensus[language];
+            ++counts["files"];
+            if (std::string_view(overlay->root().attribute("name").as_string())
+                != std::string_view(base.attribute("name").as_string()))
+            {
+                ++counts["root_name_differs"];
+            }
+
+            ALXUITranslate units;
+            units.scan(base, overlay->root());
+            for (const ALXUITranslate::Unit& unit : units.units())
+            {
+                switch (unit.state)
+                {
+                case ALXUITranslate::State::Translated:   ++counts["covered"]; break;
+                case ALXUITranslate::State::Missing:      ++counts["missing"]; break;
+                case ALXUITranslate::State::Placeholders: ++counts["placeholders_differ"]; break;
+                case ALXUITranslate::State::Forbidden:    ++counts["translated_despite_false"]; break;
+                case ALXUITranslate::State::NotApplied:
+                    ++counts["applies_to_nothing"];
+                    switch (unit.miss)
+                    {
+                    case ALXUITranslate::Miss::Moved:           ++counts["moved"]; break;
+                    case ALXUITranslate::Miss::Absent:          ++counts["absent"]; break;
+                    case ALXUITranslate::Miss::Unnamed:         ++counts["unnamed"]; break;
+                    case ALXUITranslate::Miss::Ambiguous:       ++counts["ambiguous"]; break;
+                    case ALXUITranslate::Miss::AttributeAbsent: ++counts["field_absent"]; break;
+                    default: break;
+                    }
+                    break;
+                }
+            }
+        }
+        ++mCensusFiles;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[DONE]"] = std::to_string(mCensusFiles);
+    args["[TOTAL]"] = std::to_string(mCensusFiles + (S32)mCensusQueue.size());
+    setStatus(getString("CensusProgress", args));
+    if (mCensusQueue.empty())
+    {
+        finishCensus();
+    }
+}
+
+void ALFloaterXUITool::finishCensus()
+{
+    // The columns every language has a number for, in the order they read
+    // best: what arrived, what did not, and why not.
+    static const char* COLUMNS[] = { "files", "covered", "missing", "applies_to_nothing",
+                                     "moved", "absent", "unnamed", "ambiguous", "field_absent",
+                                     "placeholders_differ", "translated_despite_false",
+                                     "root_name_differs", "orphan_file" };
+    std::vector<std::string> lines;
+    std::string header = "language   ";
+    for (const char* column : COLUMNS)
+    {
+        header += " " + std::string(column);
+    }
+    lines.push_back(header);
+
+    std::map<std::string, S32> totals;
+    for (const std::string& language : mCatalog.languages())
+    {
+        const auto it = mCensus.find(language);
+        if (it == mCensus.end())
+        {
+            continue;
+        }
+        std::string line = language;
+        line.resize(11, ' ');
+        for (const char* column : COLUMNS)
+        {
+            const auto found = it->second.find(column);
+            const S32 value = found == it->second.end() ? 0 : found->second;
+            totals[column] += value;
+            line += " " + std::to_string(value);
+        }
+        lines.push_back(line);
+    }
+    std::string all = "all        ";
+    for (const char* column : COLUMNS)
+    {
+        all += " " + std::to_string(totals[column]);
+    }
+    lines.push_back(all);
+
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_census.txt");
+    llofstream out(path);
+    for (const std::string& line : lines)
+    {
+        out << line << "\n";
+        LL_INFOS("XUITool") << line << LL_ENDL;
+    }
+    out.close();
+
+    LLStringUtil::format_map_t args;
+    args["[COVERED]"] = std::to_string(totals["covered"]);
+    args["[NOTHING]"] = std::to_string(totals["applies_to_nothing"]);
+    args["[FILE]"] = path;
+    setStatus(getString("CensusDone", args));
 }
 
 // The same over every file the language has, a few per frame so the

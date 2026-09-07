@@ -274,4 +274,220 @@ namespace tut
 
         ensure_equals("and none of them wrote anything", overlay.text(), before);
     }
+
+    // A name means one thing under its parent. Two combo boxes each with
+    // an item called "1" are not ambiguous: the item is told from the
+    // other by the box it is in.
+    template<> template<>
+    void alxuitranslate_object::test<6>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <combo_box name=\"first\">\n"
+            "        <combo_box.item name=\"1\" label=\"Near\"/>\n"
+            "    </combo_box>\n"
+            "    <combo_box name=\"second\">\n"
+            "        <combo_box.item name=\"1\" label=\"Far\"/>\n"
+            "    </combo_box>\n"
+            "</panel>\n");
+
+        // The language has both, and has put one of them at the wrong
+        // depth: the box is there, the item is outside it.
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <combo_box name=\"first\">\n"
+            "        <combo_box.item name=\"1\" label=\"Cerca\"/>\n"
+            "    </combo_box>\n"
+            "    <combo_box name=\"second\"/>\n"
+            "    <combo_box.item name=\"1\" label=\"Lejos\"/>\n"
+            "</panel>\n"));
+
+        // The one under "first" is where the base has one of that name,
+        // so it is not the stray. The stray is left where it is: one
+        // unclaimed element is not evidence for which of the two boxes it
+        // belongs to, and pairing them off by name loses a translation
+        // and duplicates another where a base names three the same. This
+        // is the case an assignment between the two files would settle,
+        // and the case this refuses until there is one.
+        const std::string before = overlay.text();
+        std::string error;
+        ensure_equals("the stray is not guessed at", ALXUITranslate::repair(overlay, root, error), 0);
+        ensure_equals("and nothing is written", overlay.text(), before);
+    }
+
+    // An element already sitting where the base has one of that name is
+    // that one: a repair moves what the language wrote, and never takes
+    // what is already in its place or writes a second copy of it.
+    template<> template<>
+    void alxuitranslate_object::test<7>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <text name=\"here\" value=\"One\"/>\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"here\" value=\"Two\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        // The language has one "here", at a path the base also has.
+        ALXUIEdit overlay;
+        const std::string before =
+            "<panel name=\"root\">\n"
+            "    <text name=\"here\" value=\"Uno\"/>\n"
+            "</panel>\n";
+        ensure("loads", overlay.loadBuffer(before));
+
+        std::string error;
+        ensure_equals("nothing moves", ALXUITranslate::repair(overlay, root, error), 0);
+        ensure_equals("and nothing is written", overlay.text(), before);
+    }
+
+    // A move that needs an ancestor another move has not made yet is done
+    // on the pass after it, and the shells the moves leave behind go.
+    template<> template<>
+    void alxuitranslate_object::test<8>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"outer\">\n"
+            "        <panel name=\"middle\">\n"
+            "            <text name=\"a\" value=\"One\"/>\n"
+            "            <text name=\"b\" value=\"Two\"/>\n"
+            "        </panel>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        // Flat, and wrapped in a shell of its own that says nothing.
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"stale\">\n"
+            "        <text name=\"a\" value=\"Uno\"/>\n"
+            "        <text name=\"b\" value=\"Dos\"/>\n"
+            "    </panel>\n"
+            "</panel>\n"));
+
+        std::string error;
+        ensure_equals("both move: " + error, ALXUITranslate::repair(overlay, root, error), 2);
+
+        const std::string& text = overlay.text();
+        const size_t middle = text.find("<panel name=\"middle\">");
+        ensure("the chain the base gives them is written: " + text, middle != std::string::npos);
+        ensure("under the ancestor above it", text.find("<panel name=\"outer\">") < middle);
+        ensure("the shell they came out of is gone", text.find("stale") == std::string::npos);
+        ensure("and both values are inside it", text.find("Uno", middle) != std::string::npos
+                                             && text.find("Dos", middle) != std::string::npos);
+        ensure("each on its own line, indented for where it landed",
+               text.find("\n            <text") != std::string::npos);
+    }
+
+    // What a file has to say, and what it has outlived.
+    template<> template<>
+    void alxuitranslate_object::test<9>()
+    {
+        Doc base;
+        Doc other;
+        pugi::xml_node root = base.load(english());
+        pugi::xml_node overlay = other.load(
+            "<panel name=\"root\" title=\"Lugares\">\n"
+            "    <text name=\"greeting\">Hola</text>\n"
+            "    <text name=\"gone\" value=\"Nada\"/>\n"
+            "    <text name=\"also_gone\" value=\"Nada\"/>\n"
+            "</panel>\n");
+
+        ALXUITranslate units;
+        units.scan(root, overlay);
+        S32 arrives = 0;
+        S32 absent = 0;
+        units.weigh(arrives, absent);
+        ensure_equals("two of its values name what the base has", arrives, 2);
+        ensure_equals("and two name what it does not", absent, 2);
+
+        // A root with no name at all is an omission, whatever the counts
+        // say; a root with a name is this file when more of it arrives
+        // than does not.
+        ensure("a nameless root is always this file", units.sameFileRenamed(std::string_view()));
+        ensure("an even split is not enough to say so", !units.sameFileRenamed("something_else"));
+    }
+
+    // Where the base repeats a name among siblings, the language's value
+    // is the first of them -- which is what the merge makes of it too --
+    // and the second cannot be addressed by a chain of names at all.
+    template<> template<>
+    void alxuitranslate_object::test<10>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"holder\">\n"
+            "        <text name=\"twice\" value=\"One\"/>\n"
+            "        <text name=\"twice\" value=\"Two\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <text name=\"twice\" value=\"Uno\"/>\n"
+            "</panel>\n"));
+
+        std::string error;
+        ensure_equals("the one it has moves to the first of them",
+                      ALXUITranslate::repair(overlay, root, error), 1);
+        ensure_equals("and it is the only thing written", overlay.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"holder\">\n"
+            "        <text name=\"twice\" value=\"Uno\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        // A second value for the second of them has nowhere to go: the
+        // ancestors this writes carry names, and a name the base repeats
+        // is not an address.
+        ALXUIEdit second;
+        const std::string before =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"holder\">\n"
+            "        <text name=\"twice\" value=\"Uno\"/>\n"
+            "    </panel>\n"
+            "    <text name=\"twice\" value=\"Dos\"/>\n"
+            "</panel>\n";
+        ensure("loads", second.loadBuffer(before));
+        ensure_equals("nothing is moved", ALXUITranslate::repair(second, root, error), 0);
+        ensure_equals("and the file is untouched", second.text(), before);
+    }
+
+    // A name can carry a hash of its own, and a path step writes an
+    // ordinal with one: only digits after it are the ordinal.
+    template<> template<>
+    void alxuitranslate_object::test<11>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"holder\">\n"
+            "        <text name=\"Give to #RLV\" value=\"Give\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <text name=\"Give to #RLV\" value=\"Dar\"/>\n"
+            "</panel>\n"));
+
+        std::string error;
+        ensure_equals("the hash in the name is part of it: " + error,
+                      ALXUITranslate::repair(overlay, root, error), 1);
+        ensure_equals("so it moves like any other name", overlay.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"holder\">\n"
+            "        <text name=\"Give to #RLV\" value=\"Dar\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+    }
 }

@@ -83,38 +83,6 @@ namespace
         return text;
     }
 
-    // What a file would say if the merge read it. A value the base has a
-    // place for arrives -- at its path already, or after the move that
-    // follows -- and a value naming something the base has nowhere is
-    // what the file has outlived.
-    void weigh(const ALXUITranslate& units, S32& arrives, S32& absent)
-    {
-        arrives = absent = 0;
-        for (const ALXUITranslate::Unit& unit : units.units())
-        {
-            switch (unit.state)
-            {
-            case ALXUITranslate::State::Translated:
-            case ALXUITranslate::State::Placeholders:
-                ++arrives;
-                break;
-            case ALXUITranslate::State::NotApplied:
-                if (unit.miss == ALXUITranslate::Miss::Absent
-                    || unit.miss == ALXUITranslate::Miss::Unnamed)
-                {
-                    ++absent;
-                }
-                else
-                {
-                    ++arrives;
-                }
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
     // What the repair leaves behind for a person: a name the base has at
     // more than one path, and a name it repeats among siblings, which an
     // ancestor chain of names cannot address.
@@ -226,9 +194,8 @@ int main(int argc, char** argv)
         {
             S32 arrives = 0;
             S32 absent = 0;
-            weigh(units, arrives, absent);
-            const bool nameless = over_root.empty();
-            if (nameless || arrives > absent)
+            units.weigh(arrives, absent);
+            if (units.sameFileRenamed(over_root))
             {
                 std::cout << (options.dry_run ? "  would name " : "  named ")
                           << options.language << "/" << entry.name << " root \"" << base_root
