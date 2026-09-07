@@ -26,6 +26,7 @@
 
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
+#include "alxuilint.h"
 #include "alxuioverlay.h"
 #include "alxuiselection.h"
 #include "alxuisourcemap.h"
@@ -35,6 +36,7 @@
 #include "llxmlnode.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -99,6 +101,7 @@ private:
         LLXMLNodePtr                                node;
         ALXUISourceMap                              sourceMap;
         ALXUIOverlay                                overlay;
+        ALXUILint                                   lint;
         std::string                                 skin;
         std::string                                 language;
         std::vector<std::unique_ptr<ALXUILiveFile>> liveFiles;
@@ -126,6 +129,7 @@ private:
     void placeHost(S32 which, LLFloater* host);
     void watchFiles(const ALXUICatalog::Entry& entry);
     LLView* buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr& node);
+    LLView* buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node);
 
     // --- the tree pane -------------------------------------------------------
     void rebuildTree();
@@ -136,9 +140,17 @@ private:
     void onTreeAction(const LLSD& param);
     bool onTreeActionEnabled(const LLSD& param);
     void onTreeHover(const ALXUITreeItem* item);
-    void fillDiagnostics();
-    void onDiagnosticSelected();
+    void runLint();
+    void fillFindings();
+    void onFindingSelected();
     void refreshBreadcrumb();
+
+    // Lint all: every file in the catalog, a few per frame so the viewer
+    // keeps drawing, with a report beside the log.
+    void startLintAll();
+    void stepLintAll();
+    void finishLintAll();
+    S32 lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines);
 
     // --- the selection -------------------------------------------------------
     void onSelectionChanged();
@@ -154,6 +166,7 @@ private:
     void refreshSource(LLView* view);
     void refreshBindings(LLView* view);
     void refreshState(LLView* view);
+    void refreshSelectionFindings();
     void onJumpToSource();
     void openInEditor(const std::string& path, S32 line);
 
@@ -188,6 +201,13 @@ private:
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;
 
+    std::deque<std::string>         mLintQueue;     // files still to check
+    std::vector<std::string>        mLintReport;
+    std::map<std::string, S32>      mLintByRule;
+    S32                             mLintFiles = 0;
+    S32                             mLintTotal = 0;
+    S32                             mLintFindings = 0;
+
     LLFilterEditor*     mCatalogFilter = nullptr;
     LLScrollListCtrl*   mFileList = nullptr;
     LLComboBox*         mSkinCombo = nullptr;
@@ -201,7 +221,7 @@ private:
     LLPanel*            mTreePanel = nullptr;
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
-    LLScrollListCtrl*   mDiagnostics = nullptr;
+    LLScrollListCtrl*   mFindings = nullptr;
     LLTabContainer*     mInspectors = nullptr;
     LLScrollListCtrl*   mAttributes = nullptr;
     LLScrollListCtrl*   mLayout = nullptr;
@@ -209,6 +229,7 @@ private:
     LLTextEditor*       mSourceText = nullptr;
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
+    LLScrollListCtrl*   mSelectionFindings = nullptr;
     LLTextBox*          mStatus = nullptr;
 
     boost::unordered_map<std::string, LLFolderViewItem*> mRows;

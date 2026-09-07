@@ -267,7 +267,7 @@ void ALXUILint::fromDiagnostics(const Input& input)
     {
         return;
     }
-    for (const ALXUIDiagnostics::Entry& e : input.diagnostics->entries())
+    for (const ALXUIDiagnostics::Entry& e : *input.diagnostics)
     {
         // A child widget's attributes fail against its parent's block by
         // design and are parsed again by the child; that is the parser

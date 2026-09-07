@@ -17,8 +17,8 @@
     <floater.string name="NoFile">Select a file.</floater.string>
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
     <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
-    <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] diagnostics, [SKIN]/[LANG]</floater.string>
-    <floater.string name="BuildFailed">Could not build [FILE]: see the diagnostics.</floater.string>
+    <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]</floater.string>
+    <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>
     <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
     <floater.string name="NoResults">No matches.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
@@ -123,6 +123,16 @@
      tool_tip="Every registered widget with its template defaults, in the chosen skin"
      top_delta="0"
      width="70" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Lint all"
+     layout="topleft"
+     left_pad="4"
+     name="lint_all_btn"
+     tool_tip="Check every file in the catalog, a few per frame, and write a report beside the log"
+     top_delta="0"
+     width="66" />
     <check_box
      follows="left|top"
      height="16"
@@ -367,7 +377,7 @@
                  height="178"
                  layout="topleft"
                  min_dim="60"
-                 name="diagnostics_area"
+                 name="findings_area"
                  user_resize="true">
                     <scroll_list
                      column_padding="0"
@@ -376,14 +386,19 @@
                      height="178"
                      layout="topleft"
                      left="0"
-                     name="diagnostics"
-                     tool_tip="What the parser, the factory and the layer merge reported while building; double-click selects the element"
+                     name="findings"
+                     tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
                      top="0"
                      width="360">
                         <scroll_list.columns
-                         label="Kind"
-                         name="kind"
-                         width="100" />
+                         label=""
+                         name="severity"
+                         tool_tip="error, warning or note"
+                         width="52" />
+                        <scroll_list.columns
+                         label="Rule"
+                         name="rule"
+                         width="90" />
                         <scroll_list.columns
                          label="Line"
                          name="line"
@@ -391,7 +406,7 @@
                         <scroll_list.columns
                          dynamic_width="true"
                          label="Where"
-                         name="path" />
+                         name="where" />
                         <scroll_list.columns
                          dynamic_width="true"
                          label="What"
@@ -559,6 +574,39 @@
                          dynamic_width="true"
                          label="Value"
                          name="value" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Findings"
+                 layout="topleft"
+                 name="findings_tab">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="640"
+                     layout="topleft"
+                     left="0"
+                     name="selection_findings"
+                     tool_tip="The findings on the selected element and everything below it"
+                     top="0"
+                     width="476">
+                        <scroll_list.columns
+                         label=""
+                         name="severity"
+                         width="52" />
+                        <scroll_list.columns
+                         label="Rule"
+                         name="rule"
+                         width="90" />
+                        <scroll_list.columns
+                         label="Where"
+                         name="where"
+                         width="110" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="What"
+                         name="message" />
                     </scroll_list>
                 </panel>
             </tab_container>

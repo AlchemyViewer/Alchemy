@@ -252,7 +252,14 @@ LLFontGL::StyleFlags ALXUITreeItem::getLabelStyle() const
 std::string ALXUITreeItem::getLabelSuffix() const
 {
     const LLRect& rect = mView->getRect();
-    std::string suffix = "  " + mTag + "  " + std::to_string(rect.getWidth()) + "x" + std::to_string(rect.getHeight());
+    std::string suffix;
+    // The findings on this row and everything below it, first, so it sits
+    // against the name rather than at the end of the line.
+    if (const S32 findings = mModel.badgeFor(mPath))
+    {
+        suffix += "  [" + std::to_string(findings) + "]";
+    }
+    suffix += "  " + mTag + "  " + std::to_string(rect.getWidth()) + "x" + std::to_string(rect.getHeight());
     if (!isShown())
     {
         suffix += isAuthoredVisible() ? "  hidden here" : "  hidden";

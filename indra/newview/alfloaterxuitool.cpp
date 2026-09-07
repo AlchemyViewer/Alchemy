@@ -600,7 +600,7 @@ bool ALFloaterXUITool::postBuild()
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
-    mDiagnostics = getChild<LLScrollListCtrl>("diagnostics");
+    mFindings = getChild<LLScrollListCtrl>("findings");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
     mAttributes = getChild<LLScrollListCtrl>("attributes");
     mLayout = getChild<LLScrollListCtrl>("layout");
@@ -608,6 +608,7 @@ bool ALFloaterXUITool::postBuild()
     mSourceText = getChild<LLTextEditor>("source_text");
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
+    mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
     mStatus = getChild<LLTextBox>("status");
 
     loadState();
@@ -624,7 +625,7 @@ bool ALFloaterXUITool::postBuild()
     mFindField->setCommitCallback(boost::bind(&ALFloaterXUITool::onFind, this));
     mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindResult, this));
     mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUITool::onTreeFilter, this));
-    mDiagnostics->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onDiagnosticSelected, this));
+    mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUITool::onFindingSelected, this));
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUITool::refreshInspectors, this));
 
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showPreviews, this));
@@ -633,6 +634,7 @@ bool ALFloaterXUITool::postBuild()
     getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
     getChild<LLButton>("jump_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::onJumpToSource, this));
     getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::showGallery, this));
+    getChild<LLButton>("lint_all_btn")->setClickedCallback(boost::bind(&ALFloaterXUITool::startLintAll, this));
 
     LLCheckBoxCtrl* hover = getChild<LLCheckBoxCtrl>("hover_check");
     hover->setValue(mHoverHighlight);
@@ -646,6 +648,8 @@ bool ALFloaterXUITool::postBuild()
     mSelection.onSelectionChanged(boost::bind(&ALFloaterXUITool::onSelectionChanged, this));
     mSelection.onHoverChanged(boost::bind(&ALFloaterXUITool::onHoverChanged, this));
     mModel.setHoverHandler(boost::bind(&ALFloaterXUITool::onTreeHover, this, _1));
+    mModel.setBadgeProvider([this](const ALXUISelection::path_t& path)
+                            { return mPreviews[PRIMARY].lint.countUnder(path); });
     mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
     mModel.getFilter().setEmptyLookupMessage(getString("NoResults"));
 
@@ -668,6 +672,10 @@ void ALFloaterXUITool::onClose(bool app_quitting)
 
 void ALFloaterXUITool::draw()
 {
+    if (!mLintQueue.empty())
+    {
+        stepLintAll();
+    }
     if (mReloadPending)
     {
         mReloadPending = false;
@@ -909,6 +917,7 @@ void ALFloaterXUITool::closePreview(S32 which)
     pv.overlay.clear();
     pv.liveFiles.clear();
     pv.diagnostics.clear();
+    pv.lint.clear();
     if (which == PRIMARY)
     {
         clearTree();
@@ -1016,6 +1025,15 @@ LLView* ALFloaterXUITool::buildRoot(S32 which, const ALXUICatalog::Entry& entry,
             return nullptr;
         }
     }
+    return buildFromNode(entry, host, node);
+}
+
+// The node as a view, by the kind of file it is. A floater is the host
+// itself; everything else is hosted by it.
+LLView* ALFloaterXUITool::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node)
+{
+    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+    const std::string& file = entry.name;
 
     LLView* root = nullptr;
     factory.pushFileName(file);
@@ -1141,7 +1159,8 @@ void ALFloaterXUITool::showPreview(S32 which)
             LLStringUtil::format_map_t args;
             args["[TAG]"] = widget_tag;
             setStatus(viewer_widget ? getString("ViewerWidget", args) : getString("NotBuilt"));
-            fillDiagnostics();
+            runLint();
+            fillFindings();
             refreshBreadcrumb();
             refreshInspectors();
         }
@@ -1175,7 +1194,8 @@ void ALFloaterXUITool::showPreview(S32 which)
             LLStringUtil::format_map_t args;
             args["[FILE]"] = mFile;
             setStatus(getString("BuildFailed", args));
-            fillDiagnostics();
+            runLint();
+            fillFindings();
         }
         return;
     }
@@ -1195,13 +1215,12 @@ void ALFloaterXUITool::showPreview(S32 which)
     if (which == PRIMARY)
     {
         watchFiles(*entry);
+        // Before the tree: a row shows the findings under it, and the
+        // rows are made once.
+        runLint();
         rebuildTree();
-        fillDiagnostics();
-        S32 findings = 0;
-        for (const ALXUIDiagnostics::Entry& e : pv.diagnostics)
-        {
-            findings += !isNoise(e);
-        }
+        fillFindings();
+        const S32 findings = (S32)pv.lint.findings().size();
         LLStringUtil::format_map_t args;
         args["[VIEWS]"] = std::to_string(pv.views);
         args["[MS]"] = std::to_string((S32)(pv.seconds * 1000.f));
@@ -1533,69 +1552,290 @@ void ALFloaterXUITool::onTreeAction(const LLSD& param)
     }
 }
 
-void ALFloaterXUITool::fillDiagnostics()
+// Every file in the catalog, checked a few per frame. The status line
+// counts down and the report lands beside the log, which is the form an
+// author can read a whole tree's worth of findings in.
+void ALFloaterXUITool::startLintAll()
 {
-    mDiagnostics->deleteAllItems();
-    const Preview& pv = mPreviews[PRIMARY];
-    for (const ALXUIDiagnostics::Entry& e : pv.diagnostics)
+    if (!mLintQueue.empty())
     {
-        if (isNoise(e))
+        mLintQueue.clear();
+        setStatus("Lint all: stopped.");
+        return;
+    }
+    mLintReport.clear();
+    mLintByRule.clear();
+    mLintFiles = 0;
+    mLintFindings = 0;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        mLintQueue.push_back(entry.name);
+    }
+    mLintTotal = (S32)mLintQueue.size();
+
+    // The rule that needs no build, once, before the files are walked.
+    for (const ALXUILint::Finding& f : ALXUILint::checkCatalog(mCatalog))
+    {
+        ++mLintByRule[ALXUILint::ruleName(f.rule)];
+        ++mLintFindings;
+        mLintReport.push_back(std::string(ALXUILint::severityName(f.severity)) + " " + ALXUILint::ruleName(f.rule)
+                              + " " + f.file + ":" + std::to_string(f.line) + " " + f.message);
+    }
+    setStatus("Lint all: " + std::to_string(mLintTotal) + " files...");
+}
+
+void ALFloaterXUITool::stepLintAll()
+{
+    // A budget per frame rather than a count of files: the largest file
+    // takes as long as twenty small ones.
+    constexpr F32 BUDGET = 0.015f;
+    LLTimer timer;
+    while (!mLintQueue.empty() && timer.getElapsedTimeF32() < BUDGET)
+    {
+        const std::string name = mLintQueue.front();
+        mLintQueue.pop_front();
+        if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
         {
-            continue;
+            ++mLintFiles;
+            mLintFindings += lintOneFile(*entry, mLintReport);
         }
-        std::string where = e.path;
-        std::string file = e.file;
+    }
+
+    if (mLintQueue.empty())
+    {
+        finishLintAll();
+    }
+    else
+    {
+        setStatus("Lint all: " + std::to_string(mLintTotal - (S32)mLintQueue.size()) + " of "
+                  + std::to_string(mLintTotal) + " files, " + std::to_string(mLintFindings) + " findings...");
+    }
+}
+
+S32 ALFloaterXUITool::lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines)
+{
+    std::string widget_tag;
+    if (entry.kind == ALXUICatalog::Kind::Widget)
+    {
+        widget_tag = entry.rootTag;
+    }
+    else if (entry.kind == ALXUICatalog::Kind::Template)
+    {
+        widget_tag = entry.name.substr(entry.name.rfind('/') + 1);
+        widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
+    }
+    if (!isBuilt(entry.kind) || (!widget_tag.empty() && !isCoreWidgetTag(widget_tag)))
+    {
+        return 0;
+    }
+
+    ALXUIPreviewHost* host = nullptr;
+    LLView* root = nullptr;
+    LLXMLNodePtr node;
+    ALXUIOverlay overlay;
+    std::vector<ALXUIDiagnostics::Entry> entries;
+    {
+        ALXUISkinScope scope(mSkin, mLanguage);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, entry.name);
+        if (paths.empty())
+        {
+            paths.push_back(entry.name);
+        }
+        if (entry.kind == ALXUICatalog::Kind::Template)
+        {
+            const std::string xml = "<" + widget_tag + " name=\"" + widget_tag + "\" layout=\"topleft\""
+                                  + " left=\"8\" top=\"8\" width=\"200\" height=\"24\"/>";
+            LLXMLNode::parseBuffer(xml.data(), xml.size(), node);
+        }
+        else
+        {
+            ALXmlLayerMerge::load(paths, node, &overlay);
+        }
+
+        if (node.notNull())
+        {
+            LLFloater::Params p(LLFloater::getDefaultParams());
+            p.min_height = p.header_height;
+            p.min_width = 10;
+            host = new ALXUIPreviewHost(this, SECONDARY, p);
+            host->detach();
+            root = buildFromNode(entry, host, node);
+        }
+        entries = sink.entries();
+    }
+
+    S32 found = 0;
+    if (root)
+    {
+        ALXUISourceMap map;
+        map.build(root, node);
+
+        ALXUILint lint;
+        ALXUILint::Input input;
+        input.root = root;
+        input.sourceMap = &map;
+        input.diagnostics = &entries;
+        input.overlay = &overlay;
+        input.catalog = &mCatalog;
+        input.file = entry.name;
+        input.callbacksAreDecisive = entry.kind == ALXUICatalog::Kind::Menu;
+        std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(entry, mSkin, mLanguage);
+        if (!layers.empty())
+        {
+            input.authored = layers.front()->root();
+        }
+        lint.run(input);
+
+        for (const ALXUILint::Finding& f : lint.findings())
+        {
+            ++mLintByRule[ALXUILint::ruleName(f.rule)];
+            ++found;
+            lines.push_back(std::string(ALXUILint::severityName(f.severity)) + " " + ALXUILint::ruleName(f.rule)
+                            + " " + entry.name + ":" + std::to_string(f.line) + " "
+                            + ALXUISelection::toString(f.path) + " " + f.what + ": " + f.message);
+        }
+    }
+    if (host)
+    {
+        host->closeFloater();
+    }
+    return found;
+}
+
+void ALFloaterXUITool::finishLintAll()
+{
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_lint.txt");
+    llofstream out(path, std::ios::binary);
+    out << mLintFiles << " files built in " << mSkin << "/" << mLanguage << ", "
+        << mLintFindings << " findings\n\n";
+    for (const auto& [rule, count] : mLintByRule)
+    {
+        out << "  " << count << "\t" << rule << "\n";
+    }
+    out << "\n";
+    for (const std::string& line : mLintReport)
+    {
+        out << line << "\n";
+    }
+
+    setStatus("Lint all: " + std::to_string(mLintFindings) + " findings over " + std::to_string(mLintFiles)
+              + " files; the report is " + path);
+    LL_INFOS("XUITool") << "lint all: " << mLintFindings << " findings over " << mLintFiles
+                        << " files, report at " << path << LL_ENDL;
+}
+
+void ALFloaterXUITool::runLint()
+{
+    Preview& pv = mPreviews[PRIMARY];
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    ALXUILint::Input input;
+    input.root = pv.root;
+    input.sourceMap = &pv.sourceMap;
+    input.diagnostics = &pv.diagnostics;
+    input.overlay = &pv.overlay;
+    input.catalog = &mCatalog;
+    input.file = mFile;
+    // A menu file's functions are registered at startup, so a name no
+    // registry knows is decisive there and nowhere else in a shell build.
+    input.callbacksAreDecisive = entry && entry->kind == ALXUICatalog::Kind::Menu;
+    if (entry)
+    {
+        // The file as written, which is where the parameter elements the
+        // parser consumed still are.
+        std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(*entry, pv.skin, pv.language);
+        if (!layers.empty())
+        {
+            input.authored = layers.front()->root();
+        }
+    }
+    pv.lint.run(input);
+}
+
+// One row per finding: the severity and rule, where it is, and what it
+// says. The path is what a double-click selects by, since a finding from
+// a layer carries that layer's line and not the base's.
+void ALFloaterXUITool::fillFindings()
+{
+    mFindings->deleteAllItems();
+    const Preview& pv = mPreviews[PRIMARY];
+    for (const ALXUILint::Finding& f : pv.lint.findings())
+    {
+        std::string where = ALXUISelection::toString(f.path);
+        std::string file = f.file;
         const size_t slash = file.find_last_of("/\\");
         if (slash != std::string::npos)
         {
             file = file.substr(slash + 1);
+        }
+        if (where.empty())
+        {
+            where = f.what;
         }
         if (!file.empty() && file != mFile)
         {
             where = file + ": " + where;
         }
         LLSD id;
-        id["line"] = e.line;
-        mDiagnostics->addElement(row(id, {
-            { "kind", ALXUIDiagnostics::kindName(e.kind) },
-            { "line", e.line > 0 ? std::to_string(e.line) : std::string() },
-            { "path", where },
-            { "message", e.message } }));
-    }
-
-    // What the merge dropped from each layer, with the layer it was in;
-    // the line is that layer's, so a double-click goes by the path.
-    for (const ALXUIOverlay::Drop& d : pv.overlay.drops())
-    {
-        LLSD id;
-        id["path"] = d.path;
-        mDiagnostics->addElement(row(id, {
-            { "kind", "overlay drop" },
-            { "line", d.line > 0 ? std::to_string(d.line) : std::string() },
-            { "path", layerLabel(PRIMARY, d.layer) + ": " + d.path },
-            { "message", d.what + ": " + d.why } }));
+        id["path"] = ALXUISelection::toString(f.path);
+        id["line"] = f.line;
+        mFindings->addElement(row(id, {
+            { "severity", ALXUILint::severityName(f.severity) },
+            { "rule", ALXUILint::ruleName(f.rule) },
+            { "line", f.line > 0 ? std::to_string(f.line) : std::string() },
+            { "where", where },
+            { "message", f.what.empty() ? f.message : f.what + ": " + f.message } }));
     }
 }
 
-void ALFloaterXUITool::onDiagnosticSelected()
+void ALFloaterXUITool::onFindingSelected()
 {
-    LLScrollListItem* item = mDiagnostics->getFirstSelected();
+    LLScrollListItem* item = mFindings->getFirstSelected();
     if (!item)
     {
         return;
     }
     const LLSD id = item->getValue();
     const Preview& pv = mPreviews[PRIMARY];
-    if (id.has("path"))
+    const std::string path = id["path"].asString();
+    if (!path.empty())
     {
-        mSelection.select(ALXUISelection::fromString(id["path"].asString()));
+        mSelection.select(ALXUISelection::fromString(path));
         return;
     }
     const LLView* view = pv.sourceMap.viewAtLine(id["line"].asInteger());
-    ALXUISelection::path_t path;
-    if (view && ALXUISelection::pathOf(view, pv.root, path))
+    ALXUISelection::path_t found;
+    if (view && ALXUISelection::pathOf(view, pv.root, found))
     {
-        mSelection.select(path);
+        mSelection.select(found);
+    }
+}
+
+// The findings on the selected element and everything below it.
+void ALFloaterXUITool::refreshSelectionFindings()
+{
+    mSelectionFindings->deleteAllItems();
+    if (!mSelection.hasSelection())
+    {
+        return;
+    }
+    const ALXUISelection::path_t& selected = mSelection.selection();
+    for (const ALXUILint::Finding& f : mPreviews[PRIMARY].lint.findings())
+    {
+        if (f.path.size() < selected.size()
+            || !std::equal(selected.begin(), selected.end(), f.path.begin()))
+        {
+            continue;
+        }
+        const bool here = f.path.size() == selected.size();
+        mSelectionFindings->addElement(row(ALXUISelection::toString(f.path), {
+            { "severity", ALXUILint::severityName(f.severity) },
+            { "rule", ALXUILint::ruleName(f.rule) },
+            { "where", here ? std::string("here")
+                            : ALXUISelection::toString(ALXUISelection::path_t(f.path.begin() + selected.size(), f.path.end())) },
+            { "message", f.what.empty() ? f.message : f.what + ": " + f.message } }));
     }
 }
 
@@ -1759,6 +1999,10 @@ void ALFloaterXUITool::refreshInspectors()
     else if (tab == "state_tab")
     {
         refreshState(view);
+    }
+    else if (tab == "findings_tab")
+    {
+        refreshSelectionFindings();
     }
 }
 

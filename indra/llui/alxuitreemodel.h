@@ -123,6 +123,12 @@ public:
     void setContextMenuHandler(context_menu_fn_t fn) { mContextMenu = std::move(fn); }
     void buildContextMenu(ALXUITreeItem& item, LLMenuGL& menu, U32 flags);
 
+    // How many findings sit on a row and everything below it, which is
+    // what a row shows beside its name. Null until something says.
+    typedef std::function<S32(const ALXUISelection::path_t& path)> badge_fn_t;
+    void setBadgeProvider(badge_fn_t fn) { mBadge = std::move(fn); }
+    S32 badgeFor(const ALXUISelection::path_t& path) const { return mBadge ? mBadge(path) : 0; }
+
     // Hover runs both ways: the row the canvas is over is drawn marked, and
     // the row the mouse is over is reported, null when it leaves the rows.
     typedef std::function<void(const ALXUITreeItem* item)> hover_fn_t;
@@ -142,6 +148,7 @@ private:
     boost::unordered_map<const LLView*, ALXUITreeItem*> mByView;
     context_menu_fn_t                                   mContextMenu;
     hover_fn_t                                          mHover;
+    badge_fn_t                                          mBadge;
     const ALXUITreeItem*                                mCanvasHover = nullptr;
     const ALXUITreeItem*                                mRowHover = nullptr;
 };

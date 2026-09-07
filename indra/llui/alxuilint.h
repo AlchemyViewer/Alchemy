@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alxuidiagnostics.h"
 #include "alxuiselection.h"
 
 #include <string>
@@ -33,7 +34,6 @@
 #include <pugixml.hpp>
 
 class ALXUICatalog;
-class ALXUIDiagnostics;
 class ALXUIOverlay;
 class ALXUISourceMap;
 class LLView;
@@ -93,7 +93,9 @@ public:
     {
         LLView*                 root = nullptr;
         const ALXUISourceMap*   sourceMap = nullptr;
-        const ALXUIDiagnostics* diagnostics = nullptr;
+        // What the sink collected while the build ran; the sink itself
+        // lives only as long as the build.
+        const std::vector<ALXUIDiagnostics::Entry>* diagnostics = nullptr;
         const ALXUIOverlay*     overlay = nullptr;
         const ALXUICatalog*     catalog = nullptr;
         // The file as written. The parser deletes each parameter element
