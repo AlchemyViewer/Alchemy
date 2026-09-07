@@ -313,9 +313,6 @@
 					<text name="smooth_method_label">
 						滑らかさ：
 					</text>
-					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
-					<button label="分析" name="Decompose"/>
-					<button label="キャンセル" name="decompose_cancel"/>
 				</panel>
 				<panel name="physics analysis vhacd">
 					<text name="method_label">
@@ -373,6 +370,11 @@
 					<text name="physics_hulls">
 						凸包数：[HULLS]
 					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="キャンセル" name="decompose_cancel"/>
+					<button label="分析" name="Decompose"/>
+					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
 				</panel>
 			</panel>
 			<!-- MODIFIERS PANEL -->

@@ -45,9 +45,6 @@
 					<stat_bar label="フォーマット済メモリ" name="formattedmemstat"/>
 					<stat_bar label="ＲＡＷメモリ" name="rawmemstat"/>
 					<stat_bar label="統合メモリ" name="glboundmemstat"/>
-					<stat_view name="material" label="マテリアル">
-						<stat_bar name="nummaterials" label="個"/>
-					</stat_view>
 				</stat_view>
 				<stat_view label="ネットワーク" name="network">
 					<stat_bar label="パケットイン" name="packetsinstat"/>
@@ -58,6 +55,9 @@
 					<stat_bar label="レイヤー" name="layersdatareceived"/>
 					<stat_bar label="実際の受信" name="messagedatain"/>
 					<stat_bar label="実際の送信" name="messagedataout"/>
+				</stat_view>
+				<stat_view name="material" label="マテリアル">
+					<stat_bar name="nummaterials" label="個"/>
 				</stat_view>
 			</stat_view>
 			<stat_view label="シミュレーター" name="sim">

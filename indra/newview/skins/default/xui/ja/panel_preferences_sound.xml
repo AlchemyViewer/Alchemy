@@ -25,10 +25,6 @@
 	<text name="Listen media from">
 		聞き取り位置：
 	</text>
-	<combo_box name="ear_location_combo">
-		<item label="カメラの位置" name="camera_position"/>
-		<item label="アバターの位置" name="avatar_position"/>
-	</combo_box>
 	<text name="media_autoplay_label">
 		メディアの自動再生：
 	</text>
@@ -53,6 +49,10 @@
 	<check_box name="media_show_on_others_btn" tool_tip="ここのチェックを外すと、近くにいる他のアバターに取り付けられたメディアを非表示にします。" label="近くのアバターのメディアを自動再生"/>
 	<check_box name="media_huds_autoplay" tool_tip="チェックを外すと、ＨＵＤは標準のメディア自動再生設定に従います。" label="ＨＵＤに装着されたメディアを自動再生する"/>
 	<check_box name="gesture_audio_play_btn" tool_tip="ジェスチャーからのサウンドを聞くにはこれを選択します。" label="ジェスチャーのサウンドを再生する"/>
+	<combo_box name="media_ear_location_combo">
+		<item label="アバターの位置" name="avatar_position"/>
+		<item label="カメラの位置" name="camera_position"/>
+	</combo_box>
 	</panel>
 	<panel name="voice_sound_panel">
 	<text name="noise_suppression_label">
