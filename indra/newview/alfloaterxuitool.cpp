@@ -1873,6 +1873,14 @@ void ALFloaterXUITool::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
         return;
     }
 
+    // The right button does not select, so Copy would have nothing on the
+    // first click. Take the row under it, unless the click landed inside a
+    // selection someone has already made.
+    if (!mMenuList->getFirstSelected())
+    {
+        mMenuList->selectItemAt(x, y, MASK_NONE);
+    }
+
     LLContextMenu* menu = static_cast<LLContextMenu*>(mListMenu.get());
     if (!menu)
     {
