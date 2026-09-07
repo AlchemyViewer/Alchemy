@@ -1,44 +1,50 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Colores" name="colors_panel">
-	<text name="effects_color_textbox">
-		Mis efectos (rayo indicador):
-	</text>
-	<color_swatch name="effect_color_swatch" tool_tip="Pulsa para abrir el selector de color"/>
-	<text name="font_colors">
-		Colores de fuente del chat:
-	</text>
-	<text name="text_box1">
-		Yo
-	</text>
-	<text name="text_box2">
-		Otros avatares
-	</text>
-	<text name="text_box3">
-		Objetos
-	</text>
-	<text name="text_box4">
-		Sistema
-	</text>
-	<text name="text_box5">
-		Errores
-	</text>
-	<text name="text_box10">
-		Directo
-	</text>
-	<text name="text_box7">
-		Propietario
-	</text>
-	<text name="text_box9">
+	<tab_container name="color_tab_container">
+		<panel name="chat_colors">
+			<text name="text_box9">
 		URLs
 	</text>
-	<text name="bubble_chat">
-		Color de fondo de la etiqueta del nombre (afectará también a los bocadillos del chat):
+			<text name="text_box7">
+		Propietario
 	</text>
-	<color_swatch name="background" tool_tip="Elige el color de las etiquetas de nombre"/>
-	<slider label="Opacidad:" name="bubble_chat_opacity" tool_tip="Elige la opacidad de las etiquetas de nombre"/>
-	<text name="floater_opacity">
+			<text name="text_box10">
+		Directo
+	</text>
+			<text name="text_box5">
+		Errores
+	</text>
+			<text name="text_box4">
+		Sistema
+	</text>
+			<text name="text_box3">
+		Objetos
+	</text>
+			<text name="text_box2">
+		Otros avatares
+	</text>
+			<text name="text_box1">
+		Yo
+	</text>
+			<text name="font_colors">
+		Colores de fuente del chat:
+	</text>
+		</panel>
+		<panel name="general_colors">
+			<slider label="Inactiva:" name="inactive"/>
+			<slider label="Activa:" name="active"/>
+			<text name="floater_opacity">
 		Opacidad de la ventana:
 	</text>
-	<slider label="Activa:" name="active"/>
-	<slider label="Inactiva:" name="inactive"/>
+			<slider label="Opacidad:" name="bubble_chat_opacity" tool_tip="Elige la opacidad de las etiquetas de nombre"/>
+			<color_swatch name="background" tool_tip="Elige el color de las etiquetas de nombre"/>
+			<text name="bubble_chat">
+		Color de fondo de la etiqueta del nombre (afectará también a los bocadillos del chat):
+	</text>
+			<color_swatch name="effect_color_swatch" tool_tip="Pulsa para abrir el selector de color"/>
+			<text name="effects_color_textbox">
+		Mis efectos (rayo indicador):
+	</text>
+		</panel>
+	</tab_container>
 </panel>

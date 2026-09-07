@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Comunicación" name="im">
-	<panel.string name="log_in_to_change">
-		Conéctate para que cambie
-	</panel.string>
-	<button label="Limpiar el historial" name="clear_cache" tool_tip="Limpia la imagen de la pantalla de conexión, la última posición, el historial de teleportes, web y caché de las texturas."/>
-	<text name="cache_size_label_l">
-		(Localizaciones, imágenes, web, historial de búsqueda)
-	</text>
-	<check_box label="Mostrar datos de mi perfil en los resultados de la búsqueda" name="online_searchresults"/>
-	<check_box label="Sólo saben si estoy conectado mis amigos y grupos" name="online_visibility"/>
 	<check_box label="Sólo pueden llamarme o mandarme un MI mis amigos y grupos" name="voice_call_friends_only_check"/>
-	<check_box label="Desconectar el micrófono cuando finalicen las llamadas" name="auto_disengage_mic_check"/>
 	<check_box label="Mostrar mis Hitos favoritos al Inicio de sesión (menú desplegable &quot;Empezar  en&quot;)" name="favorites_on_login_check" top_pad="15"/>
 	<text name="Logs:">
 		Registros de chat:
@@ -24,14 +14,28 @@
 	</text>
 	<line_editor left="278" name="log_path_string" right="-20"/>
 	<button label="Elegir" label_selected="Elegir" name="log_path_button" width="120"/>
-	<button label="Lista de ignorados" name="block_list"/>
-	<text name="inventory_header">
-		Inventory:
-	</text>
-	<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
-	<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
-	<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
-	<text name="block_list_label">
+	<tab_container name="privacy_tab_container">
+		<panel name="privacy_preferences_general">
+			<text name="block_list_label">
 		(Gente u objetos que has bloqueado)
 	</text>
+			<button label="Lista de ignorados" name="block_list"/>
+			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
+			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
+			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
+			<text name="inventory_header">
+		Inventory:
+	</text>
+			<check_box label="Desconectar el micrófono cuando finalicen las llamadas" name="auto_disengage_mic_check"/>
+			<check_box label="Sólo saben si estoy conectado mis amigos y grupos" name="online_visibility"/>
+			<check_box label="Mostrar datos de mi perfil en los resultados de la búsqueda" name="online_searchresults"/>
+			<text name="cache_size_label_l">
+		(Localizaciones, imágenes, web, historial de búsqueda)
+	</text>
+			<button label="Limpiar el historial" name="clear_cache" tool_tip="Limpia la imagen de la pantalla de conexión, la última posición, el historial de teleportes, web y caché de las texturas."/>
+			<panel.string name="log_in_to_change">
+		Conéctate para que cambie
+	</panel.string>
+		</panel>
+	</tab_container>
 </panel>

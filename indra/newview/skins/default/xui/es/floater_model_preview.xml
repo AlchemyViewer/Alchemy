@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Model Preview" title="SUBIR MODELO">
-	<string name="status_idle"/>
 	<string name="status_parse_error">
 		Error: Problema de análisis de DAE - consulta los datos en el registro.
 	</string>
@@ -179,23 +178,6 @@
 					</combo_box>
 					<button label="Buscar..." name="physics_browse"/>
 				</panel>
-				<panel name="physics analysis">
-					<text name="method_label">
-						Paso 2: Analizar
-					</text>
-					<text name="analysis_method_label">
-						Método:
-					</text>
-					<text name="quality_label">
-						Calidad:
-					</text>
-					<text name="smooth_method_label">
-						Leve:
-					</text>
-					<check_box label="Cerrar agujeros" name="Close Holes (Slow)"/>
-					<button label="Analizar" name="Decompose"/>
-					<button label="Cancelar" name="decompose_cancel"/>
-				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
 						Paso 3: Simplificar
@@ -230,6 +212,25 @@
 						Apariencias: [HULLS]
 					</text>
 				</panel>
+				<panel name="physics analysis vhacd">
+					<text name="smooth_method_label">
+						Leve:
+					</text>
+					<text name="quality_label">
+						Calidad:
+					</text>
+					<text name="analysis_method_label">
+						Método:
+					</text>
+					<text name="method_label">
+						Paso 2: Analizar
+					</text>
+				</panel>
+				<panel name="physics analysis havok">
+					<button label="Cancelar" name="decompose_cancel"/>
+					<button label="Analizar" name="Decompose"/>
+					<check_box label="Cerrar agujeros" name="Close Holes (Slow)"/>
+				</panel>
 			</panel>
 			<panel label="Opciones de subida" name="modifiers_panel">
 				<text name="scale_label">
@@ -246,13 +247,15 @@
 				<text name="include_label">
 					Solo para modelos de avatar:
 				</text>
-				<check_box label="Incluir el peso de la piel" name="upload_skin"/>
-				<check_box label="Incluir posturas de las articulaciones" name="upload_joints"/>
-				<check_box label="Bloquear la escala si está definida la posición de la articulación" name="lock_scale_if_joint_position"/>
+			</panel>
+			<panel name="rigging_panel">
+				<spinner name="pelvis_offset" value="0.0"/>
 				<text name="pelvis_offset_label">
 					Desplazamiento Z (subir o bajar el avatar):
 				</text>
-				<spinner name="pelvis_offset" value="0.0"/>
+				<check_box label="Bloquear la escala si está definida la posición de la articulación" name="lock_scale_if_joint_position"/>
+				<check_box label="Incluir posturas de las articulaciones" name="upload_joints"/>
+				<check_box label="Incluir el peso de la piel" name="upload_skin"/>
 			</panel>
 		</tab_container>
 		<panel name="weights_and_warning_panel">

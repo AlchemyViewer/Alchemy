@@ -18,9 +18,10 @@
 			<check_box label="Abrir siempre en mi navegador" name="open_always"/>
 			<button label="Cerrar" name="close"/>
 		</layout_panel>
-		<button name="seek" label="Avanzar"/>
-		<button name="rewind" label="Rebobinar"/>
-		<button name="stop" label="Detener"/>
+		<layout_panel name="time_controls">
+			<button name="seek" label="Avanzar"/>
+			<button name="stop" label="Detener"/>
+			<button name="rewind" label="Rebobinar"/>
+		</layout_panel>
 	</layout_stack>
-	<layout_panel name="time_controls"/>
 </floater>

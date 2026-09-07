@@ -46,6 +46,7 @@
 			<button label="Obtener top de colisionadores" label_selected="Obtener top de colisionadores" name="Get Top Colliders" tool_tip="Coger lista de objetos que están recibiendo narrowphase callbacks."/>
 			<button label="Obtener top de scripts" label_selected="Obtener top de scripts" name="Get Top Scripts" tool_tip="Coger lista de objetos que están consumiendo más tiempo de ejecución de scripts."/>
 			<button label="Compilador de scripts" label_selected="Compilador de scripts" name="Scripts digest" tool_tip="Coger una lista de todos los scripts y sus respectivos números de ocurrencia."/>
+			<panel.string name="no_target">(sin selección)</panel.string>
 		</panel>
 		<panel label="Requerir" name="request">
 			<text name="Destination:">Destino:</text>
@@ -63,6 +64,5 @@
 			<text name="Parameter:">Parámetro:</text>
 			<button label="Hacer exigencia" label_selected="Hacer exigencia" name="Make Request"/>
 		</panel>
-		<panel.string name="no_target">(sin selección)</panel.string>
 	</tab_container>
 </floater>

@@ -36,23 +36,23 @@
 				<texture_picker label="Tatuaje inferior" name="lower_tattoo"/>
 				<texture_picker label="Falda" name="skirt-baked"/>
 				<texture_picker label="Falda" name="skirt"/>
+				<texture_picker name="aux3_tattoo" label="Tatuaje AUXILIAR 3"/>
+				<texture_picker name="aux3-baked" label="AUXILIAR 3"/>
+				<texture_picker name="aux2_tattoo" label="Tatuaje AUXILIAR 2"/>
+				<texture_picker name="aux2-baked" label="AUXILIAR 2"/>
+				<texture_picker name="aux1_tattoo" label="Tatuaje Auxiliar 1"/>
+				<texture_picker name="aux1-baked" label="AUXILIAR 1"/>
+				<texture_picker name="leftleg_tattoo" label="Tatuaje en la pierna izquierda"/>
+				<texture_picker name="leftleg-baked" label="Pierna izquierda"/>
+				<texture_picker name="leftarm_tattoo" label="Tatuaje brazo izquierdo"/>
+				<texture_picker name="leftarm-baked" label="Brazo Izquierdo"/>
+				<texture_picker name="skirt_tattoo" label="Tatuaje de Falda"/>
+				<texture_picker name="lower_universal_tattoo" label="Tatuaje Bajo Unv"/>
+				<texture_picker name="upper_universal_tattoo" label="Tatuaje superior Unv"/>
+				<texture_picker name="eyes_tattoo" label="Tatuaje de Ojos"/>
+				<texture_picker name="head_universal_tattoo" label="Tatuaje Unv en la cabeza"/>
+				<texture_picker name="hair_tattoo" label="Tatuaje de Cabello"/>
 			</panel>
 		</panel>
-		<texture_picker name="upper_universal_tattoo" label="Tatuaje superior Unv"/>
-		<texture_picker name="aux1_tattoo" label="Tatuaje Auxiliar 1"/>
-		<texture_picker name="leftarm-baked" label="Brazo Izquierdo"/>
-		<texture_picker name="aux1-baked" label="AUXILIAR 1"/>
-		<texture_picker name="skirt_tattoo" label="Tatuaje de Falda"/>
-		<texture_picker name="aux2_tattoo" label="Tatuaje AUXILIAR 2"/>
-		<texture_picker name="eyes_tattoo" label="Tatuaje de Ojos"/>
-		<texture_picker name="head_universal_tattoo" label="Tatuaje Unv en la cabeza"/>
-		<texture_picker name="leftleg_tattoo" label="Tatuaje en la pierna izquierda"/>
-		<texture_picker name="aux3-baked" label="AUXILIAR 3"/>
-		<texture_picker name="hair_tattoo" label="Tatuaje de Cabello"/>
-		<texture_picker name="leftleg-baked" label="Pierna izquierda"/>
-		<texture_picker name="aux2-baked" label="AUXILIAR 2"/>
-		<texture_picker name="aux3_tattoo" label="Tatuaje AUXILIAR 3"/>
-		<texture_picker name="leftarm_tattoo" label="Tatuaje brazo izquierdo"/>
-		<texture_picker name="lower_universal_tattoo" label="Tatuaje Bajo Unv"/>
 	</scroll_container>
 </floater>

@@ -156,7 +156,6 @@
 			<spinner label="Y" name="Rot Y"/>
 			<spinner label="Z" name="Rot Z"/>
 			<combo_box name="comboBaseType">
-				<combo_box.item label="Caja" name="Box"/>
 				<combo_box.item label="Cilindro" name="Cylinder"/>
 				<combo_box.item label="Prisma" name="Prism"/>
 				<combo_box.item label="Esfera" name="Sphere"/>
@@ -164,6 +163,7 @@
 				<combo_box.item label="Tubo" name="Tube"/>
 				<combo_box.item label="Cono truncado" name="Ring"/>
 				<combo_box.item label="Sculpted" name="Sculpted"/>
+				<combo_box.item label="Caja" name="Box"/>
 			</combo_box>
 			<text name="text cut">Corte (inicio/fin)</text>
 			<spinner label="I" name="cut begin"/>

@@ -49,10 +49,6 @@
 	</text>
 	<combo_box label="Antialiasing" name="fsaa">
 		<combo_box.item label="Inhabilitado" name="FSAADisabled"/>
-		<combo_box.item label="× 2" name="2x"/>
-		<combo_box.item label="× 4" name="4x"/>
-		<combo_box.item label="× 8" name="8x"/>
-		<combo_box.item label="× 16" name="16x"/>
 	</combo_box>
 	<text name="antialiasing restart">
 		(requiere reiniciar)
@@ -95,8 +91,6 @@
 		<combo_box.item label="Mínimo" name="0"/>
 		<combo_box.item label="Terreno y árboles" name="1"/>
 		<combo_box.item label="Todos los objetos estáticos" name="2"/>
-		<combo_box.item label="Todos los avatares y objetos" name="3"/>
-		<combo_box.item label="Todo" name="4"/>
 	</combo_box>
 	<check_box initial_value="true" label="Shaders de la atmósfera" name="WindLightUseAtmosShaders"/>
 	<slider label="Cielo:" name="SkyMeshDetail"/>
@@ -119,4 +113,16 @@
 	<button label="Cancelar" label_selected="Cancelar" name="Cancel"/>
 	<check_box label="RenderAvatarMaxComplexity" name="RenderAvatarMaxComplexity"/>
 	<check_box label="RenderAvatarMaxNonImpostors" name="RenderAvatarMaxNonImpostors"/>
+	<combo_box name="TonemapType">
+		<combo_box.item label="Todo" name="4"/>
+	</combo_box>
+	<combo_box name="HeroProbeUpdateRate">
+		<combo_box.item label="Todos los avatares y objetos" name="3"/>
+	</combo_box>
+	<combo_box name="anisotropic_filter">
+		<combo_box.item label="× 16" name="16x"/>
+		<combo_box.item label="× 8" name="8x"/>
+		<combo_box.item label="× 4" name="4x"/>
+		<combo_box.item label="× 2" name="2x"/>
+	</combo_box>
 </floater>

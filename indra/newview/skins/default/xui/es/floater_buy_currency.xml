@@ -3,64 +3,76 @@
 	<floater.string name="buy_currency">
 		Comprar [LINDENS] L$ por, aprox., [LOCALAMOUNT]
 	</floater.string>
-	<text left="5" name="info_need_more" right="-5">
-		Necesitas más L$
-	</text>
-	<text name="contacting">
-		Contactando con el LindeX...
-	</text>
-	<text name="info_buying">
-		Comprar L$
-	</text>
-	<text name="balance_label">
-		Tengo
-	</text>
-	<text name="balance_amount">
-		[AMT] L$
-	</text>
-	<text name="currency_action">
-		Quiero comprar
-	</text>
-	<text name="currency_label">
-		L$
-	</text>
-	<line_editor label="L$" left_delta="50" name="currency_amt" width="65">
-		1234
-	</line_editor>
 	<text name="buying_label">
 		Al precio de
-	</text>
-	<text left_delta="68" name="currency_est" width="138">
-		aprox. [LOCALAMOUNT]
-	</text>
-	<text name="getting_data">
-		Calculando...
 	</text>
 	<text name="buy_action">
 		[ACTION]
 	</text>
-	<text name="total_label">
-		Mi nuevo saldo será
-	</text>
-	<text name="total_amount">
-		[AMT] L$
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php método de pago] | [http://www.secondlife.com/my/account/currency.php moneda]
-	</text>
-	<text name="exchange_rate_note">
-		Vuelve a escribir la cantidad para ver el tipo de cambio más reciente.
-	</text>
-	<text name="purchase_warning_repurchase">
-		Confirmando que con esta compra sólo se compran L$, 
-no el objeto.
 	</text>
 	<text name="purchase_warning_notenough">
 		No estás comprando suficientes L$. Por favor, aumenta la cantidad.
 	</text>
-	<button label="Comprar ahora" name="buy_btn"/>
-	<button label="Cancelar" name="cancel_btn"/>
 	<floater.string name="info_cannot_buy">
 		No se pudo hacer la compra
 	</floater.string>
+	<layout_stack name="outer_stack">
+		<layout_panel name="layout_panel_buttons">
+			<button label="Cancelar" name="cancel_btn"/>
+			<button label="Comprar ahora" name="buy_btn"/>
+			<text name="contacting">
+		Contactando con el LindeX...
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_msg">
+			<text name="purchase_warning_repurchase">
+		Confirmando que con esta compra sólo se compran L$, 
+no el objeto.
+	</text>
+			<text name="exchange_rate_note">
+		Vuelve a escribir la cantidad para ver el tipo de cambio más reciente.
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_action">
+			<text name="total_amount">
+		[AMT] L$
+	</text>
+			<text name="total_label">
+		Mi nuevo saldo será
+	</text>
+			<text name="getting_data">
+		Calculando...
+	</text>
+			<text left_delta="68" name="currency_est" width="138">
+		aprox. [LOCALAMOUNT]
+	</text>
+			<line_editor label="L$" left_delta="50" name="currency_amt" width="65">
+				1234
+			</line_editor>
+			<text name="currency_label">
+		L$
+	</text>
+			<text name="currency_action">
+		Quiero comprar
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_balance">
+			<text name="balance_amount">
+		[AMT] L$
+	</text>
+			<text name="balance_label">
+		Tengo
+	</text>
+		</layout_panel>
+		<layout_panel name="layout_panel_title">
+			<text name="info_buying">
+		Comprar L$
+	</text>
+			<text left="5" name="info_need_more" right="-5">
+		Necesitas más L$
+	</text>
+		</layout_panel>
+	</layout_stack>
 </floater>

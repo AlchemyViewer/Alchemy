@@ -272,7 +272,6 @@ Vaya al menú Mundo &gt; Acerca del terreno o seleccione otra parcela para ver s
 			<text name="Autoreturn">
 				Devolución automát. de objetos de otros (en min., 0 la desactiva):
 			</text>
-			<line_editor name="clean other time"/>
 			<text name="Object Owners:">
 				Propietarios de los objetos:
 			</text>
@@ -458,25 +457,27 @@ los media:
 			<text name="OwnerLimited">
 				(El propietario del Estado puede haber restringido estas opciones)
 			</text>
-			<panel name="Allowed_layout_panel">
-				<text label="Always Allow" name="AllowedText">
-					Siempre permitido ([COUNT], max [MAX])
-				</text>
-				<name_list name="AccessList" tool_tip="([LISTED] listados de un máx. de [MAX])"/>
-				<button label="Añadir" name="add_allowed"/>
-				<button label="Quitar" label_selected="Quitar" name="remove_allowed"/>
-			</panel>
-			<panel name="Banned_layout_panel">
-				<text label="Ban" name="BanCheck">
+			<layout_stack name="access_stack">
+				<panel name="Banned_layout_panel">
+					<text label="Ban" name="BanCheck">
 					Prohibido ([COUNT], max [MAX])
 				</text>
-				<name_list name="BannedList" tool_tip="([LISTED] listados de un máx. de [MAX])">
-					<columns label="Nombre" name="name"/>
-					<columns label="Duración" name="duration"/>
-				</name_list>
-				<button label="Añadir" name="add_banned"/>
-				<button label="Quitar" label_selected="Quitar" name="remove_banned"/>
-			</panel>
+					<name_list name="BannedList" tool_tip="([LISTED] listados de un máx. de [MAX])">
+						<columns label="Nombre" name="name"/>
+						<columns label="Duración" name="duration"/>
+					</name_list>
+					<button label="Añadir" name="add_banned"/>
+					<button label="Quitar" label_selected="Quitar" name="remove_banned"/>
+				</panel>
+				<panel name="Allowed_layout_panel">
+					<text label="Always Allow" name="AllowedText">
+					Siempre permitido ([COUNT], max [MAX])
+				</text>
+					<name_list name="AccessList" tool_tip="([LISTED] listados de un máx. de [MAX])"/>
+					<button label="Añadir" name="add_allowed"/>
+					<button label="Quitar" label_selected="Quitar" name="remove_allowed"/>
+				</panel>
+			</layout_stack>
 		</panel>
 		<panel label="EXPERIENCIAS" name="land_experiences_panel"/>
 		<panel label="ENTORNO" name="land_environment_panel"/>

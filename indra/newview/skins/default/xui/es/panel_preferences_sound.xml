@@ -32,8 +32,8 @@
 	<panel name="voice_sound_panel">
 	<text name="Listen from">Oír desde:</text>
 	<combo_box name="ear_location_combo">
-		<item label="La posición de la cámara" name="camera_position"/>
 		<item label="La posición del avatar" name="avatar_position"/>
+		<item label="La posición de la cámara" name="camera_position"/>
 	</combo_box>
 	<check_box label="Al hablar, mover los labios del avatar" name="enable_lip_sync"/>
 	<check_box label="Cambiar entre hablar on/off cuando pulse:" name="push_to_talk_toggle_check" tool_tip="En el modo 'un toque', pulsa y suelta el botón UNA VEZ para activar o desactivar el micrófono. Si no estás en el modo 'un toque', el micrófono sólo recogerá tu voz mientras mantengas pulsado el botón."/>

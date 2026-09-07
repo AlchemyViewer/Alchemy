@@ -6,9 +6,15 @@
 			<button label="Buscar actualizaciones" name="update_btn"/>
 		</panel>
 		<panel label="Créditos" name="credits_panel">
-			<text name="linden_intro">Second Life ofrecido por los Lindens, 
+			<accordion name="credits_accordion">
+				<accordion_tab name="sl_credits_tab">
+					<panel name="sl_credits_panel">
+						<text_editor name="contrib_names">Dummy Name sustituido durante la ejecución</text_editor>
+						<text name="linden_intro">Second Life ofrecido por los Lindens, 
 con contribuciones de código abierto de:</text>
-			<text_editor name="contrib_names">Dummy Name sustituido durante la ejecución</text_editor>
+					</panel>
+				</accordion_tab>
+			</accordion>
 		</panel>
 		<panel label="Licencias" name="licenses_panel">
 			<text_editor name="licenses_editor">3Dconnexion SDK Copyright (C) 1992-2009 3Dconnexion
