@@ -142,12 +142,19 @@ public:
     // The names from the root's child down to an element, which is the
     // key the merge matches by and the key the selection is held under.
     // An element without a name is "unnamed"; a repeated name among the
-    // widget siblings carries its ordinal as "name#2".
-    static std::vector<std::string> namePath(pugi::xml_node node);
+    // siblings carries its ordinal as "name#2".
+    //
+    // A path that addresses a view counts widget siblings, since only
+    // those became views. A path that addresses an element of a file
+    // counts every named sibling, because that is what the merge matches
+    // on: the parameter elements -- <floater.string>, <scroll_list.columns>
+    // -- carry names and are matched by them, and a path that walks past
+    // them cannot name what they hold.
+    static std::vector<std::string> namePath(pugi::xml_node node, bool any_tag = false);
 
-    // The element at a name path under a root: at each step, the widget
-    // child with that name, or nothing.
-    static pugi::xml_node resolve(pugi::xml_node root, const std::vector<std::string>& path);
+    // The element at a name path under a root: at each step, the child
+    // with that name, or nothing.
+    static pugi::xml_node resolve(pugi::xml_node root, const std::vector<std::string>& path, bool any_tag = false);
 
     // The line an element starts on in the layer that holds it.
     static S32 lineOf(const Layer& layer, pugi::xml_node node);

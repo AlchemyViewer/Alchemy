@@ -2799,42 +2799,13 @@ S32 ALFloaterXUITool::repairFile(const ALXUICatalog::Entry& entry, const std::st
         return 0;
     }
 
-    ALXUITranslate units;
-    units.scan(base_layers.front()->root(), overlay_layer->root());
-
-    std::vector<ALXUITranslate::Unit> moved;
-    for (const ALXUITranslate::Unit& unit : units.units())
-    {
-        if (unit.state == ALXUITranslate::State::NotApplied && unit.miss == ALXUITranslate::Miss::Moved
-            && !unit.translation.empty() && !unit.path.empty())
-        {
-            moved.push_back(unit);
-        }
-    }
-    if (moved.empty())
-    {
-        return 0;
-    }
-
     ALXUIEdit overlay;
     if (!overlay.loadFile(overlay_layer->path))
     {
         error = overlay.error();
         return 0;
     }
-    S32 done = 0;
-    for (const ALXUITranslate::Unit& unit : moved)
-    {
-        std::string why;
-        if (ALXUITranslate::write(overlay, base_layers.front()->root(), unit, unit.translation, why))
-        {
-            ++done;
-        }
-        else if (error.empty())
-        {
-            error = why;
-        }
-    }
+    const S32 done = ALXUITranslate::repair(overlay, base_layers.front()->root(), error);
     if (done && !overlay.save())
     {
         error = overlay.error();

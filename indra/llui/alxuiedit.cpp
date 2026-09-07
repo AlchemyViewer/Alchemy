@@ -125,9 +125,11 @@ pugi::xml_node ALXUIEdit::root() const
     return mDoc->document().document_element();
 }
 
+// An element of a file is addressed the way the merge addresses one: by
+// name, whatever the tag is.
 pugi::xml_node ALXUIEdit::resolve(const path_t& path) const
 {
-    return path.empty() ? root() : ALXUICatalog::resolve(root(), path);
+    return path.empty() ? root() : ALXUICatalog::resolve(root(), path, /*any_tag=*/true);
 }
 
 bool ALXUIEdit::save()
@@ -593,15 +595,26 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
     }
 
     const std::string eol = mText.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+
+    // Every line of it lands at the same depth, so an element that
+    // arrives with children of its own keeps their shape and takes the
+    // indentation of where it is going.
+    std::string block = xml;
+    for (size_t line = block.find('\n'); line != std::string::npos;
+         line = block.find('\n', line + 1 + indent.size()))
+    {
+        block.insert(line + 1, indent);
+    }
+
     if (opens)
     {
         // The parent closed itself, so it opens for its first child and
         // closes on a line of its own.
         const std::string own = indentAt((size_t)node.offset_debug() - 1);
-        splice({ at, length }, ">" + eol + indent + xml + eol + own + "</" + std::string(node.name()) + ">");
+        splice({ at, length }, ">" + eol + indent + block + eol + own + "</" + std::string(node.name()) + ">");
         return true;
     }
-    splice({ at, 0 }, eol + indent + xml);
+    splice({ at, 0 }, eol + indent + block);
     return true;
 }
 

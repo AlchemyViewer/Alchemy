@@ -118,6 +118,13 @@ public:
     static bool write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& unit,
                       const std::string& text, std::string& error);
 
+    // Every value the language writes at a path the base has moved on
+    // from, moved to where the base has it, with its own text unchanged.
+    // Nothing else is touched, and what the base has at more than one
+    // path is left for a person. Returns how many moved; the caller
+    // saves.
+    static S32 repair(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);
+
 private:
     void scanBase(pugi::xml_node base, pugi::xml_node overlay);
     void scanOverlay(pugi::xml_node base, pugi::xml_node overlay);
@@ -125,6 +132,13 @@ private:
     // The ancestors of a path, written into the overlay if they are not
     // there, each carrying nothing but its name.
     static bool ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const path_t& path, std::string& error);
+
+    // One sweep of the moves, which repair runs until it changes nothing.
+    static S32 movePass(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);
+
+    // The shells a move leaves behind: elements with nothing in them and
+    // nothing on them but a name.
+    static void prune(ALXUIEdit& overlay);
 
     std::vector<Unit> mUnits;
 };

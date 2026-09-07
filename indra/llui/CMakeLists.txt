@@ -309,6 +309,13 @@ endif ()
 
 target_precompile_headers(llui REUSE_FROM llprecompiled)
 
+# The console utilities over the UI: a XUI file built and fingerprinted
+# without a viewer, the overlay census that gates the merge, and the
+# translation repair. They live beside the library they are about rather
+# than under tests, since two of them write to the source tree and none of
+# them is a test.
+add_subdirectory(utils)
+
 # Add tests
 if(BUILD_TESTING)
   if (USE_NSSPELLCHECKER)

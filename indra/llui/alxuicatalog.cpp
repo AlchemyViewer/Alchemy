@@ -392,7 +392,7 @@ const char* ALXUICatalog::kindName(Kind kind)
 }
 
 // static
-std::vector<std::string> ALXUICatalog::namePath(pugi::xml_node node)
+std::vector<std::string> ALXUICatalog::namePath(pugi::xml_node node, bool any_tag)
 {
     std::vector<std::string> path;
     for (pugi::xml_node cur = node; cur && cur.parent() && cur.parent().type() == pugi::node_element; cur = cur.parent())
@@ -401,7 +401,7 @@ std::vector<std::string> ALXUICatalog::namePath(pugi::xml_node node)
         S32 ordinal = 0;
         for (pugi::xml_node sib = cur.previous_sibling(); sib; sib = sib.previous_sibling())
         {
-            if (sib.type() == pugi::node_element && isWidgetTag(sib.name())
+            if (sib.type() == pugi::node_element && (any_tag || isWidgetTag(sib.name()))
                 && std::string_view(sib.attribute("name").as_string("unnamed")) == name)
             {
                 ++ordinal;
@@ -414,7 +414,7 @@ std::vector<std::string> ALXUICatalog::namePath(pugi::xml_node node)
 }
 
 // static
-pugi::xml_node ALXUICatalog::resolve(pugi::xml_node root, const std::vector<std::string>& path)
+pugi::xml_node ALXUICatalog::resolve(pugi::xml_node root, const std::vector<std::string>& path, bool any_tag)
 {
     pugi::xml_node cur = root;
     for (const std::string& step : path)
@@ -430,7 +430,7 @@ pugi::xml_node ALXUICatalog::resolve(pugi::xml_node root, const std::vector<std:
         S32 seen = 0;
         for (pugi::xml_node child = cur.first_child(); child; child = child.next_sibling())
         {
-            if (child.type() != pugi::node_element || !isWidgetTag(child.name()))
+            if (child.type() != pugi::node_element || !(any_tag || isWidgetTag(child.name())))
             {
                 continue;
             }

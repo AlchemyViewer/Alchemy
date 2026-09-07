@@ -139,6 +139,37 @@ namespace
         return text;
     }
 
+    // A path with an ordinal in it -- "name#2" -- names one of several
+    // siblings the base calls the same thing. A translation cannot be
+    // written to one of those from here: the ancestors this writes carry
+    // a name and nothing else, so a second sibling of the same name is a
+    // second ambiguity and not an address.
+    bool repeatsAName(const std::vector<std::string>& path)
+    {
+        for (const std::string& step : path)
+        {
+            if (step.find('#') != std::string::npos)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Whether one element is at or above another, which is the question
+    // "would moving this into that put it inside itself".
+    bool contains(pugi::xml_node outer, pugi::xml_node inner)
+    {
+        for (pugi::xml_node node = inner; node; node = node.parent())
+        {
+            if (node == outer)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // The one element carrying a name below a root, and whether more than
     // one carries it.
     pugi::xml_node findByName(pugi::xml_node root, std::string_view name, bool& ambiguous)
@@ -288,7 +319,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
         }
 
         const bool is_root = node == base;
-        const path_t path = is_root ? path_t() : ALXUICatalog::namePath(node);
+        const path_t path = is_root ? path_t() : ALXUICatalog::namePath(node, /*any_tag=*/true);
         const std::string name = node.attribute("name").as_string();
 
         // Where the language put this element, if anywhere.
@@ -297,7 +328,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
         Miss missed = Miss::None;
         if (overlay)
         {
-            mine = is_root ? overlay : ALXUICatalog::resolve(overlay, path);
+            mine = is_root ? overlay : ALXUICatalog::resolve(overlay, path, /*any_tag=*/true);
             if (!mine && !name.empty())
             {
                 bool ambiguous = false;
@@ -305,7 +336,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
                 {
                     mine = moved;
                     missed = ambiguous ? Miss::Ambiguous : Miss::Moved;
-                    const path_t at = ALXUICatalog::namePath(moved);
+                    const path_t at = ALXUICatalog::namePath(moved, /*any_tag=*/true);
                     for (const std::string& step : at)
                     {
                         elsewhere += elsewhere.empty() ? step : "/" + step;
@@ -410,8 +441,8 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
         }
 
         const std::string name = node.attribute("name").as_string();
-        const path_t path = ALXUICatalog::namePath(node);
-        pugi::xml_node theirs = ALXUICatalog::resolve(base, path);
+        const path_t path = ALXUICatalog::namePath(node, /*any_tag=*/true);
+        pugi::xml_node theirs = ALXUICatalog::resolve(base, path, /*any_tag=*/true);
         Miss missed = Miss::None;
         if (!theirs)
         {
@@ -431,7 +462,7 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
         auto add = [&](const std::string& field, const std::string& english, const std::string& translation, Miss why)
         {
             Unit unit;
-            unit.path = theirs ? ALXUICatalog::namePath(theirs) : path;
+            unit.path = theirs ? ALXUICatalog::namePath(theirs, /*any_tag=*/true) : path;
             unit.tag = node.name();
             unit.field = field;
             unit.english = english;
@@ -481,8 +512,13 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
         error = unit.field + " is not a field a translation writes";
         return false;
     }
+    if (repeatsAName(unit.path))
+    {
+        error = "the base calls more than one sibling by that name; write this one by hand";
+        return false;
+    }
 
-    pugi::xml_node element = unit.path.empty() ? base : ALXUICatalog::resolve(base, unit.path);
+    pugi::xml_node element = unit.path.empty() ? base : ALXUICatalog::resolve(base, unit.path, /*any_tag=*/true);
     if (!element)
     {
         error = "the base has no element at that path";
@@ -514,7 +550,7 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
         }
         // The path is read before the chain is written: the insertion
         // reparses, and every node handle with it.
-        const path_t from = moved ? ALXUICatalog::namePath(moved) : path_t();
+        const path_t from = moved ? ALXUICatalog::namePath(moved, /*any_tag=*/true) : path_t();
         if (!ensureChain(overlay, base, parent, error))
         {
             return false;
@@ -562,6 +598,130 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
     return true;
 }
 
+// static
+S32 ALXUITranslate::repair(ALXUIEdit& overlay, pugi::xml_node base, std::string& error)
+{
+    if (!base || !overlay.root())
+    {
+        return 0;
+    }
+
+    // A move can be blocked by an ancestor another move has not put in
+    // place yet, so the pass runs again until it stops changing the file.
+    // What the last pass could not do is what is left for a person.
+    S32 total = 0;
+    for (S32 pass = 0; pass < 8; ++pass)
+    {
+        error.clear();
+        const S32 done = movePass(overlay, base, error);
+        total += done;
+        if (!done)
+        {
+            break;
+        }
+    }
+    if (total)
+    {
+        prune(overlay);
+    }
+    return total;
+}
+
+// static
+S32 ALXUITranslate::movePass(ALXUIEdit& overlay, pugi::xml_node base, std::string& error)
+{
+    ALXUITranslate units;
+    units.scan(base, overlay.root());
+
+    std::vector<Unit> moved;
+    for (const Unit& unit : units.units())
+    {
+        if (unit.state == State::NotApplied && unit.miss == Miss::Moved
+            && !unit.translation.empty() && !unit.path.empty()
+            && !repeatsAName(unit.path))
+        {
+            moved.push_back(unit);
+        }
+    }
+
+    S32 done = 0;
+    for (const Unit& unit : moved)
+    {
+        std::string why;
+        if (write(overlay, base, unit, unit.translation, why))
+        {
+            ++done;
+        }
+        else if (error.empty())
+        {
+            error = why;
+        }
+    }
+    return done;
+}
+
+// What a move leaves behind: an element with nothing in it and nothing on
+// it but a name. It says nothing to the merge and it was only ever the
+// shell around what has gone, so it goes too. An element carrying
+// anything else -- a value, which the merge matches unnamed children by,
+// or a layout attribute someone meant -- stays.
+// static
+void ALXUITranslate::prune(ALXUIEdit& overlay)
+{
+    for (bool again = true; again;)
+    {
+        again = false;
+        std::vector<pugi::xml_node> stack{ overlay.root() };
+        while (!stack.empty() && !again)
+        {
+            const pugi::xml_node node = stack.back();
+            stack.pop_back();
+            for (pugi::xml_node child : node.children())
+            {
+                if (child.type() != pugi::node_element)
+                {
+                    continue;
+                }
+                stack.push_back(child);
+
+                bool empty = true;
+                for (pugi::xml_node grandchild : child.children())
+                {
+                    if (grandchild.type() == pugi::node_element
+                        || (grandchild.type() == pugi::node_pcdata
+                            && !trimmed(grandchild.value()).empty()))
+                    {
+                        empty = false;
+                        break;
+                    }
+                }
+                for (pugi::xml_attribute attribute : child.attributes())
+                {
+                    if (std::string_view(attribute.name()) != "name")
+                    {
+                        empty = false;
+                        break;
+                    }
+                }
+                if (!empty)
+                {
+                    continue;
+                }
+                const path_t path = ALXUICatalog::namePath(child, /*any_tag=*/true);
+                if (path.empty() || repeatsAName(path))
+                {
+                    continue;
+                }
+                if (overlay.removeElement(path))
+                {
+                    // Every node of that parse is gone with it.
+                    again = true;
+                }
+            }
+        }
+    }
+}
+
 // The ancestors a unit needs, in base order, each carrying nothing but
 // its name: the merge matches on names, so a name is all a translation
 // has to say about the way down to what it translates.
@@ -576,18 +736,56 @@ bool ALXUITranslate::ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const 
         {
             continue;
         }
-        pugi::xml_node node = ALXUICatalog::resolve(base, so_far);
+        pugi::xml_node node = ALXUICatalog::resolve(base, so_far, /*any_tag=*/true);
         if (!node)
         {
             error = "the base has no element at " + step;
             return false;
         }
-        const std::string xml = "<" + std::string(node.name())
-                              + " name=\"" + node.attribute("name").as_string() + "\"/>";
         const path_t parent(so_far.begin(), so_far.end() - 1);
-        if (!overlay.insertElement(parent, xml))
+        const std::string name = node.attribute("name").as_string();
+
+        // The language may already have this ancestor, one level up or
+        // three: it is moved, with everything under it, rather than made
+        // a second time. A file that names one element twice is a file
+        // the merge has to guess about, which is the thing this repair
+        // exists to stop.
+        bool ambiguous = false;
+        pugi::xml_node elsewhere = name.empty() ? pugi::xml_node()
+                                                : findByName(overlay.root(), name, ambiguous);
+        if (elsewhere && ambiguous)
         {
-            error = overlay.error();
+            error = "the language names " + name + " more than once; move it by hand";
+            return false;
+        }
+        if (elsewhere && contains(elsewhere, overlay.resolve(parent)))
+        {
+            // It is above where it would be going, so moving it would
+            // put it inside itself.
+            elsewhere = pugi::xml_node();
+        }
+
+        if (elsewhere)
+        {
+            const path_t from = ALXUICatalog::namePath(elsewhere, /*any_tag=*/true);
+            if (!overlay.moveElement(from, parent))
+            {
+                error = overlay.error();
+                return false;
+            }
+        }
+        else
+        {
+            const std::string xml = "<" + std::string(node.name()) + " name=\"" + name + "\"/>";
+            if (!overlay.insertElement(parent, xml))
+            {
+                error = overlay.error();
+                return false;
+            }
+        }
+        if (!overlay.resolve(so_far))
+        {
+            error = "the ancestor " + step + " could not be written where the base has it";
             return false;
         }
     }

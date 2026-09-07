@@ -62,16 +62,4 @@ if (BUILD_TESTING)
     LL_ADD_INTEGRATION_TEST(llcontrol "" "${test_libs}" "${test_project}")
     LL_ADD_INTEGRATION_TEST(alxmllayermerge "" "${test_libs}" "${test_project}")
 
-    # The overlay census: the viewer's own merge over every skin and
-    # language of the source tree, gated by the committed baseline.
-    add_executable(xui_overlay_check tests/xui_overlay_check.cpp)
-    set_target_properties(xui_overlay_check
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
-        FOLDER "Tests/llxml"
-        )
-    target_link_libraries(xui_overlay_check ${test_libs})
-    add_dependencies(BUILD_TESTS xui_overlay_check)
-    add_test(NAME xui_overlay_check
-        COMMAND xui_overlay_check "${INDRA_SOURCE_DIR}/newview/skins" "${CMAKE_CURRENT_SOURCE_DIR}/tests/xui_overlay_baseline.txt" --examples 0)
 endif ()
