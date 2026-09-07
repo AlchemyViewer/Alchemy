@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<fs_virtual_trackball
+<fs_virtual_trackpad
     name="virtualtrackpad"
     width="150"
     height="150"
@@ -10,8 +10,8 @@
     image_sun_back="VirtualTrackball_Sun_Back"
     image_sun_front="VirtualTrackball_Sun_Front">
 
-    <fs_virtual_trackball.border
+    <fs_virtual_trackpad.border
         visible="true"/>
 
-</fs_virtual_trackball>
+</fs_virtual_trackpad>
 
