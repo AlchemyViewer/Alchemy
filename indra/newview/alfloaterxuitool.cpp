@@ -530,21 +530,43 @@ namespace
         return ALXUICatalog::Field::Any;
     }
 
-    // The registered tags a gallery can build without a parent of a
-    // particular kind, a plugin, or parameters it cannot supply.
+    // The tags the UI library registers. A tag the viewer registers is
+    // built by a viewer class, whose constructor is viewer code with the
+    // expectations of viewer code: a notification to attach to, an agent,
+    // a plugin. A shell build cannot meet them, so those tags are shown
+    // from their files and searched, and built only by the viewer.
+    bool isCoreWidgetTag(const std::string& tag)
+    {
+        static const std::set<std::string> core = {
+            "accordion", "accordion_tab", "badge", "button", "chat_editor", "check_box", "combo_box",
+            "console", "container_view", "context_menu", "filter_editor", "flat_list_view", "floater_view",
+            "flyout_button", "folder_view_item", "fs_virtual_trackpad", "icon", "icons_combo_box",
+            "layout_panel", "layout_stack", "line_editor", "loading_indicator", "locate", "menu",
+            "menu_bar", "menu_button", "menu_item", "menu_item_call", "menu_item_check",
+            "menu_item_separator", "menu_item_tear_off", "multi_slider", "multi_slider_bar", "panel",
+            "placeholder", "progress_bar", "radio_group", "scroll_bar", "scroll_container", "scroll_list",
+            "scrolling_panel_list", "search_editor", "simple_text_editor", "slider", "slider_bar",
+            "spinner", "stat_bar", "stat_view", "sun_moon_trackball", "tab_container", "text", "time",
+            "toggleable_menu", "tool_tip", "toolbar", "tooltip_view", "ui_ctrl", "view", "view_border",
+            "window_shade", "xy_vector"
+        };
+        return core.count(tag) != 0;
+    }
+
+    // The core tags the gallery shows: the ones that stand on their own
+    // with defaults. The rest need a parent of a kind, children, or
+    // parameters a template does not give.
     bool galleryTag(const std::string& tag)
     {
         static const std::set<std::string> skipped = {
-            "floater_view", "menu_holder", "folder_view", "folder_view_item", "folder_view_folder",
-            "inventory_panel", "web_browser", "media_ctrl", "layout_stack", "layout_panel",
-            "scroll_container", "tab_container", "accordion", "accordion_tab", "panel", "view",
-            "menu_bar", "menu", "context_menu", "toggleable_menu", "flat_list_view", "scrolling_panel_list",
-            "console", "chat_history", "window_shade", "tool_bar", "conversation_view_session",
-            "conversation_view_participant", "avatar_list", "group_list", "people_list", "outfit_list",
-            "inbox_inventory_panel", "outbox_inventory_panel", "wearable_items_list", "flat_list_view_bar",
-            "chat_entry", "chat_editor", "line_editor_history", "location_input", "nearby_chat"
+            "accordion", "accordion_tab", "chat_editor", "console", "container_view", "context_menu",
+            "flat_list_view", "floater_view", "folder_view_item", "layout_panel", "layout_stack", "locate",
+            "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check", "menu_item_separator",
+            "menu_item_tear_off", "panel", "placeholder", "scroll_container", "scrolling_panel_list",
+            "stat_view", "tab_container", "toggleable_menu", "tool_tip", "toolbar", "tooltip_view",
+            "ui_ctrl", "view", "window_shade"
         };
-        return skipped.find(tag) == skipped.end();
+        return isCoreWidgetTag(tag) && skipped.count(tag) == 0;
     }
 }
 
@@ -1084,11 +1106,27 @@ void ALFloaterXUITool::showPreview(S32 which)
     pv.skin = mSkin;
     pv.language = which == PRIMARY ? mLanguage : mLanguage2;
 
-    if (!isBuilt(entry->kind))
+    // A widget file or template names its tag in its root or its name;
+    // a viewer widget's constructor is not run by a shell build.
+    std::string widget_tag;
+    if (entry->kind == ALXUICatalog::Kind::Widget)
+    {
+        widget_tag = entry->rootTag;
+    }
+    else if (entry->kind == ALXUICatalog::Kind::Template)
+    {
+        widget_tag = mFile.substr(mFile.rfind('/') + 1);
+        widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
+    }
+    const bool viewer_widget = !widget_tag.empty() && !isCoreWidgetTag(widget_tag);
+
+    if (!isBuilt(entry->kind) || viewer_widget)
     {
         if (which == PRIMARY)
         {
-            setStatus(getString("NotBuilt"));
+            LLStringUtil::format_map_t args;
+            args["[TAG]"] = widget_tag;
+            setStatus(viewer_widget ? getString("ViewerWidget", args) : getString("NotBuilt"));
             fillDiagnostics();
             refreshBreadcrumb();
             refreshInspectors();
@@ -1201,15 +1239,19 @@ void ALFloaterXUITool::showGallery()
         host->setCanResize(true);
         host->setTitle("Widget gallery [" + mSkin + "/" + mLanguage + "]");
 
+        // A child registry keeps its static registrations in a scope of
+        // their own; the widget type registry lists every tag, and the
+        // default child registry says which of them it builds.
         std::vector<std::string> tags;
-        const auto& registrar = LLDefaultChildRegistry::instance().defaultRegistrar();
+        const auto& registrar = LLWidgetTypeRegistry::instance().defaultRegistrar();
         for (auto it = registrar.beginItems(); it != registrar.endItems(); ++it)
         {
-            if (galleryTag(it->first))
+            if (galleryTag(it->first) && LLDefaultChildRegistry::instance().getValue(it->first))
             {
                 tags.push_back(it->first);
             }
         }
+        std::sort(tags.begin(), tags.end());
 
         constexpr S32 COLUMNS = 4;
         constexpr S32 CELL_W = 220;
@@ -1533,34 +1575,64 @@ void ALFloaterXUITool::refreshBreadcrumb()
     }
 
     // One crumb per ancestor from the root down, then the layer the
-    // element came from.
+    // element came from. The selection's end matters more than its
+    // start, so when the chain is wider than the panel the first crumbs
+    // fold into one that selects the last of them.
     const ALXUISelection::path_t& path = mSelection.selection();
-    S32 x = 0;
-    const S32 height = mBreadcrumb->getRect().getHeight();
-    for (size_t i = 0; i <= path.size(); ++i)
-    {
-        ALXUISelection::path_t prefix(path.begin(), path.begin() + i);
-        const std::string label = i == 0 ? pv.root->getName() : path[i - 1];
-        const S32 width = LLFontGL::getFontSansSerifSmall()->getWidth(label) + 12;
-        LLButton::Params bp;
-        bp.name = "crumb_" + std::to_string(i);
-        bp.label = label;
-        bp.rect = LLRect(x, height, x + width, 0);
-        bp.font = LLFontGL::getFontSansSerifSmall();
-        bp.tab_stop = false;
-        LLButton* crumb = LLUICtrlFactory::create<LLButton>(bp);
-        crumb->setClickedCallback([this, prefix](LLUICtrl*, const LLSD&) { mSelection.select(prefix); });
-        mBreadcrumb->addChild(crumb);
-        x += width + 2;
-    }
-
+    const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
     const ALXUICatalog::Layer* layer = nullptr;
     authoredElement(layer);
+    const std::string layer_text = layer ? layer->skin + "/" + layer->language : std::string("code-built");
+    const S32 layer_width = font->getWidth(layer_text) + 12;
+    const S32 available = mBreadcrumb->getRect().getWidth() - layer_width;
+
+    std::vector<std::string> labels;
+    std::vector<S32> widths;
+    S32 total = 0;
+    for (size_t i = 0; i <= path.size(); ++i)
+    {
+        labels.push_back(i == 0 ? pv.root->getName() : path[i - 1]);
+        widths.push_back(font->getWidth(labels.back()) + 12);
+        total += widths.back() + 2;
+    }
+    size_t first = 0;
+    const S32 fold_width = font->getWidth("...") + 12 + 2;
+    while (first + 1 < labels.size() && total + (first ? fold_width : 0) > available)
+    {
+        total -= widths[first] + 2;
+        ++first;
+    }
+
+    S32 x = 0;
+    const S32 height = mBreadcrumb->getRect().getHeight();
+    auto crumb = [&](const std::string& label, S32 width, size_t depth)
+    {
+        ALXUISelection::path_t prefix(path.begin(), path.begin() + depth);
+        LLButton::Params bp;
+        bp.name = "crumb_" + std::to_string(depth);
+        bp.label = label;
+        bp.rect = LLRect(x, height, x + width, 0);
+        bp.font = font;
+        bp.tab_stop = false;
+        LLButton* button = LLUICtrlFactory::create<LLButton>(bp);
+        button->setClickedCallback([this, prefix](LLUICtrl*, const LLSD&) { mSelection.select(prefix); });
+        mBreadcrumb->addChild(button);
+        x += width + 2;
+    };
+    if (first > 0)
+    {
+        crumb("...", fold_width - 2, first - 1);
+    }
+    for (size_t i = first; i < labels.size(); ++i)
+    {
+        crumb(labels[i], widths[i], i);
+    }
+
     LLTextBox::Params tp;
     tp.name = "crumb_layer";
-    tp.rect = LLRect(x + 6, height - 3, mBreadcrumb->getRect().getWidth(), 0);
-    tp.font = LLFontGL::getFontSansSerifSmall();
-    tp.initial_value = layer ? layer->skin + "/" + layer->language : std::string("code-built");
+    tp.rect = LLRect(x + 6, height - 3, x + 6 + layer_width, 0);
+    tp.font = font;
+    tp.initial_value = layer_text;
     mBreadcrumb->addChild(LLUICtrlFactory::create<LLTextBox>(tp));
 }
 

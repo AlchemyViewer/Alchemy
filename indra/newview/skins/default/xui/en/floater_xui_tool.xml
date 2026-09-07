@@ -16,6 +16,7 @@
     <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
     <floater.string name="NoFile">Select a file.</floater.string>
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
+    <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
     <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] diagnostics, [SKIN]/[LANG]</floater.string>
     <floater.string name="BuildFailed">Could not build [FILE]: see the diagnostics.</floater.string>
     <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
@@ -308,15 +309,15 @@
                 <scroll_list.columns
                  label="Kind"
                  name="kind"
-                 width="104" />
+                 width="100" />
                 <scroll_list.columns
                  label="Line"
                  name="line"
                  width="36" />
                 <scroll_list.columns
+                 dynamic_width="true"
                  label="Where"
-                 name="path"
-                 width="110" />
+                 name="path" />
                 <scroll_list.columns
                  dynamic_width="true"
                  label="What"
