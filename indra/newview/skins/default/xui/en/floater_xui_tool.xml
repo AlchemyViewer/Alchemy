@@ -184,6 +184,40 @@
     <check_box
      follows="left|top"
      height="16"
+     label="Snap"
+     layout="topleft"
+     left_pad="6"
+     name="snap_check"
+     tool_tip="Drags land on the grid, counted in the element's own coordinates"
+     top_delta="0"
+     width="52" />
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="0"
+     name="grid_combo"
+     tool_tip="How far apart the grid lines are"
+     top_delta="-3"
+     width="48">
+        <combo_box.item label="2" name="2" value="2" />
+        <combo_box.item label="4" name="4" value="4" />
+        <combo_box.item label="8" name="8" value="8" />
+        <combo_box.item label="16" name="16" value="16" />
+    </combo_box>
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Rulers"
+     layout="topleft"
+     left_pad="6"
+     name="rulers_check"
+     tool_tip="Rules along the top and left of the preview, counting from the file's own origin"
+     top_delta="3"
+     width="58" />
+    <check_box
+     follows="left|top"
+     height="16"
      label="Code-built rows"
      layout="topleft"
      left_pad="6"

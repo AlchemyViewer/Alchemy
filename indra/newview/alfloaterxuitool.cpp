@@ -169,6 +169,14 @@ public:
         {
             return;
         }
+        if (mTool->snapToGrid())
+        {
+            drawGrid();
+        }
+        if (mTool->showRulers())
+        {
+            drawRulers();
+        }
         const ALXUISelection& selection = mTool->selection();
         if (selection.hasHover() && mTool->hoverHighlight())
         {
@@ -472,10 +480,46 @@ private:
         {
             gripEdges(mGrip, edges);
         }
+
+        // The grid is the element's own coordinates -- the ones the file
+        // writes -- so an edge lands where a number in the file lands,
+        // not where a pixel of this window happens to be.
+        if (mTool && mTool->snapToGrid())
+        {
+            LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+            const LLView* parent = view ? view->getParent() : nullptr;
+            if (view && parent)
+            {
+                const S32 grid = mTool->gridSize();
+                const LLRect& r = view->getRect();
+                const S32 top = parent->getRect().getHeight() - r.mTop;
+                if (mGrip == GRIP_MOVE)
+                {
+                    // A move keeps its size: the edges the file counts
+                    // from decide, and the others follow.
+                    dx = snapped(r.mLeft + dx, grid) - r.mLeft;
+                    dy = -(snapped(top - dy, grid) - top);
+                }
+                else
+                {
+                    // A resize lands each edge it moves on the grid.
+                    if (edges[EDGE_L]) { dx = snapped(r.mLeft + dx, grid) - r.mLeft; }
+                    else if (edges[EDGE_R]) { dx = snapped(r.mRight + dx, grid) - r.mRight; }
+                    if (edges[EDGE_T]) { dy = -(snapped(top - dy, grid) - top); }
+                    else if (edges[EDGE_B]) { dy = snapped(r.mBottom + dy, grid) - r.mBottom; }
+                }
+            }
+        }
+
         mDelta[EDGE_L] = edges[EDGE_L] ? dx : 0;
         mDelta[EDGE_R] = edges[EDGE_R] ? dx : 0;
         mDelta[EDGE_B] = edges[EDGE_B] ? dy : 0;
         mDelta[EDGE_T] = edges[EDGE_T] ? dy : 0;
+    }
+
+    static S32 snapped(S32 value, S32 grid)
+    {
+        return grid > 1 ? ((value + (value >= 0 ? grid / 2 : -grid / 2)) / grid) * grid : value;
     }
 
     // The topmost view drawn over a point, taking the deepest before its
@@ -514,6 +558,85 @@ private:
             view = view->getParent();
         }
         return view;
+    }
+
+    // The lines a drag lands on, drawn where the file's own numbers put
+    // them: from the previewed root's corner, since that is where its
+    // children are measured from.
+    void drawGrid() const
+    {
+        const S32 grid = mTool->gridSize();
+        const LLRect r = mRoot == this ? getLocalRect() : localRectOf(mRoot);
+        if (grid < 2 || r.getWidth() <= 0)
+        {
+            return;
+        }
+        static const LLUIColor grid_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+        LLColor4 faint(grid_color.get());
+        faint.mV[VALPHA] = 0.12f;
+        const S32 step = grid < 4 ? grid * 4 : grid;   // a two pixel grid drawn whole is a wash
+        for (S32 x = r.mLeft; x <= r.mRight; x += step)
+        {
+            gl_line_2d(x, r.mBottom, x, r.mTop, faint);
+        }
+        for (S32 y = r.mTop; y >= r.mBottom; y -= step)
+        {
+            gl_line_2d(r.mLeft, y, r.mRight, y, faint);
+        }
+    }
+
+    // Two strips along the top and the left, counting from the previewed
+    // root's top left corner, which is where the file counts from. The
+    // selection's edges are marked on both.
+    void drawRulers() const
+    {
+        static constexpr S32 RULER = 14;
+        const LLRect r = mRoot == this ? getLocalRect() : localRectOf(mRoot);
+        if (r.getWidth() <= 0)
+        {
+            return;
+        }
+        static const LLUIColor back = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
+        static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        LLColor4 ground(back.get());
+        ground.mV[VALPHA] = 0.85f;
+
+        const LLRect top(r.mLeft, r.mTop, r.mRight, r.mTop - RULER);
+        const LLRect left(r.mLeft, r.mTop, r.mLeft + RULER, r.mBottom);
+        gl_rect_2d(top, ground, true);
+        gl_rect_2d(left, ground, true);
+
+        const S32 grid = llmax(mTool->gridSize(), 2);
+        const S32 label_every = grid * 10 < 40 ? 50 : grid * 10;
+        const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
+        for (S32 x = 0; x <= r.getWidth(); x += grid)
+        {
+            const bool labelled = (x % label_every) == 0;
+            gl_line_2d(r.mLeft + x, r.mTop - RULER, r.mLeft + x, r.mTop - (labelled ? RULER + 4 : RULER + 2), ink.get());
+            if (labelled && x > 0)
+            {
+                font->renderUTF8(std::to_string(x), 0, r.mLeft + x + 2, r.mTop - RULER + 2,
+                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+            }
+        }
+        for (S32 y = 0; y <= r.getHeight(); y += grid)
+        {
+            const bool labelled = (y % label_every) == 0;
+            gl_line_2d(r.mLeft + RULER, r.mTop - y, r.mLeft + (labelled ? RULER + 4 : RULER + 2), r.mTop - y, ink.get());
+            if (labelled && y > 0)
+            {
+                font->renderUTF8(std::to_string(y), 0, r.mLeft + 2, r.mTop - y - 10,
+                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+            }
+        }
+
+        // Where the selection sits, on both rules.
+        if (LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
+        {
+            const LLRect box = localRectOf(view);
+            gl_rect_2d(LLRect(box.mLeft, r.mTop, box.mRight, r.mTop - RULER), LLColor4::red, false);
+            gl_rect_2d(LLRect(r.mLeft, box.mTop, r.mLeft + RULER, box.mBottom), LLColor4::red, false);
+        }
     }
 
     LLRect localRectOf(const LLView* view) const
@@ -857,6 +980,9 @@ bool ALFloaterXUITool::postBuild()
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
     mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
+    mSnapCheck = getChild<LLCheckBoxCtrl>("snap_check");
+    mRulersCheck = getChild<LLCheckBoxCtrl>("rulers_check");
+    mGridCombo = getChild<LLComboBox>("grid_combo");
     mFindQuery = getChild<LLLineEditor>("find_query");
     mFindField = getChild<LLComboBox>("find_field");
     mFindResults = getChild<LLScrollListCtrl>("find_results");
@@ -926,6 +1052,13 @@ bool ALFloaterXUITool::postBuild()
     LLCheckBoxCtrl* hover = getChild<LLCheckBoxCtrl>("hover_check");
     hover->setValue(mHoverHighlight);
     hover->setCommitCallback(boost::bind(&ALFloaterXUITool::onToggleHover, this));
+    mSnapCheck->setValue(mSnap);
+    mSnapCheck->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+    mRulersCheck->setValue(mRulers);
+    mRulersCheck->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+    mGridCombo->setValue(mGrid);
+    mGridCombo->setCommitCallback(boost::bind(&ALFloaterXUITool::onGridChanged, this));
+
     LLCheckBoxCtrl* code_built = getChild<LLCheckBoxCtrl>("code_built_check");
     code_built->setValue(mShowCodeBuilt);
     code_built->setCommitCallback(boost::bind(&ALFloaterXUITool::onToggleCodeBuilt, this));
@@ -984,10 +1117,22 @@ void ALFloaterXUITool::draw()
             scanCatalog();
         }
         mReloadEntryOnly = false;
-        // A rebuild is not a new preview: it stays where it was put.
+        // A rebuild is not a new preview: it stays where it was put, and
+        // it keeps the keyboard. Without this the arrows move an element
+        // once and then nothing: the floater they were going to is gone,
+        // and its replacement has never been focused.
+        const LLFloater* was = mPreviews[PRIMARY].host.get();
+        const bool had_keyboard = was && gFocusMgr.childHasKeyboardFocus(was);
         mKeepPlace = true;
         showPreviews();
         mKeepPlace = false;
+        if (had_keyboard)
+        {
+            if (LLFloater* host = mPreviews[PRIMARY].host.get())
+            {
+                host->setFocus(true);
+            }
+        }
         if (mReloadFromDisk)
         {
             setStatus(getString("Reloaded"));
@@ -3989,6 +4134,14 @@ void ALFloaterXUITool::setStatus(const std::string& text)
     mStatus->setText(text);
 }
 
+void ALFloaterXUITool::onGridChanged()
+{
+    mSnap = mSnapCheck->getValue().asBoolean();
+    mRulers = mRulersCheck->getValue().asBoolean();
+    mGrid = llmax(1, mGridCombo->getValue().asInteger());
+    saveState();
+}
+
 void ALFloaterXUITool::onToggleHover()
 {
     mHoverHighlight = getChild<LLCheckBoxCtrl>("hover_check")->getValue().asBoolean();
@@ -4030,6 +4183,9 @@ void ALFloaterXUITool::saveState()
     state["secondary"] = mShowSecondary;
     state["hover"] = mHoverHighlight;
     state["code_built"] = mShowCodeBuilt;
+    state["snap"] = mSnap;
+    state["rulers"] = mRulers;
+    state["grid"] = mGrid;
     if (LLPanel* current = mInspectors ? mInspectors->getCurrentPanel() : nullptr)
     {
         state["tab"] = current->getName();
@@ -4058,6 +4214,12 @@ void ALFloaterXUITool::loadState()
         mLanguage2 = state["language2"].asString();
     }
     mShowSecondary = state["secondary"].asBoolean();
+    mSnap = state["snap"].asBoolean();
+    mRulers = state["rulers"].asBoolean();
+    if (state.has("grid"))
+    {
+        mGrid = llmax(1, state["grid"].asInteger());
+    }
     if (state.has("hover"))
     {
         mHoverHighlight = state["hover"].asBoolean();

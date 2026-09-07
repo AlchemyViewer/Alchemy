@@ -93,6 +93,11 @@ public:
     bool nudge(KEY key, MASK mask);
     bool undoEdit();
     bool hoverHighlight() const { return mHoverHighlight; }
+
+    // What a drag lands on, and what the preview is measured with.
+    S32 gridSize() const { return mGrid; }
+    bool snapToGrid() const { return mSnap && mGrid > 1; }
+    bool showRulers() const { return mRulers; }
     const ALXUISelection& selection() const { return mSelection; }
     LLView* previewRoot(S32 which) const { return mPreviews[which].root; }
     const ALXUISourceMap& sourceMap(S32 which) const { return mPreviews[which].sourceMap; }
@@ -228,6 +233,7 @@ private:
     void saveState();
     void loadState();
     void onToggleHover();
+    void onGridChanged();
     void onToggleCodeBuilt();
     void onToggleSecondary();
 
@@ -260,6 +266,9 @@ private:
     bool                mShowSecondary = false;
     bool                mHoverHighlight = true;
     bool                mShowCodeBuilt = true;
+    bool                mSnap = false;
+    bool                mRulers = false;
+    S32                 mGrid = 4;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;
     bool                mReloadEntryOnly = false;   // one file changed, not the tree
@@ -301,6 +310,9 @@ private:
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
+    LLCheckBoxCtrl*     mSnapCheck = nullptr;
+    LLCheckBoxCtrl*     mRulersCheck = nullptr;
+    LLComboBox*         mGridCombo = nullptr;
     LLLineEditor*       mFindQuery = nullptr;
     LLComboBox*         mFindField = nullptr;
     LLScrollListCtrl*   mFindResults = nullptr;
