@@ -149,6 +149,11 @@ public:
     void clearLensFlareState();
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
+    // Whether generateBloomHDR will run this frame: the pyramid is deep
+    // enough and every shader it needs built. renderDoF asks before it
+    // borrows bloomMip[0], because a blur left in there would be composited
+    // as bloom if the extract never overwrote it.
+    bool bloomHDRReady() const;
     void generateBloomHDR(LLRenderTarget* src);
     void compositeBloomHDR(LLRenderTarget* scene);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
@@ -833,22 +838,12 @@ public:
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
 
-        // Depth of field scratch, owned by the DoF pass alone.
-        //
-        // DoF runs pre-tonemap on linear HDR, so it cannot borrow postPingMap
-        // (GL_RGB10_A2 under HDR). It deliberately does not borrow
-        // deferredLight either: that is the SSAO / sun-shadow factor buffer
-        // every deferred lighting shader samples, and widening it to RGBA16F
-        // to serve one late pass would double a frame-wide bandwidth cost on
-        // exactly the low-end hardware this DoF path exists for.
-        //
-        // dofSharp is RGBA16F because it carries the sharp linear copy plus
-        // the signed CoF in alpha. dofBlur drops alpha entirely -- the combine
-        // reads CoF from dofSharp and its own alpha output is discarded by the
-        // colour mask -- so it uses the pyramid's R11F_G11F_B10F and costs half.
-        // Both are main-pack only and released whenever DoF is off.
-        LLRenderTarget          dofSharp;
-        LLRenderTarget          dofBlur;
+        // Depth of field owns no scratch. It runs pre-tonemap on linear HDR,
+        // so it cannot use postPingMap (GL_RGB10_A2 under HDR), and it does
+        // not widen deferredLight to serve one late pass. It borrows two
+        // full-frame targets that are idle for exactly the stretch of
+        // renderFinalize it runs in: mWaterDis for the sharp copy plus CoF,
+        // bloomMip[0] for the blur. renderDoF says why each is free.
 
         //sun shadow map
         LLRenderTarget          shadow[4];

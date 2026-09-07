@@ -216,6 +216,7 @@ public:
         DOF_RES_SCALE,                      //  "res_scale"
         DOF_WIDTH,                          //  "dof_width"
         DOF_HEIGHT,                         //  "dof_height"
+        DOF_UV_SCALE,                       //  "dof_uv_scale"
 
         DEFERRED_DEPTH,                     //  "depthMap"
         DEFERRED_SHADOW0,                   //  "shadowMap0"
