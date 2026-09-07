@@ -31,6 +31,8 @@
 #define LLPANEL_CPP
 #include "llpanel.h"
 
+#include "alxuishellbuild.h"
+
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llrect.h"
@@ -373,7 +375,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
     LLPanel* panelp = NULL;
 
     {
-        if(!class_attr.empty())
+        if(!class_attr.empty() && !ALXUIShellBuild::active())
         {
             panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
             if (!panelp)
