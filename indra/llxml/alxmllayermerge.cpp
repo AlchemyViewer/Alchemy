@@ -212,12 +212,15 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
             continue;
         }
 
+        // A layer that does not parse is passed over: a syntax error in
+        // one language's file leaves that file untranslated, not the
+        // floater unbuildable for everyone who speaks the language.
         LLXMLNodePtr overlay;
         if (!LLXMLNode::parseFile(layer_path, overlay, nullptr))
         {
-            LL_WARNS() << "Problem reading localized UI description file: " << layer_path << LL_ENDL;
+            LL_WARNS() << "Problem reading localized UI description file: " << layer_path << ", skipping it" << LL_ENDL;
             reportSkipped(observer, layer, layer_path);
-            return false;
+            continue;
         }
         if (observer)
         {

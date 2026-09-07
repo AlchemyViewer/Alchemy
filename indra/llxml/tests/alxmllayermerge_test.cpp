@@ -297,8 +297,9 @@ namespace tut
 
     // Loading: the base and each layer in turn; a layer whose root name
     // or tag differs is merged all the same and said so; a layer that
-    // does not parse fails the load, as it does today; an empty path is
-    // passed over.
+    // does not parse is passed over and the layers after it still apply;
+    // a base that does not parse fails the load; an empty path is passed
+    // over.
     template<> template<>
     void alxmllayermerge_object::test<3>()
     {
@@ -326,10 +327,13 @@ namespace tut
         {
             RecordingObserver rec;
             LLXMLNodePtr root;
-            ensure("a broken layer fails the load", !ALXmlLayerMerge::load({ base, broken }, root, &rec));
-            ensure_equals("and is reported skipped", rec.skipped, 1);
+            ensure("a broken layer does not fail the load", ALXmlLayerMerge::load({ base, broken, overlay }, root, &rec));
+            ensure_equals("it is reported skipped", rec.skipped, 1);
             ensure("as layer 1", rec.has("skipped 1"));
             ensure("with a line past the first", rec.skippedLine >= 2);
+            ensure_equals("the base is intact", attr(root, "", "width"), std::string("100"));
+            ensure_equals("and the layer after it still applies", attr(root, "", "title"), std::string("Titel"));
+            ensure("at its own index", rec.has("root 2 floater[f]"));
         }
         {
             LLXMLNodePtr root;

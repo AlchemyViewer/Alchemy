@@ -79,10 +79,11 @@ namespace ALXmlLayerMerge
 {
     // The first path is parsed as the base and each later one is parsed
     // and merged over it in turn, as layers 1, 2, ... A path that is empty
-    // or the same as the first is passed over. Every layer is merged: the
-    // file name binds it to the base, and a root name or tag that differs
-    // is a change the layer never heard of, not another file. False when
-    // the base does not parse, or a later layer does not.
+    // or the same as the first is passed over, and so is a layer that
+    // does not parse. Every other layer is merged: the file name binds it
+    // to the base, and a root name or tag that differs is a change the
+    // layer never heard of, not another file. False when the base does
+    // not parse.
     bool load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer = nullptr);
 
     // One overlay element over one base element, and their subtrees. The
