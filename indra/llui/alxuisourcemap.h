@@ -30,7 +30,8 @@
 
 #include <map>
 #include <string>
-#include <unordered_map>
+
+#include <boost/unordered_map.hpp>
 
 class LLView;
 
@@ -69,6 +70,6 @@ private:
     void pairChildren(const LLView* parent, const LLXMLNode* node);
     void record(const LLView* view, const LLXMLNodePtr& node);
 
-    std::unordered_map<const LLView*, Origin>   mOrigins;
+    boost::unordered_map<const LLView*, Origin> mOrigins;
     std::map<S32, const LLView*>                mByLine;
 };

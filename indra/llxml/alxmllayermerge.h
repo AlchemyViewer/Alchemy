@@ -41,7 +41,9 @@ public:
     enum class Miss : U8
     {
         Unnamed,        // no name and no value to match by
-        NoSibling       // no child of the base element carries the name
+        Duplicate,      // every base element of that name here is already matched
+        NotBelow,       // nothing of that name anywhere below the base element
+        Ambiguous       // several below the base element, so which one is a guess
     };
 
     virtual ~ALXmlMergeObserver() = default;
@@ -58,8 +60,11 @@ public:
     virtual void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
     virtual void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
 
-    // An overlay child against the base element's children.
+    // An overlay child against the base element's children; or, when none
+    // of them carries the name, against the one element below the base
+    // element that does, which is where the base moved it.
     virtual void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
+    virtual void childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay) {}
     virtual void childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why) {}
 
     // Text: applied from the overlay; kept from the base when the overlay
@@ -89,8 +94,9 @@ namespace ALXmlLayerMerge
     // One overlay element over one base element, and their subtrees. The
     // rules: children match by name, or by value when they have no name,
     // and never by tag; a child matches the first base child of its name
-    // in document order that no earlier child took; on a match, text the
-    // overlay has replaces the
+    // in document order that no earlier child took, and when no child of
+    // the base element carries the name, the one element below it that
+    // does; on a match, text the overlay has replaces the
     // base's and text it lacks leaves the base's alone; a value attribute
     // where the base carries its text in the body is that text; every
     // other attribute present in both is overwritten, except the name,

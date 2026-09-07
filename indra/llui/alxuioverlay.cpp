@@ -33,6 +33,7 @@ void ALXUIOverlay::clear()
     mLayers.clear();
     mOrigins.clear();
     mDrops.clear();
+    mRescues.clear();
 }
 
 const std::string& ALXUIOverlay::layerPath(S32 layer) const
@@ -119,11 +120,34 @@ void ALXUIOverlay::rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay
          std::string("<") + overlay->getName()->mString + "> where the base says <" + base->getName()->mString + ">; merged all the same");
 }
 
+void ALXUIOverlay::childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
+{
+    Rescue& r = mRescues.emplace_back();
+    r.layer = layer;
+    r.line = overlay->getLineNumber();
+    r.from = namePath(overlay);
+    r.to = namePath(base);
+}
+
 void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why)
 {
-    drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">",
-         why == Miss::Unnamed ? "has no name to match by"
-                              : "no child of " + namePath(base_parent) + " has this name");
+    std::string why_text;
+    switch (why)
+    {
+    case Miss::Unnamed:
+        why_text = "has no name to match by";
+        break;
+    case Miss::Duplicate:
+        why_text = "every element of this name under " + namePath(base_parent) + " is already translated";
+        break;
+    case Miss::Ambiguous:
+        why_text = "several elements of this name below " + namePath(base_parent) + ", so which one is a guess";
+        break;
+    case Miss::NotBelow:
+        why_text = "nothing of this name below " + namePath(base_parent);
+        break;
+    }
+    drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">", why_text);
 }
 
 void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)

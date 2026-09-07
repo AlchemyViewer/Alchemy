@@ -27,8 +27,9 @@
 #include "alxmllayermerge.h"
 
 #include <string>
-#include <unordered_map>
 #include <vector>
+
+#include <boost/unordered_map.hpp>
 
 // The tool's observer of the viewer's own merge. It records, per
 // attribute node and per element's text, the layer and the line in that
@@ -54,6 +55,17 @@ public:
         std::string why;
     };
 
+    // An element the layer wrote at a path the base no longer has, applied
+    // to the one element below that path carrying its name: the base moved
+    // it, and the layer's author could not have known.
+    struct Rescue
+    {
+        S32         layer = 0;
+        S32         line = 0;
+        std::string from;
+        std::string to;
+    };
+
     void clear();
 
     // The files, by layer index; the base is 0.
@@ -65,12 +77,14 @@ public:
     const Origin* originOf(const LLXMLNode* node) const;
 
     const std::vector<Drop>& drops() const { return mDrops; }
+    const std::vector<Rescue>& rescues() const { return mRescues; }
 
     // ALXmlMergeObserver
     void layerParsed(S32 layer, const std::string& path) override;
     void layerSkipped(S32 layer, const std::string& path, const std::string& reason, S32 line) override;
     void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
     void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
+    void childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
     void childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why) override;
     void textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
     void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override;
@@ -84,7 +98,8 @@ public:
 private:
     void drop(S32 layer, const LLXMLNode* overlay_node, std::string what, std::string why);
 
-    std::vector<std::string>                            mLayers;
-    std::unordered_map<const LLXMLNode*, Origin>        mOrigins;
-    std::vector<Drop>                                   mDrops;
+    std::vector<std::string>                        mLayers;
+    boost::unordered_map<const LLXMLNode*, Origin>  mOrigins;
+    std::vector<Drop>                               mDrops;
+    std::vector<Rescue>                             mRescues;
 };

@@ -70,8 +70,8 @@ namespace
     // The counts, in the order they print. The first four are the gate.
     const char* const KEYS[] = {
         "unmatched", "value_dropped", "text_blanked", "parse_error",
-        "files", "orphan_file", "root_name_differs", "root_tag_differs", "duplicate_name", "misnested",
-        "misnested_unique", "misnested_outside", "misnested_ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
+        "files", "orphan_file", "root_name_differs", "root_tag_differs", "rescued", "duplicate_name",
+        "moved_outside", "ambiguous", "unmatched_absent", "unmatched_no_name", "tag_mismatch",
         "attr_not_in_base", "layout_attr_overridden", "layout_attr_dropped", "placeholder_mismatch",
         "translated_despite_translate_false", "covered", "text_kept", "value_as_text"
     };
@@ -189,17 +189,6 @@ namespace
         return hasText(overlay);
     }
 
-    S32 countDescendantsNamed(const LLXMLNode* node, const std::string& key)
-    {
-        S32 n = 0;
-        for (LLXMLNodePtr child = node->getFirstChild(); child.notNull(); child = child->getNextSibling())
-        {
-            n += matchKey(child) == key;
-            n += countDescendantsNamed(child, key);
-        }
-        return n;
-    }
-
     void indexNames(const LLXMLNode* node, std::set<std::string>& names)
     {
         for (LLXMLNodePtr child = node->getFirstChild(); child.notNull(); child = child->getNextSibling())
@@ -285,35 +274,51 @@ namespace
             element(base, overlay);
         }
 
+        void childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override
+        {
+            ++mCounts["rescued"];
+            example("rescued", pathOf(overlay) + " -> " + pathOf(base));
+            element(base, overlay);
+        }
+
         void childUnmatched(S32 layer, LLXMLNode* parent, LLXMLNode* overlay, Miss why) override
         {
             ++mCounts["unmatched"];
             const std::string key = matchKey(overlay);
-            if (why == Miss::Unnamed)
+            switch (why)
             {
+            case Miss::Unnamed:
                 ++mCounts["unmatched_no_name"];
                 example("unmatched_no_name", pathOf(overlay));
-            }
-            else if (isDuplicate(parent, overlay, key))
-            {
+                break;
+
+            case Miss::Duplicate:
                 // More children of this name here than the base has: the
                 // ones past the base's count applied to nothing.
                 ++mCounts["duplicate_name"];
                 example("duplicate_name", pathOf(overlay));
-            }
-            else if (mNames.count(key))
-            {
-                ++mCounts["misnested"];
-                const S32 hits = countDescendantsNamed(parent, key);
-                const char* kind = hits == 1 ? "misnested_unique" : hits == 0 ? "misnested_outside" : "misnested_ambiguous";
-                ++mCounts[kind];
-                example("misnested", pathOf(overlay) + " (the base has the name elsewhere; "
-                        + std::to_string(hits) + " below " + pathOf(parent) + ")");
-            }
-            else
-            {
-                ++mCounts["unmatched_absent"];
-                example("unmatched_absent", pathOf(overlay));
+                break;
+
+            case Miss::Ambiguous:
+                ++mCounts["ambiguous"];
+                example("ambiguous", pathOf(overlay) + " (several of that name below " + pathOf(parent) + ")");
+                break;
+
+            case Miss::NotBelow:
+                // The name is somewhere in the base but not under the
+                // element being merged, so the overlay's own parent is
+                // wrong; or it is nowhere, renamed or deleted.
+                if (mNames.count(key))
+                {
+                    ++mCounts["moved_outside"];
+                    example("moved_outside", pathOf(overlay) + " (the base has the name outside " + pathOf(parent) + ")");
+                }
+                else
+                {
+                    ++mCounts["unmatched_absent"];
+                    example("unmatched_absent", pathOf(overlay));
+                }
+                break;
             }
         }
 
@@ -399,28 +404,6 @@ namespace
         }
 
     private:
-        // Whether this overlay child is one of more children of its name
-        // than the base element has: those past the base's count match
-        // nothing, since a base child is matched at most once.
-        static bool isDuplicate(const LLXMLNode* parent, const LLXMLNode* overlay, const std::string& key)
-        {
-            S32 in_base = 0;
-            for (LLXMLNodePtr child = parent->getFirstChild(); child.notNull(); child = child->getNextSibling())
-            {
-                in_base += matchKey(child) == key;
-            }
-            if (in_base == 0)
-            {
-                return false;
-            }
-            S32 before = 0;
-            for (const LLXMLNode* sibling = overlay->mPrev.get(); sibling; sibling = sibling->mPrev.get())
-            {
-                before += !sibling->mIsAttribute && matchKey(sibling) == key;
-            }
-            return before >= in_base;
-        }
-
         // What the base element held before the merge overwrites it: the
         // text and the translatable attributes, for the checks that compare.
         void element(LLXMLNode* base, LLXMLNode* overlay)

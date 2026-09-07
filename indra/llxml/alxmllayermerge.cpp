@@ -31,6 +31,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <boost/unordered_set.hpp>
+
 namespace
 {
     // The name a child is matched by: its name attribute, or its value
@@ -50,6 +52,28 @@ namespace
         return node->getValue().find_first_not_of(" \t\r\n") != std::string::npos;
     }
 
+    // The base elements a layer has already applied to, for the whole of
+    // that layer rather than one element's children: an element rescued
+    // from below must not be one a later child would match in its place.
+    using claimed_t = boost::unordered_set<const LLXMLNode*>;
+
+    // The unclaimed elements of that name below a base element, at any
+    // depth, up to two: one is where the base moved it, and more than one
+    // is a guess the merge does not make.
+    void findBelow(const LLXMLNode* base, const std::string& key, const claimed_t& claimed,
+                   std::vector<LLXMLNodePtr>& found)
+    {
+        for (LLXMLNodePtr child = base->getFirstChild(); child.notNull() && found.size() < 2;
+             child = child->getNextSibling())
+        {
+            if (matchKey(child) == key && !claimed.count(child.get()))
+            {
+                found.push_back(child);
+            }
+            findBelow(child, key, claimed, found);
+        }
+    }
+
     // Why a layer did not parse, for whoever is listening; the parse that
     // failed only logged it.
     void reportSkipped(ALXmlMergeObserver* observer, S32 layer, const std::string& path)
@@ -64,7 +88,11 @@ namespace
     }
 }
 
-void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer)
+namespace
+{
+
+void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer,
+               claimed_t& claimed)
 {
     if (base.isNull() || overlay.isNull())
     {
@@ -135,40 +163,87 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
     // Each overlay child against the first base child of that name, in
     // document order, that no earlier overlay child took: a repeated name
     // matches in order, and an element matched once is not matched again.
-    std::vector<const LLXMLNode*> taken;
     for (LLXMLNodePtr overlay_child = overlay->getFirstChild(); overlay_child.notNull();
          overlay_child = overlay_child->getNextSibling())
     {
         const std::string overlay_key = matchKey(overlay_child);
-        LLXMLNodePtr match;
-        if (!overlay_key.empty())
+        if (overlay_key.empty())
         {
-            for (LLXMLNodePtr child = base->getFirstChild(); child.notNull(); child = child->getNextSibling())
+            if (observer)
             {
-                if (matchKey(child) == overlay_key
-                    && std::find(taken.begin(), taken.end(), child.get()) == taken.end())
+                observer->childUnmatched(layer, base, overlay_child, ALXmlMergeObserver::Miss::Unnamed);
+            }
+            continue;
+        }
+
+        LLXMLNodePtr match;
+        bool any_of_that_name = false;
+        for (LLXMLNodePtr child = base->getFirstChild(); child.notNull(); child = child->getNextSibling())
+        {
+            if (matchKey(child) == overlay_key)
+            {
+                any_of_that_name = true;
+                if (!claimed.count(child.get()))
                 {
                     match = child;
                     break;
                 }
             }
         }
+
         if (match.notNull())
         {
-            taken.push_back(match.get());
+            claimed.insert(match.get());
             if (observer)
             {
                 observer->childMatched(layer, match, overlay_child);
             }
-            merge(match, overlay_child, layer, observer);
+            mergeInto(match, overlay_child, layer, observer, claimed);
+            continue;
+        }
+
+        // Every element of that name here is taken, so this one is a
+        // second translation of the first: it applies to nothing.
+        if (any_of_that_name)
+        {
+            if (observer)
+            {
+                observer->childUnmatched(layer, base, overlay_child, ALXmlMergeObserver::Miss::Duplicate);
+            }
+            continue;
+        }
+
+        // No child of the base element carries the name. The base may
+        // have moved the element deeper, into a layout panel or an
+        // accordion it grew after the layer was written; the layer's
+        // author cannot know that, and the name is what binds them. One
+        // element below is where it went; several is a guess.
+        std::vector<LLXMLNodePtr> below;
+        findBelow(base.get(), overlay_key, claimed, below);
+        if (below.size() == 1)
+        {
+            claimed.insert(below.front().get());
+            if (observer)
+            {
+                observer->childRescued(layer, below.front(), overlay_child);
+            }
+            mergeInto(below.front(), overlay_child, layer, observer, claimed);
         }
         else if (observer)
         {
             observer->childUnmatched(layer, base, overlay_child,
-                                     overlay_key.empty() ? ALXmlMergeObserver::Miss::Unnamed
-                                                         : ALXmlMergeObserver::Miss::NoSibling);
+                                     below.empty() ? ALXmlMergeObserver::Miss::NotBelow
+                                                   : ALXmlMergeObserver::Miss::Ambiguous);
         }
     }
+}
+
+} // namespace
+
+void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer)
+{
+    claimed_t claimed;
+    mergeInto(base, overlay, layer, observer, claimed);
 }
 
 bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer)

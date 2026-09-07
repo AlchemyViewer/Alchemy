@@ -37,8 +37,9 @@
 #include <deque>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
+
+#include <boost/unordered_map.hpp>
 
 class ALXUILiveFile;
 class ALXUIPreviewHost;
@@ -210,5 +211,5 @@ private:
     LLScrollListCtrl*   mState = nullptr;
     LLTextBox*          mStatus = nullptr;
 
-    std::unordered_map<std::string, LLFolderViewItem*> mRows;
+    boost::unordered_map<std::string, LLFolderViewItem*> mRows;
 };

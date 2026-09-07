@@ -32,7 +32,8 @@
 
 #include <functional>
 #include <string>
-#include <unordered_map>
+
+#include <boost/unordered_map.hpp>
 
 class ALXUISourceMap;
 class ALXUITreeItem;
@@ -136,13 +137,13 @@ private:
     ALXUITreeItem* buildItem(LLView* view, const ALXUISourceMap& source_map,
                              const ALXUISelection::path_t& path, S32 order);
 
-    LLPointer<ALXUITreeItem>                                mRoot;
-    std::unordered_map<std::string, ALXUITreeItem*>         mByPath;
-    std::unordered_map<const LLView*, ALXUITreeItem*>       mByView;
-    context_menu_fn_t                                       mContextMenu;
-    hover_fn_t                                              mHover;
-    const ALXUITreeItem*                                    mCanvasHover = nullptr;
-    const ALXUITreeItem*                                    mRowHover = nullptr;
+    LLPointer<ALXUITreeItem>                            mRoot;
+    boost::unordered_map<std::string, ALXUITreeItem*>   mByPath;
+    boost::unordered_map<const LLView*, ALXUITreeItem*> mByView;
+    context_menu_fn_t                                   mContextMenu;
+    hover_fn_t                                          mHover;
+    const ALXUITreeItem*                                mCanvasHover = nullptr;
+    const ALXUITreeItem*                                mRowHover = nullptr;
 };
 
 // A row: the view, the tag it was built as, whether the file created it,
