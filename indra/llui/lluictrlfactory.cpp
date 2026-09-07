@@ -29,6 +29,7 @@
 #define LLUICTRLFACTORY_CPP
 #include "lluictrlfactory.h"
 
+#include "alxmllayermerge.h"
 #include "alxuidiagnostics.h"
 
 #include "llxmlnode.h"
@@ -105,7 +106,7 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
         LLUICtrlFactory *factory = LLUICtrlFactory::getInstance();
         factory->mFileNames.push_back(base_filename);
 
-        if (LLXMLNode::getLayeredXMLNode(root_node, search_paths))
+        if (ALXmlLayerMerge::load(search_paths, root_node))
         {
             LLXUIParser parser;
             parser.readXUI(root_node, block, base_filename);
@@ -169,7 +170,7 @@ bool LLUICtrlFactory::getLayeredXMLNode(const std::string &xui_filename, LLXMLNo
         paths.push_back(xui_filename);
     }
 
-    return LLXMLNode::getLayeredXMLNode(root, paths);
+    return ALXmlLayerMerge::load(paths, root);
 }
 
 

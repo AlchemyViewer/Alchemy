@@ -33,7 +33,6 @@
 #include <iostream>
 #include <limits>
 #include <map>
-#include <ranges>
 #include <string_view>
 #include <vector>
 
@@ -530,85 +529,6 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
 } // namespace
 
 // static
-bool LLXMLNode::updateNode(
-    LLXMLNodePtr& node,
-    LLXMLNodePtr& update_node)
-{
-
-    if (!node || !update_node)
-    {
-        LL_WARNS() << "Node invalid" << LL_ENDL;
-        return false;
-    }
-
-    //update the node value
-    node->mValue = update_node->mValue;
-
-    //update all attribute values
-    for (auto& [attribNameEntry, updateAttribNode] : update_node->mAttributes)
-    {
-        LLXMLNodePtr attribNode;
-
-        node->getAttribute(attribNameEntry, attribNode, 0);
-
-        if (attribNode)
-        {
-            attribNode->mValue = updateAttribNode->mValue;
-        }
-    }
-
-    //update all of node's children with updateNodes children that match name
-    LLXMLNodePtr child = node->getFirstChild();
-    LLXMLNodePtr last_child = child;
-    LLXMLNodePtr updateChild;
-
-    for (updateChild = update_node->getFirstChild(); updateChild.notNull();
-         updateChild = updateChild->getNextSibling())
-    {
-        while(child.notNull())
-        {
-            std::string nodeName;
-            std::string updateName;
-
-            updateChild->getAttributeString("name", updateName);
-            child->getAttributeString("name", nodeName);
-
-
-            //if it's a combobox there's no name, but there is a value
-            if (updateName.empty())
-            {
-                updateChild->getAttributeString("value", updateName);
-                child->getAttributeString("value", nodeName);
-            }
-
-            if ((nodeName != "") && (updateName == nodeName))
-            {
-                updateNode(child, updateChild);
-                last_child = child;
-                child = child->getNextSibling();
-                if (child.isNull())
-                {
-                    child = node->getFirstChild();
-                }
-                break;
-            }
-
-            child = child->getNextSibling();
-            if (child.isNull())
-            {
-                child = node->getFirstChild();
-            }
-            if (child == last_child)
-            {
-                break;
-            }
-        }
-    }
-
-    return true;
-}
-
-// static
 bool LLXMLNode::parseFile(const std::string& filename, LLXMLNodePtr& node, LLXMLNode* defaults_tree)
 {
     std::string xml = LLFile::getContents(filename);
@@ -740,56 +660,6 @@ bool LLXMLNode::isFullyDefault() const
     }
 
     return false;
-}
-
-// static
-bool LLXMLNode::getLayeredXMLNode(LLXMLNodePtr& root,
-                                  const std::vector<std::string>& paths)
-{
-    if (paths.empty()) return false;
-
-    std::string filename = paths.front();
-    if (filename.empty())
-    {
-        return false;
-    }
-
-    if (!LLXMLNode::parseFile(filename, root, nullptr))
-    {
-        LL_WARNS() << "Problem reading UI description file: " << filename << " " << errno << LL_ENDL;
-        return false;
-    }
-
-    LLXMLNodePtr updateRoot;
-
-    // We've already dealt with the first item, skip that one
-    for (const std::string& layer_filename : paths | std::views::drop(1))
-    {
-        if(layer_filename.empty() || layer_filename == filename)
-        {
-            // no localized version of this file, that's ok, keep looking
-            continue;
-        }
-
-        if (!LLXMLNode::parseFile(layer_filename, updateRoot, nullptr))
-        {
-            LL_WARNS() << "Problem reading localized UI description file: " << layer_filename << LL_ENDL;
-            return false;
-        }
-
-        std::string nodeName;
-        std::string updateName;
-
-        updateRoot->getAttributeString("name", updateName);
-        root->getAttributeString("name", nodeName);
-
-        if (updateName == nodeName)
-        {
-            LLXMLNode::updateNode(root, updateRoot);
-        }
-    }
-
-    return true;
 }
 
 // static

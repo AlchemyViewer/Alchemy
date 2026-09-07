@@ -33,6 +33,7 @@
 #include "llavatarnamecache.h"
 #include "llinstantmessage.h"
 #include "llcachename.h"
+#include "alxmllayermerge.h"
 #include "llxmlnode.h"
 #include "lluictrl.h"
 #include "lluictrlfactory.h"
@@ -1603,7 +1604,7 @@ bool LLNotifications::loadTemplates()
 
     std::string base_filename = search_paths.front();
     LLXMLNodePtr root;
-    bool success  = LLXMLNode::getLayeredXMLNode(root, search_paths);
+    bool success  = ALXmlLayerMerge::load(search_paths, root);
 
     if (!success || root.isNull() || !root->hasName( "notifications" ))
     {

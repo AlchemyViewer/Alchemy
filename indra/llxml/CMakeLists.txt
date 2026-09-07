@@ -5,6 +5,7 @@ add_library(llxml STATIC)
 target_sources(llxml
     PRIVATE
     alxmldocument.cpp
+    alxmllayermerge.cpp
     llcontrol.cpp
     llxmlnode.cpp
     llxmltree.cpp
@@ -15,6 +16,7 @@ target_sources(llxml
     FILE_SET HEADERS
     FILES
     alxmldocument.h
+    alxmllayermerge.h
     llcontrol.h
     llxmlnode.h
     llxmltree.h
@@ -56,4 +58,5 @@ if (BUILD_TESTING)
     set(test_project llxml)
 
     LL_ADD_INTEGRATION_TEST(llcontrol "" "${test_libs}" "${test_project}")
+    LL_ADD_INTEGRATION_TEST(alxmllayermerge "" "${test_libs}" "${test_project}")
 endif ()

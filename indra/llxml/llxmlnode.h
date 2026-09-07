@@ -141,13 +141,6 @@ public:
         std::istream& str,
         LLXMLNodePtr& node,
         LLXMLNode* defaults = nullptr);
-    static bool updateNode(
-        LLXMLNodePtr& node,
-        LLXMLNodePtr& update_node);
-
-    static bool getLayeredXMLNode(LLXMLNodePtr& root, const std::vector<std::string>& paths);
-
-
     // Write standard XML file header:
     // <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
     static void writeHeaderToFile(LLFILE *out_file);
