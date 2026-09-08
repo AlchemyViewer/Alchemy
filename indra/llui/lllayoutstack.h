@@ -92,6 +92,10 @@ public:
     S32 getPanelSpacing() const { return mPanelSpacing; }
     void setPanelSpacing(S32 val);
 
+    // The axis the panels run along, which is the one dimension of a
+    // panel that the stack reads from the file.
+    EOrientation getOrientation() const { return mOrientation; }
+
     static void updateClass();
 
 protected:
@@ -193,6 +197,9 @@ public:
     LLResizeBar* getResizeBar() { return mResizeBar; }
 
     bool isCollapsed() const { return mCollapsed;}
+
+    bool getAutoResize() const { return mAutoResize; }
+    bool getUserResize() const { return mUserResize; }
 
     void setOrientation(LLView::EOrientation orientation);
 

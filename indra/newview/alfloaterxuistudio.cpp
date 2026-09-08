@@ -50,6 +50,7 @@
 #include "llimagetga.h"
 #include "llfolderview.h"
 #include "llkeyboard.h"
+#include "lllayoutstack.h"
 #include "lllineeditor.h"
 #include "lllivefile.h"
 #include "llmenugl.h"
@@ -147,6 +148,71 @@ private:
     bool                mPrimed = false;
 };
 
+namespace
+{
+    // A layout stack gives its children three of their four numbers and
+    // reads the fourth from the file: the width of a panel in a stack
+    // that runs across, the height of one in a stack that runs down. The
+    // axis, or -1 where the parent is not a stack.
+    S32 stackAxisOf(const LLView* view)
+    {
+        const LLLayoutStack* stack = view ? ALViewType::as<LLLayoutStack>(view->getParent()) : nullptr;
+        return stack ? (S32)stack->getOrientation() : -1;
+    }
+
+    // Which of the eight handles a stack leaves any meaning in: the two on
+    // its axis. A move has none at all, since where the panel goes is the
+    // stack's answer and not the file's.
+    bool gripLive(S32 index, S32 axis)
+    {
+        if (axis < 0)
+        {
+            return true;
+        }
+        static const bool across[8] = { false, false, false, true,  true,  false, false, false };
+        static const bool down[8]   = { false, true,  false, false, false, false, true,  false };
+        return axis == LLView::HORIZONTAL ? across[index] : down[index];
+    }
+
+    // What the stack takes the change out of: the nearest panel beside
+    // this one that sizes itself, since those are the ones sharing what
+    // is left over. Null where every sibling holds its size, which is a
+    // stack that will simply be short of room.
+    LLView* absorbingSibling(const LLView* view)
+    {
+        const LLView* parent = view ? view->getParent() : nullptr;
+        if (!ALViewType::as<LLLayoutStack>(parent))
+        {
+            return nullptr;
+        }
+        const std::vector<LLView*> siblings(parent->getChildList()->begin(), parent->getChildList()->end());
+        auto here = std::find(siblings.begin(), siblings.end(), view);
+        if (here == siblings.end())
+        {
+            return nullptr;
+        }
+        const S32 at = (S32)std::distance(siblings.begin(), here);
+        const S32 count = (S32)siblings.size();
+        const auto absorbs = [](LLView* sibling)
+        {
+            LLLayoutPanel* panel = ALViewType::as<LLLayoutPanel>(sibling);
+            return panel && panel->getVisible() && panel->getAutoResize() ? panel : nullptr;
+        };
+        for (S32 step = 1; step < count; ++step)
+        {
+            if (at + step < count)
+            {
+                if (LLView* found = absorbs(siblings[at + step])) { return found; }
+            }
+            if (at - step >= 0)
+            {
+                if (LLView* found = absorbs(siblings[at - step])) { return found; }
+            }
+        }
+        return nullptr;
+    }
+}
+
 // A preview: a floater in the floater view that is the previewed floater,
 // or hosts the previewed panel, menu or widget. It draws the tool's hover
 // and selection over what it shows, answers a modifier click with a
@@ -213,8 +279,15 @@ public:
                 if (editable(view))
                 {
                     const LLRect r = localRectOf(view);
-                    drawGrips(r);
-                    drawAnchors(view, r);
+                    // A panel in a layout stack is given three of its four
+                    // numbers by the stack, so the handles and the anchors
+                    // that would write the other three are not offered.
+                    const S32 axis = stackAxisOf(view);
+                    drawGrips(r, axis);
+                    if (axis < 0)
+                    {
+                        drawAnchors(view, r);
+                    }
                     if (dragging())
                     {
                         LLRect dragged(r);
@@ -223,6 +296,17 @@ public:
                         dragged.mRight += mDelta[EDGE_R];
                         dragged.mTop += mDelta[EDGE_T];
                         gl_rect_2d(dragged, LLColor4::white, false);
+                        if (LLView* into = mDrop.get())
+                        {
+                            drawLabelledBox(into, LLColor4::green, "into " + into->getName());
+                        }
+                        else if (axis >= 0)
+                        {
+                            if (LLView* absorbs = absorbingSibling(view))
+                            {
+                                drawLabelledBox(absorbs, LLColor4::cyan, "from " + absorbs->getName());
+                            }
+                        }
                     }
                 }
             }
@@ -295,6 +379,7 @@ public:
         if (grabbed())
         {
             track(x, y);
+            trackDrop(x, y);
             setGripCursor(mGrip);
             return true;
         }
@@ -315,19 +400,49 @@ public:
         return LLFloater::handleHover(x, y, mask);
     }
 
+    // A panel that names a file of its own is one element here and a
+    // document elsewhere; opening it is what a double click on it means.
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override
+    {
+        if (mTool && mRoot && (mask & MASK_CONTROL))
+        {
+            LLView* view = hitTest(x, y);
+            mTool->canvasSelect(mWhich, view);
+            if (mWhich == ALFloaterXUIStudio::PRIMARY && !mTool->nestedFile(view).empty())
+            {
+                mTool->openNestedFile();
+                return true;
+            }
+            return true;
+        }
+        return LLFloater::handleDoubleClick(x, y, mask);
+    }
+
     bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
         if (grabbed())
         {
             track(x, y);
+            trackDrop(x, y);
             const S32 grip = mGrip;
+            LLView* into = mDrop.get();
             mGrip = GRIP_NONE;
+            mDrop.markDead();
             gFocusMgr.setMouseCapture(nullptr);
             if (mTool && grip != GRIP_NONE)
             {
                 // One operation for the whole drag, written when the
-                // button comes up rather than on every pixel of it.
-                mTool->canvasDrag(mWhich, mDelta[EDGE_L], mDelta[EDGE_B], mDelta[EDGE_R], mDelta[EDGE_T]);
+                // button comes up rather than on every pixel of it. A
+                // drop into another container is the same drag with
+                // somewhere else to land.
+                if (into)
+                {
+                    mTool->canvasReparent(mWhich, into, mDelta[EDGE_L], mDelta[EDGE_B]);
+                }
+                else
+                {
+                    mTool->canvasDrag(mWhich, mDelta[EDGE_L], mDelta[EDGE_B], mDelta[EDGE_R], mDelta[EDGE_T]);
+                }
             }
             return true;
         }
@@ -337,6 +452,7 @@ public:
     void onMouseCaptureLost() override
     {
         mGrip = GRIP_NONE;
+        mDrop.markDead();
         LLFloater::onMouseCaptureLost();
     }
 
@@ -501,14 +617,23 @@ private:
         return -1;
     }
 
-    void drawGrips(const LLRect& r) const
+    void drawGrips(const LLRect& r, S32 axis) const
     {
         LLRect grips[8];
         gripRects(r, grips);
-        for (const LLRect& grip : grips)
+        for (S32 i = 0; i < 8; ++i)
         {
-            gl_rect_2d(grip, LLColor4::white, true);
-            gl_rect_2d(grip, LLColor4::black, false);
+            if (!gripLive(i, axis))
+            {
+                continue;
+            }
+            gl_rect_2d(grips[i], LLColor4::white, true);
+            gl_rect_2d(grips[i], LLColor4::black, false);
+        }
+
+        if (axis >= 0)
+        {
+            return;
         }
 
         // The one in the middle moves the element, and says so with the
@@ -524,14 +649,19 @@ private:
 
     S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
     {
+        const S32 axis = stackAxisOf(ALXUISelection::resolve(mRoot, mTool->selection().selection()));
         LLRect grips[8];
         gripRects(r, grips);
         for (S32 i = 0; i < 8; ++i)
         {
-            if (grips[i].pointInRect(x, y))
+            if (gripLive(i, axis) && grips[i].pointInRect(x, y))
             {
                 return i;
             }
+        }
+        if (axis >= 0)
+        {
+            return GRIP_NONE;
         }
         if (moveGripRect(r).pointInRect(x, y))
         {
@@ -596,6 +726,35 @@ private:
     static S32 snapped(S32 value, S32 grid)
     {
         return grid > 1 ? ((value + (value >= 0 ? grid / 2 : -grid / 2)) / grid) * grid : value;
+    }
+
+    // Where a held element would land if the button came up here: the
+    // container under the pointer that takes its tag, and nothing while
+    // an edge is being dragged, since a resize goes nowhere.
+    void trackDrop(S32 x, S32 y)
+    {
+        mDrop.markDead();
+        if (mGrip != GRIP_MOVE || !mTool || !dragging())
+        {
+            return;
+        }
+        LLView* moving = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+        if (LLView* into = mTool->dropTarget(mWhich, hitTest(x, y), moving))
+        {
+            mDrop = into->getHandle();
+        }
+    }
+
+    void drawLabelledBox(const LLView* view, const LLColor4& color, const std::string& label)
+    {
+        const LLRect r = localRectOf(view);
+        gl_rect_2d(r, color, false);
+        LLRect inner(r);
+        inner.stretch(-1);
+        gl_rect_2d(inner, color, false);
+        LLFontGL::getFontSansSerifSmall()->renderUTF8(label, 0, (F32)r.mLeft + 2.f, (F32)r.mBottom + 2.f, color,
+                                                      LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
+                                                      LLFontGL::DROP_SHADOW);
     }
 
     // The topmost view drawn over a point, taking the deepest before its
@@ -809,6 +968,7 @@ private:
     S32                 mDragX = 0;
     S32                 mDragY = 0;
     S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
+    LLHandle<LLView>    mDrop;                  // the container a held element would land in
 };
 
 namespace
@@ -2860,6 +3020,10 @@ bool ALFloaterXUIStudio::onTreeActionEnabled(const LLSD& param)
     {
         return !mCutPath.empty();
     }
+    if (action == "open_nested")
+    {
+        return !nestedFile(selectedView()).empty();
+    }
     return true;
 }
 
@@ -2898,6 +3062,10 @@ void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
     else if (action == "toggle_visible")
     {
         item->toggleShown();
+    }
+    else if (action == "open_nested")
+    {
+        openNestedFile();
     }
     else if (action == "move_up" || action == "move_down" || action == "move_in"
           || action == "move_out" || action == "cut" || action == "paste"
@@ -4685,8 +4853,8 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     const ALXUISelection::path_t& path = mSelection.selection();
     S32 dx = dl;
     S32 dy = now.topLeft ? dt : db;
-    const S32 dw = dr - dl;
-    const S32 dh = dt - db;
+    S32 dw = dr - dl;
+    S32 dh = dt - db;
 
     // The root sits where the tool put it: a floater preview is placed
     // beside this window and a panel preview is placed in its host, so
@@ -4702,6 +4870,29 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
         {
             setStatus(getString("EditRootMove"));
             return false;
+        }
+    }
+
+    // A layout stack lays its children out itself and reads one dimension
+    // of each from the file: the width in a stack that runs across, the
+    // height in one that runs down. That dimension is the only number a
+    // drag there can write, and the change comes out of whichever sibling
+    // sizes itself.
+    std::string absorbs;
+    const S32 axis = stackAxisOf(view);
+    if (axis >= 0)
+    {
+        dx = 0;
+        dy = 0;
+        if (axis == LLView::HORIZONTAL) { dh = 0; } else { dw = 0; }
+        if (!dw && !dh)
+        {
+            setStatus(getString("EditStackAxis"));
+            return false;
+        }
+        if (const LLView* sibling = absorbingSibling(view))
+        {
+            absorbs = sibling->getName();
         }
     }
     std::vector<std::string> written;
@@ -4732,10 +4923,20 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     args["[ATTRS]"] = names;
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
+    args["[SIBLING]"] = absorbs;
+    const char* said = "EditWrote";
+    if (root_move)
+    {
+        said = "EditWroteNotMoved";
+    }
+    else if (!absorbs.empty())
+    {
+        said = "EditWroteStack";
+    }
     // The rebuild says what it built; this has to come after it. It waits
     // for the next frame: this can be the tail of a mouse-up in the very
     // floater it would take down.
-    documentChanged(getString(root_move ? "EditWroteNotMoved" : "EditWrote", args));
+    documentChanged(getString(said, args));
     return true;
 }
 
@@ -4790,6 +4991,214 @@ void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
     {
         applyEdges(dl, db, dr, dt);
     }
+}
+
+namespace
+{
+    // A container is something that already holds an element the file
+    // wrote. A widget that builds its own children -- a combo box's list,
+    // a scroll list's columns -- holds none, and neither does a button,
+    // which is what keeps a drag across a row of buttons from making one
+    // of them a parent. An empty container holds none either, so it is
+    // filled from the tree rather than by a drop.
+    bool holdsAuthoredChild(const ALXUISourceMap& map, const LLView* view)
+    {
+        for (const LLView* child : *view->getChildList())
+        {
+            if (map.isFromXML(child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+LLView* ALFloaterXUIStudio::dropTarget(S32 which, LLView* under, const LLView* moving) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (which != PRIMARY || !under || !moving || moving == pv.root || !moving->getParent())
+    {
+        return nullptr;
+    }
+    const ALXUISourceMap::Origin* mine = pv.sourceMap.find(moving);
+    if (!mine)
+    {
+        return nullptr;
+    }
+
+    // A point inside the thing being carried is not a drop: an element
+    // cannot land in itself, and landing in its own parent is the move it
+    // already is.
+    for (const LLView* view = under; view; view = view->getParent())
+    {
+        if (view == moving)
+        {
+            return nullptr;
+        }
+    }
+
+    const ALXUISchema& schema = ALXUISchema::get();
+    for (LLView* view = under; view; view = view->getParent())
+    {
+        if (view != pv.root && !pv.sourceMap.isFromXML(view))
+        {
+            continue;
+        }
+        if (!holdsAuthoredChild(pv.sourceMap, view))
+        {
+            continue;
+        }
+        // The tag a container answers to is the class that was built, since
+        // that is whose child registry the parser would consult; the tag
+        // being carried is the word the file wrote.
+        const std::string* container = LLUICtrlFactory::widgetTag(view->viewType());
+        if (!container || !schema.acceptsChild(*container, mine->tag))
+        {
+            continue;
+        }
+        return view == moving->getParent() ? nullptr : view;
+    }
+    return nullptr;
+}
+
+// The element lands where it was dropped. Its rect is read out of the
+// window it is drawn in and read back in the new parent's coordinates,
+// which is the only part of its old form that survives: `left_delta`
+// counts from a sibling it no longer has, `top` counts from a parent of
+// another height, and `left_pad` from a widget in another file altogether.
+// So nothing is carried -- the rect is written outright, in the layout the
+// new parent lays its children out under.
+void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 dy)
+{
+    if (which != PRIMARY || !parent)
+    {
+        return;
+    }
+    LLView* view = selectedView();
+    if (!view || !view->getParent())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const Preview& pv = mPreviews[PRIMARY];
+    ALXUISelection::path_t target;
+    if (!entry || !pv.root || !ALXUISelection::pathOf(parent, pv.root, target))
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+
+    // Structure is the base layer's: a language overlay says what a value
+    // is, not where an element lives.
+    const std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(*entry, pv.skin, mLanguage);
+    if (layers.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return;
+    }
+
+    // Where it would sit, in the coordinates the new parent counts in.
+    LLRect landed = view->calcScreenRect();
+    landed.translate(dx, dy);
+    const LLRect into = parent->calcScreenRect();
+    ALXUIEdit::Anchor want;
+    want.left = landed.mLeft - into.mLeft;
+    want.top = into.mTop - landed.mTop;
+    want.bottom = landed.mBottom - into.mBottom;
+    want.width = landed.getWidth();
+    want.height = landed.getHeight();
+    // Its own word for it if it has one, and otherwise the new parent's,
+    // which is what LLView::applyXUILayout would give it there.
+    const ALXUISelection::path_t& path = mSelection.selection();
+    const pugi::xml_node node = held->resolve(path);
+    const pugi::xml_attribute layout = node.attribute("layout");
+    want.topLeft = layout ? std::string_view(layout.value()) == "topleft" : parent->isLayoutTopLeft();
+
+    if (!held->moveElement(path, target))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    // The move puts it last among the target's children, which is where
+    // its new path is read from: the old one names a place it has left.
+    pugi::xml_node landed_node = held->resolve(target).last_child();
+    while (landed_node && landed_node.type() != pugi::node_element)
+    {
+        landed_node = landed_node.previous_sibling();
+    }
+    ALXUISelection::path_t moved = ALXUICatalog::namePath(landed_node, /*any_tag=*/true);
+    if (moved.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    // A layout stack reads one dimension of a panel and decides the rest,
+    // so that is all it is given.
+    const bool stacked = parent->as<LLLayoutStack>() != nullptr;
+    if (!held->reauthor(moved, want, stacked ? ALXUIEdit::AUTHOR_SIZE : ALXUIEdit::AUTHOR_RECT))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    mSelection.select(moved);
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = ALXUISelection::toString(path);
+    args["[INTO]"] = parent->getName();
+    documentChanged(getString("EditReparented", args));
+}
+
+// --- nested files -----------------------------------------------------------
+// A panel that carries `filename=` is one element on this canvas and a
+// whole file of its own: the outer document says where it goes and the
+// inner one says what is in it, so editing what is in it is editing the
+// other file, with the undo stack that file has.
+std::string ALFloaterXUIStudio::nestedFile(const LLView* view) const
+{
+    const ALXUISourceMap::Origin* origin = view ? mPreviews[PRIMARY].sourceMap.find(view) : nullptr;
+    std::string file;
+    if (origin && origin->node.notNull() && origin->node->getAttributeString("filename", file))
+    {
+        return file;
+    }
+    return std::string();
+}
+
+void ALFloaterXUIStudio::openNestedFile()
+{
+    const std::string file = nestedFile(selectedView());
+    if (file.empty())
+    {
+        setStatus(getString("EditNoNestedFile"));
+        return;
+    }
+    if (!mCatalog.find(file))
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = file;
+        setStatus(getString("EditNestedMissing", args));
+        return;
+    }
+    if (mDocument.dirty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+        setStatus(getString("EditUnsaved", args));
+        return;
+    }
+    mFile = file;
+    mSelection.clearSelection();
+    fillCatalog();
+    saveState();
+    showPreviews();
 }
 
 bool ALFloaterXUIStudio::nudge(KEY key, MASK mask)
@@ -5401,6 +5810,7 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "hide")          { closePreviews(); }
     else if (action == "reload")        { reloadAll(); }
     else if (action == "edit")          { onJumpToSource(); }
+    else if (action == "open_nested")   { openNestedFile(); }
     else if (action == "capture")       { capturePreview(); }
     else if (action == "save")          { saveDocument(); }
     else if (action == "save_repair")   { saveAndRepair(); }
@@ -5448,6 +5858,7 @@ bool ALFloaterXUIStudio::onMenuEnable(const LLSD& param)
     if (what == "dirty")    { return mDocument.dirty(); }
     if (what == "undo")     { return mDocument.canUndo() || !mWroteThroughPath.empty(); }
     if (what == "redo")     { return mDocument.canRedo(); }
+    if (what == "nested")   { return !nestedFile(selectedView()).empty(); }
     return true;
 }
 

@@ -685,4 +685,85 @@ namespace tut
         ensure("no such element", !edit.removeElement({ "nowhere" }));
         ensure("and nothing to undo", !edit.canUndo());
     }
+
+    // Every other form of position comes off. A delta is read before the
+    // edge it overrides and a padding is measured from a sibling the
+    // element has left, so leaving one behind puts the element somewhere
+    // nobody asked for.
+    template<> template<>
+    void alxuiedit_object::test<19>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"a\" left_delta=\"5\" top_pad=\"3\" right=\"90\" bottom=\"10\""
+            " left=\"1\" top=\"2\" width=\"9\" height=\"8\" follows=\"left|top\" />\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+
+        ALXUIEdit::Anchor want;
+        want.left = 30;
+        want.top = 40;
+        want.width = 50;
+        want.height = 60;
+        want.topLeft = true;
+        ensure("re-authors", edit.reauthor({ "a" }, want));
+
+        const pugi::xml_node node = edit.resolve({ "a" });
+        ensure_equals("left", node.attribute("left").as_int(), 30);
+        ensure_equals("top", node.attribute("top").as_int(), 40);
+        ensure_equals("width", node.attribute("width").as_int(), 50);
+        ensure_equals("height", node.attribute("height").as_int(), 60);
+        ensure("left_delta is gone", !node.attribute("left_delta"));
+        ensure("top_pad is gone", !node.attribute("top_pad"));
+        ensure("right is gone", !node.attribute("right"));
+        ensure("bottom is gone", !node.attribute("bottom"));
+        ensure("what is not a position is untouched",
+               std::string_view(node.attribute("follows").value()) == "left|top");
+
+        // And it is one step, however many splices it took.
+        ensure_equals("one step", edit.undoDepth(), 1u);
+        ensure("undo", edit.undo());
+        ensure_equals("the file it was", edit.text(), source);
+    }
+
+    // A parent that lays its children out itself is given a size and
+    // nothing else, and a parent that counts up from its bottom is given
+    // the edge it counts from.
+    template<> template<>
+    void alxuiedit_object::test<20>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"a\" left=\"1\" top=\"2\" width=\"9\" height=\"8\" />\n"
+            "</panel>\n";
+
+        ALXUIEdit::Anchor want;
+        want.left = 30;
+        want.top = 40;
+        want.bottom = 70;
+        want.width = 50;
+        want.height = 60;
+
+        {
+            ALXUIEdit edit;
+            ensure("loads", edit.loadBuffer(source));
+            want.topLeft = true;
+            ensure("re-authors as a size", edit.reauthor({ "a" }, want, ALXUIEdit::AUTHOR_SIZE));
+            const pugi::xml_node node = edit.resolve({ "a" });
+            ensure_equals("width", node.attribute("width").as_int(), 50);
+            ensure_equals("height", node.attribute("height").as_int(), 60);
+            ensure("no left", !node.attribute("left"));
+            ensure("no top", !node.attribute("top"));
+        }
+        {
+            ALXUIEdit edit;
+            ensure("loads", edit.loadBuffer(source));
+            want.topLeft = false;
+            ensure("re-authors from the bottom", edit.reauthor({ "a" }, want));
+            const pugi::xml_node node = edit.resolve({ "a" });
+            ensure_equals("bottom", node.attribute("bottom").as_int(), 70);
+            ensure("and not top", !node.attribute("top"));
+        }
+    }
 }

@@ -103,6 +103,12 @@ public:
     // What a tag says about one attribute, or null where it says nothing.
     const Attribute*            attribute(std::string_view tag, std::string_view name) const;
 
+    // Whether a container takes that tag as a child. The question a drop
+    // asks: a container with a child registry of its own answers for the
+    // few tags in it, and a container that never declared one answers for
+    // every widget there is. False for a tag the schema does not know.
+    bool                        acceptsChild(std::string_view tag, std::string_view child) const;
+
     // The whole model as one XSD document.
     std::string                 asXSD() const;
 

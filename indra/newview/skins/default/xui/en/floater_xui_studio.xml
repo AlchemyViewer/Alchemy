@@ -57,6 +57,11 @@
     <floater.string name="EditCut">[WHAT] is cut; select where it goes and choose Move It Here.</floater.string>
     <floater.string name="EditNothingCut">Nothing is cut, or it is cut and this is where it already is.</floater.string>
     <floater.string name="EditNoSibling">Nothing beside it that way.</floater.string>
+    <floater.string name="EditReparented">[WHAT] now lives in [INTO], with its position written for where it landed.</floater.string>
+    <floater.string name="EditStackAxis">A layout stack lays its panels out itself: drag the edge along the stack to change the one dimension it reads.</floater.string>
+    <floater.string name="EditWroteStack">Wrote [ATTRS] to [FILE] in [LAYER]; [SIBLING] gives up the room</floater.string>
+    <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
+    <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <menu_bar
@@ -129,6 +134,14 @@
              name="edit"
              shortcut="control|E">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="edit" />
+            </menu_item_call>
+            <menu_item_call
+             label="Open the File This Element Names"
+             layout="topleft"
+             name="open_nested"
+             shortcut="control|shift|O">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="open_nested" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="nested" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call

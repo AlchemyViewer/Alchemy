@@ -330,4 +330,24 @@ namespace tut
         ensure("a colour component is a real", alpha != nullptr);
         ensure_equals("and reads as one", (int)alpha->value, (int)ALParamType::REAL);
     }
+
+    // The question a drop asks. A container with a child registry of its
+    // own answers for the few tags in it, which is the thing that made a
+    // property grid declared inside a scroll container never get built.
+    template<> template<>
+    void alxuischema_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        ensure("a panel takes a button", schema().acceptsChild("panel", "button"));
+        ensure("a scroll container takes a panel", schema().acceptsChild("scroll_container", "panel"));
+        ensure("and takes nothing else it was not given",
+               !schema().acceptsChild("scroll_container", "button"));
+        ensure("a layout stack takes layout panels",
+               schema().acceptsChild("layout_stack", "layout_panel"));
+        ensure("a tag the schema does not know accepts nothing",
+               !schema().acceptsChild("no_such_widget", "button"));
+    }
 }

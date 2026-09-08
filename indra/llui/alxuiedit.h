@@ -140,6 +140,19 @@ public:
     bool translate(const path_t& path, S32 dx, S32 dy, const Anchor& now);
     bool resize(const path_t& path, S32 dw, S32 dh, const Anchor& now);
 
+    // What a re-author writes: the four numbers that put an element
+    // somewhere, or the two that only size it, for a parent that decides
+    // where its children go and reads nothing else.
+    enum EAuthor { AUTHOR_RECT, AUTHOR_SIZE };
+
+    // The element's position said outright rather than moved. Every other
+    // positioning attribute it carries comes off, because a delta is read
+    // before the edge it overrides and a padding is measured from a
+    // sibling this element no longer has: a form that meant one thing
+    // under one parent means another under the next, and no delta carries
+    // an element across that.
+    bool reauthor(const path_t& path, const Anchor& want, EAuthor what = AUTHOR_RECT);
+
     // The attributes the last translate or resize wrote, for the panel
     // that says what an edit is about to do.
     const std::vector<std::string>& lastWritten() const { return mWritten; }

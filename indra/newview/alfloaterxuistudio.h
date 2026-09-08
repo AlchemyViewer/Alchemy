@@ -92,6 +92,20 @@ public:
     void canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt);
     void hostClosed(S32 which);
 
+    // Where a held element would land: the nearest container over the
+    // point that the schema says takes its tag, and never the element
+    // itself, anything inside it, or the parent it already has.
+    LLView* dropTarget(S32 which, LLView* under, const LLView* moving) const;
+
+    // The same drag, landing somewhere else. The rect is converted into
+    // the new parent's coordinates and written outright, since a form
+    // measured from one parent means another thing under the next.
+    void canvasReparent(S32 which, LLView* parent, S32 dx, S32 dy);
+
+    // A panel that carries a file of its own: the file it names, or empty.
+    std::string nestedFile(const LLView* view) const;
+    void openNestedFile();
+
     // An arrow key moves the selection by a pixel, ten with shift, and
     // Control+Z puts the last write back the way it was.
     bool nudge(KEY key, MASK mask);

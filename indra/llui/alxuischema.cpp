@@ -343,6 +343,17 @@ bool ALXUISchema::accepts(std::string_view name, std::string_view attribute_name
     return attribute(name, attribute_name) != nullptr;
 }
 
+bool ALXUISchema::acceptsChild(std::string_view name, std::string_view child) const
+{
+    const Tag* container = tag(name);
+    if (!container)
+    {
+        return false;
+    }
+    return std::binary_search(container->children.begin(), container->children.end(), child,
+                              [](std::string_view a, std::string_view b) { return a < b; });
+}
+
 std::string ALXUISchema::asXSD() const
 {
     std::ostringstream out;

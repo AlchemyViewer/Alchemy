@@ -33,6 +33,7 @@
 
 #include "llfile.h"
 
+#include <algorithm>
 #include <cctype>
 
 namespace
@@ -1123,6 +1124,63 @@ bool ALXUIEdit::resize(const path_t& path, S32 dw, S32 dh, const Anchor& now)
             return false;
         }
         mWritten.push_back(attribute);
+    }
+    return true;
+}
+
+bool ALXUIEdit::reauthor(const path_t& path, const Anchor& want, EAuthor what)
+{
+    Step step(*this);
+    mError.clear();
+    mWritten.clear();
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+
+    // The ones that stay are written first, so an attribute the element
+    // already carries keeps the place it has in the tag and the diff is
+    // the numbers rather than the order.
+    std::vector<std::pair<std::string, S32>> writes;
+    if (what == AUTHOR_RECT)
+    {
+        writes.emplace_back("left", want.left);
+        writes.emplace_back(want.topLeft ? "top" : "bottom", want.topLeft ? want.top : want.bottom);
+    }
+    writes.emplace_back("width", want.width);
+    writes.emplace_back("height", want.height);
+
+    for (const auto& [attribute, value] : writes)
+    {
+        if (!setAttribute(path, attribute, std::to_string(value)))
+        {
+            return false;
+        }
+        mWritten.push_back(attribute);
+    }
+
+    // And everything else that positions it comes off. The node is stale
+    // after the first splice, so the names are taken before any of them.
+    std::vector<std::string> stale;
+    for (pugi::xml_attribute attribute : resolve(path).attributes())
+    {
+        const std::string name(attribute.name());
+        if (isGeometryAttribute(name)
+            && std::none_of(writes.begin(), writes.end(),
+                            [&name](const auto& write) { return write.first == name; }))
+        {
+            stale.push_back(name);
+        }
+    }
+    for (const std::string& name : stale)
+    {
+        if (!removeAttribute(path, name))
+        {
+            return false;
+        }
+        mWritten.push_back(name);
     }
     return true;
 }
