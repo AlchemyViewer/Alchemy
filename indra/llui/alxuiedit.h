@@ -88,6 +88,30 @@ public:
     bool moveElement(const path_t& path, const path_t& parent);
     bool removeElement(const path_t& path);
 
+    // Beside a sibling rather than at the end of a parent, taking that
+    // sibling's own indentation: order is what a menu, a tab container and
+    // a layout stack are, so where among the children is the edit.
+    bool insertBefore(const path_t& sibling, const std::string& xml);
+    bool insertAfter(const path_t& sibling, const std::string& xml);
+    bool moveBefore(const path_t& path, const path_t& sibling);
+    bool moveAfter(const path_t& path, const path_t& sibling);
+
+    // --- undo ----------------------------------------------------------------
+    // Every operation keeps the text it started from. A XUI file is small
+    // -- the largest of them is a third of a megabyte, and the largest
+    // anyone lays out by hand is a fifth of that -- so a step is the file
+    // as it was rather than a way to walk an operation backwards, which
+    // would have to be right about each of them separately.
+    //
+    // A step is one operation as a caller asked for it: a move is a
+    // removal and an insertion, and undoing it puts back both.
+    bool canUndo() const { return !mUndo.empty(); }
+    bool canRedo() const { return !mRedo.empty(); }
+    bool undo();
+    bool redo();
+    void clearHistory();
+    size_t undoDepth() const { return mUndo.size(); }
+
     // An attribute's value as the file writes it, entity spellings and
     // all, which is not always what the parser read it as. False when the
     // element does not carry the attribute.
@@ -121,6 +145,12 @@ public:
     // Which of these an element carries decides what a move writes.
     static bool isGeometryAttribute(std::string_view name);
 
+    // A path through the tree the removal of another element leaves. A
+    // step naming the same element by a later ordinal counts one fewer of
+    // them once it is gone, which is what a caller holding a path across
+    // a removal has to do to it.
+    static void afterRemoving(const path_t& removed, path_t& other);
+
     // Bytes to a file, as they are: what save writes with, and what a
     // caller holding an earlier text of its own puts back.
     static bool writeFile(const std::string& path, std::string_view text, std::string& error);
@@ -134,6 +164,23 @@ private:
 
     bool parse();
     void splice(const Span& span, std::string_view text);
+
+    // Holds the depth while one operation runs, so the operations an
+    // operation is made of do not each become a step of their own.
+    struct Step
+    {
+        explicit Step(ALXUIEdit& doc);
+        ~Step();
+        ALXUIEdit& mDoc;
+    };
+    friend struct Step;
+
+    // The element's own text, with the indentation of where it sits taken
+    // off, so it can be written in at another depth.
+    bool liftElement(const path_t& path, std::string& xml) const;
+
+    bool insertBeside(const path_t& sibling, const std::string& xml, bool before);
+    bool moveBeside(const path_t& path, const path_t& sibling, bool before);
 
     // The whole of an element in the text, from its '<' through the '>'
     // that closes it, and with the whitespace of the line it sits on.
@@ -167,8 +214,13 @@ private:
 
     std::string                     mPath;
     std::string                     mText;
+    std::string                     mSaved;     // as the file has it
     std::string                     mError;
     std::unique_ptr<ALXmlDocument>  mDoc;
     std::vector<std::string>        mWritten;
+    std::vector<std::string>        mUndo;
+    std::vector<std::string>        mRedo;
+    S32                             mDepth = 0;     // operations in progress
+    bool                            mStepOpen = false;
     bool                            mDirty = false;
 };

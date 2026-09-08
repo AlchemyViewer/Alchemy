@@ -539,4 +539,150 @@ namespace tut
         ensure("said why", !edit.error().empty());
         ensure_equals("and wrote nothing", edit.text(), raw());
     }
+
+    // Order is what a menu is, so an element arrives beside a sibling and
+    // takes that sibling's own indentation.
+    template<> template<>
+    void alxuiedit_object::test<14>()
+    {
+        const std::string source =
+            "<menu name=\"root\">\n"
+            "    <item name=\"a\"/>\n"
+            "    <item name=\"b\"/>\n"
+            "</menu>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("before", edit.insertBefore({ "b" }, "<item name=\"x\"/>"));
+        ensure("after", edit.insertAfter({ "a" }, "<item name=\"y\"/>"));
+        ensure_equals("each where it was asked for", edit.text(),
+            "<menu name=\"root\">\n"
+            "    <item name=\"a\"/>\n"
+            "    <item name=\"y\"/>\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"b\"/>\n"
+            "</menu>\n");
+    }
+
+    // A reorder among siblings, which is a removal and an insertion, and
+    // the sibling it lands beside is named as the tree stood before it.
+    template<> template<>
+    void alxuiedit_object::test<15>()
+    {
+        const std::string source =
+            "<menu name=\"root\">\n"
+            "    <item name=\"a\"/>\n"
+            "    <item name=\"b\"/>\n"
+            "    <item name=\"c\"/>\n"
+            "</menu>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("last goes first", edit.moveBefore({ "c" }, { "a" }));
+        ensure_equals("in that order", edit.text(),
+            "<menu name=\"root\">\n"
+            "    <item name=\"c\"/>\n"
+            "    <item name=\"a\"/>\n"
+            "    <item name=\"b\"/>\n"
+            "</menu>\n");
+        ensure("and not beside itself", !edit.moveAfter({ "a" }, { "a" }));
+    }
+
+    // Siblings of one name are told apart by which of them they are, so
+    // taking one away renumbers the ones after it -- including the one the
+    // move is going to land beside.
+    template<> template<>
+    void alxuiedit_object::test<16>()
+    {
+        const std::string source =
+            "<menu name=\"root\">\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"last\"/>\n"
+            "</menu>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+
+        // The ordinal is the index counted from zero, so x#2 is the third
+        // of them. Without the renumbering it would land beside itself.
+        ensure("the first goes after the third", edit.moveAfter({ "x" }, { "x#2" }));
+        ensure_equals("three of them still, in the order asked for", edit.text(),
+            "<menu name=\"root\">\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"x\"/>\n"
+            "    <item name=\"last\"/>\n"
+            "</menu>\n");
+
+        ALXUIEdit::path_t after{ "x#2" };
+        ALXUIEdit::path_t deeper{ "x#2", "child" };
+        ALXUIEdit::path_t second{ "x#1" };
+        ALXUIEdit::path_t elsewhere{ "other#2" };
+        ALXUIEdit::path_t earlier{ "x" };
+        const ALXUIEdit::path_t removed{ "x#1" };
+        ALXUIEdit::afterRemoving(removed, after);
+        ALXUIEdit::afterRemoving(removed, deeper);
+        ALXUIEdit::afterRemoving(removed, second);
+        ALXUIEdit::afterRemoving(removed, elsewhere);
+        ALXUIEdit::afterRemoving(removed, earlier);
+        ensure_equals("the one after it counts one fewer", after[0], std::string("x#1"));
+        ensure_equals("and so does a path through it", deeper[0], std::string("x#1"));
+        ensure_equals("the one that was removed keeps its own step", second[0], std::string("x#1"));
+        ensure_equals("another name is untouched", elsewhere[0], std::string("other#2"));
+        ensure_equals("and so is the one before it", earlier[0], std::string("x"));
+    }
+
+    // A step is one operation as a caller asked for it, whatever it is
+    // made of, and undoing it puts the file back byte for byte.
+    template<> template<>
+    void alxuiedit_object::test<17>()
+    {
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(raw()));
+        ensure("nothing to undo yet", !edit.canUndo());
+        ensure("and it is not dirty", !edit.dirty());
+
+        ensure("one", edit.setAttribute({ "target" }, "left", "30"));
+        ensure("two", edit.setAttribute({ "target" }, "top", "40"));
+        ensure_equals("two steps", edit.undoDepth(), 2u);
+        ensure("dirty", edit.dirty());
+
+        ensure("undo", edit.undo());
+        ensure("undo", edit.undo());
+        ensure_equals("back to the file it was", edit.text(), raw());
+        ensure("and clean again", !edit.dirty());
+        ensure("with nothing left to undo", !edit.canUndo());
+
+        ensure("redo", edit.redo());
+        ensure("redo", edit.redo());
+        ensure("both back", edit.text().find("left=\"30\"") != std::string::npos
+                         && edit.text().find("top=\"40\"") != std::string::npos);
+
+        // A move is a removal and an insertion; one undo is the whole move.
+        ensure("undo the redos", edit.undo() && edit.undo());
+        ensure("a fresh edit clears what was undone", edit.setAttribute({ "target" }, "left", "5"));
+        ensure("nothing to redo", !edit.canRedo());
+    }
+
+    // One undo for one move, however many splices it took.
+    template<> template<>
+    void alxuiedit_object::test<18>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <text name=\"a\">Hello</text>\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"c\">Here</text>\n"
+            "    </panel>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("moves", edit.moveElement({ "a" }, { "inner" }));
+        ensure_equals("one step for the move", edit.undoDepth(), 1u);
+        ensure("undo", edit.undo());
+        ensure_equals("the whole move came back", edit.text(), source);
+
+        // An operation that fails before it writes leaves no step.
+        ensure("no such element", !edit.removeElement({ "nowhere" }));
+        ensure("and nothing to undo", !edit.canUndo());
+    }
 }

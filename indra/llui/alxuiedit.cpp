@@ -27,6 +27,7 @@
 #include "alxuiedit.h"
 
 #include "alxuicatalog.h"
+#include "alxuiselection.h"
 
 #include "alxmldocument.h"
 
@@ -97,7 +98,9 @@ bool ALXUIEdit::loadFile(const std::string& path)
         return false;
     }
     mPath = path;
+    mSaved = mText;
     mDirty = false;
+    clearHistory();
     return parse();
 }
 
@@ -105,7 +108,9 @@ bool ALXUIEdit::loadBuffer(std::string_view text)
 {
     mPath.clear();
     mText.assign(text);
+    mSaved = mText;
     mDirty = false;
+    clearHistory();
     return parse();
 }
 
@@ -169,6 +174,7 @@ bool ALXUIEdit::saveAs(const std::string& path)
         return false;
     }
     mPath = path;
+    mSaved = mText;
     mDirty = false;
     return true;
 }
@@ -306,11 +312,82 @@ bool ALXUIEdit::insertionPoint(pugi::xml_node node, size_t& offset, std::string&
     return false;
 }
 
+// The undo stack holds whole texts, so it is capped by what they weigh
+// rather than by how many there are: a file of twenty kilobytes keeps two
+// hundred steps and one of two hundred keeps twenty.
+static constexpr size_t UNDO_BYTES = 4u << 20;
+
+ALXUIEdit::Step::Step(ALXUIEdit& doc)
+:   mDoc(doc)
+{
+    ++mDoc.mDepth;
+}
+
+ALXUIEdit::Step::~Step()
+{
+    if (--mDoc.mDepth == 0)
+    {
+        mDoc.mStepOpen = false;
+    }
+}
+
 void ALXUIEdit::splice(const Span& span, std::string_view text)
 {
+    // The first splice of an operation is what makes it a step. One that
+    // fails before it changes anything leaves no step behind.
+    if (mDepth > 0 && !mStepOpen)
+    {
+        mUndo.push_back(mText);
+        mRedo.clear();
+        mStepOpen = true;
+
+        size_t held = 0;
+        for (const std::string& step : mUndo)
+        {
+            held += step.size();
+        }
+        while (mUndo.size() > 1 && held > UNDO_BYTES)
+        {
+            held -= mUndo.front().size();
+            mUndo.erase(mUndo.begin());
+        }
+    }
+
     mText.replace(span.offset, span.length, text);
-    mDirty = true;
+    mDirty = mText != mSaved;
     parse();
+}
+
+bool ALXUIEdit::undo()
+{
+    if (mUndo.empty())
+    {
+        return false;
+    }
+    mRedo.push_back(std::move(mText));
+    mText = std::move(mUndo.back());
+    mUndo.pop_back();
+    mDirty = mText != mSaved;
+    return parse();
+}
+
+bool ALXUIEdit::redo()
+{
+    if (mRedo.empty())
+    {
+        return false;
+    }
+    mUndo.push_back(std::move(mText));
+    mText = std::move(mRedo.back());
+    mRedo.pop_back();
+    mDirty = mText != mSaved;
+    return parse();
+}
+
+void ALXUIEdit::clearHistory()
+{
+    mUndo.clear();
+    mRedo.clear();
 }
 
 // From the '<' of a tag to the '>' that ends it. An angle bracket inside
@@ -538,6 +615,7 @@ bool ALXUIEdit::contentPoint(pugi::xml_node node, size_t& offset, size_t& length
 
 bool ALXUIEdit::setText(const path_t& path, const std::string& text)
 {
+    Step step(*this);
     mError.clear();
     pugi::xml_node node = resolve(path);
     if (!node)
@@ -576,6 +654,7 @@ bool ALXUIEdit::setText(const path_t& path, const std::string& text)
 
 bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
 {
+    Step step(*this);
     mError.clear();
     pugi::xml_node node = resolve(parent);
     if (!node)
@@ -620,6 +699,7 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
 
 bool ALXUIEdit::removeElement(const path_t& path)
 {
+    Step step(*this);
     mError.clear();
     pugi::xml_node node = resolve(path);
     if (!node)
@@ -641,10 +721,101 @@ bool ALXUIEdit::removeElement(const path_t& path)
 // A move is the two operations, and the element carries its own text
 // between them with the indentation of its old home taken off: the
 // insertion puts back the one its new home asks for.
+bool ALXUIEdit::liftElement(const path_t& path, std::string& xml) const
+{
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        return false;
+    }
+    Span body;
+    Span whole;
+    if (!extentOf(node, body, whole))
+    {
+        return false;
+    }
+
+    const size_t start = (size_t)node.offset_debug() - 1;
+    const std::string own = indentAt(start);
+    xml.assign(mText, start, whole.offset + whole.length - start);
+    if (!own.empty())
+    {
+        const std::string from = "\n" + own;
+        for (size_t at = xml.find(from); at != std::string::npos; at = xml.find(from, at + 1))
+        {
+            xml.erase(at + 1, own.size());
+        }
+    }
+    return true;
+}
+
+// A path is a chain of names, and a name that repeats among siblings is
+// told apart by which of them it is. Take one away and the ones after it
+// in that parent each answer to one fewer.
+//
+//static
+void ALXUIEdit::afterRemoving(const path_t& removed, path_t& other)
+{
+    const size_t depth = removed.size() - 1;
+    if (removed.empty() || other.size() <= depth)
+    {
+        return;
+    }
+    for (size_t i = 0; i < depth; ++i)
+    {
+        if (removed[i] != other[i])
+        {
+            return;     // a different branch, so nothing shifts
+        }
+    }
+
+    std::string_view gone_name;
+    std::string_view mine_name;
+    S32 gone_ordinal = 0;
+    S32 mine_ordinal = 0;
+    ALXUISelection::splitOrdinal(removed[depth], gone_name, gone_ordinal);
+    ALXUISelection::splitOrdinal(other[depth], mine_name, mine_ordinal);
+    if (gone_name != mine_name || mine_ordinal <= gone_ordinal)
+    {
+        return;
+    }
+    // The ordinal a step carries is the index, counted from zero, so the
+    // first of a name carries none: ALXUISelection::step writes it and
+    // splitOrdinal reads it back.
+    other[depth] = ALXUISelection::step(mine_name, mine_ordinal - 1);
+}
+
 bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
 {
+    Step step(*this);
     mError.clear();
-    pugi::xml_node node = resolve(path);
+    std::string xml;
+    if (!liftElement(path, xml))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+
+    path_t landing(parent);
+    afterRemoving(path, landing);
+    return removeElement(path) && insertElement(landing, xml);
+}
+
+bool ALXUIEdit::insertBefore(const path_t& sibling, const std::string& xml)
+{
+    return insertBeside(sibling, xml, true);
+}
+
+bool ALXUIEdit::insertAfter(const path_t& sibling, const std::string& xml)
+{
+    return insertBeside(sibling, xml, false);
+}
+
+bool ALXUIEdit::insertBeside(const path_t& sibling, const std::string& xml, bool before)
+{
+    Step step(*this);
+    mError.clear();
+    pugi::xml_node node = resolve(sibling);
     if (!node)
     {
         mError = "no element at that path";
@@ -659,18 +830,59 @@ bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
     }
 
     const size_t start = (size_t)node.offset_debug() - 1;
-    const std::string own = indentAt(start);
-    std::string xml(mText, start, whole.offset + whole.length - start);
-    if (!own.empty())
+    const std::string indent = indentAt(start);
+    const std::string eol = mText.find("\r\n") == std::string::npos ? "\n" : "\r\n";
+
+    // The whole of it lands at the sibling's depth, children and all.
+    std::string block = xml;
+    for (size_t line = block.find('\n'); line != std::string::npos;
+         line = block.find('\n', line + 1 + indent.size()))
     {
-        const std::string from = "\n" + own;
-        for (size_t at = xml.find(from); at != std::string::npos; at = xml.find(from, at + 1))
-        {
-            xml.erase(at + 1, own.size());
-        }
+        block.insert(line + 1, indent);
     }
 
-    return removeElement(path) && insertElement(parent, xml);
+    if (before)
+    {
+        splice({ start, 0 }, block + eol + indent);
+    }
+    else
+    {
+        splice({ whole.offset + whole.length, 0 }, eol + indent + block);
+    }
+    return true;
+}
+
+bool ALXUIEdit::moveBefore(const path_t& path, const path_t& sibling)
+{
+    return moveBeside(path, sibling, true);
+}
+
+bool ALXUIEdit::moveAfter(const path_t& path, const path_t& sibling)
+{
+    return moveBeside(path, sibling, false);
+}
+
+bool ALXUIEdit::moveBeside(const path_t& path, const path_t& sibling, bool before)
+{
+    Step step(*this);
+    mError.clear();
+    if (path == sibling)
+    {
+        mError = "an element cannot be moved beside itself";
+        return false;
+    }
+    std::string xml;
+    if (!liftElement(path, xml))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+
+    // The sibling is named as the tree stands, and the removal comes
+    // first: a name it shares with what is going answers to one fewer.
+    path_t landing(sibling);
+    afterRemoving(path, landing);
+    return removeElement(path) && insertBeside(landing, xml, before);
 }
 
 bool ALXUIEdit::valueText(pugi::xml_node node, std::string_view name, std::string& out) const
@@ -687,6 +899,7 @@ bool ALXUIEdit::valueText(pugi::xml_node node, std::string_view name, std::strin
 
 bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const std::string& value)
 {
+    Step step(*this);
     mError.clear();
     pugi::xml_node node = resolve(path);
     if (!node)
@@ -717,6 +930,7 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
 
 bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
 {
+    Step step(*this);
     mError.clear();
     pugi::xml_node node = resolve(path);
     if (!node)
@@ -767,6 +981,7 @@ bool ALXUIEdit::addDelta(pugi::xml_node node, std::string_view name, S32 delta,
 // counts downwards, so a move up subtracts.
 bool ALXUIEdit::translate(const path_t& path, S32 dx, S32 dy, const Anchor& now)
 {
+    Step step(*this);
     mError.clear();
     mWritten.clear();
     pugi::xml_node node = resolve(path);
@@ -859,6 +1074,7 @@ bool ALXUIEdit::translate(const path_t& path, S32 dx, S32 dy, const Anchor& now)
 // names two edges.
 bool ALXUIEdit::resize(const path_t& path, S32 dw, S32 dh, const Anchor& now)
 {
+    Step step(*this);
     mError.clear();
     mWritten.clear();
     pugi::xml_node node = resolve(path);
