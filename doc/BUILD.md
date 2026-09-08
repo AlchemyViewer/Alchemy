@@ -394,6 +394,8 @@ VS Code, with the Red Hat XML extension:
 
 It is regenerated rather than edited, and it is permissive where XUI is ambiguous. A parameter may be written as an attribute or as a nested element, and a colour, image, font or setting name is a string whose vocabulary lives in another file. Those are for the tool's lint to check, not a schema.
 
+A few files under `xui/` are data rather than widget trees — `strings.xml`, `mime_types.xml`, the `llsd` files, the `contents` tables. The schema has no root for those and an editor will say so on their first line; the association is by path and cannot tell them apart.
+
 ## Packaging
 
 Release packages are produced by [Velopack](https://velopack.io). The packaging step runs automatically after a successful build when `PACKAGE=ON` (the default). To skip it during development:
