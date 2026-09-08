@@ -415,7 +415,7 @@ public:
     bool        followsRight() const            { return mReshapeFlags & FOLLOWS_RIGHT; }
     bool        followsTop() const              { return mReshapeFlags & FOLLOWS_TOP; }
     bool        followsBottom() const           { return mReshapeFlags & FOLLOWS_BOTTOM; }
-    bool        followsAll() const              { return mReshapeFlags & FOLLOWS_ALL; }
+    bool        followsAll() const              { return (mReshapeFlags & FOLLOWS_ALL) == FOLLOWS_ALL; }
 
     const LLRect&   getRect() const             { return mRect; }
     const LLRect&   getBoundingRect() const     { return mBoundingRect; }

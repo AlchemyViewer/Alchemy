@@ -292,4 +292,22 @@ namespace tut
         ensure("a point outside every child finds none",
                root->childFromPoint(80, 80) == nullptr);
     }
+
+    // followsAll is the four edges together, which is what its name says and
+    // what a caller reaching for it would be asking.
+    template<> template<>
+    void llview_object::test<11>()
+    {
+        std::unique_ptr<TestView> v(view("follower", LLRect(0, 10, 10, 0), FOLLOWS_LEFT));
+        ensure("one edge is not all of them", !v->followsAll());
+
+        v->setFollows(FOLLOWS_LEFT | FOLLOWS_RIGHT | FOLLOWS_TOP);
+        ensure("three edges are not all of them", !v->followsAll());
+
+        v->setFollowsAll();
+        ensure("four edges are", v->followsAll());
+
+        v->setFollowsNone();
+        ensure("none are not", !v->followsAll());
+    }
 }
