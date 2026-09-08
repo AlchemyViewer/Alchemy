@@ -108,6 +108,8 @@ target_sources(llui
     llvirtualtrackball.cpp
     llwindowshade.cpp
     llxuiparser.cpp
+    alcolorfield.cpp
+    alpropertygrid.cpp
     alxuicatalog.cpp
     alxuidiagnostics.cpp
     alxuiedit.cpp
@@ -244,6 +246,8 @@ target_sources(llui
     llvirtualtrackball.h
     llwindowshade.h
     llxuiparser.h
+    alcolorfield.h
+    alpropertygrid.h
     alxuicatalog.h
     alxuidiagnostics.h
     alxuiedit.h

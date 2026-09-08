@@ -48,6 +48,7 @@
 #include <boost/unordered_map.hpp>
 
 class ALXUILiveFile;
+class ALPropertyGrid;
 class ALXUIPreviewHost;
 class LLCheckBoxCtrl;
 class LLComboBox;
@@ -273,6 +274,7 @@ private:
     // --- the inspectors ------------------------------------------------------
     void refreshInspectors();
     void refreshAttributes(LLView* view);
+    void onFieldCommit(const std::string& name, const std::string& value);
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
     void refreshBindings(LLView* view);
@@ -382,7 +384,7 @@ private:
     LLPanel*            mBreadcrumb = nullptr;
     LLScrollListCtrl*   mFindings = nullptr;
     LLTabContainer*     mInspectors = nullptr;
-    LLScrollListCtrl*   mAttributes = nullptr;
+    ALPropertyGrid*     mAttributeGrid = nullptr;
     LLScrollListCtrl*   mLayout = nullptr;
     LLTextBox*          mSourceLayers = nullptr;
     LLTextEditor*       mSourceText = nullptr;

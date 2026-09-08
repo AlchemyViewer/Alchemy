@@ -28,6 +28,8 @@
 
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
+#include "alcolorfield.h"
+#include "alpropertygrid.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
 #include "alxuitranslate.h"
@@ -1032,7 +1034,7 @@ bool ALFloaterXUIStudio::postBuild()
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
-    mAttributes = getChild<LLScrollListCtrl>("attributes");
+    mAttributeGrid = getChild<ALPropertyGrid>("attributes_grid");
     mLayout = getChild<LLScrollListCtrl>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");
     mSourceText = getChild<LLTextEditor>("source_text");
@@ -1042,6 +1044,12 @@ bool ALFloaterXUIStudio::postBuild()
     mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
     mNotifications = getChild<LLScrollListCtrl>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
+    mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
+    getChild<LLCheckBoxCtrl>("attributes_authored")->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setAuthoredOnly(ctrl->getValue().asBoolean());
+        });
     mChannels = getChild<LLScrollListCtrl>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
@@ -1068,7 +1076,7 @@ bool ALFloaterXUIStudio::postBuild()
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
 
     // Every table in the tool copies the same way.
-    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mAttributes,
+    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings,
                                     mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
     {
         watchList(list);
@@ -3060,8 +3068,7 @@ std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
     }
 
     std::string what = "Rows";
-    if (list == mAttributes)              { what = "Attributes"; }
-    else if (list == mLayout)             { what = "Layout"; }
+    if (list == mLayout)                  { what = "Layout"; }
     else if (list == mBindings)           { what = "Bindings"; }
     else if (list == mState)              { what = "State"; }
     else if (list == mSelectionFindings)  { what = "Findings"; }
@@ -4435,9 +4442,13 @@ void ALFloaterXUIStudio::refreshInspectors()
     }
 }
 
+// Every field the selected widget answers to, with what is in force and
+// which layer put it there. The schema says what the fields are and what
+// each one is, so the grid gets a check box for a flag and a list of names
+// for an enumeration without either of them knowing what a widget is.
 void ALFloaterXUIStudio::refreshAttributes(LLView* view)
 {
-    mAttributes->deleteAllItems();
+    mAttributeGrid->clearFields();
     if (!view)
     {
         return;
@@ -4453,35 +4464,125 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
     // the tag the file wrote: <panel class="foo"> is foo's parameters.
     const std::string* tag = LLUICtrlFactory::widgetTag(view->viewType());
     const ALXUISchema& schema = ALXUISchema::get();
+    const ALXUISchema::Tag* declared = tag ? schema.tag(*tag) : nullptr;
 
-    // Which layer last wrote each attribute, and the line in that layer's
-    // file, as the merge's observer recorded it; the base wrote the rest.
+    std::vector<ALPropertyGrid::Field> fields;
+    boost::unordered_set<std::string> written;
+
+    const auto describe = [&](ALPropertyGrid::Field& field, const std::string& name)
+    {
+        if (const ALXUISchema::Attribute* attribute = tag ? schema.attribute(*tag, name) : nullptr)
+        {
+            field.kind = attribute->value;
+            field.values = attribute->values;
+            field.type = attribute->type;
+        }
+        else if (declared)
+        {
+            field.type = getString("AttributeUnknown");
+        }
+    };
+
+    // Which layer last wrote each attribute, as the merge's observer
+    // recorded it; the base wrote the rest.
     for (const auto& [name_entry, attribute] : origin->node->mAttributes)
     {
-        const char* name = name_entry->mString;
+        ALPropertyGrid::Field field;
+        field.name = name_entry->mString;
+        field.value = attribute->getValue();
         const ALXUIOverlay::Origin* from = pv.overlay.originOf(attribute.get());
-        const S32 line = from ? from->line : attribute->getLineNumber();
-        const ALXUISchema::Attribute* declared = tag ? schema.attribute(*tag, name) : nullptr;
-        mAttributes->addElement(row(name, {
-            { "attribute", name },
-            { "value", attribute->getValue() },
-            { "type", declared ? declared->type
-                               : (tag && schema.tag(*tag) ? getString("AttributeUnknown") : std::string()) },
-            { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
-            { "line", line > 0 ? std::to_string(line) : std::string() } }));
+        field.source = layerLabel(PRIMARY, from ? from->layer : 0);
+        field.authored = true;
+        describe(field, field.name);
+        written.insert(field.name);
+        fields.push_back(std::move(field));
     }
+
     if (origin->node->hasTextContents())
     {
+        ALPropertyGrid::Field field;
+        field.name = "value";
+        field.value = origin->node->getTextContents();
         const ALXUIOverlay::Origin* from = pv.overlay.originOf(origin->node.get());
-        const S32 line = from ? from->line : origin->line;
-        const ALXUISchema::Tag* declared = tag ? schema.tag(*tag) : nullptr;
-        mAttributes->addElement(row("text()", {
-            { "attribute", "(text)" },
-            { "value", origin->node->getTextContents() },
-            { "type", declared && !declared->text ? getString("AttributeUnknown") : std::string() },
-            { "layer", layerLabel(PRIMARY, from ? from->layer : 0) },
-            { "line", line > 0 ? std::to_string(line) : std::string() } }));
+        field.source = layerLabel(PRIMARY, from ? from->layer : 0);
+        field.authored = true;
+        field.kind = ALParamType::STRING;
+        written.insert(field.name);
+        fields.push_back(std::move(field));
     }
+
+    // And everything else the tag takes, for an author looking for the
+    // name of a thing rather than changing one they can already see.
+    if (declared)
+    {
+        for (const ALXUISchema::Attribute& attribute : declared->attributes)
+        {
+            if (written.count(attribute.name))
+            {
+                continue;
+            }
+            ALPropertyGrid::Field field;
+            field.name = attribute.name;
+            field.kind = attribute.value;
+            field.values = attribute.values;
+            field.type = attribute.type;
+            fields.push_back(std::move(field));
+        }
+    }
+
+    mAttributeGrid->setFields(std::move(fields));
+}
+
+// A field committed in the grid is one operation on the document, at the
+// element the selection names.
+void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::string& value)
+{
+    if (!mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return;
+    }
+
+    // Where a field is written: the layer that already writes the geometry
+    // when there is one, else the file's own base layer, which is where an
+    // author working in English means it to go.
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        const std::vector<const ALXUICatalog::Layer*> layers =
+            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+        layer = layers.empty() ? nullptr : layers.front();
+    }
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return;
+    }
+    const bool ok = name == "value"
+        ? held->setText(mSelection.selection(), value)
+        : held->setAttribute(mSelection.selection(), name, value);
+    if (!ok)
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = name;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    documentChanged(getString("EditWrote", args));
 }
 
 // A layer's skin and language, read off its path: the segments around
