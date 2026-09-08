@@ -79,6 +79,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALProbeSuperSample</key>
+        <map>
+            <key>Comment</key>
+            <string>Linear supersample factor of a reflection probe capture: each face renders at the probe resolution times this (4 = the original 512 for a 128 probe, sixteen times the pixels), is blurred and downsampled to the probe. 2 costs about a quarter of the GPU fill per face at a small cost in radiance sharpness on mirror-like surfaces; 1 renders at probe resolution. Rebuilds the render targets when changed.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>

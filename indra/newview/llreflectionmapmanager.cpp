@@ -327,7 +327,7 @@ void LLReflectionMapManager::update()
     if (!mRenderTarget.isComplete())
     {
         U32 color_fmt = render_hdr ? GL_R11F_G11F_B10F : GL_RGB8;
-        U32 targetRes = mProbeResolution * 4; // super sample
+        U32 targetRes = mProbeResolution * mSuperSample; // super sample
         mRenderTarget.allocate(targetRes, targetRes, color_fmt, true);
     }
 
@@ -1702,6 +1702,18 @@ void LLReflectionMapManager::initReflectionMaps()
 {
     static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
     U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
+
+    // The supersample factor sizes the scratch target and, through LLPipeline, the aux pack a
+    // face renders into; a change is applied like a resolution change, by the listener that
+    // rebuilds the GL buffers (handleReflectionProbeDetailChanged), so here it only has to be
+    // read. 1, 2 or 4: the blur and downsample below assume a power of two.
+    static LLCachedControl<S32> super_sample(gSavedSettings, "ALProbeSuperSample", 4);
+    const U32 supersample = super_sample >= 4 ? 4u : (super_sample >= 2 ? 2u : 1u);
+    if (supersample != mSuperSample)
+    {
+        mSuperSample = supersample;
+        mRenderTarget.release();
+    }
     // No irradiance resolution to size any more: irradiance is nine SH coefficients whatever
     // the environment looks like, so the setting that used to pick a cubemap edge length is gone.
     if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||

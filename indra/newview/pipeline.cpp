@@ -877,7 +877,8 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
 
         mRT = &mAuxillaryRT;
-        U32 res = mReflectionMapManager.mProbeResolution * 4;  //multiply by 4 because probes will be 16x super sampled
+        // faces render supersampled (ALProbeSuperSample, 4 = the original 16x) and are downsampled to the probe
+        U32 res = mReflectionMapManager.mProbeResolution * mReflectionMapManager.superSample();
         allocateScreenBufferInternal(res, res);
 
         if (RenderMirrors)
@@ -1067,6 +1068,13 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     S32 shadow_detail = RenderShadowDetail;
 
     F32 scale = gCubeSnapshot ? 1.0f : llmax(0.f, RenderShadowResolutionScale); // Don't scale probe shadow maps
+    if (gCubeSnapshot && mRT == &mAuxillaryRT)
+    {
+        // The probe pack's colour target follows ALProbeSuperSample, its shadow maps stay at
+        // the size the full supersample gave them: a coarser capture is not a reason for
+        // coarser shadows in it.
+        resX = resY = mReflectionMapManager.mProbeResolution * 4;
+    }
     U32 sun_shadow_map_width = BlurHappySize(resX, scale);
     U32 sun_shadow_map_height = BlurHappySize(resY, scale);
 
