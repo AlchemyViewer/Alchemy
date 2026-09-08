@@ -98,6 +98,10 @@ public:
     bool undoEdit();
     bool redoEdit();
 
+    // Which edge of its parent the selected element is tied to, from the
+    // anchor the canvas draws outside that edge.
+    void toggleFollows(S32 edge);
+
     // --- the document under edit ---------------------------------------------
     // Edits go into a document the tool holds, and the preview is built
     // from it: the disk hears nothing until a save.
@@ -286,6 +290,7 @@ private:
     void fillPalette();
     void onInsertFromPalette();
     void onTreeMove(const std::string& action);
+    void revealInContainers(LLView* view);
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
     void refreshBindings(LLView* view);

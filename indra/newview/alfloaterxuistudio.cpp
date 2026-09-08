@@ -57,6 +57,7 @@
 #include "llnotificationtemplate.h"
 #include "llsdparam.h"
 #include "llrender2dutils.h"
+#include "llaccordionctrltab.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
 #include "lltabcontainer.h"
@@ -213,6 +214,7 @@ public:
                 {
                     const LLRect r = localRectOf(view);
                     drawGrips(r);
+                    drawAnchors(view, r);
                     if (dragging())
                     {
                         LLRect dragged(r);
@@ -260,6 +262,14 @@ public:
         LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection());
         if (editable(selected))
         {
+            // An anchor is a click and not a drag: it says which edge of
+            // its parent the element is tied to, and that is on or off.
+            const S32 anchor = anchorAt(x, y, localRectOf(selected));
+            if (anchor >= 0)
+            {
+                mTool->toggleFollows(anchor);
+                return true;
+            }
             const S32 grip = gripAt(x, y, localRectOf(selected), mask);
             if (grip != GRIP_NONE)
             {
@@ -347,6 +357,7 @@ private:
     static constexpr S32 GRIP_MOVE = -2;
 
     static constexpr S32 GRIP_SIZE = 7;
+    static constexpr S32 ANCHOR_SIZE = 7;
     static constexpr S32 MOVE_GRIP_SIZE = 13;
     static constexpr S32 DEAD_ZONE = 3;      // a click is not a drag
 
@@ -445,6 +456,49 @@ private:
         {
             edges[i] = table[index][i];
         }
+    }
+
+    // The four anchors, just outside each edge: filled where the element
+    // follows that edge of its parent. Outside, because the eight resize
+    // grips are already on the edges and an anchor is not a size.
+    static void anchorRects(const LLRect& r, LLRect (&out)[EDGE_COUNT])
+    {
+        const S32 h = ANCHOR_SIZE / 2;
+        const S32 mid_x = (r.mLeft + r.mRight) / 2;
+        const S32 mid_y = (r.mBottom + r.mTop) / 2;
+        const S32 away = GRIP_SIZE + 2;
+        out[EDGE_L] = LLRect(r.mLeft - away - h, mid_y + h, r.mLeft - away + h, mid_y - h);
+        out[EDGE_B] = LLRect(mid_x - h, r.mBottom - away + h, mid_x + h, r.mBottom - away - h);
+        out[EDGE_R] = LLRect(r.mRight + away - h, mid_y + h, r.mRight + away + h, mid_y - h);
+        out[EDGE_T] = LLRect(mid_x - h, r.mTop + away + h, mid_x + h, r.mTop + away - h);
+    }
+
+    void drawAnchors(const LLView* view, const LLRect& r) const
+    {
+        static const U32 flags[EDGE_COUNT] = { FOLLOWS_LEFT, FOLLOWS_BOTTOM, FOLLOWS_RIGHT, FOLLOWS_TOP };
+        static const LLUIColor on = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+        LLRect anchors[EDGE_COUNT];
+        anchorRects(r, anchors);
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            const bool held = (view->getFollows() & flags[i]) != 0;
+            gl_rect_2d(anchors[i], held ? on.get() : LLColor4::black, true);
+            gl_rect_2d(anchors[i], LLColor4::white, false);
+        }
+    }
+
+    S32 anchorAt(S32 x, S32 y, const LLRect& r) const
+    {
+        LLRect anchors[EDGE_COUNT];
+        anchorRects(r, anchors);
+        for (S32 i = 0; i < EDGE_COUNT; ++i)
+        {
+            if (anchors[i].pointInRect(x, y))
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     void drawGrips(const LLRect& r) const
@@ -1034,7 +1088,22 @@ bool ALFloaterXUIStudio::postBuild()
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
-    mAttributeGrid = getChild<ALPropertyGrid>("attributes_grid");
+    // Built here rather than named in the file: a tag registered by a
+    // static in a library is only there if the linker kept the object it
+    // sits in, and a widget the factory cannot name comes back as a stray
+    // that is not in the tree and draws nowhere.
+    {
+        LLScrollContainer* scroll = getChild<LLScrollContainer>("attributes_scroll");
+        ALPropertyGrid::Params p;
+        p.name = "attributes_grid";
+        p.rect = LLRect(0, scroll->getRect().getHeight(),
+                        scroll->getRect().getWidth() - 18, 0);
+        p.label_width = 150;
+        p.source_width = 80;
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
+        scroll->addChild(mAttributeGrid);
+    }
     mLayout = getChild<LLScrollListCtrl>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");
     mSourceText = getChild<LLTextEditor>("source_text");
@@ -2835,6 +2904,99 @@ void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
           || action == "delete")
     {
         restructure(action, item->getPath());
+    }
+}
+
+// Which edge of its parent an element is tied to, written as the file
+// writes it. The flags in force are the merged document's answer, whatever
+// layer or widget template put them there, so a first click on an element
+// that says nothing writes what it already does with one edge changed --
+// which is what the overlay was showing.
+void ALFloaterXUIStudio::toggleFollows(S32 edge)
+{
+    static const U32 flags[] = { FOLLOWS_LEFT, FOLLOWS_BOTTOM, FOLLOWS_RIGHT, FOLLOWS_TOP };
+    if (edge < 0 || edge >= (S32)LL_ARRAY_SIZE(flags))
+    {
+        return;
+    }
+    LLView* view = selectedView();
+    if (!view)
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    if (layers.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return;
+    }
+
+    const U32 now = view->getFollows() ^ flags[edge];
+    std::string text;
+    const auto add = [&text](const char* name) { text += text.empty() ? name : (std::string("|") + name); };
+    if (now & FOLLOWS_LEFT)   { add("left"); }
+    if (now & FOLLOWS_TOP)    { add("top"); }
+    if (now & FOLLOWS_RIGHT)  { add("right"); }
+    if (now & FOLLOWS_BOTTOM) { add("bottom"); }
+    if (text.empty())
+    {
+        text = "none";
+    }
+
+    if (!held->setAttribute(mSelection.selection(), "follows", text))
+    {
+        setStatus(held->error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = "follows=\"" + text + "\"";
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    documentChanged(getString("EditWrote", args));
+}
+
+// A selection inside a tab, an accordion or a scroll container is not on
+// screen until its container shows it, and an author selecting a row in
+// the tree means to look at the thing. So the containers are told.
+void ALFloaterXUIStudio::revealInContainers(LLView* view)
+{
+    if (!view)
+    {
+        return;
+    }
+    for (LLView* child = view; child && child->getParent(); child = child->getParent())
+    {
+        LLView* parent = child->getParent();
+        if (LLTabContainer* tabs = parent->as<LLTabContainer>())
+        {
+            if (LLPanel* panel = child->as<LLPanel>())
+            {
+                tabs->selectTabPanel(panel);
+            }
+        }
+        else if (LLAccordionCtrlTab* tab = parent->as<LLAccordionCtrlTab>())
+        {
+            if (!tab->getDisplayChildren())
+            {
+                tab->setDisplayChildren(true);
+            }
+        }
+        else if (LLScrollContainer* scroll = parent->as<LLScrollContainer>())
+        {
+            scroll->scrollToShowRect(child->getRect());
+        }
     }
 }
 
@@ -4688,9 +4850,11 @@ void ALFloaterXUIStudio::onSelectionChanged()
         }
         mSyncingTree = false;
     }
+    revealInContainers(selectedView());
     refreshBreadcrumb();
     refreshEditTarget();
     refreshInspectors();
+    fillPalette();
 }
 
 void ALFloaterXUIStudio::onHoverChanged()
