@@ -950,6 +950,48 @@
                      top_delta="0"
                      width="80" />
                 </panel>
+                <panel
+                 label="Notifications"
+                 layout="topleft"
+                 name="notifications_pane">
+                    <filter_editor
+                     follows="left|top"
+                     height="22"
+                     label="Filter"
+                     layout="topleft"
+                     left="0"
+                     name="notification_filter"
+                     top="2"
+                     width="240" />
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="146"
+                     layout="topleft"
+                     left="0"
+                     name="notifications"
+                     tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
+                     top="28"
+                     width="1164">
+                        <scroll_list.columns
+                         label="Name"
+                         name="name"
+                         width="240" />
+                        <scroll_list.columns
+                         label="Type"
+                         name="type"
+                         width="90" />
+                        <scroll_list.columns
+                         label="Buttons"
+                         name="buttons"
+                         width="60" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Message"
+                         name="message" />
+                    </scroll_list>
+                </panel>
             </tab_container>
         </layout_panel>
 

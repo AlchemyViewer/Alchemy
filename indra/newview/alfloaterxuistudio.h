@@ -148,6 +148,13 @@ private:
     LLFloater* buildRealFloater(S32 which, const ALXUICatalog::Entry& entry,
                                 const std::string& name, LLXMLNodePtr& node);
     static void detachHost(LLFloater* host);
+
+    // --- notifications -------------------------------------------------------
+    // A template built as the panel it would produce, without posting it.
+    LLView* buildNotification(ALXUIPreviewHost* host);
+    void fillNotifications();
+    void onNotificationSelected();
+    void onBottomTab();
     void closePreview(S32 which);
     void closePreviews();
     void showGallery();
@@ -341,6 +348,10 @@ private:
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
     LLTabContainer*     mBottomTabs = nullptr;
+    LLScrollListCtrl*   mNotifications = nullptr;
+    LLFilterEditor*     mNotificationFilter = nullptr;
+    // The template being previewed, when the file is notifications.xml.
+    std::string         mNotification;
     LLComboBox*         mTranslateLanguage = nullptr;
     LLScrollListCtrl*   mTranslateList = nullptr;
     LLLineEditor*       mTranslateValue = nullptr;

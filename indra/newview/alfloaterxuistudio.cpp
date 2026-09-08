@@ -51,6 +51,9 @@
 #include "lllineeditor.h"
 #include "lllivefile.h"
 #include "llmenugl.h"
+#include "llnotifications.h"
+#include "llnotificationtemplate.h"
+#include "llsdparam.h"
 #include "llrender2dutils.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
@@ -58,6 +61,8 @@
 #include "lltextbox.h"
 #include "lltexteditor.h"
 #include "lltimer.h"
+#include "lltoastalertpanel.h"
+#include "lltoastnotifypanel.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
@@ -1027,6 +1032,8 @@ bool ALFloaterXUIStudio::postBuild()
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
     mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
+    mNotifications = getChild<LLScrollListCtrl>("notifications");
+    mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
     mTranslateList = getChild<LLScrollListCtrl>("translate_list");
     mTranslateValue = getChild<LLLineEditor>("translate_value");
@@ -1057,7 +1064,9 @@ bool ALFloaterXUIStudio::postBuild()
         watchList(list);
     }
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshInspectors, this));
-    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillTranslation, this));
+    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onBottomTab, this));
+    mNotifications->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onNotificationSelected, this));
+    mNotificationFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillNotifications, this));
     mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
     mTranslateList->setCommitOnSelectionChange(true);
     mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationSelected, this));
@@ -1606,6 +1615,10 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
         break;
     }
 
+    case ALXUICatalog::Kind::Notifications:
+        root = buildNotification(host);
+        break;
+
     case ALXUICatalog::Kind::Widget:
     case ALXUICatalog::Kind::Template:
     {
@@ -1627,6 +1640,111 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
     }
     factory.popFileName();
     return root;
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+// A template as the panel it would produce. A notification can be built
+// without being posted -- its constructor is public and touches no channel
+// -- so nothing here reaches the queues, the history, or what the viewer
+// remembers about "do not show me this again".
+//
+// No substitutions are supplied. A template's [PLACEHOLDER] left standing is
+// what a XUI author wants to see: it says where the text will grow, which is
+// the question a preview of a notification is being asked.
+LLView* ALFloaterXUIStudio::buildNotification(ALXUIPreviewHost* host)
+{
+    if (mNotification.empty() || !LLNotifications::instance().templateExists(mNotification))
+    {
+        return nullptr;
+    }
+    const LLNotificationTemplatePtr tmpl = LLNotifications::instance().getTemplate(mNotification);
+    if (!tmpl)
+    {
+        return nullptr;
+    }
+
+    LLSDParamAdapter<LLNotification::Params> params;
+    params.name = mNotification;
+    const LLNotificationPtr note(new LLNotification(params));
+
+    // The panel the viewer would route this type to.
+    LLPanel* panel = (tmpl->mType == "alertmodal" || tmpl->mType == "alert")
+                   ? (LLPanel*)new LLToastAlertPanel(note, false)
+                   : (LLPanel*)new LLToastNotifyPanel(note);
+
+    const S32 header = LLFloater::getDefaultParams().header_height;
+    const LLRect r = panel->getRect();
+    host->addChild(panel);
+    host->reshape(llmax(r.getWidth() + 16, 160), llmax(r.getHeight() + 16, 40) + header);
+    panel->setOrigin(8, host->getRect().getHeight() - header - r.getHeight() - 8);
+    host->setCanResize(true);
+    return panel;
+}
+
+// Every template the notification system knows, which is notifications.xml
+// as the viewer read it rather than as the file says it: the layers are
+// merged and the language applied by the time it is here.
+void ALFloaterXUIStudio::fillNotifications()
+{
+    if (!mNotifications)
+    {
+        return;
+    }
+    const std::string selected = mNotification;
+    mNotifications->deleteAllItems();
+
+    std::string filter = mNotificationFilter ? mNotificationFilter->getText() : std::string();
+    LLStringUtil::toLower(filter);
+
+    for (auto it = LLNotifications::instance().templatesBegin();
+         it != LLNotifications::instance().templatesEnd(); ++it)
+    {
+        const LLNotificationTemplatePtr& tmpl = it->second;
+        if (!filter.empty())
+        {
+            std::string name = tmpl->mName;
+            LLStringUtil::toLower(name);
+            if (name.find(filter) == std::string::npos)
+            {
+                continue;
+            }
+        }
+        std::string message = tmpl->mMessage;
+        LLStringUtil::replaceChar(message, '\n', ' ');
+        mNotifications->addElement(row(tmpl->mName, {
+            { "name", tmpl->mName },
+            { "type", tmpl->mType },
+            { "buttons", std::to_string(tmpl->mForm ? tmpl->mForm->getNumElements() : 0) },
+            { "message", message } }));
+    }
+    mNotifications->sortByColumn("name", true);
+    if (!selected.empty())
+    {
+        mNotifications->selectByValue(selected);
+    }
+}
+
+// The two tabs that fill themselves from something other than the preview.
+void ALFloaterXUIStudio::onBottomTab()
+{
+    fillTranslation();
+    if (mNotifications->getItemCount() == 0)
+    {
+        fillNotifications();
+    }
+}
+
+void ALFloaterXUIStudio::onNotificationSelected()
+{
+    const LLSD value = mNotifications->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return;
+    }
+    mNotification = value.asString();
+    showPreviews();
 }
 
 // A preview the tool did not make has no handles to let go of.
@@ -1745,7 +1863,10 @@ void ALFloaterXUIStudio::showPreview(S32 which)
     }
     const bool viewer_widget = !widget_tag.empty() && !isCoreWidgetTag(widget_tag);
 
-    if (!isBuilt(entry->kind) || viewer_widget)
+    // notifications.xml is a file of templates rather than a view tree; it
+    // is built once one of them has been chosen on the Notifications tab.
+    const bool notification = entry->kind == ALXUICatalog::Kind::Notifications && !mNotification.empty();
+    if ((!isBuilt(entry->kind) && !notification) || viewer_widget)
     {
         if (which == PRIMARY)
         {
@@ -1814,7 +1935,10 @@ void ALFloaterXUIStudio::showPreview(S32 which)
     pv.root = root;
     pv.node = node;
     pv.views = countViews(root);
-    pv.sourceMap.build(root, node);
+    // A notification's panel comes from its own XUI, not from the file the
+    // template is in: there is no element in notifications.xml that any of
+    // those widgets was built from, so nothing is paired with one.
+    pv.sourceMap.build(root, entry->kind == ALXUICatalog::Kind::Notifications ? LLXMLNodePtr() : node);
     placeHost(which, host);
     host->openFloater();
 
