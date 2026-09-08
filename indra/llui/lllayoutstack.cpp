@@ -33,6 +33,7 @@
 #include "lllocalcliprect.h"
 #include "llpanel.h"
 #include "llcriticaldamp.h"
+#include "llframetimer.h"
 #include "lliconctrl.h"
 #include "boost/foreach.hpp"
 
@@ -60,19 +61,19 @@ LLLayoutPanel::Params::Params()
 
 LLLayoutPanel::LLLayoutPanel(const Params& p)
 :   LLPanel(p),
+    mAutoResize(p.auto_resize),
+    mUserResize(p.user_resize),
     mExpandedMinDim(p.expanded_min_dim.isProvided() ? p.expanded_min_dim : p.min_dim),
     mMinDim(p.min_dim),
     mMaxDim(p.max_dim),
-    mAutoResize(p.auto_resize),
-    mUserResize(p.user_resize),
     mCollapsed(false),
-    mCollapseAmt(0.f),
     mVisibleAmt(1.f), // default to fully visible
-    mResizeBar(NULL),
+    mCollapseAmt(0.f),
     mFractionalSize(0.f),
     mTargetDim(0),
     mIgnoreReshape(false),
-    mOrientation(LLLayoutStack::HORIZONTAL)
+    mOrientation(LLLayoutStack::HORIZONTAL),
+    mResizeBar(nullptr)
 {
     // panels initialized as hidden should not start out partially visible
     if (!getVisible())
@@ -127,7 +128,12 @@ S32 LLLayoutPanel::getTargetDim() const
 
 void LLLayoutPanel::setTargetDim(S32 value)
 {
-    value = llmin(value, mMaxDim);
+    // Asks the stack for this size, the way a drag on the resize bar does. An
+    // auto-resize panel's target is recomputed from the stack's free space
+    // every pass, so what survives the ask there is its share of that space,
+    // not the number. Clamped to what the panel will hold either way, so the
+    // shape handed over is one a layout can settle on.
+    value = llclamp(value, getRelevantMinDim(), mMaxDim);
 
     LLRect new_rect(getRect());
     if (mOrientation == LLLayoutStack::HORIZONTAL)
@@ -236,14 +242,14 @@ LLLayoutStack::Params::Params()
 
 LLLayoutStack::LLLayoutStack(const LLLayoutStack::Params& p)
 :   LLView(p),
-    mPanelSpacing(p.border_size),
     mOrientation(p.orientation),
+    mPanelSpacing(p.border_size),
+    mAnimatedFrame(LLFrameTimer::getFrameCount() - 1),
     mAnimate(p.animate),
-    mAnimatedThisFrame(false),
-    mNeedsLayout(true),
     mClip(p.clip),
     mOpenTimeConstant(p.open_time_constant),
     mCloseTimeConstant(p.close_time_constant),
+    mNeedsLayout(true),
     mResizeBarOverlap(p.resize_bar_overlap),
     mShowDragHandle(p.show_drag_handle),
     mDragHandleFirstIndent(p.drag_handle_first_indent),
@@ -322,11 +328,17 @@ void LLLayoutStack::removeChild(LLView* view)
         if (it != mPanels.end())
         {
             mPanels.erase(it);
-        }
-        if (embedded_panelp->mResizeBar)
-        {
-            LLView::removeChild(embedded_panelp->mResizeBar);
-            embedded_panelp->mResizeBar = nullptr;
+
+            // The bar belongs to the stack, not to the panel, and a panel that
+            // has left is the last thing that would ever ask for it. Deleting
+            // takes it out of the child list on the way; removing it alone
+            // strands it, since nothing else holds it. Cleared first, so the
+            // removeChild the destructor comes back with finds nothing to do.
+            if (LLResizeBar* resize_barp = embedded_panelp->mResizeBar)
+            {
+                embedded_panelp->mResizeBar = nullptr;
+                delete resize_barp;
+            }
         }
     }
     else
@@ -357,15 +369,30 @@ bool LLLayoutStack::postBuild()
 // virtual
 bool LLLayoutStack::addChild(LLView* child, S32 tab_group)
 {
-    LLLayoutPanel* panelp = child->as<LLLayoutPanel>();
-    if (panelp)
+    // The move first. LLView::addChild is what takes the panel off whatever
+    // parent it had, and a stack losing a panel is what deletes that panel's
+    // resize bar and clears the pointer -- so a bar built before this point is
+    // the one the old stack goes on to delete, leaving the panel on a list the
+    // layout pass reads with nothing there. That reaches a stack adding a panel
+    // it already holds, too: the removal that arrives from inside would take
+    // the new entry back off the list.
+    bool result = LLView::addChild(child, tab_group);
+
+    if (LLLayoutPanel* panelp = child ? child->as<LLLayoutPanel>() : nullptr)
     {
         panelp->setOrientation(mOrientation);
         mPanels.push_back(panelp);
         createResizeBar(panelp);
         mNeedsLayout = true;
     }
-    bool result = LLView::addChild(child, tab_group);
+    else if (result && !child->as<LLResizeBar>())
+    {
+        // A stack draws its panels and their resize bars, and nothing else --
+        // it never reaches LLView::draw. Anything else added here is in the
+        // tree, takes part in hit testing and is never seen.
+        LL_WARNS_ONCE() << "\"" << child->getName() << "\" is not a layout panel; "
+                        << getName() << " will not draw it" << LL_ENDL;
+    }
 
     updateFractionalSizes();
     return result;
@@ -392,31 +419,6 @@ void LLLayoutStack::collapsePanel(LLPanel* panel, bool collapsed)
     mNeedsLayout = true;
 }
 
-class LLImagePanel : public LLPanel
-{
-public:
-    struct Params : public LLInitParam::Block<Params, LLPanel::Params>
-    {
-        Optional<bool> horizontal;
-        Params() : horizontal("horizontal", false) {}
-    };
-    LLImagePanel(const Params& p) : LLPanel(p), mHorizontal(p.horizontal) {}
-    virtual ~LLImagePanel() {}
-
-    void draw()
-    {
-        const LLRect& parent_rect = getParent()->getRect();
-        const LLRect& rect = getRect();
-        LLRect clip_rect( -rect.mLeft, parent_rect.getHeight() - rect.mBottom - 2
-            , parent_rect.getWidth() - rect.mLeft - (mHorizontal ? 2 : 0), -rect.mBottom);
-        LLLocalClipRect clip(clip_rect);
-        LLPanel::draw();
-    }
-
-private:
-    bool mHorizontal;
-};
-
 void LLLayoutStack::updateLayout()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
@@ -434,6 +436,11 @@ void LLLayoutStack::updateLayout()
                             ? getRect().getWidth()
                             : getRect().getHeight();
 
+    // The gap the loop below takes out after the last panel that is showing.
+    // Nothing follows that panel, so nothing needs the room -- and the panel it
+    // belongs to is not the last on the list once a trailing one is hidden.
+    S32 trailing_spacing = 0;
+
     // first, assign minimum dimensions
     for (LLLayoutPanel* panelp : mPanels)
     {
@@ -441,17 +448,22 @@ void LLLayoutStack::updateLayout()
         {
             panelp->mTargetDim = panelp->getRelevantMinDim();
         }
-        space_to_distribute -= panelp->getVisibleDim() + ll_round((F32)mPanelSpacing * panelp->getVisibleAmount());
+        S32 panel_spacing = ll_round((F32)mPanelSpacing * panelp->getVisibleAmount());
+        space_to_distribute -= panelp->getVisibleDim() + panel_spacing;
+        if (panel_spacing > 0)
+        {
+            trailing_spacing = panel_spacing;
+        }
         total_visible_fraction += panelp->mFractionalSize * panelp->getAutoResizeFactor();
     }
 
-    llassert(total_visible_fraction < 1.05f);
+    // The total is a divisor and nothing else: each panel's share is its own
+    // fraction over this one, so the shares sum to the space however far the
+    // total has drifted from one. A user drag rewrites fractions without
+    // renormalizing, so it does drift.
 
     // don't need spacing after last panel
-    if (!mPanels.empty())
-    {
-        space_to_distribute += ll_round(F32(mPanelSpacing) * mPanels.back()->getVisibleAmount());
-    }
+    space_to_distribute += trailing_spacing;
 
     S32 remaining_space = space_to_distribute;
     if (space_to_distribute > 0 && total_visible_fraction > 0.f)
@@ -556,9 +568,14 @@ void LLLayoutStack::updateLayout()
             }
         }
 
+        // Put back what the panel was holding rather than the answer this pass
+        // wants: a caller that told a panel to ignore reshapes said so about
+        // its own work, and would find the flag off again on the far side of
+        // any layout.
+        bool ignore_reshape = panelp->mIgnoreReshape;
         panelp->setIgnoreReshape(true);
         panelp->setShape(panel_rect);
-        panelp->setIgnoreReshape(false);
+        panelp->setIgnoreReshape(ignore_reshape);
         panelp->mResizeBar->setShape(resize_bar_rect);
     }
 
@@ -612,88 +629,50 @@ LLLayoutPanel* LLLayoutStack::findEmbeddedPanelByName(std::string_view name) con
 
 void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
 {
-    for (LLLayoutPanel* lp : mPanels)
+    if (!panelp->mResizeBar)
     {
-        if (lp->mResizeBar == NULL)
+        LLResizeBar::Params resize_params;
+        resize_params.name("resize");
+        resize_params.resizing_view(panelp);
+        resize_params.min_size(panelp->getRelevantMinDim());
+        resize_params.side((mOrientation == HORIZONTAL) ? LLResizeBar::RIGHT : LLResizeBar::BOTTOM);
+        resize_params.snapping_enabled(false);
+        LLResizeBar* resize_bar = LLUICtrlFactory::create<LLResizeBar>(resize_params);
+        panelp->mResizeBar = resize_bar;
+
+        if (mShowDragHandle)
         {
-            LLResizeBar::Params resize_params;
-            resize_params.name("resize");
-            resize_params.resizing_view(lp);
-            resize_params.min_size(lp->getRelevantMinDim());
-            resize_params.side((mOrientation == HORIZONTAL) ? LLResizeBar::RIGHT : LLResizeBar::BOTTOM);
-            resize_params.snapping_enabled(false);
-            LLResizeBar* resize_bar = LLUICtrlFactory::create<LLResizeBar>(resize_params);
-            lp->mResizeBar = resize_bar;
+            LLPanel::Params resize_bar_bg_panel_p;
+            resize_bar_bg_panel_p.name = "resize_handle_bg_panel";
+            resize_bar_bg_panel_p.rect = resize_bar->getLocalRect();
+            resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
+            resize_bar_bg_panel_p.tab_stop = false;
+            resize_bar_bg_panel_p.background_visible = true;
+            resize_bar_bg_panel_p.bg_alpha_color = mDragHandleColor;
+            resize_bar_bg_panel_p.has_border = true;
+            resize_bar_bg_panel_p.border.border_thickness = 1;
+            resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
+            resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
 
-            if (mShowDragHandle)
-            {
-                LLPanel::Params resize_bar_bg_panel_p;
-                resize_bar_bg_panel_p.name = "resize_handle_bg_panel";
-                resize_bar_bg_panel_p.rect = lp->mResizeBar->getLocalRect();
-                resize_bar_bg_panel_p.follows.flags = FOLLOWS_ALL;
-                resize_bar_bg_panel_p.tab_stop = false;
-                resize_bar_bg_panel_p.background_visible = true;
-                resize_bar_bg_panel_p.bg_alpha_color = mDragHandleColor;
-                resize_bar_bg_panel_p.has_border = true;
-                resize_bar_bg_panel_p.border.border_thickness = 1;
-                resize_bar_bg_panel_p.border.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
-                resize_bar_bg_panel_p.border.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
+            LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
 
-                LLPanel* resize_bar_bg_panel = LLUICtrlFactory::create<LLPanel>(resize_bar_bg_panel_p);
+            LLIconCtrl::Params icon_p;
+            icon_p.name = "resize_handle_image";
+            icon_p.rect = resize_bar->getLocalRect();
+            icon_p.follows.flags = FOLLOWS_ALL;
+            icon_p.image = LLUI::getUIImage(mOrientation == HORIZONTAL ? "Vertical Drag Handle" : "Horizontal Drag Handle");
+            resize_bar_bg_panel->addChild(LLUICtrlFactory::create<LLIconCtrl>(icon_p));
 
-                LLIconCtrl::Params icon_p;
-                icon_p.name = "resize_handle_image";
-                icon_p.rect = lp->mResizeBar->getLocalRect();
-                icon_p.follows.flags = FOLLOWS_ALL;
-                icon_p.image = LLUI::getUIImage(mOrientation == HORIZONTAL ? "Vertical Drag Handle" : "Horizontal Drag Handle");
-                resize_bar_bg_panel->addChild(LLUICtrlFactory::create<LLIconCtrl>(icon_p));
-
-                lp->mResizeBar->addChild(resize_bar_bg_panel);
-            }
-
-            /*if (mShowDragHandle)
-            {
-                LLViewBorder::Params border_params;
-                border_params.border_thickness = 1;
-                border_params.highlight_light_color = LLUIColorTable::instance().getColor("ResizebarBorderLight");
-                border_params.shadow_dark_color = LLUIColorTable::instance().getColor("ResizebarBorderDark");
-
-                addBorder(border_params);
-                setBorderVisible(true);
-
-                LLImagePanel::Params image_panel;
-                mDragHandleImage = LLUI::getUIImage(LLResizeBar::RIGHT == mSide ? "Vertical Drag Handle" : "Horizontal Drag Handle");
-                image_panel.bg_alpha_image = mDragHandleImage;
-                image_panel.background_visible = true;
-                image_panel.horizontal = (LLResizeBar::BOTTOM == mSide);
-                mImagePanel = LLUICtrlFactory::create<LLImagePanel>(image_panel);
-                setImagePanel(mImagePanel);
-            }*/
-
-            //if (mShowDragHandle)
-            //{
-            //  setBackgroundVisible(true);
-            //  setTransparentColor(LLUIColorTable::instance().getColor("ResizebarBody"));
-            //}
-
-            /*if (mShowDragHandle)
-            {
-            S32 image_width = mDragHandleImage->getTextureWidth();
-            S32 image_height = mDragHandleImage->getTextureHeight();
-            const LLRect& panel_rect = getRect();
-            S32 image_left = (panel_rect.getWidth() - image_width) / 2 - 1;
-            S32 image_bottom = (panel_rect.getHeight() - image_height) / 2;
-            mImagePanel->setRect(LLRect(image_left, image_bottom + image_height, image_left + image_width, image_bottom));
-            }*/
-            LLView::addChild(resize_bar, 0);
+            resize_bar->addChild(resize_bar_bg_panel);
         }
+
+        LLView::addChild(resize_bar, 0);
     }
     // bring all resize bars to the front so that they are clickable even over the panels
     // with a bit of overlap
-    for (e_panel_list_t::iterator panel_it = mPanels.begin(); panel_it != mPanels.end(); ++panel_it)
+    for (LLLayoutPanel* lp : mPanels)
     {
-        LLResizeBar* resize_barp = (*panel_it)->mResizeBar;
-        sendChildToFront(resize_barp);
+        sendChildToFront(lp->mResizeBar);
     }
 }
 
@@ -707,7 +686,6 @@ void LLLayoutStack::updateClass()
     for (auto& layout : instance_snapshot())
     {
         layout.updateLayout();
-        layout.mAnimatedThisFrame = false;
     }
 }
 
@@ -779,6 +757,17 @@ bool LLLayoutStack::animatePanels()
 {
     bool continue_animating = false;
 
+    // One frame's worth of motion, once a frame, for every panel that wants
+    // it. The interpolant is cached per frame, so the question a later pass
+    // over the same frame has to answer is whether it has already been paid --
+    // asked of the stack, not of the panel, since the panels of one stack move
+    // together.
+    U32 frame = LLFrameTimer::getFrameCount();
+    bool advance = mAnimatedFrame != frame;
+    mAnimatedFrame = frame;
+
+    bool moved = false;
+
     //
     // animate visibility
     //
@@ -788,16 +777,16 @@ bool LLLayoutStack::animatePanels()
         {
             if (mAnimate && panelp->mVisibleAmt < 1.f)
             {
-                if (!mAnimatedThisFrame)
+                if (advance)
                 {
                     panelp->mVisibleAmt = lerp(panelp->mVisibleAmt, 1.f, LLSmoothInterpolation::getInterpolant(mOpenTimeConstant));
                     if (panelp->mVisibleAmt > 0.99f)
                     {
                         panelp->mVisibleAmt = 1.f;
                     }
+                    moved = true;
                 }
 
-                mAnimatedThisFrame = true;
                 continue_animating = true;
             }
             else
@@ -805,7 +794,7 @@ bool LLLayoutStack::animatePanels()
                 if (panelp->mVisibleAmt != 1.f)
                 {
                     panelp->mVisibleAmt = 1.f;
-                    mAnimatedThisFrame = true;
+                    moved = true;
                 }
             }
         }
@@ -813,24 +802,24 @@ bool LLLayoutStack::animatePanels()
         {
             if (mAnimate && panelp->mVisibleAmt > 0.f)
             {
-                if (!mAnimatedThisFrame)
+                if (advance)
                 {
                     panelp->mVisibleAmt = lerp(panelp->mVisibleAmt, 0.f, LLSmoothInterpolation::getInterpolant(mCloseTimeConstant));
                     if (panelp->mVisibleAmt < 0.001f)
                     {
                         panelp->mVisibleAmt = 0.f;
                     }
+                    moved = true;
                 }
 
                 continue_animating = true;
-                mAnimatedThisFrame = true;
             }
             else
             {
                 if (panelp->mVisibleAmt != 0.f)
                 {
                     panelp->mVisibleAmt = 0.f;
-                    mAnimatedThisFrame = true;
+                    moved = true;
                 }
             }
         }
@@ -840,9 +829,10 @@ bool LLLayoutStack::animatePanels()
         {
             if (mAnimate)
             {
-                if (!mAnimatedThisFrame)
+                if (advance)
                 {
                     panelp->mCollapseAmt = lerp(panelp->mCollapseAmt, collapse_state, LLSmoothInterpolation::getInterpolant(mCloseTimeConstant));
+                    moved = true;
                 }
 
                 if (llabs(panelp->mCollapseAmt - collapse_state) < 0.001f)
@@ -850,18 +840,17 @@ bool LLLayoutStack::animatePanels()
                     panelp->mCollapseAmt = collapse_state;
                 }
 
-                mAnimatedThisFrame = true;
                 continue_animating = true;
             }
             else
             {
                 panelp->mCollapseAmt = collapse_state;
-                mAnimatedThisFrame = true;
+                moved = true;
             }
         }
     }
 
-    if (mAnimatedThisFrame) mNeedsLayout = true;
+    if (moved) mNeedsLayout = true;
     return continue_animating;
 }
 

@@ -57,6 +57,11 @@ public:
         Optional<bool>          show_drag_handle;
         Optional<S32>           drag_handle_first_indent;
         Optional<S32>           drag_handle_second_indent;
+        // A handle of this thickness, sitting this far past the panel it
+        // follows, needs a gap wider than itself to sit in: border_size (which
+        // drag_handle_gap also names) is that gap. In a gap it does not fit,
+        // the resize bar takes the whole of it instead and these two do
+        // nothing -- the handle is still drawn, filling the bar.
         Optional<S32>           drag_handle_thickness;
         Optional<S32>           drag_handle_shift;
 
@@ -68,14 +73,14 @@ public:
     typedef LayoutStackRegistry child_registry_t;
 
 
-    virtual ~LLLayoutStack();
+    ~LLLayoutStack() override;
 
-    /*virtual*/ void draw();
-    /*virtual*/ void deleteAllChildren();
-    /*virtual*/ void removeChild(LLView*);
-    /*virtual*/ bool postBuild();
-    /*virtual*/ bool addChild(LLView* child, S32 tab_group = 0);
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+    void draw() override;
+    void deleteAllChildren() override;
+    void removeChild(LLView*) override;
+    bool postBuild() override;
+    bool addChild(LLView* child, S32 tab_group = 0) override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     typedef enum e_animate
     {
@@ -121,8 +126,11 @@ private:
 
     S32 mPanelSpacing;
 
-    // true if we already applied animation this frame
-    bool mAnimatedThisFrame;
+    // The frame whose worth of animation the panels have already had. Layout
+    // runs several times in a frame -- from updateClass, from draw, and from
+    // any panel that reshapes -- while the interpolant is computed once per
+    // frame, so a second pass would move every panel twice as far.
+    U32  mAnimatedFrame;
     bool mAnimate;
     bool mClip;
     F32  mOpenTimeConstant;
@@ -156,17 +164,17 @@ public:
         Params();
     };
 
-    ~LLLayoutPanel();
+    ~LLLayoutPanel() override;
 
-
+    // Hides LLPanel's, rather than overriding it: the parameters a layout
+    // panel is built from are its own block, not a panel's.
     void initFromParams(const Params& p);
 
-    void handleReshape(const LLRect& new_rect, bool by_user);
+    void handleReshape(const LLRect& new_rect, bool by_user) override;
 
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-
-    void setVisible(bool visible);
+    void setVisible(bool visible) override;
 
     S32 getLayoutDim() const;
     S32 getTargetDim() const;
@@ -179,16 +187,12 @@ public:
     S32 getExpandedMinDim() const { return mExpandedMinDim >= 0 ? mExpandedMinDim : getMinDim(); }
     void setExpandedMinDim(S32 value) { mExpandedMinDim = value; }
 
+    // Never negative: -1 is how min_dim says it was never given, and a
+    // negative dimension travels through the stack's space arithmetic and out
+    // into a clip rect.
     S32 getRelevantMinDim() const
     {
-        S32 min_dim = mMinDim;
-
-        if (!mCollapsed)
-        {
-            min_dim = getExpandedMinDim();
-        }
-
-        return min_dim;
+        return mCollapsed ? getMinDim() : getExpandedMinDim();
     }
 
     F32 getAutoResizeFactor() const;
