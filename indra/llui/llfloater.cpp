@@ -132,6 +132,17 @@ bool            LLFloater::sQuitting = false; // Flag to prevent storing visibil
 
 LLFloaterView* gFloaterView = NULL;
 
+// Where a floater goes when it leaves its host: the view the host itself
+// lives in. A host in the floater view hands it to the floater view, which
+// is what has always happened, and a host inside a panel hands it to that
+// panel rather than to the window the panel is in. The host's rect, which
+// is what places it next, is in that same view's coordinates either way.
+static LLView* detached_into(LLMultiFloater* host)
+{
+    LLView* parent = host ? host->getParent() : nullptr;
+    return parent ? parent : (LLView*)gFloaterView;
+}
+
 /*==========================================================================*|
 // DEV-38598: The fundamental problem with this operation is that it can only
 // support a subset of LLSD values. While it's plausible to compare two arrays
@@ -845,10 +856,11 @@ void LLFloater::closeFloater(bool app_quitting)
 
     if (canClose())
     {
-        if (getHost())
+        if (LLMultiFloater* host = getHost())
         {
-            ((LLMultiFloater*)getHost())->removeFloater(this);
-            gFloaterView->addChild(this);
+            LLView* into = detached_into(host);
+            host->removeFloater(this);
+            into->addChild(this);
         }
 
         if (getSoundFlags() != SILENT
@@ -2074,9 +2086,9 @@ void LLFloater::onClickTearOff(LLFloater* self)
     if (host_floater) //Tear off
     {
         LLRect new_rect;
+        LLView* into = detached_into(host_floater);
         host_floater->removeFloater(self);
-        // reparent to floater view
-        gFloaterView->addChild(self);
+        into->addChild(self);
 
         self->openFloater(self->getKey());
         if (self->mSaveRect && !self->mRectControl.empty())
