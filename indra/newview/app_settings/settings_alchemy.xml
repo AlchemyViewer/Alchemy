@@ -57,6 +57,17 @@
             <key>Value</key>
             <real>2.0</real>
         </map>
+        <key>ALProbeSHProjectionRes</key>
+        <map>
+            <key>Comment</key>
+            <string>Face edge length, in texels, of the reflection probe mip that the spherical-harmonic irradiance projection integrates over. Rounded to a mip and clamped between 4 and the probe resolution. Irradiance has only nine coefficients, so 8 reproduces a full-resolution integration to within half a percent; 32 is the previous fixed value and costs sixteen times the GPU work per probe update.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>

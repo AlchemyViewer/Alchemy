@@ -1150,16 +1150,11 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             // The old pass re-integrated the environment once per output texel; this integrates
             // it once, into the only nine numbers irradiance actually has.
             //
-            // Integrate a mip whose faces are mSHProjectionRes, not mip 0. Averaging texels
+            // Integrate the mip ALProbeSHProjectionRes asks for, not mip 0. Averaging texels
             // before an integral does not change the integral, and the target basis cannot
             // represent anything the finer mip would add.
             S32 sh_mip = 0;
-            U32 sh_res = mProbeResolution;
-            while (sh_res > mSHProjectionRes && (size_t)(sh_mip + 1) < mMipChain.size())
-            {
-                sh_res >>= 1;
-                ++sh_mip;
-            }
+            const U32 sh_res = shProjectionRes(sh_mip);
 
             gSHProjectionProgram.bind();
             S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
@@ -1182,6 +1177,28 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             gSHProjectionProgram.unbind();
         }
     }
+}
+
+U32 LLReflectionMapManager::shProjectionRes(S32& mip) const
+{
+    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
+    // coefficients, so this only has to be fine enough not to alias the source before the
+    // integral -- it is not an output resolution and does not bound reconstruction quality.
+    // scripts/content_tools/check_sh_projection.py puts the 8x8 default within half a percent
+    // of a 128x128 integration; 4x4 is the floor, where that error passes one percent. The
+    // cost scales with the texel count, so 32 (the old fixed value) is sixteen times 8.
+    static LLCachedControl<S32> projection_res(gSavedSettings, "ALProbeSHProjectionRes", 8);
+    const U32 target = llmin((U32)llmax((S32)projection_res, 4), mProbeResolution);
+
+    // Every probe resolution writes mips down to 2x2, so the walk always reaches the target.
+    mip = 0;
+    U32 res = mProbeResolution;
+    while (res > target && (size_t)(mip + 1) < mMipChain.size())
+    {
+        res >>= 1;
+        ++mip;
+    }
+    return res;
 }
 
 void LLReflectionMapManager::reset()

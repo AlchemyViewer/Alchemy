@@ -236,6 +236,10 @@ private:
     // update the specified face of the specified probe
     void updateProbeFace(LLReflectionMap* probe, U32 face);
 
+    // face edge length of the probe mip the SH irradiance projection integrates over, from
+    // ALProbeSHProjectionRes, and in `mip` the level of mTexture that holds it
+    U32 shProjectionRes(S32& mip) const;
+
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap> > mProbes;
 
@@ -280,12 +284,6 @@ private:
 
     // resolution of reflection probes
     U32 mProbeResolution = 128;
-
-    // resolution of irradiance maps
-    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
-    // coefficients, so this only has to be fine enough not to alias the source before the
-    // integral -- it is not an output resolution and does not bound reconstruction quality.
-    U32 mSHProjectionRes = 32;
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
