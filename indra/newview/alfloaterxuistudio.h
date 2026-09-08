@@ -60,6 +60,7 @@ class LLFolderViewItem;
 class LLLineEditor;
 class LLScrollListCtrl;
 class LLScrollListItem;
+class LLMenuBarGL;
 class LLTabContainer;
 class LLTextBox;
 class LLTextEditor;
@@ -275,6 +276,15 @@ private:
     void refreshInspectors();
     void refreshAttributes(LLView* view);
     void onFieldCommit(const std::string& name, const std::string& value);
+
+    // --- the shape of the file -----------------------------------------------
+    // Order among siblings, reparenting and removal, and the palette of
+    // what may go under the selection.
+    void restructure(const std::string& action, const ALXUISelection::path_t& path);
+    bool siblingOf(const ALXUIEdit& document, const ALXUISelection::path_t& path,
+                   bool before, ALXUISelection::path_t& out) const;
+    void fillPalette();
+    void onInsertFromPalette();
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
     void refreshBindings(LLView* view);
@@ -385,12 +395,16 @@ private:
     LLScrollListCtrl*   mFindings = nullptr;
     LLTabContainer*     mInspectors = nullptr;
     ALPropertyGrid*     mAttributeGrid = nullptr;
+    LLScrollListCtrl*   mPalette = nullptr;
+    // The element named for reparenting, until somewhere is chosen for it.
+    ALXUISelection::path_t mCutPath;
     LLScrollListCtrl*   mLayout = nullptr;
     LLTextBox*          mSourceLayers = nullptr;
     LLTextEditor*       mSourceText = nullptr;
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
+    LLMenuBarGL*        mMenuBar = nullptr;
     LLTabContainer*     mBottomTabs = nullptr;
     LLScrollListCtrl*   mNotifications = nullptr;
     LLFilterEditor*     mNotificationFilter = nullptr;

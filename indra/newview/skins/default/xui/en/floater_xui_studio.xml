@@ -54,6 +54,9 @@
     <floater.string name="AttributeUnknown">no such parameter</floater.string>
     <floater.string name="SchemaWritten">[SUMMARY]; written to [FILE]</floater.string>
     <floater.string name="SchemaFailed">Could not write [FILE]</floater.string>
+    <floater.string name="EditCut">[WHAT] is cut; select where it goes and choose Move It Here.</floater.string>
+    <floater.string name="EditNothingCut">Nothing is cut, or it is cut and this is where it already is.</floater.string>
+    <floater.string name="EditNoSibling">Nothing beside it that way.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
 
     <menu_bar
@@ -76,7 +79,8 @@
             <menu_item_call
              label="Save"
              layout="topleft"
-             name="save">
+             name="save"
+             shortcut="control|S">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="save" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
             </menu_item_call>
@@ -98,14 +102,16 @@
             <menu_item_call
              label="Undo"
              layout="topleft"
-             name="undo">
+             name="undo"
+             shortcut="control|Z">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="undo" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="undo" />
             </menu_item_call>
             <menu_item_call
              label="Redo"
              layout="topleft"
-             name="redo">
+             name="redo"
+             shortcut="control|Y">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="redo" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="redo" />
             </menu_item_call>
@@ -113,13 +119,15 @@
             <menu_item_call
              label="Reload Catalog"
              layout="topleft"
-             name="reload">
+             name="reload"
+             shortcut="control|R">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="reload" />
             </menu_item_call>
             <menu_item_call
              label="Open in External Editor"
              layout="topleft"
-             name="edit">
+             name="edit"
+             shortcut="control|E">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="edit" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
@@ -140,13 +148,15 @@
             <menu_item_call
              label="Show Preview"
              layout="topleft"
-             name="show">
+             name="show"
+             shortcut="control|shift|S">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="show" />
             </menu_item_call>
             <menu_item_call
              label="Hide Previews"
              layout="topleft"
-             name="hide">
+             name="hide"
+             shortcut="control|shift|H">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="hide" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
@@ -235,7 +245,8 @@
             <menu_item_call
              label="Lint All Files"
              layout="topleft"
-             name="lint_all">
+             name="lint_all"
+             shortcut="control|L">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="lint_all" />
             </menu_item_call>
             <menu_item_call
@@ -255,7 +266,8 @@
             <menu_item_call
              label="Translation Impact"
              layout="topleft"
-             name="impact">
+             name="impact"
+             shortcut="control|I">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="impact" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
             </menu_item_call>
@@ -354,6 +366,16 @@
      tool_tip="Read the catalog and the previews again"
      top_delta="0"
      width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Gallery"
+     layout="topleft"
+     left_pad="4"
+     name="gallery_btn"
+     tool_tip="Every registered widget with its template defaults, in the chosen skin"
+     top_delta="0"
+     width="66" />
     <button
      follows="left|top"
      height="22"
@@ -670,7 +692,7 @@
                          left="0"
                          name="attributes_grid"
                          source_width="80"
-                         top="404"
+                         top="0"
                          width="458" />
                     </scroll_container>
                 </panel>
@@ -1053,6 +1075,41 @@
                          dynamic_width="true"
                          label="Message"
                          name="message" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Palette"
+                 layout="topleft"
+                 name="palette_pane">
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Insert"
+                     layout="topleft"
+                     left="0"
+                     name="palette_insert"
+                     tool_tip="Put one of these under the selected element, with a name and where it goes and nothing else"
+                     top="2"
+                     width="60" />
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="146"
+                     layout="topleft"
+                     left="0"
+                     name="palette"
+                     tool_tip="The tags the selected element may contain, from the registry it names as its children"
+                     top="28"
+                     width="1164">
+                        <scroll_list.columns
+                         label="Tag"
+                         name="tag"
+                         width="200" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Takes"
+                         name="takes" />
                     </scroll_list>
                 </panel>
                 <panel

@@ -1041,6 +1041,7 @@ bool ALFloaterXUIStudio::postBuild()
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
+    mMenuBar = getChild<LLMenuBarGL>("studio_menu");
     mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
     mNotifications = getChild<LLScrollListCtrl>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
@@ -1052,6 +1053,9 @@ bool ALFloaterXUIStudio::postBuild()
         });
     mChannels = getChild<LLScrollListCtrl>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
+    mPalette = getChild<LLScrollListCtrl>("palette");
+    getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
+    getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
     mTranslateList = getChild<LLScrollListCtrl>("translate_list");
     mTranslateValue = getChild<LLLineEditor>("translate_value");
@@ -1207,6 +1211,13 @@ void ALFloaterXUIStudio::draw()
 
 bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
 {
+    // The menu bar's own accelerators, which belong to this floater and
+    // not to the viewer: they answer while it has the keyboard and are
+    // silent everywhere else, which is what a floater-local menu is for.
+    if (mMenuBar && mMenuBar->handleAcceleratorKey(key, mask))
+    {
+        return true;
+    }
     if (key == 'F' && mask == MASK_CONTROL)
     {
         mTreeFilter->setFocus(true);
@@ -1219,10 +1230,6 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
             copyList(list, list->getAllSelected());
             return true;
         }
-    }
-    if (key == 'Z' && mask == MASK_CONTROL && undoEdit())
-    {
-        return true;
     }
     // The panes keep their own keys: the hierarchy walks itself with the
     // arrows and a list scrolls with them, and a list that happens to
@@ -1872,10 +1879,112 @@ LLNotificationPtr ALFloaterXUIStudio::selectedChannelNotification() const
     return found == mChannelNotifications.end() ? LLNotificationPtr() : found->second;
 }
 
+// ---------------------------------------------------------------------------
+// The palette
+// ---------------------------------------------------------------------------
+// What may go under the selected element: the registry that element names
+// as its children, which is what the factory will accept there and nothing
+// wider. A tag that takes text or holds other widgets says so, since that
+// is what decides which of them is wanted.
+void ALFloaterXUIStudio::fillPalette()
+{
+    if (!mPalette)
+    {
+        return;
+    }
+    const std::string chosen = mPalette->getSelectedValue().asString();
+    mPalette->deleteAllItems();
+
+    LLView* view = selectedView();
+    const std::string* tag = view ? LLUICtrlFactory::widgetTag(view->viewType()) : nullptr;
+    const ALXUISchema::Tag* declared = tag ? ALXUISchema::get().tag(*tag) : nullptr;
+    if (!declared)
+    {
+        return;
+    }
+    for (const std::string& child : declared->children)
+    {
+        const ALXUISchema::Tag* what = ALXUISchema::get().tag(child);
+        std::string takes;
+        if (what)
+        {
+            if (what->text)
+            {
+                takes = "text";
+            }
+            if (!what->children.empty())
+            {
+                takes += takes.empty() ? "" : ", ";
+                takes += std::to_string(what->children.size()) + " kinds of child";
+            }
+        }
+        mPalette->addElement(row(child, { { "tag", child }, { "takes", takes } }));
+    }
+    if (!chosen.empty())
+    {
+        mPalette->selectByValue(chosen);
+    }
+}
+
+// A new element carrying its name, where it goes, and nothing else: the
+// widget's own template supplies the rest, and writing what the template
+// already says is what makes a file hard to read.
+void ALFloaterXUIStudio::onInsertFromPalette()
+{
+    const LLSD chosen = mPalette->getSelectedValue();
+    if (!chosen.isDefined() || !mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    if (layers.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return;
+    }
+
+    // A name of its own, since a name is identity to the merge, to
+    // getChild and to every overlay, and two of one name is a defect the
+    // lint already reports.
+    const std::string tag = chosen.asString();
+    std::string name = tag;
+    for (S32 n = 2; held->resolve({ name }) && n < 100; ++n)
+    {
+        name = tag + "_" + std::to_string(n);
+    }
+
+    const std::string xml = "<" + tag + " name=\"" + name + "\" layout=\"topleft\""
+                            " left=\"8\" top=\"8\" width=\"100\" height=\"20\"/>";
+    if (!held->insertElement(mSelection.selection(), xml))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = tag;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    documentChanged(getString("EditWrote", args));
+}
+
 // The two tabs that fill themselves from something other than the preview.
 void ALFloaterXUIStudio::onBottomTab()
 {
     fillTranslation();
+    fillPalette();
     if (mNotifications->getItemCount() == 0)
     {
         fillNotifications();
@@ -2661,6 +2770,10 @@ bool ALFloaterXUIStudio::onTreeActionEnabled(const LLSD& param)
         ALXUITreeItem* item = selectedItem();
         return item && item->isFromXML();
     }
+    if (action == "paste")
+    {
+        return !mCutPath.empty();
+    }
     return true;
 }
 
@@ -2700,6 +2813,124 @@ void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
     {
         item->toggleShown();
     }
+    else if (action == "move_up" || action == "move_down" || action == "cut"
+          || action == "paste" || action == "delete")
+    {
+        restructure(action, item->getPath());
+    }
+}
+
+// The four things an editor does to the shape of a file: order among
+// siblings, take an element somewhere else, and take it away.
+//
+// Reparenting is two steps rather than a drag, because the tree is where
+// the hierarchy is legible and a drag in it would have to mean three
+// things at once -- before, after, or into. Cut names the element; the
+// next selection is where it goes.
+void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelection::path_t& path)
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || path.empty())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+
+    if (action == "cut")
+    {
+        mCutPath = path;
+        LLStringUtil::format_map_t args;
+        args["[WHAT]"] = ALXUISelection::toString(path);
+        setStatus(getString("EditCut", args));
+        return;
+    }
+
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    if (layers.empty())
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return;
+    }
+
+    bool ok = false;
+    std::string what;
+    if (action == "delete")
+    {
+        ok = held->removeElement(path);
+        what = "removed";
+    }
+    else if (action == "paste")
+    {
+        if (mCutPath.empty())
+        {
+            setStatus(getString("EditNothingCut"));
+            return;
+        }
+        // Into the element the tree has now, which is where the author is
+        // pointing; a cut of the very thing pointed at goes nowhere.
+        if (mCutPath == path)
+        {
+            setStatus(getString("EditNothingCut"));
+            return;
+        }
+        ok = held->moveElement(mCutPath, path);
+        mCutPath.clear();
+        what = "moved";
+    }
+    else
+    {
+        // Among the siblings, which is what a menu, a tab container and a
+        // layout stack are: the element before or after this one in the
+        // file, which the document knows and the built tree does not.
+        ALXUISelection::path_t sibling;
+        if (!siblingOf(*held, path, action == "move_up", sibling))
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ok = action == "move_up" ? held->moveBefore(path, sibling)
+                                 : held->moveAfter(path, sibling);
+        what = "moved";
+    }
+
+    if (!ok)
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = what;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    documentChanged(getString("EditWrote", args));
+}
+
+// The element before or after this one among its parent's children, in
+// the document rather than in the built tree: the file's order is what a
+// move changes, and a widget may build children of its own that no
+// element describes.
+bool ALFloaterXUIStudio::siblingOf(const ALXUIEdit& document, const ALXUISelection::path_t& path,
+                                   bool before, ALXUISelection::path_t& out) const
+{
+    pugi::xml_node node = document.resolve(path);
+    pugi::xml_node found = before ? node.previous_sibling() : node.next_sibling();
+    while (found && found.type() != pugi::node_element)
+    {
+        found = before ? found.previous_sibling() : found.next_sibling();
+    }
+    if (!found)
+    {
+        return false;
+    }
+    out = ALXUICatalog::namePath(found, /*any_tag=*/true);
+    return !out.empty();
 }
 
 // The preview as it stands on screen, cropped out of a snapshot of the

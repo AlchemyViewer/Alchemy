@@ -129,10 +129,16 @@ void ALPropertyGrid::rebuild()
 {
     deleteAllChildren();
 
+    // A scrolled document grows downward from a top that stays put: reshape
+    // alone keeps the bottom edge, which would walk the rows off the bottom
+    // of the container every time the list got shorter.
+    const S32 was_top = getRect().mTop;
     const S32 height = contentHeight();
     reshape(getRect().getWidth(), height, false);
+    translate(0, was_top - getRect().mTop);
 
     S32 top = height;
+    S32 rows = 0;
     for (const Field& field : mFields)
     {
         if (mAuthoredOnly && !field.authored)
@@ -141,6 +147,19 @@ void ALPropertyGrid::rebuild()
         }
         addRow(field, top);
         top -= mRowHeight;
+        ++rows;
+    }
+
+    if (!rows)
+    {
+        // An empty grid and a broken one look the same, so it says which.
+        LLTextBox::Params p;
+        p.name = "empty";
+        p.rect = LLRect(4, height, getRect().getWidth(), height - mRowHeight);
+        p.initial_value = mFields.empty() ? "Nothing selected."
+                                          : "This element writes nothing; take the switch off to see every field.";
+        p.font_valign = LLFontGL::VCENTER;
+        addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 }
 
