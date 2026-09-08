@@ -81,6 +81,15 @@ void LLDragHandle::initFromParams(const LLDragHandle::Params& p)
     setTitle( p.label );
 }
 
+void LLDragHandle::setForeground(bool b)
+{
+    mForeground = b;
+    if (mTitleBox)
+    {
+        mTitleBox->setEnabled(b);
+    }
+}
+
 void LLDragHandle::setTitleVisible(bool visible)
 {
     if(mTitleBox)
@@ -110,6 +119,7 @@ void LLDragHandleTop::setTitle(const std::string& title)
         params.use_ellipses = true;
         params.parse_urls = false; //cancel URL replacement in floater title
         mTitleBox = LLUICtrlFactory::create<LLTextBox> (params);
+        mTitleBox->setEnabled(getForeground());
         addChild( mTitleBox );
     }
 
@@ -181,12 +191,6 @@ void LLDragHandleTop::draw()
     }
     */
 
-    // Colorize the text to match the frontmost state
-    if (mTitleBox)
-    {
-        mTitleBox->setEnabled(getForeground());
-    }
-
     LLView::draw();
 }
 
@@ -226,12 +230,6 @@ void LLDragHandleLeft::draw()
     }
     */
 
-    // Colorize the text to match the frontmost state
-    if (mTitleBox)
-    {
-        mTitleBox->setEnabled(getForeground());
-    }
-
     LLView::draw();
 }
 
@@ -260,11 +258,6 @@ void LLDragHandleTop::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLView::reshape(width, height, called_from_parent);
     reshapeTitleBox();
-}
-
-void LLDragHandleLeft::reshape(S32 width, S32 height, bool called_from_parent)
-{
-    LLView::reshape(width, height, called_from_parent);
 }
 
 //-------------------------------------------------------------

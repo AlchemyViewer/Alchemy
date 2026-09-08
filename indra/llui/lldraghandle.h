@@ -67,7 +67,8 @@ public:
 
     virtual void setValue(const LLSD& value);
 
-    void            setForeground(bool b)       { mForeground = b; }
+    // Colours the title to match, which is the whole of what the state is for.
+    void            setForeground(bool b);
     bool            getForeground() const       { return mForeground; }
     void            setMaxTitleWidth(S32 max_width) {mMaxTitleWidth = llmin(max_width, mMaxTitleWidth); }
     S32             getMaxTitleWidth() const { return mMaxTitleWidth; }
@@ -145,7 +146,6 @@ public:
     virtual void    setTitle( const std::string& title );
     virtual std::string getTitle() const;
     virtual void    draw();
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
 
 };
 
