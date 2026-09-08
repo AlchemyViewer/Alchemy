@@ -96,6 +96,18 @@ namespace ALXmlLayerMerge
     // not parse.
     bool load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer = nullptr);
 
+    // A layer as the caller has it rather than as the disk has it: an
+    // editor previews what it holds, which is not what was last written.
+    // The path still names the layer, so an observer reports it the way
+    // it reports any other.
+    struct Source
+    {
+        std::string         path;
+        const std::string*  text = nullptr;     // null: read the file
+    };
+
+    bool loadSources(const std::vector<Source>& sources, LLXMLNodePtr& root, ALXmlMergeObserver* observer = nullptr);
+
     // One overlay element over one base element, and their subtrees. The
     // rules: children match by name, or by value when they have no name,
     // and never by tag; a child matches the first base child of its name

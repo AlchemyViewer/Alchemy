@@ -263,6 +263,29 @@ void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer
 
 bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer)
 {
+    std::vector<Source> sources;
+    sources.reserve(paths.size());
+    for (const std::string& path : paths)
+    {
+        sources.push_back({ path, nullptr });
+    }
+    return loadSources(sources, root, observer);
+}
+
+namespace
+{
+    // A layer from where the caller keeps it. Parsing a buffer and parsing
+    // a file are the same parse; only where the bytes come from differs.
+    bool parseSource(const ALXmlLayerMerge::Source& source, LLXMLNodePtr& node)
+    {
+        return source.text
+            ? LLXMLNode::parseBuffer(source.text->data(), source.text->size(), node)
+            : LLXMLNode::parseFile(source.path, node, nullptr);
+    }
+}
+
+bool ALXmlLayerMerge::loadSources(const std::vector<Source>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer)
+{
     if (paths.empty())
     {
         return false;
@@ -273,13 +296,13 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
         observer = sDefaultObserver;
     }
 
-    const std::string& base_path = paths.front();
+    const std::string& base_path = paths.front().path;
     if (base_path.empty())
     {
         return false;
     }
 
-    if (!LLXMLNode::parseFile(base_path, root, nullptr))
+    if (!parseSource(paths.front(), root))
     {
         LL_WARNS() << "Problem reading UI description file: " << base_path << " " << errno << LL_ENDL;
         reportSkipped(observer, 0, base_path);
@@ -293,7 +316,7 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
     S32 layer = 0;
     for (size_t i = 1; i < paths.size(); ++i)
     {
-        const std::string& layer_path = paths[i];
+        const std::string& layer_path = paths[i].path;
         ++layer;
         if (layer_path.empty() || layer_path == base_path)
         {
@@ -305,7 +328,7 @@ bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& 
         // one language's file leaves that file untranslated, not the
         // floater unbuildable for everyone who speaks the language.
         LLXMLNodePtr overlay;
-        if (!LLXMLNode::parseFile(layer_path, overlay, nullptr))
+        if (!parseSource(paths[i], overlay))
         {
             LL_WARNS() << "Problem reading localized UI description file: " << layer_path << ", skipping it" << LL_ENDL;
             reportSkipped(observer, layer, layer_path);

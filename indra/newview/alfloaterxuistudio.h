@@ -94,6 +94,17 @@ public:
     // Control+Z puts the last write back the way it was.
     bool nudge(KEY key, MASK mask);
     bool undoEdit();
+    bool redoEdit();
+
+    // --- the document under edit ---------------------------------------------
+    // Edits go into a document the tool holds, and the preview is built
+    // from it: the disk hears nothing until a save.
+    std::vector<ALXmlLayerMerge::Source> sourcesFor(const std::string& file) const;
+    ALXUIEdit* document(const ALXUICatalog::Layer& layer);
+    void documentChanged(const std::string& status);
+    void saveDocument();
+    void revertDocument();
+    bool documentDirty() const { return mDocument.dirty(); }
     bool hoverHighlight() const { return mHoverHighlight; }
 
     // What a drag lands on, and what the preview is measured with.
@@ -265,6 +276,7 @@ private:
     // The menu bar: an action by name, and whether a switch is on.
     void onMenuAction(const LLSD& param);
     bool onMenuCheck(const LLSD& param);
+    bool onMenuEnable(const LLSD& param);
     void onToggleSecondary();
 
     static LLSD row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells);
@@ -308,8 +320,14 @@ private:
     bool                mReloadFromDisk = false;    // and someone else changed it
     bool                mKeepPlace = false;         // a rebuild leaves the preview where it is
     std::string         mPendingStatus;             // what to say once the rebuild is done
-    std::string         mUndoPath;                  // the file the last write went to
-    std::string         mUndoText;                  // and what it held before it
+    // The layer under edit, held between operations: its undo stack, its
+    // dirty flag and the text the preview is built from are all its own.
+    ALXUIEdit           mDocument;
+    std::string         mDocumentPath;
+    // The translation table is written through, so its last write is kept
+    // as the file it replaced rather than as a step of the document.
+    std::string         mWroteThroughPath;
+    std::string         mWroteThroughText;
     S32                 mLastX = -1;
     S32                 mLastY = -1;
     LLFrameTimer        mStateTimer;

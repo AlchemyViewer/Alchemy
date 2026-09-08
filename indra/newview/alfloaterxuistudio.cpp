@@ -1001,6 +1001,7 @@ ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
     mEnableCallbackRegistrar.add("XUIStudio.ListEnabled", boost::bind(&ALFloaterXUIStudio::onListActionEnabled, this, _2));
     mCommitCallbackRegistrar.add("XUIStudio.Menu", boost::bind(&ALFloaterXUIStudio::onMenuAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.MenuCheck", boost::bind(&ALFloaterXUIStudio::onMenuCheck, this, _2));
+    mEnableCallbackRegistrar.add("XUIStudio.MenuEnable", boost::bind(&ALFloaterXUIStudio::onMenuEnable, this, _2));
 }
 
 ALFloaterXUIStudio::~ALFloaterXUIStudio()
@@ -1539,13 +1540,11 @@ LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entr
     {
         // The viewer's own layers in the viewer's own order, merged by
         // its own call, with the tool's observer recording what each
-        // layer wrote and what it dropped.
-        std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, file);
-        if (paths.empty())
-        {
-            paths.push_back(file);
-        }
-        if (!ALXmlLayerMerge::load(paths, node, &mPreviews[which].overlay))
+        // layer wrote and what it dropped -- and the layer under edit
+        // taken from the document rather than from the disk, so the
+        // preview is of what has been done to it and not of what was
+        // last written.
+        if (!ALXmlLayerMerge::loadSources(sourcesFor(file), node, &mPreviews[which].overlay))
         {
             return nullptr;
         }
@@ -1884,6 +1883,101 @@ void ALFloaterXUIStudio::onNotificationSelected()
     showPreviews();
 }
 
+// ---------------------------------------------------------------------------
+// The document under edit
+// ---------------------------------------------------------------------------
+// The layers a file is built from, with the one being edited taken from
+// memory. Every preview goes through here, so an edit shows on the screen
+// without the disk hearing about it.
+std::vector<ALXmlLayerMerge::Source> ALFloaterXUIStudio::sourcesFor(const std::string& file) const
+{
+    std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, file);
+    if (paths.empty())
+    {
+        paths.push_back(file);
+    }
+
+    std::vector<ALXmlLayerMerge::Source> sources;
+    sources.reserve(paths.size());
+    for (const std::string& path : paths)
+    {
+        const bool edited = !mDocumentPath.empty() && path == mDocumentPath;
+        sources.push_back({ path, edited ? &mDocument.text() : nullptr });
+    }
+    return sources;
+}
+
+// The document for a layer, loaded from it the first time. Moving to
+// another layer with work in hand would lose it, so it does not: the
+// caller is told to save or revert first.
+ALXUIEdit* ALFloaterXUIStudio::document(const ALXUICatalog::Layer& layer)
+{
+    if (mDocumentPath == layer.path)
+    {
+        return &mDocument;
+    }
+    if (mDocument.dirty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+        setStatus(getString("EditUnsaved", args));
+        return nullptr;
+    }
+    if (!mDocument.loadFile(layer.path))
+    {
+        setStatus(mDocument.error());
+        return nullptr;
+    }
+    mDocumentPath = layer.path;
+    return &mDocument;
+}
+
+// What an operation does once it has changed the document: the preview is
+// rebuilt from what is now in memory, next frame.
+void ALFloaterXUIStudio::documentChanged(const std::string& status)
+{
+    mPendingStatus = status;
+    setStatus(status);
+    mReloadEntryOnly = true;
+    mReloadPending = true;
+}
+
+void ALFloaterXUIStudio::saveDocument()
+{
+    if (mDocumentPath.empty() || !mDocument.dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!mDocument.save())
+    {
+        setStatus(mDocument.error());
+        return;
+    }
+    // The watchers prime themselves on what they find when the rebuild
+    // makes them, so a write of the tool's own is not an outside change.
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+    documentChanged(getString("EditSaved", args));
+}
+
+void ALFloaterXUIStudio::revertDocument()
+{
+    if (mDocumentPath.empty() || !mDocument.dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!mDocument.loadFile(mDocumentPath))
+    {
+        setStatus(mDocument.error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+    documentChanged(getString("EditReverted", args));
+}
+
 // A preview the tool did not make has no handles to let go of.
 void ALFloaterXUIStudio::detachHost(LLFloater* host)
 {
@@ -1949,12 +2043,7 @@ LLFloater* ALFloaterXUIStudio::buildRealFloater(S32 which, const ALXUICatalog::E
 {
     // The layers as the tool reads them, for the source map and the record
     // of which layer wrote what. The floater merges them again for itself.
-    std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, entry.name);
-    if (paths.empty())
-    {
-        paths.push_back(entry.name);
-    }
-    if (!ALXmlLayerMerge::load(paths, node, &mPreviews[which].overlay))
+    if (!ALXmlLayerMerge::loadSources(sourcesFor(entry.name), node, &mPreviews[which].overlay))
     {
         return nullptr;
     }
@@ -2123,6 +2212,17 @@ void ALFloaterXUIStudio::watchFiles(const ALXUICatalog::Entry& entry)
 // need no special case here.
 void ALFloaterXUIStudio::fileChanged()
 {
+    // Not while there is work in hand. A rebuild reads the layers again,
+    // and the layer under edit would come back as the disk has it: the
+    // author is told instead, and chooses which of the two to keep.
+    if (mDocument.dirty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+        setStatus(getString("EditChangedOnDisk", args));
+        return;
+    }
+
     // The check runs from a timer; the rebuild waits for the next frame.
     mReloadEntryOnly = true;
     mReloadFromDisk = true;
@@ -3251,6 +3351,11 @@ void ALFloaterXUIStudio::onTranslationWrite()
         return;
     }
 
+    // The table is written through: a cell answered is a cell written,
+    // and what reads it back is the catalog rather than a document held
+    // open. So this one keeps the file it replaced, and undo puts that
+    // back, where an edit to the document under preview is undone in
+    // memory and never reached the disk at all.
     ALXUIEdit overlay;
     if (!overlay.loadFile(path))
     {
@@ -3269,8 +3374,8 @@ void ALFloaterXUIStudio::onTranslationWrite()
         return;
     }
 
-    mUndoPath = path;
-    mUndoText = before;
+    mWroteThroughPath = path;
+    mWroteThroughText = before;
     LLStringUtil::format_map_t args;
     args["[FIELD]"] = unit.field.empty() ? std::string("the text") : unit.field;
     args["[FILE]"] = language + "/" + mFile;
@@ -3953,13 +4058,12 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     now.height = rect.getHeight();
     now.topLeft = view->isLayoutTopLeft();
 
-    ALXUIEdit edit;
-    if (!edit.loadFile(layer->path))
+    ALXUIEdit* held = document(*layer);
+    if (!held)
     {
-        setStatus(edit.error());
         return false;
     }
-    const std::string before = edit.text();
+    ALXUIEdit& edit = *held;
 
     const ALXUISelection::path_t& path = mSelection.selection();
     S32 dx = dl;
@@ -3996,22 +4100,11 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
         return false;
     }
     written.insert(written.end(), edit.lastWritten().begin(), edit.lastWritten().end());
-    if (written.empty() || !edit.save())
+    if (written.empty())
     {
         setStatus(edit.error());
         return false;
     }
-
-    // One step back, which is the whole file as it was: an edit is one
-    // write and a stray drag is one write to undo. The stack arrives with
-    // the rest of the operations.
-    mUndoPath = layer->path;
-    mUndoText = before;
-
-    // The rebuild waits for the next frame: this can be the tail of a
-    // mouse-up in the very floater it would take down.
-    mReloadEntryOnly = true;
-    mReloadPending = true;
 
     std::string names;
     for (const std::string& name : written)
@@ -4022,34 +4115,55 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     args["[ATTRS]"] = names;
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
-    // The rebuild says what it built; this has to come after it.
-    mPendingStatus = getString(root_move ? "EditWroteNotMoved" : "EditWrote", args);
-    setStatus(mPendingStatus);
+    // The rebuild says what it built; this has to come after it. It waits
+    // for the next frame: this can be the tail of a mouse-up in the very
+    // floater it would take down.
+    documentChanged(getString(root_move ? "EditWroteNotMoved" : "EditWrote", args));
     return true;
 }
 
-// The file as it was before the last write. One step, because one drag or
-// one key is one write, and a stray one should cost nothing to take back.
+// One step of the document's own stack, which is one operation as it was
+// asked for however many splices it took, and nothing on disk to put back
+// because nothing went there. The translation table is written through
+// rather than held, so its last write is undone the other way: the file it
+// replaced, put back.
 bool ALFloaterXUIStudio::undoEdit()
 {
-    if (mUndoPath.empty())
+    if (!mDocumentPath.empty() && mDocument.undo())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+        documentChanged(getString("EditUndone", args));
+        return true;
+    }
+
+    if (mWroteThroughPath.empty())
     {
         return false;
     }
     std::string error;
-    if (!ALXUIEdit::writeFile(mUndoPath, mUndoText, error))
+    if (!ALXUIEdit::writeFile(mWroteThroughPath, mWroteThroughText, error))
     {
         setStatus(error);
         return false;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = mUndoPath.substr(mUndoPath.find_last_of("/\\") + 1);
-    mPendingStatus = getString("EditUndone", args);
-    setStatus(mPendingStatus);
-    mUndoPath.clear();
-    mUndoText.clear();
-    mReloadEntryOnly = true;
-    mReloadPending = true;
+    args["[FILE]"] = mWroteThroughPath.substr(mWroteThroughPath.find_last_of("/\\") + 1);
+    mWroteThroughPath.clear();
+    mWroteThroughText.clear();
+    documentChanged(getString("EditUndone", args));
+    return true;
+}
+
+bool ALFloaterXUIStudio::redoEdit()
+{
+    if (mDocumentPath.empty() || !mDocument.redo())
+    {
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+    documentChanged(getString("EditRedone", args));
     return true;
 }
 
@@ -4576,6 +4690,10 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "reload")        { reloadAll(); }
     else if (action == "edit")          { onJumpToSource(); }
     else if (action == "capture")       { capturePreview(); }
+    else if (action == "save")          { saveDocument(); }
+    else if (action == "revert")        { revertDocument(); }
+    else if (action == "undo")          { undoEdit(); }
+    else if (action == "redo")          { redoEdit(); }
     else if (action == "gallery")       { showGallery(); }
     else if (action == "lint_all")      { startLintAll(); }
     else if (action == "census")        { startCensus(); }
@@ -4605,6 +4723,18 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
         mGrid = llmax(1, std::atoi(action.c_str() + 5));
         saveState();
     }
+}
+
+// Whether an item can be chosen at all: what the document has to say
+// about itself, which is the only state the menu asks about.
+bool ALFloaterXUIStudio::onMenuEnable(const LLSD& param)
+{
+    const std::string what = param.asString();
+
+    if (what == "dirty")    { return mDocument.dirty(); }
+    if (what == "undo")     { return mDocument.canUndo() || !mWroteThroughPath.empty(); }
+    if (what == "redo")     { return mDocument.canRedo(); }
+    return true;
 }
 
 bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)

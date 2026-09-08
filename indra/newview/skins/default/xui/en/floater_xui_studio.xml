@@ -29,6 +29,12 @@
     <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
     <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
     <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
+    <floater.string name="EditRedone">Did that to [FILE] again.</floater.string>
+    <floater.string name="EditSaved">Wrote [FILE].</floater.string>
+    <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
+    <floater.string name="EditNothingToSave">Nothing has been changed.</floater.string>
+    <floater.string name="EditUnsaved">[FILE] has changes that are not written. Save or revert first.</floater.string>
+    <floater.string name="EditChangedOnDisk">[FILE] changed on disk, and there are changes here that are not written. Save to keep these, or revert to take those.</floater.string>
     <floater.string name="TranslateCounts">[TRANSLATED] translated, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
     <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
     <floater.string name="TranslateWrote">Wrote [FIELD] into [FILE]</floater.string>
@@ -64,6 +70,36 @@
          name="file"
          tear_off="false"
          width="200">
+            <menu_item_call
+             label="Save"
+             layout="topleft"
+             name="save">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Revert"
+             layout="topleft"
+             name="revert">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="revert" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Undo"
+             layout="topleft"
+             name="undo">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="undo" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="undo" />
+            </menu_item_call>
+            <menu_item_call
+             label="Redo"
+             layout="topleft"
+             name="redo">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="redo" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="redo" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_call
              label="Reload Catalog"
              layout="topleft"
