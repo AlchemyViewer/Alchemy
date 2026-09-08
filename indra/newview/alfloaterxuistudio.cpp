@@ -170,7 +170,10 @@ public:
         {
             return;
         }
-        if (mTool->snapToGrid())
+        // Only while a handle is held: the grid answers "where will this
+        // land", which is a question nobody is asking the rest of the time,
+        // and a preview under a permanent mesh is a preview of the mesh.
+        if (mTool->snapToGrid() && grabbed())
         {
             drawGrid();
         }
@@ -269,7 +272,7 @@ public:
 
     bool handleHover(S32 x, S32 y, MASK mask) override
     {
-        if (mGrip != GRIP_NONE && hasMouseCapture())
+        if (grabbed())
         {
             track(x, y);
             setGripCursor(mGrip);
@@ -294,7 +297,7 @@ public:
 
     bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
-        if (mGrip != GRIP_NONE && hasMouseCapture())
+        if (grabbed())
         {
             track(x, y);
             const S32 grip = mGrip;
@@ -349,6 +352,14 @@ private:
     bool dragging() const
     {
         return mDelta[EDGE_L] || mDelta[EDGE_B] || mDelta[EDGE_R] || mDelta[EDGE_T];
+    }
+
+    // A handle is held: the button went down on one and has not come up.
+    // True from the grab rather than from the first pixel of movement,
+    // because what the grid is for is saying where a move will land.
+    bool grabbed()
+    {
+        return mGrip != GRIP_NONE && hasMouseCapture();
     }
 
     bool beginDrag(S32 grip, S32 x, S32 y)
