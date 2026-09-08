@@ -27,14 +27,18 @@
 
 #include "linden_common.h"
 
+#include "../llaccordionctrl.h"
+#include "../lllayoutstack.h"
 #include "../llui.h"
 
 #include "llcontrol.h"
 #include "lldir.h"
 #include "llfontfreetype.h"
+#include "llfloater.h"
 #include "llfontgl.h"
 
 #include <cstdio>
+#include <vector>
 
 #ifndef LLUI_TEST_APP_DIR
 #  define LLUI_TEST_APP_DIR ""
@@ -112,6 +116,17 @@ namespace ll_test
             LLFontGL::initClass(96.f, 1.f, 1.f, LLUI_TEST_APP_DIR, fonts_xml, LLSD(),
                                 /*create_gl_textures=*/false);
 
+            // A floater reaches for the floater view while it is being built
+            // -- to fit itself on a screen this has none of -- and reads its
+            // rect for the snap. One here, the size of a plausible window,
+            // is what lets a test build a floater at all.
+            LLFloaterView::Params fvp;
+            fvp.name = "test_floater_view";
+            fvp.rect = LLRect(0, 1080, 1920, 0);
+            fvp.mouse_opaque = false;
+            fvp.follows.flags = FOLLOWS_ALL;
+            gFloaterView = LLUICtrlFactory::create<LLFloaterView>(fvp);
+
             mOk = true;
         }
 
@@ -129,6 +144,46 @@ namespace ll_test
         LLControlGroup mConfig;
         bool mOk { false };
     };
+
+    // What a frame does to a layout, run until it stops changing.
+    //
+    // A layout stack lays its panels out on the frame AFTER it is told to,
+    // and laying one out tells the stacks around it -- so one pass measures
+    // what the file said, and a second measures something halfway between
+    // that and the answer. The viewer converges because it draws sixty
+    // frames a second and nobody watches the first three; a test has to say
+    // so out loud, and has to know whether it got there.
+    //
+    // Returns false if it did not settle, which is itself worth failing on:
+    // a layout that never stops moving is one the viewer redraws for ever.
+    inline bool settle(LLView* root, S32 passes = 16)
+    {
+        const auto snapshot = [](LLView* view, std::vector<LLRect>& out, auto&& self) -> void
+        {
+            out.push_back(view->getRect());
+            for (LLView* child : *view->getChildList())
+            {
+                self(child, out, self);
+            }
+        };
+
+        std::vector<LLRect> before;
+        std::vector<LLRect> after;
+        snapshot(root, before, snapshot);
+        for (S32 pass = 0; pass < passes; ++pass)
+        {
+            LLAccordionCtrl::updateClass();
+            LLLayoutStack::updateClass();
+            after.clear();
+            snapshot(root, after, snapshot);
+            if (after == before)
+            {
+                return true;
+            }
+            before.swap(after);
+        }
+        return false;
+    }
 }
 
 #endif // AL_ALHEADLESSUI_FIXTURE_H
