@@ -43,6 +43,9 @@
 #include "llfocusmgr.h"
 #include "llresmgr.h"
 #include "lluictrlfactory.h"
+#include "llwindow.h"
+
+#include <cstdlib>
 
 const U32 MAX_STRING_LENGTH = 255;
 
@@ -54,10 +57,13 @@ LLSpinCtrl::Params::Params()
     allow_text_entry("allow_text_entry", true),
     allow_digits_only("allow_digits_only", false),
     label_wrap("label_wrap", false),
+    scrub("scrub", false),
     text_enabled_color("text_enabled_color"),
     text_disabled_color("text_disabled_color"),
     up_button("up_button"),
-    down_button("down_button")
+    down_button("down_button"),
+    mouse_down_callback("mouse_down_callback"),
+    mouse_up_callback("mouse_up_callback")
 {}
 
 LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
@@ -66,11 +72,25 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
     mbHasBeenSet( false ),
     mPrecision(p.decimal_digits),
     mTextEnabledColor(p.text_enabled_color()),
-    mTextDisabledColor(p.text_disabled_color())
+    mTextDisabledColor(p.text_disabled_color()),
+    mScrub(p.scrub),
+    mScrubbing(false),
+    mScrubMoved(false),
+    mScrubStartX(0),
+    mScrubStartY(0),
+    mScrubStartValue(0.f),
+    mMouseDownSignal(NULL),
+    mMouseUpSignal(NULL)
 {
     static LLUICachedControl<S32> spinctrl_spacing ("UISpinctrlSpacing", 0);
     static LLUICachedControl<S32> spinctrl_btn_width ("UISpinctrlBtnWidth", 0);
     static LLUICachedControl<S32> spinctrl_btn_height ("UISpinctrlBtnHeight", 0);
+    // The two buttons and the editor beside them are as tall as the control
+    // has room for, in the middle of it. Laid out from the top at a fixed
+    // height, as this was, a spinner shorter than two buttons put its lower
+    // button and the foot of its editor below its own rect -- and all but
+    // thirty-three of the viewer's spinners are shorter than that, forty-four
+    // of them by twelve pixels.
     S32 centered_top = getRect().getHeight();
     S32 centered_bottom = getRect().getHeight() - 2 * spinctrl_btn_height;
     S32 btn_left = 0;
@@ -150,6 +170,21 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
 
     updateEditor();
     setUseBoundingRect( true );
+
+    if (p.mouse_down_callback.isProvided())
+    {
+        setMouseDownCallback(initCommitCallback(p.mouse_down_callback));
+    }
+    if (p.mouse_up_callback.isProvided())
+    {
+        setMouseUpCallback(initCommitCallback(p.mouse_up_callback));
+    }
+}
+
+LLSpinCtrl::~LLSpinCtrl()
+{
+    delete mMouseDownSignal;
+    delete mMouseUpSignal;
 }
 
 F32 clamp_precision(F32 value, S32 decimal_precision)
@@ -255,6 +290,182 @@ void LLSpinCtrl::onDownBtn( const LLSD& data )
             onCommit();
         }
     }
+}
+
+// Travel before a press is a drag, so a click stays a click.
+const S32 SCRUB_SLOP = 3;
+
+// The increments the buttons already use, chosen by the same modifiers, so
+// the drag and the click say the same thing about shift, control and alt.
+static F32 scrub_increment(F32 increment, MASK mask)
+{
+    if (mask & MASK_SHIFT)      { return increment * 0.01f; }
+    if (mask & MASK_CONTROL)    { return increment * 0.1f; }
+    if (mask & MASK_ALT)        { return increment * 10.f; }
+    return increment;
+}
+
+// static
+F32 LLSpinCtrl::scrubbedValue(F32 start, S32 travel, F32 increment, MASK mask,
+                              S32 precision, F32 min_value, F32 max_value)
+{
+    const F32 value = start + ((F32)travel / SCRUB_PIXELS_PER_STEP) * scrub_increment(increment, mask);
+    return llclamp(clamp_precision(value, precision), min_value, max_value);
+}
+
+bool LLSpinCtrl::inScrubZone(S32 x, S32 y) const
+{
+    if (!mScrub || !getEnabled())
+    {
+        return false;
+    }
+    if (mLabelBox)
+    {
+        return mLabelBox->getRect().pointInRect(x, y);
+    }
+    return mUpBtn->getRect().pointInRect(x, y) || mDownBtn->getRect().pointInRect(x, y);
+}
+
+bool LLSpinCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    if (!inScrubZone(x, y))
+    {
+        return LLF32UICtrl::handleMouseDown(x, y, mask);
+    }
+
+    // The editor's text, not the control's value, because a number typed and
+    // not yet committed is the number the developer is looking at.
+    std::string text = mEditor->getText();
+    if (LLLineEditor::postvalidateFloat(text))
+    {
+        LLLocale locale(LLLocale::USER_LOCALE);
+        mScrubStartValue = (F32)atof(text.c_str());
+    }
+    else
+    {
+        mScrubStartValue = getValueF32();
+    }
+
+    mScrubbing = true;
+    mScrubMoved = false;
+    mScrubStartX = x;
+    mScrubStartY = y;
+    gFocusMgr.setMouseCapture(this);
+
+    if (mMouseDownSignal)
+    {
+        (*mMouseDownSignal)(this, mScrubStartValue);
+    }
+    return true;
+}
+
+bool LLSpinCtrl::handleHover(S32 x, S32 y, MASK mask)
+{
+    const bool vertical = scrubVertical();
+    if (hasMouseCapture() && mScrubbing)
+    {
+        const S32 travel = vertical ? (y - mScrubStartY) : (x - mScrubStartX);
+        // A press that has not travelled is still a click, so nothing is
+        // written until it has gone far enough to be a drag.
+        if (!mScrubMoved && std::abs(travel) >= SCRUB_SLOP)
+        {
+            mScrubMoved = true;
+        }
+        if (mScrubMoved)
+        {
+            scrubTo(x, y, mask);
+        }
+        getWindow()->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        return true;
+    }
+    if (inScrubZone(x, y))
+    {
+        getWindow()->setCursor(vertical ? UI_CURSOR_SIZENS : UI_CURSOR_SIZEWE);
+        return true;
+    }
+    return LLF32UICtrl::handleHover(x, y, mask);
+}
+
+bool LLSpinCtrl::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    if (!hasMouseCapture() || !mScrubbing)
+    {
+        return LLF32UICtrl::handleMouseUp(x, y, mask);
+    }
+
+    gFocusMgr.setMouseCapture(NULL);
+
+    // A press on a button that never became a drag is the click it has always
+    // been. On a label there is nothing a click was ever for.
+    if (!mScrubMoved && scrubVertical())
+    {
+        if (mUpBtn->getRect().pointInRect(x, y))
+        {
+            onUpBtn(LLSD());
+        }
+        else if (mDownBtn->getRect().pointInRect(x, y))
+        {
+            onDownBtn(LLSD());
+        }
+    }
+    endScrub();
+    return true;
+}
+
+void LLSpinCtrl::onMouseCaptureLost()
+{
+    endScrub();
+    LLF32UICtrl::onMouseCaptureLost();
+}
+
+void LLSpinCtrl::endScrub()
+{
+    if (!mScrubbing)
+    {
+        return;
+    }
+    mScrubbing = false;
+    mScrubMoved = false;
+    if (mMouseUpSignal)
+    {
+        (*mMouseUpSignal)(this, getValueF32());
+    }
+}
+
+void LLSpinCtrl::scrubTo(S32 x, S32 y, MASK mask)
+{
+    const S32 travel = scrubVertical() ? (y - mScrubStartY) : (x - mScrubStartX);
+    const F32 val = scrubbedValue(mScrubStartValue, travel, mIncrement, mask,
+                                  mPrecision, mMinValue, mMaxValue);
+    if (val == getValueF32())
+    {
+        return;
+    }
+
+    const F32 saved_val = getValueF32();
+    setValue(val);
+    if (enable_signal_t* signal = validateSignal(); signal && !(*signal)(this, val))
+    {
+        // Nothing is reported: a drag crossing a value its owner refuses
+        // would say so on every frame it crossed it.
+        setValue(saved_val);
+        updateEditor();
+        return;
+    }
+    updateEditor();
+    onCommit();
+}
+
+boost::signals2::connection LLSpinCtrl::setMouseDownCallback(const commit_signal_t::slot_type& cb)
+{
+    if (!mMouseDownSignal) mMouseDownSignal = new commit_signal_t();
+    return mMouseDownSignal->connect(cb);
+}
+
+boost::signals2::connection LLSpinCtrl::setMouseUpCallback(const commit_signal_t::slot_type& cb)
+{
+    if (!mMouseUpSignal) mMouseUpSignal = new commit_signal_t();
+    return mMouseUpSignal->connect(cb);
 }
 
 // static

@@ -49,11 +49,16 @@ public:
         Optional<bool> allow_digits_only;
         Optional<bool> label_wrap;
 
+        Optional<bool> scrub;
+
         Optional<LLUIColor> text_enabled_color;
         Optional<LLUIColor> text_disabled_color;
 
         Optional<LLButton::Params> up_button;
         Optional<LLButton::Params> down_button;
+
+        Optional<CommitCallbackParam> mouse_down_callback,
+                                      mouse_up_callback;
 
         Params();
     };
@@ -61,8 +66,16 @@ protected:
     LLSpinCtrl(const Params&);
     friend class LLUICtrlFactory;
 public:
-    virtual ~LLSpinCtrl() {} // Children all cleaned up by default view destructor.
+    virtual ~LLSpinCtrl(); // Children all cleaned up by default view destructor.
 
+    // Pixels of travel a scrub spends on one increment.
+    static constexpr F32 SCRUB_PIXELS_PER_STEP = 4.f;
+
+    // Where a scrub of this many pixels arrives, so what the gesture does can
+    // be asked without a mouse. Travel is rightwards on a labelled spinner and
+    // upwards on one whose buttons carry the drag.
+    static F32      scrubbedValue(F32 start, S32 travel, F32 increment, MASK mask,
+                                  S32 precision, F32 min_value, F32 max_value);
 
     virtual void    forceSetValue(const LLSD& value ) ;
     virtual void    setValue(const LLSD& value );
@@ -94,6 +107,23 @@ public:
     virtual bool    handleScrollWheel(S32 x,S32 y,LLScrollDelta delta);
     virtual bool    handleKeyHere(KEY key, MASK mask);
 
+    // Dragging the label changes the value, and a spinner with no label puts
+    // the same gesture on its buttons, vertically. Shift is fine, control is
+    // finer still, alt is coarse -- the increments the buttons already use.
+    // The value tracks the drag; the ends of it are their own callbacks, so a
+    // listener that wants one edit per gesture has somewhere to put it.
+    void            setScrub(bool scrub)                        { mScrub = scrub; }
+    bool            getScrub() const                            { return mScrub; }
+    bool            isScrubbing() const                         { return mScrubbing; }
+
+    boost::signals2::connection setMouseDownCallback(const commit_signal_t::slot_type& cb);
+    boost::signals2::connection setMouseUpCallback(const commit_signal_t::slot_type& cb);
+
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool    handleHover(S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual void    onMouseCaptureLost();
+
     void            onEditorCommit(const LLSD& data);
     static void     onEditorGainFocus(LLFocusableElement* caller, void *userdata);
     static void     onEditorLostFocus(LLFocusableElement* caller, void *userdata);
@@ -109,6 +139,13 @@ private:
     void            updateEditor();
     void            reportInvalidData();
 
+    // The label carries the drag where there is one; a spinner that draws its
+    // own label elsewhere has only its buttons, and they drag vertically.
+    bool            scrubVertical() const                       { return mLabelBox == nullptr; }
+    bool            inScrubZone(S32 x, S32 y) const;
+    void            scrubTo(S32 x, S32 y, MASK mask);
+    void            endScrub();
+
     S32             mPrecision;
     class LLTextBox*    mLabelBox;
 
@@ -121,6 +158,16 @@ private:
 
     bool            mbHasBeenSet;
     bool            mAllowEdit;
+
+    bool            mScrub;
+    bool            mScrubbing;
+    bool            mScrubMoved;
+    S32             mScrubStartX;
+    S32             mScrubStartY;
+    F32             mScrubStartValue;
+
+    commit_signal_t*    mMouseDownSignal;
+    commit_signal_t*    mMouseUpSignal;
 };
 
 #endif  // LL_LLSPINCTRL_H
