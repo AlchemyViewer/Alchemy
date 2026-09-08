@@ -349,7 +349,10 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
             "shown with a rect of " + std::to_string(rect.getWidth()) + " by " + std::to_string(rect.getHeight()));
     }
 
-    if (const LLView* parent = view->getParent())
+    // The root's parent is whatever the tool built it into -- a canvas, a
+    // window -- and how big that is says nothing about the file. Only what
+    // the file puts inside something else the file describes is checked.
+    if (const LLView* parent = view != input.root ? view->getParent() : nullptr)
     {
         const LLRect bounds = parent->getLocalRect();
         if (view->getVisible() && parent->getVisible() && !isFurniture(view)
