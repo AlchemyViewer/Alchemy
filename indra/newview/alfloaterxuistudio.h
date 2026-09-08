@@ -285,6 +285,7 @@ private:
                    bool before, ALXUISelection::path_t& out) const;
     void fillPalette();
     void onInsertFromPalette();
+    void onTreeMove(const std::string& action);
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
     void refreshBindings(LLView* view);

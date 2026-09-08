@@ -1056,6 +1056,10 @@ bool ALFloaterXUIStudio::postBuild()
     mPalette = getChild<LLScrollListCtrl>("palette");
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
     getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
+    getChild<LLButton>("tree_up")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_up"));
+    getChild<LLButton>("tree_down")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_down"));
+    getChild<LLButton>("tree_in")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_in"));
+    getChild<LLButton>("tree_out")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_out"));
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
     mTranslateList = getChild<LLScrollListCtrl>("translate_list");
     mTranslateValue = getChild<LLLineEditor>("translate_value");
@@ -1222,6 +1226,19 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     {
         mTreeFilter->setFocus(true);
         return true;
+    }
+    // The outline keys, which are the buttons over the tree. Held down
+    // they repeat, which is how a row is walked several places at once.
+    if (mask == MASK_CONTROL && mSelection.hasSelection())
+    {
+        switch (key)
+        {
+        case KEY_UP:    onTreeMove("move_up");   return true;
+        case KEY_DOWN:  onTreeMove("move_down"); return true;
+        case KEY_RIGHT: onTreeMove("move_in");   return true;
+        case KEY_LEFT:  onTreeMove("move_out");  return true;
+        default: break;
+        }
     }
     if (key == 'C' && mask == MASK_CONTROL)
     {
@@ -2813,10 +2830,26 @@ void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
     {
         item->toggleShown();
     }
-    else if (action == "move_up" || action == "move_down" || action == "cut"
-          || action == "paste" || action == "delete")
+    else if (action == "move_up" || action == "move_down" || action == "move_in"
+          || action == "move_out" || action == "cut" || action == "paste"
+          || action == "delete")
     {
         restructure(action, item->getPath());
+    }
+}
+
+// The four buttons over the tree, and the keys that do the same: an
+// outline is edited by moving a line up, down, in and out, and a tree of
+// widgets is an outline.
+void ALFloaterXUIStudio::onTreeMove(const std::string& action)
+{
+    if (ALXUITreeItem* item = selectedItem())
+    {
+        restructure(action, item->getPath());
+    }
+    else
+    {
+        setStatus(getString("EditNoSelection"));
     }
 }
 
@@ -2881,6 +2914,32 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
         ok = held->moveElement(mCutPath, path);
         mCutPath.clear();
+        what = "moved";
+    }
+    else if (action == "move_in")
+    {
+        // Into the element above it, which is the outline gesture: what is
+        // above a thing is what it would become part of.
+        ALXUISelection::path_t sibling;
+        if (!siblingOf(*held, path, /*before=*/true, sibling))
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ok = held->moveElement(path, sibling);
+        what = "moved";
+    }
+    else if (action == "move_out")
+    {
+        // Out to sit after its parent among that parent's siblings, which
+        // is where a thing goes when it stops being part of one.
+        if (path.size() < 2)
+        {
+            setStatus(getString("EditNoSibling"));
+            return;
+        }
+        ALXUISelection::path_t parent(path.begin(), path.end() - 1);
+        ok = held->moveAfter(path, parent);
         what = "moved";
     }
     else
