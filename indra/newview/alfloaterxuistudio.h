@@ -161,7 +161,12 @@ private:
 
     struct Preview
     {
+        // Where it is drawn: the window's own canvas, or one belonging to a
+        // floater of its own -- and that one dies with its floater, whether
+        // the tool closed it or the developer did, so it is held the same
+        // way the floater is.
         LLHandle<LLFloater>                         host;
+        LLHandle<LLView>                            canvas;
         LLView*                                     root = nullptr;
         LLXMLNodePtr                                node;
         ALXUISourceMap                              sourceMap;
@@ -213,6 +218,7 @@ private:
     void onRespondToNotification();
     LLNotificationPtr selectedChannelNotification() const;
     void closePreview(S32 which);
+    ALXUICanvas* canvasOf(const Preview& pv) const;
     void closePreviews();
     void showGallery();
     void placeHost(S32 which, LLFloater* host);
@@ -376,6 +382,12 @@ private:
     std::string         mWroteThroughText;
     S32                 mLastX = -1;
     S32                 mLastY = -1;
+
+    // The window's own canvas, in the region between the outline and the
+    // inspector. The first preview is drawn here unless the developer has
+    // asked for it in a window of its own.
+    ALXUICanvas*        mCanvas = nullptr;
+    bool                mFloatPreview = false;
     LLFrameTimer        mStateTimer;
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;

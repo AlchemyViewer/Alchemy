@@ -370,6 +370,32 @@ public:
     void setRoot(LLView* root) { mRoot = root; }
     LLView* root() const { return mRoot; }
 
+    // A canvas in a window of its own is as big as what it shows. A canvas
+    // that is a region of a window is as big as the region, and what it
+    // shows sits at the top of it -- which is why nothing is placed from
+    // the bottom edge.
+    void setSizable(bool sizable) { mSizable = sizable; }
+
+    void fitContent(S32 width, S32 height)
+    {
+        mContentWidth = llmax(width, 120);
+        mContentHeight = llmax(height, 40);
+        if (mSizable)
+        {
+            reshape(mContentWidth, mContentHeight);
+        }
+    }
+
+    S32 contentWidth() const { return mContentWidth; }
+    S32 contentHeight() const { return mContentHeight; }
+
+    // Everything on the canvas goes, and the canvas forgets what it held.
+    void clear()
+    {
+        deleteAllChildren();
+        mRoot = nullptr;
+    }
+
     void draw() override
     {
         LLPanel::draw();
@@ -1093,6 +1119,9 @@ private:
     ALFloaterXUIStudio*   mTool;
     LLView*             mRoot = nullptr;
     S32                 mWhich;
+    bool                mSizable = false;
+    S32                 mContentWidth = 0;
+    S32                 mContentHeight = 0;
 
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
     S32                 mDragX = 0;
@@ -1122,6 +1151,7 @@ public:
         cp.background_visible = false;
         mCanvas = new ALXUICanvas(tool, which, cp);
         mCanvas->initFromParams(cp);
+        mCanvas->setSizable(true);
         addChild(mCanvas);
     }
 
@@ -1503,6 +1533,23 @@ bool ALFloaterXUIStudio::postBuild()
     mTranslateCounts = getChild<LLTextBox>("translate_counts");
     mEditTarget = getChild<LLTextBox>("edit_target");
     mStatus = getChild<LLTextBox>("status");
+
+    // The canvas is built here rather than declared in the XUI because it
+    // is the tool's own view of a preview, not a widget a file can ask for.
+    // It is as big as what it shows and the container scrolls it, so a file
+    // larger than the region is scrolled to rather than cut off.
+    if (LLScrollContainer* area = findChild<LLScrollContainer>("canvas_area", true))
+    {
+        LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        cp.name = "canvas";
+        cp.rect = area->getLocalRect();
+        cp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        cp.background_visible = false;
+        mCanvas = new ALXUICanvas(this, PRIMARY, cp);
+        mCanvas->initFromParams(cp);
+        mCanvas->setSizable(true);
+        area->addChild(mCanvas);
+    }
 
     loadState();
     scanCatalog();
@@ -1889,6 +1936,14 @@ void ALFloaterXUIStudio::onFindResult()
 // ---------------------------------------------------------------------------
 // Previews
 // ---------------------------------------------------------------------------
+// The canvas a preview is drawn on, or nothing where it has gone: a canvas
+// in a floater dies with the floater, and a raw pointer to one outlives it.
+ALXUICanvas* ALFloaterXUIStudio::canvasOf(const Preview& pv) const
+{
+    LLView* view = pv.canvas.get();
+    return view ? view->as<ALXUICanvas>() : nullptr;
+}
+
 void ALFloaterXUIStudio::closePreview(S32 which)
 {
     Preview& pv = mPreviews[which];
@@ -1903,7 +1958,15 @@ void ALFloaterXUIStudio::closePreview(S32 which)
         detachHost(host);
         host->closeFloater();
     }
+    else if (ALXUICanvas* canvas = canvasOf(pv))
+    {
+        // The window's own canvas outlives the preview on it, so what was
+        // built on it has to go. A canvas belonging to a floater went with
+        // the floater, and its handle says so.
+        canvas->clear();
+    }
     pv.host.markDead();
+    pv.canvas.markDead();
     pv.root = nullptr;
     pv.node = nullptr;
     pv.sourceMap.clear();
@@ -2035,10 +2098,12 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
 
     // The canvas is sized before anything is placed on it, because a panel
     // carries its children when its own height changes and a child placed
-    // first would be carried away from where it was put.
+    // first would be carried away from where it was put. A canvas that is a
+    // region of a window keeps its size and takes the number as what it is
+    // showing, so `top` below is the canvas's own height either way.
     const auto fit = [canvas](S32 width, S32 height)
     {
-        canvas->reshape(llmax(width, 120), llmax(height, 40));
+        canvas->fitContent(width, height);
     };
 
     LLView* root = nullptr;
@@ -2053,16 +2118,17 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
         canvas->addChild(floater);
         if (floater->initFloaterXML(node, canvas, file))
         {
-            floater->setCanDrag(false);
             floater->setCanResize(false);
             floater->enableResizeCtrls(false);
             floater->setCanClose(false);
             floater->setCanMinimize(false);
+            floater->setCanCollapse(false);
             floater->setCanTearOff(false);
             floater->setVisible(true);
             const LLRect r = floater->getRect();
             fit(r.getWidth() + 2 * CANVAS_MARGIN, r.getHeight() + 2 * CANVAS_MARGIN);
-            floater->setOrigin(CANVAS_MARGIN, CANVAS_MARGIN);
+            floater->setOrigin(CANVAS_MARGIN,
+                               canvas->getRect().getHeight() - r.getHeight() - CANVAS_MARGIN);
             root = floater;
         }
         else
@@ -2089,7 +2155,8 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
             // so the surface starts where the drawing does and not where
             // the panel says it does.
             panel->setOrigin(2 + llmax(0, panel->getRect().mLeft - box.mLeft),
-                             2 + llmax(0, panel->getRect().mBottom - box.mBottom));
+                             canvas->getRect().getHeight() - box.getHeight() - 2
+                                 + llmax(0, panel->getRect().mBottom - box.mBottom));
             panel->reshape(box.getWidth(), box.getHeight());
             root = panel;
         }
@@ -2120,6 +2187,7 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
             }
             const LLRect r = menu->getRect();
             fit(r.getWidth() + 8, r.getHeight() + 8);
+            holder->setRect(canvas->getLocalRect());
             holder->reshape(canvas->getRect().getWidth(), canvas->getRect().getHeight());
             menu->setOrigin(4, holder->getRect().getHeight() - r.getHeight() - 4);
             root = menu;
@@ -2190,7 +2258,7 @@ LLView* ALFloaterXUIStudio::buildNotification(ALXUICanvas* canvas)
 
     const LLRect r = panel->getRect();
     canvas->addChild(panel);
-    canvas->reshape(llmax(r.getWidth() + 16, 160), llmax(r.getHeight() + 16, 40));
+    canvas->fitContent(r.getWidth() + 16, r.getHeight() + 16);
     panel->setOrigin(8, canvas->getRect().getHeight() - r.getHeight() - 8);
     return panel;
 }
@@ -2879,17 +2947,29 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         ALXUIShellBuild shell;
         ALXUIDiagnostics sink;
 
-        LLFloater::Params p(LLFloater::getDefaultParams());
-        p.min_height = p.header_height;
-        p.min_width = 10;
-        p.can_resize = true;
-        ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
-        host = preview;
-        root = buildRoot(which, *entry, preview->canvas(), node);
-        if (root)
+        // The first preview is drawn in the window, where the developer is
+        // already looking. A second one, and one the developer has asked to
+        // float, get a window of their own.
+        if (which == PRIMARY && mCanvas && !mFloatPreview)
         {
-            preview->sizeToCanvas(preview->canvas()->getRect().getWidth(),
-                                  preview->canvas()->getRect().getHeight());
+            pv.canvas = mCanvas->getHandle();
+            root = buildRoot(which, *entry, mCanvas, node);
+        }
+        else
+        {
+            LLFloater::Params p(LLFloater::getDefaultParams());
+            p.min_height = p.header_height;
+            p.min_width = 10;
+            p.can_resize = true;
+            ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
+            host = preview;
+            pv.canvas = preview->canvas()->getHandle();
+            root = buildRoot(which, *entry, preview->canvas(), node);
+            if (root)
+            {
+                preview->sizeToCanvas(preview->canvas()->contentWidth(),
+                                      preview->canvas()->contentHeight());
+            }
         }
         pv.diagnostics = sink.entries();
     }
@@ -2897,8 +2977,11 @@ void ALFloaterXUIStudio::showPreview(S32 which)
 
     if (!root)
     {
-        detachHost(host);
-        host->closeFloater();
+        if (host)
+        {
+            detachHost(host);
+            host->closeFloater();
+        }
         if (which == PRIMARY)
         {
             LLStringUtil::format_map_t args;
@@ -2910,17 +2993,20 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         return;
     }
 
-    if (ALXUIPreviewHost* preview = host->as<ALXUIPreviewHost>())
+    if (ALXUICanvas* canvas = canvasOf(pv))
     {
-        preview->canvas()->setRoot(root);
+        canvas->setRoot(root);
     }
     // A floater file has a title of its own, and it is the useful one; a
     // registered floater is its own host and so is the same case.
     const LLFloater* titled = root == host ? host : (root ? root->as<LLFloater>() : nullptr);
     std::string title = titled ? titled->getTitle() : mFile;
     title += " [" + pv.skin + "/" + pv.language + (which == PRIMARY ? "" : ", second") + "]";
-    host->setTitle(title);
-    pv.host = host->getHandle();
+    if (host)
+    {
+        host->setTitle(title);
+        pv.host = host->getHandle();
+    }
     pv.root = root;
     pv.node = node;
     pv.views = countViews(root);
@@ -2928,8 +3014,11 @@ void ALFloaterXUIStudio::showPreview(S32 which)
     // template is in: there is no element in notifications.xml that any of
     // those widgets was built from, so nothing is paired with one.
     pv.sourceMap.build(root, entry->kind == ALXUICatalog::Kind::Notifications ? LLXMLNodePtr() : node);
-    placeHost(which, host);
-    host->openFloater();
+    if (host)
+    {
+        placeHost(which, host);
+        host->openFloater();
+    }
 
     if (which == PRIMARY)
     {
@@ -2948,7 +3037,7 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         args["[LANG]"] = pv.language;
         // Which build this was, since the answer to almost every other
         // question the tool gives depends on it.
-        setStatus(getString(host->as<ALXUIPreviewHost>() ? "Built" : "BuiltReal", args));
+        setStatus(getString(!host || host->as<ALXUIPreviewHost>() ? "Built" : "BuiltReal", args));
         fillTranslation();
         // The selection is a path; it may name something in the new tree.
         onSelectionChanged();
@@ -5228,10 +5317,24 @@ bool ALFloaterXUIStudio::redoEdit()
 
 void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
 {
-    if (which == PRIMARY)
+    if (which != PRIMARY)
     {
-        applyEdges(dl, db, dr, dt);
+        return;
     }
+    // Moving the root moves the preview on its canvas and writes nothing:
+    // where a file sits on the surface it is shown on is the tool's business
+    // and not the file's. Refusing the drag outright, which is what this did,
+    // left the gesture doing nothing at all. Its size is the file's, and that
+    // still goes through the document.
+    Preview& pv = mPreviews[PRIMARY];
+    const bool move_only = dl == dr && db == dt && (dl || db);
+    if (pv.root && move_only && selectedView() == pv.root)
+    {
+        pv.root->translate(dl, db);
+        setStatus(getString("EditRootMoved"));
+        return;
+    }
+    applyEdges(dl, db, dr, dt);
 }
 
 namespace

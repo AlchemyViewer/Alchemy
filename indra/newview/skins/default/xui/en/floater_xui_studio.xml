@@ -5,14 +5,14 @@
  height="760"
  layout="topleft"
  min_height="480"
- min_width="900"
+ min_width="1200"
  name="xui_studio"
  help_topic="xui_studio"
  save_rect="true"
  single_instance="true"
  title="XUI Studio"
  translate="false"
- width="1180">
+ width="1620">
     <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
     <floater.string name="NoFile">Select a file.</floater.string>
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
@@ -27,6 +27,7 @@
     <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
     <floater.string name="EditWrote">Wrote [ATTRS] to [FILE] in [LAYER]</floater.string>
     <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
+    <floater.string name="EditRootMoved">Moved the preview on its canvas. Where it sits here is not in the file, so nothing was written.</floater.string>
     <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
     <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
     <floater.string name="EditRedone">Did that to [FILE] again.</floater.string>
@@ -409,13 +410,13 @@
     <layout_stack
      animate="false"
      follows="all"
-     height="662"
+     height="431"
      layout="topleft"
      left="8"
      name="outer_stack"
      orientation="vertical"
      top="70"
-     width="1164">
+     width="1604">
 
     <layout_panel
      auto_resize="true"
@@ -433,13 +434,13 @@
      name="main_stack"
      orientation="horizontal"
      top="0"
-     width="1164">
+     width="1604">
 
         <layout_panel
          auto_resize="false"
          height="474"
          layout="topleft"
-         min_dim="200"
+         min_dim="180"
          name="catalog_panel"
          user_resize="true"
          width="300">
@@ -586,7 +587,7 @@
          auto_resize="false"
          height="474"
          layout="topleft"
-         min_dim="220"
+         min_dim="180"
          name="tree_panel"
          user_resize="true"
          width="360">
@@ -613,7 +614,7 @@
                      left="0"
                      name="tree_filter"
                      top="0"
-                     width="196" />
+                     width="186" />
                     <button
                      follows="top|right"
                      height="22"
@@ -707,8 +708,26 @@
          auto_resize="true"
          height="474"
          layout="topleft"
-         min_dim="320"
+         min_dim="160"
+         name="canvas_panel"
+         user_resize="true"
+         width="320">
+            <scroll_container
+             follows="all"
+             height="474"
+             layout="topleft"
+             left="0"
+             name="canvas_area"
+             top="0"
+             width="320" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         height="474"
+         layout="topleft"
+         min_dim="260"
          name="inspector_panel"
+         user_resize="true"
          width="480">
             <tab_container
              follows="all"
@@ -723,7 +742,10 @@
                 <panel
                  label="Attributes"
                  layout="topleft"
-                 name="attributes_tab">
+                 follows="all"
+                 height="431"
+                 name="attributes_tab"
+                 width="478">
                     <text
                      follows="left|top"
                      font="SansSerifBold"
@@ -770,18 +792,21 @@
                 <panel
                  label="Layout"
                  layout="topleft"
-                 name="layout_tab">
+                 follows="all"
+                 height="431"
+                 name="layout_tab"
+                 width="478">
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="430"
+                     height="431"
                      layout="topleft"
                      left="0"
                      name="layout"
                      top="0"
-                     width="476">
+                     width="478">
                         <scroll_list.columns
                          label="Property"
                          name="property"
@@ -795,7 +820,10 @@
                 <panel
                  label="Source"
                  layout="topleft"
-                 name="source_tab">
+                 follows="all"
+                 height="431"
+                 name="source_tab"
+                 width="478">
                     <text
                      follows="left|top|right"
                      height="16"
@@ -830,18 +858,21 @@
                 <panel
                  label="Bindings"
                  layout="topleft"
-                 name="bindings_tab">
+                 follows="all"
+                 height="431"
+                 name="bindings_tab"
+                 width="478">
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="430"
+                     height="431"
                      layout="topleft"
                      left="0"
                      name="bindings"
                      top="0"
-                     width="476">
+                     width="478">
                         <scroll_list.columns
                          label="Kind"
                          name="kind"
@@ -859,18 +890,21 @@
                 <panel
                  label="State"
                  layout="topleft"
-                 name="state_tab">
+                 follows="all"
+                 height="431"
+                 name="state_tab"
+                 width="478">
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="430"
+                     height="431"
                      layout="topleft"
                      left="0"
                      name="state"
                      top="0"
-                     width="476">
+                     width="478">
                         <scroll_list.columns
                          label="Property"
                          name="property"
@@ -884,19 +918,22 @@
                 <panel
                  label="Findings"
                  layout="topleft"
-                 name="findings_tab">
+                 follows="all"
+                 height="431"
+                 name="findings_tab"
+                 width="478">
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="430"
+                     height="431"
                      layout="topleft"
                      left="0"
                      name="selection_findings"
                      tool_tip="The findings on the selected element and everything below it"
                      top="0"
-                     width="476">
+                     width="478">
                         <scroll_list.columns
                          label=""
                          name="severity"
@@ -937,23 +974,26 @@
              tab_height="20"
              tab_position="top"
              top="0"
-             width="1164">
+             width="1604">
                 <panel
                  label="Findings"
                  layout="topleft"
-                 name="findings_pane">
+                 follows="all"
+                 height="178"
+                 name="findings_pane"
+                 width="1602">
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
                      follows="all"
-                     height="174"
+                     height="178"
                      layout="topleft"
                      left="0"
                      name="findings"
                      tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
                      top="0"
-                     width="1164">
+                     width="1602">
                         <scroll_list.columns
                          label=""
                          name="severity"
@@ -978,128 +1018,161 @@
                     </scroll_list>
                 </panel>
                 <panel
+                 follows="all"
+                 height="178"
                  label="Translation"
                  layout="topleft"
-                 name="translation_pane">
-                    <text
-                     follows="left|top"
-                     height="16"
-                     layout="topleft"
-                     left="0"
-                     name="translate_label"
-                     top="4"
-                     width="58">Language</text>
-                    <combo_box
-                     follows="left|top"
-                     height="22"
-                     layout="topleft"
-                     left_pad="2"
-                     name="translate_language"
-                     tool_tip="The language this table is about, which the second preview shows"
-                     top_delta="-3"
-                     width="56" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Repair file"
-                     layout="topleft"
-                     left_pad="12"
-                     name="translate_repair_file"
-                     tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
-                     top_delta="0"
-                     width="80" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Repair language"
-                     layout="topleft"
-                     left_pad="4"
-                     name="translate_repair_all"
-                     tool_tip="The same over every file this language has"
-                     top_delta="0"
-                     width="110" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Repair roots"
-                     layout="topleft"
-                     left_pad="4"
-                     name="translate_repair_roots"
-                     tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
-                     top_delta="0"
-                     width="92" />
-                    <text
-                     follows="left|top|right"
-                     height="16"
-                     layout="topleft"
-                     left_pad="12"
-                     name="translate_counts"
-                     top_delta="3"
-                     use_ellipses="true"
-                     width="660" />
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     multi_select="true"
+                 name="translation_pane"
+                 width="1602">
+                    <layout_stack
+                     animate="false"
                      follows="all"
-                     height="120"
+                     height="178"
                      layout="topleft"
                      left="0"
-                     name="translate_list"
-                     tool_tip="One row per field a translator writes; double-click selects the element"
-                     top="28"
-                     width="1164">
-                        <scroll_list.columns
-                         label="Where"
-                         name="path"
-                         width="200" />
-                        <scroll_list.columns
-                         label="Field"
-                         name="field"
-                         width="90" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="English"
-                         name="english" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Translation"
-                         name="translation" />
-                        <scroll_list.columns
-                         label="State"
-                         name="state"
-                         width="150" />
-                        <scroll_list.columns
-                         label="Fits"
-                         name="fits"
-                         tool_tip="Whether the translation fits its widget in the second preview"
-                         width="40" />
-                    </scroll_list>
-                    <line_editor
-                     follows="left|right|bottom"
-                     height="22"
-                     layout="topleft"
-                     left="0"
-                     name="translate_value"
-                     select_on_focus="true"
-                     tool_tip="The translation for the selected row; Return writes it into the language's file"
-                     top="152"
-                     width="1080" />
-                    <button
-                     follows="right|bottom"
-                     height="22"
-                     label="Write"
-                     layout="topleft"
-                     left_pad="4"
-                     name="translate_write"
-                     tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
-                     top_delta="0"
-                     width="80" />
+                     name="translation_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="1602">
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         name="translate_head">
+                        <text
+                         follows="left|top"
+                         height="16"
+                         layout="topleft"
+                         left="0"
+                         name="translate_label"
+                         top="4"
+                         width="58">Language</text>
+                        <combo_box
+                         follows="left|top"
+                         height="22"
+                         layout="topleft"
+                         left_pad="2"
+                         name="translate_language"
+                         tool_tip="The language this table is about, which the second preview shows"
+                         top_delta="-3"
+                         width="56" />
+                        <button
+                         follows="left|top"
+                         height="22"
+                         label="Repair file"
+                         layout="topleft"
+                         left_pad="12"
+                         name="translate_repair_file"
+                         tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
+                         top_delta="0"
+                         width="80" />
+                        <button
+                         follows="left|top"
+                         height="22"
+                         label="Repair language"
+                         layout="topleft"
+                         left_pad="4"
+                         name="translate_repair_all"
+                         tool_tip="The same over every file this language has"
+                         top_delta="0"
+                         width="110" />
+                        <button
+                         follows="left|top"
+                         height="22"
+                         label="Repair roots"
+                         layout="topleft"
+                         left_pad="4"
+                         name="translate_repair_roots"
+                         tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
+                         top_delta="0"
+                         width="92" />
+                        <text
+                         follows="left|top|right"
+                         height="16"
+                         layout="topleft"
+                         left_pad="12"
+                         name="translate_counts"
+                         top_delta="3"
+                         use_ellipses="true"
+                         width="660" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="120"
+                         min_dim="48"
+                         name="translate_table">
+                        <scroll_list
+                         column_padding="0"
+                         draw_heading="true"
+                         multi_select="true"
+                         follows="all"
+                         height="120"
+                         layout="topleft"
+                         left="0"
+                         name="translate_list"
+                         tool_tip="One row per field a translator writes; double-click selects the element"
+                         top="0"
+                         width="1602">
+                            <scroll_list.columns
+                             label="Where"
+                             name="path"
+                             width="200" />
+                            <scroll_list.columns
+                             label="Field"
+                             name="field"
+                             width="90" />
+                            <scroll_list.columns
+                             dynamic_width="true"
+                             label="English"
+                             name="english" />
+                            <scroll_list.columns
+                             dynamic_width="true"
+                             label="Translation"
+                             name="translation" />
+                            <scroll_list.columns
+                             label="State"
+                             name="state"
+                             width="150" />
+                            <scroll_list.columns
+                             label="Fits"
+                             name="fits"
+                             tool_tip="Whether the translation fits its widget in the second preview"
+                             width="40" />
+                        </scroll_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="24"
+                         name="translate_write_row">
+                        <line_editor
+                         follows="left|top|right"
+                         height="22"
+                         layout="topleft"
+                         left="0"
+                         name="translate_value"
+                         select_on_focus="true"
+                         tool_tip="The translation for the selected row; Return writes it into the language's file"
+                         top="0"
+                         width="1080" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         label="Write"
+                         layout="topleft"
+                         left_pad="4"
+                         name="translate_write"
+                         tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
+                         top_delta="0"
+                         width="80" />
+                        </layout_panel>
+                    </layout_stack>
                 </panel>
                 <panel
                  label="Notifications"
                  layout="topleft"
-                 name="notifications_pane">
+                 follows="all"
+                 height="178"
+                 name="notifications_pane"
+                 width="1602">
                     <filter_editor
                      follows="left|top"
                      height="22"
@@ -1123,13 +1196,13 @@
                      column_padding="0"
                      draw_heading="true"
                      follows="all"
-                     height="146"
+                     height="150"
                      layout="topleft"
                      left="0"
                      name="notifications"
                      tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
                      top="28"
-                     width="1164">
+                     width="1602">
                         <scroll_list.columns
                          label="Name"
                          name="name"
@@ -1151,7 +1224,10 @@
                 <panel
                  label="Palette"
                  layout="topleft"
-                 name="palette_pane">
+                 follows="all"
+                 height="178"
+                 name="palette_pane"
+                 width="1602">
                     <button
                      follows="left|top"
                      height="22"
@@ -1166,13 +1242,13 @@
                      column_padding="0"
                      draw_heading="true"
                      follows="all"
-                     height="146"
+                     height="150"
                      layout="topleft"
                      left="0"
                      name="palette"
                      tool_tip="The tags the selected element may contain, from the registry it names as its children"
                      top="28"
-                     width="1164">
+                     width="1602">
                         <scroll_list.columns
                          label="Tag"
                          name="tag"
@@ -1186,7 +1262,10 @@
                 <panel
                  label="Channels"
                  layout="topleft"
-                 name="channels_pane">
+                 follows="all"
+                 height="178"
+                 name="channels_pane"
+                 width="1602">
                     <text
                      follows="left|top"
                      height="16"
@@ -1228,13 +1307,13 @@
                      column_padding="0"
                      draw_heading="true"
                      follows="all"
-                     height="146"
+                     height="150"
                      layout="topleft"
                      left="0"
                      name="channels"
                      tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
                      top="28"
-                     width="1164">
+                     width="1602">
                         <scroll_list.columns
                          label="Channel"
                          name="channel"
@@ -1266,5 +1345,5 @@
      name="status"
      top_pad="6"
      use_ellipses="true"
-     width="1164" />
+     width="1604" />
 </floater>
