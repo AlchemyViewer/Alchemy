@@ -55,18 +55,16 @@ protected:
 
 public:
 
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
+    bool            handleHover(S32 x, S32 y, MASK mask) override;
+    bool            handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool            handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool            handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
     void            setResizeLimits( S32 min_size, S32 max_size ) { mMinSize = min_size; mMaxSize = max_size; }
     void            setEnableSnapping(bool enable) { mSnappingEnabled = enable; }
     void            setAllowDoubleClickSnapping(bool allow) { mAllowDoubleClickSnapping = allow; }
     bool            canResize() const { return getEnabled() && mMaxSize > mMinSize; }
     void            setResizeListener(std::function<void(void*)> listener) { mResizeListener = listener; }
-    void            setImagePanel(LLPanel * panelp);
-    LLPanel *       getImagePanel() const;
 
 private:
     S32                             mDragLastScreenX;
@@ -80,9 +78,7 @@ private:
     bool                            mSnappingEnabled,
                                     mAllowDoubleClickSnapping;
     LLView*                         mResizingView;
-    std::function<void(void*)>    mResizeListener;
-    LLPointer<LLUIImage>            mDragHandleImage;
-    LLPanel *                       mImagePanel;
+    std::function<void(void*)>      mResizeListener;
 };
 
 #endif  // LL_RESIZEBAR_H

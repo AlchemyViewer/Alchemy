@@ -36,7 +36,8 @@
 #include "llwindow.h"
 
 LLResizeBar::Params::Params()
-:   max_size("max_size", S32_MAX),
+:   min_size("min_size", 0),
+    max_size("max_size", S32_MAX),
     snapping_enabled("snapping_enabled", true),
     resizing_view("resizing_view"),
     side("side"),
@@ -57,8 +58,7 @@ LLResizeBar::LLResizeBar(const LLResizeBar::Params& p)
     mSnappingEnabled(p.snapping_enabled),
     mAllowDoubleClickSnapping(p.allow_double_click_snapping),
     mResizingView(p.resizing_view),
-    mResizeListener(NULL),
-    mImagePanel(NULL)
+    mResizeListener(NULL)
 {
     setFollowsNone();
     // set up some generically good follow code.
@@ -134,6 +134,14 @@ bool LLResizeBar::handleHover(S32 x, S32 y, MASK mask)
         S32 screen_y;
         localPointToScreen(x, y, &screen_x, &screen_y);
 
+        // A drag that leaves the window keeps resizing from the edge it left
+        // by, which is what the corner handle does with the same gesture. The
+        // clamp is also what keeps the resized view from growing past the
+        // window and taking the bar out of reach.
+        const LLRect valid_rect = getRootView()->getRect();
+        screen_x = llclamp(screen_x, valid_rect.mLeft, valid_rect.mRight);
+        screen_y = llclamp(screen_y, valid_rect.mBottom, valid_rect.mTop);
+
         S32 delta_x = screen_x - mDragLastScreenX;
         S32 delta_y = screen_y - mDragLastScreenY;
 
@@ -145,11 +153,7 @@ bool LLResizeBar::handleHover(S32 x, S32 y, MASK mask)
         mLastMouseScreenX = screen_x;
         mLastMouseScreenY = screen_y;
 
-        // Make sure the mouse in still over the application.  We don't want to make the parent
-        // so big that we can't see the resize handle any more.
-        LLRect valid_rect = getRootView()->getRect();
-
-        if( valid_rect.localPointInRect( screen_x, screen_y ) && mResizingView )
+        if( mResizingView )
         {
             // Resize the parent
             LLRect orig_rect = mResizingView->getRect();
@@ -287,6 +291,13 @@ bool LLResizeBar::handleHover(S32 x, S32 y, MASK mask)
             default:
                 break;
             }
+
+            // Said where a resize actually happened: under the capture, and
+            // past the point where a drag off the window is turned away.
+            if (mResizeListener)
+            {
+                mResizeListener(NULL);
+            }
         }
 
         handled = true;
@@ -312,16 +323,18 @@ bool LLResizeBar::handleHover(S32 x, S32 y, MASK mask)
         }
     }
 
-    if (mResizeListener)
-    {
-        mResizeListener(NULL);
-    }
-
     return handled;
 } // end LLResizeBar::handleHover
 
 bool LLResizeBar::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
+    // resizing_view is mandatory, and a block that fails to provide one is
+    // built anyway with a warning; the hover path asks the same question.
+    if (!mResizingView)
+    {
+        return true;
+    }
+
     LLRect orig_rect = mResizingView->getRect();
     LLRect scaled_rect = orig_rect;
 
@@ -351,26 +364,4 @@ bool LLResizeBar::handleDoubleClick(S32 x, S32 y, MASK mask)
     }
 
     return true;
-}
-
-void LLResizeBar::setImagePanel(LLPanel * panelp)
-{
-    const LLView::child_list_t * children = getChildList();
-    if (getChildCount() == 2)
-    {
-        LLPanel * image_panelp = children->back()->as<LLPanel>();
-        if (image_panelp)
-        {
-            removeChild(image_panelp);
-            delete image_panelp;
-        }
-    }
-
-    addChild(panelp);
-    sendChildToBack(panelp);
-}
-
-LLPanel * LLResizeBar::getImagePanel() const
-{
-    return getChildCount() > 0 ? (LLPanel *)getChildList()->back() : NULL;
 }
