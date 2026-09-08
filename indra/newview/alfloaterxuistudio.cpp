@@ -150,6 +150,10 @@ private:
 
 namespace
 {
+    // What a canvas keeps around what it shows, so a preview is not
+    // drawn hard against the edge of the surface it is on.
+    constexpr S32 CANVAS_MARGIN = 4;
+
     // The sections the attribute grid is divided into, in the order an
     // author reads them: what the thing is, where it is, what it looks
     // like, what it does, and then everything a tag will take that none of
@@ -344,36 +348,31 @@ namespace
     }
 }
 
-// A preview: a floater in the floater view that is the previewed floater,
-// or hosts the previewed panel, menu or widget. It draws the tool's hover
-// and selection over what it shows, answers a modifier click with a
-// selection, and tells the tool when it goes.
-class ALXUIPreviewHost final : public LLFloater
+// The surface a file is previewed on: it holds the built view tree, draws
+// the tool's hover, selection, grips, anchors, rulers and guides over it,
+// and answers a modifier click with a selection. It is a panel, so it can
+// be a region of a window as readily as the contents of a floater -- what
+// it needs is a root view and a rect, and nothing else it does is about
+// being a window.
+class ALXUICanvas final : public LLPanel
 {
 public:
-    AL_VIEW_TYPE(ALXUIPreviewHost, LLFloater);
+    AL_VIEW_TYPE(ALXUICanvas, LLPanel);
 
-    ALXUIPreviewHost(ALFloaterXUIStudio* tool, S32 which, const LLFloater::Params& p)
-    :   LLFloater(LLSD(), p),
+    ALXUICanvas(ALFloaterXUIStudio* tool, S32 which, const LLPanel::Params& p)
+    :   LLPanel(p),
         mTool(tool),
         mWhich(which)
     {
     }
 
-    ~ALXUIPreviewHost() override
-    {
-        if (mTool)
-        {
-            mTool->hostClosed(mWhich);
-        }
-    }
-
     void detach() { mTool = nullptr; }
     void setRoot(LLView* root) { mRoot = root; }
+    LLView* root() const { return mRoot; }
 
     void draw() override
     {
-        LLFloater::draw();
+        LLPanel::draw();
         if (!mTool || !mRoot)
         {
             return;
@@ -457,7 +456,7 @@ public:
                 return true;
             }
         }
-        return LLFloater::handleKeyHere(key, mask);
+        return LLPanel::handleKeyHere(key, mask);
     }
 
     // A plain click belongs to the preview: its tabs turn and its lists
@@ -468,7 +467,7 @@ public:
     {
         if (!mTool || !mRoot)
         {
-            return LLFloater::handleMouseDown(x, y, mask);
+            return LLPanel::handleMouseDown(x, y, mask);
         }
 
         // A handle answers before the widget under it does, with or
@@ -502,7 +501,7 @@ public:
             setFocus(true);
             return true;
         }
-        return LLFloater::handleMouseDown(x, y, mask);
+        return LLPanel::handleMouseDown(x, y, mask);
     }
 
     bool handleHover(S32 x, S32 y, MASK mask) override
@@ -528,7 +527,7 @@ public:
                 }
             }
         }
-        return LLFloater::handleHover(x, y, mask);
+        return LLPanel::handleHover(x, y, mask);
     }
 
     // A panel that names a file of its own is one element here and a
@@ -546,7 +545,7 @@ public:
             }
             return true;
         }
-        return LLFloater::handleDoubleClick(x, y, mask);
+        return LLPanel::handleDoubleClick(x, y, mask);
     }
 
     bool handleMouseUp(S32 x, S32 y, MASK mask) override
@@ -577,19 +576,19 @@ public:
             }
             return true;
         }
-        return LLFloater::handleMouseUp(x, y, mask);
+        return LLPanel::handleMouseUp(x, y, mask);
     }
 
     void onMouseCaptureLost() override
     {
         mGrip = GRIP_NONE;
         mDrop.markDead();
-        LLFloater::onMouseCaptureLost();
+        LLPanel::onMouseCaptureLost();
     }
 
     void onMouseLeave(S32 x, S32 y, MASK mask) override
     {
-        LLFloater::onMouseLeave(x, y, mask);
+        LLPanel::onMouseLeave(x, y, mask);
         if (mTool)
         {
             mTool->canvasHover(mWhich, nullptr);
@@ -1100,6 +1099,65 @@ private:
     S32                 mDragY = 0;
     S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
     LLHandle<LLView>    mDrop;                  // the container a held element would land in
+};
+
+// A canvas in a window of its own, which is where a preview lives until the
+// studio has a region to put one in -- and afterwards, for the developer
+// with a second monitor. It owns the canvas, sizes itself around it, and
+// tells the tool when it goes.
+class ALXUIPreviewHost final : public LLFloater
+{
+public:
+    AL_VIEW_TYPE(ALXUIPreviewHost, LLFloater);
+
+    ALXUIPreviewHost(ALFloaterXUIStudio* tool, S32 which, const LLFloater::Params& p)
+    :   LLFloater(LLSD(), p),
+        mTool(tool),
+        mWhich(which)
+    {
+        LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        cp.name = "canvas";
+        cp.rect = contentRect(getRect().getWidth(), getRect().getHeight());
+        cp.follows.flags = FOLLOWS_ALL;
+        cp.background_visible = false;
+        mCanvas = new ALXUICanvas(tool, which, cp);
+        mCanvas->initFromParams(cp);
+        addChild(mCanvas);
+    }
+
+    ~ALXUIPreviewHost() override
+    {
+        if (mTool)
+        {
+            mTool->hostClosed(mWhich);
+        }
+    }
+
+    ALXUICanvas* canvas() const { return mCanvas; }
+
+    void detach()
+    {
+        mTool = nullptr;
+        mCanvas->detach();
+    }
+
+    // The window around a canvas of this size. Everything a file asks for is
+    // the size of what it describes; the header is the tool's own.
+    void sizeToCanvas(S32 width, S32 height)
+    {
+        reshape(width, height + getHeaderHeight());
+        mCanvas->setShape(contentRect(width, height + getHeaderHeight()));
+    }
+
+private:
+    LLRect contentRect(S32 width, S32 height) const
+    {
+        return LLRect(0, height - getHeaderHeight(), width, 0);
+    }
+
+    ALFloaterXUIStudio* mTool;
+    ALXUICanvas*        mCanvas = nullptr;
+    S32                 mWhich;
 };
 
 namespace
@@ -1932,7 +1990,7 @@ void ALFloaterXUIStudio::placeHost(S32 which, LLFloater* host)
     gFloaterView->adjustToFitScreen(host, false);
 }
 
-LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr& node)
+LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr& node)
 {
     LLUICtrlFactory& factory = LLUICtrlFactory::instance();
     const std::string& file = entry.name;
@@ -1962,47 +2020,77 @@ LLView* ALFloaterXUIStudio::buildRoot(S32 which, const ALXUICatalog::Entry& entr
             return nullptr;
         }
     }
-    return buildFromNode(entry, host, node);
+    return buildFromNode(entry, canvas, node);
 }
 
-// The node as a view, by the kind of file it is. A floater is the host
-// itself; everything else is hosted by it.
-LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node)
+// The node as a view, by the kind of file it is. Every kind lands on the
+// canvas, floaters included: a file that describes a floater describes its
+// chrome, and the chrome is worth seeing -- but a preview must not drag
+// itself out of the surface it is being previewed on, so its own dragging,
+// sizing and closing go off and the canvas's grips do that work.
+LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr node)
 {
     LLUICtrlFactory& factory = LLUICtrlFactory::instance();
     const std::string& file = entry.name;
+
+    // The canvas is sized before anything is placed on it, because a panel
+    // carries its children when its own height changes and a child placed
+    // first would be carried away from where it was put.
+    const auto fit = [canvas](S32 width, S32 height)
+    {
+        canvas->reshape(llmax(width, 120), llmax(height, 40));
+    };
 
     LLView* root = nullptr;
     factory.pushFileName(file);
     switch (entry.kind)
     {
     case ALXUICatalog::Kind::Floater:
-        if (host->initFloaterXML(node, gFloaterView, file))
+    {
+        // Parented before the XML is read: the last thing LLFloater::initFloater
+        // does is give itself to the floater view if nobody else has claimed it.
+        LLFloater* floater = new LLFloater(LLSD(), LLFloater::getDefaultParams());
+        canvas->addChild(floater);
+        if (floater->initFloaterXML(node, canvas, file))
         {
-            root = host;
-            host->setCanResize(host->isResizable());
+            floater->setCanDrag(false);
+            floater->setCanResize(false);
+            floater->enableResizeCtrls(false);
+            floater->setCanClose(false);
+            floater->setCanMinimize(false);
+            floater->setCanTearOff(false);
+            floater->setVisible(true);
+            const LLRect r = floater->getRect();
+            fit(r.getWidth() + 2 * CANVAS_MARGIN, r.getHeight() + 2 * CANVAS_MARGIN);
+            floater->setOrigin(CANVAS_MARGIN, CANVAS_MARGIN);
+            root = floater;
+        }
+        else
+        {
+            canvas->removeChild(floater);
+            delete floater;
         }
         break;
+    }
 
     case ALXUICatalog::Kind::Panel:
     {
         LLPanel::Params pp;
         LLPanel* panel = LLUICtrlFactory::create<LLPanel>(pp);
-        if (panel->initPanelXML(node, host, LLUICtrlFactory::getDefaultParams<LLPanel>()))
+        if (panel->initPanelXML(node, canvas, LLUICtrlFactory::getDefaultParams<LLPanel>()))
         {
             panel->setOrigin(2, 2);
             panel->setUseBoundingRect(true);
             panel->updateBoundingRect();
-            LLRect fit = panel->getRect();
-            fit.unionWith(panel->getBoundingRect());
+            LLRect box = panel->getRect();
+            box.unionWith(panel->getBoundingRect());
+            fit(box.getWidth() + 4, box.getHeight() + 4);
             // A child positioned past its parent's edge is drawn past it,
-            // so the window starts where the drawing does and not where
+            // so the surface starts where the drawing does and not where
             // the panel says it does.
-            panel->setOrigin(2 + llmax(0, panel->getRect().mLeft - fit.mLeft),
-                             2 + llmax(0, panel->getRect().mBottom - fit.mBottom));
-            panel->reshape(fit.getWidth(), fit.getHeight());
-            host->reshape(fit.getWidth() + 4, fit.getHeight() + 4 + LLFloater::getDefaultParams().header_height);
-            host->setCanResize(true);
+            panel->setOrigin(2 + llmax(0, panel->getRect().mLeft - box.mLeft),
+                             2 + llmax(0, panel->getRect().mBottom - box.mBottom));
+            panel->reshape(box.getWidth(), box.getHeight());
             root = panel;
         }
         else
@@ -2016,11 +2104,11 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
     {
         LLMenuHolderGL::Params hp;
         hp.name = "menu_holder";
-        hp.rect = host->getLocalRect();
+        hp.rect = canvas->getLocalRect();
         hp.follows.flags = FOLLOWS_ALL;
         LLMenuHolderGL* holder = LLUICtrlFactory::create<LLMenuHolderGL>(hp);
         holder->setCanHide(false);
-        host->addChild(holder);
+        canvas->addChild(holder);
         LLView* view = factory.createFromXML(node, holder, file, LLMenuHolderGL::child_registry_t::instance());
         if (LLMenuGL* menu = view ? view->as<LLMenuGL>() : nullptr)
         {
@@ -2030,10 +2118,9 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
                 menu->needsArrange();
                 menu->arrangeAndClear();
             }
-            const S32 header = LLFloater::getDefaultParams().header_height;
             const LLRect r = menu->getRect();
-            host->reshape(llmax(r.getWidth() + 8, 120), r.getHeight() + 8 + header);
-            holder->reshape(host->getRect().getWidth(), host->getRect().getHeight() - header);
+            fit(r.getWidth() + 8, r.getHeight() + 8);
+            holder->reshape(canvas->getRect().getWidth(), canvas->getRect().getHeight());
             menu->setOrigin(4, holder->getRect().getHeight() - r.getHeight() - 4);
             root = menu;
         }
@@ -2045,20 +2132,18 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
     }
 
     case ALXUICatalog::Kind::Notifications:
-        root = buildNotification(host);
+        root = buildNotification(canvas);
         break;
 
     case ALXUICatalog::Kind::Widget:
     case ALXUICatalog::Kind::Template:
     {
-        LLView* view = factory.createFromXML(node, host, file, LLDefaultChildRegistry::instance());
+        LLView* view = factory.createFromXML(node, canvas, file, LLDefaultChildRegistry::instance());
         if (view)
         {
-            const S32 header = LLFloater::getDefaultParams().header_height;
-            LLRect r = view->getRect();
-            host->reshape(llmax(r.getWidth() + 16, 120), llmax(r.getHeight() + 16, 40) + header);
-            view->setOrigin(8, host->getRect().getHeight() - header - r.getHeight() - 8);
-            host->setCanResize(true);
+            const LLRect r = view->getRect();
+            fit(r.getWidth() + 16, r.getHeight() + 16);
+            view->setOrigin(8, canvas->getRect().getHeight() - r.getHeight() - 8);
             root = view;
         }
         break;
@@ -2082,7 +2167,7 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
 // No substitutions are supplied. A template's [PLACEHOLDER] left standing is
 // what a XUI author wants to see: it says where the text will grow, which is
 // the question a preview of a notification is being asked.
-LLView* ALFloaterXUIStudio::buildNotification(ALXUIPreviewHost* host)
+LLView* ALFloaterXUIStudio::buildNotification(ALXUICanvas* canvas)
 {
     if (mNotification.empty() || !LLNotifications::instance().templateExists(mNotification))
     {
@@ -2103,12 +2188,10 @@ LLView* ALFloaterXUIStudio::buildNotification(ALXUIPreviewHost* host)
                    ? (LLPanel*)new LLToastAlertPanel(note, false)
                    : (LLPanel*)new LLToastNotifyPanel(note);
 
-    const S32 header = LLFloater::getDefaultParams().header_height;
     const LLRect r = panel->getRect();
-    host->addChild(panel);
-    host->reshape(llmax(r.getWidth() + 16, 160), llmax(r.getHeight() + 16, 40) + header);
-    panel->setOrigin(8, host->getRect().getHeight() - header - r.getHeight() - 8);
-    host->setCanResize(true);
+    canvas->addChild(panel);
+    canvas->reshape(llmax(r.getWidth() + 16, 160), llmax(r.getHeight() + 16, 40));
+    panel->setOrigin(8, canvas->getRect().getHeight() - r.getHeight() - 8);
     return panel;
 }
 
@@ -2799,9 +2882,15 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         LLFloater::Params p(LLFloater::getDefaultParams());
         p.min_height = p.header_height;
         p.min_width = 10;
+        p.can_resize = true;
         ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
         host = preview;
-        root = buildRoot(which, *entry, preview, node);
+        root = buildRoot(which, *entry, preview->canvas(), node);
+        if (root)
+        {
+            preview->sizeToCanvas(preview->canvas()->getRect().getWidth(),
+                                  preview->canvas()->getRect().getHeight());
+        }
         pv.diagnostics = sink.entries();
     }
     pv.seconds = timer.getElapsedTimeF32();
@@ -2823,9 +2912,12 @@ void ALFloaterXUIStudio::showPreview(S32 which)
 
     if (ALXUIPreviewHost* preview = host->as<ALXUIPreviewHost>())
     {
-        preview->setRoot(root);
+        preview->canvas()->setRoot(root);
     }
-    std::string title = root == host ? host->getTitle() : mFile;
+    // A floater file has a title of its own, and it is the useful one; a
+    // registered floater is its own host and so is the same case.
+    const LLFloater* titled = root == host ? host : (root ? root->as<LLFloater>() : nullptr);
+    std::string title = titled ? titled->getTitle() : mFile;
     title += " [" + pv.skin + "/" + pv.language + (which == PRIMARY ? "" : ", second") + "]";
     host->setTitle(title);
     pv.host = host->getHandle();
@@ -2922,8 +3014,7 @@ void ALFloaterXUIStudio::showGallery()
         p.min_height = 100;
         p.min_width = 200;
         host = new ALXUIPreviewHost(this, SECONDARY, p);
-        const S32 header = p.header_height;
-        host->reshape(900, 640 + header);
+        host->sizeToCanvas(900, 640);
         host->setCanResize(true);
         host->setTitle("Widget gallery [" + mSkin + "/" + mLanguage + "]");
 
@@ -2949,10 +3040,10 @@ void ALFloaterXUIStudio::showGallery()
 
         LLScrollContainer::Params sp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
         sp.name = "gallery_scroller";
-        sp.rect = LLRect(0, host->getRect().getHeight() - header, host->getRect().getWidth(), 0);
+        sp.rect = host->canvas()->getLocalRect();
         sp.follows.flags = FOLLOWS_ALL;
         scroller = LLUICtrlFactory::create<LLScrollContainer>(sp);
-        host->addChild(scroller);
+        host->canvas()->addChild(scroller);
 
         LLPanel::Params cp;
         cp.name = "gallery";
@@ -2991,7 +3082,7 @@ void ALFloaterXUIStudio::showGallery()
             }
         }
     }
-    host->setRoot(content);
+    host->canvas()->setRoot(content);
     host->detach();
     host->center();
     gFloaterView->adjustToFitScreen(host, false);
@@ -3694,7 +3785,7 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vecto
             p.min_width = 10;
             host = new ALXUIPreviewHost(this, SECONDARY, p);
             host->detach();
-            root = buildFromNode(entry, host, node);
+            root = buildFromNode(entry, host->canvas(), node);
         }
         entries = sink.entries();
     }

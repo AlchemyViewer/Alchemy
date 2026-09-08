@@ -49,6 +49,7 @@
 
 class ALXUILiveFile;
 class ALPropertyGrid;
+class ALXUICanvas;
 class ALXUIPreviewHost;
 class LLCheckBoxCtrl;
 class LLComboBox;
@@ -197,7 +198,7 @@ private:
 
     // --- notifications -------------------------------------------------------
     // A template built as the panel it would produce, without posting it.
-    LLView* buildNotification(ALXUIPreviewHost* host);
+    LLView* buildNotification(ALXUICanvas* canvas);
     void fillNotifications();
     void onNotificationSelected();
     void onPostNotification();
@@ -216,8 +217,8 @@ private:
     void showGallery();
     void placeHost(S32 which, LLFloater* host);
     void watchFiles(const ALXUICatalog::Entry& entry);
-    LLView* buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr& node);
-    LLView* buildFromNode(const ALXUICatalog::Entry& entry, ALXUIPreviewHost* host, LLXMLNodePtr node);
+    LLView* buildRoot(S32 which, const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr& node);
+    LLView* buildFromNode(const ALXUICatalog::Entry& entry, ALXUICanvas* canvas, LLXMLNodePtr node);
 
     // --- the tree pane -------------------------------------------------------
     void rebuildTree();
