@@ -575,7 +575,9 @@ private:
         static const LLUIColor grid_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
         LLColor4 faint(grid_color.get());
         faint.mV[VALPHA] = 0.12f;
-        const S32 step = grid < 4 ? grid * 4 : grid;   // a two pixel grid drawn whole is a wash
+        // A two pixel grid drawn whole is a wash, so a fine grid is drawn
+        // every few of itself: the lines a drag lands on are still the grid.
+        const S32 step = grid >= 4 ? grid : grid * ((8 + grid - 1) / grid);
         for (S32 x = r.mLeft; x <= r.mRight; x += step)
         {
             gl_line_2d(x, r.mBottom, x, r.mTop, faint);
@@ -586,12 +588,19 @@ private:
         }
     }
 
-    // Two strips along the top and the left, counting from the previewed
-    // root's top left corner, which is where the file counts from. The
-    // selection's edges are marked on both.
+    // Two strips beyond the top and the left edges, counting from the
+    // previewed root's top left corner, which is where the file counts from.
+    // Outside it, so a rule never sits over the thing being measured: a view
+    // draws through its parent's translation and nothing clips it to its own
+    // rect, so the strips are simply at negative coordinates.
+    //
+    // Ticks are the grid, which is whatever the grid is; the numbers are
+    // every fifty, which is round whether or not fifty is a multiple of the
+    // grid. The selection's edges are marked on both.
     void drawRulers() const
     {
         static constexpr S32 RULER = 14;
+        static constexpr S32 LABEL_EVERY = 50;
         const LLRect r = mRoot == this ? getLocalRect() : localRectOf(mRoot);
         if (r.getWidth() <= 0)
         {
@@ -602,31 +611,38 @@ private:
         LLColor4 ground(back.get());
         ground.mV[VALPHA] = 0.85f;
 
-        const LLRect top(r.mLeft, r.mTop, r.mRight, r.mTop - RULER);
-        const LLRect left(r.mLeft, r.mTop, r.mLeft + RULER, r.mBottom);
+        const LLRect top(r.mLeft - RULER, r.mTop + RULER, r.mRight, r.mTop);
+        const LLRect left(r.mLeft - RULER, r.mTop, r.mLeft, r.mBottom);
         gl_rect_2d(top, ground, true);
         gl_rect_2d(left, ground, true);
+        gl_rect_2d(top, ink.get(), false);
+        gl_rect_2d(left, ink.get(), false);
 
         const S32 grid = llmax(mTool->gridSize(), 2);
-        const S32 label_every = grid * 10 < 40 ? 50 : grid * 10;
         const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
         for (S32 x = 0; x <= r.getWidth(); x += grid)
         {
-            const bool labelled = (x % label_every) == 0;
-            gl_line_2d(r.mLeft + x, r.mTop - RULER, r.mLeft + x, r.mTop - (labelled ? RULER + 4 : RULER + 2), ink.get());
-            if (labelled && x > 0)
-            {
-                font->renderUTF8(std::to_string(x), 0, r.mLeft + x + 2, r.mTop - RULER + 2,
-                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
-            }
+            gl_line_2d(r.mLeft + x, r.mTop, r.mLeft + x, r.mTop + 3, ink.get());
         }
         for (S32 y = 0; y <= r.getHeight(); y += grid)
         {
-            const bool labelled = (y % label_every) == 0;
-            gl_line_2d(r.mLeft + RULER, r.mTop - y, r.mLeft + (labelled ? RULER + 4 : RULER + 2), r.mTop - y, ink.get());
-            if (labelled && y > 0)
+            gl_line_2d(r.mLeft, r.mTop - y, r.mLeft - 3, r.mTop - y, ink.get());
+        }
+        for (S32 x = 0; x <= r.getWidth(); x += LABEL_EVERY)
+        {
+            gl_line_2d(r.mLeft + x, r.mTop, r.mLeft + x, r.mTop + 5, ink.get());
+            if (x > 0)
             {
-                font->renderUTF8(std::to_string(y), 0, r.mLeft + 2, r.mTop - y - 10,
+                font->renderUTF8(std::to_string(x), 0, r.mLeft + x + 2, r.mTop + 5,
+                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+            }
+        }
+        for (S32 y = 0; y <= r.getHeight(); y += LABEL_EVERY)
+        {
+            gl_line_2d(r.mLeft, r.mTop - y, r.mLeft - 5, r.mTop - y, ink.get());
+            if (y > 0)
+            {
+                font->renderUTF8(std::to_string(y), 0, r.mLeft - RULER + 2, r.mTop - y - 10,
                                  ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
@@ -635,8 +651,8 @@ private:
         if (LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
         {
             const LLRect box = localRectOf(view);
-            gl_rect_2d(LLRect(box.mLeft, r.mTop, box.mRight, r.mTop - RULER), LLColor4::red, false);
-            gl_rect_2d(LLRect(r.mLeft, box.mTop, r.mLeft + RULER, box.mBottom), LLColor4::red, false);
+            gl_rect_2d(LLRect(box.mLeft, r.mTop + RULER, box.mRight, r.mTop), LLColor4::red, false);
+            gl_rect_2d(LLRect(r.mLeft - RULER, box.mTop, r.mLeft, box.mBottom), LLColor4::red, false);
         }
     }
 

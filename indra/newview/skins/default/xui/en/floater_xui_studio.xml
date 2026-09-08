@@ -133,9 +133,17 @@
                     <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:2" />
                     <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:2" />
                 </menu_item_check>
+                <menu_item_check label="3" layout="topleft" name="grid_3">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:3" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:3" />
+                </menu_item_check>
                 <menu_item_check label="4" layout="topleft" name="grid_4">
                     <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:4" />
                     <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:4" />
+                </menu_item_check>
+                <menu_item_check label="5" layout="topleft" name="grid_5">
+                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:5" />
+                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:5" />
                 </menu_item_check>
                 <menu_item_check label="8" layout="topleft" name="grid_8">
                     <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:8" />
