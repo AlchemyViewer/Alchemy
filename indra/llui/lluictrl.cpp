@@ -292,13 +292,18 @@ LLUICtrl::enable_signal_t::slot_type LLUICtrl::initEnableCallback(const EnableCa
     }
     else
     {
-        enable_callback_t* func = (EnableCallbackRegistry::getValue(cb.function_name));
+        const std::string& function_name = cb.function_name;
+        enable_callback_t* func = (EnableCallbackRegistry::getValue(function_name));
         if (func)
         {
             if (cb.parameter.isProvided())
                 return boost::bind((*func), this, cb.parameter);
             else
                 return enable_signal_t::slot_type(*func);
+        }
+        else if (!function_name.empty())
+        {
+            LL_WARNS() << "No callback found for: '" << function_name << "' in control: " << getName() << LL_ENDL;
         }
     }
     return default_enable_handler;
@@ -567,17 +572,23 @@ void LLUICtrl::setControlName(const std::string& control_name, LLView *context)
         context = this;
     }
 
-    // Register new listener
-    if (!control_name.empty())
+    // No name is a name to stop answering to, the same as a name nobody has:
+    // leaving the old binding in place is how a control keeps taking values
+    // from a setting the file no longer mentions.
+    if (control_name.empty())
     {
-        LLControlVariable* control = context->findControl(control_name);
-        if (!control)
-        {
-            LL_WARNS() << "Failed to assign control variable to " << getName()
-                        << ": control "<< control_name << " does not exist." << LL_ENDL;
-        }
-        setControlVariable(control);
+        removeControlVariable();
+        return;
     }
+
+    // Register new listener
+    LLControlVariable* control = context->findControl(control_name);
+    if (!control)
+    {
+        LL_WARNS() << "Failed to assign control variable to " << getName()
+                    << ": control "<< control_name << " does not exist." << LL_ENDL;
+    }
+    setControlVariable(control);
 }
 
 void LLUICtrl::setEnabledControlVariable(LLControlVariable* control)
@@ -716,13 +727,13 @@ bool LLUICtrl::hasFocus() const
 
 void LLUICtrl::setFocus(bool b)
 {
-    // focus NEVER goes to ui ctrls that are disabled!
-    if (!getEnabled())
-    {
-        return;
-    }
     if( b )
     {
+        // focus NEVER goes to ui ctrls that are disabled!
+        if (!getEnabled())
+        {
+            return;
+        }
         if (!hasFocus())
         {
             gFocusMgr.setKeyboardFocus( this );
@@ -730,6 +741,9 @@ void LLUICtrl::setFocus(bool b)
     }
     else
     {
+        // Giving focus up is not the same question. A control that had it and
+        // was disabled since would otherwise keep it, with no way to be asked
+        // for it back.
         if( gFocusMgr.childHasKeyboardFocus(this))
         {
             gFocusMgr.setKeyboardFocus( nullptr );

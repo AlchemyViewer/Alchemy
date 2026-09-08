@@ -171,11 +171,45 @@ namespace tut
                       resized->getRect().getWidth(), 300);
     }
 
+    // Being disabled is a reason focus cannot arrive, not a reason it cannot
+    // leave. A control disabled while it held focus would otherwise keep it,
+    // with nothing able to ask for it back.
+    struct PlainCtrl : public LLUICtrl
+    {
+        PlainCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+    };
+
+    template<> template<>
+    void llresizebar_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLUICtrl::Params p;
+        p.name = "ctrl";
+        p.rect = LLRect(0, 10, 10, 0);
+        std::unique_ptr<PlainCtrl> c(new PlainCtrl(p));
+
+        c->setFocus(true);
+        ensure("an enabled control takes focus", c->hasFocus());
+
+        c->setEnabled(false);
+        c->setFocus(false);
+        ensure("and a disabled one gives it up", !c->hasFocus());
+
+        c->setFocus(true);
+        ensure("but does not take it back", !c->hasFocus());
+
+        gFocusMgr.setKeyboardFocus(nullptr);
+    }
+
     // A panel names the file it was built from while it builds, and everything
     // built after it reads that name back. One whose referenced file will not
     // load has to put the name back too.
     template<> template<>
-    void llresizebar_object::test<5>()
+    void llresizebar_object::test<6>()
     {
         if (!ui.ok())
         {
