@@ -64,6 +64,8 @@ public:
     bool saveAs(const std::string& path);
 
     const std::string& text() const { return mText; }
+    // The file as it stands on disk, which is what the edits are against.
+    const std::string& saved() const { return mSaved; }
     const std::string& path() const { return mPath; }
     const std::string& error() const { return mError; }
     bool dirty() const { return mDirty; }

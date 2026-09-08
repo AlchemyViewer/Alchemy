@@ -70,6 +70,8 @@
 #include "llviewerwindow.h"
 #include "llwindow.h"
 
+#include <boost/unordered_set.hpp>
+
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -1940,6 +1942,162 @@ void ALFloaterXUIStudio::documentChanged(const std::string& status)
     setStatus(status);
     mReloadEntryOnly = true;
     mReloadPending = true;
+}
+
+// What the unsaved edits would do to the translations, before they are
+// written. A translation applies because the base has an element of that
+// name at that place; rename it, move it, or take it away, and the
+// language's value stops arriving without a word being said to anyone.
+// This is the word: the base as the disk has it and the base as it now
+// stands, each scanned against every language, and the difference is what
+// the edit costs.
+//
+// Only when the document is the file's base layer. Editing a language's
+// own overlay changes that translation and no other.
+S32 ALFloaterXUIStudio::translationImpact(std::vector<Impact>& out) const
+{
+    out.clear();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || mDocumentPath.empty() || !mDocument.dirty())
+    {
+        return 0;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    if (layers.empty() || layers.front()->path != mDocumentPath)
+    {
+        return 0;
+    }
+
+    ALXUIEdit before;
+    if (!before.loadBuffer(mDocument.saved()) || !before.root() || !mDocument.root())
+    {
+        return 0;
+    }
+
+    S32 total = 0;
+    for (const std::string& language : mCatalog.languages())
+    {
+        if (language == mLanguage)
+        {
+            continue;
+        }
+        const ALXUICatalog::Layer* overlay = overlayLayer(*entry, language);
+        if (!overlay || !overlay->root())
+        {
+            continue;
+        }
+
+        ALXUITranslate was;
+        ALXUITranslate now;
+        was.scan(before.root(), overlay->root());
+        now.scan(mDocument.root(), overlay->root());
+
+        // A value the language wrote, keyed by where it sits in the
+        // language's own file: the base paths are what the edit moves, so
+        // they are the one thing that cannot be compared across the two
+        // scans, and the overlay's line does not move at all.
+        boost::unordered_set<std::string> applied;
+        for (const ALXUITranslate::Unit& unit : was.units())
+        {
+            if (unit.applies())
+            {
+                applied.insert(std::to_string(unit.overlayLine) + "\n" + unit.field);
+            }
+        }
+        for (const ALXUITranslate::Unit& unit : now.units())
+        {
+            if (unit.applies())
+            {
+                applied.erase(std::to_string(unit.overlayLine) + "\n" + unit.field);
+            }
+        }
+        if (applied.empty())
+        {
+            continue;
+        }
+
+        Impact impact;
+        impact.language = language;
+        impact.stranded = (S32)applied.size();
+        for (const ALXUITranslate::Unit& unit : was.units())
+        {
+            if (unit.applies() && applied.count(std::to_string(unit.overlayLine) + "\n" + unit.field)
+                && impact.what.size() < 8)
+            {
+                impact.what.push_back(ALXUISelection::toString(unit.path)
+                                      + (unit.field.empty() ? "" : "/" + unit.field));
+            }
+        }
+        total += impact.stranded;
+        out.push_back(std::move(impact));
+    }
+    return total;
+}
+
+void ALFloaterXUIStudio::reportTranslationImpact()
+{
+    std::vector<Impact> impacts;
+    const S32 total = translationImpact(impacts);
+    if (!total)
+    {
+        setStatus(getString("TranslateImpactNone"));
+        return;
+    }
+
+    std::string languages;
+    for (const Impact& impact : impacts)
+    {
+        languages += (languages.empty() ? "" : ", ") + impact.language
+                   + " " + std::to_string(impact.stranded);
+        for (const std::string& what : impact.what)
+        {
+            LL_INFOS("XUIStudio") << impact.language << "/" << mFile << ": " << what
+                                  << " stops applying" << LL_ENDL;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(total);
+    args["[LANGS]"] = languages;
+    setStatus(getString("TranslateImpact", args));
+}
+
+// Save, then put the translations back where the saved base wants them.
+// The repair moves what a language wrote to the path the base now gives
+// it, so it has to run against the base as written and not as held.
+void ALFloaterXUIStudio::saveAndRepair()
+{
+    std::vector<Impact> impacts;
+    if (!translationImpact(impacts))
+    {
+        saveDocument();
+        return;
+    }
+
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mDocument.save())
+    {
+        setStatus(mDocument.error());
+        return;
+    }
+    mCatalog.reload(mFile);
+
+    S32 moved = 0;
+    std::string error;
+    for (const Impact& impact : impacts)
+    {
+        const S32 count = repairFile(*entry, impact.language, error);
+        if (count > 0)
+        {
+            moved += count;
+        }
+    }
+    mCatalog.reload(mFile);
+
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
+    args["[MOVES]"] = std::to_string(moved);
+    documentChanged(getString("EditSavedAndRepaired", args));
 }
 
 void ALFloaterXUIStudio::saveDocument()
@@ -4691,6 +4849,8 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "edit")          { onJumpToSource(); }
     else if (action == "capture")       { capturePreview(); }
     else if (action == "save")          { saveDocument(); }
+    else if (action == "save_repair")   { saveAndRepair(); }
+    else if (action == "impact")        { reportTranslationImpact(); }
     else if (action == "revert")        { revertDocument(); }
     else if (action == "undo")          { undoEdit(); }
     else if (action == "redo")          { redoEdit(); }

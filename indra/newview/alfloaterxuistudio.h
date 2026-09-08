@@ -104,6 +104,18 @@ public:
     void documentChanged(const std::string& status);
     void saveDocument();
     void revertDocument();
+
+    // What the unsaved edits would strand: a value a language wrote that
+    // the base no longer has a place for. Per language, before writing.
+    struct Impact
+    {
+        std::string                 language;
+        S32                         stranded = 0;
+        std::vector<std::string>    what;       // the first few, for the log
+    };
+    S32 translationImpact(std::vector<Impact>& out) const;
+    void reportTranslationImpact();
+    void saveAndRepair();
     bool documentDirty() const { return mDocument.dirty(); }
     bool hoverHighlight() const { return mHoverHighlight; }
 

@@ -31,6 +31,9 @@
     <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
     <floater.string name="EditRedone">Did that to [FILE] again.</floater.string>
     <floater.string name="EditSaved">Wrote [FILE].</floater.string>
+    <floater.string name="EditSavedAndRepaired">Wrote [FILE] and moved [MOVES] translations to where it now puts them.</floater.string>
+    <floater.string name="TranslateImpactNone">No translation stops applying because of this.</floater.string>
+    <floater.string name="TranslateImpact">[COUNT] translations stop applying if this is written as it stands: [LANGS]. Save and Repair Translations moves them.</floater.string>
     <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
     <floater.string name="EditNothingToSave">Nothing has been changed.</floater.string>
     <floater.string name="EditUnsaved">[FILE] has changes that are not written. Save or revert first.</floater.string>
@@ -75,6 +78,13 @@
              layout="topleft"
              name="save">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Save and Repair Translations"
+             layout="topleft"
+             name="save_repair">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save_repair" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
             </menu_item_call>
             <menu_item_call
@@ -242,6 +252,13 @@
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="schema" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Translation Impact"
+             layout="topleft"
+             name="impact">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="impact" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
             <menu_item_call
              label="Repair Roots"
              layout="topleft"
