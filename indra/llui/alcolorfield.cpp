@@ -26,12 +26,15 @@
 
 #include "alcolorfield.h"
 
+#include "alcolorpicker.h"
+
 #include "llfiltereditor.h"
 #include "llfloater.h"
 #include "llfocusmgr.h"
 #include "lllineeditor.h"
 #include "llrender2dutils.h"
 #include "llscrollcontainer.h"
+#include "lltabcontainer.h"
 #include "lltextbox.h"
 #include "lluictrlfactory.h"
 #include "lluicolortable.h"
@@ -46,7 +49,7 @@ namespace
     constexpr S32 GAP = 3;
     constexpr S32 PER_ROW = 12;
     constexpr S32 POPOVER_WIDTH = PER_ROW * (SWATCH + GAP) + GAP + 8;
-    constexpr S32 GRID_HEIGHT = 280;
+    constexpr S32 GRID_HEIGHT = 320;
 
     // Four numbers, which is the other thing a file writes for a colour.
     bool literalColor(const std::string& text, LLColor4& out)
@@ -204,19 +207,54 @@ namespace
             mFilter = LLUICtrlFactory::create<LLFilterEditor>(fp);
             addChild(mFilter);
 
+            LLTabContainer::Params tp;
+            tp.name = "tabs";
+            tp.rect = LLRect(2, GRID_HEIGHT, POPOVER_WIDTH - 2, 2);
+            tp.tab_position = LLTabContainer::TOP;
+            tp.tab_height = 20;
+            LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(tp);
+            addChild(tabs);
+
+            LLPanel::Params np;
+            np.name = "names";
+            np.label = "Names";
+            np.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 6, 0);
+            LLPanel* names = LLUICtrlFactory::create<LLPanel>(np);
+
             LLScrollContainer::Params sp;
             sp.name = "scroll";
-            sp.rect = LLRect(2, GRID_HEIGHT, POPOVER_WIDTH - 2, 2);
+            sp.rect = names->getRect();
             sp.follows.flags = FOLLOWS_ALL;
             LLScrollContainer* scroll = LLUICtrlFactory::create<LLScrollContainer>(sp);
-            addChild(scroll);
+            names->addChild(scroll);
 
             LLPanel::Params gp;
             gp.name = "swatches";
-            gp.rect = LLRect(0, GRID_HEIGHT, POPOVER_WIDTH - 20, 0);
+            gp.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 26, 0);
             gp.background_visible = false;
-            mGrid = new ALColorSwatchGrid(gp, std::move(chose));
+            mGrid = new ALColorSwatchGrid(gp, chose);
             scroll->addChild(mGrid);
+            tabs->addTabPanel(names);
+
+            // The other way a file writes a colour, for the times the
+            // table has no name for what is wanted.
+            LLPanel::Params cp;
+            cp.name = "custom";
+            cp.label = "Custom";
+            cp.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 6, 0);
+            LLPanel* custom = LLUICtrlFactory::create<LLPanel>(cp);
+
+            ALColorPicker::Params pp;
+            pp.name = "picker";
+            pp.rect = LLRect(2, GRID_HEIGHT - 22, POPOVER_WIDTH - 8, 2);
+            pp.follows.flags = FOLLOWS_ALL;
+            ALColorPicker* picker = LLUICtrlFactory::create<ALColorPicker>(pp);
+            picker->setCommitCallback([chose, picker](LLUICtrl*, const LLSD&)
+            {
+                chose(picker->getValue().asString());
+            });
+            custom->addChild(picker);
+            tabs->addTabPanel(custom);
 
             mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&)
             {

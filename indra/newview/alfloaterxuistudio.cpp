@@ -4884,11 +4884,10 @@ void ALFloaterXUIStudio::refreshState(LLView* view)
 
 void ALFloaterXUIStudio::onJumpToSource()
 {
-    if (mSourcePath.empty())
-    {
-        // The Source tab has not been shown for this selection.
-        refreshSource(selectedView());
-    }
+    // Worked out again every time. The Source tab's path is where it last
+    // looked, and a file chosen since then is the one the button means:
+    // keeping the old one opened whatever had been looked at first.
+    refreshSource(selectedView());
     if (mSourcePath.empty())
     {
         const ALXUICatalog::Entry* entry = mCatalog.find(mFile);

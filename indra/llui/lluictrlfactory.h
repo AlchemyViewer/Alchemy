@@ -113,6 +113,17 @@ void registerWidgetSchema(const char* tag)
         LLChildRegistryRegistry::instance().defaultRegistrar()
             .add(tag, &T::child_registry_t::instance());
     }
+
+    // And the tag a built view answers to. Without it a floater is looked
+    // up through its bases and comes back as a panel, so every parameter
+    // only a floater has reads as one no widget of that name declares.
+    if constexpr (ALViewTypeOf<T>::declared)
+    {
+        if (!LLWidgetTagRegistry::instance().exists(&T::sViewType))
+        {
+            LLWidgetTagRegistry::instance().defaultRegistrar().add(&T::sViewType, tag);
+        }
+    }
 }
 
 // One of these as a file-scope static is how a root tag registers.
