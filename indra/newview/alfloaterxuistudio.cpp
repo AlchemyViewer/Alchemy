@@ -4428,7 +4428,13 @@ void ALFloaterXUIStudio::onTranslationSelected()
         return;
     }
     const ALXUITranslate::Unit& unit = mTranslate.units()[index];
-    mTranslateValue->setText(unit.translation.empty() ? unit.english : unit.translation);
+    // What is being translated goes in the placeholder and what the language
+    // says goes in the field. Filling the field with the English when there
+    // was no translation meant Write, pressed without touching it, wrote
+    // English into the language's file -- and the census then counted that
+    // as translated.
+    mTranslateValue->setText(unit.translation);
+    mTranslateValue->setLabel(unit.english);
     if (!unit.path.empty())
     {
         mSelection.select(unit.path);

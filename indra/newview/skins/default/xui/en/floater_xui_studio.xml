@@ -1146,6 +1146,7 @@
                         <line_editor
                          follows="left|top|right"
                          height="22"
+                         label="Select a row above to translate it"
                          layout="topleft"
                          left="0"
                          name="translate_value"
