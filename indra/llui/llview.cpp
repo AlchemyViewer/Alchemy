@@ -2534,6 +2534,11 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
             else if (token == "top")    { flags |= FOLLOWS_TOP; }
             else if (token == "bottom") { flags |= FOLLOWS_BOTTOM; }
             else if (token == "all")    { flags |= FOLLOWS_ALL; }
+            // The word for no edges at all. It was always the effect of
+            // writing anything the four names do not cover; naming it makes
+            // "this element follows nothing" something a file can say on
+            // purpose rather than by writing a token that is ignored.
+            else if (token == "none")   { flags |= FOLLOWS_NONE; }
 
             if (bar == std::string_view::npos)
             {

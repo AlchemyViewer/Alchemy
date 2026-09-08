@@ -197,11 +197,18 @@ namespace
         }
         else if (field.name == "font.style")
         {
-            // Every combination that means anything, since the value is
-            // one string and the flags in it are written with bars.
-            field.values = { "NORMAL", "BOLD", "ITALIC", "UNDERLINE",
-                             "BOLD|ITALIC", "BOLD|UNDERLINE", "ITALIC|UNDERLINE",
-                             "BOLD|ITALIC|UNDERLINE" };
+            field.values = { "BOLD", "ITALIC", "UNDERLINE" };
+            field.flags = true;
+            field.noneWord = "NORMAL";
+        }
+        else if (field.name == "follows")
+        {
+            // Which edges of its parent the element is tied to: four
+            // answers, written as one word.
+            field.values = { "left", "top", "right", "bottom" };
+            field.flags = true;
+            field.allWord = "all";
+            field.noneWord = "none";
         }
     }
 
@@ -1394,6 +1401,11 @@ bool ALFloaterXUIStudio::postBuild()
         [this](LLUICtrl* ctrl, const LLSD&)
         {
             mAttributeGrid->setFilter(ctrl->getValue().asString());
+        });
+    getChild<LLCheckBoxCtrl>("attributes_nested")->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setNested(ctrl->getValue().asBoolean());
         });
     mLayout = getChild<LLScrollListCtrl>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");

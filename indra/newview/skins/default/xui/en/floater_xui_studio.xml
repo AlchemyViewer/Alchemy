@@ -744,14 +744,25 @@
                     <check_box
                      follows="left|top"
                      height="16"
-                     initial_value="true"
+                     initial_value="false"
                      label="Only what the files write"
                      layout="topleft"
                      left="8"
                      name="attributes_authored"
-                     tool_tip="Off shows every field the tag answers to, whether or not anything writes it"
+                     tool_tip="The short list an author is working in: the fields this file actually writes"
                      top="28"
-                     width="220" />
+                     width="200" />
+                    <check_box
+                     follows="left|top"
+                     height="16"
+                     initial_value="false"
+                     label="Nested fields"
+                     layout="topleft"
+                     left="214"
+                     name="attributes_nested"
+                     tool_tip="The leaves of the blocks a field carries, such as font.name and bg_alpha_color.alpha. A nested field the file writes is always shown."
+                     top="28"
+                     width="160" />
                     <scroll_container
                      follows="all"
                      height="380"

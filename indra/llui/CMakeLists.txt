@@ -109,6 +109,8 @@ target_sources(llui
     llwindowshade.cpp
     llxuiparser.cpp
     alcolorfield.cpp
+    alflagsfield.cpp
+    alfontfield.cpp
     alcolorpicker.cpp
     alpropertygrid.cpp
     alxuicatalog.cpp
@@ -248,6 +250,8 @@ target_sources(llui
     llwindowshade.h
     llxuiparser.h
     alcolorfield.h
+    alflagsfield.h
+    alfontfield.h
     alcolorpicker.h
     alpropertygrid.h
     alxuicatalog.h

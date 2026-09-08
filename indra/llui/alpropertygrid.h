@@ -79,6 +79,12 @@ public:
         // The C++ type: it decides the colour editor, and it is the rest
         // of the row's tool tip.
         std::string                 type;
+        // The value is a set of names with bars between them rather than
+        // one name: `values` are the flags, and these two words are what a
+        // file writes for all of them and for none.
+        bool                        flags = false;
+        std::string                 allWord;
+        std::string                 noneWord;
         // Which heading the row sits under, as an index into the names
         // given to setGroups. Out of range is the last heading.
         S32                         group = 0;
@@ -116,6 +122,13 @@ public:
     void setAuthoredOnly(bool only);
     bool authoredOnly() const { return mAuthoredOnly; }
 
+    // The leaves of the blocks a field carries -- `font.name`, `bg_alpha
+    // _color.alpha` -- as well as the fields themselves. Off by default,
+    // because a widget's own vocabulary is a page and the whole tree is
+    // five, and a nested leaf the file actually writes is shown either way.
+    void setNested(bool nested);
+    bool nested() const { return mNested; }
+
     // How tall the rows come to, so a scroll container can be told.
     S32 contentHeight() const;
 
@@ -134,6 +147,9 @@ private:
     // The heading of one section, which folds the rows under it.
     void addHeading(S32 group, S32 count, S32 top);
     bool shows(const Field& field) const;
+    // What another field of the same widget says, for an editor that is
+    // for more than one attribute.
+    std::string valueOf(const std::string& name) const;
     // Whether any row survives the switch and the filter, since a heading
     // over nothing is worse than no heading.
     bool anyShown(S32 group) const;
@@ -152,7 +168,8 @@ private:
     S32                         mRowHeight;
     S32                         mLabelWidth;
     S32                         mSourceWidth;
-    bool                        mAuthoredOnly = true;
+    bool                        mAuthoredOnly = false;
+    bool                        mNested = false;
     bool                        mRebuilding = false;    // rebuild reshapes; that is not a resize
     // False where every row would say the same thing, which is a column
     // of one repeated word.

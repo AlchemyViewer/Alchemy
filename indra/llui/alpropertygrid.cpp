@@ -27,6 +27,8 @@
 #include "alpropertygrid.h"
 
 #include "alcolorfield.h"
+#include "alflagsfield.h"
+#include "alfontfield.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "lllineeditor.h"
@@ -80,6 +82,13 @@ namespace
     bool isColorType(std::string_view type)
     {
         return type == "LLUIColor" || type == "LLColor4" || type == "LLColor3" || type == "LLColor4U";
+    }
+
+    // A font is a name, a size and three flags, and all three vocabularies
+    // live in fonts.xml. The type is the pointer the block holds.
+    bool isFontType(std::string_view type)
+    {
+        return type.find("LLFontGL") != std::string_view::npos;
     }
 
     bool carries(std::string_view haystack, std::string_view needle)
@@ -166,6 +175,15 @@ void ALPropertyGrid::setAuthoredOnly(bool only)
     }
 }
 
+void ALPropertyGrid::setNested(bool nested)
+{
+    if (mNested != nested)
+    {
+        mNested = nested;
+        rebuild();
+    }
+}
+
 void ALPropertyGrid::setFilter(const std::string& text)
 {
     if (mFilter != text)
@@ -175,9 +193,26 @@ void ALPropertyGrid::setFilter(const std::string& text)
     }
 }
 
+// What another field of this same widget is in force at. A composite
+// editor -- a font is three attributes -- needs the ones that are not the
+// row it is on, and the grid is what has them.
+std::string ALPropertyGrid::valueOf(const std::string& name) const
+{
+    const auto it = std::find_if(mFields.begin(), mFields.end(),
+                                 [&name](const Field& field) { return field.name == name; });
+    return it == mFields.end() ? std::string() : it->value;
+}
+
 bool ALPropertyGrid::shows(const Field& field) const
 {
     if (mAuthoredOnly && !field.authored)
+    {
+        return false;
+    }
+    // A leaf of a block the widget carries. Hidden by default because it
+    // multiplies the list several times over -- but never hidden when the
+    // file writes it, since the tool must not be quiet about what is there.
+    if (!mNested && !field.authored && field.name.find('.') != std::string::npos)
     {
         return false;
     }
@@ -412,6 +447,35 @@ void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
         ALColorField* colour = LLUICtrlFactory::create<ALColorField>(p);
         colour->setValue(field.value);
         editor = colour;
+    }
+    else if (field.flags)
+    {
+        // Four independent answers written as one word, so four boxes.
+        ALFlagsField::Params p;
+        p.name = name;
+        p.rect = LLRect(left, top - 2, left + editor_width, bottom);
+        ALFlagsField* flags = LLUICtrlFactory::create<ALFlagsField>(p);
+        flags->setFlags(field.values, field.allWord, field.noneWord);
+        flags->setValue(field.value);
+        editor = flags;
+    }
+    else if (isFontType(field.type))
+    {
+        // The other two attributes of the same font are edited here too,
+        // because they are what a font is: this row is where they are,
+        // whatever the file calls them.
+        ALFontField::Params p;
+        p.name = name;
+        p.rect = LLRect(left, top - 1, left + editor_width, bottom + 1);
+        ALFontField* font = LLUICtrlFactory::create<ALFontField>(p);
+        font->setValue(field.value);
+        font->setSize(valueOf(name + ".size"));
+        font->setStyle(valueOf(name + ".style"));
+        font->onPartCommit([this, name](const std::string& part, const std::string& value)
+        {
+            mFieldCommit(part.empty() ? name : name + "." + part, value);
+        });
+        editor = font;
     }
     else if (!field.values.empty())
     {
