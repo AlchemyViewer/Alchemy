@@ -26,6 +26,7 @@
 
 #include "../llaccordionctrltab.h"
 
+#include "../llpanel.h"
 #include "../lluictrlfactory.h"
 #include "../llxuiparser.h"
 
@@ -101,5 +102,49 @@ namespace tut
         LLAccordionCtrlTab::Params params;
         ensure("open unless a file says otherwise", params.display_children());
         ensure("and nothing wrote it", !params.display_children.isProvided());
+    }
+
+    // A tab carries the panel it holds: resize the tab and the panel takes
+    // the width, less the tab's padding. Worth pinning even though it holds,
+    // because `hideScrollbar` returns early once the scrollbar is away and
+    // that looks, reading it, exactly like a tab that stops placing its panel
+    // -- twice now. It places it anyway, and this is what says so.
+    template<> template<>
+    void llaccordionctrltab_object::test<3>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+        tp.name = "tab";
+        tp.title = "Tab";
+        tp.display_children = true;
+        // The branch that owns a scrollbar. A fitted tab always places its
+        // panel and never reached the placing this is about.
+        tp.fit_panel = false;
+        tp.rect = LLRect(0, 200, 300, 0);
+        LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+
+        // Short enough to fit, so the tab's own scrollbar stays away.
+        LLPanel::Params pp;
+        pp.name = "rows";
+        pp.rect = LLRect(0, 40, 300, 0);
+        LLPanel* rows = LLUICtrlFactory::create<LLPanel>(pp);
+        tab->setAccordionView(rows);
+
+        tab->reshape(300, 200);
+        const S32 wide = rows->getRect().getWidth();
+        ensure_equals("the panel is as wide as the tab lets it be", wide,
+                      300 - tab->getPaddingLeft() - tab->getPaddingRight());
+
+        tab->reshape(200, 200);
+        ensure_equals("and follows the tab in", rows->getRect().getWidth(), wide - 100);
+
+        tab->reshape(300, 200);
+        ensure_equals("and back out", rows->getRect().getWidth(), wide);
+
+        tab->die();
     }
 }
