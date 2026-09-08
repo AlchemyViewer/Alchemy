@@ -1440,8 +1440,11 @@ bool LLAppViewer::doFrame()
     }
 #endif
 
-    LL_PROFILE_GPU_ZONE("Frame");
     {
+    // The "doFrame" zone above already owns this scope, and a Tracy GPU zone
+    // is a fixed-name local, so this one has to live in the block it times
+    // or the two collide the moment GPU profiling is compiled in.
+    LL_PROFILE_GPU_ZONE("Frame");
     // and now adjust the visuals from previous frame.
     if(LLPerfStats::tunables.userAutoTuneEnabled && LLPerfStats::tunables.tuningFlag != LLPerfStats::Tunables::Nothing)
     {
