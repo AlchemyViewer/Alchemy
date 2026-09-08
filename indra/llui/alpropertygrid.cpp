@@ -169,9 +169,6 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
         tab->setAccordionView(rows);
 
         mAccordion->addCollapsibleCtrl(tab);
-        // The factory does not read display_children off the params, so a
-        // section that should start open is told to.
-        tab->setDisplayChildren(true);
         mSections.push_back({ tab, rows });
     }
     rebuild();

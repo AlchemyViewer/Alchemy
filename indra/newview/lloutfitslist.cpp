@@ -210,8 +210,6 @@ void LLOutfitsList::updateAddedCategory(LLUUID cat_id)
     tab->setTitle(name);
     tab->setFavorite(cat->getIsFavorite());
 
-    // *TODO: LLUICtrlFactory::defaultBuilder does not use "display_children" from xml. Should be investigated.
-    tab->setDisplayChildren(false);
     mAccordion->addCollapsibleCtrl(tab);
 
     // Start observing the new outfit category.

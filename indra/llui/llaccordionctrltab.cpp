@@ -407,6 +407,11 @@ LLAccordionCtrlTab::Params::Params()
     ,selection_enabled("selection_enabled", false)
 {
     changeDefault(mouse_opaque, false);
+    // The block calls it display_children and a file calls it `expanded`,
+    // and a file writing the other name was writing an attribute nothing
+    // declares -- read, dropped, and no warning worth finding. Both names
+    // now reach the same parameter.
+    addSynonym(display_children, "display_children");
 }
 
 LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
