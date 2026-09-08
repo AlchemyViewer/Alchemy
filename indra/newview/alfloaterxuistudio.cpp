@@ -201,6 +201,12 @@ namespace
             field.flags = true;
             field.noneWord = "NORMAL";
         }
+        else if (field.name == "layout")
+        {
+            // Which corner an element's numbers are measured from. Two
+            // answers, and the file writes one of them as a word.
+            field.values = { "topleft", "bottomleft" };
+        }
         else if (field.name == "follows")
         {
             // Which edges of its parent the element is tied to: four

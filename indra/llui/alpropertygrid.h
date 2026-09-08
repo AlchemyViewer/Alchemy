@@ -167,6 +167,10 @@ private:
     // for more than one attribute.
     std::string valueOf(const std::string& name) const;
     S32 countShown(S32 group) const;
+    // How wide a row may be: the accordion's width, less everything
+    // between it and the row -- including the scrollbar's column, which
+    // the accordion draws over its tabs rather than beside them.
+    S32 rowWidth() const;
     // Where the columns are, given how wide the rows have been made.
     S32 editorLeft() const;
     S32 editorWidth(S32 width) const;
@@ -184,9 +188,6 @@ private:
     S32                         mRowHeight;
     S32                         mLabelWidth;
     S32                         mSourceWidth;
-    // The width a tab actually gives its panel, learned from the first
-    // arrange and used by every rebuild after it.
-    S32                         mRowWidth = 0;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
     bool                        mRebuilding = false;    // rebuild reshapes; that is not a resize

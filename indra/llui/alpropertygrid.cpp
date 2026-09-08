@@ -26,6 +26,7 @@
 
 #include "alpropertygrid.h"
 
+#include "llui.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "alcolorfield.h"
@@ -105,7 +106,7 @@ namespace
 }
 
 ALPropertyGrid::Params::Params()
-:   row_height("row_height", 20),
+:   row_height("row_height", 22),
     label_width("label_width", 150),
     source_width("source_width", 90)
 {
@@ -204,6 +205,20 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
             break;
         }
     }
+
+    // A section the file writes nothing in is every field the tag will take
+    // and none that anyone chose, which is a page of grey to scroll past to
+    // reach the next heading. So it arrives folded: everything is still
+    // here, and what is in the file is what is in front of you. Choosing
+    // another widget is a fresh view of a different thing, which is why
+    // this is done here and not on every rebuild.
+    for (size_t group = 0; group < mSections.size(); ++group)
+    {
+        const bool written = std::any_of(mFields.begin(), mFields.end(),
+                                         [group](const Field& field)
+                                         { return field.group == (S32)group && field.authored; });
+        mSections[group].tab->setDisplayChildren(written);
+    }
     rebuild();
 }
 
@@ -285,6 +300,27 @@ S32 ALPropertyGrid::countShown(S32 group) const
     return count;
 }
 
+// An accordion does not reserve room for its scrollbar: it lays its tabs
+// out to its whole width and draws the scrollbar over the right edge of
+// them. So a row laid out to the width its panel reports is a row with its
+// last inch under a scrollbar, whenever there is one -- and whether there
+// is one changes every time a section is folded, which is why it looked
+// like a thing that happened at random.
+//
+// The width is taken from the accordion instead, with everything between
+// it and the row subtracted: the margin a tab is inset by, the padding a
+// tab keeps inside that, and the scrollbar's column whether or not the
+// scrollbar is in it.
+S32 ALPropertyGrid::rowWidth() const
+{
+    static LLUICachedControl<S32> scrollbar_size("UIScrollbarSize", 16);
+    constexpr S32 TAB_MARGIN = 4;       // LLAccordionCtrl::arrangeMultiple
+    const S32 padding = mSections.empty()
+        ? 4
+        : mSections.front().tab->getPaddingLeft() + mSections.front().tab->getPaddingRight();
+    return llmax(120, mAccordion->getRect().getWidth() - TAB_MARGIN - padding - scrollbar_size);
+}
+
 S32 ALPropertyGrid::editorLeft() const
 {
     return MARGIN + mLabelWidth + GUTTER;
@@ -318,7 +354,7 @@ void ALPropertyGrid::rebuild()
     }
     mRebuilding = true;
 
-    const S32 width = mRowWidth > 0 ? mRowWidth : mAccordion->getRect().getWidth() - 24;
+    const S32 width = rowWidth();
     S32 shown = 0;
     for (size_t group = 0; group < mSections.size(); ++group)
     {
@@ -358,29 +394,6 @@ void ALPropertyGrid::rebuild()
     }
 
     mAccordion->arrange();
-
-    // What width a tab gives its panel is the tab's own answer -- its
-    // padding, and a scrollbar where it needs one -- and it is only an
-    // answer once it has arranged. A row is laid out to a width, so a width
-    // that turns out to be another one is one more pass, and only one:
-    // the second answer is the same as the first.
-    for (const Section& section : mSections)
-    {
-        if (!section.tab->getVisible())
-        {
-            continue;
-        }
-        const S32 given = section.rows->getRect().getWidth();
-        if (given > 0 && given != width)
-        {
-            mRowWidth = given;
-            mRebuilding = false;
-            rebuild();
-            return;
-        }
-        break;
-    }
-
     mAccordion->setVisible(shown > 0);
     mEmpty->setVisible(shown == 0);
     if (!shown)
