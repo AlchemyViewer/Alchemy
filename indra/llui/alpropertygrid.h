@@ -151,17 +151,24 @@ protected:
     ~ALPropertyGrid() override;
 
 private:
+    // The panel a section's rows live in. It stacks them from its own top
+    // every time it is reshaped, because an accordion tab sizes the view it
+    // holds to the tab and not to the view: a row placed at an absolute
+    // position inside a panel that is later made taller is a row that has
+    // moved, and only a full rebuild put it back.
+    class Rows;
+
     // One heading and the rows under it. The tab is what folds and the
     // panel is what the rows are in, and both outlive a rebuild, so
     // choosing another widget does not unfold everything again.
     struct Section
     {
         LLAccordionCtrlTab* tab = nullptr;
-        LLPanel*            rows = nullptr;
+        Rows*               rows = nullptr;
     };
 
     void rebuild();
-    void addRow(LLPanel* host, const Field& field, S32 top, bool shaded);
+    void addRow(Rows* host, const Field& field, bool shaded);
     bool shows(const Field& field) const;
     // What another field of the same widget says, for an editor that is
     // for more than one attribute.
@@ -190,7 +197,6 @@ private:
     S32                         mSourceWidth;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
-    bool                        mRebuilding = false;    // rebuild reshapes; that is not a resize
     // False where every row would say the same thing, which is a column
     // of one repeated word.
     bool                        mShowSource = true;

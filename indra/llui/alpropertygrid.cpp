@@ -105,6 +105,44 @@ namespace
     }
 }
 
+// Every row is a panel of its own, and this stacks them from its top: one
+// row height each, full width, in the order they were added. Whatever the
+// accordion decides this panel's height is, the rows begin at the top of it.
+class ALPropertyGrid::Rows final : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(Rows, LLPanel);
+
+    Rows(const LLPanel::Params& p, S32 row_height)
+    :   LLPanel(p),
+        mRowHeight(row_height)
+    {
+    }
+
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override
+    {
+        LLPanel::reshape(width, height, called_from_parent);
+        stack();
+    }
+
+    // The rows, oldest first: a view list is filled from the front.
+    void stack()
+    {
+        const S32 width = getRect().getWidth();
+        S32 top = getRect().getHeight();
+        for (auto it = getChildList()->rbegin(); it != getChildList()->rend(); ++it)
+        {
+            LLView* row = *it;
+            row->reshape(width, mRowHeight);
+            row->setOrigin(0, top - mRowHeight);
+            top -= mRowHeight;
+        }
+    }
+
+private:
+    const S32 mRowHeight;
+};
+
 ALPropertyGrid::Params::Params()
 :   row_height("row_height", 22),
     label_width("label_width", 150),
@@ -161,12 +199,13 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
 
         LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
 
-        LLPanel::Params rp;
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
         rp.name = name + "_rows";
         rp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
         rp.background_visible = false;
         rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
-        LLPanel* rows = LLUICtrlFactory::create<LLPanel>(rp);
+        Rows* rows = new Rows(rp, mRowHeight);
+        rows->initFromParams(rp);
         tab->setAccordionView(rows);
 
         mAccordion->addCollapsibleCtrl(tab);
@@ -332,14 +371,14 @@ S32 ALPropertyGrid::editorWidth(S32 width) const
     return llmax(60, right - editorLeft());
 }
 
+// A row is anchored to the two edges its parts belong to, so a change of
+// width widens the row rather than replacing it. Rebuilding here instead --
+// which is what this did -- deleted and remade every widget in the grid on
+// every frame of a drag, including the one under the pointer and any whose
+// image was still arriving, which is what made a resize look like a fault.
 void ALPropertyGrid::reshape(S32 width, S32 height, bool called_from_parent)
 {
-    const bool changed = width != getRect().getWidth();
     LLPanel::reshape(width, height, called_from_parent);
-    if (changed && !mRebuilding)
-    {
-        rebuild();
-    }
 }
 
 // Each section is filled and then sized to what it holds; the accordion
@@ -352,13 +391,11 @@ void ALPropertyGrid::rebuild()
     {
         return;
     }
-    mRebuilding = true;
-
     const S32 width = rowWidth();
     S32 shown = 0;
     for (size_t group = 0; group < mSections.size(); ++group)
     {
-        LLPanel* rows = mSections[group].rows;
+        Rows* rows = mSections[group].rows;
         rows->deleteAllChildren();
 
         const S32 count = countShown((S32)group);
@@ -372,7 +409,6 @@ void ALPropertyGrid::rebuild()
         const S32 height = count * mRowHeight;
         rows->reshape(width, height, false);
 
-        S32 top = height;
         S32 within = 0;
         for (const Field& field : mFields)
         {
@@ -382,9 +418,9 @@ void ALPropertyGrid::rebuild()
             }
             // Alternate rows are banded, because a name and the value
             // across from it are a hundred and fifty pixels apart.
-            addRow(rows, field, top, (within++ & 1) != 0);
-            top -= mRowHeight;
+            addRow(rows, field, (within++ & 1) != 0);
         }
+        rows->stack();
 
         // A tab is as tall as it was told its panel is, once, when the panel
         // was put in it. Reshaping the panel afterwards says nothing: this
@@ -402,14 +438,15 @@ void ALPropertyGrid::rebuild()
                       : !mFilter.empty() ? mNoMatch
                                          : mNothingWritten);
     }
-    mRebuilding = false;
 }
 
 // The label, the editor its type asks for, and where the value came from.
 // A field the file does not write is shown with what is in force anyway:
 // an author changing it is writing it here for the first time, and the
 // value to start from is the one on the screen.
-void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool shaded)
+// One panel per row, so a section can stack them and a row is a thing rather
+// than four views that happen to share a Y.
+void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
 {
     static const LLUIColor stripe = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
     static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
@@ -418,19 +455,26 @@ void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool sha
     const S32 width = host->getRect().getWidth();
     const S32 left = editorLeft();
     const S32 editor_width = editorWidth(width);
-    const S32 bottom = top - mRowHeight;
+    // Row-local: the section says where the row is, the row says where its
+    // parts are.
+    const S32 top = mRowHeight;
+    const S32 bottom = 0;
 
+    LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+    rp.name = field.name + "_row";
+    rp.rect = LLRect(0, mRowHeight, width, 0);
+    rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+    rp.mouse_opaque = false;
+    // Alternate rows are banded, because a name and the value across from it
+    // are a hundred and fifty pixels apart. The row is its own band.
+    rp.background_visible = shaded;
     if (shaded)
     {
-        LLPanel::Params band;
-        band.name = "stripe";
-        band.rect = LLRect(0, top, width, bottom);
-        band.background_visible = true;
-        band.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
-                                                 stripe.get().mV[VBLUE], 0.25f));
-        band.mouse_opaque = false;
-        host->addChild(LLUICtrlFactory::create<LLPanel>(band));
+        rp.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
+                                               stripe.get().mV[VBLUE], 0.25f));
     }
+    LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
+    host->addChild(row);
 
     {
         // A field nothing writes is shown in the quieter ink, and so is one
@@ -447,7 +491,8 @@ void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool sha
         p.font_valign = LLFontGL::VCENTER;
         p.text_color = (field.authored && !field.ignored) ? written : unwritten;
         p.use_ellipses = true;
-        host->addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 
     const std::string name = field.name;
@@ -570,7 +615,11 @@ void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool sha
         }
         mFieldCommit(name, text);
     });
-    host->addChild(editor);
+    // Everything between the two columns, so the row widens where the width
+    // is. A spinner is the exception: it is as wide as a number needs.
+    editor->setFollows(editor->as<LLSpinCtrl>() ? (FOLLOWS_LEFT | FOLLOWS_TOP)
+                                                : (FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT));
+    row->addChild(editor);
 
     if (mShowSource)
     {
@@ -583,6 +632,7 @@ void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool sha
         p.font_halign = LLFontGL::RIGHT;
         p.text_color = unwritten;
         p.use_ellipses = true;
-        host->addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
+        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 }
