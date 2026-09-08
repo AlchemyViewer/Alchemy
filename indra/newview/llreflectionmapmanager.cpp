@@ -344,6 +344,23 @@ void LLReflectionMapManager::update()
         }
     }
 
+    {
+        // Scratch for the row-parallel SH projection in updateProbeFace: nine coefficients wide,
+        // one row per face row of the mip it integrates. Sized here, outside the reset guard in
+        // initReflectionMaps, so a change of ALProbeSHProjectionRes resizes this and nothing else.
+        static LLCachedControl<bool> two_pass(gSavedSettings, "ALProbeSHProjectionTwoPass", true);
+        S32 sh_mip = 0;
+        const U32 sh_rows = two_pass ? 6 * shProjectionRes(sh_mip) : 0;
+        if (mSHPartial.isComplete() && mSHPartial.getHeight() != sh_rows)
+        {
+            mSHPartial.release();
+        }
+        if (sh_rows > 0 && !mSHPartial.isComplete())
+        {
+            mSHPartial.allocate(LL_SH_COEFF_COUNT, sh_rows, GL_RGBA16F);
+        }
+    }
+
     llassert(mProbes[0] == mDefaultProbe);
 
     LLVector4a camera_pos;
@@ -1156,25 +1173,72 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             S32 sh_mip = 0;
             const U32 sh_res = shProjectionRes(sh_mip);
 
-            gSHProjectionProgram.bind();
-            S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
-            mTexture->bind(channel);
+            // The last draw is the same for both forms below: nine fragments write this probe's
+            // row of mSHCoeffs. This probe owns one row and must not disturb any other, so the
+            // viewport is the write mask -- the target is never cleared.
+            auto draw_coefficients = [&](LLGLSLShader& program)
+            {
+                program.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
 
-            gSHProjectionProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
-            gSHProjectionProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
-            gSHProjectionProgram.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
+                mSHCoeffs.bindTarget();
+                glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
 
-            mSHCoeffs.bindTarget();
-            // This probe owns one row and must not disturb any other, so the viewport is the
-            // write mask -- the target is never cleared.
-            glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
+                mVertexBuffer->setBuffer();
+                mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
 
-            mVertexBuffer->setBuffer();
-            mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
+                mSHCoeffs.flush();
+                program.unbind();
+            };
 
-            mSHCoeffs.flush();
+            static LLCachedControl<bool> two_pass(gSavedSettings, "ALProbeSHProjectionTwoPass", true);
+            const U32 sh_rows = 6 * sh_res;
+            if (two_pass && mSHPartial.isComplete() && mSHPartial.getHeight() == sh_rows)
+            {
+                // Row-parallel form: 9 x 6R fragments each integrate one face row into
+                // mSHPartial, then nine fragments add the rows. The single-pass form below
+                // serialises the whole cube inside each of nine fragments, which is what made
+                // it a multi-millisecond stall however few texels it read.
+                {
+                    LL_PROFILE_GPU_ZONE("probe sh rows");
+                    gSHProjectionRowsProgram.bind();
+                    S32 channel = gSHProjectionRowsProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
+                    mTexture->bind(channel);
 
-            gSHProjectionProgram.unbind();
+                    gSHProjectionRowsProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
+                    gSHProjectionRowsProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
+                    gSHProjectionRowsProgram.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
+
+                    mSHPartial.bindTarget();
+                    // bindTarget sets the viewport to the whole target, which is exactly this
+                    // strip; restated because the draw depends on it.
+                    glViewport(0, 0, LL_SH_COEFF_COUNT, sh_rows);
+
+                    mVertexBuffer->setBuffer();
+                    mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
+
+                    mSHPartial.flush();
+                    gSHProjectionRowsProgram.unbind();
+                }
+                {
+                    LL_PROFILE_GPU_ZONE("probe sh reduce");
+                    gSHProjectionReduceProgram.bind();
+                    // texelFetch source: point sampled, so nothing is filtered across rows
+                    gSHProjectionReduceProgram.bindTexture(LLShaderMgr::SH_PARTIAL, &mSHPartial, ALSamplers::PointClamp);
+                    draw_coefficients(gSHProjectionReduceProgram);
+                }
+            }
+            else
+            {
+                // Single pass: nine fragments each walk the whole cube. Kept for A/B captures
+                // and as the fallback when the partial target is not there.
+                gSHProjectionProgram.bind();
+                S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
+                mTexture->bind(channel);
+
+                gSHProjectionProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
+                gSHProjectionProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
+                draw_coefficients(gSHProjectionProgram);
+            }
         }
     }
 }
@@ -1766,6 +1830,7 @@ void LLReflectionMapManager::cleanup()
 
     mTexture = nullptr;
     mSHCoeffs.release();
+    mSHPartial.release();
 
     mProbes.clear();
     mKillList.clear();

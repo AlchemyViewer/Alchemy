@@ -227,6 +227,11 @@ private:
     // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
     LLRenderTarget mSHCoeffs;
 
+    // Scratch for the row-parallel form of the SH projection: the same nine columns, one row of
+    // partial sums per face row of the mip being integrated (6 x ALProbeSHProjectionRes rows).
+    // Sized in update(), consumed by the reduce pass, never kept between probes.
+    LLRenderTarget mSHPartial;
+
     // list of free cubemap indices
     std::list<S32> mCubeFree;
 

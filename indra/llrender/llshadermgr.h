@@ -523,6 +523,8 @@ public:
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
 
+        SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on

@@ -125,6 +125,8 @@ LLGLSLShader    gGaussianProgram;
 LLGLSLShader    gRadianceGenProgram;
 LLGLSLShader    gHeroRadianceGenProgram;
 LLGLSLShader    gSHProjectionProgram;
+LLGLSLShader    gSHProjectionRowsProgram;
+LLGLSLShader    gSHProjectionReduceProgram;
 LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
@@ -3962,6 +3964,30 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
         gSHProjectionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gSHProjectionProgram.createShader();
+    }
+
+    if (success && gGLManager.mHasCubeMapArray)
+    {
+        // Row-parallel form of the projection above: one fragment per coefficient and face row,
+        // then a reduce that adds the rows. The same integrand over 6 x R times more fragments
+        // (see LLReflectionMapManager::updateProbeFace).
+        gSHProjectionRowsProgram.mName = "SH Irradiance Projection Rows Shader";
+        gSHProjectionRowsProgram.mShaderFiles.clear();
+        gSHProjectionRowsProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
+        gSHProjectionRowsProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionRowsProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        gSHProjectionRowsProgram.addPermutation("SH_ROW_PARTIAL", "1");
+        success = gSHProjectionRowsProgram.createShader();
+    }
+
+    if (success && gGLManager.mHasCubeMapArray)
+    {
+        gSHProjectionReduceProgram.mName = "SH Irradiance Projection Reduce Shader";
+        gSHProjectionReduceProgram.mShaderFiles.clear();
+        gSHProjectionReduceProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
+        gSHProjectionReduceProgram.mShaderFiles.push_back(make_pair("interface/shProjectReduceF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionReduceProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSHProjectionReduceProgram.createShader();
     }
 
     if( !success )

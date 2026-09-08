@@ -8,9 +8,12 @@ deferred shaders reconstruct irradiance from them (evalSHIrradiance in
 class3/deferred/reflectionProbeF.glsl). Two things about that pass are easy to get subtly
 wrong and hard to see on screen, so they are checked here, statement for statement:
 
-  (a) The texel solid-angle weights must sum to 4 pi over the whole cube at every face
+  (a) The two-pass, row-parallel form of the projection (SH_ROW_PARTIAL in shProjectF.glsl
+      followed by shProjectReduceF.glsl) must sum to exactly what the single-pass triple loop
+      sums, and the partials must survive being stored as 16-bit floats.
+  (b) The texel solid-angle weights must sum to 4 pi over the whole cube at every face
       resolution the viewer can integrate (ALProbeSHProjectionRes is clamped to 4 and up).
-  (b) Integrating a coarser mip must not move the reconstructed irradiance by more than a
+  (c) Integrating a coarser mip must not move the reconstructed irradiance by more than a
       fraction of a percent: nine coefficients are band-limited to degree two, so an 8x8
       face (the default) is already enough. This is the number that justified lowering the
       integrated resolution from 32 to 8.
@@ -24,6 +27,7 @@ Standard library only. Exit status 0 on RESULT: OK, 1 on RESULT: MISMATCH.
 
 import math
 import random
+import struct
 import sys
 
 SH_COEFF_COUNT = 9
@@ -168,7 +172,7 @@ def box_downsample(faces):
 
 
 # ---------------------------------------------------------------------------------------
-# the projection
+# the projection, single pass and two pass
 
 
 def texel_term(coef, faces, face, x, y, inv_res):
@@ -182,7 +186,7 @@ def texel_term(coef, faces, face, x, y, inv_res):
 
 
 def project_single_pass(faces):
-    """shProjectF.glsl: one fragment per coefficient, looping over every texel of the cube"""
+    """shProjectF.glsl without SH_ROW_PARTIAL: one fragment per coefficient, every texel"""
     res = len(faces[0])
     inv_res = 1.0 / res
     coeffs = []
@@ -196,6 +200,39 @@ def project_single_pass(faces):
                     s[1] += t[1]
                     s[2] += t[2]
         coeffs.append(s)
+    return coeffs
+
+
+def fp16(v):
+    return struct.unpack("e", struct.pack("e", v))[0]
+
+
+def project_two_pass(faces, round_partials=False):
+    """shProjectF.glsl with SH_ROW_PARTIAL (one fragment per coefficient and face row) then
+    shProjectReduceF.glsl (one fragment per coefficient summing rows 0 .. 6*res-1)"""
+    res = len(faces[0])
+    inv_res = 1.0 / res
+    coeffs = []
+    for coef in range(SH_COEFF_COUNT):
+        partials = []
+        for row in range(6 * res):
+            face = row // res
+            y = row - face * res
+            s = [0.0, 0.0, 0.0]
+            for x in range(res):
+                t = texel_term(coef, faces, face, x, y, inv_res)
+                s[0] += t[0]
+                s[1] += t[1]
+                s[2] += t[2]
+            if round_partials:
+                s = [fp16(c) for c in s]
+            partials.append(s)
+        total = [0.0, 0.0, 0.0]
+        for p in partials:
+            total[0] += p[0]
+            total[1] += p[1]
+            total[2] += p[2]
+        coeffs.append(total)
     return coeffs
 
 
@@ -233,7 +270,7 @@ def max_irradiance_error(coeffs, reference, normals):
 def main():
     ok = True
 
-    # (a) solid angles cover the sphere exactly
+    # (b) solid angles cover the sphere exactly
     print("solid-angle coverage (sum over 6*R*R texels vs 4pi):")
     for res in (4, 8, 16, 32):
         inv_res = 1.0 / res
@@ -257,7 +294,20 @@ def main():
         res //= 2
         mips[res] = faces
 
-    # (b) integrating coarser mips barely moves the reconstructed irradiance
+    # (a) the two-pass path equals the single pass, and survives fp16 partials
+    print("two-pass row partials vs single pass:")
+    for res in (4, 8, 16):
+        single = project_single_pass(mips[res])
+        rows = project_two_pass(mips[res])
+        rows16 = project_two_pass(mips[res], round_partials=True)
+        exact = max(abs(rows[i][c] - single[i][c]) for i in range(SH_COEFF_COUNT) for c in range(3))
+        scale = max(abs(single[0][c]) for c in range(3))
+        half = max(abs(rows16[i][c] - single[i][c]) for i in range(SH_COEFF_COUNT) for c in range(3)) / scale
+        flag = "ok" if (exact < 1e-9 and half < 1e-3) else "MISMATCH"
+        ok = ok and exact < 1e-9 and half < 1e-3
+        print("  R=%3d  max abs diff=%.2e  with fp16 partials rel=%.2e  %s" % (res, exact, half, flag))
+
+    # (c) integrating coarser mips barely moves the reconstructed irradiance
     print("irradiance error of coarser integration mips vs the 128 face:")
     normals = sample_normals()
     reference = project_single_pass(mips[128])

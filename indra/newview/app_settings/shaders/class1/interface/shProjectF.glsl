@@ -39,8 +39,13 @@
 // One fragment per coefficient: gl_FragCoord.x selects which, and the whole set for one probe is
 // a 9x1 strip written into that probe's row. Nine fragments each walk the source, so the source
 // is read nine times over; that redundancy is still far cheaper than what it replaces, and it
-// keeps this to a single pass with no MRT juggling and no compute shader, which the GL floor here
-// cannot assume.
+// needs no MRT juggling and no compute shader, which the GL floor here cannot assume. With
+// SH_ROW_PARTIAL defined the walk is split instead into one fragment per face row, and
+// shProjectReduceF.glsl adds the rows: the same terms in the same order, spread over enough
+// fragments to fill the GPU rather than nine lanes of it.
+//
+// scripts/content_tools/check_sh_projection.py mirrors this file -- weights, directions, basis
+// and both summation orders -- so change them together.
 
 out vec4 frag_color;
 
@@ -98,35 +103,57 @@ float shBasis(int i, vec3 d)
                 return 0.546274 * (d.x * d.x - d.y * d.y);
 }
 
+// One texel's contribution to coefficient `coef`: its radiance, weighted by the basis function in
+// its direction and by its solid angle. Both forms of main() sum exactly these terms; they differ
+// only in how the sum is split across fragments.
+vec3 texelTerm(int coef, int face, int x, int y, float inv_res)
+{
+    // Texel centre in [-1,1].
+    float u = (2.0 * (float(x) + 0.5) * inv_res) - 1.0;
+    float v = (2.0 * (float(y) + 0.5) * inv_res) - 1.0;
+
+    vec3 dir = cubeDirection(face, u, v);
+    float sa = texelSolidAngle(u, v, inv_res);
+
+    vec3 radiance = textureLod(reflectionProbes, vec4(dir, float(sourceIdx)), mipLevel).rgb;
+
+    return radiance * shBasis(coef, normalize(dir)) * sa;
+}
+
 void main()
 {
     int coef = int(gl_FragCoord.x);
 
-    float res     = float(u_width);
-    float inv_res = 1.0 / res;
+    float inv_res = 1.0 / float(u_width);
 
     vec3 sum = vec3(0.0);
 
+#ifdef SH_ROW_PARTIAL
+    // Row-parallel form. This fragment owns one row of one face -- gl_FragCoord.y runs over the
+    // 6 * u_width face rows -- and integrates across it; shProjectReduceF.glsl adds the rows.
+    // The single-pass form below serialises the whole cube inside each of nine fragments, so
+    // nine lanes do all the work while the rest of the GPU idles; this spreads the same texel
+    // reads over 9 x 6 x u_width fragments and finishes in a fraction of the time.
+    int row  = int(gl_FragCoord.y);
+    int face = row / u_width;
+    int y    = row - face * u_width;
+
+    for (int x = 0; x < u_width; ++x)
+    {
+        sum += texelTerm(coef, face, x, y, inv_res);
+    }
+#else
     for (int face = 0; face < 6; ++face)
     {
         for (int y = 0; y < u_width; ++y)
         {
-            // Texel centre in [-1,1].
-            float v = (2.0 * (float(y) + 0.5) * inv_res) - 1.0;
-
             for (int x = 0; x < u_width; ++x)
             {
-                float u = (2.0 * (float(x) + 0.5) * inv_res) - 1.0;
-
-                vec3 dir = cubeDirection(face, u, v);
-                float sa = texelSolidAngle(u, v, inv_res);
-
-                vec3 radiance = textureLod(reflectionProbes, vec4(dir, float(sourceIdx)), mipLevel).rgb;
-
-                sum += radiance * shBasis(coef, normalize(dir)) * sa;
+                sum += texelTerm(coef, face, x, y, inv_res);
             }
         }
     }
+#endif
 
     // Signed: bands 1 and 2 are negative over half the sphere by construction, which is why this
     // target cannot be one of the unsigned float formats the radiance chain uses.

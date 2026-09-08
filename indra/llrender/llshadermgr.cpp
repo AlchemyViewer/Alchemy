@@ -1996,6 +1996,8 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // End Alchemy Effects Stack
 
+    mReservedUniforms.push_back("shPartial");
+
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a
     // wrong index still resolves to some other real uniform. Fatal, like the duplicate check
