@@ -350,4 +350,29 @@ namespace tut
         ensure("a tag the schema does not know accepts nothing",
                !schema().acceptsChild("no_such_widget", "button"));
     }
+
+    // A block that reads a value written whole. CustomParamValue does that
+    // read by hand rather than through a parameter of its own, so nothing
+    // in the descriptor table mentions it and the schema used to call
+    // text_color="White" an attribute no widget declares -- which is what
+    // every shipped file writes.
+    template<> template<>
+    void alxuischema_object::test<13>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const ALXUISchema::Tag* text = schema().tag("text");
+        ensure("text", text != nullptr);
+
+        const ALXUISchema::Attribute* colour = find(*text, "text_color");
+        ensure("a colour is written whole", colour != nullptr);
+        ensure_equals("as the type it is", colour->type, std::string("LLUIColor"));
+        ensure("and its parts are still there beside it", find(*text, "text_color.red") != nullptr);
+
+        ensure("so is a font", find(*text, "font") != nullptr);
+        ensure("and its parts", find(*text, "font.name") != nullptr);
+        ensure("and an image", find(*schema().tag("button"), "image_unselected") != nullptr);
+    }
 }

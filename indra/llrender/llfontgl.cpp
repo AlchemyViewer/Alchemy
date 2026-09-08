@@ -1875,6 +1875,22 @@ std::vector<LLFontRegistry::FamilyInfo> LLFontGL::getAvailableFamilies(
     return sFontRegistry->getAvailableFamilies(filter);
 }
 
+// static
+std::vector<std::string> LLFontGL::getDeclaredFontNames()
+{
+    if (!sFontRegistry)
+        return {};
+    return sFontRegistry->getDeclaredFontNames();
+}
+
+// static
+std::vector<std::string> LLFontGL::getDeclaredSizeNames()
+{
+    if (!sFontRegistry)
+        return {};
+    return sFontRegistry->getDeclaredSizeNames();
+}
+
 //static
 void LLFontGL::destroyAllGL()
 {

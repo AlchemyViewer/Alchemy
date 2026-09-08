@@ -200,6 +200,14 @@ namespace LLInitParam
         typedef IS_A_BLOCK value_t;
     };
 
+    // Declared here so that a parameter can say, where its type is still
+    // known, whether its block reads a value written whole as well as the
+    // parts it declares. Nothing in a block's table says so: CustomParamValue
+    // reads that value by hand rather than through a parameter of its own,
+    // which is why text_color="White" is legal and no descriptor mentions it.
+    template<typename T>
+    class CustomParamValue;
+
     // ParamValue class directly manages the wrapped value
     // by holding on to a copy (scalar params)
     // or deriving from it (blocks)
@@ -1450,7 +1458,8 @@ namespace LLInitParam
                     validate_func,
                     min_count, max_count, name),
                 ALParamType::BLOCK,
-                &param_value_t::getBlockDescriptor());
+                &param_value_t::getBlockDescriptor(),
+                std::is_base_of_v<CustomParamValue<value_t>, param_value_t>);
         }
     };
 
@@ -1943,7 +1952,8 @@ namespace LLInitParam
                     validate_func,
                     min_count, max_count, name),
                 ALParamType::MULTIPLE_BLOCK,
-                &param_value_t::getBlockDescriptor());
+                &param_value_t::getBlockDescriptor(),
+                std::is_base_of_v<CustomParamValue<value_t>, param_value_t>);
         }
     };
 

@@ -150,6 +150,124 @@ private:
 
 namespace
 {
+    // The sections the attribute grid is divided into, in the order an
+    // author reads them: what the thing is, where it is, what it looks
+    // like, what it does, and then everything a tag will take that none of
+    // those cover.
+    enum EAttributeGroup
+    {
+        GROUP_IDENTITY,
+        GROUP_GEOMETRY,
+        GROUP_APPEARANCE,
+        GROUP_BEHAVIOUR,
+        GROUP_OTHER,
+        // Two sections that are not subjects but verdicts: what a file may
+        // write and the viewer throws away, and what a file writes that
+        // nothing declares. Both are worth an author's eye and neither is
+        // worth being mixed in with the fields that work.
+        GROUP_IGNORED,
+        GROUP_UNKNOWN
+    };
+
+    std::vector<std::string> attributeGroupNames()
+    {
+        return { "Identity", "Position and size", "Appearance", "Behaviour", "Other",
+                 "Read and thrown away", "Declared by nothing" };
+    }
+
+    // The vocabulary of the few fields whose values are a list the viewer
+    // holds rather than an enumeration the schema can read. A font is
+    // named in fonts.xml, its size is named there too, and its style is a
+    // set of flags written with bars between them -- none of which an
+    // author should have to remember, and none of which the type system
+    // knows, since all three are strings as far as the block is concerned.
+    void vocabularyFor(ALPropertyGrid::Field& field)
+    {
+        if (!field.values.empty())
+        {
+            return;
+        }
+        if (field.name == "font")
+        {
+            field.values = LLFontGL::getDeclaredFontNames();
+        }
+        else if (field.name == "font.size")
+        {
+            field.values = LLFontGL::getDeclaredSizeNames();
+        }
+        else if (field.name == "font.style")
+        {
+            // Every combination that means anything, since the value is
+            // one string and the flags in it are written with bars.
+            field.values = { "NORMAL", "BOLD", "ITALIC", "UNDERLINE",
+                             "BOLD|ITALIC", "BOLD|UNDERLINE", "ITALIC|UNDERLINE",
+                             "BOLD|ITALIC|UNDERLINE" };
+        }
+    }
+
+    bool oneOf(std::string_view name, std::initializer_list<std::string_view> names)
+    {
+        return std::find(names.begin(), names.end(), name) != names.end();
+    }
+
+    bool builtFrom(std::string_view name, std::initializer_list<std::string_view> words)
+    {
+        return std::any_of(words.begin(), words.end(), [name](std::string_view word)
+        {
+            return name.find(word) != std::string_view::npos;
+        });
+    }
+
+    // Which section a field belongs in. XUI's vocabulary is wide but its
+    // shape is narrow: a fixed handful of names position a widget and a
+    // fixed handful name it, and what is left divides fairly well by the
+    // words the name is built from. A name none of these rules recognise
+    // is left in the last section rather than guessed at, which is what
+    // that section is for.
+    S32 attributeGroupOf(std::string_view name)
+    {
+        // A nested leaf belongs where its block belongs: bg_alpha_color
+        // .alpha is a colour and rect.left is a position.
+        const std::string_view head = name.substr(0, name.find('.'));
+
+        if (oneOf(head, { "name", "label", "label_selected", "value", "initial_value", "title",
+                          "short_title", "tool_tip", "help_topic", "filename", "menu_filename",
+                          "class", "type" }))
+        {
+            return GROUP_IDENTITY;
+        }
+        if (oneOf(head, { "left", "right", "top", "bottom", "width", "height", "rect",
+                          "left_pad", "top_pad", "left_delta", "top_delta", "bottom_delta",
+                          "follows", "layout", "orientation", "min_width", "max_width",
+                          "min_height", "max_height", "min_dim", "max_dim", "expanded_min_dim",
+                          "auto_resize", "user_resize", "border_size" }))
+        {
+            return GROUP_GEOMETRY;
+        }
+        if (oneOf(head, { "enabled", "visible", "mouse_opaque", "tab_stop", "tab_group",
+                          "default_tab_group", "read_only", "allow_text_entry", "chrome",
+                          "single_instance", "reuse_instance", "can_close", "can_drag",
+                          "can_minimize", "can_resize", "can_tear_off", "save_rect",
+                          "save_visibility", "focus_root" }))
+        {
+            return GROUP_BEHAVIOUR;
+        }
+        if (builtFrom(head, { "color", "image", "font", "texture", "bg_", "border", "highlight",
+                              "shadow", "style", "halign", "valign" }))
+        {
+            return GROUP_APPEARANCE;
+        }
+        if (builtFrom(head, { "width", "height", "_pad", "pad_", "margin", "spacing", "delta", "dim" }))
+        {
+            return GROUP_GEOMETRY;
+        }
+        if (builtFrom(head, { "callback", "control", "enabled", "visible", "hover", "focus", "commit" }))
+        {
+            return GROUP_BEHAVIOUR;
+        }
+        return GROUP_OTHER;
+    }
+
     // A layout stack gives its children three of their four numbers and
     // reads the fourth from the file: the width of a panel in a stack
     // that runs across, the height of one in a stack that runs down. The
@@ -1253,17 +1371,30 @@ bool ALFloaterXUIStudio::postBuild()
     // sits in, and a widget the factory cannot name comes back as a stray
     // that is not in the tree and draws nowhere.
     {
-        LLScrollContainer* scroll = getChild<LLScrollContainer>("attributes_scroll");
+        mAttributeScroll = getChild<LLScrollContainer>("attributes_scroll");
+        LLScrollContainer* scroll = mAttributeScroll;
+        // The window the container leaves for what it scrolls, rather than
+        // the container's own rect: its border and its scrollbar are inside
+        // that rect, and a row laid out to the outer width has its ends
+        // under both.
+        const LLRect window = scroll->getContentWindowRect();
         ALPropertyGrid::Params p;
         p.name = "attributes_grid";
-        p.rect = LLRect(0, scroll->getRect().getHeight(),
-                        scroll->getRect().getWidth() - 18, 0);
+        p.rect = LLRect(0, window.getHeight(), window.getWidth(), 0);
         p.label_width = 150;
         p.source_width = 80;
         p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
         mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
         scroll->addChild(mAttributeGrid);
+        mAttributeGrid->setGroups(attributeGroupNames());
     }
+    mAttributeWhat = getChild<LLTextBox>("attributes_what");
+    mAttributeFilter = getChild<LLFilterEditor>("attributes_filter");
+    mAttributeFilter->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&)
+        {
+            mAttributeGrid->setFilter(ctrl->getValue().asString());
+        });
     mLayout = getChild<LLScrollListCtrl>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");
     mSourceText = getChild<LLTextEditor>("source_text");
@@ -1377,6 +1508,7 @@ void ALFloaterXUIStudio::onClose(bool app_quitting)
 
 void ALFloaterXUIStudio::draw()
 {
+    fitAttributeGrid();
     if (!mLintQueue.empty())
     {
         stepLintAll();
@@ -5309,25 +5441,56 @@ void ALFloaterXUIStudio::refreshInspectors()
 // which layer put it there. The schema says what the fields are and what
 // each one is, so the grid gets a check box for a flag and a list of names
 // for an enumeration without either of them knowing what a widget is.
+// The container's window changes with the floater and with the coming and
+// going of its own scrollbar, and a row is laid out to the width the grid
+// had, so the grid is told before it is filled and again while it is shown.
+void ALFloaterXUIStudio::fitAttributeGrid()
+{
+    if (!mAttributeGrid || !mAttributeScroll)
+    {
+        return;
+    }
+    const S32 width = mAttributeScroll->getContentWindowRect().getWidth();
+    if (width > 0 && width != mAttributeGrid->getRect().getWidth())
+    {
+        mAttributeGrid->reshape(width, mAttributeGrid->getRect().getHeight(), false);
+    }
+}
+
 void ALFloaterXUIStudio::refreshAttributes(LLView* view)
 {
+    fitAttributeGrid();
     mAttributeGrid->clearFields();
     if (!view)
     {
+        mAttributeWhat->setText(getString("AttributeWhatNone"));
         return;
     }
     const Preview& pv = mPreviews[PRIMARY];
     const ALXUISourceMap::Origin* origin = pv.sourceMap.find(view);
-    if (!origin)
-    {
-        return;
-    }
 
     // What the widget answers to, which is the class that was built and not
     // the tag the file wrote: <panel class="foo"> is foo's parameters.
     const std::string* tag = LLUICtrlFactory::widgetTag(view->viewType());
     const ALXUISchema& schema = ALXUISchema::get();
     const ALXUISchema::Tag* declared = tag ? schema.tag(*tag) : nullptr;
+
+    // What is selected, in the three words that say it: what it is called,
+    // the tag the file wrote, and the class that was built from it. The
+    // last two differ often enough that showing one is not showing the
+    // other, and a view no element describes has only the last.
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = view->getName();
+        args["[TAG]"] = origin ? origin->tag : std::string();
+        args["[CLASS]"] = view->viewType()->mName;
+        mAttributeWhat->setText(getString(origin ? "AttributeWhat" : "AttributeWhatCodeBuilt", args));
+    }
+
+    if (!origin)
+    {
+        return;
+    }
 
     std::vector<ALPropertyGrid::Field> fields;
     boost::unordered_set<std::string> written;
@@ -5339,11 +5502,19 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.kind = attribute->value;
             field.values = attribute->values;
             field.type = attribute->type;
+            field.ignored = attribute->ignored;
         }
         else if (declared)
         {
             field.type = getString("AttributeUnknown");
+            field.unknown = true;
         }
+        // What a field does outranks what its name suggests: an attribute
+        // that is thrown away is not a position however it is spelled.
+        field.group = field.ignored ? GROUP_IGNORED
+                    : field.unknown ? GROUP_UNKNOWN
+                                    : attributeGroupOf(name);
+        vocabularyFor(field);
     };
 
     // Which layer last wrote each attribute, as the merge's observer
@@ -5370,6 +5541,7 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         field.source = layerLabel(PRIMARY, from ? from->layer : 0);
         field.authored = true;
         field.kind = ALParamType::STRING;
+        field.group = attributeGroupOf(field.name);
         written.insert(field.name);
         fields.push_back(std::move(field));
     }
@@ -5389,6 +5561,9 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.kind = attribute.value;
             field.values = attribute.values;
             field.type = attribute.type;
+            field.ignored = attribute.ignored;
+            field.group = field.ignored ? GROUP_IGNORED : attributeGroupOf(field.name);
+            vocabularyFor(field);
             fields.push_back(std::move(field));
         }
     }

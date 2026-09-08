@@ -2061,6 +2061,33 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
     return true;
 }
 
+// Every family declared, whether or not a person may pick it: a XUI file
+// names the internal ones too, and this is the list a tool offers an author
+// rather than the list a preference offers a user. "default" is the
+// OS-fallback plumbing and is not a name anything writes.
+std::vector<std::string> LLFontRegistry::getDeclaredFontNames() const
+{
+    std::set<std::string> uniq;
+    for (const auto& kv : mFontMap)
+    {
+        if (kv.first.isTemplate() && kv.first.getName() != "default")
+        {
+            uniq.insert(kv.first.getName());
+        }
+    }
+    return std::vector<std::string>(uniq.begin(), uniq.end());
+}
+
+std::vector<std::string> LLFontRegistry::getDeclaredSizeNames() const
+{
+    std::set<std::string> uniq;
+    for (const auto& kv : mFontSizes)
+    {
+        uniq.insert(kv.first);
+    }
+    return std::vector<std::string>(uniq.begin(), uniq.end());
+}
+
 std::vector<LLFontRegistry::FamilyInfo> LLFontRegistry::getAvailableFamilies(FamilyFilter filter) const
 {
     // Templates are the canonical "<font name='X'>" entries from fonts.xml

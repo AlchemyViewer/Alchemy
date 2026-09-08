@@ -279,6 +279,13 @@ public:
     static std::vector<LLFontRegistry::FamilyInfo> getAvailableFamilies(
         LLFontRegistry::FamilyFilter filter = LLFontRegistry::FamilyFilter::ANY);
 
+    // The names a XUI file may write for `font=` and `font.size=`, which
+    // is a wider list than the one a preference offers: a file names the
+    // families that are not user-selectable too. Empty if the registry is
+    // not ready.
+    static std::vector<std::string> getDeclaredFontNames();
+    static std::vector<std::string> getDeclaredSizeNames();
+
     // Takes a string with potentially several flags, i.e. "NORMAL|BOLD|ITALIC"
     static U8 getStyleFromString(const std::string &style);
     static const std::string& getStringFromStyle(U8 style);

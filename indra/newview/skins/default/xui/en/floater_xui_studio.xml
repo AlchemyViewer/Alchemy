@@ -60,6 +60,9 @@
     <floater.string name="EditReparented">[WHAT] now lives in [INTO], with its position written for where it landed.</floater.string>
     <floater.string name="EditStackAxis">A layout stack lays its panels out itself: drag the edge along the stack to change the one dimension it reads.</floater.string>
     <floater.string name="EditWroteStack">Wrote [ATTRS] to [FILE] in [LAYER]; [SIBLING] gives up the room</floater.string>
+    <floater.string name="AttributeWhat">[NAME]   &lt;[TAG]&gt;   [CLASS]</floater.string>
+    <floater.string name="AttributeWhatCodeBuilt">[NAME]   built in code   [CLASS]</floater.string>
+    <floater.string name="AttributeWhatNone">Nothing selected</floater.string>
     <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
@@ -718,24 +721,44 @@
                  label="Attributes"
                  layout="topleft"
                  name="attributes_tab">
+                    <text
+                     follows="left|top"
+                     font="SansSerifBold"
+                     height="16"
+                     layout="topleft"
+                     left="8"
+                     name="attributes_what"
+                     text_color="EmphasisColor"
+                     top="6"
+                     use_ellipses="true"
+                     width="300">Nothing selected</text>
+                    <filter_editor
+                     follows="top|right"
+                     height="20"
+                     label="Filter fields"
+                     layout="topleft"
+                     left="314"
+                     name="attributes_filter"
+                     top="4"
+                     width="156" />
                     <check_box
                      follows="left|top"
                      height="16"
                      initial_value="true"
                      label="Only what the files write"
                      layout="topleft"
-                     left="2"
+                     left="8"
                      name="attributes_authored"
                      tool_tip="Off shows every field the tag answers to, whether or not anything writes it"
-                     top="4"
+                     top="28"
                      width="220" />
                     <scroll_container
                      follows="all"
-                     height="404"
+                     height="380"
                      layout="topleft"
                      left="0"
                      name="attributes_scroll"
-                     top="24"
+                     top="48"
                      width="476" />
                 </panel>
                 <panel

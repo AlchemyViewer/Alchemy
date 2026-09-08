@@ -278,6 +278,15 @@ public:
     // font-override dropdowns.
     std::vector<FamilyInfo> getAvailableFamilies(FamilyFilter filter = FamilyFilter::ANY) const;
 
+    // The names a XUI file may write. `font="SansSerifSmall"` names a
+    // declared font and not a family: SansSerifSmall is a name, DejaVu is
+    // a family, and the two lists overlap without being the same one.
+    // `font.size="Large"` names a size out of the same file. Both sorted,
+    // for a tool offering an author the vocabulary rather than asking them
+    // to remember it.
+    std::vector<std::string> getDeclaredFontNames() const;
+    std::vector<std::string> getDeclaredSizeNames() const;
+
     // Look up the point size for a size name, optionally honoring per-family
     // overrides (<size> children of <font> in fonts.xml). Pass an empty family
     // to skip the per-family lookup and consult only the global table.

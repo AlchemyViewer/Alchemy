@@ -93,6 +93,12 @@ public:
     LLInitParam::BlockDescriptor*   mBlock{ nullptr };
     // Null where the type names no values.
     names_func_t                    mValueNames{ nullptr };
+    // Whether the block reads a value written whole as well as its own
+    // parts, which is how text_color="White" and font="SansSerif" are
+    // legal beside text_color.red and font.name. The block reads that
+    // value by hand, so its table has no parameter for it and only the
+    // declaring template can say it is there.
+    bool                            mDirectValue{ false };
 };
 
 // Filled while parameter blocks first construct, and read once something asks
@@ -186,7 +192,8 @@ struct ALParamNoNames
 template <typename VALUE_T, typename NAMED_VALUE>
 inline void alRecordParamType(const LLInitParam::ParamDescriptor* param,
                               ALParamType::EKind kind,
-                              LLInitParam::BlockDescriptor* block = nullptr)
+                              LLInitParam::BlockDescriptor* block = nullptr,
+                              bool direct_value = false)
 {
     ALParamType type;
     type.mKind = kind;
@@ -194,5 +201,6 @@ inline void alRecordParamType(const LLInitParam::ParamDescriptor* param,
     type.mTypeName = typeid(VALUE_T).name();
     type.mBlock = block;
     type.mValueNames = alParamValueNamesFunc<NAMED_VALUE>();
+    type.mDirectValue = direct_value;
     ALParamTypes::record(param, type);
 }

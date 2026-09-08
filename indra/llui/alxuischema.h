@@ -68,6 +68,11 @@ public:
         // whose vocabulary is in another file. For the inspector, which is
         // the only place a developer sees it.
         std::string                 type;
+        // Declared only so that a file may write it and be quiet about it:
+        // `type=` and `length=` are read off every widget and thrown away,
+        // and a tool that shows them beside the ones that do something is
+        // telling an author they do something.
+        bool                        ignored = false;
     };
 
     struct Element

@@ -119,6 +119,7 @@ namespace
         attribute.name = std::move(name);
         attribute.value = type.mValue;
         attribute.required = required;
+        attribute.ignored = type.mKind == ALParamType::IGNORED;
         // A type that takes a name or any string besides names no closed set,
         // so only a C++ enumeration is written as one.
         if (type.mValueNames && type.mValue == ALParamType::OTHER)
@@ -174,11 +175,22 @@ namespace
             case ALParamType::BLOCK:
             case ALParamType::MULTIPLE_BLOCK:
                 addElements(tag, name, *named.second, prefix.empty());
+                // A block that reads a value written whole takes its own
+                // type as an attribute, and its parts are still there
+                // beside it: text_color="White" and text_color.red are
+                // both legal, and only the first is what files use.
+                if (type->mDirectValue)
+                {
+                    addAttribute(tag, name, *type, false);
+                }
                 if (type->mBlock)
                 {
-                    if (const std::optional<ALParamType> direct = directValue(*type->mBlock))
+                    if (!type->mDirectValue)
                     {
-                        addAttribute(tag, name, *direct, false);
+                        if (const std::optional<ALParamType> direct = directValue(*type->mBlock))
+                        {
+                            addAttribute(tag, name, *direct, false);
+                        }
                     }
                     if (depth > 0)
                     {
