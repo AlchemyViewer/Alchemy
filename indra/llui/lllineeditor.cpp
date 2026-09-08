@@ -2406,6 +2406,12 @@ void LLLineEditor::draw()
         // draw label if no text provided
         if (0 == mText.lengthBytes())
         {
+            // The label is named to its buffer the way the text is named to
+            // the other three. A caller that changes a placeholder while the
+            // field is on screen -- and one that never changes it is only the
+            // common case, not the contract -- would otherwise have the
+            // buffer replay the label it recorded first.
+            mFontBufferLabel.setSource(&mLabel, mLabel.getGeneration());
             mFontBufferLabel.renderBytes(mGLFont,
                             mLabel.getString(), 0,
                             (F32)mTextLeftEdge, (F32)text_bottom,
