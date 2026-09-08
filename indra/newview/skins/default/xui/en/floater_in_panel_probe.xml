@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ legacy_header_height="18"
+ can_resize="true"
+ height="640"
+ layout="topleft"
+ min_height="420"
+ min_width="820"
+ name="in_panel_probe"
+ save_rect="true"
+ single_instance="true"
+ title="Floater in Panel Probe"
+ translate="false"
+ width="1060">
+    <combo_box
+     allow_text_entry="true"
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left="10"
+     max_chars="128"
+     name="file_combo"
+     tool_tip="The floater file to build inside the stage"
+     top="24"
+     width="240" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Build"
+     layout="topleft"
+     left_pad="6"
+     name="build_btn"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Clear"
+     layout="topleft"
+     left_pad="4"
+     name="clear_btn"
+     top_delta="0"
+     width="60" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Focus it"
+     layout="topleft"
+     left_pad="4"
+     name="focus_btn"
+     tool_tip="Give the built floater keyboard focus"
+     top_delta="0"
+     width="70" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Tame the chrome"
+     layout="topleft"
+     left_pad="12"
+     name="tame_check"
+     tool_tip="Turn off dragging, resizing, closing and minimizing before showing it"
+     top_delta="3"
+     width="130" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="In a multi_floater"
+     layout="topleft"
+     left_pad="4"
+     name="multi_check"
+     tool_tip="Build a multi_floater in the stage and host the file in it"
+     top_delta="0"
+     width="140" />
+    <spinner
+     decimal_digits="2"
+     follows="left|top"
+     height="20"
+     increment="1"
+     initial_value="0"
+     label="Scrub"
+     label_width="36"
+     layout="topleft"
+     left_pad="16"
+     max_val="100"
+     min_val="-100"
+     name="scrub_labelled"
+     scrub="true"
+     tool_tip="Drag the label sideways: shift is fine, control finer, alt coarse"
+     top_delta="-3"
+     width="130" />
+    <spinner
+     decimal_digits="2"
+     follows="left|top"
+     height="20"
+     increment="1"
+     initial_value="0"
+     layout="topleft"
+     left_pad="8"
+     max_val="100"
+     min_val="-100"
+     name="scrub_bare"
+     scrub="true"
+     tool_tip="No label, so the buttons carry the drag: press one and move up or down"
+     top_delta="0"
+     width="70" />
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="570"
+     layout="topleft"
+     left="10"
+     name="body"
+     orientation="horizontal"
+     top="52"
+     width="1040">
+        <layout_panel
+         auto_resize="true"
+         min_width="300"
+         name="left_panel"
+         user_resize="true"
+         width="640">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="570"
+             layout="topleft"
+             left="0"
+             name="left_body"
+             orientation="vertical"
+             top="0"
+             width="640">
+                <layout_panel
+                 auto_resize="true"
+                 min_height="120"
+                 name="stage_panel"
+                 user_resize="true"
+                 height="430">
+                    <panel
+                     background_visible="true"
+                     bevel_style="in"
+                     border="true"
+                     follows="all"
+                     height="430"
+                     layout="topleft"
+                     left="0"
+                     name="stage"
+                     top="0"
+                     width="640" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="140"
+                 name="live_panel"
+                 user_resize="true">
+                    <text_editor
+                     follows="all"
+                     font="Monospace"
+                     height="140"
+                     layout="topleft"
+                     left="0"
+                     max_length="8192"
+                     name="live"
+                     read_only="true"
+                     top="0"
+                     width="640"
+                     word_wrap="false" />
+                </layout_panel>
+            </layout_stack>
+        </layout_panel>
+        <layout_panel
+         auto_resize="true"
+         min_width="240"
+         name="report_panel"
+         user_resize="true"
+         width="392">
+            <text_editor
+             follows="all"
+             font="Monospace"
+             height="570"
+             layout="topleft"
+             left="0"
+             max_length="65536"
+             name="report"
+             read_only="true"
+             top="0"
+             width="392"
+             word_wrap="false" />
+        </layout_panel>
+    </layout_stack>
+</floater>
