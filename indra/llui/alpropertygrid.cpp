@@ -169,6 +169,9 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
         tab->setAccordionView(rows);
 
         mAccordion->addCollapsibleCtrl(tab);
+        // The factory does not read display_children off the params, so a
+        // section that should start open is told to.
+        tab->setDisplayChildren(true);
         mSections.push_back({ tab, rows });
     }
     rebuild();
@@ -318,6 +321,7 @@ void ALPropertyGrid::rebuild()
     }
     mRebuilding = true;
 
+    const S32 width = mRowWidth > 0 ? mRowWidth : mAccordion->getRect().getWidth() - 24;
     S32 shown = 0;
     for (size_t group = 0; group < mSections.size(); ++group)
     {
@@ -332,10 +336,10 @@ void ALPropertyGrid::rebuild()
         }
         shown += count;
 
-        const S32 width = mAccordion->getRect().getWidth() - 24;
-        rows->reshape(width, count * mRowHeight, false);
+        const S32 height = count * mRowHeight;
+        rows->reshape(width, height, false);
 
-        S32 top = count * mRowHeight;
+        S32 top = height;
         S32 within = 0;
         for (const Field& field : mFields)
         {
@@ -348,9 +352,38 @@ void ALPropertyGrid::rebuild()
             addRow(rows, field, top, (within++ & 1) != 0);
             top -= mRowHeight;
         }
+
+        // A tab is as tall as it was told its panel is, once, when the panel
+        // was put in it. Reshaping the panel afterwards says nothing: this
+        // is what says it, and it is what every other growing thing inside
+        // an accordion sends.
+        rows->notifyParent(LLSD().with("action", "size_changes").with("height", height));
     }
 
     mAccordion->arrange();
+
+    // What width a tab gives its panel is the tab's own answer -- its
+    // padding, and a scrollbar where it needs one -- and it is only an
+    // answer once it has arranged. A row is laid out to a width, so a width
+    // that turns out to be another one is one more pass, and only one:
+    // the second answer is the same as the first.
+    for (const Section& section : mSections)
+    {
+        if (!section.tab->getVisible())
+        {
+            continue;
+        }
+        const S32 given = section.rows->getRect().getWidth();
+        if (given > 0 && given != width)
+        {
+            mRowWidth = given;
+            mRebuilding = false;
+            rebuild();
+            return;
+        }
+        break;
+    }
+
     mAccordion->setVisible(shown > 0);
     mEmpty->setVisible(shown == 0);
     if (!shown)

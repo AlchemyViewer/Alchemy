@@ -184,6 +184,9 @@ private:
     S32                         mRowHeight;
     S32                         mLabelWidth;
     S32                         mSourceWidth;
+    // The width a tab actually gives its panel, learned from the first
+    // arrange and used by every rebuild after it.
+    S32                         mRowWidth = 0;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
     bool                        mRebuilding = false;    // rebuild reshapes; that is not a resize
