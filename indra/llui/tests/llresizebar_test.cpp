@@ -26,6 +26,8 @@
 
 #include "../llresizebar.h"
 #include "../llfocusmgr.h"
+#include "../llpanel.h"
+#include "../lluictrl.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -167,5 +169,34 @@ namespace tut
 
         ensure_equals("the resize followed the cursor to the window's edge",
                       resized->getRect().getWidth(), 300);
+    }
+
+    // A panel names the file it was built from while it builds, and everything
+    // built after it reads that name back. One whose referenced file will not
+    // load has to put the name back too.
+    template<> template<>
+    void llresizebar_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLUICtrlFactory::instance().pushFileName("panel_people.xml");
+        const std::string before = LLUICtrlFactory::instance().getCurFileName();
+
+        LLXMLNodePtr node;
+        const std::string xml = "<panel name=\"missing\" filename=\"no_such_file_at_all.xml\"/>";
+        ensure("parsed", LLXMLNode::parseBuffer(const_cast<char*>(xml.data()), xml.size(), node));
+
+        LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        std::unique_ptr<LLPanel> panel(LLUICtrlFactory::create<LLPanel>(pp));
+        panel->setXMLFilename("no_such_file_at_all.xml");
+        ensure("a panel whose file will not load did not build",
+               !panel->initPanelXML(node, nullptr, LLUICtrlFactory::getDefaultParams<LLPanel>()));
+
+        const std::string after = LLUICtrlFactory::instance().getCurFileName();
+        LLUICtrlFactory::instance().popFileName();
+        ensure_equals("and left the file name where it found it", after, before);
     }
 }
