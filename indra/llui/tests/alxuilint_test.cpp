@@ -395,4 +395,30 @@ namespace tut
 
         gDirUtilp->deleteDirAndContents(skins);
     }
+
+    // A layout panel has one dimension the stack reads -- the one along the
+    // axis the stack runs -- and three names for it. A name for the other axis
+    // sets that same parameter, and two names on one panel are one value.
+    template<> template<>
+    void alxuilint_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "<layout_stack name=\"stack\" orientation=\"horizontal\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
+            "  <layout_panel name=\"across\" min_height=\"20\"/>\n"
+            "  <layout_panel name=\"twice\" min_width=\"30\" min_height=\"40\"/>\n"
+            "  <layout_panel name=\"along\" min_width=\"50\"/>\n"
+            "</layout_stack>"));
+
+        ensure_equals(run.describe(), run.count(ALXUILint::Rule::LayoutDimension), 2);
+
+        const ALXUILint::Finding* first = run.first(ALXUILint::Rule::LayoutDimension);
+        ensure("the cross-axis name is the one reported", first != nullptr);
+        ensure_equals("named by attribute", first->what, std::string("min_height"));
+    }
 }

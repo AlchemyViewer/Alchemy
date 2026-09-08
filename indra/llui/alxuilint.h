@@ -56,6 +56,7 @@ public:
         Alternatives,           // two siblings intersect, not shown together
         OutOfBounds,            // a child sits outside its parent
         NameCollision,          // two siblings of one name; getChild answers the first
+        LayoutDimension,        // a layout panel's dimension read along the other axis, or twice
         EmptyRect,              // a shown widget with no width or no height
         Truncation,             // a label wider than the box it is in
         TemplateRootMismatch,   // a widgets/ file whose root is not the tag it configures
@@ -145,6 +146,8 @@ private:
     void checkChildren(const Input& input, LLView* view, const ALXUISelection::path_t& path);
     void checkAttributes(const Input& input, LLView* view, const ALXUISelection::path_t& path,
                          const LLXMLNode* node);
+    void checkLayoutDimensions(const Input& input, LLView* view, const ALXUISelection::path_t& path,
+                               const LLXMLNode* node);
     void checkCallbacks(const Input& input, const ALXUISelection::path_t& path, S32 line);
 
     std::vector<Finding>                        mFindings;

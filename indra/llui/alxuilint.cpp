@@ -35,6 +35,7 @@
 #include "lldraghandle.h"
 #include "llfontgl.h"
 #include "llfontregistry.h"
+#include "lllayoutstack.h"
 #include "llresizebar.h"
 #include "llresizehandle.h"
 #include "lltextbox.h"
@@ -156,6 +157,7 @@ const char* ALXUILint::ruleName(Rule rule)
     case Rule::Alternatives:            return "alternatives";
     case Rule::OutOfBounds:             return "out of bounds";
     case Rule::NameCollision:           return "name collision";
+    case Rule::LayoutDimension:         return "layout dimension";
     case Rule::EmptyRect:               return "empty rect";
     case Rule::Truncation:              return "truncation";
     case Rule::TemplateRootMismatch:    return "template root";
@@ -316,6 +318,7 @@ void ALXUILint::walkViews(const Input& input, LLView* view, const ALXUISelection
     if (origin && origin->node.notNull())
     {
         checkAttributes(input, view, path, origin->node.get());
+        checkLayoutDimensions(input, view, path, origin->node.get());
         checkCallbacks(input, path, origin->line);
     }
 
@@ -523,6 +526,66 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             {
                 add(Rule::FileMissing, Severity::Error, path, input.file, line, name,
                     "no XUI file is named \"" + value + "\"");
+            }
+        }
+    }
+}
+
+// A layout panel has one dimension the stack reads -- the one along the axis
+// the stack runs -- and three names for it: min_dim and its two synonyms
+// min_width and min_height, and the same for max. So a name is either the one
+// for the axis the stack actually lays out along, or it is the same parameter
+// under a name that says the other axis; and two of them on one panel is one
+// value, chosen by which name sorts last.
+void ALXUILint::checkLayoutDimensions(const Input& input, LLView* view, const ALXUISelection::path_t& path,
+                                      const LLXMLNode* node)
+{
+    LLLayoutPanel* panelp = view->as<LLLayoutPanel>();
+    LLLayoutStack* stackp = panelp ? panelp->getParentAs<LLLayoutStack>() : nullptr;
+    if (!stackp)
+    {
+        return;
+    }
+
+    const bool horizontal = stackp->getOrientation() == LLView::HORIZONTAL;
+    const char* const along = horizontal ? "width" : "height";
+    const char* const across = horizontal ? "height" : "width";
+
+    // The node holds its attributes sorted by name, which is the order the
+    // parser applies them in, so the last of a group is the one left standing.
+    for (const char* bound : { "min", "max" })
+    {
+        std::vector<std::pair<std::string, LLXMLNodePtr>> named;
+        for (const auto& [name_entry, attribute] : node->mAttributes)
+        {
+            const std::string name = name_entry->mString;
+            if (name == std::string(bound) + "_dim"
+                || name == std::string(bound) + "_width"
+                || name == std::string(bound) + "_height")
+            {
+                named.emplace_back(name, attribute);
+            }
+        }
+        if (named.empty())
+        {
+            continue;
+        }
+        const std::string& winner = named.back().first;
+
+        for (const auto& [name, attribute] : named)
+        {
+            const S32 line = attribute->getLineNumber() > 0 ? attribute->getLineNumber() : node->getLineNumber();
+            if (name != winner)
+            {
+                add(Rule::LayoutDimension, Severity::Warning, path, input.file, line, name,
+                    "\"" + name + "\" and \"" + winner + "\" are two names for one parameter; \""
+                        + winner + "\" is the one that takes effect");
+            }
+            else if (name == std::string(bound) + "_" + across)
+            {
+                add(Rule::LayoutDimension, Severity::Warning, path, input.file, line, name,
+                    std::string("this stack runs ") + (horizontal ? "horizontally" : "vertically")
+                        + ", so \"" + name + "\" sets the panel's " + bound + "imum " + along);
             }
         }
     }
