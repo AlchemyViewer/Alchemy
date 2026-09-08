@@ -389,6 +389,12 @@ LLControlGroup& LLUI::getControlControlGroup (std::string_view controlname)
     return *mSettingGroups["config"]; // default group
 }
 
+LLControlGroup* LLUI::getSettingGroup(std::string_view name) const
+{
+    settings_map_t::const_iterator found = mSettingGroups.find(name);
+    return found != mSettingGroups.end() ? found->second : nullptr;
+}
+
 void LLUI::addPopup(LLView* viewp)
 {
     if (mAddPopupFunc)

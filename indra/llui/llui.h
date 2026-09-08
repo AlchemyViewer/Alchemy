@@ -294,6 +294,10 @@ public:
     void glRectToScreen(const LLRect& gl, LLRect *screen);
     // Returns the control group containing the control name, or the default group
     LLControlGroup& getControlControlGroup (std::string_view controlname);
+    // The group registered under this name, or null. Indexing mSettingGroups
+    // instead inserts a null under a name nobody registered and then hands it
+    // back to be dereferenced.
+    LLControlGroup* getSettingGroup(std::string_view name) const;
     F32 getMouseIdleTime() { return mMouseIdleTimer.getElapsedTimeF32(); }
     void resetMouseIdleTimer() { mMouseIdleTimer.reset(); }
     LLWindow* getWindow() const { return mWindow; }
