@@ -127,6 +127,11 @@ namespace
         return true;
     }
 
+    // An element's own text, as the widget built from it will be given it.
+    // A file writes body text on its own line, so the value carries the
+    // newline and the indent around it -- and `LLXMLNode::getTextContents`
+    // trims both before any widget sees them. Reading it raw here meant
+    // comparing, measuring and showing a string the viewer never builds.
     std::string textOf(pugi::xml_node element)
     {
         std::string text;
@@ -137,7 +142,7 @@ namespace
                 text += child.value();
             }
         }
-        return text;
+        return trimmed(text);
     }
 
     // A path with an ordinal in it -- "name#2" -- names one of several

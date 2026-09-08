@@ -490,4 +490,41 @@ namespace tut
             "    </panel>\n"
             "</panel>\n");
     }
+
+    // Body text is what the widget will be given, not what the file's own
+    // formatting put around it. A `<text>` element written over three lines
+    // carries the newline and the indent of the line it sits on, and
+    // LLXMLNode::getTextContents trims both off before any widget sees them
+    // -- so a translation table that did not was comparing, measuring and
+    // showing a string the viewer never builds.
+    template<> template<>
+    void alxuitranslate_object::test<12>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <text name=\"greeting\">\n"
+            "        Show direction to:\n"
+            "    </text>\n"
+            "</panel>\n");
+
+        Doc theirs;
+        pugi::xml_node mine = theirs.load(
+            "<panel name=\"root\">\n"
+            "    <text name=\"greeting\">\n"
+            "        Zeige Richtung zu:\n"
+            "    </text>\n"
+            "</panel>\n");
+
+        ALXUITranslate units;
+        units.scan(root, mine);
+
+        const ALXUITranslate::Unit* unit = find(units, "greeting", "");
+        ensure("body text is a unit", unit != nullptr);
+        ensure_equals("the English is what a widget would be given",
+                      unit->english, std::string("Show direction to:"));
+        ensure_equals("and so is the translation",
+                      unit->translation, std::string("Zeige Richtung zu:"));
+    }
+
 }
