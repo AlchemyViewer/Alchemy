@@ -141,7 +141,7 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
     S32 floater_x, floater_y;
     if (!hostctrl_p->localPointToOtherView(local_x, local_y, &floater_x, &floater_y, gFloaterView))
     {
-        LL_ERRS() << "Cannot show emoji helper for non-floater controls." << LL_ENDL;
+        LL_WARNS() << "Cannot show emoji helper for a control outside the floater view." << LL_ENDL;
         return;
     }
 

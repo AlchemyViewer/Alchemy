@@ -951,7 +951,10 @@ LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
         }
 
         // This call differentiates this method from childrenHandleMouseEvent().
-        LLUI::getInstance()->mWindow->setCursor(viewp->getHoverCursor());
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(viewp->getHoverCursor());
+        }
 
         if (viewp->handleHover(local_x, local_y, mask)
             || viewp->blockMouseEvent(local_x, local_y))
@@ -993,13 +996,13 @@ LLView* LLView::childFromPoint(S32 x, S32 y, bool recur)
         return viewp;
 
     }
-    return 0;
+    return nullptr;
 }
 
 F32 LLView::getTooltipTimeout()
 {
-    static LLCachedControl<F32> tooltip_fast_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipFastDelay", 0.1f);
-    static LLCachedControl<F32> tooltip_delay(*LLUI::getInstance()->mSettingGroups["config"], "ToolTipDelay", 0.7f);
+    static LLCachedControl<F32> tooltip_fast_delay(LLUI::getInstance()->getControlControlGroup("ToolTipFastDelay"), "ToolTipFastDelay", 0.1f);
+    static LLCachedControl<F32> tooltip_delay(LLUI::getInstance()->getControlControlGroup("ToolTipDelay"), "ToolTipDelay", 0.7f);
     // allow "scrubbing" over ui by showing next tooltip immediately
     // if previous one was still visible
     return (F32)(LLToolTipMgr::instance().toolTipVisible()
@@ -1044,7 +1047,7 @@ bool LLView::handleToolTip(S32 x, S32 y, MASK mask)
     std::string tooltip = getToolTip();
     if (!tooltip.empty())
     {
-        static LLCachedControl<bool> allow_ui_tooltips(*LLUI::getInstance()->mSettingGroups["config"], "BasicUITooltips", true);
+        static LLCachedControl<bool> allow_ui_tooltips(LLUI::getInstance()->getControlControlGroup("BasicUITooltips"), "BasicUITooltips", true);
 
         // Even if we don't show tooltips, consume the event, nothing below should show tooltip
         if (allow_ui_tooltips)
@@ -1492,7 +1495,12 @@ void LLView::drawChild(LLView* childp, S32 x_offset, S32 y_offset, bool force_dr
             LLUI::pushMatrix();
             {
                 LLUI::translate((F32)childp->getRect().mLeft + x_offset, (F32)childp->getRect().mBottom + y_offset);
+                // Said the same way drawChildren says it, so that a widget
+                // taken out of its parent from inside draw is caught wherever
+                // the parent draws it from.
+                childp->mInDraw = true;
                 childp->draw();
+                childp->mInDraw = false;
             }
             LLUI::popMatrix();
         }
@@ -1751,16 +1759,22 @@ bool LLView::hasAncestor(const LLView* parentp) const
 
 bool LLView::childHasKeyboardFocus(std::string_view childname) const
 {
+    // A child of this view by that name, which is what the name says. The walk
+    // up from the focused view passes every name between it and the root, so
+    // without knowing where this view sits on that walk it answered for any
+    // view of that name anywhere -- another floater's, or an ancestor's.
     LLView* focus = gFocusMgr.getKeyboardFocusView();
+    if (!focus || !focus->hasAncestor(this))
+    {
+        return false;
+    }
 
-    while (focus != nullptr)
+    for (; focus && focus != this; focus = focus->getParent())
     {
         if (focus->getName() == childname)
         {
             return true;
         }
-
-        focus = focus->getParent();
     }
 
     return false;
@@ -2041,8 +2055,10 @@ bool LLView::localPointToOtherView( S32 x, S32 y, S32 *other_x, S32 *other_y, co
         x += cur_view->getRect().mLeft;
         y += cur_view->getRect().mBottom;
 
-        cur_view = cur_view->getParent();
+        // The view, not its parent: taken after the walk this would be the
+        // null that ended it, and every tree's walk ends in the same null.
         root_view = cur_view;
+        cur_view = cur_view->getParent();
     }
 
     // assuming common root between two views, chase other_view's parents up to root
@@ -2052,14 +2068,14 @@ bool LLView::localPointToOtherView( S32 x, S32 y, S32 *other_x, S32 *other_y, co
         x -= cur_view->getRect().mLeft;
         y -= cur_view->getRect().mBottom;
 
-        cur_view = cur_view->getParent();
-
         if (cur_view == root_view)
         {
             *other_x = x;
             *other_y = y;
             return true;
         }
+
+        cur_view = cur_view->getParent();
     }
 
     *other_x = x;
@@ -2083,8 +2099,9 @@ bool LLView::localRectToOtherView( const LLRect& local, LLRect* other, const LLV
 
         cur_rect.translate(cur_view->getRect().mLeft, cur_view->getRect().mBottom);
 
-        cur_view = cur_view->getParent();
+        // The view, not its parent -- see localPointToOtherView.
         root_view = cur_view;
+        cur_view = cur_view->getParent();
     }
 
     // assuming common root between two views, chase other_view's parents up to root
@@ -2093,13 +2110,13 @@ bool LLView::localRectToOtherView( const LLRect& local, LLRect* other, const LLV
     {
         cur_rect.translate(-cur_view->getRect().mLeft, -cur_view->getRect().mBottom);
 
-        cur_view = cur_view->getParent();
-
         if (cur_view == root_view)
         {
             *other = cur_rect;
             return true;
         }
+
+        cur_view = cur_view->getParent();
     }
 
     *other = cur_rect;
@@ -2137,7 +2154,7 @@ public:
 
         if(a_group < mDefaultTabGroup && b_group >= mDefaultTabGroup) return true;
         if(b_group < mDefaultTabGroup && a_group >= mDefaultTabGroup) return false;
-        return a_group > b_group;  // sort correctly if they're both on the same side of the default tab groupreturn a > b;
+        return a_group > b_group;  // sort correctly if they're both on the same side of the default tab group
     }
 private:
     // ok to store a reference, as this should only be allocated on stack during view query operations
@@ -2364,7 +2381,7 @@ LLView* LLView::findSnapEdge(S32& new_edge_val, const LLCoordGL& mouse_dir, ESna
                 }
                 // if snapped with sibling along other axis, check for shared edge
                 else if (llabs(sibling_rect.mTop - (test_rect.mBottom - padding)) <= y_threshold
-                    || llabs(sibling_rect.mBottom - (test_rect.mTop + padding)) <= x_threshold)
+                    || llabs(sibling_rect.mBottom - (test_rect.mTop + padding)) <= y_threshold)
                 {
                     if (llabs(test_rect.mRight - sibling_rect.mRight) <= x_threshold
                         && (test_rect.mRight - sibling_rect.mRight) * mouse_dir.mX <= 0)
@@ -2843,10 +2860,14 @@ S32 LLView::notifyParent(const LLSD& info)
 }
 bool    LLView::notifyChildren(const LLSD& info)
 {
+    // Every child, not every child up to the first one that says yes. The
+    // answer is whether anybody handled it, and a message sent to a panel to
+    // have each of its accordions store its state is one every accordion has
+    // to see.
     bool ret = false;
     for (LLView* childp : children())
     {
-        ret = ret || childp->notifyChildren(info);
+        ret |= childp->notifyChildren(info);
     }
     return ret;
 }

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../llview.h"
+#include "../llfocusmgr.h"
 
 #include "../test/lltut.h"
 
@@ -309,5 +310,97 @@ namespace tut
 
         v->setFollowsNone();
         ensure("none are not", !v->followsAll());
+    }
+
+    // A message sent to the children is sent to all of them. One child saying
+    // it handled the message is the answer to give back, not a reason to stop:
+    // a panel telling each of its accordions to store its state has as many
+    // handlers as it has accordions.
+    struct CountingView : public LLView
+    {
+        CountingView(const LLView::Params& p) : LLView(p) {}
+        bool notifyChildren(const LLSD& info) override
+        {
+            ++mHeard;
+            return true;
+        }
+        S32 mHeard = 0;
+    };
+
+    template<> template<>
+    void llview_object::test<12>()
+    {
+        std::unique_ptr<TestView> root(view("root", LLRect(0, 100, 100, 0)));
+        std::vector<CountingView*> counters;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            LLView::Params p;
+            p.name = "counter";
+            p.rect = LLRect(0, 10, 10, 0);
+            counters.push_back(new CountingView(p));
+            root->addChild(counters.back());
+        }
+
+        ensure("somebody handled it", root->notifyChildren(LLSD().with("action", "store_state")));
+        for (CountingView* counter : counters)
+        {
+            ensure_equals("every child heard it", counter->mHeard, 1);
+        }
+    }
+
+    // Two views with no ancestor in common have no offset between them, and
+    // that is what the answer says. The walk up from the far view ends at a
+    // null, and so does the walk up from this one -- comparing those two nulls
+    // is how every pair of views looked related.
+    template<> template<>
+    void llview_object::test<13>()
+    {
+        std::unique_ptr<TestView> tree_a(view("a", LLRect(0, 100, 100, 0)));
+        std::unique_ptr<TestView> tree_b(view("b", LLRect(0, 100, 100, 0)));
+        TestView* leaf = view("leaf", LLRect(10, 30, 30, 10));
+        tree_a->addChild(leaf);
+
+        S32 x = 0, y = 0;
+        ensure("a view in another tree is not reachable",
+               !leaf->localPointToOtherView(1, 1, &x, &y, tree_b.get()));
+
+        LLRect rect;
+        ensure("nor is its rect",
+               !leaf->localRectToOtherView(leaf->getLocalRect(), &rect, tree_b.get()));
+
+        // And a view that does share a root still answers, with the offset.
+        TestView* sibling = view("sibling", LLRect(50, 80, 70, 60));
+        tree_a->addChild(sibling);
+        ensure("a view in the same tree is",
+               leaf->localPointToOtherView(0, 0, &x, &y, sibling));
+        ensure_equals("offset by the difference of their origins", x, 10 - 50);
+        ensure_equals("on both axes", y, 10 - 60);
+    }
+
+    // childHasKeyboardFocus asks about a child of this view. A name is not a
+    // tree, so the same name under somebody else is not an answer, and neither
+    // is this view holding the focus itself.
+    template<> template<>
+    void llview_object::test<14>()
+    {
+        std::unique_ptr<TestView> mine(view("mine", LLRect(0, 100, 100, 0)));
+        std::unique_ptr<TestView> theirs(view("theirs", LLRect(0, 100, 100, 0)));
+        TestView* my_combo = view("combo");
+        TestView* their_combo = view("combo");
+        mine->addChild(my_combo);
+        theirs->addChild(their_combo);
+
+        gFocusMgr.setKeyboardFocus(my_combo);
+        ensure("the view holding it owns the child", mine->childHasKeyboardFocus("combo"));
+        ensure("a view of the same name elsewhere does not",
+               !theirs->childHasKeyboardFocus("combo"));
+        ensure("nor does a name nobody under it has",
+               !mine->childHasKeyboardFocus("absent"));
+
+        gFocusMgr.setKeyboardFocus(mine.get());
+        ensure("a view holding focus itself has no child holding it",
+               !mine->childHasKeyboardFocus("mine"));
+
+        gFocusMgr.setKeyboardFocus(nullptr);
     }
 }

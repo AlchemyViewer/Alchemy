@@ -445,8 +445,9 @@ public:
     S32         getChildCount() const           { return mChildList ? (S32)mChildList->size() : 0; }
     template<class _Pr3> void sortChildren(_Pr3 _Pred) { if (mChildList) mChildList->sort(_Pred); }
     bool        hasAncestor(const LLView* parentp) const;
-    bool        hasChild(std::string_view childname, bool recurse = false) const;
+    // Whether a child of this view, by that name, holds the keyboard focus.
     bool        childHasKeyboardFocus( std::string_view childname ) const;
+    bool        hasChild(std::string_view childname, bool recurse = false) const;
 
     // these iterators are used for collapsing various tree traversals into for loops
     using tree_iterator_t = LLTreeDFSIter<LLView, child_list_const_iter_t>;
