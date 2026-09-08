@@ -1378,22 +1378,23 @@ bool ALFloaterXUIStudio::postBuild()
     // sits in, and a widget the factory cannot name comes back as a stray
     // that is not in the tree and draws nowhere.
     {
-        mAttributeScroll = getChild<LLScrollContainer>("attributes_scroll");
-        LLScrollContainer* scroll = mAttributeScroll;
-        // The window the container leaves for what it scrolls, rather than
-        // the container's own rect: its border and its scrollbar are inside
-        // that rect, and a row laid out to the outer width has its ends
-        // under both.
-        const LLRect window = scroll->getContentWindowRect();
+        // Built here rather than named in the file, because a tag a library
+        // registers is only there if the linker kept the object it sits in.
+        // It holds an accordion of its own, so it goes straight into the
+        // tab: what scrolls the sections is the accordion.
+        LLPanel* tab = getChild<LLPanel>("attributes_tab");
         ALPropertyGrid::Params p;
         p.name = "attributes_grid";
-        p.rect = LLRect(0, window.getHeight(), window.getWidth(), 0);
+        p.rect = LLRect(0, tab->getRect().getHeight() - 48, tab->getRect().getWidth(), 0);
         p.label_width = 150;
         p.source_width = 80;
-        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        p.follows.flags = FOLLOWS_ALL;
         mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
-        scroll->addChild(mAttributeGrid);
+        tab->addChild(mAttributeGrid);
         mAttributeGrid->setGroups(attributeGroupNames());
+        mAttributeGrid->setNotices(getString("AttributeNothingSelected"),
+                                   getString("AttributeNothingWritten"),
+                                   getString("AttributeNoMatch"));
     }
     mAttributeWhat = getChild<LLTextBox>("attributes_what");
     mAttributeFilter = getChild<LLFilterEditor>("attributes_filter");
@@ -1520,7 +1521,6 @@ void ALFloaterXUIStudio::onClose(bool app_quitting)
 
 void ALFloaterXUIStudio::draw()
 {
-    fitAttributeGrid();
     if (!mLintQueue.empty())
     {
         stepLintAll();
@@ -5453,25 +5453,8 @@ void ALFloaterXUIStudio::refreshInspectors()
 // which layer put it there. The schema says what the fields are and what
 // each one is, so the grid gets a check box for a flag and a list of names
 // for an enumeration without either of them knowing what a widget is.
-// The container's window changes with the floater and with the coming and
-// going of its own scrollbar, and a row is laid out to the width the grid
-// had, so the grid is told before it is filled and again while it is shown.
-void ALFloaterXUIStudio::fitAttributeGrid()
-{
-    if (!mAttributeGrid || !mAttributeScroll)
-    {
-        return;
-    }
-    const S32 width = mAttributeScroll->getContentWindowRect().getWidth();
-    if (width > 0 && width != mAttributeGrid->getRect().getWidth())
-    {
-        mAttributeGrid->reshape(width, mAttributeGrid->getRect().getHeight(), false);
-    }
-}
-
 void ALFloaterXUIStudio::refreshAttributes(LLView* view)
 {
-    fitAttributeGrid();
     mAttributeGrid->clearFields();
     if (!view)
     {

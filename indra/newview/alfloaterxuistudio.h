@@ -294,10 +294,6 @@ private:
     // --- the inspectors ------------------------------------------------------
     void refreshInspectors();
     void refreshAttributes(LLView* view);
-    // The grid is as wide as the window the scroll container leaves for
-    // it, which changes when the floater is resized and when the vertical
-    // scrollbar comes and goes.
-    void fitAttributeGrid();
     void onFieldCommit(const std::string& name, const std::string& value);
 
     // --- the shape of the file -----------------------------------------------
@@ -420,7 +416,6 @@ private:
     LLScrollListCtrl*   mFindings = nullptr;
     LLTabContainer*     mInspectors = nullptr;
     ALPropertyGrid*     mAttributeGrid = nullptr;
-    LLScrollContainer*  mAttributeScroll = nullptr;
     LLTextBox*          mAttributeWhat = nullptr;       // what is selected, in its own words
     LLFilterEditor*     mAttributeFilter = nullptr;
     LLScrollListCtrl*   mPalette = nullptr;

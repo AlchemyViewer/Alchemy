@@ -45,11 +45,17 @@ static LLDefaultChildRegistry::Register<ALColorField> r("color_field");
 
 namespace
 {
-    constexpr S32 SWATCH = 18;
-    constexpr S32 GAP = 3;
-    constexpr S32 PER_ROW = 12;
-    constexpr S32 POPOVER_WIDTH = PER_ROW * (SWATCH + GAP) + GAP + 8;
-    constexpr S32 GRID_HEIGHT = 320;
+    constexpr S32 SWATCH = 28;
+    constexpr S32 GAP = 5;
+    constexpr S32 HEADER = 26;          // the preview line over the tabs
+    constexpr S32 ROW = 22;
+    constexpr S32 MIN_WIDTH = 360;
+    constexpr S32 MIN_HEIGHT = 340;
+
+    // Where the popover opens, and where it opens next time: it is
+    // resizable, and a size someone chose once is the size they wanted.
+    S32 sWidth = 470;
+    S32 sHeight = 460;
 
     // Four numbers, which is the other thing a file writes for a colour.
     bool literalColor(const std::string& text, LLColor4& out)
@@ -73,6 +79,23 @@ namespace
         }
         out.set(v[0], v[1], v[2], v[3]);
         return true;
+    }
+
+    // What the text comes to on screen, and whether it comes to anything: a
+    // name colors.xml does not carry is drawn as nothing, which is the
+    // lint's finding made visible.
+    bool resolve(const std::string& text, LLColor4& color)
+    {
+        if (text.empty())
+        {
+            return false;
+        }
+        if (LLUIColorTable::instance().colorExists(text))
+        {
+            color = LLUIColorTable::instance().getColor(text).get();
+            return true;
+        }
+        return literalColor(text, color);
     }
 
     // The swatches themselves. A grid rather than a list because a colour
@@ -103,28 +126,52 @@ namespace
             filter(LLStringUtil::null);
         }
 
+        void setChosen(const std::string& name) { mChosen = name; }
+
         void filter(const std::string& text)
         {
-            std::string wanted(text);
-            LLStringUtil::toLower(wanted);
+            mFilter = text;
+            LLStringUtil::toLower(mFilter);
             mShown.clear();
             for (const Entry& entry : mAll)
             {
-                if (wanted.empty())
+                if (mFilter.empty())
                 {
                     mShown.push_back(&entry);
                     continue;
                 }
                 std::string name(entry.name);
                 LLStringUtil::toLower(name);
-                if (name.find(wanted) != std::string::npos)
+                if (name.find(mFilter) != std::string::npos)
                 {
                     mShown.push_back(&entry);
                 }
             }
-            const S32 rows = ((S32)mShown.size() + PER_ROW - 1) / PER_ROW;
+            reflow();
+        }
+
+        // As many across as the width holds, so widening the popover shows
+        // more of them rather than the same twelve further apart.
+        S32 columns() const
+        {
+            return llmax(1, (getRect().getWidth() - GAP) / (SWATCH + GAP));
+        }
+
+        void reflow()
+        {
+            const S32 rows = ((S32)mShown.size() + columns() - 1) / columns();
             reshape(getRect().getWidth(), llmax(1, rows) * (SWATCH + GAP) + GAP, false);
             mHover = -1;
+        }
+
+        void reshape(S32 width, S32 height, bool called_from_parent = true) override
+        {
+            const bool wider = width != getRect().getWidth();
+            LLPanel::reshape(width, height, called_from_parent);
+            if (wider)
+            {
+                reflow();
+            }
         }
 
         void draw() override
@@ -135,7 +182,19 @@ namespace
             {
                 const LLRect cell = rectOf((S32)i);
                 gl_rect_2d(cell, mShown[i]->color, true);
-                gl_rect_2d(cell, (S32)i == mHover ? LLColor4::white : edge.get(), false);
+                // What is chosen keeps a ring around it, so that a popover
+                // left open still says what it is about to give back.
+                if (mShown[i]->name == mChosen)
+                {
+                    LLRect ring(cell);
+                    ring.stretch(2);
+                    gl_rect_2d(ring, LLColor4::white, false);
+                    gl_rect_2d(cell, LLColor4::black, false);
+                }
+                else
+                {
+                    gl_rect_2d(cell, (S32)i == mHover ? LLColor4::white : edge.get(), false);
+                }
             }
         }
 
@@ -154,7 +213,8 @@ namespace
             const S32 which = at(x, y);
             if (which >= 0)
             {
-                mChose(mShown[which]->name);
+                mChosen = mShown[which]->name;
+                mChose(mChosen);
                 return true;
             }
             return LLPanel::handleMouseDown(x, y, mask);
@@ -163,8 +223,8 @@ namespace
     private:
         LLRect rectOf(S32 index) const
         {
-            const S32 column = index % PER_ROW;
-            const S32 row = index / PER_ROW;
+            const S32 column = index % columns();
+            const S32 row = index / columns();
             const S32 left = GAP + column * (SWATCH + GAP);
             const S32 top = getRect().getHeight() - GAP - row * (SWATCH + GAP);
             return LLRect(left, top, left + SWATCH, top - SWATCH);
@@ -184,55 +244,72 @@ namespace
 
         std::vector<Entry>          mAll;
         std::vector<const Entry*>   mShown;
+        std::string                 mChosen;
+        std::string                 mFilter;
         chose_t                     mChose;
         S32                         mHover = -1;
     };
 
-    // The popover: a floater with no chrome, closed by choosing, by
-    // clicking away or by escape. A floater rather than a child of the
-    // field, because a field in a scroll container has nowhere to drop a
-    // list of four hundred colours.
+    // The popover. A colour is arrived at rather than known, so choosing
+    // here is choosing and not committing: the swatch at the top says what
+    // would be written, and it is written when the popover goes. Escape
+    // abandons it. It resizes, and the size it is left at is the size it
+    // opens at next time, because how much of a colour wheel someone wants
+    // to see is not something this can decide for them.
     class ALColorPopover final : public LLFloater
     {
     public:
         AL_VIEW_TYPE(ALColorPopover, LLFloater);
 
-        ALColorPopover(const LLFloater::Params& p, ALColorSwatchGrid::chose_t chose)
-        :   LLFloater(LLSD(), p)
+        typedef std::function<void(const std::string&)> settled_t;
+
+        ALColorPopover(const LLFloater::Params& p, const std::string& value, settled_t settled)
+        :   LLFloater(LLSD(), p),
+            mValue(value),
+            mSettled(std::move(settled))
         {
+            const S32 width = getRect().getWidth();
+            const S32 height = getRect().getHeight();
+
             LLFilterEditor::Params fp;
             fp.name = "filter";
-            fp.rect = LLRect(4, GRID_HEIGHT + 26, POPOVER_WIDTH - 4, GRID_HEIGHT + 4);
+            fp.rect = LLRect(HEADER + 8, height - 4, width - 4, height - 4 - ROW);
             fp.label = "Filter";
+            fp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
             mFilter = LLUICtrlFactory::create<LLFilterEditor>(fp);
             addChild(mFilter);
 
             LLTabContainer::Params tp;
             tp.name = "tabs";
-            tp.rect = LLRect(2, GRID_HEIGHT, POPOVER_WIDTH - 2, 2);
+            tp.rect = LLRect(2, height - 8 - ROW, width - 2, 2);
             tp.tab_position = LLTabContainer::TOP;
             tp.tab_height = 20;
+            tp.follows.flags = FOLLOWS_ALL;
             LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(tp);
             addChild(tabs);
+
+            const LLRect body(0, tabs->getRect().getHeight() - 22, tabs->getRect().getWidth() - 6, 0);
 
             LLPanel::Params np;
             np.name = "names";
             np.label = "Names";
-            np.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 6, 0);
+            np.rect = body;
             LLPanel* names = LLUICtrlFactory::create<LLPanel>(np);
 
             LLScrollContainer::Params sp;
             sp.name = "scroll";
-            sp.rect = names->getRect();
+            sp.rect = body;
             sp.follows.flags = FOLLOWS_ALL;
             LLScrollContainer* scroll = LLUICtrlFactory::create<LLScrollContainer>(sp);
             names->addChild(scroll);
 
             LLPanel::Params gp;
             gp.name = "swatches";
-            gp.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 26, 0);
+            gp.rect = LLRect(0, body.getHeight(), scroll->getContentWindowRect().getWidth(), 0);
             gp.background_visible = false;
-            mGrid = new ALColorSwatchGrid(gp, chose);
+            gp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+            mGrid = new ALColorSwatchGrid(gp, [this](const std::string& name) { chose(name); });
+            mGrid->setChosen(mValue);
             scroll->addChild(mGrid);
             tabs->addTabPanel(names);
 
@@ -241,25 +318,57 @@ namespace
             LLPanel::Params cp;
             cp.name = "custom";
             cp.label = "Custom";
-            cp.rect = LLRect(0, GRID_HEIGHT - 20, POPOVER_WIDTH - 6, 0);
+            cp.rect = body;
             LLPanel* custom = LLUICtrlFactory::create<LLPanel>(cp);
 
             ALColorPicker::Params pp;
             pp.name = "picker";
-            pp.rect = LLRect(2, GRID_HEIGHT - 22, POPOVER_WIDTH - 8, 2);
+            pp.rect = LLRect(4, body.getHeight() - 4, body.getWidth() - 4, 4);
             pp.follows.flags = FOLLOWS_ALL;
-            ALColorPicker* picker = LLUICtrlFactory::create<ALColorPicker>(pp);
-            picker->setCommitCallback([chose, picker](LLUICtrl*, const LLSD&)
+            mPicker = LLUICtrlFactory::create<ALColorPicker>(pp);
+            mPicker->setValue(mValue);
+            mPicker->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
             {
-                chose(picker->getValue().asString());
+                chose(ctrl->getValue().asString());
             });
-            custom->addChild(picker);
+            custom->addChild(mPicker);
             tabs->addTabPanel(custom);
 
-            mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&)
+            mFilter->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
             {
-                mGrid->filter(mFilter->getText());
+                mGrid->filter(ctrl->getValue().asString());
             });
+            refreshPreview();
+        }
+
+        // The field is going away and this with it: what was chosen has
+        // nowhere to be written to.
+        void abandon() { mKeep = false; }
+
+        void draw() override
+        {
+            LLFloater::draw();
+            // What would be written, drawn where it can be compared with
+            // what is under the pointer.
+            static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+            const LLRect swatch(4, getRect().getHeight() - 4, 4 + HEADER - 8, getRect().getHeight() - 4 - (ROW - 2));
+            LLColor4 color;
+            if (resolve(mValue, color))
+            {
+                gl_rect_2d(swatch, color, true);
+            }
+            gl_rect_2d(swatch, edge.get(), false);
+        }
+
+        void onClose(bool app_quitting) override
+        {
+            sWidth = getRect().getWidth();
+            sHeight = getRect().getHeight();
+            if (mKeep && mSettled)
+            {
+                mSettled(mValue);
+            }
+            LLFloater::onClose(app_quitting);
         }
 
         void onFocusLost() override
@@ -271,6 +380,12 @@ namespace
         {
             if (key == KEY_ESCAPE && mask == MASK_NONE)
             {
+                mKeep = false;
+                closeFloater();
+                return true;
+            }
+            if (key == KEY_RETURN && mask == MASK_NONE)
+            {
                 closeFloater();
                 return true;
             }
@@ -278,8 +393,24 @@ namespace
         }
 
     private:
+        void chose(const std::string& value)
+        {
+            mValue = value;
+            mGrid->setChosen(value);
+            refreshPreview();
+        }
+
+        void refreshPreview()
+        {
+            setTitle(mValue);
+        }
+
+        std::string         mValue;
+        settled_t           mSettled;
         LLFilterEditor*     mFilter = nullptr;
         ALColorSwatchGrid*  mGrid = nullptr;
+        ALColorPicker*      mPicker = nullptr;
+        bool                mKeep = true;
     };
 }
 
@@ -323,16 +454,7 @@ LLSD ALColorField::getValue() const
 
 bool ALColorField::resolved(LLColor4& color) const
 {
-    if (mText.empty())
-    {
-        return false;
-    }
-    if (LLUIColorTable::instance().colorExists(mText))
-    {
-        color = LLUIColorTable::instance().getColor(mText).get();
-        return true;
-    }
-    return literalColor(mText, color);
+    return resolve(mText, color);
 }
 
 void ALColorField::draw()
@@ -370,10 +492,10 @@ void ALColorField::onTextCommit()
     onCommit();
 }
 
+// What the popover settled on, once it has gone.
 void ALColorField::chose(const std::string& name)
 {
     setValue(name);
-    closePopover();
     onCommit();
 }
 
@@ -384,11 +506,14 @@ void ALColorField::openPopover()
     LLFloater::Params p(LLFloater::getDefaultParams());
     p.can_close = false;
     p.can_minimize = false;
-    p.can_resize = false;
-    p.title = LLStringUtil::null;
-    p.rect = LLRect(0, GRID_HEIGHT + 30, POPOVER_WIDTH, 0);
+    p.can_resize = true;
+    p.min_width = MIN_WIDTH;
+    p.min_height = MIN_HEIGHT;
+    p.title = mText;
+    p.rect = LLRect(0, sHeight, sWidth, 0);
 
-    ALColorPopover* popover = new ALColorPopover(p, [this](const std::string& name) { chose(name); });
+    ALColorPopover* popover = new ALColorPopover(p, mText,
+        [this](const std::string& value) { chose(value); });
     mPopover = popover->getHandle();
 
     // Under the field, and shoved back on screen if that would put it off.
@@ -404,10 +529,17 @@ void ALColorField::openPopover()
     popover->setFocus(true);
 }
 
+// Closed from this side rather than from its own: whatever was chosen is
+// dropped, because this is either about to open another one or about to be
+// deleted, and a popover closing itself is the path that keeps a choice.
 void ALColorField::closePopover()
 {
     if (LLFloater* popover = mPopover.get())
     {
+        if (ALColorPopover* colour = popover->as<ALColorPopover>())
+        {
+            colour->abandon();
+        }
         popover->closeFloater();
     }
     mPopover.markDead();

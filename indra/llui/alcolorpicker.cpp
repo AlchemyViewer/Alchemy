@@ -38,10 +38,15 @@ static LLDefaultChildRegistry::Register<ALColorPicker> r("color_picker");
 
 namespace
 {
-    constexpr S32 RING_WIDTH = 22;      // how thick the hue ring is
     constexpr S32 GAP = 8;
-    constexpr S32 SLIDER_HEIGHT = 20;
     constexpr S32 SLIDER_GAP = 4;
+    // What the sliders need before the ring may have any of the width, and
+    // what a slider is worth reading at. Everything else here grows with
+    // the widget, because a colour picker is looked at rather than read and
+    // the whole point of making one resizable is that it gets bigger.
+    constexpr S32 CHANNELS_MIN_WIDTH = 210;
+    constexpr S32 SLIDER_MIN_HEIGHT = 18;
+    constexpr S32 SLIDER_MAX_HEIGHT = 34;
     constexpr S32 LABEL_WIDTH = 14;
     constexpr S32 HARMONY_ROWS = 2;
     constexpr S32 HARMONY_COLUMNS = 11;
@@ -162,21 +167,34 @@ void ALColorPicker::layout()
 {
     const S32 width = getRect().getWidth();
     const S32 height = getRect().getHeight();
-    const S32 side = llmin(height, (S32)(width * 0.45f));
+    // The ring takes what is left once the sliders have what they need,
+    // rather than a fixed share: widening the widget widens the ring.
+    const S32 side = llmax(60, llmin(height, width - CHANNELS_MIN_WIDTH - GAP));
 
     mRingBox = LLRect(0, height, side, height - side);
 
+    // A band in proportion to the ring, so that a big ring is not a hairline
+    // around a big hole.
+    mRingWidth = llclamp(side / 7, 12, 40);
+
     // The shades of the hue fill the circle the ring encloses.
-    const S32 inner = side / 2 - RING_WIDTH;
+    const S32 inner = side / 2 - mRingWidth;
     const S32 square = (S32)(inner * 1.414f) - 2;
     const S32 cx = mRingBox.mLeft + side / 2;
     const S32 cy = mRingBox.mBottom + side / 2;
     mSquare = LLRect(cx - square / 2, cy + square / 2, cx + square / 2, cy - square / 2);
 
     const S32 right_left = side + GAP;
-    const S32 harmony_height = HARMONY_ROWS * ((height - side) > 0 ? 24 : 24);
+    const S32 rows = mShowAlpha ? 7 : 6;
+    // The strip of what goes with the colour keeps a fixed share of the
+    // height; the sliders share what is left, so they grow with the widget
+    // instead of leaving a field of nothing under them.
+    const S32 harmony_height = llclamp(height / 6, 30, 64);
     mHarmonies = LLRect(right_left, height, width, height - harmony_height);
     mChannels = LLRect(right_left, mHarmonies.mBottom - GAP, width, 0);
+
+    const S32 room = mChannels.getHeight() - GAP - (rows - 1) * SLIDER_GAP - 16;
+    mSliderHeight = llclamp(room / llmax(1, rows), SLIDER_MIN_HEIGHT, SLIDER_MAX_HEIGHT);
 }
 
 void ALColorPicker::draw()
@@ -194,7 +212,7 @@ void ALColorPicker::draw()
 void ALColorPicker::drawRing() const
 {
     const F32 outer = mRingBox.getWidth() * 0.5f;
-    const F32 inner = outer - RING_WIDTH;
+    const F32 inner = outer - (F32)mRingWidth;
     if (inner <= 2.f)
     {
         return;
@@ -361,13 +379,13 @@ void ALColorPicker::drawChannels() const
         {
             top -= GAP;
         }
-        const LLRect track(left, top, mChannels.mRight, top - SLIDER_HEIGHT);
+        const LLRect track(left, top, mChannels.mRight, top - mSliderHeight);
         if (track.mBottom < mChannels.mBottom)
         {
             break;
         }
         drawSlider(track, rows[i].fraction, rows[i].from, rows[i].to, rows[i].hue, rows[i].label);
-        top -= SLIDER_HEIGHT + SLIDER_GAP;
+        top -= mSliderHeight + SLIDER_GAP;
     }
 
     static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
@@ -388,7 +406,7 @@ ALColorPicker::Grab ALColorPicker::grabAt(S32 x, S32 y) const
         const F32 cy = (F32)(mRingBox.mBottom + mRingBox.getHeight() / 2);
         const F32 distance = std::hypot(x - cx, y - cy);
         const F32 outer = mRingBox.getWidth() * 0.5f;
-        if (distance <= outer && distance >= outer - RING_WIDTH)
+        if (distance <= outer && distance >= outer - (F32)mRingWidth)
         {
             return Grab::Ring;
         }
@@ -404,12 +422,12 @@ ALColorPicker::Grab ALColorPicker::grabAt(S32 x, S32 y) const
         {
             top -= GAP;
         }
-        const LLRect track(left, top, mChannels.mRight, top - SLIDER_HEIGHT);
+        const LLRect track(left, top, mChannels.mRight, top - mSliderHeight);
         if (track.pointInRect(x, y))
         {
             return (Grab)((S32)Grab::Hue + i);
         }
-        top -= SLIDER_HEIGHT + SLIDER_GAP;
+        top -= mSliderHeight + SLIDER_GAP;
     }
     return Grab::None;
 }

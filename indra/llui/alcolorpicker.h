@@ -104,6 +104,9 @@ private:
     Grab        mGrab = Grab::None;
 
     // Where each part sits, worked out from the rect on every reshape.
+    // Sized from the widget rather than fixed: see layout().
+    S32         mRingWidth = 22;
+    S32         mSliderHeight = 20;
     LLRect      mRingBox;       // the square the ring is inscribed in
     LLRect      mSquare;        // the shades of the hue
     LLRect      mHarmonies;

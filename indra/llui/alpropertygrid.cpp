@@ -26,6 +26,8 @@
 
 #include "alpropertygrid.h"
 
+#include "llaccordionctrl.h"
+#include "llaccordionctrltab.h"
 #include "alcolorfield.h"
 #include "alflagsfield.h"
 #include "alfontfield.h"
@@ -48,7 +50,6 @@ namespace
     // which is what the container is drawn with.
     constexpr S32 MARGIN = 8;
     constexpr S32 GUTTER = 10;      // between the label and its editor
-    constexpr S32 HEADING_EXTRA = 6;
 
     // A number written the way a file writes one, which is not the way a
     // spinner holds it: three point zero is 3, and a value that carries a
@@ -116,14 +117,60 @@ ALPropertyGrid::ALPropertyGrid(const Params& p)
     mLabelWidth(p.label_width),
     mSourceWidth(p.source_width)
 {
+    LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
+    ap.name = "sections";
+    ap.rect = getLocalRect();
+    ap.follows.flags = FOLLOWS_ALL;
+    ap.single_expansion = false;
+    mAccordion = LLUICtrlFactory::create<LLAccordionCtrl>(ap);
+    addChild(mAccordion);
+
+    // An empty grid and a broken one look the same, so it says which. Over
+    // the accordion rather than in it, because what it is saying is that
+    // there are no sections.
+    LLTextBox::Params tp;
+    tp.name = "empty";
+    tp.rect = LLRect(MARGIN, getRect().getHeight(), getRect().getWidth(), getRect().getHeight() - mRowHeight);
+    tp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+    tp.font_valign = LLFontGL::VCENTER;
+    tp.use_ellipses = true;
+    mEmpty = LLUICtrlFactory::create<LLTextBox>(tp);
+    addChild(mEmpty);
 }
 
 ALPropertyGrid::~ALPropertyGrid() = default;
 
 void ALPropertyGrid::setGroups(std::vector<std::string> groups)
 {
+    for (Section& section : mSections)
+    {
+        mAccordion->removeCollapsibleCtrl(section.tab);
+        section.tab->die();
+    }
+    mSections.clear();
     mGroups = std::move(groups);
-    mFolded.assign(llmax<size_t>(mGroups.size(), 1), false);
+
+    for (const std::string& name : mGroups)
+    {
+        LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+        tp.name = name;
+        tp.title = name;
+        tp.display_children = true;
+        tp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
+
+        LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+
+        LLPanel::Params rp;
+        rp.name = name + "_rows";
+        rp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
+        rp.background_visible = false;
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+        LLPanel* rows = LLUICtrlFactory::create<LLPanel>(rp);
+        tab->setAccordionView(rows);
+
+        mAccordion->addCollapsibleCtrl(tab);
+        mSections.push_back({ tab, rows });
+    }
     rebuild();
 }
 
@@ -184,6 +231,15 @@ void ALPropertyGrid::setNested(bool nested)
     }
 }
 
+void ALPropertyGrid::setNotices(std::string nothing_selected, std::string nothing_written,
+                                std::string no_match)
+{
+    mNothingSelected = std::move(nothing_selected);
+    mNothingWritten = std::move(nothing_written);
+    mNoMatch = std::move(no_match);
+    rebuild();
+}
+
 void ALPropertyGrid::setFilter(const std::string& text)
 {
     if (mFilter != text)
@@ -219,17 +275,14 @@ bool ALPropertyGrid::shows(const Field& field) const
     return carries(field.name, mFilter);
 }
 
-bool ALPropertyGrid::anyShown(S32 group) const
+S32 ALPropertyGrid::countShown(S32 group) const
 {
-    return std::any_of(mFields.begin(), mFields.end(), [&](const Field& field)
+    S32 count = 0;
+    for (const Field& field : mFields)
     {
-        return field.group == group && shows(field);
-    });
-}
-
-bool ALPropertyGrid::open(S32 group) const
-{
-    return group < 0 || (size_t)group >= mFolded.size() || !mFolded[group];
+        count += (field.group == group && shows(field)) ? 1 : 0;
+    }
+    return count;
 }
 
 S32 ALPropertyGrid::editorLeft() const
@@ -237,35 +290,10 @@ S32 ALPropertyGrid::editorLeft() const
     return MARGIN + mLabelWidth + GUTTER;
 }
 
-S32 ALPropertyGrid::editorWidth() const
+S32 ALPropertyGrid::editorWidth(S32 width) const
 {
-    const S32 right = getRect().getWidth() - MARGIN - (mShowSource ? mSourceWidth + GUTTER : 0);
+    const S32 right = width - MARGIN - (mShowSource ? mSourceWidth + GUTTER : 0);
     return llmax(60, right - editorLeft());
-}
-
-S32 ALPropertyGrid::contentHeight() const
-{
-    const S32 headings = (S32)llmax<size_t>(mGroups.size(), 1);
-    S32 height = 0;
-    for (S32 group = 0; group < headings; ++group)
-    {
-        if (!anyShown(group))
-        {
-            continue;
-        }
-        // An unnamed section has no heading to draw and nothing to fold.
-        height += mGroups.empty() ? 0 : mRowHeight + HEADING_EXTRA;
-        if (!open(group))
-        {
-            continue;
-        }
-        for (const Field& field : mFields)
-        {
-            height += (field.group == group && shows(field)) ? mRowHeight : 0;
-        }
-    }
-    // Never nothing: an empty grid still has a line saying it is empty.
-    return llmax(height, mRowHeight);
 }
 
 void ALPropertyGrid::reshape(S32 width, S32 height, bool called_from_parent)
@@ -278,122 +306,75 @@ void ALPropertyGrid::reshape(S32 width, S32 height, bool called_from_parent)
     }
 }
 
+// Each section is filled and then sized to what it holds; the accordion
+// arranges them, folds them and scrolls them. A section with nothing under
+// it is hidden rather than shown empty, since a heading over nothing is
+// worse than no heading.
 void ALPropertyGrid::rebuild()
 {
-    mRebuilding = true;
-    deleteAllChildren();
-
-    // A scrolled document grows downward from a top that stays put: reshape
-    // alone keeps the bottom edge, which would walk the rows off the bottom
-    // of the container every time the list got shorter.
-    const S32 was_top = getRect().mTop;
-    const S32 height = contentHeight();
-    reshape(getRect().getWidth(), height, false);
-    translate(0, was_top - getRect().mTop);
-
-    const S32 headings = (S32)llmax<size_t>(mGroups.size(), 1);
-    S32 top = height;
-    S32 rows = 0;
-    for (S32 group = 0; group < headings; ++group)
+    if (!mAccordion)
     {
-        if (!anyShown(group))
+        return;
+    }
+    mRebuilding = true;
+
+    S32 shown = 0;
+    for (size_t group = 0; group < mSections.size(); ++group)
+    {
+        LLPanel* rows = mSections[group].rows;
+        rows->deleteAllChildren();
+
+        const S32 count = countShown((S32)group);
+        mSections[group].tab->setVisible(count > 0);
+        if (!count)
         {
             continue;
         }
-        S32 count = 0;
-        for (const Field& field : mFields)
-        {
-            count += field.group == group && shows(field);
-        }
-        if (!mGroups.empty())
-        {
-            addHeading(group, count, top);
-            top -= mRowHeight + HEADING_EXTRA;
-        }
-        if (!open(group))
-        {
-            continue;
-        }
-        // Alternate rows are shaded, because a name and the value across
-        // from it are a hundred and fifty pixels apart.
+        shown += count;
+
+        const S32 width = mAccordion->getRect().getWidth() - 24;
+        rows->reshape(width, count * mRowHeight, false);
+
+        S32 top = count * mRowHeight;
         S32 within = 0;
         for (const Field& field : mFields)
         {
-            if (field.group != group || !shows(field))
+            if (field.group != (S32)group || !shows(field))
             {
                 continue;
             }
-            addRow(field, top, (within++ & 1) != 0);
+            // Alternate rows are banded, because a name and the value
+            // across from it are a hundred and fifty pixels apart.
+            addRow(rows, field, top, (within++ & 1) != 0);
             top -= mRowHeight;
-            ++rows;
         }
     }
 
-    if (!rows)
+    mAccordion->arrange();
+    mAccordion->setVisible(shown > 0);
+    mEmpty->setVisible(shown == 0);
+    if (!shown)
     {
-        // An empty grid and a broken one look the same, so it says which.
-        LLTextBox::Params p;
-        p.name = "empty";
-        p.rect = LLRect(MARGIN, height, getRect().getWidth(), height - mRowHeight);
-        p.initial_value = mFields.empty()
-            ? "Nothing selected."
-            : (!mFilter.empty() ? "No field of that name."
-                                : "This element writes nothing; take the switch off to see every field.");
-        p.font_valign = LLFontGL::VCENTER;
-        addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        mEmpty->setText(mFields.empty() ? mNothingSelected
+                      : !mFilter.empty() ? mNoMatch
+                                         : mNothingWritten);
     }
     mRebuilding = false;
-}
-
-// The name of a section and how many fields are under it, over a band of
-// its own so that the eye can find where one subject ends. Clicking it
-// folds the section away, and the arrow says which way that will go.
-void ALPropertyGrid::addHeading(S32 group, S32 count, S32 top)
-{
-    static const LLUIColor band = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4::grey4);
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-
-    const std::string& name = mGroups[llclamp(group, 0, (S32)mGroups.size() - 1)];
-    const bool folded = !open(group);
-
-    LLTextBox::Params p;
-    p.name = "heading_" + name;
-    p.rect = LLRect(0, top - HEADING_EXTRA / 2, getRect().getWidth(), top - mRowHeight - HEADING_EXTRA / 2);
-    p.initial_value = (folded ? "\xE2\x96\xB6  " : "\xE2\x96\xBC  ") + name
-                      + "   (" + std::to_string(count) + ")";
-    p.font = LLFontGL::getFontSansSerifSmallBold();
-    p.font_valign = LLFontGL::VCENTER;
-    p.h_pad = MARGIN;
-    p.text_color = ink;
-    p.bg_visible = true;
-    p.bg_readonly_color = band;
-    p.mouse_opaque = true;
-    p.tool_tip = folded ? "Show these fields" : "Hide these fields";
-    LLTextBox* heading = LLUICtrlFactory::create<LLTextBox>(p);
-    heading->setClickedCallback([this, group](void*)
-    {
-        if ((size_t)group < mFolded.size())
-        {
-            mFolded[group] = !mFolded[group];
-            rebuild();
-        }
-    });
-    addChild(heading);
 }
 
 // The label, the editor its type asks for, and where the value came from.
 // A field the file does not write is shown with what is in force anyway:
 // an author changing it is writing it here for the first time, and the
 // value to start from is the one on the screen.
-void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
+void ALPropertyGrid::addRow(LLPanel* host, const Field& field, S32 top, bool shaded)
 {
     static const LLUIColor stripe = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
     static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
     static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
 
-    const S32 width = getRect().getWidth();
+    const S32 width = host->getRect().getWidth();
     const S32 left = editorLeft();
-    const S32 editor_width = editorWidth();
+    const S32 editor_width = editorWidth(width);
     const S32 bottom = top - mRowHeight;
 
     if (shaded)
@@ -405,7 +386,7 @@ void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
         band.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
                                                  stripe.get().mV[VBLUE], 0.25f));
         band.mouse_opaque = false;
-        addChild(LLUICtrlFactory::create<LLPanel>(band));
+        host->addChild(LLUICtrlFactory::create<LLPanel>(band));
     }
 
     {
@@ -423,7 +404,7 @@ void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
         p.font_valign = LLFontGL::VCENTER;
         p.text_color = (field.authored && !field.ignored) ? written : unwritten;
         p.use_ellipses = true;
-        addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        host->addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 
     const std::string name = field.name;
@@ -546,7 +527,7 @@ void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
         }
         mFieldCommit(name, text);
     });
-    addChild(editor);
+    host->addChild(editor);
 
     if (mShowSource)
     {
@@ -559,6 +540,6 @@ void ALPropertyGrid::addRow(const Field& field, S32 top, bool shaded)
         p.font_halign = LLFontGL::RIGHT;
         p.text_color = unwritten;
         p.use_ellipses = true;
-        addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        host->addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 }

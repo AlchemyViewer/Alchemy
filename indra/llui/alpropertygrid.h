@@ -27,6 +27,10 @@
 #include "alparamtype.h"
 #include "llpanel.h"
 
+class LLAccordionCtrl;
+class LLAccordionCtrlTab;
+class LLTextBox;
+
 #include <string>
 #include <vector>
 
@@ -41,9 +45,11 @@
 // Rows are shown under headings the caller names, in the order the caller
 // gives, because which fields belong together is a fact about the
 // vocabulary and not about the types: a grid that sorted its own rows would
-// have to know that `left` and `top_pad` are the same subject. A heading
-// folds away, and a filter narrows the list to the names that match, since
-// a widget answers to eighty fields and an author is looking for one.
+// have to know that `left` and `top_pad` are the same subject. Each heading
+// is an accordion tab, which is what folds it, scrolls it and draws it the
+// way every other folding list in the viewer is drawn. A filter narrows the
+// rows to the names that match, since a widget answers to eighty fields and
+// an author is looking for one.
 //
 // The grid holds no view and no document. It is given a list of fields and
 // says which one was committed and to what; putting that into a file is
@@ -112,6 +118,12 @@ public:
     // every field, and a heading with nothing left under it goes too.
     void setFilter(const std::string& text);
 
+    // What is said when there are no rows, which is three different things:
+    // nothing is selected, the element writes nothing, or the filter matches
+    // nothing. Given rather than written here, because this library has no
+    // file for a translator to open.
+    void setNotices(std::string nothing_selected, std::string nothing_written, std::string no_match);
+
     boost::signals2::connection onFieldCommit(const commit_signal_t::slot_type& cb)
     {
         return mFieldCommit.connect(cb);
@@ -129,11 +141,8 @@ public:
     void setNested(bool nested);
     bool nested() const { return mNested; }
 
-    // How tall the rows come to, so a scroll container can be told.
-    S32 contentHeight() const;
-
-    // A row is laid out to the width the grid had when it was made, so a
-    // change of width is a re-layout of the rows and not a stretch of them.
+    // A row is laid out to the width it was given, so a change of width is
+    // a re-layout of the rows and not a stretch of them.
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
 protected:
@@ -142,28 +151,35 @@ protected:
     ~ALPropertyGrid() override;
 
 private:
+    // One heading and the rows under it. The tab is what folds and the
+    // panel is what the rows are in, and both outlive a rebuild, so
+    // choosing another widget does not unfold everything again.
+    struct Section
+    {
+        LLAccordionCtrlTab* tab = nullptr;
+        LLPanel*            rows = nullptr;
+    };
+
     void rebuild();
-    void addRow(const Field& field, S32 top, bool shaded);
-    // The heading of one section, which folds the rows under it.
-    void addHeading(S32 group, S32 count, S32 top);
+    void addRow(LLPanel* host, const Field& field, S32 top, bool shaded);
     bool shows(const Field& field) const;
     // What another field of the same widget says, for an editor that is
     // for more than one attribute.
     std::string valueOf(const std::string& name) const;
-    // Whether any row survives the switch and the filter, since a heading
-    // over nothing is worse than no heading.
-    bool anyShown(S32 group) const;
-    bool open(S32 group) const;
-    // Where the columns are, given how wide the grid has been made.
+    S32 countShown(S32 group) const;
+    // Where the columns are, given how wide the rows have been made.
     S32 editorLeft() const;
-    S32 editorWidth() const;
+    S32 editorWidth(S32 width) const;
 
     std::vector<Field>          mFields;
     std::vector<std::string>    mGroups;
-    // Which headings are folded, by index. Kept across a rebuild, so
-    // choosing another widget does not unfold everything again.
-    std::vector<bool>           mFolded;
+    std::vector<Section>        mSections;
+    LLAccordionCtrl*            mAccordion = nullptr;
+    LLTextBox*                  mEmpty = nullptr;
     std::string                 mFilter;
+    std::string                 mNothingSelected;
+    std::string                 mNothingWritten;
+    std::string                 mNoMatch;
     commit_signal_t             mFieldCommit;
     S32                         mRowHeight;
     S32                         mLabelWidth;

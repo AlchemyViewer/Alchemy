@@ -63,6 +63,9 @@
     <floater.string name="AttributeWhat">[NAME]   &lt;[TAG]&gt;   [CLASS]</floater.string>
     <floater.string name="AttributeWhatCodeBuilt">[NAME]   built in code   [CLASS]</floater.string>
     <floater.string name="AttributeWhatNone">Nothing selected</floater.string>
+    <floater.string name="AttributeNothingSelected">Nothing selected.</floater.string>
+    <floater.string name="AttributeNothingWritten">This element writes nothing. Take the switch off to see every field the tag answers to.</floater.string>
+    <floater.string name="AttributeNoMatch">No field of that name.</floater.string>
     <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
@@ -763,14 +766,6 @@
                      tool_tip="The leaves of the blocks a field carries, such as font.name and bg_alpha_color.alpha. A nested field the file writes is always shown."
                      top="28"
                      width="160" />
-                    <scroll_container
-                     follows="all"
-                     height="380"
-                     layout="topleft"
-                     left="0"
-                     name="attributes_scroll"
-                     top="48"
-                     width="476" />
                 </panel>
                 <panel
                  label="Layout"
