@@ -258,14 +258,15 @@ void LLFloater::initClass()
         sButtonToolTips[i] = LLTrans::getString( sButtonToolTipsIndex[i] );
     }
 
-    LLControlVariable* ctrl = LLUI::getInstance()->mSettingGroups["config"]->getControl("ActiveFloaterTransparency").get();
+    LLControlGroup* config = LLUI::getInstance()->getSettingGroup("config");
+    LLControlVariable* ctrl = config ? config->getControl("ActiveFloaterTransparency").get() : nullptr;
     if (ctrl)
     {
         ctrl->getSignal()->connect(boost::bind(&LLFloater::updateActiveFloaterTransparency));
         updateActiveFloaterTransparency();
     }
 
-    ctrl = LLUI::getInstance()->mSettingGroups["config"]->getControl("InactiveFloaterTransparency").get();
+    ctrl = config ? config->getControl("InactiveFloaterTransparency").get() : nullptr;
     if (ctrl)
     {
         ctrl->getSignal()->connect(boost::bind(&LLFloater::updateInactiveFloaterTransparency));
@@ -333,7 +334,8 @@ LLFloater::LLFloater(const LLSD& key, const LLFloater::Params& p)
     static bool sShowCollapseInit = false;
     if (!sShowCollapseInit)
     {
-        if (LLControlVariable* pControl = LLUI::instance().mSettingGroups["config"]->getControl("ShowFloaterCollapseButton"))
+        LLControlGroup* config = LLUI::instance().getSettingGroup("config");
+        if (LLControlVariable* pControl = config ? config->getControl("ShowFloaterCollapseButton").get() : nullptr)
         {
             sShowCollapseButton = pControl->getValue().asBoolean();
             pControl->getSignal()->connect(boost::bind(&LLFloater::handleShowCollapseButtonChanged, _2));
@@ -675,7 +677,7 @@ std::string LLFloater::getControlName(const std::string& name, const LLSD& key)
 LLControlGroup* LLFloater::getControlGroup()
 {
     // Floater size, position, visibility, etc are saved in per-account settings.
-    return LLUI::getInstance()->mSettingGroups["account"];
+    return LLUI::getInstance()->getSettingGroup("account");
 }
 
 void LLFloater::setVisible( bool visible )
@@ -710,16 +712,16 @@ void LLFloater::setVisible( bool visible )
         }
     }
 
-    for(handle_set_iter_t dependent_it = mDependents.begin();
-        dependent_it != mDependents.end(); )
+    // Over a copy: a dependent shown or hidden here can reach back and take
+    // itself off this set -- closing is one way -- and the iterator would then
+    // be standing on a node that had gone.
+    handle_set_t dependents = mDependents;
+    for (const LLHandle<LLFloater>& handle : dependents)
     {
-        LLFloater* floaterp = dependent_it->get();
-
-        if (floaterp)
+        if (LLFloater* floaterp = handle.get())
         {
             floaterp->setVisible(visible);
         }
-        ++dependent_it;
     }
 
     storeVisibilityControl();
@@ -966,12 +968,6 @@ void LLFloater::closeHostedFloater()
     {
         closeFloater();
     }
-}
-
-/*virtual*/
-void LLFloater::reshape(S32 width, S32 height, bool called_from_parent)
-{
-    LLPanel::reshape(width, height, called_from_parent);
 }
 
 // virtual
@@ -1324,6 +1320,12 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
         }
     }
 
+    // Where the reshape actually left us, which is not new_rect once
+    // adjustToFitScreen above has had its say. Everything below asks what moved
+    // and by how much, and both ends of that have to be rects this floater
+    // really held: the one it started at and the one it came to rest at.
+    const LLRect settled_rect = getRect();
+
     // if not minimized, adjust all snapped dependents to new shape
     if (!isMinimized())
     {
@@ -1351,24 +1353,24 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
                 S32 delta_y = 0;
 
                 // take translation of dependee floater into account
-                delta_x += new_rect.mLeft - old_rect.mLeft;
-                delta_y += new_rect.mBottom - old_rect.mBottom;
+                delta_x += settled_rect.mLeft - old_rect.mLeft;
+                delta_y += settled_rect.mBottom - old_rect.mBottom;
 
                 // check to see if it snapped to right or top, and move if dependee floater is resizing
                 LLRect dependent_rect = floaterp->getRect();
-                if ((dependent_rect.mLeft - getRect().mLeft >= old_rect.getWidth() || // dependent on my right?
-                     dependent_rect.mRight == getRect().mLeft + old_rect.getWidth()) // dependent aligned with my right
+                if ((dependent_rect.mLeft >= old_rect.mRight || // dependent on my right?
+                     dependent_rect.mRight == old_rect.mRight) // dependent aligned with my right
                     && dependent_rect.mBottom <= old_rect.mTop + 1)
                 {
                     // was snapped directly onto right side or aligned with it
-                    delta_x += new_rect.getWidth() - old_rect.getWidth();
+                    delta_x += settled_rect.getWidth() - old_rect.getWidth();
 
                     // make sure dependent still touches floater and din't go too high,
                     // it can go over edge, but should't detach completely
                     if (delta_y > 0
-                        && dependent_rect.mBottom + delta_y > new_rect.mTop)
+                        && dependent_rect.mBottom + delta_y > settled_rect.mTop)
                     {
-                        delta_y = llmax(new_rect.mTop - dependent_rect.mBottom, 0);
+                        delta_y = llmax(settled_rect.mTop - dependent_rect.mBottom, 0);
                     }
                 }
                 else if (dependent_rect.mRight == old_rect.mLeft)
@@ -1376,25 +1378,25 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
                     // make sure dependent still touches floater and don't go too high
                     if (delta_y > 0
                         && dependent_rect.mBottom <= old_rect.mTop
-                        && dependent_rect.mBottom + delta_y > new_rect.mTop)
+                        && dependent_rect.mBottom + delta_y > settled_rect.mTop)
                     {
-                        delta_y = llmax(new_rect.mTop - dependent_rect.mBottom, 0);
+                        delta_y = llmax(settled_rect.mTop - dependent_rect.mBottom, 0);
                     }
                 }
 
-                if ((dependent_rect.mBottom - getRect().mBottom >= old_rect.getHeight() ||
-                     dependent_rect.mTop == getRect().mBottom + old_rect.getHeight())
+                if ((dependent_rect.mBottom >= old_rect.mTop ||
+                     dependent_rect.mTop == old_rect.mTop)
                     && dependent_rect.mLeft <= old_rect.mRight + 1)
                 {
                     // was snapped directly onto top side or aligned with it
-                    delta_y += new_rect.getHeight() - old_rect.getHeight();
+                    delta_y += settled_rect.getHeight() - old_rect.getHeight();
 
                     // make sure dependent still touches floater
                     // and din't go too far to the right
                     if (delta_x > 0
-                        && dependent_rect.mLeft + delta_x > new_rect.mRight)
+                        && dependent_rect.mLeft + delta_x > settled_rect.mRight)
                     {
-                        delta_x = llmax(new_rect.mRight - dependent_rect.mLeft, 0);
+                        delta_x = llmax(settled_rect.mRight - dependent_rect.mLeft, 0);
                     }
                 }
                 else if (dependent_rect.mTop == old_rect.mBottom)
@@ -1402,9 +1404,9 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
                     // make sure dependent still touches floater and don't go too far to the right
                     if (delta_x > 0
                         && dependent_rect.mLeft <= old_rect.mRight
-                        && dependent_rect.mLeft + delta_x > new_rect.mRight)
+                        && dependent_rect.mLeft + delta_x > settled_rect.mRight)
                     {
-                        delta_x = llmax(new_rect.mRight - dependent_rect.mLeft, 0);
+                        delta_x = llmax(settled_rect.mRight - dependent_rect.mLeft, 0);
                     }
                 }
 
@@ -1417,8 +1419,8 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
     {
         // If minimized, and origin has changed, set
         // mHasBeenDraggedWhileMinimized to true
-        if ((new_rect.mLeft != old_rect.mLeft) ||
-            (new_rect.mBottom != old_rect.mBottom))
+        if ((settled_rect.mLeft != old_rect.mLeft) ||
+            (settled_rect.mBottom != old_rect.mBottom))
         {
             mHasBeenDraggedWhileMinimized = true;
         }
@@ -1493,6 +1495,7 @@ void LLFloater::setMinimized(bool minimize)
 
         setBorderVisible(true);
 
+        mDependentsHiddenOnMinimize.clear();
         for(handle_set_iter_t dependent_it = mDependents.begin();
             dependent_it != mDependents.end();
             ++dependent_it)
@@ -1504,8 +1507,12 @@ void LLFloater::setMinimized(bool minimize)
                 {
                     floaterp->setMinimized(true);
                 }
-                else if (!floaterp->isMinimized())
+                else if (!floaterp->isMinimized() && floaterp->getVisible())
                 {
+                    // Remembered, because a restore shows back what this hid
+                    // and nothing else: a dependent the user had already put
+                    // away stays away.
+                    mDependentsHiddenOnMinimize.insert(floaterp->getHandle());
                     floaterp->setVisible(false);
                 }
             }
@@ -1578,9 +1585,13 @@ void LLFloater::setMinimized(bool minimize)
             if (floaterp)
             {
                 floaterp->setMinimized(false);
-                floaterp->setVisible(true);
+                if (mDependentsHiddenOnMinimize.count(floaterp->getHandle()))
+                {
+                    floaterp->setVisible(true);
+                }
             }
         }
+        mDependentsHiddenOnMinimize.clear();
 
         for (S32 i = 0; i < 4; i++)
         {
@@ -1603,7 +1614,7 @@ void LLFloater::setMinimized(bool minimize)
         reshape( mExpandedRect.getWidth(), mExpandedRect.getHeight(), true );
     }
 
-    make_ui_sound("UISndWindowClose");
+    make_ui_sound(minimize ? "UISndWindowClose" : "UISndWindowOpen");
     updateTitleButtons();
     applyTitle ();
 }
@@ -1769,9 +1780,22 @@ void LLFloater::addDependentFloater(LLFloater* floaterp, bool reposition, bool r
     mDependents.insert(floaterp->getHandle());
     floaterp->mDependeeHandle = getHandle();
 
+    // The view this floater lives in, which is the one the dependent is being
+    // placed beside. Only a floater with no view of its own falls back to the
+    // global one.
+    LLFloaterView* floater_view = getParentByType<LLFloaterView>();
+    if (!floater_view)
+    {
+        floater_view = gFloaterView;
+    }
+    if (!floater_view)
+    {
+        return;
+    }
+
     if (reposition)
     {
-        LLRect rect = gFloaterView->findNeighboringPosition(this, floaterp);
+        LLRect rect = floater_view->findNeighboringPosition(this, floaterp);
         if (resize)
         {
             const LLRect& base = getRect();
@@ -1784,11 +1808,11 @@ void LLFloater::addDependentFloater(LLFloater* floaterp, bool reposition, bool r
         floaterp->setRect(rect);
         floaterp->setSnapTarget(getHandle());
     }
-    gFloaterView->adjustToFitScreen(floaterp, false, true);
+    floater_view->adjustToFitScreen(floaterp, false, true);
     if (floaterp->isFrontmost())
     {
         // make sure to bring self and sibling floaters to front
-        gFloaterView->bringToFront(floaterp, floaterp->getAutoFocus() && !getIsChrome());
+        floater_view->bringToFront(floaterp, floaterp->getAutoFocus() && !getIsChrome());
     }
 }
 
@@ -3058,12 +3082,25 @@ void LLFloaterView::getMinimizePosition(S32 *left, S32 *bottom)
     static LLUICachedControl<S32> minimized_width ("UIMinimizedWidth", 0);
     LLRect snap_rect_local = getLocalSnapRect();
     snap_rect_local.mTop += mMinimizePositionVOffset;
+
+    // A step of nothing would walk the grid forever, and neither of these is a
+    // size this view chose.
+    if (minimized_width <= 0 || floater_header_size <= 0)
+    {
+        *left = snap_rect_local.mLeft;
+        *bottom = snap_rect_local.mBottom;
+        return;
+    }
+
+    // Both bounds are edges of the snap rect, which is inset by whatever
+    // toolbars are showing; a width compared against a column that starts at
+    // that inset loses the inset twice.
     for(S32 col = snap_rect_local.mLeft;
-        col < snap_rect_local.getWidth() - minimized_width;
+        col < snap_rect_local.mRight - minimized_width;
         col += minimized_width)
     {
         for(S32 row = snap_rect_local.mTop - floater_header_size;
-        row > floater_header_size;
+        row > snap_rect_local.mBottom;
         row -= floater_header_size ) //loop rows
         {
 
@@ -3202,7 +3239,7 @@ bool LLFloaterView::allChildrenClosed()
     return true;
 }
 
-void LLFloaterView::shiftFloaters(S32 x_offset, S32 y_offset)
+void LLFloaterView::shiftMinimizedFloaters(S32 x_offset, S32 y_offset)
 {
     for (child_list_const_iter_t it = getChildList()->begin(); it != getChildList()->end(); ++it)
     {
@@ -3294,7 +3331,9 @@ void LLFloaterView::adjustToFitScreen(LLFloater* floater, bool allow_partial_out
         }
     }
 
-    const LLRect& constraint = snap_in_toolbars ? getSnapRect() : gFloaterView->getRect();
+    // This view, not whichever one is global: a second floater view -- the XUI
+    // tool builds one -- would otherwise hold its floaters to the viewer's.
+    const LLRect constraint = snap_in_toolbars ? getSnapRect() : getRect();
     S32 min_overlap_pixels = allow_partial_outside ? FLOATER_MIN_VISIBLE_PIXELS : S32_MAX;
 
     floater->fitWithDependentsOnScreen(mToolbarLeftRect, mToolbarBottomRect, mToolbarRightRect, constraint, min_overlap_pixels);

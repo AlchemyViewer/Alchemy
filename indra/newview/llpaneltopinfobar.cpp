@@ -203,7 +203,7 @@ void LLPanelTopInfoBar::onVisibilityChanged(const LLSD& show)
         height = minimize_pos_offset = -height;
     }
 
-    gFloaterView->shiftFloaters(0, height);
+    gFloaterView->shiftMinimizedFloaters(0, height);
     gFloaterView->setMinimizePositionVerticalOffset(minimize_pos_offset);
 }
 

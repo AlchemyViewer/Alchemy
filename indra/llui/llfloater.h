@@ -256,7 +256,6 @@ public:
     // Close the floater or its host. Use when hidding or toggling a floater instance.
     virtual void    closeHostedFloater();
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void translate(S32 x, S32 y);
 
     // Release keyboard and mouse focus
@@ -556,6 +555,9 @@ private:
     typedef std::set<LLHandle<LLFloater> > handle_set_t;
     typedef std::set<LLHandle<LLFloater> >::iterator handle_set_iter_t;
     handle_set_t    mDependents;
+    // The dependents this floater hid when it was minimized, so that restoring
+    // shows back what it put away and not what the user had.
+    handle_set_t    mDependentsHiddenOnMinimize;
     bool            mTranslateWithDependents { false };
 
     bool            mButtonsEnabled[BUTTON_COUNT];
@@ -648,7 +650,7 @@ public:
     // attempt to close all floaters
     void            closeAllChildren(bool app_quitting);
     bool            allChildrenClosed();
-    void            shiftFloaters(S32 x_offset, S32 y_offset);
+    void            shiftMinimizedFloaters(S32 x_offset, S32 y_offset);
 
     void            hideAllFloaters();
     void            showHiddenFloaters();
