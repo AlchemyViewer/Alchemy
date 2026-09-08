@@ -771,9 +771,12 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
             // (2 MB grayscale / 4 MB BGRA) for every new glyph.
             image_gl->setSubImage(image_raw, pos_x, pos_y, width, height, /*force_fast_update=*/true, 0, true);
         }
-        else
+        else if (!image_raw || LLFontBitmapCache::usesGL())
         {
-            llassert(false); //images were just inserted by nextOpenPos, they shouldn't be missing
+            // nextOpenPos just made both, so a missing one is a fault --
+            // except where this process has no GL, and a sheet is CPU-only
+            // by design with nothing to upload the glyph to.
+            llassert(false);
         }
     }
 

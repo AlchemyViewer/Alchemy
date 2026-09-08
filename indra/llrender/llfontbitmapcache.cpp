@@ -34,6 +34,7 @@
 #include "llframetimer.h"
 
 S32 LLFontBitmapCache::sNextGeneration = 0;
+bool LLFontBitmapCache::sUsesGL = true;
 
 LLFontBitmapCache::LLFontBitmapCache()
     : mGeneration(++sNextGeneration)
@@ -221,8 +222,10 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
             image_raw->clear(0, 0, 0, 0);
         }
 
-        // Make corresponding GL image.
-        mImageGLVec[bitmap_idx][slot] = new LLImageGL(image_raw, false);
+        // Make corresponding GL image, where there is somewhere to put it.
+        // With no GL context the sheet is CPU-only: the glyphs go in and are
+        // measured, and the slot reads as a released one to everybody else.
+        mImageGLVec[bitmap_idx][slot] = sUsesGL ? new LLImageGL(image_raw, false) : nullptr;
         LLImageGL* image_gl = mImageGLVec[bitmap_idx][slot];
 
         // Fresh sheet hasn't been read or written yet.

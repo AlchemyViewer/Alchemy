@@ -111,6 +111,14 @@ public:
     // for index stability but holds no images.
     bool isSheetReleased(EFontGlyphType bitmap_type, U32 bitmap_num) const;
 
+    // Whether this process has a GL context to upload glyph sheets to. A
+    // viewer has one; a headless test does not, and there a sheet stays on
+    // the CPU: glyphs still rasterize into it and still measure, and nothing
+    // is uploaded. A slot with no GL image is the state a released sheet is
+    // already in, so every reader of one already handles it.
+    static void setUsesGL(bool uses_gl) { sUsesGL = uses_gl; }
+    static bool usesGL() { return sUsesGL; }
+
 protected:
     static U32 getNumComponents(EFontGlyphType bitmap_type);
 
@@ -156,6 +164,7 @@ private:
     // keep rendering with stale atlas UVs from the previous font.
     S32 mGeneration;
     static S32 sNextGeneration;
+    static bool sUsesGL;
     std::vector<LLPointer<LLImageRaw>> mImageRawVec[static_cast<U32>(EFontGlyphType::Count)];
     std::vector<LLPointer<LLImageGL>> mImageGLVec[static_cast<U32>(EFontGlyphType::Count)];
     // Per-sheet last-used timestamp, parallel-indexed with mImageRawVec /

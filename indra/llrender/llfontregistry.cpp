@@ -30,6 +30,7 @@
 
 #include "linden_common.h"
 #include "llgl.h"
+#include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
 #include "llfontgl.h"
 #include "llfontregistry.h"
@@ -299,6 +300,9 @@ void LLFontDescriptor::addFontFile(const std::string& file_name, EFontHinting hi
 LLFontRegistry::LLFontRegistry(bool create_gl_textures)
 :   mCreateGLTextures(create_gl_textures)
 {
+    // The atlas is what needs a GL context, so the atlas is what is told.
+    LLFontBitmapCache::setUsesGL(create_gl_textures);
+
     // This is potentially a slow directory traversal, so we want to
     // cache the result.
     mUltimateFallbackList = LLWindow::getDynamicFallbackFontList();
@@ -1709,9 +1713,15 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     {
         LLFontGL *fontp = NULL;
 
-        // *HACK: Fallback fonts don't render, so we can use that to suppress
-        // creation of OpenGL textures for test apps. JC
-        bool is_fallback = !is_first_found || !mCreateGLTextures;
+        // Whether this face is a fallback says one thing only: that it is
+        // not the head of this family's chain. It used to also mean "this
+        // process has no GL", because a fallback never rasterizes and that
+        // was a cheap way to keep a test app off the atlas -- at the cost of
+        // flagging the head too, which made measuring text an assertion
+        // failure. The atlas is now what knows about GL
+        // (LLFontBitmapCache::usesGL), so a headless registry has real heads
+        // that measure, and uploads nothing.
+        bool is_fallback = !is_first_found;
         F32 extra_scale = (is_fallback) ? fallback_scale : 1.0f;
         // Per-family absolute pin: if this file's source family declares
         // a <size> for the requested size_name, that point size pins THIS
@@ -2188,10 +2198,9 @@ LLFontGL *LLFontRegistry::getFont(const LLFontDescriptor& desc)
         else if (mCreateGLTextures)
         {
             // Generate glyphs for ASCII chars to avoid stalls later. Only
-            // worth doing when there is an atlas to warm -- and only safe
-            // then: createFont marks every face a fallback when
-            // mCreateGLTextures is off, including the head, and asking a
-            // fallback for glyph info directly is an error.
+            // worth doing where there is an atlas to warm; without one the
+            // sheets are CPU-side and a glyph costs what it costs whenever
+            // it is first measured.
             fontp->generateASCIIglyphs();
         }
         return fontp;
