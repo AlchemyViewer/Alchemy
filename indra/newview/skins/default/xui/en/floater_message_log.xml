@@ -158,6 +158,7 @@
       <!-- Only visible in IPANE_HTTP_LOG mode -->
       <layout_stack
        name="conv_stack"
+       orientation="horizontal"
        follows="all"
        left="10"
        right="-10"

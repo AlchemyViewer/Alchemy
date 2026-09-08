@@ -102,7 +102,7 @@
                     right="-5"
                     bottom="-5"
                     follows="left|top|right|bottom"
-                    orientation="hoizontal">
+                    orientation="horizontal">
                 <layout_panel
                         name="left_lp"
                         border="false"

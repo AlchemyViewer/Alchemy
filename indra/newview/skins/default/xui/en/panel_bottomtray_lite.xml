@@ -54,7 +54,6 @@
          follows="right"
          height="28"
          layout="topleft"
-         min_height="28"
          width="82"
          top_delta="0"
          min_width="52"

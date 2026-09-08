@@ -314,7 +314,7 @@
         user_resize="true"
         auto_resize="true"
         height="248"
-        min_width="150"
+        min_height="150"
         name="comb_gallery_layout">
         <panel
          class="inventory_gallery"

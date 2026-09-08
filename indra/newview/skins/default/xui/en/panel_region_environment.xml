@@ -83,7 +83,7 @@
                     orientation="horizontal">
                 <layout_panel
                         user_resize="false"
-                        min_height="0"
+                        min_width="0"
                         top="0"
                         name="pnl_environment_day"
                         visible="true">
@@ -247,7 +247,7 @@
                 </layout_panel>
                 <layout_panel
                         user_resize="false"
-                        min_height="0"
+                        min_width="0"
                         top="0"
                         name="pnl_environment_altitudes"
                         visible="true">

@@ -13163,7 +13163,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <real>3</real>
+      <integer>3</integer>
     </map>
     <key>HUDScaleFactor</key>
     <map>
