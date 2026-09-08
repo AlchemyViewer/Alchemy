@@ -40,6 +40,8 @@
     <floater.string name="CensusStarted">Counting what every language's overlay does...</floater.string>
     <floater.string name="CensusProgress">Counted [DONE] of [TOTAL] files</floater.string>
     <floater.string name="CensusDone">[COVERED] values arrive, [NOTHING] apply to nothing; table written to [FILE]</floater.string>
+    <floater.string name="NotificationPosted">Sent [NAME] through the channels; the Channels tab says where it went.</floater.string>
+    <floater.string name="NotificationAnswered">Answered [NAME] with [BUTTON].</floater.string>
     <floater.string name="AttributeUnknown">no such parameter</floater.string>
     <floater.string name="SchemaWritten">[SUMMARY]; written to [FILE]</floater.string>
     <floater.string name="SchemaFailed">Could not write [FILE]</floater.string>
@@ -963,6 +965,16 @@
                      name="notification_filter"
                      top="2"
                      width="240" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Post"
+                     layout="topleft"
+                     left_pad="12"
+                     name="notification_post"
+                     tool_tip="Send the selected notification for real, through the channels, as the viewer would"
+                     top_delta="0"
+                     width="60" />
                     <scroll_list
                      column_padding="0"
                      draw_heading="true"
@@ -986,6 +998,76 @@
                          label="Buttons"
                          name="buttons"
                          width="60" />
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Message"
+                         name="message" />
+                    </scroll_list>
+                </panel>
+                <panel
+                 label="Channels"
+                 layout="topleft"
+                 name="channels_pane">
+                    <text
+                     follows="left|top"
+                     height="16"
+                     layout="topleft"
+                     left="0"
+                     name="channel_label"
+                     top="6"
+                     width="58">Respond</text>
+                    <combo_box
+                     follows="left|top"
+                     height="22"
+                     layout="topleft"
+                     left_pad="2"
+                     name="channel_response"
+                     tool_tip="The buttons the selected notification's form declares"
+                     top_delta="-3"
+                     width="180" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Respond"
+                     layout="topleft"
+                     left_pad="8"
+                     name="channel_respond"
+                     tool_tip="Answer the notification as a user would, which is a real answer"
+                     top_delta="0"
+                     width="70" />
+                    <button
+                     follows="left|top"
+                     height="22"
+                     label="Clear"
+                     layout="topleft"
+                     left_pad="12"
+                     name="channel_clear"
+                     tool_tip="Empty the list; what has already been through the channels stays through them"
+                     top_delta="0"
+                     width="60" />
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="true"
+                     follows="all"
+                     height="146"
+                     layout="topleft"
+                     left="0"
+                     name="channels"
+                     tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
+                     top="28"
+                     width="1164">
+                        <scroll_list.columns
+                         label="Channel"
+                         name="channel"
+                         width="140" />
+                        <scroll_list.columns
+                         label="Notification"
+                         name="name"
+                         width="200" />
+                        <scroll_list.columns
+                         label="Time"
+                         name="time"
+                         width="80" />
                         <scroll_list.columns
                          dynamic_width="true"
                          label="Message"

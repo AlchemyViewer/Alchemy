@@ -33,8 +33,10 @@
 #include "alxuisourcemap.h"
 #include "alxuitranslate.h"
 #include "alxuitreemodel.h"
+#include "llevents.h"
 #include "llfloater.h"
 #include "llframetimer.h"
+#include "llnotificationptr.h"
 #include "llxmlnode.h"
 
 #include <deque>
@@ -154,7 +156,17 @@ private:
     LLView* buildNotification(ALXUIPreviewHost* host);
     void fillNotifications();
     void onNotificationSelected();
+    void onPostNotification();
     void onBottomTab();
+
+    // --- channels ------------------------------------------------------------
+    // What the notification system did with what was posted, which is the
+    // half a preview cannot show.
+    void watchChannels();
+    bool onChannelChanged(const std::string& channel, const LLSD& payload);
+    void onChannelSelected();
+    void onRespondToNotification();
+    LLNotificationPtr selectedChannelNotification() const;
     void closePreview(S32 which);
     void closePreviews();
     void showGallery();
@@ -352,6 +364,13 @@ private:
     LLFilterEditor*     mNotificationFilter = nullptr;
     // The template being previewed, when the file is notifications.xml.
     std::string         mNotification;
+
+    LLScrollListCtrl*   mChannels = nullptr;
+    LLComboBox*         mChannelResponse = nullptr;
+    // The listeners are disconnected here: a channel outlives this floater,
+    // and a signal still bound to a closed one calls into freed memory.
+    std::vector<LLBoundListener>                            mChannelListeners;
+    boost::unordered_map<std::string, LLNotificationPtr>     mChannelNotifications;
     LLComboBox*         mTranslateLanguage = nullptr;
     LLScrollListCtrl*   mTranslateList = nullptr;
     LLLineEditor*       mTranslateValue = nullptr;

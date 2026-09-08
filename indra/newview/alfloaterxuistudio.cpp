@@ -1005,6 +1005,11 @@ ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
 
 ALFloaterXUIStudio::~ALFloaterXUIStudio()
 {
+    // The channels outlive this, and each holds a slot bound to it.
+    for (LLBoundListener& listener : mChannelListeners)
+    {
+        listener.disconnect();
+    }
     closePreviews();
 }
 
@@ -1034,6 +1039,8 @@ bool ALFloaterXUIStudio::postBuild()
     mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
     mNotifications = getChild<LLScrollListCtrl>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
+    mChannels = getChild<LLScrollListCtrl>("channels");
+    mChannelResponse = getChild<LLComboBox>("channel_response");
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
     mTranslateList = getChild<LLScrollListCtrl>("translate_list");
     mTranslateValue = getChild<LLLineEditor>("translate_value");
@@ -1067,6 +1074,16 @@ bool ALFloaterXUIStudio::postBuild()
     mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onBottomTab, this));
     mNotifications->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onNotificationSelected, this));
     mNotificationFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillNotifications, this));
+    getChild<LLButton>("notification_post")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onPostNotification, this));
+    mChannels->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onChannelSelected, this));
+    getChild<LLButton>("channel_respond")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRespondToNotification, this));
+    getChild<LLButton>("channel_clear")->setClickedCallback([this](LLUICtrl*, const LLSD&)
+    {
+        mChannels->deleteAllItems();
+        mChannelNotifications.clear();
+        mChannelResponse->removeall();
+    });
+    watchChannels();
     mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
     mTranslateList->setCommitOnSelectionChange(true);
     mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationSelected, this));
@@ -1724,6 +1741,126 @@ void ALFloaterXUIStudio::fillNotifications()
     {
         mNotifications->selectByValue(selected);
     }
+}
+
+// Sending one for real, which is the other half of the question: the
+// preview says what it looks like, and this says where it goes. It is a
+// button rather than the selection, so nobody posts a notification to the
+// whole viewer by arrowing down a list.
+void ALFloaterXUIStudio::onPostNotification()
+{
+    const LLSD value = mNotifications->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = value.asString();
+    setStatus(getString("NotificationPosted", args));
+    LLNotifications::instance().add(value.asString(), LLSD(), LLSD());
+}
+
+// ---------------------------------------------------------------------------
+// Channels
+// ---------------------------------------------------------------------------
+// Every notification through every channel, in the order the channels
+// process them. The first four decide whether a notification is seen at
+// all; the rest hang off Visible and are the kinds it can be seen as. A
+// notification that appears in one and not the next was stopped between
+// them, which is the question this pane exists to answer.
+void ALFloaterXUIStudio::watchChannels()
+{
+    static const char* CHANNELS[] = {
+        "Unexpired", "Ignore", "VisibilityRules", "Visible",
+        "Persistent", "Alerts", "AlertModal",
+        "Group Notifications", "Notifications", "NotificationTips" };
+
+    for (const char* name : CHANNELS)
+    {
+        LLNotificationChannelPtr channel = LLNotifications::instance().getChannel(name);
+        if (!channel)
+        {
+            continue;
+        }
+        const std::string label(name);
+        mChannelListeners.push_back(channel->connectChanged(
+            [this, label](const LLSD& payload) { return onChannelChanged(label, payload); }));
+    }
+}
+
+bool ALFloaterXUIStudio::onChannelChanged(const std::string& channel, const LLSD& payload)
+{
+    const LLNotificationPtr note = LLNotifications::instance().find(payload["id"].asUUID());
+    if (note && mChannels)
+    {
+        // Held by pointer rather than copied: the notification may be
+        // answered and dropped while its row is still on screen, and a row
+        // that outlives what it is about is what the console it replaces
+        // used a raw new and a destructor to avoid.
+        const std::string id = note->getID().asString();
+        mChannelNotifications[id] = note;
+
+        std::string message = note->getMessage();
+        LLStringUtil::replaceChar(message, '\n', ' ');
+        mChannels->addElement(row(id, {
+            { "channel", channel },
+            { "name", note->getName() },
+            { "time", LLDate(LLTimer::getTotalSeconds()).toHTTPDateString("%H:%M:%S") },
+            { "message", message } }));
+    }
+    return false;
+}
+
+void ALFloaterXUIStudio::onChannelSelected()
+{
+    mChannelResponse->removeall();
+    const LLNotificationPtr note = selectedChannelNotification();
+    if (!note)
+    {
+        return;
+    }
+    const LLNotificationFormPtr form = note->getForm();
+    if (!form)
+    {
+        return;
+    }
+    const LLSD elements = form->asLLSD();
+    for (LLSD::array_const_iterator it = elements.beginArray(); it != elements.endArray(); ++it)
+    {
+        if ((*it)["type"].asString() == "button")
+        {
+            mChannelResponse->add((*it)["text"].asString());
+        }
+    }
+}
+
+void ALFloaterXUIStudio::onRespondToNotification()
+{
+    const LLNotificationPtr note = selectedChannelNotification();
+    const std::string button = mChannelResponse->getSelectedValue().asString();
+    if (!note || button.empty())
+    {
+        return;
+    }
+    LLSD response = note->getResponseTemplate();
+    response[button] = true;
+    note->respond(response);
+
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = note->getName();
+    args["[BUTTON]"] = button;
+    setStatus(getString("NotificationAnswered", args));
+}
+
+LLNotificationPtr ALFloaterXUIStudio::selectedChannelNotification() const
+{
+    const LLSD value = mChannels->getSelectedValue();
+    if (!value.isDefined())
+    {
+        return LLNotificationPtr();
+    }
+    const auto found = mChannelNotifications.find(value.asString());
+    return found == mChannelNotifications.end() ? LLNotificationPtr() : found->second;
 }
 
 // The two tabs that fill themselves from something other than the preview.

@@ -201,7 +201,6 @@
 		<menu label="Konsoller" name="Consoles">
 			<menu_item_check label="Tekstur konsol" name="Texture Console"/>
 			<menu_item_check label="Debug konsol" name="Debug Console"/>
-			<menu_item_call label="Konsol med notifikationer" name="Notifications"/>
 			<menu_item_check label="Tekstur størrelse konsol" name="Texture Size"/>
 			<menu_item_check label="Konsol med tekstur kategorier" name="Texture Category"/>
 			<menu_item_check label="Hukommelse" name="Memory"/>

@@ -139,7 +139,6 @@
 #include "llfloatermyenvironment.h"
 #include "llfloaternamedesc.h"
 #include "llfloaternewfeaturenotification.h"
-#include "llfloaternotificationsconsole.h"
 #include "llfloaternotificationstabbed.h"
 #include "llfloaterobjectweights.h"
 #include "llfloateropenobject.h"
@@ -470,7 +469,6 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("mini_map", "floater_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMap>);
     LLFloaterReg::add("new_feature_notification", "floater_new_feature_notification.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNewFeatureNotification>);
 
-    LLFloaterReg::add("notifications_console", "floater_notifications_console.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterNotificationConsole>);
 
     if (!gSkinSettings.getBOOL("LegacyNotificationWell"))
     {

@@ -246,7 +246,6 @@
 			<menu_item_check name="FOV" label="Campo de vision"/>
 			<menu_item_call name="Capabilities Info to Debug Console" label="Información de capacidades a Consola de Depuración"/>
 			<menu_item_call name="Group Info to Debug Console" label="Información de Grupo a Consola de Depuración"/>
-			<menu_item_call label="Notifications Console" name="Notifications"/>
 		</menu>
 		<menu label="Show Info" name="Display Info">
 			<menu_item_check label="Show Time" name="Show Time"/>

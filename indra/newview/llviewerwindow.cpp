@@ -208,7 +208,6 @@
 #include "llnotificationsutil.h"
 #include "llnotificationmanager.h"
 
-#include "llfloaternotificationsconsole.h"
 
 #include "llwindowlistener.h"
 #include "llviewerwindowlistener.h"
