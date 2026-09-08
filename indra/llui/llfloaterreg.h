@@ -107,6 +107,15 @@ public:
                     const std::string& groupname = LLStringUtil::null);
     static bool isRegistered(std::string_view name);
 
+    // The name a XUI file is registered under, or empty. Several names can
+    // share a file -- the inspectors do -- and the first found answers.
+    static std::string findNameForFile(std::string_view file);
+
+    // What a name builds from. For a caller that wants a floater of its own
+    // rather than the instance the rest of the viewer shares: XUI Studio
+    // previews one, and previewing must not move or close the real thing.
+    static const BuildData* getBuildData(std::string_view name);
+
     // Helpers
     static LLFloater* getLastFloaterInGroup(std::string_view name);
     static LLFloater* getLastFloaterCascading();

@@ -39,6 +39,7 @@
 #include "llexternaleditor.h"
 #include "llfile.h"
 #include "llfiltereditor.h"
+#include "llfloaterreg.h"
 #include "llfocusmgr.h"
 #include "llimagebmp.h"
 #include "llimagej2c.h"
@@ -1401,7 +1402,7 @@ void ALFloaterXUIStudio::closePreview(S32 which)
             mLastX = r.mLeft;
             mLastY = r.mBottom;
         }
-        static_cast<ALXUIPreviewHost*>(host)->detach();
+        detachHost(host);
         host->closeFloater();
     }
     pv.host.markDead();
@@ -1628,6 +1629,95 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
     return root;
 }
 
+// A preview the tool did not make has no handles to let go of.
+void ALFloaterXUIStudio::detachHost(LLFloater* host)
+{
+    if (ALXUIPreviewHost* preview = host ? host->as<ALXUIPreviewHost>() : nullptr)
+    {
+        preview->detach();
+    }
+}
+
+// The name a file is registered under, when the real floater is what the
+// author asked to see and this one may be built.
+//
+// A shell build shows what the file describes. It is the right answer for
+// reading a layout and the wrong one for anything the class does: the
+// callbacks a floater registers in its own constructor are not there, so
+// every one of them reads as unregistered, and a panel the file names by
+// class is a plain panel. The real floater answers all of that, and pays
+// for it -- a constructor that wants an agent, a region or an inventory
+// gets none of them at the login screen. So it is asked for, per file, and
+// a name the deny list carries is never built.
+std::string ALFloaterXUIStudio::realFloaterName(const ALXUICatalog::Entry& entry) const
+{
+    if (!mRealFloater || entry.kind != ALXUICatalog::Kind::Floater)
+    {
+        return LLStringUtil::null;
+    }
+    const std::string name = LLFloaterReg::findNameForFile(entry.name);
+    if (name.empty() || !LLFloaterReg::getBuildData(name))
+    {
+        return LLStringUtil::null;
+    }
+
+    // The viewer's own gate first: a floater it would refuse to show now is
+    // one this has no business building either.
+    if (!LLFloaterReg::canShowInstance(name))
+    {
+        return LLStringUtil::null;
+    }
+
+    const std::string deny = gSavedSettings.getString("ALXUIStudioRealFloaterDenyList");
+    for (size_t start = 0; start < deny.size();)
+    {
+        const size_t end = deny.find_first_of(" ,", start);
+        const std::string one = deny.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        if (one == name)
+        {
+            return LLStringUtil::null;
+        }
+        if (end == std::string::npos)
+        {
+            break;
+        }
+        start = end + 1;
+    }
+    return name;
+}
+
+// The floater the registrar builds, made fresh rather than fetched: the
+// instance the rest of the viewer shares is one the author may have open,
+// and a preview must not move it, retitle it or close it.
+LLFloater* ALFloaterXUIStudio::buildRealFloater(S32 which, const ALXUICatalog::Entry& entry,
+                                                const std::string& name, LLXMLNodePtr& node)
+{
+    // The layers as the tool reads them, for the source map and the record
+    // of which layer wrote what. The floater merges them again for itself.
+    std::vector<std::string> paths = gDirUtilp->findSkinnedFilenames(LLDir::XUI, entry.name);
+    if (paths.empty())
+    {
+        paths.push_back(entry.name);
+    }
+    if (!ALXmlLayerMerge::load(paths, node, &mPreviews[which].overlay))
+    {
+        return nullptr;
+    }
+
+    const LLFloaterReg::BuildData* data = LLFloaterReg::getBuildData(name);
+    LLFloater* floater = data->mFunc ? data->mFunc(LLSD()) : nullptr;
+    if (!floater)
+    {
+        return nullptr;
+    }
+    if (!floater->buildFromFile(data->mFile))
+    {
+        floater->closeFloater();
+        return nullptr;
+    }
+    return floater;
+}
+
 void ALFloaterXUIStudio::showPreview(S32 which)
 {
     closePreview(which);
@@ -1670,10 +1760,19 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         return;
     }
 
-    ALXUIPreviewHost* host = nullptr;
+    LLFloater* host = nullptr;
     LLView* root = nullptr;
     LLXMLNodePtr node;
     LLTimer timer;
+    if (const std::string registered = realFloaterName(*entry); !registered.empty())
+    {
+        ALXUISkinScope scope(pv.skin, pv.language);
+        ALXUIDiagnostics sink;
+        host = buildRealFloater(which, *entry, registered, node);
+        root = host;
+        pv.diagnostics = sink.entries();
+    }
+    else
     {
         ALXUISkinScope scope(pv.skin, pv.language);
         ALXUIShellBuild shell;
@@ -1682,15 +1781,16 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         LLFloater::Params p(LLFloater::getDefaultParams());
         p.min_height = p.header_height;
         p.min_width = 10;
-        host = new ALXUIPreviewHost(this, which, p);
-        root = buildRoot(which, *entry, host, node);
+        ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
+        host = preview;
+        root = buildRoot(which, *entry, preview, node);
         pv.diagnostics = sink.entries();
     }
     pv.seconds = timer.getElapsedTimeF32();
 
     if (!root)
     {
-        host->detach();
+        detachHost(host);
         host->closeFloater();
         if (which == PRIMARY)
         {
@@ -1703,7 +1803,10 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         return;
     }
 
-    host->setRoot(root);
+    if (ALXUIPreviewHost* preview = host->as<ALXUIPreviewHost>())
+    {
+        preview->setRoot(root);
+    }
     std::string title = root == host ? host->getTitle() : mFile;
     title += " [" + pv.skin + "/" + pv.language + (which == PRIMARY ? "" : ", second") + "]";
     host->setTitle(title);
@@ -1730,7 +1833,9 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         args["[DIAG]"] = std::to_string(findings);
         args["[SKIN]"] = pv.skin;
         args["[LANG]"] = pv.language;
-        setStatus(getString("Built", args));
+        // Which build this was, since the answer to almost every other
+        // question the tool gives depends on it.
+        setStatus(getString(host->as<ALXUIPreviewHost>() ? "Built" : "BuiltReal", args));
         fillTranslation();
         // The selection is a path; it may name something in the new tree.
         onSelectionChanged();
@@ -4013,9 +4118,18 @@ void ALFloaterXUIStudio::refreshBindings(LLView* view)
         mBindings->addElement(row(n++, { { "kind", kind }, { "name", name }, { "status", status } }));
     };
 
-    // Callbacks are child elements with a function attribute; in shell
-    // mode only the global registries answer, so a floater's own
-    // registrar is reported as such.
+    // A floater's own registrar is a scope pushed around its build and
+    // popped after it, so nothing global can be asked about a name it
+    // holds. The registrar object outlives the scope, though, and the real
+    // floater is the one that filled it: where the preview is that floater,
+    // "not global" becomes an answer instead of a shrug.
+    LLFloater* real = mPreviews[PRIMARY].host.get();
+    if (real && real->as<ALXUIPreviewHost>())
+    {
+        real = nullptr;
+    }
+
+    // Callbacks are child elements with a function attribute.
     for (pugi::xml_node child = element.first_child(); child; child = child.next_sibling())
     {
         if (child.type() != pugi::node_element)
@@ -4035,7 +4149,14 @@ void ALFloaterXUIStudio::refreshBindings(LLView* view)
         }
         const bool commit = LLUICtrl::CommitCallbackRegistry::instance().getValue(function.value()) != nullptr;
         const bool enable = LLUICtrl::EnableCallbackRegistry::instance().getValue(function.value()) != nullptr;
-        std::string status = commit ? "commit registry" : enable ? "enable registry" : "not global";
+        const bool own = real
+                      && (real->getCommitCallbackRegistrar().getValueFromScope(function.value()) != nullptr
+                       || real->getEnableCallbackRegistrar().getValueFromScope(function.value()) != nullptr);
+        std::string status = commit  ? "commit registry"
+                           : enable  ? "enable registry"
+                           : own     ? "the floater's own"
+                           : real    ? "registered nowhere"
+                                     : "not global";
         std::string name = function.value();
         if (pugi::xml_attribute parameter = child.attribute("parameter"))
         {
@@ -4203,6 +4324,15 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "hover")         { mHoverHighlight = !mHoverHighlight; saveState(); }
     else if (action == "rulers")        { mRulers = !mRulers; saveState(); }
     else if (action == "snap")          { mSnap = !mSnap; saveState(); }
+    else if (action == "real_floater")
+    {
+        mRealFloater = !mRealFloater;
+        saveState();
+        if (!mFile.empty())
+        {
+            showPreviews();
+        }
+    }
     else if (action == "code_built")
     {
         mShowCodeBuilt = !mShowCodeBuilt;
@@ -4224,6 +4354,7 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     if (flag == "rulers")       { return mRulers; }
     if (flag == "snap")         { return mSnap; }
     if (flag == "code_built")   { return mShowCodeBuilt; }
+    if (flag == "real_floater") { return mRealFloater; }
     if (flag.compare(0, 5, "grid:") == 0)
     {
         return mGrid == std::atoi(flag.c_str() + 5);
@@ -4261,6 +4392,7 @@ void ALFloaterXUIStudio::saveState()
     state["code_built"] = mShowCodeBuilt;
     state["snap"] = mSnap;
     state["rulers"] = mRulers;
+    state["real_floater"] = mRealFloater;
     state["grid"] = mGrid;
     if (LLPanel* current = mInspectors ? mInspectors->getCurrentPanel() : nullptr)
     {
@@ -4292,6 +4424,7 @@ void ALFloaterXUIStudio::loadState()
     mShowSecondary = state["secondary"].asBoolean();
     mSnap = state["snap"].asBoolean();
     mRulers = state["rulers"].asBoolean();
+    mRealFloater = state["real_floater"].asBoolean();
     if (state.has("grid"))
     {
         mGrid = llmax(1, state["grid"].asInteger());

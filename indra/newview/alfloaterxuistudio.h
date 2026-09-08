@@ -141,6 +141,13 @@ private:
     // --- previews ------------------------------------------------------------
     void showPreviews();
     void showPreview(S32 which);
+    // The registered floater itself, rather than a shell of what the file
+    // describes: the name to build under, or empty when this file is not
+    // one, or the author has not asked, or the viewer says not now.
+    std::string realFloaterName(const ALXUICatalog::Entry& entry) const;
+    LLFloater* buildRealFloater(S32 which, const ALXUICatalog::Entry& entry,
+                                const std::string& name, LLXMLNodePtr& node);
+    static void detachHost(LLFloater* host);
     void closePreview(S32 which);
     void closePreviews();
     void showGallery();
@@ -272,6 +279,9 @@ private:
     bool                mShowCodeBuilt = true;
     bool                mSnap = false;
     bool                mRulers = false;
+    // Build the registered class rather than a shell of the file. Off, and
+    // remembered off: what it costs is the viewer's own crashes.
+    bool                mRealFloater = false;
     S32                 mGrid = 4;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;

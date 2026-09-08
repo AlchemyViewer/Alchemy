@@ -244,6 +244,17 @@
             <key>Value</key>
             <map />
         </map>
+        <key>ALXUIStudioRealFloaterDenyList</key>
+        <map>
+            <key>Comment</key>
+            <string>XUI Studio: floaters never built for real, whatever "Build the Registered Floater" says. Names as LLFloaterReg knows them, separated by spaces or commas.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
         <key>NumpadControl</key>
         <map>
             <key>Comment</key>

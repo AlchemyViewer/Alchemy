@@ -18,6 +18,7 @@
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
     <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
     <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]</floater.string>
+    <floater.string name="BuiltReal">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]; the registered floater, so no handles</floater.string>
     <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>
     <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
     <floater.string name="NoResults">No matches.</floater.string>
@@ -155,6 +156,13 @@
                 </menu_item_check>
             </menu>
             <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Build the Registered Floater"
+             layout="topleft"
+             name="real_floater">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="real_floater" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="real_floater" />
+            </menu_item_check>
             <menu_item_check
              label="Code-built Rows"
              layout="topleft"
