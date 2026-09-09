@@ -390,19 +390,44 @@ public:
         rememberRoot();
     }
 
-    // The developer moved the preview on its surface. Where it sits there is
-    // not in the file and is remembered nowhere else, so it is remembered
-    // here -- without this the next change of size puts it back where it was
-    // built, which is a window resize away from wherever it was dragged to.
+    // Where the preview sits, and how far past itself it draws. Called when
+    // a preview is built and again when the developer moves it: where it
+    // sits there is not in the file and is remembered nowhere else, so
+    // without this the next change of size puts it back where it was built.
     void rememberRoot()
     {
-        if (mRoot)
+        mNeedWidth = 0;
+        mNeedHeight = 0;
+        if (!mRoot)
         {
-            const LLView* parent = mRoot->getParent();
-            mAnchorLeft = mRoot->getRect().mLeft;
-            mAnchorTop = (parent == this ? surfaceHeight() : parent->getRect().getHeight())
-                       - mRoot->getRect().mTop;
+            return;
         }
+        const LLView* parent = mRoot->getParent();
+        const LLRect placed = mRoot->getRect();
+        mAnchorLeft = placed.mLeft;
+        mAnchorTop = (parent == this ? surfaceHeight() : parent->getRect().getHeight()) - placed.mTop;
+
+        // What the preview actually draws, which is not always the rect it
+        // claims: a child placed past its parent's edge is drawn past it,
+        // and a surface cut to the rect leaves that drawing clipped with
+        // nowhere to scroll to -- which is the one thing a canvas that
+        // scrolls exists to prevent.
+        mRoot->setUseBoundingRect(true);
+        mRoot->updateBoundingRect();
+        LLRect drawn(placed);
+        drawn.unionWith(mRoot->getBoundingRect());
+        // What spills off the near sides is room the preview has to be
+        // moved over by, and a preview cannot be dragged off the top left
+        // of the surface it is on -- there is no growing that way.
+        mAnchorLeft = llmax(mAnchorLeft, placed.mLeft - drawn.mLeft);
+        mAnchorTop = llmax(mAnchorTop, drawn.mTop - placed.mTop);
+        // So the surface reaches from its own top left corner to the far
+        // side of everything the preview draws, wherever it has been put.
+        mNeedWidth = mAnchorLeft + placed.getWidth() + (drawn.mRight - placed.mRight) + CANVAS_MARGIN;
+        mNeedHeight = mAnchorTop + placed.getHeight() + (placed.mBottom - drawn.mBottom) + CANVAS_MARGIN;
+
+        resurface();
+        anchorRoot();
     }
 
     // A canvas in a window of its own is as big as what it shows. A canvas
@@ -441,8 +466,14 @@ public:
     // file's own coordinates: that is the surface rect, and it is what the
     // room comes to at this zoom. What the row places and the container
     // scrolls is what the surface is drawn as, which is the view's own rect.
-    S32 surfaceWidth() const  { return llmax(mContentWidth, ll_round((F32)mLeastWidth / mZoom)); }
-    S32 surfaceHeight() const { return llmax(mContentHeight, ll_round((F32)mLeastHeight / mZoom)); }
+    S32 surfaceWidth() const
+    {
+        return llmax(mContentWidth, mNeedWidth, ll_round((F32)mLeastWidth / mZoom));
+    }
+    S32 surfaceHeight() const
+    {
+        return llmax(mContentHeight, mNeedHeight, ll_round((F32)mLeastHeight / mZoom));
+    }
     LLRect surfaceRect() const { return LLRect(0, surfaceHeight(), surfaceWidth(), 0); }
 
     void resurface()
@@ -1412,6 +1443,8 @@ private:
     S32                 mLeastHeight = 0;
     S32                 mAnchorLeft = 0;        // where the root was put, from
     S32                 mAnchorTop = 0;         // the surface's top left corner
+    S32                 mNeedWidth = 0;         // to the far side of what it
+    S32                 mNeedHeight = 0;        // draws, from the top left
     F32                 mZoom = 1.f;
 
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
@@ -1487,6 +1520,20 @@ public:
             shareRoom();
             layout();
         }
+        else
+        {
+            // A canvas that changed size on its own -- a preview rebuilt, a
+            // preview moved towards an edge -- is a document of a different
+            // size, and what the container scrolls is this. Cheaper to ask
+            // every frame than to be wrong about it for one.
+            S32 width = 0;
+            S32 height = 0;
+            wanted(width, height);
+            if (width != getRect().getWidth() || height != getRect().getHeight())
+            {
+                layout();
+            }
+        }
         LLPanel::draw();
     }
 
@@ -1517,10 +1564,15 @@ public:
 
     // A canvas sizes itself to what was built on it, so this runs after a
     // build and not before one.
-    void layout()
+    // What the row has to be: as wide as what is on it, as tall as its
+    // tallest, and never smaller than the region it is shown in -- the row
+    // covers the region whatever is on it, so a wheel over the part of it
+    // nothing was built on is still a wheel over the canvas, and a row of no
+    // area is one the container has nothing to place.
+    void wanted(S32& width, S32& height) const
     {
-        S32 width = 0;
-        S32 height = 0;
+        width = 0;
+        height = 0;
         for (const ALXUICanvas* canvas : mCanvases)
         {
             if (canvas->getVisible())
@@ -1529,11 +1581,15 @@ public:
                 height = llmax(height, canvas->getRect().getHeight());
             }
         }
-        // The row covers the region whatever is on it: a wheel over the part
-        // of it nothing was built on is still a wheel over the canvas, and a
-        // row of no area is one the container has nothing to place.
         width = llmax(width, mRoomWidth, 1);
         height = llmax(height, mRoomHeight, 1);
+    }
+
+    void layout()
+    {
+        S32 width = 0;
+        S32 height = 0;
+        wanted(width, height);
         LLPanel::reshape(width, height, false);
 
         S32 left = 0;
@@ -6303,10 +6359,12 @@ void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
     {
         pv.root->translate(dl, db);
         // The surface has to be told, or it puts the preview back where it
-        // was built the next time it changes size.
+        // was built the next time it changes size -- and a preview moved
+        // towards an edge is a surface that has to grow to keep it.
         if (ALXUICanvas* canvas = canvasOf(pv))
         {
             canvas->rememberRoot();
+            layoutCanvases();
         }
         setStatus(getString("EditRootMoved"));
         return;
