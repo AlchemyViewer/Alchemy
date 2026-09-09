@@ -224,4 +224,51 @@ namespace tut
         }
         grid->die();
     }
+
+    // Two fields that are the same thought share a row: left and top are a
+    // position, and reading them on one line is how anybody says it. The
+    // named half gets no row of its own, and the section is as tall as the
+    // rows it will hold rather than the fields it was given.
+    template<> template<>
+    void alpropertygrid_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "position" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("left", 0));
+        fields.back().pairWith = "top";
+        fields.push_back(field("top", 0));
+        fields.push_back(field("name", 0));
+        grid->setFields(fields);
+
+        LLPanel* rows = grid->getChild<LLPanel>("position_rows", true);
+        ensure("the pair is one row", rows->findChild<LLPanel>("left_row", true) != nullptr);
+        ensure("and the other half has none of its own",
+               rows->findChild<LLPanel>("top_row", true) == nullptr);
+        ensure("the unpaired field still has one",
+               rows->findChild<LLPanel>("name_row", true) != nullptr);
+
+        // Both editors are on the one row, and inside it.
+        LLPanel* row = rows->getChild<LLPanel>("left_row", true);
+        LLView* first = row->findChild<LLView>("left", true);
+        LLView* second = row->findChild<LLView>("top", true);
+        ensure("the first editor is on the row", first != nullptr);
+        ensure("and so is the second", second != nullptr);
+        ensure("the first is inside it " + where(first->getRect()),
+               row->getLocalRect().contains(first->getRect()));
+        ensure("the second is inside it " + where(second->getRect()),
+               row->getLocalRect().contains(second->getRect()));
+        ensure("and the second is to the right of the first",
+               second->getRect().mLeft >= first->getRect().mRight);
+
+        // Two rows, not three: the section is as tall as what it shows.
+        ensure_equals("the section holds two rows", rows->getRect().getHeight(), 2 * ROW);
+        grid->die();
+    }
 }

@@ -100,6 +100,12 @@ public:
         bool                        ignored = false;
         // Written by the file and declared by nothing.
         bool                        unknown = false;
+        // The field that shares this one's row. Left and top are a position
+        // and width and height are a size: read on one line each, they are
+        // the two rows anybody actually thinks in rather than four. Only the
+        // first of a pair names the other, and the named one gets no row of
+        // its own.
+        std::string                 pairWith;
     };
 
     // name and the value committed, as the file would write it.
@@ -178,7 +184,14 @@ private:
     };
 
     void rebuild();
-    void addRow(Rows* host, const Field& field, bool shaded);
+    void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
+    LLUICtrl* makeEditor(const Field& field, const LLRect& box, LLPanel* row);
+    // The field this one shares its row with, where it names one that is
+    // shown, in the same section, and not filtered away.
+    const Field* partnerOf(const Field& field) const;
+    // Whether some shown field has named this one as its partner, in
+    // which case it is on that row and needs none of its own.
+    bool isPartnered(const Field& field) const;
     bool shows(const Field& field) const;
     // What another field of the same widget says, for an editor that is
     // for more than one attribute.

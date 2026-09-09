@@ -337,7 +337,10 @@ S32 ALPropertyGrid::countShown(S32 group) const
     S32 count = 0;
     for (const Field& field : mFields)
     {
-        count += (field.group == group && shows(field)) ? 1 : 0;
+        // A pair is one row, and it is counted where the first of them is:
+        // the section is as tall as the rows it will hold, not as the fields
+        // it was given.
+        count += (field.group == group && shows(field) && !isPartnered(field)) ? 1 : 0;
     }
     return count;
 }
@@ -423,9 +426,14 @@ void ALPropertyGrid::rebuild()
             {
                 continue;
             }
+            // A field on somebody else's row is not a row.
+            if (isPartnered(field))
+            {
+                continue;
+            }
             // Alternate rows are banded, because a name and the value
             // across from it are a hundred and fifty pixels apart.
-            addRow(rows, field, (within++ & 1) != 0);
+            addRow(rows, field, partnerOf(field), (within++ & 1) != 0);
         }
         rows->stack();
 
@@ -447,61 +455,12 @@ void ALPropertyGrid::rebuild()
     }
 }
 
-// The label, the editor its type asks for, and where the value came from.
-// A field the file does not write is shown with what is in force anyway:
-// an author changing it is writing it here for the first time, and the
-// value to start from is the one on the screen.
-// One panel per row, so a section can stack them and a row is a thing rather
-// than four views that happen to share a Y.
-void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
+// The editor a field's type asks for, in the box it is given, wired to say
+// which field it is when it commits. A row holds one of these, or two where
+// two fields are the same thought: left and top are a position, and reading
+// them on one line is how anybody says it.
+LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPanel* row)
 {
-    static const LLUIColor stripe = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
-    static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-
-    const S32 width = host->getRect().getWidth();
-    const S32 left = editorLeft();
-    const S32 editor_width = editorWidth(width);
-    // Row-local: the section says where the row is, the row says where its
-    // parts are.
-    const S32 top = mRowHeight;
-    const S32 bottom = 0;
-
-    LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
-    rp.name = field.name + "_row";
-    rp.rect = LLRect(0, mRowHeight, width, 0);
-    rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
-    rp.mouse_opaque = false;
-    // Alternate rows are banded, because a name and the value across from it
-    // are a hundred and fifty pixels apart. The row is its own band.
-    rp.background_visible = shaded;
-    if (shaded)
-    {
-        rp.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
-                                               stripe.get().mV[VBLUE], 0.25f));
-    }
-    LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
-    host->addChild(row);
-
-    {
-        // A field nothing writes is shown in the quieter ink, and so is one
-        // that is written and does nothing: what is on the row is what the
-        // widget is doing, not what the file says.
-        LLTextBox::Params p;
-        p.name = field.name + "_label";
-        p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
-        p.initial_value = field.name;
-        p.tool_tip = field.ignored ? field.name + " is read off every widget and thrown away"
-                   : field.unknown ? field.name + " is written here and declared by nothing"
-                   : field.type.empty() ? field.name
-                                        : field.name + " : " + field.type;
-        p.font_valign = LLFontGL::VCENTER;
-        p.text_color = (field.authored && !field.ignored) ? written : unwritten;
-        p.use_ellipses = true;
-        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
-        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
-    }
-
     const std::string name = field.name;
     LLUICtrl* editor = nullptr;
 
@@ -509,7 +468,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
     {
         LLCheckBoxCtrl::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 2, left + editor_width, bottom);
+        p.rect = LLRect(box.mLeft, box.mTop - 2, box.mRight, box.mBottom);
         p.label = LLStringUtil::null;
         p.initial_value = field.value == "true" || field.value == "1";
         editor = LLUICtrlFactory::create<LLCheckBoxCtrl>(p);
@@ -519,7 +478,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         // The one type with a vocabulary worth showing rather than typing.
         ALColorField::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 1, left + editor_width, bottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
         ALColorField* colour = LLUICtrlFactory::create<ALColorField>(p);
         colour->setValue(field.value);
         editor = colour;
@@ -529,7 +488,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         // Four independent answers written as one word, so four boxes.
         ALFlagsField::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 2, left + editor_width, bottom);
+        p.rect = LLRect(box.mLeft, box.mTop - 2, box.mRight, box.mBottom);
         ALFlagsField* flags = LLUICtrlFactory::create<ALFlagsField>(p);
         flags->setFlags(field.values, field.allWord, field.noneWord);
         flags->setValue(field.value);
@@ -542,7 +501,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         // whatever the file calls them.
         ALFontField::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 1, left + editor_width, bottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
         ALFontField* font = LLUICtrlFactory::create<ALFontField>(p);
         font->setValue(field.value);
         font->setSize(valueOf(name + ".size"));
@@ -557,7 +516,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
     {
         LLComboBox::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 1, left + editor_width, bottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
         // The list is what the vocabulary offers, and typing is still
         // allowed because a value already in the file that the list does
         // not have must not be lost by looking at it.
@@ -584,7 +543,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         const bool whole = field.kind != ALParamType::REAL;
         LLSpinCtrl::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 1, left + llmin(editor_width, 120), bottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, llmin(box.mRight, box.mLeft + 120), box.mBottom + 1);
         p.label_width = 0;
         p.decimal_digits = whole ? 0 : 3;
         p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
@@ -601,7 +560,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
     {
         LLLineEditor::Params p;
         p.name = name;
-        p.rect = LLRect(left, top - 1, left + editor_width, bottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
         p.initial_value = field.value;
         p.commit_on_focus_lost = true;
         editor = LLUICtrlFactory::create<LLLineEditor>(p);
@@ -635,6 +594,106 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
     editor->setFollows(editor->as<LLSpinCtrl>() ? (FOLLOWS_LEFT | FOLLOWS_TOP)
                                                 : (FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT));
     row->addChild(editor);
+    return editor;
+}
+
+const ALPropertyGrid::Field* ALPropertyGrid::partnerOf(const Field& field) const
+{
+    if (field.pairWith.empty())
+    {
+        return nullptr;
+    }
+    for (const Field& other : mFields)
+    {
+        // The same section and shown by the same rules: a filter that matches
+        // one half of a pair does not drag the other half in with it.
+        if (other.name == field.pairWith && other.group == field.group && shows(other))
+        {
+            return &other;
+        }
+    }
+    return nullptr;
+}
+
+bool ALPropertyGrid::isPartnered(const Field& field) const
+{
+    for (const Field& other : mFields)
+    {
+        if (other.pairWith == field.name && other.group == field.group
+            && shows(other) && !other.name.empty())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The label, the editor its type asks for, and where the value came from.
+// A field the file does not write is shown with what is in force anyway:
+// an author changing it is writing it here for the first time, and the
+// value to start from is the one on the screen.
+// One panel per row, so a section can stack them and a row is a thing rather
+// than four views that happen to share a Y.
+void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner, bool shaded)
+{
+    static const LLUIColor stripe = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
+    static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+    static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+
+    const S32 width = host->getRect().getWidth();
+    // Row-local: the section says where the row is, the row says where its
+    // parts are.
+    const S32 top = mRowHeight;
+    const S32 bottom = 0;
+
+    LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+    rp.name = field.name + "_row";
+    rp.rect = LLRect(0, mRowHeight, width, 0);
+    rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+    rp.mouse_opaque = false;
+    // Alternate rows are banded, because a name and the value across from it
+    // are a hundred and fifty pixels apart. The row is its own band.
+    rp.background_visible = shaded;
+    if (shaded)
+    {
+        rp.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
+                                               stripe.get().mV[VBLUE], 0.25f));
+    }
+    LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
+    host->addChild(row);
+
+    {
+        // A field nothing writes is shown in the quieter ink, and so is one
+        // that is written and does nothing: what is on the row is what the
+        // widget is doing, not what the file says.
+        LLTextBox::Params p;
+        p.name = field.name + "_label";
+        p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
+        p.initial_value = partner ? field.name + ", " + partner->name : field.name;
+        p.tool_tip = field.ignored ? field.name + " is read off every widget and thrown away"
+                   : field.unknown ? field.name + " is written here and declared by nothing"
+                   : field.type.empty() ? field.name
+                                        : field.name + " : " + field.type;
+        p.font_valign = LLFontGL::VCENTER;
+        p.text_color = (field.authored && !field.ignored) ? written : unwritten;
+        p.use_ellipses = true;
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
+    }
+
+    // The editor, or two of them where this field carries a partner.
+    const S32 left = editorLeft();
+    const S32 editor_width = editorWidth(width);
+    if (partner)
+    {
+        const S32 half = (editor_width - GUTTER) / 2;
+        makeEditor(field, LLRect(left, top, left + half, bottom), row);
+        makeEditor(*partner, LLRect(left + half + GUTTER, top, left + editor_width, bottom), row);
+    }
+    else
+    {
+        makeEditor(field, LLRect(left, top, left + editor_width, bottom), row);
+    }
 
     // The way back, on the rows that have one. A field this file writes can
     // be taken out again, and what was in force before is in force after --
@@ -649,7 +708,8 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         p.tool_tip = field.name + " is written here; take it out and let whatever was in force before be in force";
         p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
         LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
-        remove->setCommitCallback([this, name](LLUICtrl*, const LLSD&) { mFieldRemove(name); });
+        const std::string removed = field.name;
+        remove->setCommitCallback([this, removed](LLUICtrl*, const LLSD&) { mFieldRemove(removed); });
         row->addChild(remove);
     }
 

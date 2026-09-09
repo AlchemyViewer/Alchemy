@@ -6444,6 +6444,28 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         }
     }
 
+    // The four numbers everybody reads two at a time. Which fields are the
+    // same thought is a fact about the vocabulary, so it is said here and
+    // not in the grid, which knows about types and nothing about widgets.
+    static const std::pair<const char*, const char*> PAIRS[] = {
+        { "left", "top" },
+        { "width", "height" },
+        { "min_width", "min_height" },
+        { "left_pad", "top_pad" },
+        { "left_delta", "top_delta" },
+    };
+    for (ALPropertyGrid::Field& field : fields)
+    {
+        for (const auto& [first, second] : PAIRS)
+        {
+            if (field.name == first)
+            {
+                field.pairWith = second;
+                break;
+            }
+        }
+    }
+
     mAttributeGrid->setFields(std::move(fields));
 }
 
