@@ -101,4 +101,38 @@ namespace tut
         fv.reset();
         gFloaterView = nullptr;
     }
+
+    // Built from a tree the caller already holds rather than from the file
+    // it would have been read from. A tool that keeps a file's layers in
+    // memory, because they are being edited, has the tree that read would
+    // have produced -- and going to the file for a second read of its own
+    // builds the version the edit is not in. The name here is of no file,
+    // so a build that reached for one could not succeed.
+    template<> template<>
+    void llfloater_object::test<2>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        std::unique_ptr<LLFloaterView> fv(floaterView());
+        gFloaterView = fv.get();
+
+        const std::string xml =
+            "<floater name=\"built\" title=\"Held in memory\" width=\"123\" height=\"45\"/>";
+        LLXMLNodePtr root;
+        ensure("the tree parses", LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
+
+        LLFloater::Params fp;
+        fp.name = "shell";
+        fp.rect = LLRect(0, 10, 10, 0);
+        TestFloater* f = new TestFloater(fp);
+        ensure("it builds from the tree", f->buildFromXML(root, "floater_of_no_file.xml"));
+        ensure_equals("as wide as the tree says", f->getRect().getWidth(), 123);
+        ensure_equals("and titled what it says", f->getTitle(), std::string("Held in memory"));
+
+        fv.reset();
+        gFloaterView = nullptr;
+    }
 }

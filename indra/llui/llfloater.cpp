@@ -3838,6 +3838,23 @@ bool LLFloater::buildFromFile(const std::string& filename)
         return false;
     }
 
+    return buildFromXML(root, filename);
+}
+
+// The same build against a tree somebody already holds. A tool that keeps a
+// file's layers in memory -- because they are being edited, and the disk has
+// not heard about it yet -- has the tree the read above would have produced,
+// and going to the file again would be reading the version the edit is not in.
+bool LLFloater::buildFromXML(LLXMLNodePtr root, const std::string& filename)
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    if (root.isNull())
+    {
+        LL_WARNS() << "No floater tree to build from: " << filename << LL_ENDL;
+        return false;
+    }
+
     // root must be called floater
     if( !(root->hasName("floater") || root->hasName("multi_floater")) )
     {

@@ -230,6 +230,10 @@ public:
     // Don't export top/left for rect, only height/width
     bool buildFromFile(const std::string &filename);
 
+    // The same, against a tree the caller already has rather than the file
+    // it would have been read from.
+    bool buildFromXML(LLXMLNodePtr root, const std::string& filename);
+
     boost::signals2::connection setMinimizeCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setOpenCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setCloseCallback( const commit_signal_t::slot_type& cb );
