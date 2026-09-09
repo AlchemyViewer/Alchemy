@@ -44,6 +44,10 @@ public:
     {
         S32 layer = 0;
         S32 line = 0;
+        // What that layer wrote, where there is a value to keep: an
+        // attribute has one, an element's text does not come through here
+        // as a string.
+        std::string value;
     };
 
     struct Drop
@@ -76,6 +80,13 @@ public:
     // element's text; null when the base did.
     const Origin* originOf(const LLXMLNode* node) const;
 
+    // Every layer that wrote it, in the order they were applied, so the
+    // last of them is the one in force. The base is not among them: a layer
+    // may only write over an attribute the base already has, so an empty
+    // list is a value nobody has overridden and a list of one is a value
+    // one skin or one language disagrees about.
+    const std::vector<Origin>& writersOf(const LLXMLNode* node) const;
+
     const std::vector<Drop>& drops() const { return mDrops; }
     const std::vector<Rescue>& rescues() const { return mRescues; }
 
@@ -98,8 +109,8 @@ public:
 private:
     void drop(S32 layer, const LLXMLNode* overlay_node, std::string what, std::string why);
 
-    std::vector<std::string>                        mLayers;
-    boost::unordered_map<const LLXMLNode*, Origin>  mOrigins;
+    std::vector<std::string>                                    mLayers;
+    boost::unordered_map<const LLXMLNode*, std::vector<Origin>> mOrigins;
     std::vector<Drop>                               mDrops;
     std::vector<Rescue>                             mRescues;
 };

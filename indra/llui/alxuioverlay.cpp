@@ -44,7 +44,14 @@ const std::string& ALXUIOverlay::layerPath(S32 layer) const
 const ALXUIOverlay::Origin* ALXUIOverlay::originOf(const LLXMLNode* node) const
 {
     auto it = mOrigins.find(node);
-    return it == mOrigins.end() ? nullptr : &it->second;
+    return it == mOrigins.end() || it->second.empty() ? nullptr : &it->second.back();
+}
+
+const std::vector<ALXUIOverlay::Origin>& ALXUIOverlay::writersOf(const LLXMLNode* node) const
+{
+    static const std::vector<Origin> nobody;
+    auto it = mOrigins.find(node);
+    return it == mOrigins.end() ? nobody : it->second;
 }
 
 // static
@@ -152,7 +159,7 @@ void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* 
 
 void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
-    mOrigins[base] = Origin{ layer, overlay->getLineNumber() };
+    mOrigins[base].push_back(Origin{ layer, overlay->getLineNumber(), std::string() });
 }
 
 void ALXUIOverlay::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
@@ -165,12 +172,18 @@ void ALXUIOverlay::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 
 void ALXUIOverlay::valueAppliedAsText(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute)
 {
-    mOrigins[base] = Origin{ layer, overlay_attribute->getLineNumber() };
+    mOrigins[base].push_back(Origin{ layer, overlay_attribute->getLineNumber(),
+                                     overlay_attribute->getValue() });
 }
 
+// Every layer that writes it is kept, not only the one that won: which
+// skins and which languages disagree about a value is the question the
+// gutter beside the row is asking, and the answer was crossing here and
+// being dropped.
 void ALXUIOverlay::attributeApplied(S32 layer, LLXMLNode* base_attribute, LLXMLNode* overlay_attribute)
 {
-    mOrigins[base_attribute] = Origin{ layer, overlay_attribute->getLineNumber() };
+    mOrigins[base_attribute].push_back(Origin{ layer, overlay_attribute->getLineNumber(),
+                                               overlay_attribute->getValue() });
 }
 
 void ALXUIOverlay::attributeDropped(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute)

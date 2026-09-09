@@ -77,6 +77,7 @@
     <floater.string name="AttributeNothingSelected">Nothing selected.</floater.string>
     <floater.string name="AttributeNothingWritten">This element writes nothing. Take the switch off to see every field the tag answers to.</floater.string>
     <floater.string name="AttributeNoMatch">No field of that name.</floater.string>
+    <floater.string name="AttributeAlsoWritten">[ATTR] is written over in   [LAYERS]</floater.string>
     <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>

@@ -320,4 +320,43 @@ namespace tut
                row->findChild<LLView>("follows", true) != nullptr);
         grid->die();
     }
+
+    // A value some other layer writes as well is marked beside its row, and
+    // the mark says where. A value nobody disagrees about is not marked: a
+    // mark on every row is a column, which is what this replaced.
+    template<> template<>
+    void alpropertygrid_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("name", 0));
+        fields.push_back(field("label", 0));
+        fields.back().alsoWritten = { "ja = Los", "gemini = Go on" };
+        grid->setFields(fields);
+
+        LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
+        LLUICtrl* mark = rows->findChild<LLUICtrl>("label_gutter", true);
+        ensure("the row somebody disagrees about is marked", mark != nullptr);
+        ensure("and the one nobody does is not",
+               rows->findChild<LLUICtrl>("name_gutter", true) == nullptr);
+        ensure("the mark says both places", mark->getToolTip().find("gemini") != std::string::npos
+                                         && mark->getToolTip().find("ja") != std::string::npos);
+        ensure("it is in the margin beside the label " + where(mark->getRect()),
+               mark->getRect().mRight <= rows->getChild<LLPanel>("label_row", true)
+                   ->getChild<LLTextBox>("label_label", true)->getRect().mLeft);
+
+        // Clicking it is how the caller is asked to show where else.
+        std::string asked;
+        grid->onFieldGutter([&asked](const std::string& name) { asked = name; });
+        mark->handleMouseDown(1, 1, MASK_NONE);
+        ensure_equals("the click names the field", asked, std::string("label"));
+        grid->die();
+    }
 }

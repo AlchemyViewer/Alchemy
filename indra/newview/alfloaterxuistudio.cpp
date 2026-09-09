@@ -1916,7 +1916,6 @@ bool ALFloaterXUIStudio::postBuild()
         p.name = "attributes_grid";
         p.rect = LLRect(0, tab->getRect().getHeight() - 48, tab->getRect().getWidth(), 0);
         p.label_width = 150;
-        p.source_width = 80;
         p.follows.flags = FOLLOWS_ALL;
         mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
         tab->addChild(mAttributeGrid);
@@ -1971,6 +1970,7 @@ bool ALFloaterXUIStudio::postBuild()
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
     mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
     mAttributeGrid->onFieldRemove(boost::bind(&ALFloaterXUIStudio::onFieldRemove, this, _1));
+    mAttributeGrid->onFieldGutter(boost::bind(&ALFloaterXUIStudio::onFieldGutter, this, _1));
     getChild<LLCheckBoxCtrl>("attributes_authored")->setCommitCallback(
         [this](LLUICtrl* ctrl, const LLSD&)
         {
@@ -6704,6 +6704,14 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         const ALXUIOverlay::Origin* from = pv.overlay.originOf(attribute.get());
         field.source = layerLabel(PRIMARY, from ? from->layer : 0);
         field.authored = true;
+        // Every layer that writes it, not only the one that won: a value
+        // some skin or language disagrees about is marked in the gutter,
+        // and this is what the mark says.
+        for (const ALXUIOverlay::Origin& writer : pv.overlay.writersOf(attribute.get()))
+        {
+            field.alsoWritten.push_back(layerLabel(PRIMARY, writer.layer)
+                                        + (writer.value.empty() ? std::string() : " = " + writer.value));
+        }
         describe(field, field.name);
         written.insert(field.name);
         fields.push_back(std::move(field));
@@ -6862,6 +6870,42 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditTookOut", args));
+}
+
+// The mark beside a row, clicked. The row is marked because more than one
+// layer writes the field, and what each of them says about the element is
+// already laid out, layer by layer, in the Source inspector: the click is
+// the way from noticing that they disagree to reading how.
+void ALFloaterXUIStudio::onFieldGutter(const std::string& name)
+{
+    if (mInspectors)
+    {
+        mInspectors->selectTabByName("source_tab");
+    }
+    refreshSource(selectedView());
+
+    const ALPropertyGrid::Field* field = nullptr;
+    for (const ALPropertyGrid::Field& one : mAttributeGrid->fields())
+    {
+        if (one.name == name)
+        {
+            field = &one;
+            break;
+        }
+    }
+    if (!field)
+    {
+        return;
+    }
+    std::string where;
+    for (const std::string& line : field->alsoWritten)
+    {
+        where += where.empty() ? line : "   " + line;
+    }
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = name;
+    args["[LAYERS]"] = where;
+    setStatus(getString("AttributeAlsoWritten", args));
 }
 
 // A layer's skin and language, read off its path: the segments around

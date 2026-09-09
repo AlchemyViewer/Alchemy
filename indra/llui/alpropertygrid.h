@@ -63,7 +63,6 @@ public:
     {
         Optional<S32>   row_height;
         Optional<S32>   label_width;
-        Optional<S32>   source_width;
         Params();
     };
 
@@ -117,6 +116,11 @@ public:
         // is what a caller with nothing on screen to point at should do.
         LLRect                      subject;
         LLRect                      subjectParent;
+        // Where else this value is written, one line each, as the caller
+        // names them. A row with any is marked in the gutter beside its
+        // label and this is what the mark says; a row with none leaves the
+        // gutter clear, which is what makes a marked one worth looking at.
+        std::vector<std::string>    alsoWritten;
     };
 
     // name and the value committed, as the file would write it.
@@ -156,6 +160,15 @@ public:
         return mFieldRemove.connect(cb);
     }
 
+    // The gutter mark beside a row, clicked. What is on the other side of
+    // it is the caller's: which layers write this, and the offer to add one
+    // -- neither of which this library knows anything about.
+    typedef boost::signals2::signal<void(const std::string&)> gutter_signal_t;
+    boost::signals2::connection onFieldGutter(const gutter_signal_t::slot_type& cb)
+    {
+        return mFieldGutter.connect(cb);
+    }
+
     // Only the fields the file writes, which is the short list an author
     // works in; off shows every field the tag answers to.
     void setAuthoredOnly(bool only);
@@ -178,6 +191,9 @@ protected:
     ~ALPropertyGrid() override;
 
 private:
+    // The mark in the gutter beside a row.
+    class Mark;
+
     // The panel a section's rows live in. It stacks them from its own top
     // every time it is reshaped, because an accordion tab sizes the view it
     // holds to the tab and not to the view: a row placed at an absolute
@@ -233,12 +249,9 @@ private:
     std::string                 mNoMatch;
     commit_signal_t             mFieldCommit;
     remove_signal_t             mFieldRemove;
+    gutter_signal_t             mFieldGutter;
     S32                         mRowHeight;
     S32                         mLabelWidth;
-    S32                         mSourceWidth;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
-    // False where every row would say the same thing, which is a column
-    // of one repeated word.
-    bool                        mShowSource = true;
 };

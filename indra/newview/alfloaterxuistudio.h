@@ -349,6 +349,11 @@ private:
     void onFieldCommit(const std::string& name, const std::string& value);
     void onFieldRemove(const std::string& name);
 
+    // The gutter mark beside a row, clicked: the row is marked because more
+    // than one layer writes it, and the Source inspector is where every
+    // layer's own words about the element already are.
+    void onFieldGutter(const std::string& name);
+
     // --- the shape of the file -----------------------------------------------
     // Order among siblings, reparenting and removal, and the palette of
     // what may go under the selection.

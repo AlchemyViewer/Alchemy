@@ -67,6 +67,9 @@ namespace
     // A row that carries a picture rather than a value is as tall as the
     // picture, and its label sits in the ordinary row at the top of it.
     constexpr S32 PICTURE_HEIGHT = 84;
+    // The gutter mark, in the margin the labels already leave.
+    constexpr S32 MARK_WIDTH = 3;
+    constexpr S32 MARK_INSET = 2;
 
     // A number written the way a file writes one, which is not the way a
     // spinner holds it: three point zero is 3, and a value that carries a
@@ -121,6 +124,32 @@ namespace
     }
 }
 
+// The strip beside a label that says this value is written somewhere else
+// as well. It lives in the margin the labels already leave, so marking a row
+// costs the columns nothing; it is drawn rather than imaged because it is
+// one rectangle; and it takes a click, because seeing where else is the
+// point of noticing it.
+class ALPropertyGrid::Mark final : public LLUICtrl
+{
+public:
+    AL_VIEW_TYPE(Mark, LLUICtrl);
+
+    explicit Mark(const LLUICtrl::Params& p) : LLUICtrl(p) {}
+
+    void draw() override
+    {
+        static const LLUIColor ink = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+        gl_rect_2d(getLocalRect(), ink.get(), true);
+        LLUICtrl::draw();
+    }
+
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override
+    {
+        onCommit();
+        return true;
+    }
+};
+
 // Every row is a panel of its own, and this stacks them from its top: one
 // row height each, full width, in the order they were added. Whatever the
 // accordion decides this panel's height is, the rows begin at the top of it.
@@ -161,16 +190,14 @@ public:
 
 ALPropertyGrid::Params::Params()
 :   row_height("row_height", 22),
-    label_width("label_width", 150),
-    source_width("source_width", 90)
+    label_width("label_width", 150)
 {
 }
 
 ALPropertyGrid::ALPropertyGrid(const Params& p)
 :   LLPanel(p),
     mRowHeight(p.row_height),
-    mLabelWidth(p.label_width),
-    mSourceWidth(p.source_width)
+    mLabelWidth(p.label_width)
 {
     LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
     ap.name = "sections";
@@ -248,18 +275,6 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
         }
         return a.name < b.name;
     });
-
-    // A column that says the same word on every row is a column of one
-    // repeated word, so it is only drawn where the rows disagree.
-    mShowSource = false;
-    for (const Field& field : mFields)
-    {
-        if (!field.source.empty() && field.source != mFields.front().source)
-        {
-            mShowSource = true;
-            break;
-        }
-    }
 
     // A section the file writes nothing in is every field the tag will take
     // and none that anyone chose, which is a page of grey to scroll past to
@@ -404,11 +419,10 @@ S32 ALPropertyGrid::editorLeft() const
 
 S32 ALPropertyGrid::editorWidth(S32 width) const
 {
-    // The right column ends where the source column starts, and short of the
-    // way back where a row has one. Every row leaves the room whether it has
-    // the button or not, so the editors down the pane keep one right edge.
-    const S32 right = width - MARGIN - REMOVE_WIDTH - GUTTER
-                    - (mShowSource ? mSourceWidth + GUTTER : 0);
+    // The right column ends short of the way back, where a row has one.
+    // Every row leaves the room whether it has the button or not, so the
+    // editors down the pane keep one right edge.
+    const S32 right = width - MARGIN - REMOVE_WIDTH - GUTTER;
     return llmax(60, right - editorLeft());
 }
 
@@ -722,10 +736,15 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         p.name = field.name + "_label";
         p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
         p.initial_value = partner ? field.name + ", " + partner->name : field.name;
-        p.tool_tip = field.ignored ? field.name + " is read off every widget and thrown away"
-                   : field.unknown ? field.name + " is written here and declared by nothing"
-                   : field.type.empty() ? field.name
-                                        : field.name + " : " + field.type;
+        // Which layer wrote what is in force was a column of its own,
+        // saying the same word on almost every row. It is on the row's own
+        // tool tip now, and the rows that disagree are the marked ones.
+        const std::string says =
+            field.ignored ? field.name + " is read off every widget and thrown away"
+          : field.unknown ? field.name + " is written here and declared by nothing"
+          : field.type.empty() ? field.name
+                               : field.name + " : " + field.type;
+        p.tool_tip = field.source.empty() ? says : says + "  [" + field.source + "]";
         p.font_valign = LLFontGL::VCENTER;
         p.text_color = (field.authored && !field.ignored) ? written : unwritten;
         p.use_ellipses = true;
@@ -770,19 +789,25 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         row->addChild(remove);
     }
 
-    if (mShowSource)
+    // The gutter: a value some other skin or language disagrees about, said
+    // once beside the row rather than as a column repeating the same word
+    // all the way down the pane.
+    if (!field.alsoWritten.empty())
     {
-        LLTextBox::Params p;
-        p.name = field.name + "_source";
-        p.rect = LLRect(width - MARGIN - REMOVE_WIDTH - GUTTER - mSourceWidth, top - 2,
-                        width - MARGIN - REMOVE_WIDTH - GUTTER, bottom);
-        p.initial_value = field.source;
-        p.tool_tip = field.source;
-        p.font_valign = LLFontGL::VCENTER;
-        p.font_halign = LLFontGL::RIGHT;
-        p.text_color = unwritten;
-        p.use_ellipses = true;
-        p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
-        row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
+        LLUICtrl::Params p;
+        p.name = field.name + "_gutter";
+        p.rect = LLRect(MARK_INSET, top - 4, MARK_INSET + MARK_WIDTH, bottom + 4);
+        p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        std::string says;
+        for (const std::string& line : field.alsoWritten)
+        {
+            says += says.empty() ? line : "\n" + line;
+        }
+        p.tool_tip = says;
+        Mark* mark = new Mark(p);
+        mark->initFromParams(p);
+        const std::string marked = field.name;
+        mark->setCommitCallback([this, marked](LLUICtrl*, const LLSD&) { mFieldGutter(marked); });
+        row->addChild(mark);
     }
 }

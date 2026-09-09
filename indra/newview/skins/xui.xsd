@@ -49394,7 +49394,6 @@
     <xs:attribute name="shadow_light_color.green" type="al_real"/>
     <xs:attribute name="shadow_light_color.red" type="al_real"/>
     <xs:attribute name="sound_flags" type="xs:integer"/>
-    <xs:attribute name="source_width" type="xs:integer"/>
     <xs:attribute name="string.name" type="xs:string"/>
     <xs:attribute name="string.translate" type="xs:string"/>
     <xs:attribute name="string.value" type="xs:string"/>
