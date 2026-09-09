@@ -533,6 +533,16 @@ public:
                 return true;
             }
         }
+        // The way out of a selection, answered here rather than left to the
+        // window that owns it. A panel's own answer to escape is to give up
+        // the keyboard and say it handled it, and every view between the one
+        // holding the keyboard and this window is a panel -- so a canvas that
+        // passed escape on would be the last view ever to see it.
+        if (mTool && key == KEY_ESCAPE && mask == MASK_NONE && mTool->selection().hasSelection())
+        {
+            mTool->canvasDeselect();
+            return true;
+        }
         return LLPanel::handleKeyHere(key, mask);
     }
 
@@ -747,9 +757,15 @@ public:
         return LLPanel::handleToolTip(x, y, mask);
     }
 
+    // Whoever took the pointer is why this is being called, so by now it is
+    // theirs. The drag goes down without touching it: letting go of a
+    // pointer that is somebody else's takes it off them on the very click
+    // that gave it to them, and a title bar grabbed that way is held by
+    // nothing -- the window does not move, and does not until something
+    // clears the tangle by hiding a view.
     void onMouseCaptureLost() override
     {
-        endDrag();
+        dropDrag();
         LLPanel::onMouseCaptureLost();
     }
 
@@ -797,7 +813,7 @@ private:
     }
 
     // Nothing is being dragged, and nothing is left over saying it is.
-    void endDrag()
+    void dropDrag()
     {
         mLetGo = false;
         mGrip = GRIP_NONE;
@@ -806,6 +822,13 @@ private:
         {
             d = 0;
         }
+    }
+
+    // The drag over and the pointer let go with it, which is what the button
+    // coming up means.
+    void endDrag()
+    {
+        dropDrag();
         gFocusMgr.setMouseCapture(nullptr);
     }
 
@@ -2781,8 +2804,17 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
             floater->setVisible(true);
             const LLRect r = floater->getRect();
             fit(r.getWidth() + 2 * CANVAS_MARGIN, r.getHeight() + 2 * CANVAS_MARGIN);
-            floater->setOrigin(CANVAS_MARGIN,
-                               canvas->surfaceHeight() - r.getHeight() - CANVAS_MARGIN);
+            // At the corner the first time, and where the last one was left
+            // every time after: an edit rebuilds what is on the canvas, and
+            // a preview that went back to the corner on every field written
+            // would be a window nobody could work on and move.
+            S32 left = CANVAS_MARGIN;
+            S32 down = CANVAS_MARGIN;
+            if (mKeepPlace)
+            {
+                canvas->keptPlace(left, down);
+            }
+            floater->setOrigin(left, canvas->surfaceHeight() - r.getHeight() - down);
             root = floater;
         }
         else
@@ -3577,8 +3609,10 @@ std::string ALFloaterXUIStudio::realFloaterName(const ALXUICatalog::Entry& entry
 LLFloater* ALFloaterXUIStudio::buildRealFloater(S32 which, const ALXUICatalog::Entry& entry,
                                                 const std::string& name, LLXMLNodePtr& node)
 {
-    // The layers as the tool reads them, for the source map and the record
-    // of which layer wrote what. The floater merges them again for itself.
+    // The layers as the tool reads them, which is also what the floater is
+    // built from: sending it to the file for a second read of its own would
+    // build the version on the disk, and what is being worked on here has
+    // not been written to the disk yet.
     if (!ALXmlLayerMerge::loadSources(sourcesFor(entry.name), node, &mPreviews[which].overlay))
     {
         return nullptr;
@@ -3590,7 +3624,7 @@ LLFloater* ALFloaterXUIStudio::buildRealFloater(S32 which, const ALXUICatalog::E
     {
         return nullptr;
     }
-    if (!floater->buildFromFile(data->mFile))
+    if (!floater->buildFromXML(node, data->mFile))
     {
         floater->closeFloater();
         return nullptr;
