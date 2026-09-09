@@ -124,7 +124,7 @@
               visible="true"
               tool_tip="Orbit camera around focus"
               top="3"
-              width="78" /> 
+              width="78" />
            <button
               follows="top|left"
               height="18"
@@ -154,7 +154,7 @@
                 function="Camera.roll_right" />
              <mouse_held_callback
                 function="Camera.roll_right" />
-           </button>                     
+           </button>
            <button
               follows="top|left"
               height="18"
@@ -179,7 +179,7 @@
               tool_tip="Zoom camera toward focus"
               top_pad="0"
               min_val="0"
-              max_val="1" 
+              max_val="1"
               width="18">
              <commit_callback function="Slider.value_changed"/>
            </slider_bar>
@@ -255,7 +255,6 @@
       left_pad="4">
       <panel_camera_item.mousedown_callback
         function="CameraPresets.ChangeView"
-        tool_tip="Rear View"
         parameter="Rear View" />
       <panel_camera_item.picture
         image_name="Cam_Preset_Back_Off" />
@@ -306,13 +305,13 @@
       </combo_box>
       <button
         height="18"
-        width="18"  
+        width="18"
         layout="topleft"
         mouse_opaque="true"
         name="gear_btn"
         tool_tip="My Camera Presets"
         top_delta="2"
-        left_pad="5" 
+        left_pad="5"
         image_overlay="Icon_Gear">
         <button.commit_callback
         function="CameraPresets.ShowPresetsList"/>
@@ -331,13 +330,13 @@
       </button>
       <button
         height="18"
-        width="18"  
+        width="18"
         layout="topleft"
         mouse_opaque="true"
         name="precise_controls_btn"
         tool_tip="Use precise controls"
         top_delta="2"
-        left_pad="5" 
+        left_pad="5"
         image_overlay="PanOrbit_Off">
         <button.commit_callback
         function="Floater.Toggle"
