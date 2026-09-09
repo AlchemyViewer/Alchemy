@@ -297,6 +297,13 @@ private:
     // --- the tree pane -------------------------------------------------------
     void rebuildTree();
     void clearTree();
+
+    // What every row says about itself, said again. A row's badge counts the
+    // findings on it and on everything under it, so one element gaining or
+    // losing one moves the badge on every row above it as well: a lint run
+    // is a new answer for all of them at once, and a row holds the answer it
+    // was last given.
+    void refreshTreeSuffixes();
     LLFolderViewItem* createRow(ALXUITreeItem* item, LLFolderViewFolder* parent_widget);
     void createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget);
     void onTreeFilter();

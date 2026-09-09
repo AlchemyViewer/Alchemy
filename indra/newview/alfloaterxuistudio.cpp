@@ -2012,6 +2012,7 @@ void ALFloaterXUIStudio::draw()
     {
         mRereadPending = false;
         runLint();
+        refreshTreeSuffixes();
         fillFindings();
         fillTranslation();
     }
@@ -4202,6 +4203,17 @@ void ALFloaterXUIStudio::clearTree()
     {
         mTreePanel->deleteAllChildren();
         mTree = nullptr;
+    }
+}
+
+void ALFloaterXUIStudio::refreshTreeSuffixes()
+{
+    for (const auto& [path, widget] : mRows)
+    {
+        if (widget)
+        {
+            widget->refreshSuffix();
+        }
     }
 }
 
