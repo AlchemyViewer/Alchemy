@@ -105,6 +105,10 @@ public:
     bool            isAtTop() const { return mScrollbar[VERTICAL]->isAtBeginning(); }
     bool            isAtBottom() const { return mScrollbar[VERTICAL]->isAtEnd(); }
     S32             getDocPosVertical() const { return mScrollbar[VERTICAL]->getDocPos(); }
+    // Put back where it was scrolled to, for a caller that took the document
+    // away and built it again. Clamped to what there is to scroll now, which
+    // is not always what there was to scroll then.
+    void            setDocPosVertical(S32 pos) { mScrollbar[VERTICAL]->setDocPos(pos); }
     S32             getDocPosHorizontal() const { return mScrollbar[HORIZONTAL]->getDocPos(); }
     S32             getBorderWidth() const;
 
