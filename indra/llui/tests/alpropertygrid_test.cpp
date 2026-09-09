@@ -28,6 +28,7 @@
 
 #include "../llaccordionctrl.h"
 #include "../llaccordionctrltab.h"
+#include "../llspinctrl.h"
 #include "../lltextbox.h"
 #include "../lluictrlfactory.h"
 
@@ -416,6 +417,45 @@ namespace tut
         ensure("and it names no layer: " + quiet, quiet.find("written in") == std::string::npos);
         ensure("nor is there anything to take out",
                unwritten->findChild<LLView>("height_remove", true) == nullptr);
+        grid->die();
+    }
+
+    // A number is stepped by its arrows, by the wheel over it and by a scrub
+    // along it, and all three take the same step. A field carrying no
+    // decimals rounds whatever the step leaves it at, so a step of less than
+    // one lands back on the number it started from: the arrows write what is
+    // already there and only the keyboard can change anything.
+    template<> template<>
+    void alpropertygrid_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("width", 0));
+        fields.back().kind = ALParamType::INTEGER;
+        fields.back().value = "744";
+        fields.push_back(field("alpha", 0));
+        fields.back().kind = ALParamType::REAL;
+        fields.back().value = "0.5";
+        grid->setFields(fields);
+
+        LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
+        LLSpinCtrl* whole = rows->getChild<LLPanel>("width_row", true)
+                                ->getChild<LLSpinCtrl>("width", true);
+        ensure("a whole number steps by a whole number: "
+                   + std::to_string(whole->getIncrement()),
+               whole->getIncrement() >= 1.f);
+
+        LLSpinCtrl* real = rows->getChild<LLPanel>("alpha_row", true)
+                               ->getChild<LLSpinCtrl>("alpha", true);
+        ensure("and one with decimals steps by less: " + std::to_string(real->getIncrement()),
+               real->getIncrement() > 0.f && real->getIncrement() < 1.f);
         grid->die();
     }
 }

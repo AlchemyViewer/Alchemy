@@ -668,6 +668,12 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         p.rect = LLRect(box.mLeft, box.mTop - 1, llmin(box.mRight, box.mLeft + NUMBER_WIDTH), box.mBottom + 1);
         p.label_width = 0;
         p.decimal_digits = whole ? 0 : 3;
+        // A whole number steps by one. The step is a tenth unless it is said
+        // otherwise, and a field carrying no decimals rounds a tenth straight
+        // back to the number it started at -- so every press of an arrow and
+        // every notch of the wheel wrote back the number that was there, and
+        // only the keyboard could change one.
+        p.increment = whole ? 1.f : 0.1f;
         p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
         p.max_value = 100000.f;
         p.initial_value = numberOf(field.value);
