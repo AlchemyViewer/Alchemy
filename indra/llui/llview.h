@@ -474,7 +474,11 @@ public:
     // Default behavior is to use reshape flags to resize child views
     virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
     virtual void    translate( S32 x, S32 y );
-    void            setOrigin( S32 x, S32 y )   { mRect.translate( x - mRect.mLeft, y - mRect.mBottom ); }
+    // Naming a corner is the same move as translating to it, so it is the
+    // same for everything that has to follow the rect: a view that keeps a
+    // bounding rect is hit against that rect, and one left behind by a move
+    // is a widget that cannot be clicked where it is drawn.
+    void            setOrigin( S32 x, S32 y )   { mRect.translate( x - mRect.mLeft, y - mRect.mBottom ); updateBoundingRect(); }
     bool            translateIntoRect( const LLRect& constraint, S32 min_overlap_pixels = S32_MAX);
     bool            translateRectIntoRect( const LLRect& rect, const LLRect& constraint, S32 min_overlap_pixels = S32_MAX);
     bool            translateIntoRectWithExclusion( const LLRect& inside, const LLRect& exclude, S32 min_overlap_pixels = S32_MAX);
