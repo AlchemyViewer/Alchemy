@@ -436,6 +436,17 @@ public:
         }
         if (selection.hasSelection())
         {
+            // The others in the selection, in a quieter red: they are what
+            // an alignment moves, and the one with the handles on it is
+            // what they are moved to.
+            static const LLColor4 also_color(1.f, 0.4f, 0.4f, 0.7f);
+            for (const ALXUISelection::path_t& path : selection.also())
+            {
+                if (LLView* other = ALXUISelection::resolve(mRoot, path))
+                {
+                    drawBox(other, also_color, false);
+                }
+            }
             if (LLView* view = ALXUISelection::resolve(mRoot, selection.selection()))
             {
                 drawBox(view, LLColor4::red, true);
@@ -530,6 +541,16 @@ public:
         if (mask & MASK_CONTROL)
         {
             LLView* view = hitTest(x, y);
+            // Shift adds to the selection rather than replacing it, and a
+            // second shift-click takes it out again. What is added is not
+            // dragged: a drag moves the one thing the handles are on, and
+            // the rest are there to be lined up with it.
+            if (mask & MASK_SHIFT)
+            {
+                mTool->canvasSelectAlso(mWhich, view);
+                setFocus(true);
+                return true;
+            }
             mTool->canvasSelect(mWhich, view);
             if (editable(view))
             {
@@ -1823,6 +1844,17 @@ bool ALFloaterXUIStudio::postBuild()
         mSnap = ctrl->getValue().asBoolean();
         saveState();
     });
+    for (const auto& [button, how] : {
+             std::pair<const char*, const char*>{ "align_left",   "left" },
+             { "align_centre", "centre" },
+             { "align_right",  "right" },
+             { "align_top",    "top" },
+             { "align_middle", "middle" },
+             { "align_bottom", "bottom" } })
+    {
+        getChild<LLButton>(button)->setClickedCallback(
+            [this, how = how](LLUICtrl*, const LLSD&) { alignSelection(how); });
+    }
     mGridCombo = getChild<LLComboBox>("canvas_grid");
     mGridCombo->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
     {
@@ -3680,6 +3712,15 @@ void ALFloaterXUIStudio::canvasSelect(S32 which, const LLView* view)
     }
 }
 
+void ALFloaterXUIStudio::canvasSelectAlso(S32 which, const LLView* view)
+{
+    ALXUISelection::path_t path;
+    if (view && ALXUISelection::pathOf(view, mPreviews[which].root, path))
+    {
+        mSelection.selectAlso(path);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The tree pane
 // ---------------------------------------------------------------------------
@@ -3823,7 +3864,20 @@ void ALFloaterXUIStudio::onTreeSelection(const std::deque<LLFolderViewItem*>& it
         return;
     }
     mSyncingTree = true;
+    // The outline can hold several rows at once, and the first of them is
+    // the one every pane is about. The rest come along as the others in the
+    // selection, which is the same thing a shift-click on the canvas makes.
     mSelection.select(item->getPath());
+    for (auto it = std::next(items.begin()); it != items.end(); ++it)
+    {
+        if (const LLFolderViewItem* row = *it)
+        {
+            if (const ALXUITreeItem* also = static_cast<const ALXUITreeItem*>(row->getViewModelItem()))
+            {
+                mSelection.selectAlso(also->getPath());
+            }
+        }
+    }
     mSyncingTree = false;
 }
 
@@ -5781,6 +5835,94 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     // floater it would take down.
     documentChanged(getString(said, args));
     return true;
+}
+
+// Line the selection up with the one the handles are on. Everything else in
+// the selection moves; the anchor does not, which is what makes it the
+// anchor. Screen rects are compared, because two elements being lined up
+// need not share a parent, and a translation is the same number in either
+// space.
+void ALFloaterXUIStudio::alignSelection(const std::string& how)
+{
+    if (mSelection.selectedCount() < 2)
+    {
+        setStatus(getString("AlignNeedsTwo"));
+        return;
+    }
+    LLView* anchor = selectedView();
+    if (!anchor)
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return;
+    }
+
+    const LLRect a = anchor->calcScreenRect();
+    LLView* root = mPreviews[PRIMARY].root;
+    S32 moved = 0;
+    for (const ALXUISelection::path_t& path : mSelection.also())
+    {
+        LLView* view = ALXUISelection::resolve(root, path);
+        if (!view || !view->getParent() || view == root)
+        {
+            continue;
+        }
+        // A layout stack places its own children: a move written for one of
+        // them is a number the stack overrules on its next pass.
+        if (stackAxisOf(view) >= 0)
+        {
+            continue;
+        }
+        const LLRect r = view->calcScreenRect();
+        S32 dx = 0;
+        S32 dy = 0;
+        if (how == "left")          { dx = a.mLeft - r.mLeft; }
+        else if (how == "right")    { dx = a.mRight - r.mRight; }
+        else if (how == "centre")   { dx = (a.mLeft + a.mRight) / 2 - (r.mLeft + r.mRight) / 2; }
+        else if (how == "top")      { dy = a.mTop - r.mTop; }
+        else if (how == "bottom")   { dy = a.mBottom - r.mBottom; }
+        else if (how == "middle")   { dy = (a.mTop + a.mBottom) / 2 - (r.mTop + r.mBottom) / 2; }
+        if (!dx && !dy)
+        {
+            continue;
+        }
+
+        const LLRect& rect = view->getRect();
+        ALXUIEdit::Anchor now;
+        now.left = rect.mLeft;
+        now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+        now.bottom = rect.mBottom;
+        now.width = rect.getWidth();
+        now.height = rect.getHeight();
+        now.topLeft = view->isLayoutTopLeft();
+        if (!held->translate(path, dx, dy, now))
+        {
+            setStatus(held->error());
+            return;
+        }
+        ++moved;
+    }
+
+    if (!moved)
+    {
+        setStatus(getString("AlignNothingToDo"));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(moved);
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    documentChanged(getString("EditAligned", args));
 }
 
 // One step of the document's own stack, which is one operation as it was

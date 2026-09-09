@@ -32,6 +32,9 @@
     <floater.string name="EditNoTarget">Select an element to move it.</floater.string>
     <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
     <floater.string name="EditWrote">Wrote [ATTRS] to [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditAligned">Lined [COUNT] up in [FILE] in [LAYER]</floater.string>
+    <floater.string name="AlignNeedsTwo">Select more than one element: shift-control-click on the canvas, or hold shift in the outline. The one the handles are on is the one the rest line up with.</floater.string>
+    <floater.string name="AlignNothingToDo">Nothing to move: what is selected is already lined up, or a stack places it.</floater.string>
     <floater.string name="EditTookOut">Took [ATTRS] out of [FILE] in [LAYER]; whatever was in force before it is in force again</floater.string>
     <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
     <floater.string name="EditRootMoved">Moved the preview on its canvas. Where it sits here is not in the file, so nothing was written.</floater.string>
@@ -986,6 +989,66 @@
                  name="language_combo_2"
                  top_delta="-3"
                  width="56" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="L"
+                 layout="topleft"
+                 left_pad="16"
+                 name="align_left"
+                 tool_tip="Line the rest of the selection up with the left edge of the one the handles are on"
+                 top="2"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="C"
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_centre"
+                 tool_tip="Line the rest of the selection up with the middle of the one the handles are on, across"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="R"
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_right"
+                 tool_tip="Line the rest of the selection up with the right edge of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="T"
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_top"
+                 tool_tip="Line the rest of the selection up with the top of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="M"
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_middle"
+                 tool_tip="Line the rest of the selection up with the middle of the one the handles are on, down"
+                 top_delta="0"
+                 width="26" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="B"
+                 layout="topleft"
+                 left_pad="2"
+                 name="align_bottom"
+                 tool_tip="Line the rest of the selection up with the bottom of the one the handles are on"
+                 top_delta="0"
+                 width="26" />
             </layout_panel>
             </layout_stack>
             </layout_panel>

@@ -100,6 +100,7 @@ public:
     // click, a handle dragged, and its own closing.
     void canvasHover(S32 which, const LLView* view);
     void canvasSelect(S32 which, const LLView* view);
+    void canvasSelectAlso(S32 which, const LLView* view);
     void canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt);
     void hostClosed(S32 which);
 
@@ -319,6 +320,8 @@ private:
     // A move or a resize of the selected element, as the movement of its
     // four edges, written into the layer that positions it.
     bool applyEdges(S32 dl, S32 db, S32 dr, S32 dt);
+    // Line every other selected element up with the one the handles are on.
+    void alignSelection(const std::string& how);
     const ALXUICatalog::Layer* editTarget() const;
     void refreshEditTarget();
 

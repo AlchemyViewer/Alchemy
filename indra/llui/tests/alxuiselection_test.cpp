@@ -164,4 +164,50 @@ namespace tut
         ensure_equals("hover cleared", hover_changes, 2);
         ensure("no hover", !selection.hasHover());
     }
+
+    // More than one thing selected, with one of them still the one every
+    // pane is about.
+    template<> template<>
+    void alxuiselection_object::test<3>()
+    {
+        ALXUISelection selection;
+        const ALXUISelection::path_t one = ALXUISelection::fromString("a");
+        const ALXUISelection::path_t two = ALXUISelection::fromString("b");
+        const ALXUISelection::path_t three = ALXUISelection::fromString("c");
+
+        selection.select(one);
+        ensure_equals("one thing", selection.selectedCount(), 1);
+        ensure("and it is the one", selection.isSelected(one));
+
+        selection.selectAlso(two);
+        ensure_equals("two things", selection.selectedCount(), 2);
+        ensure("both are selected", selection.isSelected(one) && selection.isSelected(two));
+        ensure_equals("the panes are still about the first",
+                      ALXUISelection::toString(selection.selection()), std::string("a"));
+
+        // The same one again takes it out: a shift-click is a switch.
+        selection.selectAlso(two);
+        ensure_equals("one thing again", selection.selectedCount(), 1);
+        ensure("and it is not that one", !selection.isSelected(two));
+
+        // The one the panes are about cannot take itself out; there would be
+        // nothing left for them to be about.
+        selection.selectAlso(one);
+        ensure_equals("still one thing", selection.selectedCount(), 1);
+        ensure("and still that one", selection.isSelected(one));
+
+        // Choosing one thing is choosing one thing.
+        selection.selectAlso(two);
+        selection.selectAlso(three);
+        ensure_equals("three things", selection.selectedCount(), 3);
+        selection.select(three);
+        ensure_equals("a plain choice replaces the lot", selection.selectedCount(), 1);
+        ensure("with the one chosen", selection.isSelected(three));
+        ensure("and nothing else", !selection.isSelected(one) && !selection.isSelected(two));
+
+        selection.selectAlso(one);
+        selection.clearSelection();
+        ensure_equals("cleared, there is nothing", selection.selectedCount(), 0);
+        ensure("not even the one", !selection.isSelected(three));
+    }
 }

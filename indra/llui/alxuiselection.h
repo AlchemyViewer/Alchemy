@@ -67,6 +67,20 @@ public:
     void select(const path_t& path);
     void clearSelection();
 
+    // What else is selected. The selection proper stays one path, because
+    // every pane that shows a thing shows one thing: the inspectors are
+    // about it, the breadcrumb names it, an edit writes to it. These are
+    // the others an alignment moves along with it, and nothing else reads
+    // them.
+    const std::vector<path_t>& also() const { return mAlso; }
+    bool isSelected(const path_t& path) const;
+    S32 selectedCount() const { return mHasSelection ? 1 + (S32)mAlso.size() : 0; }
+
+    // Adds the path to the selection, or takes it out again if it is
+    // already in it. Selecting the one the panes are about with this takes
+    // nothing away: there would be nothing left to be about.
+    void selectAlso(const path_t& path);
+
     bool hasHover() const { return mHasHover; }
     const path_t& hover() const { return mHover; }
     void setHover(const path_t& path);
@@ -82,8 +96,9 @@ public:
     }
 
 private:
-    path_t      mSelection;
-    path_t      mHover;
+    path_t                  mSelection;
+    std::vector<path_t>     mAlso;
+    path_t                  mHover;
     signal_t    mSelectionChanged;
     signal_t    mHoverChanged;
     bool        mHasSelection = false;

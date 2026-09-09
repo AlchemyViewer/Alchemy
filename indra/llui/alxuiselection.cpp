@@ -158,13 +158,50 @@ ALXUISelection::path_t ALXUISelection::fromString(std::string_view text)
 
 void ALXUISelection::select(const path_t& path)
 {
-    if (mHasSelection && mSelection == path)
+    if (mHasSelection && mSelection == path && mAlso.empty())
     {
         return;
     }
+    // Choosing one thing is choosing one thing: whatever else was selected
+    // stops being.
     mSelection = path;
+    mAlso.clear();
     mHasSelection = true;
     mSelectionChanged();
+}
+
+void ALXUISelection::selectAlso(const path_t& path)
+{
+    if (!mHasSelection)
+    {
+        select(path);
+        return;
+    }
+    if (mSelection == path)
+    {
+        // The one the panes are about cannot be taken out of the selection
+        // by itself: there would be nothing left for them to be about.
+        return;
+    }
+    const auto at = std::find(mAlso.begin(), mAlso.end(), path);
+    if (at == mAlso.end())
+    {
+        mAlso.push_back(path);
+    }
+    else
+    {
+        mAlso.erase(at);
+    }
+    mSelectionChanged();
+}
+
+bool ALXUISelection::isSelected(const path_t& path) const
+{
+    if (!mHasSelection)
+    {
+        return false;
+    }
+    return mSelection == path || std::find(mAlso.begin(), mAlso.end(), path) != mAlso.end();
 }
 
 void ALXUISelection::clearSelection()
@@ -174,6 +211,7 @@ void ALXUISelection::clearSelection()
         return;
     }
     mSelection.clear();
+    mAlso.clear();
     mHasSelection = false;
     mSelectionChanged();
 }
