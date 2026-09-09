@@ -387,12 +387,21 @@ public:
     void setRoot(LLView* root)
     {
         mRoot = root;
-        if (root)
+        rememberRoot();
+    }
+
+    // The developer moved the preview on its surface. Where it sits there is
+    // not in the file and is remembered nowhere else, so it is remembered
+    // here -- without this the next change of size puts it back where it was
+    // built, which is a window resize away from wherever it was dragged to.
+    void rememberRoot()
+    {
+        if (mRoot)
         {
-            const LLView* parent = root->getParent();
-            mAnchorLeft = root->getRect().mLeft;
+            const LLView* parent = mRoot->getParent();
+            mAnchorLeft = mRoot->getRect().mLeft;
             mAnchorTop = (parent == this ? surfaceHeight() : parent->getRect().getHeight())
-                       - root->getRect().mTop;
+                       - mRoot->getRect().mTop;
         }
     }
 
@@ -6293,6 +6302,12 @@ void ALFloaterXUIStudio::canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt)
     if (pv.root && move_only && selectedView() == pv.root)
     {
         pv.root->translate(dl, db);
+        // The surface has to be told, or it puts the preview back where it
+        // was built the next time it changes size.
+        if (ALXUICanvas* canvas = canvasOf(pv))
+        {
+            canvas->rememberRoot();
+        }
         setStatus(getString("EditRootMoved"));
         return;
     }
