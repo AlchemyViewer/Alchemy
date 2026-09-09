@@ -128,6 +128,10 @@ public:
     // anchor the canvas draws outside that edge.
     void toggleFollows(S32 edge);
 
+    // A step along the zooms the canvas bar offers, for the wheel over the
+    // canvas: the two say the same thing about what the steps are.
+    void zoomBy(S32 steps);
+
     // --- the document under edit ---------------------------------------------
     // Edits go into a document the tool holds, and the preview is built
     // from it: the disk hears nothing until a save.
@@ -408,6 +412,8 @@ private:
     // remembered off: what it costs is the viewer's own crashes.
     bool                mRealFloater = false;
     S32                 mGrid = 4;
+    // How much bigger than life the canvas draws, as a percentage.
+    S32                 mZoom = 100;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;
     bool                mReloadEntryOnly = false;   // one file changed, not the tree
@@ -469,6 +475,7 @@ private:
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
     LLComboBox*         mGridCombo = nullptr;
+    LLComboBox*         mZoomCombo = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
     LLTextBox*          mCanvasTitle = nullptr;
     LLButton*           mCanvasShown = nullptr;

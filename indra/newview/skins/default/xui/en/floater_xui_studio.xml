@@ -933,13 +933,28 @@
                  tool_tip="Read the catalog and the file again from disk"
                  top_delta="0"
                  width="58" />
+                <combo_box
+                 follows="left|top"
+                 height="22"
+                 layout="topleft"
+                 left_pad="16"
+                 name="canvas_zoom"
+                 tool_tip="How much bigger than life the preview is drawn; the numbers in it stay the file's own. Control and the wheel over the canvas does the same."
+                 top="2"
+                 width="60">
+                    <combo_box.item label="50%" name="zoom_50" value="50" />
+                    <combo_box.item label="100%" name="zoom_100" value="100" />
+                    <combo_box.item label="150%" name="zoom_150" value="150" />
+                    <combo_box.item label="200%" name="zoom_200" value="200" />
+                    <combo_box.item label="400%" name="zoom_400" value="400" />
+                </combo_box>
                 <button
                  follows="left|top"
                  height="22"
                  is_toggle="true"
                  label="Rulers"
                  layout="topleft"
-                 left_pad="16"
+                 left_pad="8"
                  name="canvas_rulers"
                  tool_tip="A rule along the top and the left of the canvas, numbered in the file's own coordinates"
                  top_delta="0"
@@ -994,7 +1009,7 @@
                  height="22"
                  label="L"
                  layout="topleft"
-                 left_pad="16"
+                 left_pad="8"
                  name="align_left"
                  tool_tip="Line the rest of the selection up with the left edge of the one the handles are on"
                  top="2"

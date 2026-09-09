@@ -393,12 +393,42 @@ public:
         mContentHeight = llmax(height, 40);
         if (mSizable)
         {
-            reshape(llmax(mContentWidth, mLeastWidth), llmax(mContentHeight, mLeastHeight));
+            // The surface is as big as the content is drawn, so a zoomed
+            // preview scrolls by what it takes up rather than by what it
+            // measures.
+            reshape(llmax(ll_round((F32)mContentWidth * mZoom), mLeastWidth),
+                    llmax(ll_round((F32)mContentHeight * mZoom), mLeastHeight));
         }
     }
 
     S32 contentWidth() const { return mContentWidth; }
     S32 contentHeight() const { return mContentHeight; }
+
+    // How much bigger than life the preview is drawn. The content keeps the
+    // numbers the file gives it: what changes is the transform it is drawn
+    // through, and the surface it needs, and what a pointer at a place means.
+    F32 zoom() const { return mZoom; }
+    void setZoom(F32 zoom)
+    {
+        zoom = llclamp(zoom, 0.25f, 4.f);
+        if (mZoom != zoom)
+        {
+            mZoom = zoom;
+            fitContent(mContentWidth, mContentHeight);
+        }
+    }
+
+    // The pointer in the coordinates the preview is laid out in. Everything
+    // that finds, measures or moves an element works in those: only the
+    // drawing and the mouse know about the zoom.
+    void toContent(S32& x, S32& y) const
+    {
+        if (mZoom != 1.f)
+        {
+            x = ll_round((F32)x / mZoom);
+            y = ll_round((F32)y / mZoom);
+        }
+    }
 
     // Everything on the canvas goes, and the canvas forgets what it held.
     void clear()
@@ -408,6 +438,30 @@ public:
     }
 
     void draw() override
+    {
+        const bool zoomed = mZoom != 1.f;
+        if (zoomed)
+        {
+            LLRender2D::pushMatrix();
+            LLRender2D::scale(mZoom, mZoom);
+        }
+        drawContent();
+        if (zoomed)
+        {
+            LLRender2D::popMatrix();
+        }
+        // A rule is the canvas's own chrome: it stays its own size at the
+        // edges of what can be seen, and it is the numbers on it that follow
+        // the preview.
+        if (mTool && mRoot && mTool->showRulers())
+        {
+            drawRulers();
+        }
+    }
+
+    // Everything that lives in the preview's own coordinates: the preview,
+    // and every mark drawn over it.
+    void drawContent()
     {
         LLPanel::draw();
         if (!mTool || !mRoot)
@@ -420,10 +474,6 @@ public:
         if (mTool->snapToGrid() && grabbed())
         {
             drawGrid();
-        }
-        if (mTool->showRulers())
-        {
-            drawRulers();
         }
         const ALXUISelection& selection = mTool->selection();
         if (selection.hasHover() && mTool->hoverHighlight())
@@ -513,6 +563,7 @@ public:
     // selected.
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
+        toContent(x, y);
         if (!mTool || !mRoot)
         {
             return LLPanel::handleMouseDown(x, y, mask);
@@ -564,6 +615,7 @@ public:
 
     bool handleHover(S32 x, S32 y, MASK mask) override
     {
+        toContent(x, y);
         if (grabbed())
         {
             track(x, y);
@@ -590,8 +642,27 @@ public:
 
     // A panel that names a file of its own is one element here and a
     // document elsewhere; opening it is what a double click on it means.
+    // Control and the wheel zooms, which is what it does in every other
+    // canvas anybody has used. Without control the wheel belongs to whatever
+    // is under it -- a list in the preview scrolls -- and to the container
+    // when nothing wants it.
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override
+    {
+        // A wheel event carries no modifiers of its own, so the keyboard is
+        // asked what is held.
+        const MASK held = gKeyboard ? gKeyboard->currentMask(false) : MASK_NONE;
+        if ((held & MASK_CONTROL) && mTool && delta.mClicks != 0)
+        {
+            mTool->zoomBy(delta.mClicks > 0 ? -1 : 1);
+            return true;
+        }
+        toContent(x, y);
+        return LLPanel::handleScrollWheel(x, y, delta);
+    }
+
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override
     {
+        toContent(x, y);
         if (mTool && mRoot && (mask & MASK_CONTROL))
         {
             LLView* view = hitTest(x, y);
@@ -608,6 +679,7 @@ public:
 
     bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
+        toContent(x, y);
         if (grabbed())
         {
             track(x, y);
@@ -1082,9 +1154,14 @@ private:
         const S32 grid = llmax(mTool->gridSize(), 2);
         const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
 
-        for (S32 fx = from(rule_right - origin.mLeft, grid); origin.mLeft + fx <= view.mRight; fx += grid)
+        // The rule is drawn on the canvas and numbered in the file: a mark
+        // for content coordinate n goes at n times the zoom.
+        const auto onCanvas = [this](S32 content) { return ll_round((F32)content * mZoom); };
+
+        for (S32 fx = from(ll_round((F32)rule_right / mZoom) - origin.mLeft, grid);
+             onCanvas(origin.mLeft + fx) <= view.mRight; fx += grid)
         {
-            const S32 x = origin.mLeft + fx;
+            const S32 x = onCanvas(origin.mLeft + fx);
             const bool named = fx % LABEL_EVERY == 0;
             gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), ink.get());
             if (named)
@@ -1093,9 +1170,10 @@ private:
                                  ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
-        for (S32 fy = from(origin.mTop - rule_bottom, grid); origin.mTop - fy >= view.mBottom; fy += grid)
+        for (S32 fy = from(origin.mTop - ll_round((F32)rule_bottom / mZoom), grid);
+             onCanvas(origin.mTop - fy) >= view.mBottom; fy += grid)
         {
-            const S32 y = origin.mTop - fy;
+            const S32 y = onCanvas(origin.mTop - fy);
             const bool named = fy % LABEL_EVERY == 0;
             gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, ink.get());
             if (named)
@@ -1108,7 +1186,9 @@ private:
         // Where the selection sits, on both rules.
         if (LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
         {
-            const LLRect box = localRectOf(selected);
+            const LLRect content = localRectOf(selected);
+            const LLRect box(onCanvas(content.mLeft), onCanvas(content.mTop),
+                             onCanvas(content.mRight), onCanvas(content.mBottom));
             gl_rect_2d(LLRect(llmax(box.mLeft, rule_right), view.mTop, llmin(box.mRight, view.mRight), rule_bottom),
                        LLColor4::red, false);
             gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
@@ -1194,6 +1274,7 @@ private:
     S32                 mContentHeight = 0;
     S32                 mLeastWidth = 0;
     S32                 mLeastHeight = 0;
+    F32                 mZoom = 1.f;
 
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
     S32                 mDragX = 0;
@@ -1855,6 +1936,20 @@ bool ALFloaterXUIStudio::postBuild()
         getChild<LLButton>(button)->setClickedCallback(
             [this, how = how](LLUICtrl*, const LLSD&) { alignSelection(how); });
     }
+    mZoomCombo = getChild<LLComboBox>("canvas_zoom");
+    mZoomCombo->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mZoom = llmax(10, ctrl->getValue().asInteger());
+        for (ALXUICanvas* canvas : mCanvases)
+        {
+            if (canvas)
+            {
+                canvas->setZoom((F32)mZoom / 100.f);
+            }
+        }
+        layoutCanvases();
+        saveState();
+    });
     mGridCombo = getChild<LLComboBox>("canvas_grid");
     mGridCombo->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
     {
@@ -1874,6 +1969,14 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("canvas_rulers")->setToggleState(mRulers);
     getChild<LLButton>("canvas_snap")->setToggleState(mSnap);
     mGridCombo->setValue(mGrid);
+    mZoomCombo->setValue(mZoom);
+    for (ALXUICanvas* canvas : mCanvases)
+    {
+        if (canvas)
+        {
+            canvas->setZoom((F32)mZoom / 100.f);
+        }
+    }
 
     mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
     mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
@@ -2339,6 +2442,25 @@ bool ALFloaterXUIStudio::paneCollapsed(std::string_view name) const
 {
     const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
     return panel && panel->isCollapsed();
+}
+
+// One step along the list of zooms the bar offers, so the wheel and the list
+// cannot disagree about what the steps are.
+void ALFloaterXUIStudio::zoomBy(S32 steps)
+{
+    if (!mZoomCombo || steps == 0)
+    {
+        return;
+    }
+    const S32 count = mZoomCombo->getItemCount();
+    S32 at = mZoomCombo->getCurrentIndex();
+    if (at < 0)
+    {
+        at = 0;
+    }
+    at = llclamp(at + steps, 0, count - 1);
+    mZoomCombo->setCurrentByIndex(at);
+    mZoomCombo->onCommit();
 }
 
 void ALFloaterXUIStudio::layoutCanvases()
@@ -7038,6 +7160,7 @@ void ALFloaterXUIStudio::saveState()
     state["rulers"] = mRulers;
     state["real_floater"] = mRealFloater;
     state["grid"] = mGrid;
+    state["zoom"] = mZoom;
     if (LLPanel* current = mInspectors ? mInspectors->getCurrentPanel() : nullptr)
     {
         state["tab"] = current->getName();
@@ -7090,6 +7213,10 @@ void ALFloaterXUIStudio::loadState()
     if (state.has("grid"))
     {
         mGrid = llmax(1, state["grid"].asInteger());
+    }
+    if (state.has("zoom"))
+    {
+        mZoom = llclamp(state["zoom"].asInteger(), 25, 400);
     }
     if (state.has("hover"))
     {
