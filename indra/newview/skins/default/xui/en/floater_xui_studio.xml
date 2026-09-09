@@ -78,6 +78,9 @@
     <floater.string name="AttributeNothingWritten">This element writes nothing. Take the switch off to see every field the tag answers to.</floater.string>
     <floater.string name="AttributeNoMatch">No field of that name.</floater.string>
     <floater.string name="AttributeAlsoWritten">[ATTR] is written over in   [LAYERS]</floater.string>
+    <floater.string name="PaneNavigator">XUI Studio: Navigator</floater.string>
+    <floater.string name="PaneBottom">XUI Studio: Findings and Tables</floater.string>
+    <floater.string name="PaneInspectors">XUI Studio: Inspectors</floater.string>
     <floater.string name="AttributeTipField">[NAME]</floater.string>
     <floater.string name="AttributeTipTyped">[NAME] : [TYPE]</floater.string>
     <floater.string name="AttributeTipSource">Written in [SOURCE].</floater.string>
@@ -235,6 +238,28 @@
              shortcut="control|shift|B">
                 <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_bottom" />
                 <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_bottom" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Navigator in a Window of its Own"
+             layout="topleft"
+             name="out_navigator">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_navigator" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_navigator" />
+            </menu_item_check>
+            <menu_item_check
+             label="Inspectors in a Window of their Own"
+             layout="topleft"
+             name="out_inspectors">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_inspectors" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_inspectors" />
+            </menu_item_check>
+            <menu_item_check
+             label="Findings and Tables in a Window of their Own"
+             layout="topleft"
+             name="out_bottom">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="out_bottom" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="out_bottom" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_check

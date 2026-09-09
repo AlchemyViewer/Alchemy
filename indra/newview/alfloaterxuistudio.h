@@ -49,6 +49,7 @@
 
 class ALXUILiveFile;
 class ALPropertyGrid;
+class ALDockPanel;
 class ALXUICanvas;
 class ALCanvasRow;
 class ALXUIPreviewHost;
@@ -253,6 +254,13 @@ private:
     // A region the developer is not using, folded away and brought back with
     // everything it held.
     void togglePane(std::string_view name);
+
+    // A region in a window of its own, and back. The canvas is not one of
+    // these: it holds a built view tree with hit-testing of its own.
+    ALDockPanel* paneOf(std::string_view name) const;
+    bool paneOut(std::string_view name) const;
+    void togglePaneOut(std::string_view name);
+    void dockPanes();
     void setPaneCollapsed(std::string_view name, bool collapsed);
     bool paneCollapsed(std::string_view name) const;
     void refreshPaneButtons();
@@ -444,6 +452,7 @@ private:
     // developer has asked for the preview in a window of its own.
     LLScrollContainer*  mCanvasArea = nullptr;
     ALCanvasRow*        mCanvasRow = nullptr;
+    std::vector<ALDockPanel*> mPanes;
     ALXUICanvas*        mCanvases[PREVIEWS] = {};
     bool                mFloatPreview = false;
     // The pill above the canvas. Hidden, the region is given over to the

@@ -60,6 +60,7 @@
 #include "llrender2dutils.h"
 #include "llaccordionctrltab.h"
 #include "alcanvasview.h"
+#include "aldockpanel.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
 #include "llspinctrl.h"
@@ -1295,6 +1296,16 @@ namespace
         { "fold_inspectors", "inspector_panel" },
     };
 
+    // The regions that can be taken out into a window of their own, and the
+    // string each window is titled from. The canvas is not among them: it
+    // holds a built view tree with hit-testing of its own, and one mechanism
+    // must not serve both.
+    constexpr std::pair<const char*, const char*> POP_PANES[] = {
+        { "navigator_panel",  "PaneNavigator" },
+        { "bottom_panel",     "PaneBottom" },
+        { "inspector_panel",  "PaneInspectors" },
+    };
+
     constexpr S32 MAX_FIND_ROWS = 500;
 
     std::string firstToken(const std::string& path)
@@ -1721,6 +1732,19 @@ bool ALFloaterXUIStudio::postBuild()
     mCanvasShown->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasShown, this));
     mCanvasPinned->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasPinned, this));
 
+    // Each region put into a pane that knows it can be somewhere else. Done
+    // here rather than in the file so the file keeps naming what it lays
+    // out; the tree gains a level and every name in it is where it was.
+    // Nothing in this window asks for anything inside a region by name after
+    // this point, which is the whole of why a region may leave.
+    for (const auto& [region, title] : POP_PANES)
+    {
+        if (LLLayoutPanel* panel = findChild<LLLayoutPanel>(region, true))
+        {
+            mPanes.push_back(ALDockPanel::wrap(panel, getString(title)));
+        }
+    }
+
     loadState();
     scanCatalog();
 
@@ -1845,6 +1869,9 @@ bool ALFloaterXUIStudio::postBuild()
 void ALFloaterXUIStudio::onClose(bool app_quitting)
 {
     saveState();
+    // Before anything else: a pane left in a window this one does not own is
+    // destroyed along with it.
+    dockPanes();
     closePreviews();
 }
 
@@ -2263,6 +2290,61 @@ void ALFloaterXUIStudio::togglePane(std::string_view name)
     setPaneCollapsed(name, !paneCollapsed(name));
     refreshPaneButtons();
     saveState();
+}
+
+// A region in a window of its own. The pane is moved, not copied, so
+// everything the tool holds a pointer to goes on working -- and nothing in
+// this window asks for anything inside a region by name after it is built,
+// which is what makes that safe.
+// Held rather than searched for: a search from this window would stop
+// finding a region the moment it left, which is the one time anybody asks.
+ALDockPanel* ALFloaterXUIStudio::paneOf(std::string_view name) const
+{
+    const std::string want = std::string(name) + "_pane";
+    for (ALDockPanel* pane : mPanes)
+    {
+        if (pane && pane->getName() == want)
+        {
+            return pane;
+        }
+    }
+    return nullptr;
+}
+
+bool ALFloaterXUIStudio::paneOut(std::string_view name) const
+{
+    const ALDockPanel* pane = paneOf(name);
+    return pane && pane->poppedOut();
+}
+
+void ALFloaterXUIStudio::togglePaneOut(std::string_view name)
+{
+    if (ALDockPanel* pane = paneOf(name))
+    {
+        if (pane->poppedOut())
+        {
+            pane->dock();
+        }
+        else
+        {
+            pane->popOut();
+        }
+        refreshPaneButtons();
+        saveState();
+    }
+}
+
+// Every region that is out, put back. Called before this window closes:
+// a pane left in a window the tool does not own is destroyed with it.
+void ALFloaterXUIStudio::dockPanes()
+{
+    for (ALDockPanel* pane : mPanes)
+    {
+        if (pane && pane->poppedOut())
+        {
+            pane->dock();
+        }
+    }
 }
 
 // The four buttons that fold the regions, pressed in while their region is
@@ -6988,6 +7070,9 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "pane_navigator")    { togglePane("navigator_panel"); }
     else if (action == "pane_inspectors")   { togglePane("inspector_panel"); }
     else if (action == "pane_bottom")       { togglePane("bottom_panel"); }
+    else if (action == "out_navigator")     { togglePaneOut("navigator_panel"); }
+    else if (action == "out_inspectors")    { togglePaneOut("inspector_panel"); }
+    else if (action == "out_bottom")        { togglePaneOut("bottom_panel"); }
     else if (action == "float_preview")
     {
         // A preview changes home rather than moving, so what is on the one
@@ -7034,6 +7119,9 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     if (flag == "pane_navigator")   { return !paneCollapsed("navigator_panel"); }
     if (flag == "pane_inspectors")  { return !paneCollapsed("inspector_panel"); }
     if (flag == "pane_bottom")      { return !paneCollapsed("bottom_panel"); }
+    if (flag == "out_navigator")    { return paneOut("navigator_panel"); }
+    if (flag == "out_inspectors")   { return paneOut("inspector_panel"); }
+    if (flag == "out_bottom")       { return paneOut("bottom_panel"); }
     return false;
 }
 
@@ -7089,6 +7177,29 @@ void ALFloaterXUIStudio::saveState()
     state["fold_navigator"] = paneCollapsed("navigator_panel");
     state["fold_inspectors"] = paneCollapsed("inspector_panel");
     state["fold_bottom"] = paneCollapsed("bottom_panel");
+    // Which regions are in a window of their own, and where those windows
+    // are: a developer who put the inspectors on the other monitor finds
+    // them there next time.
+    LLSD out;
+    for (const auto& [region, title] : POP_PANES)
+    {
+        if (const ALDockPanel* pane = paneOf(region))
+        {
+            LLSD one;
+            one["out"] = pane->poppedOut();
+            const LLRect r = pane->floatingRect();
+            if (!r.isEmpty())
+            {
+                one["rect"] = LLSD::emptyArray();
+                one["rect"].append(r.mLeft);
+                one["rect"].append(r.mBottom);
+                one["rect"].append(r.mRight);
+                one["rect"].append(r.mTop);
+            }
+            out[region] = one;
+        }
+    }
+    state["panes_out"] = out;
     gSavedSettings.setLLSD("ALXUIStudioState", state);
 }
 
@@ -7154,5 +7265,27 @@ void ALFloaterXUIStudio::loadState()
     setPaneCollapsed("navigator_panel", state["fold_navigator"].asBoolean());
     setPaneCollapsed("inspector_panel", state["fold_inspectors"].asBoolean());
     setPaneCollapsed("bottom_panel", state["fold_bottom"].asBoolean());
+    if (state.has("panes_out"))
+    {
+        const LLSD& out = state["panes_out"];
+        for (const auto& [region, title] : POP_PANES)
+        {
+            ALDockPanel* pane = paneOf(region);
+            if (!pane || !out.has(region))
+            {
+                continue;
+            }
+            const LLSD& one = out[region];
+            if (one.has("rect") && one["rect"].size() == 4)
+            {
+                pane->setFloatingRect(LLRect(one["rect"][0].asInteger(), one["rect"][3].asInteger(),
+                                             one["rect"][2].asInteger(), one["rect"][1].asInteger()));
+            }
+            if (one["out"].asBoolean())
+            {
+                pane->popOut();
+            }
+        }
+    }
     refreshPaneButtons();
 }
