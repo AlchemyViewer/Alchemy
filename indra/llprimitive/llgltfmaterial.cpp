@@ -33,6 +33,8 @@
 
 #include "hbxxh.h"
 
+#include <boost/container_hash/hash.hpp>
+
 // NOTE -- this should be the one and only place tiny_gltf.h is included
 #include <tiny_gltf.h>
 #include "llgltfmaterial_templates.h"
@@ -118,18 +120,18 @@ LLGLTFMaterial& LLGLTFMaterial::operator=(const LLGLTFMaterial& rhs)
 
 void LLGLTFMaterial::updateLocalTexDataDigest()
 {
-    mLocalTexDataDigest = 0;
-    if (!mTrackingIdToLocalTexture.empty())
+    // mTrackingIdToLocalTexture is an ordered map, so walking it in iteration
+    // order gives two materials holding the same entries the same digest.
+    // Combining sequentially rather than folding the entries together keeps
+    // the tracking id distinct from the texture it maps to, and keeps a pair
+    // of entries from cancelling each other out.
+    std::size_t digest = 0;
+    for (const auto& [tracking_id, local_texture] : mTrackingIdToLocalTexture)
     {
-        for (local_tex_map_t::const_iterator
-                it = mTrackingIdToLocalTexture.begin(),
-                end = mTrackingIdToLocalTexture.end();
-             it != end; ++it)
-        {
-            mLocalTexDataDigest ^= it->first.getDigest64() ^
-                                   it->second.getDigest64();
-        }
+        boost::hash_combine(digest, tracking_id);
+        boost::hash_combine(digest, local_texture);
     }
+    mLocalTexDataDigest = (U64)digest;
 }
 
 bool LLGLTFMaterial::operator==(const LLGLTFMaterial& rhs) const
