@@ -2005,9 +2005,20 @@ void ALFloaterXUIStudio::draw()
     {
         stepCensus();
     }
+    // The file is not what the lint, the findings and the translation table
+    // were read from any more. They are read again once the typing stops,
+    // rather than between one press of an arrow and the next.
+    if (mRereadPending && mRereadAt.hasExpired())
+    {
+        mRereadPending = false;
+        runLint();
+        fillFindings();
+        fillTranslation();
+    }
     if (mReloadPending)
     {
         mReloadPending = false;
+        mRereadPending = false;
         if (mReloadEntryOnly)
         {
             // One file changed; the rest of the tree is as it was.
@@ -3354,6 +3365,210 @@ void ALFloaterXUIStudio::documentChanged(const std::string& status)
     mReloadPending = true;
 }
 
+// How long the tool waits before reading the file over again for what it
+// says about it. Long enough that a person stepping a number with an arrow
+// or holding one down is not re-linting the file between presses.
+static constexpr F32 REREAD_SECONDS = 0.75f;
+
+void ALFloaterXUIStudio::documentRead(const std::string& status)
+{
+    setStatus(status);
+    mRereadPending = true;
+    mRereadAt.setTimerExpirySec(REREAD_SECONDS);
+}
+
+// Which of these a built view can be told about, and how. Everything else
+// is read once, when the widget is made, and there is no way to say it
+// afterwards: those are the fields the preview has to be built again for.
+bool ALFloaterXUIStudio::applyLive(const std::string& name, const std::string& value)
+{
+    Preview& pv = mPreviews[PRIMARY];
+    if (!pv.root || !mSelection.hasSelection())
+    {
+        return false;
+    }
+    LLView* view = ALXUISelection::resolve(pv.root, mSelection.selection());
+    if (!view)
+    {
+        return false;
+    }
+    const ALXUISourceMap::Origin* origin = pv.sourceMap.find(view);
+    if (!origin || origin->node.isNull())
+    {
+        return false;
+    }
+
+    // The tool's copy of the document, brought into step with the write
+    // whether or not the preview is about to be made again from it: a rect
+    // is worked out from every number on the element, not from the one that
+    // just changed.
+    origin->node->setAttributeString(name.c_str(), value);
+
+    bool done = false;
+    if (name == "visible")
+    {
+        view->setVisible(value == "true");
+        done = true;
+    }
+    else if (name == "enabled")
+    {
+        view->setEnabled(value == "true");
+        done = true;
+    }
+    else if (name == "tool_tip")
+    {
+        view->setToolTip(value);
+        done = true;
+    }
+    else if (name == "follows")
+    {
+        U32 flags = FOLLOWS_NONE;
+        for (size_t at = 0; at <= value.size();)
+        {
+            const size_t bar = value.find('|', at);
+            const std::string_view one(value.data() + at,
+                                       (bar == std::string::npos ? value.size() : bar) - at);
+            if (one == "left")        { flags |= FOLLOWS_LEFT; }
+            else if (one == "right")  { flags |= FOLLOWS_RIGHT; }
+            else if (one == "top")    { flags |= FOLLOWS_TOP; }
+            else if (one == "bottom") { flags |= FOLLOWS_BOTTOM; }
+            else if (one == "all")    { flags |= FOLLOWS_ALL; }
+            if (bar == std::string::npos)
+            {
+                break;
+            }
+            at = bar + 1;
+        }
+        view->setFollows(flags);
+        done = true;
+    }
+    else if (ALXUIEdit::isGeometryAttribute(name))
+    {
+        done = liveShape(view, origin->node, name);
+    }
+
+    // A row in the outline says how big its element is and whether it is
+    // shown, so the row that changed is told. Only that row, and only its
+    // suffix, which is the part the folder view says costs no filtering.
+    if (done)
+    {
+        if (const auto it = mRows.find(ALXUISelection::toString(mSelection.selection()));
+            it != mRows.end() && it->second)
+        {
+            it->second->refreshSuffix();
+        }
+    }
+    return done;
+}
+
+bool ALFloaterXUIStudio::liveShape(LLView* view, const LLXMLNodePtr& node, const std::string& name)
+{
+    LLView* parent = view->getParent();
+    if (!parent)
+    {
+        return false;
+    }
+
+    // The corner the element hangs from, and its size read off the element as
+    // it now stands. Both are wanted whichever way it is positioned.
+    const auto sized = [&node, view](LLRect& out)
+    {
+        S32 width = view->getRect().getWidth();
+        S32 height = view->getRect().getHeight();
+        node->getAttributeS32("width", width);
+        node->getAttributeS32("height", height);
+        std::string layout;
+        node->getAttributeString("layout", layout);
+        // Placed from the top unless the file places it from the bottom, and
+        // the corner it is placed from is the one a change of size holds.
+        const bool from_bottom = layout == "bottomleft"
+                              || node->hasAttribute("bottom")
+                              || node->hasAttribute("bottom_delta");
+        out = view->getRect();
+        out.mRight = out.mLeft + width;
+        if (from_bottom)
+        {
+            out.mTop = out.mBottom + height;
+        }
+        else
+        {
+            out.mBottom = out.mTop - height;
+        }
+    };
+
+    // What is on a canvas is put there by the canvas, not laid out against
+    // it: the numbers that mean anything to it are its size. A root that
+    // grew or shrank is a surface of a different size as well.
+    if (ALXUICanvas* canvas = ALViewType::as<ALXUICanvas>(parent); canvas && canvas->root() == view)
+    {
+        LLRect r;
+        sized(r);
+        view->setShape(r);
+        canvas->rememberRoot();
+        return true;
+    }
+
+    // A stack answers three of a panel's four numbers, so none of them is a
+    // rect this can work out on its own.
+    if (ALViewType::as<LLLayoutStack>(parent))
+    {
+        return false;
+    }
+
+    // A form written against the widget built before this one is a form only
+    // a build can resolve -- but only its position is. The corner such an
+    // element hangs from is decided by numbers that a change of size does not
+    // touch, so a size is answered here whatever the form.
+    static const char* AGAINST_A_SIBLING[] =
+        { "left_pad", "top_pad", "left_delta", "top_delta", "bottom_delta" };
+    for (const char* one : AGAINST_A_SIBLING)
+    {
+        if (node->hasAttribute(one))
+        {
+            if (name != "width" && name != "height")
+            {
+                return false;
+            }
+            LLRect r;
+            sized(r);
+            view->setShape(r);
+            if (ALXUICanvas* canvas = view->getParentByType<ALXUICanvas>())
+            {
+                canvas->rememberRoot();
+            }
+            return true;
+        }
+    }
+
+    LLView::Params p;
+    std::string layout;
+    if (node->getAttributeString("layout", layout))
+    {
+        p.layout = layout;
+    }
+    S32 value = 0;
+    if (node->getAttributeS32("left", value))   { p.rect.left = value; }
+    if (node->getAttributeS32("top", value))    { p.rect.top = value; }
+    if (node->getAttributeS32("right", value))  { p.rect.right = value; }
+    if (node->getAttributeS32("bottom", value)) { p.rect.bottom = value; }
+    if (node->getAttributeS32("width", value))  { p.rect.width = value; }
+    if (node->getAttributeS32("height", value)) { p.rect.height = value; }
+    LLView::applyXUILayout(p, parent, parent->getLocalRect());
+    const LLRect placed = p.rect;
+    if (placed.isEmpty())
+    {
+        return false;
+    }
+    view->setShape(placed);
+    // How far a surface reaches is decided by what is drawn on it, and an
+    // element that just changed size may have moved that.
+    if (ALXUICanvas* canvas = view->getParentByType<ALXUICanvas>())
+    {
+        canvas->rememberRoot();
+    }
+    return true;
+}
+
 // What the unsaved edits would do to the translations, before they are
 // written. A translation applies because the base has an element of that
 // name at that place; rename it, move it, or take it away, and the
@@ -3992,6 +4207,33 @@ void ALFloaterXUIStudio::clearTree()
 
 void ALFloaterXUIStudio::rebuildTree()
 {
+    // What the outline looked like before, since an edit rebuilds it and the
+    // developer did not ask for it to be rebuilt. Rows are made from views,
+    // and a rebuilt preview is a tree of different views, so the rows have
+    // to go -- what does not have to go is which of them were open and where
+    // the list had been scrolled to.
+    boost::unordered_set<std::string> was_open;
+    S32 was_scrolled = 0;
+    const bool remembering = !mRows.empty();
+    if (remembering)
+    {
+        for (const auto& [path, widget] : mRows)
+        {
+            if (const LLFolderViewFolder* folder = widget ? widget->as<LLFolderViewFolder>() : nullptr;
+                folder && folder->isOpen())
+            {
+                was_open.insert(path);
+            }
+        }
+        if (mTree)
+        {
+            if (const LLScrollContainer* scroller = mTree->getParentByType<LLScrollContainer>())
+            {
+                was_scrolled = scroller->getDocPosVertical();
+            }
+        }
+    }
+
     clearTree();
     Preview& pv = mPreviews[PRIMARY];
     ALXUITreeItem* root_item = mModel.build(pv.root, pv.sourceMap);
@@ -4023,6 +4265,11 @@ void ALFloaterXUIStudio::rebuildTree()
     p.view_model = &mModel;
     p.root = nullptr;
     p.use_ellipses = true;
+    // A row says more than a name: its tag, how big it is, whether it is
+    // shown, and how many findings are on it and everything under it. The
+    // model composes all of that, and a folder view says none of it unless
+    // it is told to -- the parameter carries no default.
+    p.use_label_suffix = true;
     p.options_menu = "menu_xui_studio_tree.xml";
     mTree = LLUICtrlFactory::create<LLFolderView>(p);
     mTree->setCallbackRegistrar(&mCommitCallbackRegistrar);
@@ -4049,9 +4296,30 @@ void ALFloaterXUIStudio::rebuildTree()
     {
         createRows(root_item, static_cast<LLFolderViewFolder*>(root_row));
     }
+    // Everything open the first time a file is shown, and afterwards exactly
+    // what was open before: a rebuild the developer did not ask for should
+    // leave the list reading the way they left it.
     mTree->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_DOWN);
+    if (remembering)
+    {
+        for (const auto& [path, widget] : mRows)
+        {
+            if (LLFolderViewFolder* folder = widget ? widget->as<LLFolderViewFolder>() : nullptr;
+                folder && !was_open.count(path))
+            {
+                folder->setOpen(false);
+            }
+        }
+    }
     mTree->arrangeAll();
     mModel.getFilter().setModified();
+    if (was_scrolled > 0)
+    {
+        if (LLScrollContainer* scroller = mTree->getParentByType<LLScrollContainer>())
+        {
+            scroller->setDocPosVertical(was_scrolled);
+        }
+    }
 }
 
 // One widget for one item, in the folder it belongs to. A row that holds
@@ -4291,7 +4559,14 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
     args["[ATTRS]"] = "follows=\"" + text + "\"";
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
-    documentChanged(getString("EditWrote", args));
+    const std::string said = getString("EditWrote", args);
+    if (applyLive("follows", text))
+    {
+        documentRead(said);
+        refreshInspectors();
+        return;
+    }
+    documentChanged(said);
 }
 
 // A selection inside a tab, an accordion or a scroll container is not on
@@ -6811,7 +7086,16 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     args["[ATTRS]"] = name;
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditWrote", args));
+    const std::string said = getString("EditWrote", args);
+    // A field the preview can be told about is told, and nothing is made
+    // again: the window keeps its place, the outline keeps its rows, and
+    // the keyboard stays in the box the number was typed into.
+    if (applyLive(name, value))
+    {
+        documentRead(said);
+        return;
+    }
+    documentChanged(said);
 }
 
 // The way back: this file writes this field, take it out again. What was in

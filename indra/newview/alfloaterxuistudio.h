@@ -143,6 +143,23 @@ public:
     std::vector<ALXmlLayerMerge::Source> sourcesFor(const std::string& file) const;
     ALXUIEdit* document(const ALXUICatalog::Layer& layer);
     void documentChanged(const std::string& status);
+
+    // What an edit costs the rest of the tool when the preview did not have
+    // to be built again: the lint, the findings and the translation table
+    // are about the file, and the file changed. Asked for once the typing
+    // stops rather than on every field written.
+    void documentRead(const std::string& status);
+
+    // A field put onto what is already built, where a built view can be told
+    // about it. Answering false is not a failure: it says this field is not
+    // one of those, so the preview has to be made again to show it.
+    bool applyLive(const std::string& name, const std::string& value);
+
+    // The rect the factory would have given the element, worked out again
+    // from the element as it now reads. Only where that answer does not
+    // depend on the order things were built in.
+    bool liveShape(LLView* view, const LLXMLNodePtr& node, const std::string& name);
+
     void saveDocument();
     void revertDocument();
 
@@ -437,6 +454,8 @@ private:
     bool                mReloadFromDisk = false;    // and someone else changed it
     bool                mKeepPlace = false;         // a rebuild leaves the preview where it is
     std::string         mPendingStatus;             // what to say once the rebuild is done
+    bool                mRereadPending = false;     // the file changed under what is said about it
+    LLFrameTimer        mRereadAt;                  // once the typing stops
     // The layer under edit, held between operations: its undo stack, its
     // dirty flag and the text the preview is built from are all its own.
     ALXUIEdit           mDocument;
