@@ -27,6 +27,7 @@
 #include "lllocalcliprect.h"
 
 #include "llfontgl.h"
+#include "llrender2dutils.h"
 #include "llui.h"
 
 /*static*/ std::stack<LLRect> LLScreenClipRect::sClipRectStack;
@@ -102,11 +103,11 @@ void LLScreenClipRect::updateScissorRegion()
 //---------------------------------------------------------------------------
 // LLLocalClipRect
 //---------------------------------------------------------------------------
+// Without the scale a clip under one moved with the drawing's offset and kept
+// the drawing's old size, so the scissor and the thing it was meant to cut
+// ended up in different places.
 LLLocalClipRect::LLLocalClipRect(const LLRect& rect, bool enabled /* = true */)
-:   LLScreenClipRect(LLRect(rect.mLeft + LLFontGL::sCurOrigin.mX,
-                    rect.mTop + LLFontGL::sCurOrigin.mY,
-                    rect.mRight + LLFontGL::sCurOrigin.mX,
-                    rect.mBottom + LLFontGL::sCurOrigin.mY), enabled)
+:   LLScreenClipRect(LLRender2D::toScreen(rect), enabled)
 {}
 
 LLLocalClipRect::~LLLocalClipRect()

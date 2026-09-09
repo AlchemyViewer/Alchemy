@@ -178,6 +178,19 @@ public:
     static void popMatrix();
     static void loadIdentity();
     static void translate(F32 x, F32 y, F32 z = 0.0f);
+    // Everything under this draws, clips and measures at this scale. The
+    // renderer has always been able to scale the UI; what this adds is the
+    // shadow of it that clipping, text and badges read.
+    static void scale(F32 x, F32 y);
+
+    // Where a local rect lands on screen under the UI transform, which is
+    // (local + offset) * scale: the composition the renderer applies to
+    // every UI vertex. Everything that draws or clips in screen coordinates
+    // under a reset matrix asks this, rather than each writing it out and
+    // one of them forgetting a term -- which is how a scale used to move
+    // the drawing and leave the scissor behind.
+    static LLRect toScreen(const LLRect& local);
+    static void toScreen(F32 local_x, F32 local_y, F32& x, F32& y);
 
     static void setLineWidth(F32 width);
 

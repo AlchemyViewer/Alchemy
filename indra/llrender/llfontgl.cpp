@@ -77,7 +77,9 @@ LLFontRegistry* LLFontGL::sFontRegistry = NULL;
 
 LLCoordGL LLFontGL::sCurOrigin;
 F32 LLFontGL::sCurDepth;
-std::vector<std::pair<LLCoordGL, F32> > LLFontGL::sOriginStack;
+F32 LLFontGL::sCurScaleX = 1.f;
+F32 LLFontGL::sCurScaleY = 1.f;
+std::vector<LLFontGL::UITransform> LLFontGL::sOriginStack;
 
 const F32 PAD_UVY = 0.5f; // half of vertical padding between glyphs in the glyph texture
 const F32 DROP_SHADOW_SOFT_STRENGTH = 0.3f;
@@ -367,9 +369,17 @@ ALTextTransform::ALTextTransform()
     // 'in-world' and is correctly occluded.
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
-    gGL.translatef(floorf((F32)LLFontGL::sCurOrigin.mX * LLFontGL::sScaleX),
-                   floorf((F32)LLFontGL::sCurOrigin.mY * LLFontGL::sScaleY),
+    // Where the text sits is (local + origin) * scale, the same composition
+    // the renderer applies to every other UI vertex. The glyphs arrive in
+    // local units, so the scale goes on the matrix under them rather than
+    // into the placement.
+    gGL.translatef(floorf((F32)LLFontGL::sCurOrigin.mX * LLFontGL::sCurScaleX * LLFontGL::sScaleX),
+                   floorf((F32)LLFontGL::sCurOrigin.mY * LLFontGL::sCurScaleY * LLFontGL::sScaleY),
                    LLFontGL::sCurDepth);
+    if (LLFontGL::sCurScaleX != 1.f || LLFontGL::sCurScaleY != 1.f)
+    {
+        gGL.scalef(LLFontGL::sCurScaleX, LLFontGL::sCurScaleY, 1.f);
+    }
 }
 
 ALTextTransform::~ALTextTransform()

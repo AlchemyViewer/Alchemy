@@ -150,6 +150,8 @@ if (BUILD_TESTING)
   set(font_test_data_dir "${ALCHEMY_FONTS_DIR}/")
   set(font_test_fonts_xml "${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml")
 
+  # Arithmetic only: where a local coordinate lands under the UI transform.
+  LL_ADD_INTEGRATION_TEST(lluitransform "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alfontcolrv1 "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontregistry "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")

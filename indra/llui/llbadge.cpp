@@ -30,6 +30,7 @@
 #include "llbadge.h"
 
 #include "llfontgl.h"
+#include "llrender2dutils.h"
 #include "llfonttextcache.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
@@ -197,13 +198,17 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
     gGL.color4ubv(color.mV);
     gGL.texCoord2i(0, 0);
 
-    F32 x = LLFontGL::sCurOrigin.mX + centerX - width * 0.5f;
-    F32 y = LLFontGL::sCurOrigin.mY + centerY - height * 0.5f;
+    // Drawn in screen coordinates under a reset UI matrix, so it asks where
+    // its own corner lands.
+    F32 x, y;
+    LLRender2D::toScreen(centerX - width * 0.5f, centerY - height * 0.5f, x, y);
+    const F32 w = width * LLFontGL::sCurScaleX;
+    const F32 h = height * LLFontGL::sCurScaleY;
 
     LLRectf screen_rect((F32)ll_round(x),
                         (F32)ll_round(y),
-                        (F32)ll_round(x) + width,
-                        (F32)ll_round(y) + height);
+                        (F32)ll_round(x) + w,
+                        (F32)ll_round(y) + h);
 
     LLVector4a vertices[4];
     vertices[0].set(screen_rect.mLeft,  screen_rect.mTop,    1.0f);

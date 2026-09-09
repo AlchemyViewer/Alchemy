@@ -100,16 +100,16 @@ void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, const LL
 void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, S32 pixel_offset, bool filled)
 {
     gGL.pushUIMatrix();
-    left += LLFontGL::sCurOrigin.mX;
-    right += LLFontGL::sCurOrigin.mX;
-    bottom += LLFontGL::sCurOrigin.mY;
-    top += LLFontGL::sCurOrigin.mY;
+    // This draws in screen coordinates, so it asks where its own corners land.
+    F32 sx, sy, ex, ey;
+    LLRender2D::toScreen((F32)left, (F32)bottom, sx, sy);
+    LLRender2D::toScreen((F32)right, (F32)top, ex, ey);
 
     gGL.loadUIIdentity();
-    gl_rect_2d(llfloor((F32)left * LLRender::sUIGLScaleFactor.mV[VX]) - pixel_offset,
-                llfloor((F32)top * LLRender::sUIGLScaleFactor.mV[VY]) + pixel_offset,
-                llfloor((F32)right * LLRender::sUIGLScaleFactor.mV[VX]) + pixel_offset,
-                llfloor((F32)bottom * LLRender::sUIGLScaleFactor.mV[VY]) - pixel_offset,
+    gl_rect_2d(llfloor(sx * LLRender::sUIGLScaleFactor.mV[VX]) - pixel_offset,
+                llfloor(ey * LLRender::sUIGLScaleFactor.mV[VY]) + pixel_offset,
+                llfloor(ex * LLRender::sUIGLScaleFactor.mV[VX]) + pixel_offset,
+                llfloor(sy * LLRender::sUIGLScaleFactor.mV[VY]) - pixel_offset,
                 filled);
     gGL.popUIMatrix();
 }
@@ -1969,18 +1969,49 @@ void LLRender2D::translate(F32 x, F32 y, F32 z)
 }
 
 // static
+// The offset is in unscaled units, because a UI vertex is
+// (local + offset) * scale: a translation under a scale is not scaled here,
+// it is scaled where the transform is used.
+void LLRender2D::scale(F32 x, F32 y)
+{
+    gGL.scaleUI(x, y, 1.f);
+    LLFontGL::sCurScaleX *= x;
+    LLFontGL::sCurScaleY *= y;
+}
+
+// static
+void LLRender2D::toScreen(F32 local_x, F32 local_y, F32& x, F32& y)
+{
+    x = (local_x + (F32)LLFontGL::sCurOrigin.mX) * LLFontGL::sCurScaleX;
+    y = (local_y + (F32)LLFontGL::sCurOrigin.mY) * LLFontGL::sCurScaleY;
+}
+
+// static
+LLRect LLRender2D::toScreen(const LLRect& local)
+{
+    F32 left, bottom, right, top;
+    toScreen((F32)local.mLeft, (F32)local.mBottom, left, bottom);
+    toScreen((F32)local.mRight, (F32)local.mTop, right, top);
+    return LLRect(ll_round(left), ll_round(top), ll_round(right), ll_round(bottom));
+}
+
+// static
 void LLRender2D::pushMatrix()
 {
     gGL.pushUIMatrix();
-    LLFontGL::sOriginStack.push_back(std::make_pair(LLFontGL::sCurOrigin, LLFontGL::sCurDepth));
+    LLFontGL::sOriginStack.push_back({ LLFontGL::sCurOrigin, LLFontGL::sCurDepth,
+                                       LLFontGL::sCurScaleX, LLFontGL::sCurScaleY });
 }
 
 // static
 void LLRender2D::popMatrix()
 {
     gGL.popUIMatrix();
-    LLFontGL::sCurOrigin = LLFontGL::sOriginStack.back().first;
-    LLFontGL::sCurDepth = LLFontGL::sOriginStack.back().second;
+    const LLFontGL::UITransform& was = LLFontGL::sOriginStack.back();
+    LLFontGL::sCurOrigin = was.origin;
+    LLFontGL::sCurDepth = was.depth;
+    LLFontGL::sCurScaleX = was.scaleX;
+    LLFontGL::sCurScaleY = was.scaleY;
     LLFontGL::sOriginStack.pop_back();
 }
 
@@ -1991,6 +2022,8 @@ void LLRender2D::loadIdentity()
     LLFontGL::sCurOrigin.mX = 0;
     LLFontGL::sCurOrigin.mY = 0;
     LLFontGL::sCurDepth = 0.f;
+    LLFontGL::sCurScaleX = 1.f;
+    LLFontGL::sCurScaleY = 1.f;
 }
 
 // static

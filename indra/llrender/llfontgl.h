@@ -319,9 +319,28 @@ public:
     static std::string getFontPathLocal();
     static std::string getFontPathSystem();
 
+    // The shadow of the UI transform, kept on the CPU for the three things
+    // that need to know where a local coordinate lands without asking the
+    // renderer: clipping, text and badges.
+    //
+    // It composes the way LLRender composes it -- a vertex is
+    // (local + offset) * scale -- so the offset is in unscaled units and the
+    // scale is applied at the point of use. It tracked the offset and not the
+    // scale for years, which was invisible only because nothing pushed a UI
+    // scale: a scale moved the drawing and left the scissor behind it.
+    struct UITransform
+    {
+        LLCoordGL   origin;
+        F32         depth = 0.f;
+        F32         scaleX = 1.f;
+        F32         scaleY = 1.f;
+    };
+
     static LLCoordGL sCurOrigin;
     static F32          sCurDepth;
-    static std::vector<std::pair<LLCoordGL, F32> > sOriginStack;
+    static F32          sCurScaleX;
+    static F32          sCurScaleY;
+    static std::vector<UITransform> sOriginStack;
 
     static LLColor4 sShadowColor;
 
