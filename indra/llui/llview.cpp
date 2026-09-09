@@ -2615,7 +2615,7 @@ static bool get_last_child_rect(LLView* parent, LLRect *rect)
 }
 
 //static
-void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rect)
+void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rect, const LLRect* after)
 {
     if (!parent) return;
 
@@ -2676,8 +2676,20 @@ void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rec
 
     default_rect.translate(0, default_rect.getHeight());
 
-    // If there was a recently constructed child, use its rectangle
-    get_last_child_rect(parent, &default_rect);
+    if (after)
+    {
+        // What a pad or a delta is measured from, said outright. The list of
+        // children answers that during a build, because the child being
+        // placed is the last one on it -- afterwards every child is on it and
+        // the list cannot say which one came before which. A caller placing a
+        // child again knows, and this is where it says so.
+        default_rect = *after;
+    }
+    else
+    {
+        // If there was a recently constructed child, use its rectangle
+        get_last_child_rect(parent, &default_rect);
+    }
 
     if (layout_topleft)
     {

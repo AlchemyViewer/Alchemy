@@ -618,7 +618,12 @@ public:
 
     // Set up params after XML load before calling new(),
     // usually to adjust layout.
-    static void applyXUILayout(Params& p, LLView* parent, LLRect layout_rect = LLRect());
+    // The rect a child's positioning form resolves to. `after` is the widget
+    // a pad or a delta is measured from: during a build that is whichever
+    // child was made last, which the child list answers on its own, and this
+    // is for a caller placing a child again once every child is on that list.
+    static void applyXUILayout(Params& p, LLView* parent, LLRect layout_rect = LLRect(),
+                               const LLRect* after = nullptr);
 
     // For re-export of floaters and panels, convert the coordinate system
     // to be top-left based.
