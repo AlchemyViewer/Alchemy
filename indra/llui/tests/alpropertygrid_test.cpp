@@ -359,4 +359,63 @@ namespace tut
         ensure_equals("the click names the field", asked, std::string("label"));
         grid->die();
     }
+
+    // A row says what it is wherever the pointer rests along it, in the
+    // caller's words: the two things that have to be said rather than shown
+    // are which layer wrote what is in force, and that on an unwritten row
+    // nobody wrote it at all.
+    template<> template<>
+    void alpropertygrid_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        ALPropertyGrid::Tips tips;
+        tips.field = "[NAME]";
+        tips.fieldTyped = "[NAME] is a [TYPE]";
+        tips.source = "written in [SOURCE]";
+        tips.unwritten = "nobody wrote this";
+        tips.remove = "take [NAME] out again";
+        grid->setTips(tips);
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("width", 0));
+        fields.back().type = "S32";
+        fields.push_back(field("height", 0));
+        fields.back().type = "S32";
+        fields.back().authored = false;
+        fields.back().source.clear();
+        grid->setFields(fields);
+
+        LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
+        LLPanel* row = rows->getChild<LLPanel>("width_row", true);
+        const std::string tip = row->getChild<LLTextBox>("width_label", true)->getToolTip();
+        ensure("it names the field: " + tip, tip.find("width is a S32") != std::string::npos);
+        ensure("and says where what is in force came from: " + tip,
+               tip.find("written in base") != std::string::npos);
+        ensure("a row somebody wrote does not say nobody did: " + tip,
+               tip.find("nobody wrote this") == std::string::npos);
+
+        // The editor answers the same question as the label.
+        ensure_equals("the editor says what the label says",
+                      row->getChild<LLView>("width", true)->getToolTip(), tip);
+        ensure("and the way back says what it takes out",
+               row->getChild<LLView>("width_remove", true)->getToolTip()
+                   .find("take width out again") != std::string::npos);
+
+        // The row nobody wrote says so, and has no way back to offer.
+        LLPanel* unwritten = rows->getChild<LLPanel>("height_row", true);
+        const std::string quiet = unwritten->getChild<LLTextBox>("height_label", true)->getToolTip();
+        ensure("an unwritten row says nobody wrote it: " + quiet,
+               quiet.find("nobody wrote this") != std::string::npos);
+        ensure("and it names no layer: " + quiet, quiet.find("written in") == std::string::npos);
+        ensure("nor is there anything to take out",
+               unwritten->findChild<LLView>("height_remove", true) == nullptr);
+        grid->die();
+    }
 }

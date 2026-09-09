@@ -112,6 +112,24 @@ namespace
         return type.find("LLFontGL") != std::string_view::npos;
     }
 
+    // A row's own words, out of the pattern the caller gave. A caller who
+    // gave none gets the name of the field, which is the one thing this
+    // library knows how to say about it.
+    std::string say(const std::string& pattern, const ALPropertyGrid::Field& field)
+    {
+        if (pattern.empty())
+        {
+            return field.name;
+        }
+        std::string text = pattern;
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = field.name;
+        args["[TYPE]"] = field.type;
+        args["[SOURCE]"] = field.source;
+        LLStringUtil::format(text, args);
+        return text;
+    }
+
     bool carries(std::string_view haystack, std::string_view needle)
     {
         if (needle.empty())
@@ -325,6 +343,18 @@ void ALPropertyGrid::setNotices(std::string nothing_selected, std::string nothin
     rebuild();
 }
 
+void ALPropertyGrid::setTips(Tips tips)
+{
+    mTips = std::move(tips);
+    rebuild();
+}
+
+void ALPropertyGrid::setEdgeTips(std::vector<std::string> tips)
+{
+    mEdgeTips = std::move(tips);
+    rebuild();
+}
+
 void ALPropertyGrid::setFilter(const std::string& text)
 {
     if (mFilter != text)
@@ -358,6 +388,27 @@ bool ALPropertyGrid::shows(const Field& field) const
         return false;
     }
     return carries(field.name, mFilter);
+}
+
+// What the row is, then where what is in force came from, then -- where
+// nobody wrote it -- that nobody did. Three lines at most, and the second
+// and third are the two things about this pane that have to be said rather
+// than shown.
+std::string ALPropertyGrid::tipFor(const Field& field) const
+{
+    std::string text = say(field.ignored      ? mTips.ignored
+                         : field.unknown      ? mTips.unknown
+                         : field.type.empty() ? mTips.field
+                                              : mTips.fieldTyped, field);
+    if (!field.source.empty() && !mTips.source.empty())
+    {
+        text += "\n" + say(mTips.source, field);
+    }
+    if (!field.authored && !mTips.unwritten.empty())
+    {
+        text += "\n" + say(mTips.unwritten, field);
+    }
+    return text;
 }
 
 S32 ALPropertyGrid::rowHeight(const Field& field) const
@@ -539,6 +590,7 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         ALFollowsControl* follows = LLUICtrlFactory::create<ALFollowsControl>(p);
         follows->setEdges(field.edges[0], field.edges[1], field.edges[2], field.edges[3],
                           field.allWord, field.noneWord);
+        follows->setTips(mEdgeTips);
         if (!field.subjectParent.isEmpty())
         {
             follows->setSubject(field.subject, field.subjectParent);
@@ -652,6 +704,10 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         }
         mFieldCommit(name, text);
     });
+    // The row's own words, on the editor as well: a pointer resting on a
+    // control is asking what a pointer resting on its label is asking, and
+    // on a paired row the two halves are two different questions.
+    editor->setToolTip(tipFor(field));
     // Everything between the two columns, so the row widens where the width
     // is. A spinner is the exception: it is as wide as a number needs.
     editor->setFollows(editor->as<LLSpinCtrl>() ? (FOLLOWS_LEFT | FOLLOWS_TOP)
@@ -728,6 +784,12 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
     host->addChild(row);
 
+    // What this row is, in the caller's words, said the same way wherever
+    // the pointer is along it. Which layer wrote what is in force was a
+    // column of its own, saying one word on almost every row; it is part of
+    // this sentence now, and the rows that disagree are the marked ones.
+    const std::string tip = tipFor(field);
+
     {
         // A field nothing writes is shown in the quieter ink, and so is one
         // that is written and does nothing: what is on the row is what the
@@ -736,15 +798,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         p.name = field.name + "_label";
         p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
         p.initial_value = partner ? field.name + ", " + partner->name : field.name;
-        // Which layer wrote what is in force was a column of its own,
-        // saying the same word on almost every row. It is on the row's own
-        // tool tip now, and the rows that disagree are the marked ones.
-        const std::string says =
-            field.ignored ? field.name + " is read off every widget and thrown away"
-          : field.unknown ? field.name + " is written here and declared by nothing"
-          : field.type.empty() ? field.name
-                               : field.name + " : " + field.type;
-        p.tool_tip = field.source.empty() ? says : says + "  [" + field.source + "]";
+        p.tool_tip = tip;
         p.font_valign = LLFontGL::VCENTER;
         p.text_color = (field.authored && !field.ignored) ? written : unwritten;
         p.use_ellipses = true;
@@ -781,7 +835,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         p.name = field.name + "_remove";
         p.label = std::string("x");
         p.rect = LLRect(width - MARGIN - REMOVE_WIDTH, top - 2, width - MARGIN, bottom);
-        p.tool_tip = field.name + " is written here; take it out and let whatever was in force before be in force";
+        p.tool_tip = say(mTips.remove, field);
         p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
         LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
         const std::string removed = field.name;

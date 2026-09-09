@@ -1923,6 +1923,20 @@ bool ALFloaterXUIStudio::postBuild()
         mAttributeGrid->setNotices(getString("AttributeNothingSelected"),
                                    getString("AttributeNothingWritten"),
                                    getString("AttributeNoMatch"));
+        // The words the rows explain themselves in. They live in the skin
+        // rather than in llui, which has no file for a translator to open.
+        ALPropertyGrid::Tips tips;
+        tips.field = getString("AttributeTipField");
+        tips.fieldTyped = getString("AttributeTipTyped");
+        tips.ignored = getString("AttributeTipIgnored");
+        tips.unknown = getString("AttributeTipUnknown");
+        tips.source = getString("AttributeTipSource");
+        tips.unwritten = getString("AttributeTipUnwritten");
+        tips.remove = getString("AttributeTipRemove");
+        mAttributeGrid->setTips(tips);
+        mAttributeGrid->setEdgeTips({ getString("FollowsTipLeft"), getString("FollowsTipBottom"),
+                                      getString("FollowsTipRight"), getString("FollowsTipTop"),
+                                      getString("FollowsTipAcross"), getString("FollowsTipDown") });
     }
     mAttributeWhat = getChild<LLTextBox>("attributes_what");
     mAttributeFilter = getChild<LLFilterEditor>("attributes_filter");

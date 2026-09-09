@@ -78,6 +78,19 @@
     <floater.string name="AttributeNothingWritten">This element writes nothing. Take the switch off to see every field the tag answers to.</floater.string>
     <floater.string name="AttributeNoMatch">No field of that name.</floater.string>
     <floater.string name="AttributeAlsoWritten">[ATTR] is written over in   [LAYERS]</floater.string>
+    <floater.string name="AttributeTipField">[NAME]</floater.string>
+    <floater.string name="AttributeTipTyped">[NAME] : [TYPE]</floater.string>
+    <floater.string name="AttributeTipSource">Written in [SOURCE].</floater.string>
+    <floater.string name="AttributeTipUnwritten">Nobody writes this here. What is shown is what is in force, and changing it writes it for the first time.</floater.string>
+    <floater.string name="AttributeTipIgnored">[NAME] is read off every widget and thrown away. A file may write it; nothing does anything with it.</floater.string>
+    <floater.string name="AttributeTipUnknown">[NAME] is written here and declared by nothing. Either the name is a typo or the widget stopped answering to it.</floater.string>
+    <floater.string name="AttributeTipRemove">Take [NAME] out of this file again, and let whatever was in force before it be in force.</floater.string>
+    <floater.string name="FollowsTipLeft">Holds the gap between this element's left edge and its parent's, so the element stays where it is when the parent widens. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipBottom">Holds the gap between this element's bottom edge and its parent's, so the element stays where it is when the parent grows taller. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipRight">Holds the gap between this element's right edge and its parent's, so the element travels with that edge when the parent widens. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipTop">Holds the gap between this element's top edge and its parent's, so the element travels with that edge when the parent grows taller. Click to hold it or to let it go.</floater.string>
+    <floater.string name="FollowsTipAcross">Both side edges held at once, which is a width that has to give: the element grows and shrinks across with its parent. Click to hold both or to let both go.</floater.string>
+    <floater.string name="FollowsTipDown">Both the top and the bottom held at once, which is a height that has to give: the element grows and shrinks down with its parent. Click to hold both or to let both go.</floater.string>
     <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
@@ -324,6 +337,7 @@
      layout="topleft"
      left_pad="2"
      name="skin_combo"
+     tool_tip="Which skin the preview is built in. A skin's own copy of a file is layered over the default's, so what is on the canvas is what that skin's users see."
      top_delta="-3"
      width="90" />
     <text
@@ -340,6 +354,7 @@
      layout="topleft"
      left_pad="2"
      name="language_combo"
+     tool_tip="Which language the preview is built in. The language file is layered over the base one, so what is on the canvas is what a reader of that language sees."
      top_delta="-3"
      width="56" />
     <button
@@ -463,6 +478,7 @@
                              layout="topleft"
                              left="0"
                              name="file_list"
+                             tool_tip="Every XUI file the skins hold, and which of them have a copy of each. Choose one to build it on the canvas."
                              top="0"
                              width="376">
                                 <scroll_list.columns
@@ -499,6 +515,7 @@
                              layout="topleft"
                              left="0"
                              name="catalog_filter"
+                             tool_tip="Narrow the list to the files whose name carries this"
                              top="2"
                              width="376" />
                         </layout_panel>
@@ -634,6 +651,7 @@
                              layout="topleft"
                              left="0"
                              name="tree_filter"
+                             tool_tip="Narrow the outline to the elements whose name, tag or value carries this"
                              top="2"
                              width="376" />
                         </layout_panel>
@@ -678,6 +696,7 @@
                              layout="topleft"
                              left_pad="2"
                              name="find_field"
+                             tool_tip="Which part of a file the words are looked for in: anywhere, a tag, an attribute's name, an attribute's value, an element's name, or the text between the tags"
                              top_delta="-3"
                              width="84">
                                 <combo_box.item label="Any" name="any" value="any" />
@@ -713,6 +732,7 @@
                              layout="topleft"
                              left="0"
                              name="find_results"
+                             tool_tip="Where the words were found, gathered by file. Choose a row to open that file and select the element it is in."
                              top="0"
                              width="376">
                                 <scroll_list.columns
@@ -1003,6 +1023,7 @@
                  layout="topleft"
                  left_pad="0"
                  name="language_combo_2"
+                 tool_tip="The language the second canvas is built in, beside the first. Both are the same file and share one selection."
                  top_delta="-3"
                  width="56" />
                 <button
@@ -1251,6 +1272,7 @@
                                     <scroll_list.columns
                                      label="State"
                                      name="state"
+                                     tool_tip="Whether the language has this value, is missing it, or writes it at a path the base has moved on from"
                                      width="120" />
                                     <scroll_list.columns
                                      label="Fits"
@@ -1358,6 +1380,7 @@
                                  layout="topleft"
                                  left="0"
                                  name="notification_filter"
+                                 tool_tip="Narrow the list to the templates whose name carries this"
                                  top="2"
                                  width="674" />
                                 <button
@@ -1504,6 +1527,7 @@
                  follows="all"
                  height="431"
                  name="attributes_tab"
+                 tool_tip="Attributes: every field the tag answers to, with what is in force and who wrote it"
                  width="478">
                     <text
                      follows="left|top"
@@ -1523,6 +1547,7 @@
                      layout="topleft"
                      left="314"
                      name="attributes_filter"
+                     tool_tip="Narrow the rows to the fields whose name carries this"
                      top="4"
                      width="156" />
                     <check_box
@@ -1554,6 +1579,7 @@
                  follows="all"
                  height="431"
                  name="layout_tab"
+                 tool_tip="Layout: where the element ended up, and which of its numbers decided that"
                  width="478">
                     <scroll_list
                      column_padding="0"
@@ -1564,6 +1590,7 @@
                      layout="topleft"
                      left="0"
                      name="layout"
+                     tool_tip="What decides where this element is: its own numbers, the numbers the file writes, and what its parent does with them."
                      top="0"
                      width="478">
                         <scroll_list.columns
@@ -1582,6 +1609,7 @@
                  follows="all"
                  height="431"
                  name="source_tab"
+                 tool_tip="Source: the element as each layer writes it, one after another"
                  width="478">
                     <text
                      follows="left|top|right"
@@ -1599,6 +1627,7 @@
                      layout="topleft"
                      left_pad="4"
                      name="jump_btn"
+                     tool_tip="Open the file in the external editor, at this element's line"
                      top_delta="-2"
                      width="90" />
                     <text_editor
@@ -1609,6 +1638,7 @@
                      layout="topleft"
                      left="0"
                      name="source_text"
+                     tool_tip="The element as each layer of the file writes it, in the order they are merged"
                      read_only="true"
                      top_pad="4"
                      width="476"
@@ -1620,6 +1650,7 @@
                  follows="all"
                  height="431"
                  name="bindings_tab"
+                 tool_tip="Bindings: the callbacks the file names, and whether anything answers to them"
                  width="478">
                     <scroll_list
                      column_padding="0"
@@ -1630,6 +1661,7 @@
                      layout="topleft"
                      left="0"
                      name="bindings"
+                     tool_tip="The callbacks the file names, and whether anything is registered to answer to each name."
                      top="0"
                      width="478">
                         <scroll_list.columns
@@ -1652,6 +1684,7 @@
                  follows="all"
                  height="431"
                  name="state_tab"
+                 tool_tip="State: what the built widget says about itself right now"
                  width="478">
                     <scroll_list
                      column_padding="0"
@@ -1662,6 +1695,7 @@
                      layout="topleft"
                      left="0"
                      name="state"
+                     tool_tip="What the built widget says about itself as it is now, read again while this tab is showing."
                      top="0"
                      width="478">
                         <scroll_list.columns
@@ -1680,6 +1714,7 @@
                  follows="all"
                  height="431"
                  name="findings_tab"
+                 tool_tip="Findings: what the parser, the merge and the rules said about this element"
                  width="478">
                     <scroll_list
                      column_padding="0"

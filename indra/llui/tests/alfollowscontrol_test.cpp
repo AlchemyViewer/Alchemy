@@ -215,6 +215,53 @@ namespace tut
         delete control;
     }
 
+    // Every part of the picture says what it is and what it does. A strut
+    // is not a thing anybody is born knowing, and a picture nobody can read
+    // is four check boxes that are harder to click.
+    template<> template<>
+    void alfollowscontrol_object::test<10>()
+    {
+        ALFollowsControl* control = build();
+        control->setTips({ "holds the left", "holds the bottom", "holds the right", "holds the top",
+                           "the width gives", "the height gives" });
+
+        static const char* named[] = { "left", "bottom", "right", "top" };
+        static const char* said[] = { "holds the left", "holds the bottom",
+                                      "holds the right", "holds the top" };
+        for (S32 edge = 0; edge < 4; ++edge)
+        {
+            const LLCoordGL at = onStrut(edge);
+            const std::string tip = control->tipAt(at.mX, at.mY);
+            ensure(std::string("the strut says which edge it is: ") + tip,
+                   tip.find(named[edge]) != std::string::npos);
+            ensure(std::string("and what holding it does: ") + tip,
+                   tip.find(said[edge]) != std::string::npos);
+        }
+
+        const std::string across = control->tipAt(SIDE / 2 - 12, SIDE / 2);
+        ensure("the spring says it is both edges: " + across,
+               across.find("left") != std::string::npos && across.find("right") != std::string::npos);
+        ensure("and what that means: " + across, across.find("the width gives") != std::string::npos);
+
+        // Off the picture there is nothing to say about a part, and the
+        // control's own tool tip is what answers.
+        ensure("outside the picture it says nothing of its own",
+               control->tipAt(SIDE * 2 + 20, SIDE / 2).empty());
+        delete control;
+    }
+
+    // Told no words, it still says which edge is under the pointer: the
+    // names of the edges are the one thing it was given.
+    template<> template<>
+    void alfollowscontrol_object::test<11>()
+    {
+        ALFollowsControl* control = build();
+        const LLCoordGL at = onStrut(3);
+        ensure_equals("the name of the edge, and nothing else",
+                      control->tipAt(at.mX, at.mY), std::string("top"));
+        delete control;
+    }
+
     // The picture is a square at the left however wide the control is, so
     // the struts are where a click will find them.
     template<> template<>

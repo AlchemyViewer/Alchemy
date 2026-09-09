@@ -27,6 +27,7 @@
 #include "lluictrl.h"
 
 #include <string>
+#include <vector>
 
 // `follows` is four bits that decide where an element goes when the thing
 // it is in changes size, and four check boxes say only that four words
@@ -61,6 +62,15 @@ public:
     void setEdges(std::string left, std::string bottom, std::string right, std::string top,
                   std::string all_word, std::string none_word);
 
+    // What each part of the picture does, said in the caller's words: six
+    // of them, in the order left, bottom, right, top, then the dimension
+    // that runs across and the one that runs down. A picture is only worth
+    // more than four check boxes if what it is a picture of can be read off
+    // it, and a strut is not a thing anybody is born knowing. Given rather
+    // than written here, because this library has no file for a translator
+    // to open; a control given none falls back to the names of its edges.
+    void setTips(std::vector<std::string> tips);
+
     // What the picture is a picture of. A control that is not told draws a
     // box half the size of the one it is in, since what it is showing then
     // is the rule rather than any particular element.
@@ -70,6 +80,11 @@ public:
     // the list does not carry is passed over, which is what the parsers do.
     void setValue(const LLSD& value) override;
     LLSD getValue() const override;
+
+    // What the picture says about the point under the pointer: what that
+    // part is called in the file's words, and what it does. Empty where the
+    // point is not on a part, and then the control's own tool tip answers.
+    std::string tipAt(S32 x, S32 y) const;
 
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -112,6 +127,7 @@ private:
 
     bool        mSet[EDGES] = { false, false, false, false };
     std::string mNames[EDGES];
+    std::vector<std::string> mTips;
     std::string mAll;
     std::string mNone;
     // The proportions of the picture: what fraction of the parent each

@@ -82,6 +82,7 @@
                      layout="topleft"
                      left="0"
                      name="library_filter"
+                     tool_tip="Narrow the list to the tags whose name carries this"
                      top="2"
                      width="240" />
                 </layout_panel>
@@ -127,6 +128,7 @@
                      left="0"
                      max_length="65536"
                      name="library_about"
+                     tool_tip="What the schema knows about the chosen tag: what it builds, what it takes, what may go in it, what it may go in, and how many files use it"
                      read_only="true"
                      top="0"
                      width="604"

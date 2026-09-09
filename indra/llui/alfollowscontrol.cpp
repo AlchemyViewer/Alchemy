@@ -72,6 +72,11 @@ void ALFollowsControl::setEdges(std::string left, std::string bottom, std::strin
     mNone = std::move(none_word);
 }
 
+void ALFollowsControl::setTips(std::vector<std::string> tips)
+{
+    mTips = std::move(tips);
+}
+
 // The margins the element leaves inside its parent, as fractions, kept far
 // enough from nought and from a half that every strut has a length and the
 // element still has a middle to put a spring across.
@@ -273,14 +278,32 @@ bool ALFollowsControl::handleMouseDown(S32 x, S32 y, MASK mask)
     return true;
 }
 
-bool ALFollowsControl::handleToolTip(S32 x, S32 y, MASK mask)
+// What the part under the pointer does, and what it is called in the file.
+std::string ALFollowsControl::tipAt(S32 x, S32 y) const
 {
     const S32 part = partAt(x, y);
-    if (part == NONE || mNames[LEFT].empty())
+    if (part == NONE)
+    {
+        return std::string();
+    }
+    const std::string name = mNames[LEFT].empty() ? std::string() : partName(part);
+    const std::string says = part < (S32)mTips.size() ? mTips[part] : std::string();
+    return says.empty() ? name
+         : name.empty() ? says
+                        : name + "\n" + says;
+}
+
+// Outside the picture -- the two thumbnails, the space around them -- the
+// control's own tool tip answers, since what is being asked there is what
+// the whole thing is.
+bool ALFollowsControl::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    const std::string says = tipAt(x, y);
+    if (says.empty())
     {
         return LLUICtrl::handleToolTip(x, y, mask);
     }
-    LLToolTipMgr::instance().show(partName(part));
+    LLToolTipMgr::instance().show(says);
     return true;
 }
 

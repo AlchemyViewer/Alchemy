@@ -145,6 +145,28 @@ public:
     // file for a translator to open.
     void setNotices(std::string nothing_selected, std::string nothing_written, std::string no_match);
 
+    // The words a row is explained in, for the same reason: each may carry
+    // [NAME], [TYPE] and [SOURCE] -- the field's own name, the C++ type
+    // behind it, and the layer that wrote what is in force. A row's label,
+    // its editor and its way back all say one of these, so hovering
+    // anywhere along a row answers the same question.
+    struct Tips
+    {
+        std::string field;          // a row whose type is not worth saying
+        std::string fieldTyped;     // and one where it is
+        std::string ignored;        // read off every widget and thrown away
+        std::string unknown;        // written by the file, declared by nothing
+        std::string source;         // added where a row knows which layer wrote it
+        std::string unwritten;      // added where nobody wrote it and it is in force anyway
+        std::string remove;         // the way back, on the rows that have one
+    };
+    void setTips(Tips tips);
+
+    // The words the picture of a set of edges explains itself in: six, in
+    // the order a field's `edges` are given. Set on the grid rather than on
+    // each field, because every such field means the same thing by them.
+    void setEdgeTips(std::vector<std::string> tips);
+
     boost::signals2::connection onFieldCommit(const commit_signal_t::slot_type& cb)
     {
         return mFieldCommit.connect(cb);
@@ -220,6 +242,8 @@ private:
     // which case it is on that row and needs none of its own.
     bool isPartnered(const Field& field) const;
     bool shows(const Field& field) const;
+    // What a row says about itself, wherever along it the pointer is.
+    std::string tipFor(const Field& field) const;
     // How tall a field's row is: one row, or as tall as the picture it
     // carries instead of a value.
     S32 rowHeight(const Field& field) const;
@@ -244,6 +268,8 @@ private:
     LLAccordionCtrl*            mAccordion = nullptr;
     LLTextBox*                  mEmpty = nullptr;
     std::string                 mFilter;
+    Tips                        mTips;
+    std::vector<std::string>    mEdgeTips;
     std::string                 mNothingSelected;
     std::string                 mNothingWritten;
     std::string                 mNoMatch;
