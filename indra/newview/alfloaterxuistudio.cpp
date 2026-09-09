@@ -157,6 +157,55 @@ namespace
     // drawn hard against the edge of the surface it is on.
     constexpr S32 CANVAS_MARGIN = 4;
 
+    // Every colour the canvas draws over a preview, each named in colors.xml
+    // so a skin can say what the tool looks like, and gathered here so there
+    // is one place to read what those names are. Asked for once, the first
+    // time anything is drawn.
+    struct Ink
+    {
+        LLUIColor selection;        // the one the handles are on
+        LLUIColor also;             // the rest of a selection, which alignment moves
+        LLUIColor hover;
+        LLUIColor grip;             // the eight handles and the ninth in the middle
+        LLUIColor gripEdge;
+        LLUIColor anchorHeld;       // an edge this element is tied to
+        LLUIColor anchorFree;
+        LLUIColor dropTarget;       // where a held element would land
+        LLUIColor absorbing;        // the sibling a stack takes the room from
+        LLUIColor dragged;          // where a drag has got to
+        LLUIColor guide;            // what the numbers mean, drawn to the edges
+        LLUIColor guideSibling;     // and to the element before it
+        LLUIColor grid;
+        LLUIColor rulerGround;
+        LLUIColor rulerInk;
+
+        Ink()
+        {
+            const LLUIColorTable& table = LLUIColorTable::instance();
+            selection    = table.getColor("XUIStudioSelection", LLColor4::red);
+            also         = table.getColor("XUIStudioSelectionAlso", LLColor4(1.f, 0.4f, 0.4f, 0.7f));
+            hover        = table.getColor("XUIStudioHover", LLColor4::yellow);
+            grip         = table.getColor("XUIStudioGrip", LLColor4::white);
+            gripEdge     = table.getColor("XUIStudioGripEdge", LLColor4::black);
+            anchorHeld   = table.getColor("XUIStudioAnchorHeld", LLColor4::yellow);
+            anchorFree   = table.getColor("XUIStudioAnchorFree", LLColor4::black);
+            dropTarget   = table.getColor("XUIStudioDropTarget", LLColor4::green);
+            absorbing    = table.getColor("XUIStudioAbsorbing", LLColor4::cyan);
+            dragged      = table.getColor("XUIStudioDragged", LLColor4::white);
+            guide        = table.getColor("XUIStudioGuide", LLColor4::yellow);
+            guideSibling = table.getColor("XUIStudioGuideSibling", LLColor4::cyan);
+            grid         = table.getColor("XUIStudioGrid", LLColor4(0.3f, 0.82f, 1.f, 0.12f));
+            rulerGround  = table.getColor("XUIStudioRulerGround", LLColor4(0.169f, 0.169f, 0.169f, 0.85f));
+            rulerInk     = table.getColor("XUIStudioRulerInk", LLColor4::white);
+        }
+    };
+
+    const Ink& ink()
+    {
+        static const Ink held;
+        return held;
+    }
+
     // How much bigger than life a preview may be drawn, and how far one
     // step of the wheel or one press of the spinner's arrow moves it. The
     // spinner in the canvas bar says the same three numbers.
@@ -410,28 +459,26 @@ public:
         const ALXUISelection& selection = mTool->selection();
         if (selection.hasHover() && mTool->hoverHighlight())
         {
-            static const LLUIColor hover_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
             if (LLView* view = ALXUISelection::resolve(root(), selection.hover()))
             {
-                drawBox(view, hover_color.get(), true);
+                drawBox(view, ink().hover.get(), true);
             }
         }
         if (selection.hasSelection())
         {
-            // The others in the selection, in a quieter red: they are what
+            // The others in the selection, in a quieter ink: they are what
             // an alignment moves, and the one with the handles on it is
             // what they are moved to.
-            static const LLColor4 also_color(1.f, 0.4f, 0.4f, 0.7f);
             for (const ALXUISelection::path_t& path : selection.also())
             {
                 if (LLView* other = ALXUISelection::resolve(root(), path))
                 {
-                    drawBox(other, also_color, false);
+                    drawBox(other, ink().also.get(), false);
                 }
             }
             if (LLView* view = ALXUISelection::resolve(root(), selection.selection()))
             {
-                drawBox(view, LLColor4::red, true);
+                drawBox(view, ink().selection.get(), true);
                 if (gKeyboard && (gKeyboard->currentMask(false) & MASK_ALT))
                 {
                     drawGuides(view);
@@ -455,16 +502,16 @@ public:
                         dragged.mBottom += mDelta[EDGE_B];
                         dragged.mRight += mDelta[EDGE_R];
                         dragged.mTop += mDelta[EDGE_T];
-                        gl_rect_2d(dragged, LLColor4::white, false);
+                        gl_rect_2d(dragged, ink().dragged.get(), false);
                         if (LLView* into = mDrop.get())
                         {
-                            drawLabelledBox(into, LLColor4::green, "into " + into->getName());
+                            drawLabelledBox(into, ink().dropTarget.get(), "into " + into->getName());
                         }
                         else if (axis >= 0)
                         {
                             if (LLView* absorbs = absorbingSibling(view))
                             {
-                                drawLabelledBox(absorbs, LLColor4::cyan, "from " + absorbs->getName());
+                                drawLabelledBox(absorbs, ink().absorbing.get(), "from " + absorbs->getName());
                             }
                         }
                     }
@@ -817,14 +864,14 @@ private:
     void drawAnchors(const LLView* view, const LLRect& r) const
     {
         static const U32 flags[EDGE_COUNT] = { FOLLOWS_LEFT, FOLLOWS_BOTTOM, FOLLOWS_RIGHT, FOLLOWS_TOP };
-        static const LLUIColor on = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+
         LLRect anchors[EDGE_COUNT];
         anchorRects(r, anchors);
         for (S32 i = 0; i < EDGE_COUNT; ++i)
         {
             const bool held = (view->getFollows() & flags[i]) != 0;
-            gl_rect_2d(anchors[i], held ? on.get() : LLColor4::black, true);
-            gl_rect_2d(anchors[i], LLColor4::white, false);
+            gl_rect_2d(anchors[i], held ? ink().anchorHeld.get() : ink().anchorFree.get(), true);
+            gl_rect_2d(anchors[i], ink().grip.get(), false);
         }
     }
 
@@ -852,8 +899,8 @@ private:
             {
                 continue;
             }
-            gl_rect_2d(grips[i], LLColor4::white, true);
-            gl_rect_2d(grips[i], LLColor4::black, false);
+            gl_rect_2d(grips[i], ink().grip.get(), true);
+            gl_rect_2d(grips[i], ink().gripEdge.get(), false);
         }
 
         if (axis >= 0)
@@ -864,12 +911,12 @@ private:
         // The one in the middle moves the element, and says so with the
         // four arrows a move cursor has.
         const LLRect move = moveGripRect(r);
-        gl_rect_2d(move, LLColor4::white, true);
-        gl_rect_2d(move, LLColor4::black, false);
+        gl_rect_2d(move, ink().grip.get(), true);
+        gl_rect_2d(move, ink().gripEdge.get(), false);
         const S32 mid_x = (move.mLeft + move.mRight) / 2;
         const S32 mid_y = (move.mBottom + move.mTop) / 2;
-        gl_line_2d(move.mLeft + 2, mid_y, move.mRight - 2, mid_y, LLColor4::black);
-        gl_line_2d(mid_x, move.mBottom + 2, mid_x, move.mTop - 2, LLColor4::black);
+        gl_line_2d(move.mLeft + 2, mid_y, move.mRight - 2, mid_y, ink().gripEdge.get());
+        gl_line_2d(mid_x, move.mBottom + 2, mid_x, move.mTop - 2, ink().gripEdge.get());
     }
 
     S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
@@ -1031,9 +1078,7 @@ private:
         {
             return;
         }
-        static const LLUIColor grid_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-        LLColor4 faint(grid_color.get());
-        faint.mV[VALPHA] = 0.12f;
+        const LLColor4 faint = ink().grid.get();
         // A two pixel grid drawn whole is a wash, so a fine grid is drawn
         // every few of itself: the lines a drag lands on are still the grid.
         const S32 step = grid >= 4 ? grid : grid * ((8 + grid - 1) / grid);
@@ -1076,10 +1121,8 @@ private:
         }
         const LLRect origin = (root() && root() != this) ? localRectOf(root()) : getLocalRect();
 
-        static const LLUIColor back = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
-        static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-        LLColor4 ground(back.get());
-        ground.mV[VALPHA] = 0.85f;
+        const LLColor4 ground = ink().rulerGround.get();
+        const LLColor4 marks = ink().rulerInk.get();
 
         const S32 rule_bottom = view.mTop - RULER;
         const S32 rule_right = view.mLeft + RULER;
@@ -1087,8 +1130,8 @@ private:
         const LLRect left(view.mLeft, rule_bottom, rule_right, view.mBottom);
         gl_rect_2d(top, ground, true);
         gl_rect_2d(left, ground, true);
-        gl_rect_2d(top, ink.get(), false);
-        gl_rect_2d(left, ink.get(), false);
+        gl_rect_2d(top, marks, false);
+        gl_rect_2d(left, marks, false);
 
         // The first mark at or after a coordinate. Rounding towards zero is
         // not rounding down, and a rule that reaches left of the preview has
@@ -1111,11 +1154,11 @@ private:
         {
             const S32 x = onCanvas(origin.mLeft + fx);
             const bool named = fx % LABEL_EVERY == 0;
-            gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), ink.get());
+            gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), marks);
             if (named)
             {
                 font->renderUTF8(std::to_string(fx), 0, x + 2, rule_bottom + 3,
-                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+                                 marks, LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
         for (S32 fy = from(origin.mTop - ll_round((F32)rule_bottom / mZoom), grid);
@@ -1123,11 +1166,11 @@ private:
         {
             const S32 y = onCanvas(origin.mTop - fy);
             const bool named = fy % LABEL_EVERY == 0;
-            gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, ink.get());
+            gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, marks);
             if (named)
             {
                 font->renderUTF8(std::to_string(fy), 0, view.mLeft + 2, y - 10,
-                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+                                 marks, LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
 
@@ -1138,9 +1181,9 @@ private:
             const LLRect box(onCanvas(content.mLeft), onCanvas(content.mTop),
                              onCanvas(content.mRight), onCanvas(content.mBottom));
             gl_rect_2d(LLRect(llmax(box.mLeft, rule_right), view.mTop, llmin(box.mRight, view.mRight), rule_bottom),
-                       LLColor4::red, false);
+                       ink().selection.get(), false);
             gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
-                       LLColor4::red, false);
+                       ink().selection.get(), false);
         }
     }
 
@@ -1185,8 +1228,7 @@ private:
         {
             return;
         }
-        static const LLUIColor guide_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-        const LLColor4 color = guide_color.get();
+        const LLColor4 color = ink().guide.get();
         const LLRect r = localRectOf(view);
         const LLRect p = localRectOf(parent);
         const S32 mid_y = (r.mTop + r.mBottom) / 2;
@@ -1201,7 +1243,7 @@ private:
         if (it != siblings.end() && std::next(it) != siblings.end())
         {
             const LLRect s = localRectOf(*std::next(it));
-            LLColor4 sibling_color = LLColor4::cyan;
+            const LLColor4 sibling_color = ink().guideSibling.get();
             drawDistance(s.mRight, mid_y, r.mLeft, mid_y, r.mLeft - s.mRight, sibling_color);
             drawDistance(mid_x, r.mTop, mid_x, s.mBottom, s.mBottom - r.mTop, sibling_color);
         }
@@ -1979,6 +2021,32 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
             onMode();
         }
         mCatalogFilter->setFocus(true);
+        return true;
+    }
+    // Between the two places an element is worked on: the outline, where it
+    // is found and moved in the tree, and the canvas, where it is dragged
+    // and its handles are. Control and tab rather than tab, because tab
+    // belongs to the field the developer is typing in.
+    if (key == KEY_TAB && mask == MASK_CONTROL)
+    {
+        ALXUICanvas* canvas = mCanvases[PRIMARY];
+        const bool on_canvas = canvas && canvas->getVisible() && gFocusMgr.childHasKeyboardFocus(canvas);
+        if (on_canvas || !mTree)
+        {
+            if (mModes)
+            {
+                mModes->selectTabByName("outline_mode");
+                onMode();
+            }
+            if (mTree)
+            {
+                mTree->setFocus(true);
+            }
+        }
+        else if (canvas && canvas->getVisible())
+        {
+            canvas->setFocus(true);
+        }
         return true;
     }
     // Nothing selected, which is the way out of a selection rather than a

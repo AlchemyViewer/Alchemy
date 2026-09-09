@@ -762,7 +762,11 @@ bool ALPropertyGrid::isPartnered(const Field& field) const
 // than four views that happen to share a Y.
 void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner, bool shaded)
 {
-    static const LLUIColor stripe = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
+    // The band behind alternate rows is a colour of its own rather than the
+    // background at a quarter alpha: a skin that wants a different band has
+    // one to set.
+    static const LLUIColor stripe = LLUIColorTable::instance().getColor(
+        "PropertyGridBandColor", LLColor4(0.169f, 0.169f, 0.169f, 0.25f));
     static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
     static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
 
@@ -785,8 +789,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     rp.background_visible = shaded;
     if (shaded)
     {
-        rp.bg_alpha_color = LLUIColor(LLColor4(stripe.get().mV[VRED], stripe.get().mV[VGREEN],
-                                               stripe.get().mV[VBLUE], 0.25f));
+        rp.bg_alpha_color = stripe;
     }
     LLPanel* row = LLUICtrlFactory::create<LLPanel>(rp);
     host->addChild(row);
