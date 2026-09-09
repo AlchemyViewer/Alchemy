@@ -34,283 +34,857 @@
     <xs:anyAttribute processContents="skip"/>
   </xs:complexType>
 
-  <xs:element name="accordion" type="accordion_t"/>
-
-  <xs:element name="accordion_tab" type="accordion_tab_t"/>
-
-  <xs:element name="asset_filtered_inv_panel" type="asset_filtered_inv_panel_t"/>
-
-  <xs:element name="avatar_icon" type="avatar_icon_t"/>
-
-  <xs:element name="avatar_list" type="avatar_list_t"/>
-
-  <xs:element name="badge" type="badge_t"/>
-
-  <xs:element name="block_list" type="block_list_t"/>
-
-  <xs:element name="button" type="button_t"/>
-
-  <xs:element name="chat_editor" type="chat_editor_t"/>
-
-  <xs:element name="chat_history" type="chat_history_t"/>
-
-  <xs:element name="check_box" type="check_box_t"/>
-
-  <xs:element name="chiclet_notification" type="chiclet_notification_t"/>
-
-  <xs:element name="chiclet_offer" type="chiclet_offer_t"/>
-
-  <xs:element name="chiclet_panel" type="chiclet_panel_t"/>
-
-  <xs:element name="chiclet_script" type="chiclet_script_t"/>
-
-  <xs:element name="color_field" type="color_field_t"/>
-
-  <xs:element name="color_picker" type="color_picker_t"/>
-
-  <xs:element name="color_swatch" type="color_swatch_t"/>
-
-  <xs:element name="color_wheel" type="color_wheel_t"/>
-
-  <xs:element name="combo_box" type="combo_box_t"/>
-
-  <xs:element name="console" type="console_t"/>
-
-  <xs:element name="container_view" type="container_view_t"/>
-
-  <xs:element name="context_menu" type="context_menu_t"/>
-
-  <xs:element name="conversation_log_list" type="conversation_log_list_t"/>
-
-  <xs:element name="conversation_view_participant" type="conversation_view_participant_t"/>
-
-  <xs:element name="conversation_view_session" type="conversation_view_session_t"/>
-
-  <xs:element name="curve_editor" type="curve_editor_t"/>
-
-  <xs:element name="debug_view" type="debug_view_t"/>
-
-  <xs:element name="dnd_button" type="dnd_button_t"/>
-
-  <xs:element name="drop_target" type="drop_target_t"/>
-
-  <xs:element name="emoji_complete" type="emoji_complete_t"/>
-
-  <xs:element name="expandable_text" type="expandable_text_t"/>
-
-  <xs:element name="favorites_bar" type="favorites_bar_t"/>
-
-  <xs:element name="favorites_inventory_panel" type="favorites_inventory_panel_t"/>
-
-  <xs:element name="filter_editor" type="filter_editor_t"/>
-
-  <xs:element name="flags_field" type="flags_field_t"/>
-
-  <xs:element name="flat_list_view" type="flat_list_view_t"/>
-
-  <xs:element name="floater" type="floater_t"/>
-
-  <xs:element name="floater_view" type="floater_view_t"/>
-
-  <xs:element name="flyout_button" type="flyout_button_t"/>
-
-  <xs:element name="folder_view_item" type="folder_view_item_t"/>
-
-  <xs:element name="font_field" type="font_field_t"/>
-
-  <xs:element name="fs_virtual_trackpad" type="fs_virtual_trackpad_t"/>
-
-  <xs:element name="group_drop_target" type="group_drop_target_t"/>
-
-  <xs:element name="group_icon" type="group_icon_t"/>
-
-  <xs:element name="group_list" type="group_list_t"/>
-
-  <xs:element name="hex_editor" type="hex_editor_t"/>
-
-  <xs:element name="hint_popup" type="hint_popup_t"/>
-
-  <xs:element name="icon" type="icon_t"/>
-
-  <xs:element name="icons_combo_box" type="icons_combo_box_t"/>
-
-  <xs:element name="inbox_folder_view_folder" type="inbox_folder_view_folder_t"/>
-
-  <xs:element name="inbox_folder_view_item" type="inbox_folder_view_item_t"/>
-
-  <xs:element name="inbox_inventory_panel" type="inbox_inventory_panel_t"/>
-
-  <xs:element name="inventory_gallery_item" type="inventory_gallery_item_t"/>
-
-  <xs:element name="inventory_link_replace_drop_target" type="inventory_link_replace_drop_target_t"/>
-
-  <xs:element name="inventory_panel" type="inventory_panel_t"/>
-
-  <xs:element name="joystick_quat" type="joystick_quat_t"/>
-
-  <xs:element name="joystick_rotate" type="joystick_rotate_t"/>
-
-  <xs:element name="joystick_slide" type="joystick_slide_t"/>
-
-  <xs:element name="joystick_track" type="joystick_track_t"/>
-
-  <xs:element name="joystick_turn" type="joystick_turn_t"/>
-
-  <xs:element name="labeled_back_button" type="labeled_back_button_t"/>
-
-  <xs:element name="layout_panel" type="layout_panel_t"/>
-
-  <xs:element name="layout_stack" type="layout_stack_t"/>
-
-  <xs:element name="line_editor" type="line_editor_t"/>
-
-  <xs:element name="list_view" type="list_view_t"/>
-
-  <xs:element name="loading_indicator" type="loading_indicator_t"/>
-
-  <xs:element name="locate" type="locate_t"/>
-
-  <xs:element name="location_input" type="location_input_t"/>
-
-  <xs:element name="menu" type="menu_t"/>
-
-  <xs:element name="menu_bar" type="menu_bar_t"/>
-
-  <xs:element name="menu_button" type="menu_button_t"/>
-
-  <xs:element name="menu_holder" type="menu_holder_t"/>
-
-  <xs:element name="menu_item" type="menu_item_t"/>
-
-  <xs:element name="menu_item_call" type="menu_item_call_t"/>
-
-  <xs:element name="menu_item_check" type="menu_item_check_t"/>
-
-  <xs:element name="menu_item_separator" type="menu_item_separator_t"/>
-
-  <xs:element name="menu_item_tear_off" type="menu_item_tear_off_t"/>
-
-  <xs:element name="multi_floater" type="multi_floater_t"/>
-
-  <xs:element name="multi_slider" type="multi_slider_t"/>
-
-  <xs:element name="multi_slider_bar" type="multi_slider_bar_t"/>
-
-  <xs:element name="name_box" type="name_box_t"/>
-
-  <xs:element name="name_editor" type="name_editor_t"/>
-
-  <xs:element name="name_list" type="name_list_t"/>
-
-  <xs:element name="net_map" type="net_map_t"/>
-
-  <xs:element name="notification_list_view" type="notification_list_view_t"/>
-
-  <xs:element name="outfit_gallery_item" type="outfit_gallery_item_t"/>
-
-  <xs:element name="output_monitor" type="output_monitor_t"/>
-
-  <xs:element name="panel" type="panel_t"/>
-
-  <xs:element name="panel_camera_item" type="panel_camera_item_t"/>
-
-  <xs:element name="panel_container" type="panel_container_t"/>
-
-  <xs:element name="panel_inventory_object" type="panel_inventory_object_t"/>
-
-  <xs:element name="placeholder" type="placeholder_t"/>
-
-  <xs:element name="places_inventory_panel" type="places_inventory_panel_t"/>
-
-  <xs:element name="profile_drop_target" type="profile_drop_target_t"/>
-
-  <xs:element name="profile_image" type="profile_image_t"/>
-
-  <xs:element name="progress_bar" type="progress_bar_t"/>
-
-  <xs:element name="property_grid" type="property_grid_t"/>
-
-  <xs:element name="pull_button" type="pull_button_t"/>
-
-  <xs:element name="radio_group" type="radio_group_t"/>
-
-  <xs:element name="recent_inventory_panel" type="recent_inventory_panel_t"/>
-
-  <xs:element name="script_editor" type="script_editor_t"/>
-
-  <xs:element name="scroll_bar" type="scroll_bar_t"/>
-
-  <xs:element name="scroll_container" type="scroll_container_t"/>
-
-  <xs:element name="scroll_list" type="scroll_list_t"/>
-
-  <xs:element name="scrolling_panel_list" type="scrolling_panel_list_t"/>
-
-  <xs:element name="search_combo_box" type="search_combo_box_t"/>
-
-  <xs:element name="search_editor" type="search_editor_t"/>
-
-  <xs:element name="settings_drop_target" type="settings_drop_target_t"/>
-
-  <xs:element name="simple_text_editor" type="simple_text_editor_t"/>
-
-  <xs:element name="single_folder_inventory_panel" type="single_folder_inventory_panel_t"/>
-
-  <xs:element name="slider" type="slider_t"/>
-
-  <xs:element name="slider_bar" type="slider_bar_t"/>
-
-  <xs:element name="snapshot_floater_view" type="snapshot_floater_view_t"/>
-
-  <xs:element name="sound_drop_target" type="sound_drop_target_t"/>
-
-  <xs:element name="spinner" type="spinner_t"/>
-
-  <xs:element name="split_button" type="split_button_t"/>
-
-  <xs:element name="stat_bar" type="stat_bar_t"/>
-
-  <xs:element name="stat_view" type="stat_view_t"/>
-
-  <xs:element name="sun_moon_trackball" type="sun_moon_trackball_t"/>
-
-  <xs:element name="tab_container" type="tab_container_t"/>
-
-  <xs:element name="teleport_history_menu_item" type="teleport_history_menu_item_t"/>
-
-  <xs:element name="text" type="text_t"/>
-
-  <xs:element name="text_chat" type="text_chat_t"/>
-
-  <xs:element name="text_editor" type="text_editor_t"/>
-
-  <xs:element name="texture_picker" type="texture_picker_t"/>
-
-  <xs:element name="thumbnail" type="thumbnail_t"/>
-
-  <xs:element name="toggleable_menu" type="toggleable_menu_t"/>
-
-  <xs:element name="tool_tip" type="tool_tip_t"/>
-
-  <xs:element name="toolbar" type="toolbar_t"/>
-
-  <xs:element name="toolbar_view" type="toolbar_view_t"/>
-
-  <xs:element name="tooltip_view" type="tooltip_view_t"/>
-
-  <xs:element name="ui_ctrl" type="ui_ctrl_t"/>
-
-  <xs:element name="view" type="view_t"/>
-
-  <xs:element name="view_border" type="view_border_t"/>
-
-  <xs:element name="wearable_items_list" type="wearable_items_list_t"/>
-
-  <xs:element name="web_browser" type="web_browser_t"/>
-
-  <xs:element name="window_shade" type="window_shade_t"/>
-
-  <xs:element name="xy_vector" type="xy_vector_t"/>
+  <xs:element name="accordion" type="accordion_t">
+    <xs:annotation>
+      <xs:documentation>A column of folding sections, one heading each, for a pane with more in it than fits.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="accordion_tab" type="accordion_tab_t">
+    <xs:annotation>
+      <xs:documentation>One folding section of an accordion: a heading that opens and closes, and whatever is under it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="asset_filtered_inv_panel" type="asset_filtered_inv_panel_t">
+    <xs:annotation>
+      <xs:documentation>An inventory panel showing only one kind of asset, for a picker that wants animations or sounds and nothing else.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="avatar_icon" type="avatar_icon_t">
+    <xs:annotation>
+      <xs:documentation>One resident's picture, fetched by key and drawn at whatever size it is given.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="avatar_list" type="avatar_list_t">
+    <xs:annotation>
+      <xs:documentation>A list of residents, each row a picture, a name and whatever the list was told to show beside them.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="badge" type="badge_t">
+    <xs:annotation>
+      <xs:documentation>A small count or mark placed on the corner of the thing it is about, drawn over its holder rather than inside it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="block_list" type="block_list_t">
+    <xs:annotation>
+      <xs:documentation>The residents this account has blocked, and what each block covers.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="button" type="button_t">
+    <xs:annotation>
+      <xs:documentation>A thing to press. Its label, its image or both say what pressing it does.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chat_editor" type="chat_editor_t">
+    <xs:annotation>
+      <xs:documentation>The line chat is typed into: history on the arrow keys, and it grows as what is being written does.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chat_history" type="chat_history_t">
+    <xs:annotation>
+      <xs:documentation>What has been said, in order, with names, times and links made clickable.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="check_box" type="check_box_t">
+    <xs:annotation>
+      <xs:documentation>One answer that is yes or no, with the question written beside it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chiclet_notification" type="chiclet_notification_t">
+    <xs:annotation>
+      <xs:documentation>The little marker in the toolbar for a notification waiting to be read.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chiclet_offer" type="chiclet_offer_t">
+    <xs:annotation>
+      <xs:documentation>The marker for an offer of an object or a folder, waiting to be taken or declined.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chiclet_panel" type="chiclet_panel_t">
+    <xs:annotation>
+      <xs:documentation>The strip the chiclets sit in, which shares its room out between them as they come and go.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="chiclet_script" type="chiclet_script_t">
+    <xs:annotation>
+      <xs:documentation>The marker for a script asking this account for something.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="color_field" type="color_field_t">
+    <xs:annotation>
+      <xs:documentation>A colour written the way a file writes one: a swatch, the name it is called in the colour table, and the four numbers behind it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="color_picker" type="color_picker_t">
+    <xs:annotation>
+      <xs:documentation>A wheel, a value slider and the numbers, for choosing a colour rather than naming one.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="color_swatch" type="color_swatch_t">
+    <xs:annotation>
+      <xs:documentation>A block of one colour that opens a picker when it is clicked.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="color_wheel" type="color_wheel_t">
+    <xs:annotation>
+      <xs:documentation>The hue and saturation of a colour, chosen by pointing at it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="combo_box" type="combo_box_t">
+    <xs:annotation>
+      <xs:documentation>One choice out of a list, shown closed until it is asked to open.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="console" type="console_t">
+    <xs:annotation>
+      <xs:documentation>Lines of text that arrive, are read and fade, for what the viewer is saying rather than what anybody typed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="container_view" type="container_view_t">
+    <xs:annotation>
+      <xs:documentation>A view whose only job is to hold others: it draws nothing of its own.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="context_menu" type="context_menu_t">
+    <xs:annotation>
+      <xs:documentation>The menu a right click opens, over the thing that was right-clicked.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="conversation_log_list" type="conversation_log_list_t">
+    <xs:annotation>
+      <xs:documentation>Every conversation this account has had, most recent first.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="conversation_view_participant" type="conversation_view_participant_t">
+    <xs:annotation>
+      <xs:documentation>One person in a conversation, with what they can do in it and what they are doing.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="conversation_view_session" type="conversation_view_session_t">
+    <xs:annotation>
+      <xs:documentation>One conversation in the list, with the people in it folded under it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="curve_editor" type="curve_editor_t">
+    <xs:annotation>
+      <xs:documentation>A curve dragged by its points, for a setting whose value is a shape rather than a number.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="debug_view" type="debug_view_t">
+    <xs:annotation>
+      <xs:documentation>What the viewer draws over the world for a developer: the stats, the outlines and the rest.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="dnd_button" type="dnd_button_t">
+    <xs:annotation>
+      <xs:documentation>A button that also takes a drop, so a thing can be dragged onto what it does.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="dock_panel" type="dock_panel_t">
+    <xs:annotation>
+      <xs:documentation>A pane that knows it can be in a window of its own, and how to come back.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="drop_target" type="drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes what is dragged onto it and says what it took.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="emoji_complete" type="emoji_complete_t">
+    <xs:annotation>
+      <xs:documentation>The list that offers emoji as they are typed, and puts the chosen one in.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="empty_state" type="empty_state_t">
+    <xs:annotation>
+      <xs:documentation>What a pane says when there is nothing in it: what is missing, how to get some, and the one thing that would fix it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="expandable_text" type="expandable_text_t">
+    <xs:annotation>
+      <xs:documentation>Text cut to the room there is, with a way to open the rest of it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="favorites_bar" type="favorites_bar_t">
+    <xs:annotation>
+      <xs:documentation>The landmarks kept on the bar, in the order they were put there.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="favorites_inventory_panel" type="favorites_inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>The favourites folder as an inventory panel, for the bar to be filled from.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="filter_editor" type="filter_editor_t">
+    <xs:annotation>
+      <xs:documentation>A line that narrows a list to what carries what is typed, with a way to clear it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="flags_field" type="flags_field_t">
+    <xs:annotation>
+      <xs:documentation>A set of independent answers written as one word with bars between them, shown as one box each.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="flat_list_view" type="flat_list_view_t">
+    <xs:annotation>
+      <xs:documentation>A list whose rows are views rather than text, kept in one flat column.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="floater" type="floater_t">
+    <xs:annotation>
+      <xs:documentation>A window of its own: a title bar, what is in it, and whatever it is allowed to do about being moved, sized or closed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="floater_view" type="floater_view_t">
+    <xs:annotation>
+      <xs:documentation>What every floater is a child of, and what decides which of them is in front.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="flyout_button" type="flyout_button_t">
+    <xs:annotation>
+      <xs:documentation>A button with a menu on its edge: press it for the usual thing, open it for the rest.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="folder_view_item" type="folder_view_item_t">
+    <xs:annotation>
+      <xs:documentation>One row of a tree: an icon, a name, and whatever is folded under it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="follows_control" type="follows_control_t">
+    <xs:annotation>
+      <xs:documentation>Which edges of its parent an element is tied to, drawn as the four struts and two springs that says.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="font_field" type="font_field_t">
+    <xs:annotation>
+      <xs:documentation>A font written the way a file writes one: the name from fonts.xml, its size and its style.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="fs_virtual_trackpad" type="fs_virtual_trackpad_t">
+    <xs:annotation>
+      <xs:documentation>A pad dragged in two directions at once, for a value that is a point rather than a number.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="group_drop_target" type="group_drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes a group dragged onto it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="group_icon" type="group_icon_t">
+    <xs:annotation>
+      <xs:documentation>One group's picture, fetched by key.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="group_list" type="group_list_t">
+    <xs:annotation>
+      <xs:documentation>The groups this account is in, each row a picture and a name.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="hex_editor" type="hex_editor_t">
+    <xs:annotation>
+      <xs:documentation>Bytes as bytes: the offsets down the side, the values across, and the text of them beside.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="hint_popup" type="hint_popup_t">
+    <xs:annotation>
+      <xs:documentation>A pointer at something on the screen, with a line saying what it is.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="icon" type="icon_t">
+    <xs:annotation>
+      <xs:documentation>A picture and nothing else: it does not take a click.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="icons_combo_box" type="icons_combo_box_t">
+    <xs:annotation>
+      <xs:documentation>A combo box whose choices are pictures rather than words.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inbox_folder_view_folder" type="inbox_folder_view_folder_t">
+    <xs:annotation>
+      <xs:documentation>One folder of the received-items inbox.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inbox_folder_view_item" type="inbox_folder_view_item_t">
+    <xs:annotation>
+      <xs:documentation>One item of the received-items inbox, with whether it has been looked at.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inbox_inventory_panel" type="inbox_inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>The received-items inbox as an inventory panel.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inventory_gallery_item" type="inventory_gallery_item_t">
+    <xs:annotation>
+      <xs:documentation>One inventory item as a picture with its name under it, for the gallery rather than the tree.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inventory_link_replace_drop_target" type="inventory_link_replace_drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes an inventory item, for saying which one a set of links should point at instead.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="inventory_panel" type="inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>Inventory as a tree: folders that open, items that can be dragged, and a filter over the whole of it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="joystick_quat" type="joystick_quat_t">
+    <xs:annotation>
+      <xs:documentation>A control dragged in two directions that answers with a rotation.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="joystick_rotate" type="joystick_rotate_t">
+    <xs:annotation>
+      <xs:documentation>The camera turned about what it is looking at.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="joystick_slide" type="joystick_slide_t">
+    <xs:annotation>
+      <xs:documentation>The camera moved sideways and up without turning.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="joystick_track" type="joystick_track_t">
+    <xs:annotation>
+      <xs:documentation>The camera moved along its own line of sight.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="joystick_turn" type="joystick_turn_t">
+    <xs:annotation>
+      <xs:documentation>The camera turned where it stands.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="labeled_back_button" type="labeled_back_button_t">
+    <xs:annotation>
+      <xs:documentation>A back button that says where back is.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="layout_panel" type="layout_panel_t">
+    <xs:annotation>
+      <xs:documentation>One pane of a layout stack: it says how much room it wants and whether it gives any up.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="layout_stack" type="layout_stack_t">
+    <xs:annotation>
+      <xs:documentation>Panes in a row or a column, sharing the room out between them and giving a bar to drag where two of them meet.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="line_editor" type="line_editor_t">
+    <xs:annotation>
+      <xs:documentation>One line of text to type in, with what it will take and what it will not.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="list_view" type="list_view_t">
+    <xs:annotation>
+      <xs:documentation>Rows in a column, each a view of its own.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="loading_indicator" type="loading_indicator_t">
+    <xs:annotation>
+      <xs:documentation>A mark that says something is still coming, and nothing about how much of it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="locate" type="locate_t">
+    <xs:annotation>
+      <xs:documentation>A mark drawn where something is, for pointing at a place.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="location_input" type="location_input_t">
+    <xs:annotation>
+      <xs:documentation>The address bar: where this account is, and somewhere else to type.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu" type="menu_t">
+    <xs:annotation>
+      <xs:documentation>A list of things that can be done, opened from a bar, a button or a right click.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_bar" type="menu_bar_t">
+    <xs:annotation>
+      <xs:documentation>The row of menus along the top of a window, which also answers that window's keyboard shortcuts.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_button" type="menu_button_t">
+    <xs:annotation>
+      <xs:documentation>A button that opens a menu instead of doing one thing.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_holder" type="menu_holder_t">
+    <xs:annotation>
+      <xs:documentation>What open menus are drawn in, above everything else in the window.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_item" type="menu_item_t">
+    <xs:annotation>
+      <xs:documentation>One line of a menu.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_item_call" type="menu_item_call_t">
+    <xs:annotation>
+      <xs:documentation>A menu line that does something when it is chosen.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_item_check" type="menu_item_check_t">
+    <xs:annotation>
+      <xs:documentation>A menu line that is on or off, and says which.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_item_separator" type="menu_item_separator_t">
+    <xs:annotation>
+      <xs:documentation>A line across a menu, to say the things above it and below it are different things.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="menu_item_tear_off" type="menu_item_tear_off_t">
+    <xs:annotation>
+      <xs:documentation>The line at the top of a menu that takes the menu out into a window of its own.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="multi_floater" type="multi_floater_t">
+    <xs:annotation>
+      <xs:documentation>A window holding other windows as tabs, each of which can be torn back out.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="multi_slider" type="multi_slider_t">
+    <xs:annotation>
+      <xs:documentation>One track with more than one thumb on it, for a set of values in the same range.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="multi_slider_bar" type="multi_slider_bar_t">
+    <xs:annotation>
+      <xs:documentation>The track a multi slider's thumbs run along, without the numbers beside it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="name_box" type="name_box_t">
+    <xs:annotation>
+      <xs:documentation>A resident's name, fetched by key and filled in when it arrives.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="name_editor" type="name_editor_t">
+    <xs:annotation>
+      <xs:documentation>A resident's name that can also be typed into.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="name_list" type="name_list_t">
+    <xs:annotation>
+      <xs:documentation>A list of names fetched by key, which fill themselves in as they arrive.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="net_map" type="net_map_t">
+    <xs:annotation>
+      <xs:documentation>The little map: this region and its neighbours, with what is on them.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="notification_list_view" type="notification_list_view_t">
+    <xs:annotation>
+      <xs:documentation>Notifications as a list, in the order they arrived.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="outfit_gallery_item" type="outfit_gallery_item_t">
+    <xs:annotation>
+      <xs:documentation>One outfit as a picture with its name under it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="output_monitor" type="output_monitor_t">
+    <xs:annotation>
+      <xs:documentation>Whether a resident is speaking, and how loudly.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="panel" type="panel_t">
+    <xs:annotation>
+      <xs:documentation>A region of a window: something to put things in, with a background and a border if it wants them.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="panel_camera_item" type="panel_camera_item_t">
+    <xs:annotation>
+      <xs:documentation>One camera preset as a row that can be chosen.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="panel_container" type="panel_container_t">
+    <xs:annotation>
+      <xs:documentation>A panel holding other panels, one of which is showing.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="panel_inventory_object" type="panel_inventory_object_t">
+    <xs:annotation>
+      <xs:documentation>One inventory object shown as a panel rather than as a row.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="placeholder" type="placeholder_t">
+    <xs:annotation>
+      <xs:documentation>A view that holds a space until something is put in it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="places_inventory_panel" type="places_inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>Landmarks as an inventory panel.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="profile_drop_target" type="profile_drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes a resident dragged onto it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="profile_image" type="profile_image_t">
+    <xs:annotation>
+      <xs:documentation>A profile picture, with a way to change it where that is allowed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="progress_bar" type="progress_bar_t">
+    <xs:annotation>
+      <xs:documentation>How far along something is, when that is known.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="property_grid" type="property_grid_t">
+    <xs:annotation>
+      <xs:documentation>One row per field of a thing, with the editor each field's type asks for, under headings.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="pull_button" type="pull_button_t">
+    <xs:annotation>
+      <xs:documentation>A button with a menu that opens by pulling it in a direction.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="radio_group" type="radio_group_t">
+    <xs:annotation>
+      <xs:documentation>One answer out of a few, all of them shown at once.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="recent_inventory_panel" type="recent_inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>What has arrived in inventory lately, newest first.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="script_editor" type="script_editor_t">
+    <xs:annotation>
+      <xs:documentation>Script text, with its keywords coloured, its lines numbered and its errors pointed at.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="scroll_bar" type="scroll_bar_t">
+    <xs:annotation>
+      <xs:documentation>The bar that says how much of something is being seen and moves what part of it that is.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="scroll_container" type="scroll_container_t">
+    <xs:annotation>
+      <xs:documentation>A window onto something bigger than itself, with bars for reaching the rest.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="scroll_list" type="scroll_list_t">
+    <xs:annotation>
+      <xs:documentation>Rows and columns of text, sorted by a heading, with one or more of them chosen.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="scrolling_panel_list" type="scrolling_panel_list_t">
+    <xs:annotation>
+      <xs:documentation>Panels stacked in a column that scrolls.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="search_combo_box" type="search_combo_box_t">
+    <xs:annotation>
+      <xs:documentation>A line to search in, with what has been searched for before under it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="search_editor" type="search_editor_t">
+    <xs:annotation>
+      <xs:documentation>A line to search in, with the button that starts the search.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="settings_drop_target" type="settings_drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes an environment setting dragged onto it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="simple_text_editor" type="simple_text_editor_t">
+    <xs:annotation>
+      <xs:documentation>Text to type into, over more than one line, with nothing coloured.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="single_folder_inventory_panel" type="single_folder_inventory_panel_t">
+    <xs:annotation>
+      <xs:documentation>One inventory folder at a time, rather than the whole tree.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="slider" type="slider_t">
+    <xs:annotation>
+      <xs:documentation>A number chosen by dragging along a track, with the number written beside it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="slider_bar" type="slider_bar_t">
+    <xs:annotation>
+      <xs:documentation>The track a slider's thumb runs along, without the number beside it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="snapshot_floater_view" type="snapshot_floater_view_t">
+    <xs:annotation>
+      <xs:documentation>What the snapshot window is drawn in, so it can be placed against the picture being taken.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="sound_drop_target" type="sound_drop_target_t">
+    <xs:annotation>
+      <xs:documentation>A region that takes a sound dragged onto it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="spinner" type="spinner_t">
+    <xs:annotation>
+      <xs:documentation>A number typed in or stepped by its arrows, between the two ends it is given.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="split_button" type="split_button_t">
+    <xs:annotation>
+      <xs:documentation>A button with a second half that offers the other things it could do.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="stat_bar" type="stat_bar_t">
+    <xs:annotation>
+      <xs:documentation>One measurement over time, drawn as a bar or a line, with what it is called and what it is in.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="stat_view" type="stat_view_t">
+    <xs:annotation>
+      <xs:documentation>A group of measurements shown together, which folds away as one.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="sun_moon_trackball" type="sun_moon_trackball_t">
+    <xs:annotation>
+      <xs:documentation>Where the sun and the moon are, dragged about the sky rather than typed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="tab_container" type="tab_container_t">
+    <xs:annotation>
+      <xs:documentation>Pages sharing one region, with a strip of tabs saying which is showing.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="teleport_history_menu_item" type="teleport_history_menu_item_t">
+    <xs:annotation>
+      <xs:documentation>One place this account has been, as a menu line that goes back there.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="text" type="text_t">
+    <xs:annotation>
+      <xs:documentation>Words to read: it is not typed into and it is not pressed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="text_chat" type="text_chat_t">
+    <xs:annotation>
+      <xs:documentation>What has been said in chat, laid out for reading rather than for editing.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="text_editor" type="text_editor_t">
+    <xs:annotation>
+      <xs:documentation>Text to type into, over more than one line, with what it will take and what it will not.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="texture_picker" type="texture_picker_t">
+    <xs:annotation>
+      <xs:documentation>A picture chosen out of inventory, with a swatch of what is chosen.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="thumbnail" type="thumbnail_t">
+    <xs:annotation>
+      <xs:documentation>A small picture standing for a larger thing, with a way to change it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="toggleable_menu" type="toggleable_menu_t">
+    <xs:annotation>
+      <xs:documentation>A menu that closes when the thing that opened it is pressed again.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="tool_tip" type="tool_tip_t">
+    <xs:annotation>
+      <xs:documentation>What is said about the thing under the pointer when it has rested there.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="toolbar" type="toolbar_t">
+    <xs:annotation>
+      <xs:documentation>Buttons in a strip, which can be arranged and can carry their labels or not.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="toolbar_view" type="toolbar_view_t">
+    <xs:annotation>
+      <xs:documentation>The four edges a toolbar can be docked to, and what is docked where.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="tooltip_view" type="tooltip_view_t">
+    <xs:annotation>
+      <xs:documentation>What tool tips are drawn in, above everything else in the window.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="ui_ctrl" type="ui_ctrl_t">
+    <xs:annotation>
+      <xs:documentation>Anything that can be interacted with: it can take focus, hold a value and say when that value changed.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="view" type="view_t">
+    <xs:annotation>
+      <xs:documentation>The plainest thing there is: a rect, children, and the rules for where it goes when its parent changes size.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="view_border" type="view_border_t">
+    <xs:annotation>
+      <xs:documentation>A line round a region, for saying where one thing ends and the next begins.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="wearable_items_list" type="wearable_items_list_t">
+    <xs:annotation>
+      <xs:documentation>What can be worn, as a list, with what is worn already marked.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="web_browser" type="web_browser_t">
+    <xs:annotation>
+      <xs:documentation>A page rendered in the viewer, with what it is allowed to do.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="window_shade" type="window_shade_t">
+    <xs:annotation>
+      <xs:documentation>A panel that rolls down over what it covers to say something about it.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <xs:element name="xy_vector" type="xy_vector_t">
+    <xs:annotation>
+      <xs:documentation>Two numbers chosen at once by pointing at where they meet.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
 
   <xs:complexType name="accordion_t" mixed="true">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
@@ -343,8 +917,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -354,6 +930,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -1119,8 +1696,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -1130,6 +1709,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -1761,8 +2341,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -1772,6 +2354,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -2531,8 +3114,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -2542,6 +3127,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -3199,8 +3785,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -3210,6 +3798,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -3869,8 +4458,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -3880,6 +4471,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -4443,8 +5035,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -4454,6 +5048,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -4884,8 +5479,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -4895,6 +5492,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -5533,8 +6131,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -5544,6 +6144,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -6307,8 +6908,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -6318,6 +6921,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -7078,8 +7682,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -7089,6 +7695,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -7897,8 +8504,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -7908,6 +8517,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -8275,8 +8885,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -8286,6 +8898,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -9077,8 +9690,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -9088,6 +9703,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -9335,8 +9951,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -9346,6 +9964,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -9593,8 +10212,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -9604,6 +10225,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -10155,8 +10777,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -10166,6 +10790,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -10441,8 +11066,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -10452,6 +11079,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -12002,8 +12630,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -12013,6 +12643,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -12832,8 +13463,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -12843,6 +13476,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -13543,8 +14177,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -13554,6 +14190,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -13761,8 +14398,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -13772,6 +14411,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -14058,8 +14698,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -14069,6 +14711,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -14230,8 +14873,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -14241,6 +14886,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -14773,6 +15419,383 @@
     <xs:attribute name="width" type="xs:integer"/>
   </xs:complexType>
 
+  <xs:complexType name="dock_panel_t" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="accordion"/>
+      <xs:element ref="accordion_tab"/>
+      <xs:element ref="asset_filtered_inv_panel"/>
+      <xs:element ref="avatar_icon"/>
+      <xs:element ref="avatar_list"/>
+      <xs:element ref="badge"/>
+      <xs:element ref="block_list"/>
+      <xs:element ref="button"/>
+      <xs:element ref="chat_editor"/>
+      <xs:element ref="chat_history"/>
+      <xs:element ref="check_box"/>
+      <xs:element ref="chiclet_notification"/>
+      <xs:element ref="chiclet_offer"/>
+      <xs:element ref="chiclet_panel"/>
+      <xs:element ref="chiclet_script"/>
+      <xs:element ref="color_field"/>
+      <xs:element ref="color_picker"/>
+      <xs:element ref="color_swatch"/>
+      <xs:element ref="color_wheel"/>
+      <xs:element ref="combo_box"/>
+      <xs:element ref="console"/>
+      <xs:element ref="container_view"/>
+      <xs:element ref="context_menu"/>
+      <xs:element ref="conversation_log_list"/>
+      <xs:element ref="conversation_view_participant"/>
+      <xs:element ref="conversation_view_session"/>
+      <xs:element ref="curve_editor"/>
+      <xs:element ref="debug_view"/>
+      <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
+      <xs:element ref="drop_target"/>
+      <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
+      <xs:element ref="expandable_text"/>
+      <xs:element ref="favorites_bar"/>
+      <xs:element ref="favorites_inventory_panel"/>
+      <xs:element ref="filter_editor"/>
+      <xs:element ref="flags_field"/>
+      <xs:element ref="flat_list_view"/>
+      <xs:element ref="floater_view"/>
+      <xs:element ref="flyout_button"/>
+      <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
+      <xs:element ref="font_field"/>
+      <xs:element ref="fs_virtual_trackpad"/>
+      <xs:element ref="group_drop_target"/>
+      <xs:element ref="group_icon"/>
+      <xs:element ref="group_list"/>
+      <xs:element ref="hex_editor"/>
+      <xs:element ref="hint_popup"/>
+      <xs:element ref="icon"/>
+      <xs:element ref="icons_combo_box"/>
+      <xs:element ref="inbox_folder_view_folder"/>
+      <xs:element ref="inbox_folder_view_item"/>
+      <xs:element ref="inbox_inventory_panel"/>
+      <xs:element ref="inventory_gallery_item"/>
+      <xs:element ref="inventory_link_replace_drop_target"/>
+      <xs:element ref="inventory_panel"/>
+      <xs:element ref="joystick_quat"/>
+      <xs:element ref="joystick_rotate"/>
+      <xs:element ref="joystick_slide"/>
+      <xs:element ref="joystick_track"/>
+      <xs:element ref="joystick_turn"/>
+      <xs:element ref="labeled_back_button"/>
+      <xs:element ref="layout_stack"/>
+      <xs:element ref="line_editor"/>
+      <xs:element ref="list_view"/>
+      <xs:element ref="loading_indicator"/>
+      <xs:element ref="locate"/>
+      <xs:element ref="location_input"/>
+      <xs:element ref="menu"/>
+      <xs:element ref="menu_bar"/>
+      <xs:element ref="menu_button"/>
+      <xs:element ref="menu_holder"/>
+      <xs:element ref="multi_slider"/>
+      <xs:element ref="multi_slider_bar"/>
+      <xs:element ref="name_box"/>
+      <xs:element ref="name_editor"/>
+      <xs:element ref="name_list"/>
+      <xs:element ref="net_map"/>
+      <xs:element ref="notification_list_view"/>
+      <xs:element ref="outfit_gallery_item"/>
+      <xs:element ref="output_monitor"/>
+      <xs:element ref="panel"/>
+      <xs:element ref="panel_camera_item"/>
+      <xs:element ref="panel_container"/>
+      <xs:element ref="panel_inventory_object"/>
+      <xs:element ref="placeholder"/>
+      <xs:element ref="places_inventory_panel"/>
+      <xs:element ref="profile_drop_target"/>
+      <xs:element ref="profile_image"/>
+      <xs:element ref="progress_bar"/>
+      <xs:element ref="property_grid"/>
+      <xs:element ref="pull_button"/>
+      <xs:element ref="radio_group"/>
+      <xs:element ref="recent_inventory_panel"/>
+      <xs:element ref="script_editor"/>
+      <xs:element ref="scroll_bar"/>
+      <xs:element ref="scroll_container"/>
+      <xs:element ref="scroll_list"/>
+      <xs:element ref="scrolling_panel_list"/>
+      <xs:element ref="search_combo_box"/>
+      <xs:element ref="search_editor"/>
+      <xs:element ref="settings_drop_target"/>
+      <xs:element ref="simple_text_editor"/>
+      <xs:element ref="single_folder_inventory_panel"/>
+      <xs:element ref="slider"/>
+      <xs:element ref="slider_bar"/>
+      <xs:element ref="snapshot_floater_view"/>
+      <xs:element ref="sound_drop_target"/>
+      <xs:element ref="spinner"/>
+      <xs:element ref="split_button"/>
+      <xs:element ref="stat_view"/>
+      <xs:element ref="sun_moon_trackball"/>
+      <xs:element ref="tab_container"/>
+      <xs:element ref="teleport_history_menu_item"/>
+      <xs:element ref="text"/>
+      <xs:element ref="text_chat"/>
+      <xs:element ref="text_editor"/>
+      <xs:element ref="texture_picker"/>
+      <xs:element ref="thumbnail"/>
+      <xs:element ref="toggleable_menu"/>
+      <xs:element ref="tool_tip"/>
+      <xs:element ref="toolbar"/>
+      <xs:element ref="toolbar_view"/>
+      <xs:element ref="tooltip_view"/>
+      <xs:element ref="ui_ctrl"/>
+      <xs:element ref="view"/>
+      <xs:element ref="view_border"/>
+      <xs:element ref="wearable_items_list"/>
+      <xs:element ref="web_browser"/>
+      <xs:element ref="window_shade"/>
+      <xs:element ref="xy_vector"/>
+      <xs:element name="bg_alpha_color" type="al_any"/>
+      <xs:element name="bg_alpha_image" type="al_any"/>
+      <xs:element name="bg_alpha_image_overlay" type="al_any"/>
+      <xs:element name="bg_opaque_color" type="al_any"/>
+      <xs:element name="bg_opaque_image" type="al_any"/>
+      <xs:element name="bg_opaque_image_overlay" type="al_any"/>
+      <xs:element name="commit_callback" type="al_any"/>
+      <xs:element name="dock_panel.bg_alpha_color" type="al_any"/>
+      <xs:element name="dock_panel.bg_alpha_image" type="al_any"/>
+      <xs:element name="dock_panel.bg_alpha_image_overlay" type="al_any"/>
+      <xs:element name="dock_panel.bg_opaque_color" type="al_any"/>
+      <xs:element name="dock_panel.bg_opaque_image" type="al_any"/>
+      <xs:element name="dock_panel.bg_opaque_image_overlay" type="al_any"/>
+      <xs:element name="dock_panel.commit_callback" type="al_any"/>
+      <xs:element name="dock_panel.follows" type="al_any"/>
+      <xs:element name="dock_panel.font" type="al_any"/>
+      <xs:element name="dock_panel.highlight_dark_color" type="al_any"/>
+      <xs:element name="dock_panel.highlight_light_color" type="al_any"/>
+      <xs:element name="dock_panel.init_callback" type="al_any"/>
+      <xs:element name="dock_panel.initial_value" type="al_any"/>
+      <xs:element name="dock_panel.mouseenter_callback" type="al_any"/>
+      <xs:element name="dock_panel.mouseleave_callback" type="al_any"/>
+      <xs:element name="dock_panel.rect" type="al_any"/>
+      <xs:element name="dock_panel.shadow_dark_color" type="al_any"/>
+      <xs:element name="dock_panel.shadow_light_color" type="al_any"/>
+      <xs:element name="dock_panel.string" type="al_any"/>
+      <xs:element name="dock_panel.validate_callback" type="al_any"/>
+      <xs:element name="dock_panel.value" type="al_any"/>
+      <xs:element name="dock_panel.visible_callback" type="al_any"/>
+      <xs:element name="follows" type="al_any"/>
+      <xs:element name="font" type="al_any"/>
+      <xs:element name="highlight_dark_color" type="al_any"/>
+      <xs:element name="highlight_light_color" type="al_any"/>
+      <xs:element name="init_callback" type="al_any"/>
+      <xs:element name="initial_value" type="al_any"/>
+      <xs:element name="mouseenter_callback" type="al_any"/>
+      <xs:element name="mouseleave_callback" type="al_any"/>
+      <xs:element name="rect" type="al_any"/>
+      <xs:element name="shadow_dark_color" type="al_any"/>
+      <xs:element name="shadow_light_color" type="al_any"/>
+      <xs:element name="string" type="al_any"/>
+      <xs:element name="validate_callback" type="al_any"/>
+      <xs:element name="value" type="al_any"/>
+      <xs:element name="visible_callback" type="al_any"/>
+    </xs:choice>
+    <xs:attribute name="accepts_badge" type="xs:boolean"/>
+    <xs:attribute name="background_opaque" type="xs:boolean"/>
+    <xs:attribute name="background_visible" type="xs:boolean"/>
+    <xs:attribute name="bevel_style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="bright"/>
+          <xs:enumeration value="in"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="out"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="bg_alpha_color" type="xs:string"/>
+    <xs:attribute name="bg_alpha_color.alpha" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.blue" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.green" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.red" type="al_real"/>
+    <xs:attribute name="bg_alpha_image" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image.name" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image_overlay" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image_overlay.alpha" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.blue" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.green" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.red" type="al_real"/>
+    <xs:attribute name="bg_opaque_color" type="xs:string"/>
+    <xs:attribute name="bg_opaque_color.alpha" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.blue" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.green" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.red" type="al_real"/>
+    <xs:attribute name="bg_opaque_image" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image.name" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image_overlay" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image_overlay.alpha" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.blue" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.green" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.red" type="al_real"/>
+    <xs:attribute name="bg_visible" type="xs:boolean"/>
+    <xs:attribute name="border" type="xs:boolean"/>
+    <xs:attribute name="border_style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="line"/>
+          <xs:enumeration value="texture"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="border_thickness" type="xs:integer"/>
+    <xs:attribute name="border_visible" type="xs:boolean"/>
+    <xs:attribute name="bottom" type="xs:integer"/>
+    <xs:attribute name="bottom_delta" type="xs:integer"/>
+    <xs:attribute name="chrome" type="xs:boolean"/>
+    <xs:attribute name="class" type="xs:string"/>
+    <xs:attribute name="commit_callback" type="xs:string"/>
+    <xs:attribute name="commit_callback.control" type="xs:string"/>
+    <xs:attribute name="commit_callback.function" type="xs:string"/>
+    <xs:attribute name="commit_callback.name" type="xs:string"/>
+    <xs:attribute name="commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="control_name" type="xs:string"/>
+    <xs:attribute name="default_tab_group" type="xs:integer"/>
+    <xs:attribute name="disabled_control" type="xs:string"/>
+    <xs:attribute name="enabled" type="xs:boolean"/>
+    <xs:attribute name="enabled_control" type="xs:string"/>
+    <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="focus_root" type="xs:boolean"/>
+    <xs:attribute name="follows" type="xs:string"/>
+    <xs:attribute name="follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="font" type="xs:string"/>
+    <xs:attribute name="font.name" type="xs:string"/>
+    <xs:attribute name="font.size" type="xs:string"/>
+    <xs:attribute name="font.style" type="xs:string"/>
+    <xs:attribute name="from_xui" type="xs:boolean"/>
+    <xs:attribute name="halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="height" type="xs:integer"/>
+    <xs:attribute name="help_topic" type="xs:string"/>
+    <xs:attribute name="highlight_dark_color" type="xs:string"/>
+    <xs:attribute name="highlight_dark_color.alpha" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.blue" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.green" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.red" type="al_real"/>
+    <xs:attribute name="highlight_light_color" type="xs:string"/>
+    <xs:attribute name="highlight_light_color.alpha" type="al_real"/>
+    <xs:attribute name="highlight_light_color.blue" type="al_real"/>
+    <xs:attribute name="highlight_light_color.green" type="al_real"/>
+    <xs:attribute name="highlight_light_color.red" type="al_real"/>
+    <xs:attribute name="hover_cursor" type="xs:string"/>
+    <xs:attribute name="init_callback" type="xs:string"/>
+    <xs:attribute name="init_callback.control" type="xs:string"/>
+    <xs:attribute name="init_callback.function" type="xs:string"/>
+    <xs:attribute name="init_callback.name" type="xs:string"/>
+    <xs:attribute name="init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="initial_value" type="xs:string"/>
+    <xs:attribute name="invisibility_control" type="xs:string"/>
+    <xs:attribute name="invisiblity_control" type="xs:string"/>
+    <xs:attribute name="label" type="xs:string"/>
+    <xs:attribute name="layout" type="xs:string"/>
+    <xs:attribute name="left" type="xs:integer"/>
+    <xs:attribute name="left_delta" type="xs:integer"/>
+    <xs:attribute name="left_pad" type="xs:integer"/>
+    <xs:attribute name="length" type="xs:string"/>
+    <xs:attribute name="min_height" type="xs:integer"/>
+    <xs:attribute name="min_width" type="xs:integer"/>
+    <xs:attribute name="mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="rect" type="xs:string"/>
+    <xs:attribute name="rect.bottom" type="xs:integer"/>
+    <xs:attribute name="rect.height" type="xs:integer"/>
+    <xs:attribute name="rect.left" type="xs:integer"/>
+    <xs:attribute name="rect.right" type="xs:integer"/>
+    <xs:attribute name="rect.top" type="xs:integer"/>
+    <xs:attribute name="rect.width" type="xs:integer"/>
+    <xs:attribute name="requests_front" type="xs:boolean"/>
+    <xs:attribute name="right" type="xs:integer"/>
+    <xs:attribute name="shadow_dark_color" type="xs:string"/>
+    <xs:attribute name="shadow_dark_color.alpha" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.blue" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.green" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.red" type="al_real"/>
+    <xs:attribute name="shadow_light_color" type="xs:string"/>
+    <xs:attribute name="shadow_light_color.alpha" type="al_real"/>
+    <xs:attribute name="shadow_light_color.blue" type="al_real"/>
+    <xs:attribute name="shadow_light_color.green" type="al_real"/>
+    <xs:attribute name="shadow_light_color.red" type="al_real"/>
+    <xs:attribute name="sound_flags" type="xs:integer"/>
+    <xs:attribute name="string.name" type="xs:string"/>
+    <xs:attribute name="string.translate" type="xs:string"/>
+    <xs:attribute name="string.value" type="xs:string"/>
+    <xs:attribute name="style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="line"/>
+          <xs:enumeration value="texture"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="tab_group" type="xs:integer"/>
+    <xs:attribute name="tab_stop" type="xs:boolean"/>
+    <xs:attribute name="thickness" type="xs:integer"/>
+    <xs:attribute name="title" type="xs:string"/>
+    <xs:attribute name="tool_tip" type="xs:string"/>
+    <xs:attribute name="top" type="xs:integer"/>
+    <xs:attribute name="top_delta" type="xs:integer"/>
+    <xs:attribute name="top_pad" type="xs:integer"/>
+    <xs:attribute name="translate" type="xs:string"/>
+    <xs:attribute name="type" type="xs:string"/>
+    <xs:attribute name="use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="validate_callback" type="xs:string"/>
+    <xs:attribute name="validate_callback.control" type="xs:string"/>
+    <xs:attribute name="validate_callback.function" type="xs:string"/>
+    <xs:attribute name="validate_callback.name" type="xs:string"/>
+    <xs:attribute name="validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="value" type="xs:string"/>
+    <xs:attribute name="visibility_control" type="xs:string"/>
+    <xs:attribute name="visible" type="xs:boolean"/>
+    <xs:attribute name="visible_callback" type="xs:string"/>
+    <xs:attribute name="visible_callback.control" type="xs:string"/>
+    <xs:attribute name="visible_callback.function" type="xs:string"/>
+    <xs:attribute name="visible_callback.name" type="xs:string"/>
+    <xs:attribute name="visible_callback.parameter" type="xs:string"/>
+    <xs:attribute name="visible_callback.userdata" type="xs:string"/>
+    <xs:attribute name="visiblity_control" type="xs:string"/>
+    <xs:attribute name="width" type="xs:integer"/>
+  </xs:complexType>
+
   <xs:complexType name="drop_target_t">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element ref="accordion"/>
@@ -14804,8 +15827,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -14815,6 +15840,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -14978,8 +16004,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -14989,6 +16017,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -15213,6 +16242,387 @@
     <xs:attribute name="width" type="xs:integer"/>
   </xs:complexType>
 
+  <xs:complexType name="empty_state_t" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="accordion"/>
+      <xs:element ref="accordion_tab"/>
+      <xs:element ref="asset_filtered_inv_panel"/>
+      <xs:element ref="avatar_icon"/>
+      <xs:element ref="avatar_list"/>
+      <xs:element ref="badge"/>
+      <xs:element ref="block_list"/>
+      <xs:element ref="button"/>
+      <xs:element ref="chat_editor"/>
+      <xs:element ref="chat_history"/>
+      <xs:element ref="check_box"/>
+      <xs:element ref="chiclet_notification"/>
+      <xs:element ref="chiclet_offer"/>
+      <xs:element ref="chiclet_panel"/>
+      <xs:element ref="chiclet_script"/>
+      <xs:element ref="color_field"/>
+      <xs:element ref="color_picker"/>
+      <xs:element ref="color_swatch"/>
+      <xs:element ref="color_wheel"/>
+      <xs:element ref="combo_box"/>
+      <xs:element ref="console"/>
+      <xs:element ref="container_view"/>
+      <xs:element ref="context_menu"/>
+      <xs:element ref="conversation_log_list"/>
+      <xs:element ref="conversation_view_participant"/>
+      <xs:element ref="conversation_view_session"/>
+      <xs:element ref="curve_editor"/>
+      <xs:element ref="debug_view"/>
+      <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
+      <xs:element ref="drop_target"/>
+      <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
+      <xs:element ref="expandable_text"/>
+      <xs:element ref="favorites_bar"/>
+      <xs:element ref="favorites_inventory_panel"/>
+      <xs:element ref="filter_editor"/>
+      <xs:element ref="flags_field"/>
+      <xs:element ref="flat_list_view"/>
+      <xs:element ref="floater_view"/>
+      <xs:element ref="flyout_button"/>
+      <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
+      <xs:element ref="font_field"/>
+      <xs:element ref="fs_virtual_trackpad"/>
+      <xs:element ref="group_drop_target"/>
+      <xs:element ref="group_icon"/>
+      <xs:element ref="group_list"/>
+      <xs:element ref="hex_editor"/>
+      <xs:element ref="hint_popup"/>
+      <xs:element ref="icon"/>
+      <xs:element ref="icons_combo_box"/>
+      <xs:element ref="inbox_folder_view_folder"/>
+      <xs:element ref="inbox_folder_view_item"/>
+      <xs:element ref="inbox_inventory_panel"/>
+      <xs:element ref="inventory_gallery_item"/>
+      <xs:element ref="inventory_link_replace_drop_target"/>
+      <xs:element ref="inventory_panel"/>
+      <xs:element ref="joystick_quat"/>
+      <xs:element ref="joystick_rotate"/>
+      <xs:element ref="joystick_slide"/>
+      <xs:element ref="joystick_track"/>
+      <xs:element ref="joystick_turn"/>
+      <xs:element ref="labeled_back_button"/>
+      <xs:element ref="layout_stack"/>
+      <xs:element ref="line_editor"/>
+      <xs:element ref="list_view"/>
+      <xs:element ref="loading_indicator"/>
+      <xs:element ref="locate"/>
+      <xs:element ref="location_input"/>
+      <xs:element ref="menu"/>
+      <xs:element ref="menu_bar"/>
+      <xs:element ref="menu_button"/>
+      <xs:element ref="menu_holder"/>
+      <xs:element ref="multi_slider"/>
+      <xs:element ref="multi_slider_bar"/>
+      <xs:element ref="name_box"/>
+      <xs:element ref="name_editor"/>
+      <xs:element ref="name_list"/>
+      <xs:element ref="net_map"/>
+      <xs:element ref="notification_list_view"/>
+      <xs:element ref="outfit_gallery_item"/>
+      <xs:element ref="output_monitor"/>
+      <xs:element ref="panel"/>
+      <xs:element ref="panel_camera_item"/>
+      <xs:element ref="panel_container"/>
+      <xs:element ref="panel_inventory_object"/>
+      <xs:element ref="placeholder"/>
+      <xs:element ref="places_inventory_panel"/>
+      <xs:element ref="profile_drop_target"/>
+      <xs:element ref="profile_image"/>
+      <xs:element ref="progress_bar"/>
+      <xs:element ref="property_grid"/>
+      <xs:element ref="pull_button"/>
+      <xs:element ref="radio_group"/>
+      <xs:element ref="recent_inventory_panel"/>
+      <xs:element ref="script_editor"/>
+      <xs:element ref="scroll_bar"/>
+      <xs:element ref="scroll_container"/>
+      <xs:element ref="scroll_list"/>
+      <xs:element ref="scrolling_panel_list"/>
+      <xs:element ref="search_combo_box"/>
+      <xs:element ref="search_editor"/>
+      <xs:element ref="settings_drop_target"/>
+      <xs:element ref="simple_text_editor"/>
+      <xs:element ref="single_folder_inventory_panel"/>
+      <xs:element ref="slider"/>
+      <xs:element ref="slider_bar"/>
+      <xs:element ref="snapshot_floater_view"/>
+      <xs:element ref="sound_drop_target"/>
+      <xs:element ref="spinner"/>
+      <xs:element ref="split_button"/>
+      <xs:element ref="stat_view"/>
+      <xs:element ref="sun_moon_trackball"/>
+      <xs:element ref="tab_container"/>
+      <xs:element ref="teleport_history_menu_item"/>
+      <xs:element ref="text"/>
+      <xs:element ref="text_chat"/>
+      <xs:element ref="text_editor"/>
+      <xs:element ref="texture_picker"/>
+      <xs:element ref="thumbnail"/>
+      <xs:element ref="toggleable_menu"/>
+      <xs:element ref="tool_tip"/>
+      <xs:element ref="toolbar"/>
+      <xs:element ref="toolbar_view"/>
+      <xs:element ref="tooltip_view"/>
+      <xs:element ref="ui_ctrl"/>
+      <xs:element ref="view"/>
+      <xs:element ref="view_border"/>
+      <xs:element ref="wearable_items_list"/>
+      <xs:element ref="web_browser"/>
+      <xs:element ref="window_shade"/>
+      <xs:element ref="xy_vector"/>
+      <xs:element name="bg_alpha_color" type="al_any"/>
+      <xs:element name="bg_alpha_image" type="al_any"/>
+      <xs:element name="bg_alpha_image_overlay" type="al_any"/>
+      <xs:element name="bg_opaque_color" type="al_any"/>
+      <xs:element name="bg_opaque_image" type="al_any"/>
+      <xs:element name="bg_opaque_image_overlay" type="al_any"/>
+      <xs:element name="commit_callback" type="al_any"/>
+      <xs:element name="empty_state.bg_alpha_color" type="al_any"/>
+      <xs:element name="empty_state.bg_alpha_image" type="al_any"/>
+      <xs:element name="empty_state.bg_alpha_image_overlay" type="al_any"/>
+      <xs:element name="empty_state.bg_opaque_color" type="al_any"/>
+      <xs:element name="empty_state.bg_opaque_image" type="al_any"/>
+      <xs:element name="empty_state.bg_opaque_image_overlay" type="al_any"/>
+      <xs:element name="empty_state.commit_callback" type="al_any"/>
+      <xs:element name="empty_state.follows" type="al_any"/>
+      <xs:element name="empty_state.font" type="al_any"/>
+      <xs:element name="empty_state.highlight_dark_color" type="al_any"/>
+      <xs:element name="empty_state.highlight_light_color" type="al_any"/>
+      <xs:element name="empty_state.init_callback" type="al_any"/>
+      <xs:element name="empty_state.initial_value" type="al_any"/>
+      <xs:element name="empty_state.mouseenter_callback" type="al_any"/>
+      <xs:element name="empty_state.mouseleave_callback" type="al_any"/>
+      <xs:element name="empty_state.rect" type="al_any"/>
+      <xs:element name="empty_state.shadow_dark_color" type="al_any"/>
+      <xs:element name="empty_state.shadow_light_color" type="al_any"/>
+      <xs:element name="empty_state.string" type="al_any"/>
+      <xs:element name="empty_state.validate_callback" type="al_any"/>
+      <xs:element name="empty_state.value" type="al_any"/>
+      <xs:element name="empty_state.visible_callback" type="al_any"/>
+      <xs:element name="follows" type="al_any"/>
+      <xs:element name="font" type="al_any"/>
+      <xs:element name="highlight_dark_color" type="al_any"/>
+      <xs:element name="highlight_light_color" type="al_any"/>
+      <xs:element name="init_callback" type="al_any"/>
+      <xs:element name="initial_value" type="al_any"/>
+      <xs:element name="mouseenter_callback" type="al_any"/>
+      <xs:element name="mouseleave_callback" type="al_any"/>
+      <xs:element name="rect" type="al_any"/>
+      <xs:element name="shadow_dark_color" type="al_any"/>
+      <xs:element name="shadow_light_color" type="al_any"/>
+      <xs:element name="string" type="al_any"/>
+      <xs:element name="validate_callback" type="al_any"/>
+      <xs:element name="value" type="al_any"/>
+      <xs:element name="visible_callback" type="al_any"/>
+    </xs:choice>
+    <xs:attribute name="accepts_badge" type="xs:boolean"/>
+    <xs:attribute name="action" type="xs:string"/>
+    <xs:attribute name="background_opaque" type="xs:boolean"/>
+    <xs:attribute name="background_visible" type="xs:boolean"/>
+    <xs:attribute name="bevel_style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="bright"/>
+          <xs:enumeration value="in"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="out"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="bg_alpha_color" type="xs:string"/>
+    <xs:attribute name="bg_alpha_color.alpha" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.blue" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.green" type="al_real"/>
+    <xs:attribute name="bg_alpha_color.red" type="al_real"/>
+    <xs:attribute name="bg_alpha_image" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image.name" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image_overlay" type="xs:string"/>
+    <xs:attribute name="bg_alpha_image_overlay.alpha" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.blue" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.green" type="al_real"/>
+    <xs:attribute name="bg_alpha_image_overlay.red" type="al_real"/>
+    <xs:attribute name="bg_opaque_color" type="xs:string"/>
+    <xs:attribute name="bg_opaque_color.alpha" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.blue" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.green" type="al_real"/>
+    <xs:attribute name="bg_opaque_color.red" type="al_real"/>
+    <xs:attribute name="bg_opaque_image" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image.name" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image_overlay" type="xs:string"/>
+    <xs:attribute name="bg_opaque_image_overlay.alpha" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.blue" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.green" type="al_real"/>
+    <xs:attribute name="bg_opaque_image_overlay.red" type="al_real"/>
+    <xs:attribute name="bg_visible" type="xs:boolean"/>
+    <xs:attribute name="border" type="xs:boolean"/>
+    <xs:attribute name="border_style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="line"/>
+          <xs:enumeration value="texture"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="border_thickness" type="xs:integer"/>
+    <xs:attribute name="border_visible" type="xs:boolean"/>
+    <xs:attribute name="bottom" type="xs:integer"/>
+    <xs:attribute name="bottom_delta" type="xs:integer"/>
+    <xs:attribute name="chrome" type="xs:boolean"/>
+    <xs:attribute name="class" type="xs:string"/>
+    <xs:attribute name="commit_callback" type="xs:string"/>
+    <xs:attribute name="commit_callback.control" type="xs:string"/>
+    <xs:attribute name="commit_callback.function" type="xs:string"/>
+    <xs:attribute name="commit_callback.name" type="xs:string"/>
+    <xs:attribute name="commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="control_name" type="xs:string"/>
+    <xs:attribute name="default_tab_group" type="xs:integer"/>
+    <xs:attribute name="disabled_control" type="xs:string"/>
+    <xs:attribute name="enabled" type="xs:boolean"/>
+    <xs:attribute name="enabled_control" type="xs:string"/>
+    <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="focus_root" type="xs:boolean"/>
+    <xs:attribute name="follows" type="xs:string"/>
+    <xs:attribute name="follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="font" type="xs:string"/>
+    <xs:attribute name="font.name" type="xs:string"/>
+    <xs:attribute name="font.size" type="xs:string"/>
+    <xs:attribute name="font.style" type="xs:string"/>
+    <xs:attribute name="from_xui" type="xs:boolean"/>
+    <xs:attribute name="halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="headline" type="xs:string"/>
+    <xs:attribute name="height" type="xs:integer"/>
+    <xs:attribute name="help_topic" type="xs:string"/>
+    <xs:attribute name="highlight_dark_color" type="xs:string"/>
+    <xs:attribute name="highlight_dark_color.alpha" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.blue" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.green" type="al_real"/>
+    <xs:attribute name="highlight_dark_color.red" type="al_real"/>
+    <xs:attribute name="highlight_light_color" type="xs:string"/>
+    <xs:attribute name="highlight_light_color.alpha" type="al_real"/>
+    <xs:attribute name="highlight_light_color.blue" type="al_real"/>
+    <xs:attribute name="highlight_light_color.green" type="al_real"/>
+    <xs:attribute name="highlight_light_color.red" type="al_real"/>
+    <xs:attribute name="hover_cursor" type="xs:string"/>
+    <xs:attribute name="icon" type="xs:string"/>
+    <xs:attribute name="init_callback" type="xs:string"/>
+    <xs:attribute name="init_callback.control" type="xs:string"/>
+    <xs:attribute name="init_callback.function" type="xs:string"/>
+    <xs:attribute name="init_callback.name" type="xs:string"/>
+    <xs:attribute name="init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="initial_value" type="xs:string"/>
+    <xs:attribute name="invisibility_control" type="xs:string"/>
+    <xs:attribute name="invisiblity_control" type="xs:string"/>
+    <xs:attribute name="label" type="xs:string"/>
+    <xs:attribute name="layout" type="xs:string"/>
+    <xs:attribute name="left" type="xs:integer"/>
+    <xs:attribute name="left_delta" type="xs:integer"/>
+    <xs:attribute name="left_pad" type="xs:integer"/>
+    <xs:attribute name="length" type="xs:string"/>
+    <xs:attribute name="min_height" type="xs:integer"/>
+    <xs:attribute name="min_width" type="xs:integer"/>
+    <xs:attribute name="mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="rect" type="xs:string"/>
+    <xs:attribute name="rect.bottom" type="xs:integer"/>
+    <xs:attribute name="rect.height" type="xs:integer"/>
+    <xs:attribute name="rect.left" type="xs:integer"/>
+    <xs:attribute name="rect.right" type="xs:integer"/>
+    <xs:attribute name="rect.top" type="xs:integer"/>
+    <xs:attribute name="rect.width" type="xs:integer"/>
+    <xs:attribute name="requests_front" type="xs:boolean"/>
+    <xs:attribute name="right" type="xs:integer"/>
+    <xs:attribute name="sentence" type="xs:string"/>
+    <xs:attribute name="shadow_dark_color" type="xs:string"/>
+    <xs:attribute name="shadow_dark_color.alpha" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.blue" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.green" type="al_real"/>
+    <xs:attribute name="shadow_dark_color.red" type="al_real"/>
+    <xs:attribute name="shadow_light_color" type="xs:string"/>
+    <xs:attribute name="shadow_light_color.alpha" type="al_real"/>
+    <xs:attribute name="shadow_light_color.blue" type="al_real"/>
+    <xs:attribute name="shadow_light_color.green" type="al_real"/>
+    <xs:attribute name="shadow_light_color.red" type="al_real"/>
+    <xs:attribute name="sound_flags" type="xs:integer"/>
+    <xs:attribute name="string.name" type="xs:string"/>
+    <xs:attribute name="string.translate" type="xs:string"/>
+    <xs:attribute name="string.value" type="xs:string"/>
+    <xs:attribute name="style">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="line"/>
+          <xs:enumeration value="texture"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="tab_group" type="xs:integer"/>
+    <xs:attribute name="tab_stop" type="xs:boolean"/>
+    <xs:attribute name="thickness" type="xs:integer"/>
+    <xs:attribute name="title" type="xs:string"/>
+    <xs:attribute name="tool_tip" type="xs:string"/>
+    <xs:attribute name="top" type="xs:integer"/>
+    <xs:attribute name="top_delta" type="xs:integer"/>
+    <xs:attribute name="top_pad" type="xs:integer"/>
+    <xs:attribute name="translate" type="xs:string"/>
+    <xs:attribute name="type" type="xs:string"/>
+    <xs:attribute name="use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="validate_callback" type="xs:string"/>
+    <xs:attribute name="validate_callback.control" type="xs:string"/>
+    <xs:attribute name="validate_callback.function" type="xs:string"/>
+    <xs:attribute name="validate_callback.name" type="xs:string"/>
+    <xs:attribute name="validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="value" type="xs:string"/>
+    <xs:attribute name="visibility_control" type="xs:string"/>
+    <xs:attribute name="visible" type="xs:boolean"/>
+    <xs:attribute name="visible_callback" type="xs:string"/>
+    <xs:attribute name="visible_callback.control" type="xs:string"/>
+    <xs:attribute name="visible_callback.function" type="xs:string"/>
+    <xs:attribute name="visible_callback.name" type="xs:string"/>
+    <xs:attribute name="visible_callback.parameter" type="xs:string"/>
+    <xs:attribute name="visible_callback.userdata" type="xs:string"/>
+    <xs:attribute name="visiblity_control" type="xs:string"/>
+    <xs:attribute name="width" type="xs:integer"/>
+  </xs:complexType>
+
   <xs:complexType name="expandable_text_t" mixed="true">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element ref="accordion"/>
@@ -15244,8 +16654,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -15255,6 +16667,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -15899,8 +17312,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -15910,6 +17325,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -16559,8 +17975,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -16570,6 +17988,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -17328,8 +18747,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -17339,6 +18760,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -18497,8 +19919,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -18508,6 +19932,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -19114,8 +20539,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -19125,6 +20552,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -19598,8 +21026,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -19609,6 +21039,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -19855,8 +21286,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -19866,6 +21299,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -21727,8 +23161,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -21738,6 +23174,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -21914,6 +23351,266 @@
     <xs:attribute name="width" type="xs:integer"/>
   </xs:complexType>
 
+  <xs:complexType name="follows_control_t" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="accordion"/>
+      <xs:element ref="accordion_tab"/>
+      <xs:element ref="asset_filtered_inv_panel"/>
+      <xs:element ref="avatar_icon"/>
+      <xs:element ref="avatar_list"/>
+      <xs:element ref="badge"/>
+      <xs:element ref="block_list"/>
+      <xs:element ref="button"/>
+      <xs:element ref="chat_editor"/>
+      <xs:element ref="chat_history"/>
+      <xs:element ref="check_box"/>
+      <xs:element ref="chiclet_notification"/>
+      <xs:element ref="chiclet_offer"/>
+      <xs:element ref="chiclet_panel"/>
+      <xs:element ref="chiclet_script"/>
+      <xs:element ref="color_field"/>
+      <xs:element ref="color_picker"/>
+      <xs:element ref="color_swatch"/>
+      <xs:element ref="color_wheel"/>
+      <xs:element ref="combo_box"/>
+      <xs:element ref="console"/>
+      <xs:element ref="container_view"/>
+      <xs:element ref="context_menu"/>
+      <xs:element ref="conversation_log_list"/>
+      <xs:element ref="conversation_view_participant"/>
+      <xs:element ref="conversation_view_session"/>
+      <xs:element ref="curve_editor"/>
+      <xs:element ref="debug_view"/>
+      <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
+      <xs:element ref="drop_target"/>
+      <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
+      <xs:element ref="expandable_text"/>
+      <xs:element ref="favorites_bar"/>
+      <xs:element ref="favorites_inventory_panel"/>
+      <xs:element ref="filter_editor"/>
+      <xs:element ref="flags_field"/>
+      <xs:element ref="flat_list_view"/>
+      <xs:element ref="floater_view"/>
+      <xs:element ref="flyout_button"/>
+      <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
+      <xs:element ref="font_field"/>
+      <xs:element ref="fs_virtual_trackpad"/>
+      <xs:element ref="group_drop_target"/>
+      <xs:element ref="group_icon"/>
+      <xs:element ref="group_list"/>
+      <xs:element ref="hex_editor"/>
+      <xs:element ref="hint_popup"/>
+      <xs:element ref="icon"/>
+      <xs:element ref="icons_combo_box"/>
+      <xs:element ref="inbox_folder_view_folder"/>
+      <xs:element ref="inbox_folder_view_item"/>
+      <xs:element ref="inbox_inventory_panel"/>
+      <xs:element ref="inventory_gallery_item"/>
+      <xs:element ref="inventory_link_replace_drop_target"/>
+      <xs:element ref="inventory_panel"/>
+      <xs:element ref="joystick_quat"/>
+      <xs:element ref="joystick_rotate"/>
+      <xs:element ref="joystick_slide"/>
+      <xs:element ref="joystick_track"/>
+      <xs:element ref="joystick_turn"/>
+      <xs:element ref="labeled_back_button"/>
+      <xs:element ref="layout_stack"/>
+      <xs:element ref="line_editor"/>
+      <xs:element ref="list_view"/>
+      <xs:element ref="loading_indicator"/>
+      <xs:element ref="locate"/>
+      <xs:element ref="location_input"/>
+      <xs:element ref="menu"/>
+      <xs:element ref="menu_bar"/>
+      <xs:element ref="menu_button"/>
+      <xs:element ref="menu_holder"/>
+      <xs:element ref="multi_slider"/>
+      <xs:element ref="multi_slider_bar"/>
+      <xs:element ref="name_box"/>
+      <xs:element ref="name_editor"/>
+      <xs:element ref="name_list"/>
+      <xs:element ref="net_map"/>
+      <xs:element ref="notification_list_view"/>
+      <xs:element ref="outfit_gallery_item"/>
+      <xs:element ref="output_monitor"/>
+      <xs:element ref="panel"/>
+      <xs:element ref="panel_camera_item"/>
+      <xs:element ref="panel_container"/>
+      <xs:element ref="panel_inventory_object"/>
+      <xs:element ref="placeholder"/>
+      <xs:element ref="places_inventory_panel"/>
+      <xs:element ref="profile_drop_target"/>
+      <xs:element ref="profile_image"/>
+      <xs:element ref="progress_bar"/>
+      <xs:element ref="property_grid"/>
+      <xs:element ref="pull_button"/>
+      <xs:element ref="radio_group"/>
+      <xs:element ref="recent_inventory_panel"/>
+      <xs:element ref="script_editor"/>
+      <xs:element ref="scroll_bar"/>
+      <xs:element ref="scroll_container"/>
+      <xs:element ref="scroll_list"/>
+      <xs:element ref="scrolling_panel_list"/>
+      <xs:element ref="search_combo_box"/>
+      <xs:element ref="search_editor"/>
+      <xs:element ref="settings_drop_target"/>
+      <xs:element ref="simple_text_editor"/>
+      <xs:element ref="single_folder_inventory_panel"/>
+      <xs:element ref="slider"/>
+      <xs:element ref="slider_bar"/>
+      <xs:element ref="snapshot_floater_view"/>
+      <xs:element ref="sound_drop_target"/>
+      <xs:element ref="spinner"/>
+      <xs:element ref="split_button"/>
+      <xs:element ref="stat_view"/>
+      <xs:element ref="sun_moon_trackball"/>
+      <xs:element ref="tab_container"/>
+      <xs:element ref="teleport_history_menu_item"/>
+      <xs:element ref="text"/>
+      <xs:element ref="text_chat"/>
+      <xs:element ref="text_editor"/>
+      <xs:element ref="texture_picker"/>
+      <xs:element ref="thumbnail"/>
+      <xs:element ref="toggleable_menu"/>
+      <xs:element ref="tool_tip"/>
+      <xs:element ref="toolbar"/>
+      <xs:element ref="toolbar_view"/>
+      <xs:element ref="tooltip_view"/>
+      <xs:element ref="ui_ctrl"/>
+      <xs:element ref="view"/>
+      <xs:element ref="view_border"/>
+      <xs:element ref="wearable_items_list"/>
+      <xs:element ref="web_browser"/>
+      <xs:element ref="window_shade"/>
+      <xs:element ref="xy_vector"/>
+      <xs:element name="commit_callback" type="al_any"/>
+      <xs:element name="follows" type="al_any"/>
+      <xs:element name="follows_control.commit_callback" type="al_any"/>
+      <xs:element name="follows_control.follows" type="al_any"/>
+      <xs:element name="follows_control.font" type="al_any"/>
+      <xs:element name="follows_control.init_callback" type="al_any"/>
+      <xs:element name="follows_control.initial_value" type="al_any"/>
+      <xs:element name="follows_control.mouseenter_callback" type="al_any"/>
+      <xs:element name="follows_control.mouseleave_callback" type="al_any"/>
+      <xs:element name="follows_control.rect" type="al_any"/>
+      <xs:element name="follows_control.validate_callback" type="al_any"/>
+      <xs:element name="follows_control.value" type="al_any"/>
+      <xs:element name="font" type="al_any"/>
+      <xs:element name="init_callback" type="al_any"/>
+      <xs:element name="initial_value" type="al_any"/>
+      <xs:element name="mouseenter_callback" type="al_any"/>
+      <xs:element name="mouseleave_callback" type="al_any"/>
+      <xs:element name="rect" type="al_any"/>
+      <xs:element name="validate_callback" type="al_any"/>
+      <xs:element name="value" type="al_any"/>
+    </xs:choice>
+    <xs:attribute name="bottom" type="xs:integer"/>
+    <xs:attribute name="bottom_delta" type="xs:integer"/>
+    <xs:attribute name="chrome" type="xs:boolean"/>
+    <xs:attribute name="commit_callback" type="xs:string"/>
+    <xs:attribute name="commit_callback.control" type="xs:string"/>
+    <xs:attribute name="commit_callback.function" type="xs:string"/>
+    <xs:attribute name="commit_callback.name" type="xs:string"/>
+    <xs:attribute name="commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="control_name" type="xs:string"/>
+    <xs:attribute name="default_tab_group" type="xs:integer"/>
+    <xs:attribute name="disabled_control" type="xs:string"/>
+    <xs:attribute name="enabled" type="xs:boolean"/>
+    <xs:attribute name="enabled_control" type="xs:string"/>
+    <xs:attribute name="focus_root" type="xs:boolean"/>
+    <xs:attribute name="follows" type="xs:string"/>
+    <xs:attribute name="follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="font" type="xs:string"/>
+    <xs:attribute name="font.name" type="xs:string"/>
+    <xs:attribute name="font.size" type="xs:string"/>
+    <xs:attribute name="font.style" type="xs:string"/>
+    <xs:attribute name="from_xui" type="xs:boolean"/>
+    <xs:attribute name="halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="height" type="xs:integer"/>
+    <xs:attribute name="hover_cursor" type="xs:string"/>
+    <xs:attribute name="init_callback" type="xs:string"/>
+    <xs:attribute name="init_callback.control" type="xs:string"/>
+    <xs:attribute name="init_callback.function" type="xs:string"/>
+    <xs:attribute name="init_callback.name" type="xs:string"/>
+    <xs:attribute name="init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="initial_value" type="xs:string"/>
+    <xs:attribute name="invisibility_control" type="xs:string"/>
+    <xs:attribute name="invisiblity_control" type="xs:string"/>
+    <xs:attribute name="label" type="xs:string"/>
+    <xs:attribute name="layout" type="xs:string"/>
+    <xs:attribute name="left" type="xs:integer"/>
+    <xs:attribute name="left_delta" type="xs:integer"/>
+    <xs:attribute name="left_pad" type="xs:integer"/>
+    <xs:attribute name="length" type="xs:string"/>
+    <xs:attribute name="mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="rect" type="xs:string"/>
+    <xs:attribute name="rect.bottom" type="xs:integer"/>
+    <xs:attribute name="rect.height" type="xs:integer"/>
+    <xs:attribute name="rect.left" type="xs:integer"/>
+    <xs:attribute name="rect.right" type="xs:integer"/>
+    <xs:attribute name="rect.top" type="xs:integer"/>
+    <xs:attribute name="rect.width" type="xs:integer"/>
+    <xs:attribute name="requests_front" type="xs:boolean"/>
+    <xs:attribute name="right" type="xs:integer"/>
+    <xs:attribute name="sound_flags" type="xs:integer"/>
+    <xs:attribute name="tab_group" type="xs:integer"/>
+    <xs:attribute name="tab_stop" type="xs:boolean"/>
+    <xs:attribute name="tool_tip" type="xs:string"/>
+    <xs:attribute name="top" type="xs:integer"/>
+    <xs:attribute name="top_delta" type="xs:integer"/>
+    <xs:attribute name="top_pad" type="xs:integer"/>
+    <xs:attribute name="translate" type="xs:string"/>
+    <xs:attribute name="type" type="xs:string"/>
+    <xs:attribute name="use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="validate_callback" type="xs:string"/>
+    <xs:attribute name="validate_callback.control" type="xs:string"/>
+    <xs:attribute name="validate_callback.function" type="xs:string"/>
+    <xs:attribute name="validate_callback.name" type="xs:string"/>
+    <xs:attribute name="validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="value" type="xs:string"/>
+    <xs:attribute name="visibility_control" type="xs:string"/>
+    <xs:attribute name="visible" type="xs:boolean"/>
+    <xs:attribute name="visiblity_control" type="xs:string"/>
+    <xs:attribute name="width" type="xs:integer"/>
+  </xs:complexType>
+
   <xs:complexType name="font_field_t" mixed="true">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element ref="accordion"/>
@@ -21945,8 +23642,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -21956,6 +23655,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -22203,8 +23903,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -22214,6 +23916,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -22566,8 +24269,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -22577,6 +24282,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -22741,8 +24447,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -22752,6 +24460,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -23381,8 +25090,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -23392,6 +25103,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -23638,8 +25350,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -23649,6 +25363,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -24055,8 +25770,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -24066,6 +25783,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -24329,8 +26047,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -24340,6 +26060,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -25892,8 +27613,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -25903,6 +27626,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -26257,8 +27981,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -26268,6 +27994,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -26622,8 +28349,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -26633,6 +28362,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -27391,8 +29121,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -27402,6 +29134,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -27765,8 +29498,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -27776,6 +29511,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -28307,8 +30043,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -28318,6 +30056,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -29075,8 +30814,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -29086,6 +30827,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -29659,8 +31401,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -29670,6 +31414,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -30243,8 +31988,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -30254,6 +32001,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -30827,8 +32575,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -30838,6 +32588,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -31411,8 +33162,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -31422,6 +33175,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -31995,8 +33749,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -32006,6 +33762,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -32569,8 +34326,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -32580,6 +34339,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -33021,8 +34781,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -33032,6 +34794,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -33563,8 +35326,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -33574,6 +35339,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -33841,8 +35607,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -33852,6 +35620,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -34103,8 +35872,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -34114,6 +35885,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -34360,8 +36132,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -34371,6 +36145,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -38766,8 +40541,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -38777,6 +40554,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -39361,8 +41139,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -39372,6 +41152,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -39735,8 +41516,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -39746,6 +41529,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -40016,8 +41800,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -40027,6 +41813,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -40321,8 +42108,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -40332,6 +42121,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -40634,8 +42424,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -40645,6 +42437,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -40923,8 +42716,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -40934,6 +42729,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -41204,8 +43000,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -41215,6 +43013,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -41688,8 +43487,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -41699,6 +43500,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -42001,8 +43803,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -42012,6 +43816,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -42330,8 +44135,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -42341,6 +44148,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -42707,8 +44515,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -42718,6 +44528,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -43251,8 +45062,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -43262,6 +45075,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -43767,8 +45581,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -43778,6 +45594,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -44391,8 +46208,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -44402,6 +46221,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -44765,8 +46585,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -44776,6 +46598,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -44965,8 +46788,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -44976,6 +46801,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -45339,8 +47165,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -45350,6 +47178,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -46388,8 +48217,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -46399,6 +48230,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -46854,8 +48686,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -46865,6 +48699,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -47229,8 +49064,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -47240,6 +49077,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -47603,8 +49441,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -47614,6 +49454,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -48373,8 +50214,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -48384,6 +50227,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -48547,8 +50391,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -48558,6 +50404,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -48821,8 +50668,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -48832,6 +50681,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -49100,8 +50950,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -49111,6 +50963,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -49475,8 +51328,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -49486,6 +51341,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -50050,8 +51906,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -50061,6 +51919,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -50314,8 +52173,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -50325,6 +52186,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -51083,8 +52945,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -51094,6 +52958,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -51523,8 +53388,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -51534,6 +53401,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -53218,8 +55086,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -53229,6 +55099,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -53730,8 +55601,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -53741,6 +55614,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -53990,8 +55864,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -54001,6 +55877,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -55862,8 +57739,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -55873,6 +57752,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -57031,8 +58911,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -57042,6 +58924,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -57204,8 +59087,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -57215,6 +59100,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -57642,8 +59528,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -57653,6 +59541,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -58411,8 +60300,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -58422,6 +60313,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -59565,8 +61457,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -59576,6 +61470,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -59884,8 +61779,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -59895,6 +61792,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -60141,8 +62039,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -60152,6 +62052,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -60314,8 +62215,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -60325,6 +62228,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -61230,8 +63134,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -61241,6 +63147,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -61989,8 +63896,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -62000,6 +63909,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -62233,8 +64143,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -62244,6 +64156,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -64637,8 +66550,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -64648,6 +66563,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -65102,8 +67018,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -65113,6 +67031,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -65429,8 +67348,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -65440,6 +67361,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -65804,8 +67726,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -65815,6 +67739,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -66180,8 +68105,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -66191,6 +68118,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -66618,8 +68546,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -66629,6 +68559,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -67386,8 +69317,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -67397,6 +69330,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -67903,8 +69837,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -67914,6 +69850,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -68308,8 +70245,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -68319,6 +70258,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -70039,8 +71979,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -70050,6 +71992,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -70296,8 +72239,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -70307,6 +72252,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -70469,8 +72415,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -70480,6 +72428,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -70726,8 +72675,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -70737,6 +72688,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -70899,8 +72851,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -70910,6 +72864,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -71493,8 +73448,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -71504,6 +73461,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -71883,8 +73841,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -71894,6 +73854,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
@@ -72160,8 +74121,10 @@
       <xs:element ref="curve_editor"/>
       <xs:element ref="debug_view"/>
       <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
       <xs:element ref="drop_target"/>
       <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
       <xs:element ref="expandable_text"/>
       <xs:element ref="favorites_bar"/>
       <xs:element ref="favorites_inventory_panel"/>
@@ -72171,6 +74134,7 @@
       <xs:element ref="floater_view"/>
       <xs:element ref="flyout_button"/>
       <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
       <xs:element ref="font_field"/>
       <xs:element ref="fs_virtual_trackpad"/>
       <xs:element ref="group_drop_target"/>
