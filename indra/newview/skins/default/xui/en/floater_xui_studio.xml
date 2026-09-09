@@ -22,6 +22,12 @@
     <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>
     <floater.string name="Reloaded">Reloaded after a change on disk.</floater.string>
     <floater.string name="NoResults">No matches.</floater.string>
+    <floater.string name="CanvasEmpty">Nothing is being previewed.</floater.string>
+    <floater.string name="CanvasOne">[FILE] in [SKIN]/[LANG]</floater.string>
+    <floater.string name="CanvasVariants">[FILE] in [SKIN], [LANG] beside [LANG2]</floater.string>
+    <floater.string name="CanvasWaiting">, holding while [FILE] waits</floater.string>
+    <floater.string name="CanvasHeld">The canvas is held on [FILE]; [PENDING] is built when the pin comes off.</floater.string>
+    <floater.string name="CanvasPinnedHere">The canvas is held on [FILE], which is the file the catalog is on.</floater.string>
     <floater.string name="EditTarget">Moves write to [FILE] in [LAYER]</floater.string>
     <floater.string name="EditNoTarget">Select an element to move it.</floater.string>
     <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
@@ -235,6 +241,38 @@
             </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_check
+             label="Navigator"
+             layout="topleft"
+             name="pane_navigator"
+             shortcut="control|0">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_navigator" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_navigator" />
+            </menu_item_check>
+            <menu_item_check
+             label="Inspectors"
+             layout="topleft"
+             name="pane_inspectors"
+             shortcut="control|alt|0">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_inspectors" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_inspectors" />
+            </menu_item_check>
+            <menu_item_check
+             label="Findings and Tables"
+             layout="topleft"
+             name="pane_bottom"
+             shortcut="control|shift|B">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="pane_bottom" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="pane_bottom" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check
+             label="Preview in a Window of its Own"
+             layout="topleft"
+             name="float_preview">
+                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="float_preview" />
+                <menu_item_check.on_click function="XUIStudio.Menu" parameter="float_preview" />
+            </menu_item_check>
+            <menu_item_check
              label="Build the Registered Floater"
              layout="topleft"
              name="real_floater">
@@ -345,7 +383,7 @@
      layout="topleft"
      left_pad="10"
      name="secondary_check"
-     tool_tip="Show a second preview in another language beside the first"
+     tool_tip="Build the file a second time in another language, on the canvas beside the first, sharing its selection"
      top_delta="3"
      width="66" />
     <combo_box
@@ -407,325 +445,939 @@
      top_delta="0"
      width="60" />
 
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Navigator"
+     layout="topleft"
+     left_pad="24"
+     name="fold_navigator"
+     tool_tip="The pane of files, the outline, search and the library, down the left (Control+0)"
+     top_delta="0"
+     width="72" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Tables"
+     layout="topleft"
+     left_pad="2"
+     name="fold_bottom"
+     tool_tip="The band under the canvas: findings, translation, notices and channels (Control+Shift+B)"
+     top_delta="0"
+     width="56" />
+    <button
+     follows="left|top"
+     height="22"
+     is_toggle="true"
+     label="Inspectors"
+     layout="topleft"
+     left_pad="2"
+     name="fold_inspectors"
+     tool_tip="The inspectors of the selected element, down the right (Control+Alt+0)"
+     top_delta="0"
+     width="76" />
+
     <layout_stack
      animate="false"
      follows="all"
      height="431"
      layout="topleft"
      left="8"
-     name="outer_stack"
-     orientation="vertical"
+     name="main_stack"
+     orientation="horizontal"
      top="70"
      width="1604">
 
-    <layout_panel
-     auto_resize="true"
-     height="474"
-     layout="topleft"
-     min_dim="200"
-     name="panes">
-
-    <layout_stack
-     animate="false"
-     follows="all"
-     height="474"
-     layout="topleft"
-     left="0"
-     name="main_stack"
-     orientation="horizontal"
-     top="0"
-     width="1604">
-
         <layout_panel
          auto_resize="false"
+         expanded_min_dim="220"
          height="474"
          layout="topleft"
-         min_dim="180"
-         name="catalog_panel"
+         min_dim="0"
+         name="navigator_panel"
          user_resize="true"
-         width="300">
-            <layout_stack
-             animate="false"
+         width="380">
+            <tab_container
              follows="all"
              height="474"
              layout="topleft"
              left="0"
-             name="catalog_stack"
-             orientation="vertical"
+             name="navigator_tabs"
+             tab_height="26"
+             tab_max_width="34"
+             tab_min_width="34"
+             tab_position="top"
              top="0"
-             width="300">
-                <layout_panel
-                 auto_resize="false"
-                 height="26"
+             width="380">
+                <panel
+                 follows="all"
+                 height="444"
+                 label=""
                  layout="topleft"
-                 name="catalog_filter_row">
-                    <filter_editor
-                     follows="left|top|right"
-                     height="22"
-                     label="Filter files"
-                     layout="topleft"
-                     left="0"
-                     name="catalog_filter"
-                     top="0"
-                     width="300" />
-                </layout_panel>
-                <layout_panel
-                 auto_resize="true"
-                 height="244"
-                 layout="topleft"
-                 min_dim="120"
-                 name="file_list_area">
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     multi_select="true"
+                 name="files_mode"
+                 tool_tip="Files: every XUI file in the skin, with the ones the chosen skin and language have of their own"
+                 width="376">
+                    <layout_stack
+                     animate="false"
                      follows="all"
-                     height="244"
+                     height="444"
                      layout="topleft"
                      left="0"
-                     name="file_list"
+                     name="files_stack"
+                     orientation="vertical"
                      top="0"
-                     width="300">
-                        <scroll_list.columns
-                         label="Kind"
-                         name="kind"
-                         width="58" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="File"
-                         name="name" />
-                        <scroll_list.columns
-                         label="L"
-                         name="lang"
-                         tool_tip="The chosen language has a file"
-                         width="20" />
-                        <scroll_list.columns
-                         label="S"
-                         name="skin"
-                         tool_tip="The chosen skin has a file"
-                         width="20" />
-                    </scroll_list>
-                </layout_panel>
-                <layout_panel
-                 auto_resize="false"
-                 height="30"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="file_list_area"
+                         width="376">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             multi_select="true"
+                             follows="all"
+                             height="418"
+                             layout="topleft"
+                             left="0"
+                             name="file_list"
+                             top="0"
+                             width="376">
+                                <scroll_list.columns
+                                 label="Kind"
+                                 name="kind"
+                                 width="58" />
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="File"
+                                 name="name" />
+                                <scroll_list.columns
+                                 label="L"
+                                 name="lang"
+                                 tool_tip="The chosen language has a file"
+                                 width="20" />
+                                <scroll_list.columns
+                                 label="S"
+                                 name="skin"
+                                 tool_tip="The chosen skin has a file"
+                                 width="20" />
+                            </scroll_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="catalog_filter_row"
+                         width="376">
+                            <filter_editor
+                             follows="left|top|right"
+                             height="22"
+                             label="Filter files"
+                             layout="topleft"
+                             left="0"
+                             name="catalog_filter"
+                             top="2"
+                             width="376" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label=""
                  layout="topleft"
-                 name="find_row">
-                    <text
-                     follows="left|top"
-                     height="16"
-                     layout="topleft"
-                     left="0"
-                     name="find_label"
-                     top="7"
-                     width="34">Find</text>
-                    <combo_box
-                     follows="left|top"
-                     height="22"
-                     layout="topleft"
-                     left_pad="2"
-                     name="find_field"
-                     top_delta="-3"
-                     width="84">
-                        <combo_box.item label="Any" name="any" value="any" />
-                        <combo_box.item label="Tag" name="tag" value="tag" />
-                        <combo_box.item label="Attribute" name="attribute" value="attribute" />
-                        <combo_box.item label="Value" name="value" value="value" />
-                        <combo_box.item label="Name" name="name" value="name" />
-                        <combo_box.item label="Text" name="text" value="text" />
-                    </combo_box>
-                    <line_editor
-                     follows="left|top|right"
-                     height="22"
-                     layout="topleft"
-                     left_pad="4"
-                     name="find_query"
-                     tool_tip="Search every file and layer; Enter runs it"
-                     top_delta="0"
-                     width="176" />
-                </layout_panel>
-                <layout_panel
-                 auto_resize="false"
-                 height="150"
-                 layout="topleft"
-                 min_dim="60"
-                 name="find_results_area"
-                 user_resize="true">
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     multi_select="true"
+                 name="outline_mode"
+                 tool_tip="Outline: the tree of the previewed file, with its filter and the buttons that reorder it"
+                 width="376">
+                    <layout_stack
+                     animate="false"
                      follows="all"
-                     height="150"
+                     height="444"
                      layout="topleft"
                      left="0"
-                     name="find_results"
+                     name="tree_stack"
+                     orientation="vertical"
                      top="0"
-                     width="300">
-                        <scroll_list.columns
-                         label="File"
-                         name="file"
-                         width="110" />
-                        <scroll_list.columns
-                         label="Line"
-                         name="line"
-                         width="36" />
-                        <scroll_list.columns
-                         label="Layer"
-                         name="layer"
-                         width="60" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Match"
-                         name="snippet" />
-                    </scroll_list>
-                </layout_panel>
-            </layout_stack>
-        </layout_panel>
-
-        <layout_panel
-         auto_resize="false"
-         height="474"
-         layout="topleft"
-         min_dim="180"
-         name="tree_panel"
-         user_resize="true"
-         width="360">
-            <layout_stack
-             animate="false"
-             follows="all"
-             height="474"
-             layout="topleft"
-             left="0"
-             name="tree_stack"
-             orientation="vertical"
-             top="0"
-             width="360">
-                <layout_panel
-                 auto_resize="false"
-                 height="26"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="348"
+                         layout="topleft"
+                         min_dim="120"
+                         name="tree_area"
+                         width="376">
+                            <panel
+                             follows="all"
+                             height="348"
+                             layout="topleft"
+                             left="0"
+                             name="tree_host"
+                             top="0"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="breadcrumb_row"
+                         width="376">
+                            <panel
+                             follows="left|top|right"
+                             height="22"
+                             layout="topleft"
+                             left="0"
+                             name="breadcrumb"
+                             top="0"
+                             width="376" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="18"
+                         layout="topleft"
+                         min_dim="18"
+                         name="edit_target_row"
+                         width="376">
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left="0"
+                             name="edit_target"
+                             text_color="LabelDisabledColor"
+                             tool_tip="Ctrl-click an element in the preview to select it and Ctrl-drag to move it; the middle handle moves it and the corners and edges resize it; arrows move it a pixel and ten with shift; a plain click works the widget itself"
+                             top="0"
+                             width="376">Select an element to move it.</text>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="tree_buttons_row"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Up"
+                             layout="topleft"
+                             left="0"
+                             name="tree_up"
+                             tool_tip="Move the element before the one above it (Control+Up)"
+                             top="2"
+                             width="38" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Down"
+                             layout="topleft"
+                             left_pad="2"
+                             name="tree_down"
+                             tool_tip="Move the element after the one below it (Control+Down)"
+                             top_delta="0"
+                             width="46" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="In"
+                             layout="topleft"
+                             left_pad="6"
+                             name="tree_in"
+                             tool_tip="Make it a child of the element above it (Control+Right)"
+                             top_delta="0"
+                             width="34" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Out"
+                             layout="topleft"
+                             left_pad="2"
+                             name="tree_out"
+                             tool_tip="Make it a sibling of its parent (Control+Left)"
+                             top_delta="0"
+                             width="40" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="tree_filter_row"
+                         width="376">
+                            <filter_editor
+                             follows="left|top|right"
+                             height="22"
+                             label="Filter by name or tag"
+                             layout="topleft"
+                             left="0"
+                             name="tree_filter"
+                             top="2"
+                             width="376" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label=""
                  layout="topleft"
-                 name="tree_filter_row">
-                    <filter_editor
-                     follows="left|top|right"
-                     height="22"
-                     label="Filter by name or tag"
-                     layout="topleft"
-                     left="0"
-                     name="tree_filter"
-                     top="0"
-                     width="186" />
-                    <button
-                     follows="top|right"
-                     height="22"
-                     label="Up"
-                     layout="topleft"
-                     left_pad="6"
-                     name="tree_up"
-                     tool_tip="Move the element before the one above it (Control+Up)"
-                     top_delta="0"
-                     width="38" />
-                    <button
-                     follows="top|right"
-                     height="22"
-                     label="Down"
-                     layout="topleft"
-                     left_pad="2"
-                     name="tree_down"
-                     tool_tip="Move the element after the one below it (Control+Down)"
-                     top_delta="0"
-                     width="46" />
-                    <button
-                     follows="top|right"
-                     height="22"
-                     label="In"
-                     layout="topleft"
-                     left_pad="6"
-                     name="tree_in"
-                     tool_tip="Make it a child of the element above it (Control+Right)"
-                     top_delta="0"
-                     width="34" />
-                    <button
-                     follows="top|right"
-                     height="22"
-                     label="Out"
-                     layout="topleft"
-                     left_pad="2"
-                     name="tree_out"
-                     tool_tip="Make it a sibling of its parent (Control+Left)"
-                     top_delta="0"
-                     width="40" />
-                </layout_panel>
-                <layout_panel
-                 auto_resize="true"
-                 height="406"
-                 layout="topleft"
-                 min_dim="150"
-                 name="tree_area">
-                    <panel
+                 name="find_mode"
+                 tool_tip="Find: a search across every file and every layer"
+                 width="376">
+                    <layout_stack
+                     animate="false"
                      follows="all"
-                     height="406"
+                     height="444"
                      layout="topleft"
                      left="0"
-                     name="tree_host"
+                     name="find_stack"
+                     orientation="vertical"
                      top="0"
-                     width="360" />
-                </layout_panel>
-                <layout_panel
-                 auto_resize="false"
-                 height="26"
+                     width="376">
+                        <layout_panel
+                         auto_resize="false"
+                         height="30"
+                         layout="topleft"
+                         min_dim="30"
+                         name="find_row"
+                         width="376">
+                            <text
+                             follows="left|top"
+                             height="16"
+                             layout="topleft"
+                             left="0"
+                             name="find_label"
+                             top="7"
+                             width="34">Find</text>
+                            <combo_box
+                             follows="left|top"
+                             height="22"
+                             layout="topleft"
+                             left_pad="2"
+                             name="find_field"
+                             top_delta="-3"
+                             width="84">
+                                <combo_box.item label="Any" name="any" value="any" />
+                                <combo_box.item label="Tag" name="tag" value="tag" />
+                                <combo_box.item label="Attribute" name="attribute" value="attribute" />
+                                <combo_box.item label="Value" name="value" value="value" />
+                                <combo_box.item label="Name" name="name" value="name" />
+                                <combo_box.item label="Text" name="text" value="text" />
+                            </combo_box>
+                            <line_editor
+                             follows="left|top|right"
+                             height="22"
+                             layout="topleft"
+                             left_pad="4"
+                             name="find_query"
+                             tool_tip="Search every file and layer; Enter runs it"
+                             top_delta="0"
+                             width="252" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="414"
+                         layout="topleft"
+                         min_dim="60"
+                         name="find_results_area"
+                         width="376">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             multi_select="true"
+                             follows="all"
+                             height="414"
+                             layout="topleft"
+                             left="0"
+                             name="find_results"
+                             top="0"
+                             width="376">
+                                <scroll_list.columns
+                                 label="File"
+                                 name="file"
+                                 width="110" />
+                                <scroll_list.columns
+                                 label="Line"
+                                 name="line"
+                                 width="36" />
+                                <scroll_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="60" />
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="Match"
+                                 name="snippet" />
+                            </scroll_list>
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label=""
                  layout="topleft"
-                 name="breadcrumb_row">
-                    <panel
-                     follows="left|top|right"
-                     height="22"
+                 name="palette_mode"
+                 tool_tip="Library: the tags the selected element may contain"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
                      layout="topleft"
                      left="0"
-                     name="breadcrumb"
+                     name="palette_stack"
+                     orientation="vertical"
                      top="0"
-                     width="360" />
-                </layout_panel>
-                <layout_panel
-                 auto_resize="false"
-                 height="18"
-                 layout="topleft"
-                 name="edit_target_row">
-                    <text
-                     follows="left|top|right"
-                     height="16"
-                     layout="topleft"
-                     left="0"
-                     name="edit_target"
-                     text_color="LabelDisabledColor"
-                     tool_tip="Ctrl-click an element in the preview to select it and Ctrl-drag to move it; the middle handle moves it and the corners and edges resize it; arrows move it a pixel and ten with shift; a plain click works the widget itself"
-                     top="0"
-                     width="360">Select an element to move it.</text>
-                </layout_panel>
-            </layout_stack>
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="palette_area"
+                         width="376">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="418"
+                             layout="topleft"
+                             left="0"
+                             name="palette"
+                             tool_tip="The tags the selected element may contain, from the registry it names as its children"
+                             top="0"
+                             width="376">
+                                <scroll_list.columns
+                                 label="Tag"
+                                 name="tag"
+                                 width="170" />
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="Takes"
+                                 name="takes" />
+                            </scroll_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="palette_foot"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Insert"
+                             layout="topleft"
+                             left="0"
+                             name="palette_insert"
+                             tool_tip="Put one of these under the selected element, with a name and where it goes and nothing else"
+                             top="2"
+                             width="64" />
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+            </tab_container>
         </layout_panel>
 
         <layout_panel
          auto_resize="true"
          height="474"
          layout="topleft"
-         min_dim="160"
+         min_dim="400"
          name="canvas_panel"
          user_resize="true"
-         width="320">
-            <scroll_container
+         width="744">
+            <layout_stack
+             animate="false"
              follows="all"
              height="474"
              layout="topleft"
              left="0"
-             name="canvas_area"
+             name="centre_stack"
+             orientation="vertical"
              top="0"
-             width="320" />
+             width="744">
+
+
+                <layout_panel
+                 auto_resize="false"
+                 height="24"
+                 layout="topleft"
+                 min_dim="24"
+                 name="canvas_head"
+                 width="744">
+                    <button
+                     follows="left|top"
+                     height="20"
+                     is_toggle="true"
+                     label="Shown"
+                     layout="topleft"
+                     left="0"
+                     name="canvas_shown"
+                     tool_tip="Hide the preview and give the room to what is being read about it; what is on the canvas stays built"
+                     top="2"
+                     width="54" />
+                    <button
+                     follows="left|top"
+                     height="20"
+                     is_toggle="true"
+                     label="Pin"
+                     layout="topleft"
+                     left_pad="2"
+                     name="canvas_pinned"
+                     tool_tip="Hold the canvas on this file while the catalog is read; the file chosen meanwhile is taken when the pin comes off"
+                     top_delta="0"
+                     width="42" />
+                    <text
+                     follows="left|top|right"
+                     height="16"
+                     layout="topleft"
+                     left_pad="8"
+                     name="canvas_title"
+                     top_delta="3"
+                     use_ellipses="true"
+                     width="636" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="450"
+                 layout="topleft"
+                 min_dim="80"
+                 name="canvas_body"
+                 width="744">
+                    <scroll_container
+                     follows="all"
+                     height="450"
+                     layout="topleft"
+                     left="0"
+                     name="canvas_area"
+                     top="0"
+                     width="744" />
+                </layout_panel>
+
+            <layout_panel
+             auto_resize="false"
+             expanded_min_dim="120"
+             height="180"
+             layout="topleft"
+             min_dim="0"
+             name="bottom_panel"
+             user_resize="true"
+             width="744">
+                <tab_container
+                 follows="all"
+                 height="180"
+                 layout="topleft"
+                 left="0"
+                 name="bottom_tabs"
+                 tab_height="20"
+                 tab_position="top"
+                 top="0"
+                 width="744">
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Findings"
+                     layout="topleft"
+                     name="findings_mode"
+                     tool_tip="What the parser, the factory, the layer merge and the rules found in this file"
+                     width="742">
+                        <scroll_list
+                         column_padding="0"
+                         draw_heading="true"
+                         multi_select="true"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="findings"
+                         tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+                         top="0"
+                         width="742">
+                            <scroll_list.columns
+                             label=""
+                             name="severity"
+                             tool_tip="error, warning or note"
+                             width="52" />
+                            <scroll_list.columns
+                             label="Rule"
+                             name="rule"
+                             width="110" />
+                            <scroll_list.columns
+                             label="Line"
+                             name="line"
+                             width="44" />
+                            <scroll_list.columns
+                             dynamic_width="true"
+                             label="Where"
+                             name="where" />
+                            <scroll_list.columns
+                             dynamic_width="true"
+                             label="What"
+                             name="message" />
+                        </scroll_list>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Translation"
+                     layout="topleft"
+                     name="translation_mode"
+                     tool_tip="One row per field a translator writes, for the chosen language"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="translation_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="translate_head"
+                             width="742">
+                                <text
+                                 follows="left|top"
+                                 height="16"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_label"
+                                 top="4"
+                                 width="58">Language</text>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="2"
+                                 name="translate_language"
+                                 tool_tip="The language this table is about, which the second variant on the canvas shows"
+                                 top_delta="-3"
+                                 width="56" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair file"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_repair_file"
+                                 tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
+                                 top_delta="0"
+                                 width="80" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair language"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="translate_repair_all"
+                                 tool_tip="The same over every file this language has"
+                                 top_delta="0"
+                                 width="110" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Repair roots"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="translate_repair_roots"
+                                 tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
+                                 top_delta="0"
+                                 width="92" />
+                                <text
+                                 follows="left|top|right"
+                                 height="16"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_counts"
+                                 top_delta="3"
+                                 use_ellipses="true"
+                                 width="284" />
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="true"
+                             height="106"
+                             layout="topleft"
+                             min_dim="48"
+                             name="translate_table"
+                             width="742">
+                                <scroll_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 multi_select="true"
+                                 follows="all"
+                                 height="106"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_list"
+                                 tool_tip="One row per field a translator writes; double-click selects the element"
+                                 top="0"
+                                 width="742">
+                                    <scroll_list.columns
+                                     label="Where"
+                                     name="path"
+                                     width="160" />
+                                    <scroll_list.columns
+                                     label="Field"
+                                     name="field"
+                                     width="80" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="English"
+                                     name="english" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="Translation"
+                                     name="translation" />
+                                    <scroll_list.columns
+                                     label="State"
+                                     name="state"
+                                     width="120" />
+                                    <scroll_list.columns
+                                     label="Fits"
+                                     name="fits"
+                                     tool_tip="Whether the translation fits its widget in the second variant"
+                                     width="36" />
+                                </scroll_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="translate_write_row"
+                             width="742">
+                                <line_editor
+                                 follows="left|top|right"
+                                 height="22"
+                                 label="Select a row above to translate it"
+                                 layout="topleft"
+                                 left="0"
+                                 name="translate_value"
+                                 select_on_focus="true"
+                                 tool_tip="The translation for the selected row; Return writes it into the language's file"
+                                 top="2"
+                                 width="658" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Write"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="translate_write"
+                                 tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
+                                 top_delta="0"
+                                 width="80" />
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Notices"
+                     layout="topleft"
+                     name="notifications_mode"
+                     tool_tip="Every template notifications.xml declares, and the panel each would produce"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="notifications_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="true"
+                             height="132"
+                             layout="topleft"
+                             min_dim="60"
+                             name="notifications_area"
+                             width="742">
+                                <scroll_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 follows="all"
+                                 height="132"
+                                 layout="topleft"
+                                 left="0"
+                                 name="notifications"
+                                 tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
+                                 top="0"
+                                 width="742">
+                                    <scroll_list.columns
+                                     label="Name"
+                                     name="name"
+                                     width="240" />
+                                    <scroll_list.columns
+                                     label="Type"
+                                     name="type"
+                                     width="90" />
+                                    <scroll_list.columns
+                                     label="Buttons"
+                                     name="buttons"
+                                     width="60" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="Message"
+                                     name="message" />
+                                </scroll_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="notification_foot"
+                             width="742">
+                                <filter_editor
+                                 follows="left|top|right"
+                                 height="22"
+                                 label="Filter"
+                                 layout="topleft"
+                                 left="0"
+                                 name="notification_filter"
+                                 top="2"
+                                 width="674" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Post"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="notification_post"
+                                 tool_tip="Send the selected notification for real, through the channels, as the viewer would"
+                                 top_delta="0"
+                                 width="64" />
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="Channels"
+                     layout="topleft"
+                     name="channels_mode"
+                     tool_tip="What the notification system did with what was posted"
+                     width="742">
+                        <layout_stack
+                         animate="false"
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="channels_stack"
+                         orientation="vertical"
+                         top="0"
+                         width="742">
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="channel_head"
+                             width="742">
+                                <text
+                                 follows="left|top"
+                                 height="16"
+                                 layout="topleft"
+                                 left="0"
+                                 name="channel_label"
+                                 top="4"
+                                 width="58">Respond</text>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="2"
+                                 name="channel_response"
+                                 tool_tip="The buttons the selected notification's form declares"
+                                 top_delta="-3"
+                                 width="180" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Respond"
+                                 layout="topleft"
+                                 left_pad="8"
+                                 name="channel_respond"
+                                 tool_tip="Answer the notification as a user would, which is a real answer"
+                                 top_delta="0"
+                                 width="70" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Clear"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="channel_clear"
+                                 tool_tip="Empty the list; what has already been through the channels stays through them"
+                                 top_delta="0"
+                                 width="60" />
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="true"
+                             height="132"
+                             layout="topleft"
+                             min_dim="60"
+                             name="channels_area"
+                             width="742">
+                                <scroll_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 follows="all"
+                                 height="132"
+                                 layout="topleft"
+                                 left="0"
+                                 name="channels"
+                                 tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
+                                 top="0"
+                                 width="742">
+                                    <scroll_list.columns
+                                     label="Channel"
+                                     name="channel"
+                                     width="140" />
+                                    <scroll_list.columns
+                                     label="Notification"
+                                     name="name"
+                                     width="200" />
+                                    <scroll_list.columns
+                                     label="Time"
+                                     name="time"
+                                     width="80" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="Message"
+                                     name="message" />
+                                </scroll_list>
+                            </layout_panel>
+                        </layout_stack>
+                    </panel>
+                </tab_container>
+            </layout_panel>
+
+            </layout_stack>
         </layout_panel>
         <layout_panel
          auto_resize="false"
+         expanded_min_dim="260"
          height="474"
          layout="topleft"
-         min_dim="260"
+         min_dim="0"
          name="inspector_panel"
          user_resize="true"
          width="480">
@@ -954,388 +1606,6 @@
                 </panel>
             </tab_container>
         </layout_panel>
-    </layout_stack>
-
-    </layout_panel>
-
-        <layout_panel
-         auto_resize="false"
-         height="200"
-         layout="topleft"
-         min_dim="60"
-         name="findings_area"
-         user_resize="true">
-            <tab_container
-             follows="all"
-             height="200"
-             layout="topleft"
-             left="0"
-             name="bottom_tabs"
-             tab_height="20"
-             tab_position="top"
-             top="0"
-             width="1604">
-                <panel
-                 label="Findings"
-                 layout="topleft"
-                 follows="all"
-                 height="178"
-                 name="findings_pane"
-                 width="1602">
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     multi_select="true"
-                     follows="all"
-                     height="178"
-                     layout="topleft"
-                     left="0"
-                     name="findings"
-                     tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
-                     top="0"
-                     width="1602">
-                        <scroll_list.columns
-                         label=""
-                         name="severity"
-                         tool_tip="error, warning or note"
-                         width="52" />
-                        <scroll_list.columns
-                         label="Rule"
-                         name="rule"
-                         width="110" />
-                        <scroll_list.columns
-                         label="Line"
-                         name="line"
-                         width="44" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Where"
-                         name="where" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="What"
-                         name="message" />
-                    </scroll_list>
-                </panel>
-                <panel
-                 follows="all"
-                 height="178"
-                 label="Translation"
-                 layout="topleft"
-                 name="translation_pane"
-                 width="1602">
-                    <layout_stack
-                     animate="false"
-                     follows="all"
-                     height="178"
-                     layout="topleft"
-                     left="0"
-                     name="translation_stack"
-                     orientation="vertical"
-                     top="0"
-                     width="1602">
-                        <layout_panel
-                         auto_resize="false"
-                         height="26"
-                         name="translate_head">
-                        <text
-                         follows="left|top"
-                         height="16"
-                         layout="topleft"
-                         left="0"
-                         name="translate_label"
-                         top="4"
-                         width="58">Language</text>
-                        <combo_box
-                         follows="left|top"
-                         height="22"
-                         layout="topleft"
-                         left_pad="2"
-                         name="translate_language"
-                         tool_tip="The language this table is about, which the second preview shows"
-                         top_delta="-3"
-                         width="56" />
-                        <button
-                         follows="left|top"
-                         height="22"
-                         label="Repair file"
-                         layout="topleft"
-                         left_pad="12"
-                         name="translate_repair_file"
-                         tool_tip="Move every value this file writes at a path the base has moved on from, and change nothing else"
-                         top_delta="0"
-                         width="80" />
-                        <button
-                         follows="left|top"
-                         height="22"
-                         label="Repair language"
-                         layout="topleft"
-                         left_pad="4"
-                         name="translate_repair_all"
-                         tool_tip="The same over every file this language has"
-                         top_delta="0"
-                         width="110" />
-                        <button
-                         follows="left|top"
-                         height="22"
-                         label="Repair roots"
-                         layout="topleft"
-                         left_pad="4"
-                         name="translate_repair_roots"
-                         tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
-                         top_delta="0"
-                         width="92" />
-                        <text
-                         follows="left|top|right"
-                         height="16"
-                         layout="topleft"
-                         left_pad="12"
-                         name="translate_counts"
-                         top_delta="3"
-                         use_ellipses="true"
-                         width="660" />
-                        </layout_panel>
-                        <layout_panel
-                         auto_resize="true"
-                         height="120"
-                         min_dim="48"
-                         name="translate_table">
-                        <scroll_list
-                         column_padding="0"
-                         draw_heading="true"
-                         multi_select="true"
-                         follows="all"
-                         height="120"
-                         layout="topleft"
-                         left="0"
-                         name="translate_list"
-                         tool_tip="One row per field a translator writes; double-click selects the element"
-                         top="0"
-                         width="1602">
-                            <scroll_list.columns
-                             label="Where"
-                             name="path"
-                             width="200" />
-                            <scroll_list.columns
-                             label="Field"
-                             name="field"
-                             width="90" />
-                            <scroll_list.columns
-                             dynamic_width="true"
-                             label="English"
-                             name="english" />
-                            <scroll_list.columns
-                             dynamic_width="true"
-                             label="Translation"
-                             name="translation" />
-                            <scroll_list.columns
-                             label="State"
-                             name="state"
-                             width="150" />
-                            <scroll_list.columns
-                             label="Fits"
-                             name="fits"
-                             tool_tip="Whether the translation fits its widget in the second preview"
-                             width="40" />
-                        </scroll_list>
-                        </layout_panel>
-                        <layout_panel
-                         auto_resize="false"
-                         height="24"
-                         name="translate_write_row">
-                        <line_editor
-                         follows="left|top|right"
-                         height="22"
-                         label="Select a row above to translate it"
-                         layout="topleft"
-                         left="0"
-                         name="translate_value"
-                         select_on_focus="true"
-                         tool_tip="The translation for the selected row; Return writes it into the language's file"
-                         top="0"
-                         width="1080" />
-                        <button
-                         follows="right|top"
-                         height="22"
-                         label="Write"
-                         layout="topleft"
-                         left_pad="4"
-                         name="translate_write"
-                         tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
-                         top_delta="0"
-                         width="80" />
-                        </layout_panel>
-                    </layout_stack>
-                </panel>
-                <panel
-                 label="Notifications"
-                 layout="topleft"
-                 follows="all"
-                 height="178"
-                 name="notifications_pane"
-                 width="1602">
-                    <filter_editor
-                     follows="left|top"
-                     height="22"
-                     label="Filter"
-                     layout="topleft"
-                     left="0"
-                     name="notification_filter"
-                     top="2"
-                     width="240" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Post"
-                     layout="topleft"
-                     left_pad="12"
-                     name="notification_post"
-                     tool_tip="Send the selected notification for real, through the channels, as the viewer would"
-                     top_delta="0"
-                     width="60" />
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     follows="all"
-                     height="150"
-                     layout="topleft"
-                     left="0"
-                     name="notifications"
-                     tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
-                     top="28"
-                     width="1602">
-                        <scroll_list.columns
-                         label="Name"
-                         name="name"
-                         width="240" />
-                        <scroll_list.columns
-                         label="Type"
-                         name="type"
-                         width="90" />
-                        <scroll_list.columns
-                         label="Buttons"
-                         name="buttons"
-                         width="60" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Message"
-                         name="message" />
-                    </scroll_list>
-                </panel>
-                <panel
-                 label="Palette"
-                 layout="topleft"
-                 follows="all"
-                 height="178"
-                 name="palette_pane"
-                 width="1602">
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Insert"
-                     layout="topleft"
-                     left="0"
-                     name="palette_insert"
-                     tool_tip="Put one of these under the selected element, with a name and where it goes and nothing else"
-                     top="2"
-                     width="60" />
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     follows="all"
-                     height="150"
-                     layout="topleft"
-                     left="0"
-                     name="palette"
-                     tool_tip="The tags the selected element may contain, from the registry it names as its children"
-                     top="28"
-                     width="1602">
-                        <scroll_list.columns
-                         label="Tag"
-                         name="tag"
-                         width="200" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Takes"
-                         name="takes" />
-                    </scroll_list>
-                </panel>
-                <panel
-                 label="Channels"
-                 layout="topleft"
-                 follows="all"
-                 height="178"
-                 name="channels_pane"
-                 width="1602">
-                    <text
-                     follows="left|top"
-                     height="16"
-                     layout="topleft"
-                     left="0"
-                     name="channel_label"
-                     top="6"
-                     width="58">Respond</text>
-                    <combo_box
-                     follows="left|top"
-                     height="22"
-                     layout="topleft"
-                     left_pad="2"
-                     name="channel_response"
-                     tool_tip="The buttons the selected notification's form declares"
-                     top_delta="-3"
-                     width="180" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Respond"
-                     layout="topleft"
-                     left_pad="8"
-                     name="channel_respond"
-                     tool_tip="Answer the notification as a user would, which is a real answer"
-                     top_delta="0"
-                     width="70" />
-                    <button
-                     follows="left|top"
-                     height="22"
-                     label="Clear"
-                     layout="topleft"
-                     left_pad="12"
-                     name="channel_clear"
-                     tool_tip="Empty the list; what has already been through the channels stays through them"
-                     top_delta="0"
-                     width="60" />
-                    <scroll_list
-                     column_padding="0"
-                     draw_heading="true"
-                     follows="all"
-                     height="150"
-                     layout="topleft"
-                     left="0"
-                     name="channels"
-                     tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
-                     top="28"
-                     width="1602">
-                        <scroll_list.columns
-                         label="Channel"
-                         name="channel"
-                         width="140" />
-                        <scroll_list.columns
-                         label="Notification"
-                         name="name"
-                         width="200" />
-                        <scroll_list.columns
-                         label="Time"
-                         name="time"
-                         width="80" />
-                        <scroll_list.columns
-                         dynamic_width="true"
-                         label="Message"
-                         name="message" />
-                    </scroll_list>
-                </panel>
-            </tab_container>
-        </layout_panel>
-
     </layout_stack>
 
     <text

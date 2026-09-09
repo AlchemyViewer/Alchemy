@@ -50,7 +50,9 @@
 class ALXUILiveFile;
 class ALPropertyGrid;
 class ALXUICanvas;
+class ALXUICanvasRow;
 class ALXUIPreviewHost;
+class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
 class LLImageRaw;
@@ -67,11 +69,12 @@ class LLTabContainer;
 class LLTextBox;
 class LLTextEditor;
 
-// Three panes that agree about one selection: the catalog of files with a
-// search across them, the hierarchy of the previewed file with its
-// diagnostics, and the inspectors. The previews are floaters of their own
-// in the floater view, built from the file's layered document in the
-// chosen skin and language, and drawn over with the hover and selection.
+// Four regions that agree about one selection. The navigator, whose modes
+// are the files, a search across them, the findings, the translation table,
+// the notification templates, the library and the channels. The outline of
+// the previewed file. The canvas, where the file is built from its layered
+// document in the chosen skin and language, once per variant, and drawn
+// over with the hover and the selection. And the inspectors.
 class ALFloaterXUIStudio final : public LLFloater
 {
     friend class LLFloaterReg;
@@ -86,6 +89,12 @@ public:
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
+
+    // This window has a menu bar of its own, so its shortcuts are asked
+    // before the viewer's. Without saying so the viewer's menu answers
+    // first and quietly keeps every key it also binds -- Control+0 is Zoom
+    // In out there, and the pane it folds here was never reached.
+    bool hasAccelerators() const override { return true; }
 
     // What a preview host reports: the view under the mouse, a modifier
     // click, a handle dragged, and its own closing.
@@ -180,7 +189,14 @@ private:
         F32                                         seconds = 0.f;
     };
 
-    // --- the catalog pane ---------------------------------------------------
+    // --- the navigator -------------------------------------------------------
+    // One pane, one mode at a time: which one is showing, and what each has
+    // to say for itself on its own button.
+    void onMode();
+    static std::string modeName(LLTabContainer* tabs);
+    void refreshModeCounts();
+
+    // --- the files and find modes --------------------------------------------
     void scanCatalog();
     void fillCatalog();
     void fillSkinsAndLanguages();
@@ -207,7 +223,6 @@ private:
     void fillNotifications();
     void onNotificationSelected();
     void onPostNotification();
-    void onBottomTab();
 
     // --- channels ------------------------------------------------------------
     // What the notification system did with what was posted, which is the
@@ -220,6 +235,21 @@ private:
     void closePreview(S32 which);
     ALXUICanvas* canvasOf(const Preview& pv) const;
     void closePreviews();
+    // The variants side by side, after any of them has been built: a canvas
+    // is as big as what it holds, so where the next one starts is not known
+    // until the one before it has something on it.
+    // A region the developer is not using, folded away and brought back with
+    // everything it held.
+    void togglePane(std::string_view name);
+    void setPaneCollapsed(std::string_view name, bool collapsed);
+    bool paneCollapsed(std::string_view name) const;
+    void refreshPaneButtons();
+    void layoutCanvases();
+    // The pill: what is on the canvas, whether it is being shown, and
+    // whether it is being held on this file.
+    void refreshCanvasHead();
+    void onToggleCanvasShown();
+    void onToggleCanvasPinned();
     void showGallery();
     void placeHost(S32 which, LLFloater* host);
     void watchFiles(const ALXUICatalog::Entry& entry);
@@ -229,6 +259,7 @@ private:
     // --- the tree pane -------------------------------------------------------
     void rebuildTree();
     void clearTree();
+    LLFolderViewItem* createRow(ALXUITreeItem* item, LLFolderViewFolder* parent_widget);
     void createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget);
     void onTreeFilter();
     void onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action);
@@ -383,11 +414,19 @@ private:
     S32                 mLastX = -1;
     S32                 mLastY = -1;
 
-    // The window's own canvas, in the region between the outline and the
-    // inspector. The first preview is drawn here unless the developer has
-    // asked for it in a window of its own.
-    ALXUICanvas*        mCanvas = nullptr;
+    // The window's own canvases, in the region between the outline and the
+    // inspector: one per variant, side by side on the row, unless the
+    // developer has asked for the preview in a window of its own.
+    LLScrollContainer*  mCanvasArea = nullptr;
+    ALXUICanvasRow*     mCanvasRow = nullptr;
+    ALXUICanvas*        mCanvases[PREVIEWS] = {};
     bool                mFloatPreview = false;
+    // The pill above the canvas. Hidden, the region is given over to the
+    // file it is about; pinned, the canvas keeps the file it has while the
+    // catalog is read, and takes the one waiting for it when unpinned.
+    bool                mPreviewHidden = false;
+    bool                mPinned = false;
+    std::string         mPendingFile;
     LLFrameTimer        mStateTimer;
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;
@@ -419,6 +458,9 @@ private:
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
+    LLTextBox*          mCanvasTitle = nullptr;
+    LLButton*           mCanvasShown = nullptr;
+    LLButton*           mCanvasPinned = nullptr;
     LLLineEditor*       mFindQuery = nullptr;
     LLComboBox*         mFindField = nullptr;
     LLScrollListCtrl*   mFindResults = nullptr;
@@ -441,7 +483,8 @@ private:
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
     LLMenuBarGL*        mMenuBar = nullptr;
-    LLTabContainer*     mBottomTabs = nullptr;
+    LLTabContainer*     mModes = nullptr;
+    LLTabContainer*     mBottom = nullptr;
     LLScrollListCtrl*   mNotifications = nullptr;
     LLFilterEditor*     mNotificationFilter = nullptr;
     // The template being previewed, when the file is notifications.xml.

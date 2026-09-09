@@ -376,13 +376,24 @@ public:
     // the bottom edge.
     void setSizable(bool sizable) { mSizable = sizable; }
 
+    // The least a surface may be, whatever is on it: its share of the room
+    // the row is shown in. A canvas that stopped at the edge of its content
+    // had nowhere to draw a rule along, nowhere to drag an element to and
+    // nothing to drop onto. Set before a build, because what is built is
+    // then placed against the surface's final height.
+    void setLeastSurface(S32 width, S32 height)
+    {
+        mLeastWidth = width;
+        mLeastHeight = height;
+    }
+
     void fitContent(S32 width, S32 height)
     {
         mContentWidth = llmax(width, 120);
         mContentHeight = llmax(height, 40);
         if (mSizable)
         {
-            reshape(mContentWidth, mContentHeight);
+            reshape(llmax(mContentWidth, mLeastWidth), llmax(mContentHeight, mLeastHeight));
         }
     }
 
@@ -987,62 +998,100 @@ private:
     // Ticks are the grid, which is whatever the grid is; the numbers are
     // every fifty, which is round whether or not fifty is a multiple of the
     // grid. The selection's edges are marked on both.
-    void drawRulers() const
+    // What of the canvas can be seen, in the canvas's own coordinates. A
+    // canvas is as big as what is on it and the container scrolls it, so the
+    // surface's own top-left is often somewhere off screen.
+    LLRect viewportRect()
+    {
+        if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
+        {
+            LLRect screen;
+            scroller->localRectToScreen(scroller->getContentWindowRect(), &screen);
+            LLRect local;
+            screenRectToLocal(screen, &local);
+            local.intersectWith(getLocalRect());
+            if (local.getWidth() > 0 && local.getHeight() > 0)
+            {
+                return local;
+            }
+        }
+        return getLocalRect();
+    }
+
+    // The rules belong to the canvas, along the edges of what can be seen.
+    // They were drawn against the preview's own rect, which put them outside
+    // it, moved them whenever it moved, and took them off the surface
+    // entirely when it was dragged. What still comes from the preview is
+    // where zero is: the numbers are the ones the file is written in, so
+    // moving a preview renumbers the rules rather than carrying them off.
+    void drawRulers()
     {
         static constexpr S32 RULER = 14;
         static constexpr S32 LABEL_EVERY = 50;
-        const LLRect r = mRoot == this ? getLocalRect() : localRectOf(mRoot);
-        if (r.getWidth() <= 0)
+        const LLRect view = viewportRect();
+        if (view.getWidth() <= RULER * 2 || view.getHeight() <= RULER * 2)
         {
             return;
         }
+        const LLRect origin = (mRoot && mRoot != this) ? localRectOf(mRoot) : getLocalRect();
+
         static const LLUIColor back = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
         static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
         LLColor4 ground(back.get());
         ground.mV[VALPHA] = 0.85f;
 
-        const LLRect top(r.mLeft - RULER, r.mTop + RULER, r.mRight, r.mTop);
-        const LLRect left(r.mLeft - RULER, r.mTop, r.mLeft, r.mBottom);
+        const S32 rule_bottom = view.mTop - RULER;
+        const S32 rule_right = view.mLeft + RULER;
+        const LLRect top(view.mLeft, view.mTop, view.mRight, rule_bottom);
+        const LLRect left(view.mLeft, rule_bottom, rule_right, view.mBottom);
         gl_rect_2d(top, ground, true);
         gl_rect_2d(left, ground, true);
         gl_rect_2d(top, ink.get(), false);
         gl_rect_2d(left, ink.get(), false);
 
+        // The first mark at or after a coordinate. Rounding towards zero is
+        // not rounding down, and a rule that reaches left of the preview has
+        // negative numbers on it.
+        const auto from = [](S32 value, S32 step)
+        {
+            const S32 n = value >= 0 ? (value + step - 1) / step : -((-value) / step);
+            return n * step;
+        };
+
         const S32 grid = llmax(mTool->gridSize(), 2);
         const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-        for (S32 x = 0; x <= r.getWidth(); x += grid)
+
+        for (S32 fx = from(rule_right - origin.mLeft, grid); origin.mLeft + fx <= view.mRight; fx += grid)
         {
-            gl_line_2d(r.mLeft + x, r.mTop, r.mLeft + x, r.mTop + 3, ink.get());
-        }
-        for (S32 y = 0; y <= r.getHeight(); y += grid)
-        {
-            gl_line_2d(r.mLeft, r.mTop - y, r.mLeft - 3, r.mTop - y, ink.get());
-        }
-        for (S32 x = 0; x <= r.getWidth(); x += LABEL_EVERY)
-        {
-            gl_line_2d(r.mLeft + x, r.mTop, r.mLeft + x, r.mTop + 5, ink.get());
-            if (x > 0)
+            const S32 x = origin.mLeft + fx;
+            const bool named = fx % LABEL_EVERY == 0;
+            gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), ink.get());
+            if (named)
             {
-                font->renderUTF8(std::to_string(x), 0, r.mLeft + x + 2, r.mTop + 5,
+                font->renderUTF8(std::to_string(fx), 0, x + 2, rule_bottom + 3,
                                  ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
-        for (S32 y = 0; y <= r.getHeight(); y += LABEL_EVERY)
+        for (S32 fy = from(origin.mTop - rule_bottom, grid); origin.mTop - fy >= view.mBottom; fy += grid)
         {
-            gl_line_2d(r.mLeft, r.mTop - y, r.mLeft - 5, r.mTop - y, ink.get());
-            if (y > 0)
+            const S32 y = origin.mTop - fy;
+            const bool named = fy % LABEL_EVERY == 0;
+            gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, ink.get());
+            if (named)
             {
-                font->renderUTF8(std::to_string(y), 0, r.mLeft - RULER + 2, r.mTop - y - 10,
+                font->renderUTF8(std::to_string(fy), 0, view.mLeft + 2, y - 10,
                                  ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
 
         // Where the selection sits, on both rules.
-        if (LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
+        if (LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
         {
-            const LLRect box = localRectOf(view);
-            gl_rect_2d(LLRect(box.mLeft, r.mTop + RULER, box.mRight, r.mTop), LLColor4::red, false);
-            gl_rect_2d(LLRect(r.mLeft - RULER, box.mTop, r.mLeft, box.mBottom), LLColor4::red, false);
+            const LLRect box = localRectOf(selected);
+            gl_rect_2d(LLRect(llmax(box.mLeft, rule_right), view.mTop, llmin(box.mRight, view.mRight), rule_bottom),
+                       LLColor4::red, false);
+            gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
+                       LLColor4::red, false);
         }
     }
 
@@ -1122,12 +1171,113 @@ private:
     bool                mSizable = false;
     S32                 mContentWidth = 0;
     S32                 mContentHeight = 0;
+    S32                 mLeastWidth = 0;
+    S32                 mLeastHeight = 0;
 
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
     S32                 mDragX = 0;
     S32                 mDragY = 0;
     S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
     LLHandle<LLView>    mDrop;                  // the container a held element would land in
+};
+
+// The variants, side by side. Each is a canvas of its own, with its own
+// skin and its own language, and they share one selection: what is selected
+// is an element of the file, not of any one build of it, so a click on the
+// German one puts the marks round the same element of the English one.
+//
+// The row is as wide as what is on it and as tall as its tallest, and the
+// container it sits in scrolls: a variant that does not fit is scrolled to,
+// which is what a canvas is for. Nothing here is placed from the bottom,
+// because the two canvases are read across and their tops are what line up.
+class ALXUICanvasRow final : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(ALXUICanvasRow, LLPanel);
+
+    static constexpr S32 GUTTER = 12;
+
+    explicit ALXUICanvasRow(const LLPanel::Params& p) : LLPanel(p) {}
+
+    void addCanvas(ALXUICanvas* canvas)
+    {
+        mCanvases.push_back(canvas);
+        addChild(canvas);
+    }
+
+    // A canvas comes and goes with the variant on it, and the room is shared
+    // out again when it does. This is told before a build rather than after,
+    // because what is built is placed against the surface it lands on.
+    void show(ALXUICanvas* canvas, bool visible)
+    {
+        canvas->setVisible(visible);
+        shareRoom();
+    }
+
+    void shareRoom()
+    {
+        S32 showing = 0;
+        for (const ALXUICanvas* canvas : mCanvases)
+        {
+            showing += canvas->getVisible() ? 1 : 0;
+        }
+        if (showing == 0)
+        {
+            return;
+        }
+        const LLRect room = regionRect();
+        const S32 share = (room.getWidth() - GUTTER * (showing - 1)) / showing;
+        for (ALXUICanvas* canvas : mCanvases)
+        {
+            canvas->setLeastSurface(llmax(share, 0), room.getHeight());
+        }
+    }
+
+    // A canvas sizes itself to what was built on it, so this runs after a
+    // build and not before one.
+    void layout()
+    {
+        S32 width = 0;
+        S32 height = 0;
+        for (const ALXUICanvas* canvas : mCanvases)
+        {
+            if (canvas->getVisible())
+            {
+                width += (width > 0 ? GUTTER : 0) + canvas->getRect().getWidth();
+                height = llmax(height, canvas->getRect().getHeight());
+            }
+        }
+        // The row keeps a size even with nothing on it: a scrolled view of
+        // no area is one the container has nothing to place.
+        width = llmax(width, 1);
+        height = llmax(height, 1);
+        LLPanel::reshape(width, height, false);
+
+        S32 left = 0;
+        for (ALXUICanvas* canvas : mCanvases)
+        {
+            if (canvas->getVisible())
+            {
+                canvas->setOrigin(left, height - canvas->getRect().getHeight());
+                left += canvas->getRect().getWidth() + GUTTER;
+            }
+        }
+    }
+
+private:
+    // The room the row is shown in, which is the container's window rather
+    // than the row's own rect: the row is the thing being sized here, so its
+    // rect is the answer from last time.
+    LLRect regionRect()
+    {
+        if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
+        {
+            return scroller->getContentWindowRect();
+        }
+        return getLocalRect();
+    }
+
+    std::vector<ALXUICanvas*> mCanvases;
 };
 
 // A canvas in a window of its own, which is where a preview lives until the
@@ -1192,6 +1342,15 @@ private:
 
 namespace
 {
+    // The four regions that fold away, and the button in the window bar that
+    // folds each. The menu has the same four switches; both read the same
+    // state, so neither is the one that is right.
+    constexpr std::pair<const char*, const char*> FOLD_BUTTONS[] = {
+        { "fold_navigator",  "navigator_panel" },
+        { "fold_bottom",     "bottom_panel" },
+        { "fold_inspectors", "inspector_panel" },
+    };
+
     constexpr S32 MAX_FIND_ROWS = 500;
 
     std::string firstToken(const std::string& path)
@@ -1509,7 +1668,29 @@ bool ALFloaterXUIStudio::postBuild()
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
     mMenuBar = getChild<LLMenuBarGL>("studio_menu");
-    mBottomTabs = getChild<LLTabContainer>("bottom_tabs");
+    // Two strips, split by what each mode needs rather than by what it is
+    // about. The navigator holds the ones that are a list of names and read
+    // well narrow; the band under the canvas holds the tables, which are
+    // unreadable in a column and want the width of the middle of the window.
+    mModes = getChild<LLTabContainer>("navigator_tabs");
+    mBottom = getChild<LLTabContainer>("bottom_tabs");
+    // A navigator mode is a picture in a strip. The file says what each one
+    // is, in the tooltip its page carries; which picture stands for it is
+    // named here, because a tab's icon is not something a XUI file can ask
+    // for. The band's tabs have room for their names and keep them.
+    static constexpr std::pair<const char*, const char*> MODE_ICONS[] = {
+        { "files_mode",   "Command_Scripts_Icon" },
+        { "outline_mode", "Command_Inventory_Icon" },
+        { "find_mode",    "Command_Search_Icon" },
+        { "palette_mode", "Command_Build_Icon" },
+    };
+    for (const auto& [page, icon] : MODE_ICONS)
+    {
+        if (LLPanel* panel = mModes->getPanelByName(page))
+        {
+            mModes->setTabImage(panel, icon, LLColor4::white, LLFontGL::HCENTER);
+        }
+    }
     mNotifications = getChild<LLScrollListCtrl>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
     mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
@@ -1523,6 +1704,11 @@ bool ALFloaterXUIStudio::postBuild()
     mPalette = getChild<LLScrollListCtrl>("palette");
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
     getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
+    for (const auto& [button, pane] : FOLD_BUTTONS)
+    {
+        getChild<LLButton>(button)->setCommitCallback(
+            [this, pane = pane](LLUICtrl*, const LLSD&) { togglePane(pane); });
+    }
     getChild<LLButton>("tree_up")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_up"));
     getChild<LLButton>("tree_down")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_down"));
     getChild<LLButton>("tree_in")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_in"));
@@ -1534,22 +1720,44 @@ bool ALFloaterXUIStudio::postBuild()
     mEditTarget = getChild<LLTextBox>("edit_target");
     mStatus = getChild<LLTextBox>("status");
 
-    // The canvas is built here rather than declared in the XUI because it
-    // is the tool's own view of a preview, not a widget a file can ask for.
-    // It is as big as what it shows and the container scrolls it, so a file
-    // larger than the region is scrolled to rather than cut off.
+    // The canvases are built here rather than declared in the XUI because
+    // they are the tool's own view of a preview, not a widget a file can
+    // ask for. Each is as big as what it shows and the container scrolls
+    // the row of them, so a file larger than the region is scrolled to
+    // rather than cut off.
     if (LLScrollContainer* area = findChild<LLScrollContainer>("canvas_area", true))
     {
-        LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
-        cp.name = "canvas";
-        cp.rect = area->getLocalRect();
-        cp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
-        cp.background_visible = false;
-        mCanvas = new ALXUICanvas(this, PRIMARY, cp);
-        mCanvas->initFromParams(cp);
-        mCanvas->setSizable(true);
-        area->addChild(mCanvas);
+        mCanvasArea = area;
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "canvas_row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        rp.background_visible = false;
+        mCanvasRow = new ALXUICanvasRow(rp);
+        mCanvasRow->initFromParams(rp);
+        area->addChild(mCanvasRow);
+
+        for (S32 i = 0; i < PREVIEWS; ++i)
+        {
+            LLPanel::Params cp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+            cp.name = i == PRIMARY ? "canvas" : "canvas_variant";
+            cp.rect = area->getLocalRect();
+            cp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+            cp.background_visible = false;
+            mCanvases[i] = new ALXUICanvas(this, i, cp);
+            mCanvases[i]->initFromParams(cp);
+            mCanvases[i]->setSizable(true);
+            // A canvas with nothing on it takes no room on the row.
+            mCanvases[i]->setVisible(false);
+            mCanvasRow->addCanvas(mCanvases[i]);
+        }
     }
+
+    mCanvasTitle = getChild<LLTextBox>("canvas_title");
+    mCanvasShown = getChild<LLButton>("canvas_shown");
+    mCanvasPinned = getChild<LLButton>("canvas_pinned");
+    mCanvasShown->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasShown, this));
+    mCanvasPinned->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasPinned, this));
 
     loadState();
     scanCatalog();
@@ -1574,7 +1782,8 @@ bool ALFloaterXUIStudio::postBuild()
         watchList(list);
     }
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshInspectors, this));
-    mBottomTabs->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onBottomTab, this));
+    mModes->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onMode, this));
+    mBottom->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onMode, this));
     mNotifications->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onNotificationSelected, this));
     mNotificationFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillNotifications, this));
     getChild<LLButton>("notification_post")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onPostNotification, this));
@@ -1585,6 +1794,7 @@ bool ALFloaterXUIStudio::postBuild()
         mChannels->deleteAllItems();
         mChannelNotifications.clear();
         mChannelResponse->removeall();
+        refreshModeCounts();
     });
     watchChannels();
     mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
@@ -1620,7 +1830,11 @@ bool ALFloaterXUIStudio::postBuild()
     else
     {
         setStatus(getString("NoFile"));
+        refreshCanvasHead();
     }
+    // The mode the tool was left in is the mode it opens in, and it fills
+    // itself the same way choosing it would.
+    onMode();
     return true;
 }
 
@@ -1710,6 +1924,20 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     {
         mTreeFilter->setFocus(true);
         return true;
+    }
+    // A developer who works in one mode reaches it without the mouse, and
+    // the number is the mode's place in the strip rather than a name to
+    // learn: Files, Find, Findings, Translation, Notices, Library,
+    // Channels, in the order they are read down the side of the pane.
+    if (mask == MASK_CONTROL && key >= '1' && key <= '9' && mModes)
+    {
+        const S32 which = key - '1';
+        if (which < mModes->getTabCount())
+        {
+            mModes->selectTab(which);
+            onMode();
+            return true;
+        }
     }
     // The outline keys, which are the buttons over the tree. Held down
     // they repeat, which is how a row is walked several places at once.
@@ -1843,7 +2071,24 @@ void ALFloaterXUIStudio::onCatalogFilter()
 void ALFloaterXUIStudio::onFileSelected()
 {
     const std::string file = mFileList->getSelectedValue().asString();
-    if (file.empty() || file == mFile)
+    if (file.empty())
+    {
+        return;
+    }
+    // Held, the canvas keeps the file it has and this one waits for the pin
+    // to come off. The catalog goes where it was sent either way: reading
+    // the list of files is the point of being able to hold the canvas.
+    if (mPinned)
+    {
+        mPendingFile = file == mFile ? std::string() : file;
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mFile;
+        args["[PENDING]"] = file;
+        setStatus(getString(mPendingFile.empty() ? "CanvasPinnedHere" : "CanvasHeld", args));
+        refreshCanvasHead();
+        return;
+    }
+    if (file == mFile)
     {
         return;
     }
@@ -1872,6 +2117,7 @@ void ALFloaterXUIStudio::onFind()
     mFindResults->deleteAllItems();
     if (query.empty())
     {
+        refreshModeCounts();
         return;
     }
     std::vector<ALXUICatalog::Hit> hits = mCatalog.find(query, fieldFrom(mFindField->getValue().asString()));
@@ -1896,6 +2142,7 @@ void ALFloaterXUIStudio::onFind()
     }
     setStatus(std::to_string(hits.size()) + (hits.size() == 1 ? " match" : " matches")
               + (hits.size() > (size_t)MAX_FIND_ROWS ? ", the first " + std::to_string(MAX_FIND_ROWS) + " listed" : ""));
+    refreshModeCounts();
 }
 
 void ALFloaterXUIStudio::onFindResult()
@@ -1915,7 +2162,10 @@ void ALFloaterXUIStudio::onFindResult()
     }
     if (file != mFile)
     {
+        // A result is a place, not a browse: the canvas goes there whether
+        // it is pinned or not, and holds that file afterwards.
         mFile = file;
+        mPendingFile.clear();
         mFileList->setSelectedByValue(mFile, true);
         showPreviews();
     }
@@ -1961,9 +2211,12 @@ void ALFloaterXUIStudio::closePreview(S32 which)
     else if (ALXUICanvas* canvas = canvasOf(pv))
     {
         // The window's own canvas outlives the preview on it, so what was
-        // built on it has to go. A canvas belonging to a floater went with
-        // the floater, and its handle says so.
+        // built on it has to go, and the room it took on the row goes with
+        // it. A canvas belonging to a floater went with the floater, and
+        // its handle says so.
         canvas->clear();
+        mCanvasRow->show(canvas, false);
+        layoutCanvases();
     }
     pv.host.markDead();
     pv.canvas.markDead();
@@ -1986,6 +2239,132 @@ void ALFloaterXUIStudio::closePreviews()
     {
         closePreview(i);
     }
+}
+
+// A pane the developer is not using gives its room to the canvas, and the
+// canvas is the region that grows because it is the one the stack resizes.
+// A collapsed pane keeps everything it holds: what goes is the room, so
+// coming back costs nothing and loses no selection.
+void ALFloaterXUIStudio::setPaneCollapsed(std::string_view name, bool collapsed)
+{
+    LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
+    if (LLLayoutStack* stack = panel ? panel->getParentAs<LLLayoutStack>() : nullptr)
+    {
+        stack->collapsePanel(panel, collapsed);
+    }
+}
+
+void ALFloaterXUIStudio::togglePane(std::string_view name)
+{
+    setPaneCollapsed(name, !paneCollapsed(name));
+    refreshPaneButtons();
+    saveState();
+}
+
+// The four buttons that fold the regions, pressed in while their region is
+// showing. They are the same switches as the menu's, so they say the same
+// thing about the same state and neither is the one that is right.
+void ALFloaterXUIStudio::refreshPaneButtons()
+{
+    for (const auto& [button, pane] : FOLD_BUTTONS)
+    {
+        if (LLButton* toggle = findChild<LLButton>(button, true))
+        {
+            toggle->setToggleState(!paneCollapsed(pane));
+        }
+    }
+}
+
+bool ALFloaterXUIStudio::paneCollapsed(std::string_view name) const
+{
+    const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
+    return panel && panel->isCollapsed();
+}
+
+void ALFloaterXUIStudio::layoutCanvases()
+{
+    if (mCanvasRow)
+    {
+        mCanvasRow->layout();
+    }
+}
+
+// What is on the canvas, said above the canvas. A pinned canvas also names
+// the file waiting for it: the catalog has moved on by then, and the pill
+// is the only thing left in the window that knows the two are different.
+void ALFloaterXUIStudio::refreshCanvasHead()
+{
+    if (!mCanvasTitle)
+    {
+        return;
+    }
+
+    std::string text;
+    if (mFile.empty())
+    {
+        text = getString("CanvasEmpty");
+    }
+    else
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mFile;
+        args["[SKIN]"] = mSkin;
+        args["[LANG]"] = mLanguage;
+        args["[LANG2]"] = mLanguage2;
+        text = getString(mShowSecondary ? "CanvasVariants" : "CanvasOne", args);
+    }
+    if (mPinned && !mPendingFile.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mPendingFile;
+        text += getString("CanvasWaiting", args);
+    }
+    mCanvasTitle->setText(text);
+    if (mCanvasShown)
+    {
+        mCanvasShown->setToggleState(!mPreviewHidden);
+    }
+    if (mCanvasPinned)
+    {
+        mCanvasPinned->setToggleState(mPinned);
+    }
+}
+
+// The eye. What it hides is the surface rather than the previews on it: the
+// tree, the inspectors and the findings are all about a build that is still
+// there, and a hidden canvas that had thrown its build away would take them
+// with it.
+void ALFloaterXUIStudio::onToggleCanvasShown()
+{
+    mPreviewHidden = !mCanvasShown->getToggleState();
+    if (mCanvasArea)
+    {
+        // The container rather than the row: a hidden row leaves the
+        // container measuring the room it took and drawing bars for it.
+        mCanvasArea->setVisible(!mPreviewHidden);
+    }
+    saveState();
+    refreshCanvasHead();
+}
+
+// The pin. Held, the canvas keeps the file it has while the catalog is
+// read; released, it takes whichever file was chosen in the meantime. The
+// tool's edit target goes with the canvas and not with the catalog, because
+// what is written is written through the tree and the inspectors, and those
+// are of the build that is on the canvas.
+void ALFloaterXUIStudio::onToggleCanvasPinned()
+{
+    mPinned = mCanvasPinned->getToggleState();
+    if (!mPinned && !mPendingFile.empty())
+    {
+        const std::string file = mPendingFile;
+        mPendingFile.clear();
+        mFile = file;
+        mSelection.clearSelection();
+        showPreviews();
+    }
+    saveState();
+    refreshCanvasHead();
 }
 
 void ALFloaterXUIStudio::hostClosed(S32 which)
@@ -2022,6 +2401,7 @@ void ALFloaterXUIStudio::showPreviews()
     {
         closePreview(SECONDARY);
     }
+    refreshCanvasHead();
 }
 
 // A preview opens beside the tool, since the two are read together. A
@@ -2370,6 +2750,7 @@ bool ALFloaterXUIStudio::onChannelChanged(const std::string& channel, const LLSD
             { "name", note->getName() },
             { "time", LLDate(LLTimer::getTotalSeconds()).toHTTPDateString("%H:%M:%S") },
             { "message", message } }));
+        refreshModeCounts();
     }
     return false;
 }
@@ -2528,14 +2909,74 @@ void ALFloaterXUIStudio::onInsertFromPalette()
 }
 
 // The two tabs that fill themselves from something other than the preview.
-void ALFloaterXUIStudio::onBottomTab()
+// A mode is chosen. Each fills what it shows when it is looked at rather
+// than on every rebuild -- the translation table is a whole language's
+// worth of rows -- and the one that was open is the one that opens next
+// time the tool does.
+void ALFloaterXUIStudio::onMode()
 {
-    fillTranslation();
-    fillPalette();
-    if (mNotifications->getItemCount() == 0)
+    // Either strip: which one the mode came from does not change what it
+    // has to fill, and only the one that is showing is worth filling.
+    for (const std::string& mode : { modeName(mModes), modeName(mBottom) })
     {
-        fillNotifications();
+        if (mode == "translation_mode")
+        {
+            fillTranslation();
+        }
+        else if (mode == "palette_mode")
+        {
+            fillPalette();
+        }
+        else if (mode == "notifications_mode" && mNotifications->getItemCount() == 0)
+        {
+            fillNotifications();
+        }
     }
+    saveState();
+}
+
+std::string ALFloaterXUIStudio::modeName(LLTabContainer* tabs)
+{
+    const LLPanel* current = tabs ? tabs->getCurrentPanel() : nullptr;
+    return current ? current->getName() : std::string();
+}
+
+// What each mode has to show, on the mode's own button. A count nobody
+// needs is not written: a file list is as long as the catalog and saying
+// so tells the developer nothing.
+void ALFloaterXUIStudio::refreshModeCounts()
+{
+    // A channel can report before the window has finished being built, and
+    // a count of a list that does not exist yet is not one to take.
+    if (!mModes || !mBottom || !mFindResults || !mFindings || !mChannels)
+    {
+        return;
+    }
+    const auto count = [](LLTabContainer* tabs, std::string_view page, S32 n)
+    {
+        LLPanel* panel = tabs->getPanelByName(page);
+        if (!panel)
+        {
+            return;
+        }
+        // A tab with a name says how many beside it, and grows to fit: a
+        // badge there would sit on the half of the name that says which tab
+        // it is. A tab that is only a picture has nowhere to put a number
+        // beside it, so the number goes on it.
+        const std::string label = panel->getLabel();
+        if (label.empty())
+        {
+            tabs->setTabBadge(panel, n > 0 ? std::to_string(n) : std::string());
+        }
+        else
+        {
+            tabs->setPanelTitle(tabs->getIndexForPanel(panel),
+                                n > 0 ? label + " " + std::to_string(n) : label);
+        }
+    };
+    count(mModes, "find_mode", mFindResults->getItemCount());
+    count(mBottom, "findings_mode", mFindings->getItemCount());
+    count(mBottom, "channels_mode", mChannels->getItemCount());
 }
 
 void ALFloaterXUIStudio::onNotificationSelected()
@@ -2947,13 +3388,14 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         ALXUIShellBuild shell;
         ALXUIDiagnostics sink;
 
-        // The first preview is drawn in the window, where the developer is
-        // already looking. A second one, and one the developer has asked to
-        // float, get a window of their own.
-        if (which == PRIMARY && mCanvas && !mFloatPreview)
+        // Every variant is drawn in the window, on the row, where the
+        // developer is already looking. Only a preview the developer asked
+        // to float gets a window of its own.
+        if (ALXUICanvas* canvas = mFloatPreview ? nullptr : mCanvases[which])
         {
-            pv.canvas = mCanvas->getHandle();
-            root = buildRoot(which, *entry, mCanvas, node);
+            pv.canvas = canvas->getHandle();
+            mCanvasRow->show(canvas, true);
+            root = buildRoot(which, *entry, canvas, node);
         }
         else
         {
@@ -2982,6 +3424,11 @@ void ALFloaterXUIStudio::showPreview(S32 which)
             detachHost(host);
             host->closeFloater();
         }
+        if (ALXUICanvas* canvas = mCanvases[which])
+        {
+            mCanvasRow->show(canvas, false);
+        }
+        layoutCanvases();
         if (which == PRIMARY)
         {
             LLStringUtil::format_map_t args;
@@ -2997,6 +3444,7 @@ void ALFloaterXUIStudio::showPreview(S32 which)
     {
         canvas->setRoot(root);
     }
+    layoutCanvases();
     // A floater file has a title of its own, and it is the useful one; a
     // registered floater is its own host and so is the same case.
     const LLFloater* titled = root == host ? host : (root ? root->as<LLFloater>() : nullptr);
@@ -3229,12 +3677,26 @@ void ALFloaterXUIStudio::rebuildTree()
         return;
     }
 
+    // A folder view never draws its own root, so the file's root cannot be
+    // it: that left the one element nobody could select, the floater or the
+    // panel whose own attributes say how big it is. The view gets a
+    // container of its own that stands for the document, and the file's root
+    // is a row under it.
+    //
+    // The two have to be different objects. A folder adopts a row by telling
+    // its own item to take the row's as a child, and an item told to take
+    // itself becomes its own parent -- after which every walk up the parents
+    // from anywhere under it runs for ever, which is a window that opens and
+    // never comes back.
+    LLPointer<ALXUITreeItem> document = new ALXUITreeItem(pv.root, root_item->getTag(), false, 0,
+                                                          ALXUISelection::path_t(), mModel);
+
     LLFolderView::Params p(LLUICtrlFactory::getDefaultParams<LLFolderView>());
     p.name = "xui_tree";
     p.title = root_item->getName();
     p.rect = LLRect(0, 0, mTreePanel->getRect().getWidth(), 0);
     p.parent_panel = mTreePanel;
-    p.listener = root_item;
+    p.listener = document.get();
     p.view_model = &mModel;
     p.root = nullptr;
     p.use_ellipses = true;
@@ -3256,43 +3718,59 @@ void ALFloaterXUIStudio::rebuildTree()
     mTree->setSelectCallback(boost::bind(&ALFloaterXUIStudio::onTreeSelection, this, _1, _2));
     mModel.setFolderView(mTree);
 
-    createRows(root_item, mTree);
+    // The file's root is a row like any other, and its attributes -- the
+    // size, the title, whether it can be resized -- are edited where every
+    // other element's are.
+    LLFolderViewItem* root_row = createRow(root_item, mTree);
+    if (root_item->hasChildren())
+    {
+        createRows(root_item, static_cast<LLFolderViewFolder*>(root_row));
+    }
     mTree->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_DOWN);
     mTree->arrangeAll();
     mModel.getFilter().setModified();
 }
 
-void ALFloaterXUIStudio::createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
+// One widget for one item, in the folder it belongs to. A row that holds
+// nothing is a row; anything else is a folder, because that is what can be
+// opened.
+LLFolderViewItem* ALFloaterXUIStudio::createRow(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
 {
     static const LLUIColor from_xml_color = LLUIColorTable::instance().getColor("MenuItemEnabledColor", LLColor4::white);
     static const LLUIColor code_built_color = LLUIColorTable::instance().getColor("MenuItemDisabledColor", LLColor4::grey);
     static const LLUIColor highlight_color = LLUIColorTable::instance().getColor("MenuItemHighlightColor", LLColor4::white);
 
+    LLFolderViewItem::Params params(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    params.name = item->getName();
+    params.root = mTree;
+    params.listener = item;
+    params.tool_tip = ALXUISelection::toString(item->getPath());
+    params.text_pad_right = ALXUITreeEye::WIDTH + 4;
+    params.font_color = item->isFromXML() ? from_xml_color : code_built_color;
+    params.font_highlight_color = highlight_color;
+
+    LLFolderViewItem* widget;
+    if (item->hasChildren())
+    {
+        ALXUITreeFolder* folder = LLUICtrlFactory::create<ALXUITreeFolder>(params);
+        folder->setChildrenInited(true);
+        widget = folder;
+    }
+    else
+    {
+        widget = LLUICtrlFactory::create<ALXUITreeRow>(params);
+    }
+    widget->addToFolder(parent_widget);
+    mRows[ALXUISelection::toString(item->getPath())] = widget;
+    return widget;
+}
+
+void ALFloaterXUIStudio::createRows(ALXUITreeItem* item, LLFolderViewFolder* parent_widget)
+{
     for (auto it = item->getChildrenBegin(); it != item->getChildrenEnd(); ++it)
     {
         ALXUITreeItem* child = static_cast<ALXUITreeItem*>(it->get());
-        LLFolderViewItem::Params params(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
-        params.name = child->getName();
-        params.root = mTree;
-        params.listener = child;
-        params.tool_tip = ALXUISelection::toString(child->getPath());
-        params.text_pad_right = ALXUITreeEye::WIDTH + 4;
-        params.font_color = child->isFromXML() ? from_xml_color : code_built_color;
-        params.font_highlight_color = highlight_color;
-
-        LLFolderViewItem* widget;
-        if (child->hasChildren())
-        {
-            ALXUITreeFolder* folder = LLUICtrlFactory::create<ALXUITreeFolder>(params);
-            folder->setChildrenInited(true);
-            widget = folder;
-        }
-        else
-        {
-            widget = LLUICtrlFactory::create<ALXUITreeRow>(params);
-        }
-        widget->addToFolder(parent_widget);
-        mRows[ALXUISelection::toString(child->getPath())] = widget;
+        LLFolderViewItem* widget = createRow(child, parent_widget);
         if (child->hasChildren())
         {
             createRows(child, static_cast<LLFolderViewFolder*>(widget));
@@ -4952,6 +5430,7 @@ void ALFloaterXUIStudio::fillFindings()
             { "where", where },
             { "message", f.what.empty() ? f.message : f.what + ": " + f.message } }));
     }
+    refreshModeCounts();
 }
 
 void ALFloaterXUIStudio::onFindingSelected()
@@ -6212,6 +6691,21 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
             showPreviews();
         }
     }
+    else if (action == "pane_navigator")    { togglePane("navigator_panel"); }
+    else if (action == "pane_inspectors")   { togglePane("inspector_panel"); }
+    else if (action == "pane_bottom")       { togglePane("bottom_panel"); }
+    else if (action == "float_preview")
+    {
+        // A preview changes home rather than moving, so what is on the one
+        // it is leaving goes first.
+        mFloatPreview = !mFloatPreview;
+        saveState();
+        closePreviews();
+        if (!mFile.empty())
+        {
+            showPreviews();
+        }
+    }
     else if (action == "code_built")
     {
         mShowCodeBuilt = !mShowCodeBuilt;
@@ -6247,6 +6741,12 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     if (flag == "snap")         { return mSnap; }
     if (flag == "code_built")   { return mShowCodeBuilt; }
     if (flag == "real_floater") { return mRealFloater; }
+    if (flag == "float_preview") { return mFloatPreview; }
+    // The switch is on when the pane is showing, so the menu reads as a list
+    // of what is on screen rather than a list of what is hidden.
+    if (flag == "pane_navigator")   { return !paneCollapsed("navigator_panel"); }
+    if (flag == "pane_inspectors")  { return !paneCollapsed("inspector_panel"); }
+    if (flag == "pane_bottom")      { return !paneCollapsed("bottom_panel"); }
     if (flag.compare(0, 5, "grid:") == 0)
     {
         return mGrid == std::atoi(flag.c_str() + 5);
@@ -6270,6 +6770,7 @@ void ALFloaterXUIStudio::onToggleSecondary()
             closePreview(SECONDARY);
         }
     }
+    refreshCanvasHead();
 }
 
 void ALFloaterXUIStudio::saveState()
@@ -6280,6 +6781,9 @@ void ALFloaterXUIStudio::saveState()
     state["language"] = mLanguage;
     state["language2"] = mLanguage2;
     state["secondary"] = mShowSecondary;
+    state["preview_hidden"] = mPreviewHidden;
+    state["pinned"] = mPinned;
+    state["float_preview"] = mFloatPreview;
     state["hover"] = mHoverHighlight;
     state["code_built"] = mShowCodeBuilt;
     state["snap"] = mSnap;
@@ -6290,6 +6794,17 @@ void ALFloaterXUIStudio::saveState()
     {
         state["tab"] = current->getName();
     }
+    if (LLPanel* current = mModes ? mModes->getCurrentPanel() : nullptr)
+    {
+        state["mode"] = current->getName();
+    }
+    if (LLPanel* current = mBottom ? mBottom->getCurrentPanel() : nullptr)
+    {
+        state["bottom"] = current->getName();
+    }
+    state["fold_navigator"] = paneCollapsed("navigator_panel");
+    state["fold_inspectors"] = paneCollapsed("inspector_panel");
+    state["fold_bottom"] = paneCollapsed("bottom_panel");
     gSavedSettings.setLLSD("ALXUIStudioState", state);
 }
 
@@ -6314,6 +6829,13 @@ void ALFloaterXUIStudio::loadState()
         mLanguage2 = state["language2"].asString();
     }
     mShowSecondary = state["secondary"].asBoolean();
+    mPreviewHidden = state["preview_hidden"].asBoolean();
+    mPinned = state["pinned"].asBoolean();
+    mFloatPreview = state["float_preview"].asBoolean();
+    if (mCanvasArea)
+    {
+        mCanvasArea->setVisible(!mPreviewHidden);
+    }
     mSnap = state["snap"].asBoolean();
     mRulers = state["rulers"].asBoolean();
     mRealFloater = state["real_floater"].asBoolean();
@@ -6333,4 +6855,16 @@ void ALFloaterXUIStudio::loadState()
     {
         mInspectors->selectTabByName(state["tab"].asString());
     }
+    if (state.has("mode") && mModes)
+    {
+        mModes->selectTabByName(state["mode"].asString());
+    }
+    if (state.has("bottom") && mBottom)
+    {
+        mBottom->selectTabByName(state["bottom"].asString());
+    }
+    setPaneCollapsed("navigator_panel", state["fold_navigator"].asBoolean());
+    setPaneCollapsed("inspector_panel", state["fold_inspectors"].asBoolean());
+    setPaneCollapsed("bottom_panel", state["fold_bottom"].asBoolean());
+    refreshPaneButtons();
 }
