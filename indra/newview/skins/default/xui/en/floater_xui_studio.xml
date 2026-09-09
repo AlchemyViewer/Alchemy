@@ -859,6 +859,23 @@
                      use_ellipses="true"
                      width="636" />
                 </layout_panel>
+            <layout_panel
+             auto_resize="true"
+             height="476"
+             layout="topleft"
+             min_dim="106"
+             name="canvas_region"
+             width="744">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="476"
+             layout="topleft"
+             left="0"
+             name="canvas_region_stack"
+             orientation="vertical"
+             top="0"
+             width="744">
                 <layout_panel
                  auto_resize="true"
                  height="450"
@@ -969,6 +986,8 @@
                  name="language_combo_2"
                  top_delta="-3"
                  width="56" />
+            </layout_panel>
+            </layout_stack>
             </layout_panel>
 
             <layout_panel

@@ -26,6 +26,7 @@
 
 #include "../llfloater.h"
 #include "../lllayoutstack.h"
+#include "../llresizebar.h"
 #include "../lltabcontainer.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
@@ -184,6 +185,26 @@ namespace tut
             report += "\n  " + gap;
         }
         ensure("every stack fills what it is in:" + report, gaps.empty());
+
+        // The band of tables is dragged against the canvas, and the bar that
+        // does it belongs to the panel above it. Put anything between them
+        // that can give no room -- a toolbar, a status line -- and the bar
+        // goes without a word: the drag area is simply not there any more.
+        LLLayoutStack* centre = floater->findChild<LLLayoutStack>("centre_stack", true);
+        ensure("the centre is a stack", centre != nullptr);
+        ensure("the band of tables is in it",
+               centre->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
+
+        S32 draggable = 0;
+        for (LLView* child : *centre->getChildList())
+        {
+            if (LLLayoutPanel* band = child->as<LLLayoutPanel>())
+            {
+                draggable += (band->getResizeBar() && band->getResizeBar()->getVisible()) ? 1 : 0;
+            }
+        }
+        ensure("and there is somewhere to drag it", draggable > 0);
+
         stage->die();
     }
 

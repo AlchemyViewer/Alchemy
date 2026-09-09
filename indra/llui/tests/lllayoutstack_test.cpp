@@ -419,4 +419,56 @@ namespace tut
         p->setTargetDim(10);
         ensure_equals("a target under the minimum is the minimum", p->getTargetDim(), 100);
     }
+
+    // A resize bar sits between two panels and needs both of them to be able
+    // to give room. Putting a panel that is neither auto- nor user-resizable
+    // between the two that were resizing against each other takes the bar
+    // away, and it goes silently: the drag area is simply not there any more.
+    template<> template<>
+    void lllayoutstack_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // A panel the stack does not size and nobody may drag: a toolbar.
+        const auto band = [](const std::string& name, S32 width)
+        {
+            LLLayoutPanel::Params p;
+            p.name = name;
+            p.rect = LLRect(0, 100, width, 0);
+            p.auto_resize = false;
+            p.user_resize = false;
+            return LLUICtrlFactory::create<LLLayoutPanel>(p);
+        };
+
+        {
+            LLLayoutStack* s = stack();
+            LLLayoutPanel* grows = panel("grows");
+            LLLayoutPanel* dragged = fixedPanel("dragged", 80);
+            s->addPanel(grows);
+            s->addPanel(dragged);
+            s->updateLayout();
+            ensure("the pair can resize, so there is somewhere to drag",
+                   grows->getResizeBar()->getVisible());
+            s->die();
+        }
+
+        {
+            LLLayoutStack* s = stack();
+            LLLayoutPanel* grows = panel("grows");
+            LLLayoutPanel* between = band("between", 26);
+            LLLayoutPanel* dragged = fixedPanel("dragged", 80);
+            s->addPanel(grows);
+            s->addPanel(between);
+            s->addPanel(dragged);
+            s->updateLayout();
+            ensure("a band that cannot give room has no bar of its own",
+                   !between->getResizeBar()->getVisible());
+            ensure("and it takes the bar off the panel behind it too",
+                   !grows->getResizeBar()->getVisible());
+            s->die();
+        }
+    }
 }
