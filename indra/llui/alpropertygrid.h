@@ -129,6 +129,16 @@ public:
         return mFieldCommit.connect(cb);
     }
 
+    // The way back: this file writes this field, take it out again and let
+    // whatever was in force before be in force. Only a row the file wrote is
+    // offered it, because it is the only row there is anything to take out
+    // of.
+    typedef boost::signals2::signal<void(const std::string&)> remove_signal_t;
+    boost::signals2::connection onFieldRemove(const remove_signal_t::slot_type& cb)
+    {
+        return mFieldRemove.connect(cb);
+    }
+
     // Only the fields the file writes, which is the short list an author
     // works in; off shows every field the tag answers to.
     void setAuthoredOnly(bool only);
@@ -192,6 +202,7 @@ private:
     std::string                 mNothingWritten;
     std::string                 mNoMatch;
     commit_signal_t             mFieldCommit;
+    remove_signal_t             mFieldRemove;
     S32                         mRowHeight;
     S32                         mLabelWidth;
     S32                         mSourceWidth;

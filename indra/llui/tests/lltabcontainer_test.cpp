@@ -175,6 +175,41 @@ namespace tut
         tabs->die();
     }
 
+    // Hiding a tab that is not the one being read leaves the reader where
+    // they are. A container that hides a tab as the selection changes threw
+    // them back to the first tab every time it did.
+    template<> template<>
+    void lltabcontainer_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build();
+        LLPanel* first = page("first", std::string());
+        LLPanel* second = page("second", std::string());
+        LLPanel* third = page("third", std::string());
+        tabs->addTabPanel(first);
+        tabs->addTabPanel(second);
+        tabs->addTabPanel(third);
+
+        tabs->selectTabPanel(third);
+        ensure_equals("reading the third", tabs->getCurrentPanel(), third);
+
+        tabs->setTabVisibility(second, false);
+        ensure_equals("hiding another leaves it there", tabs->getCurrentPanel(), third);
+
+        // The one being read is the one that went: somewhere else, then.
+        tabs->setTabVisibility(third, false);
+        ensure_equals("hiding this one moves to the first left", tabs->getCurrentPanel(), first);
+        ensure("and the container is still worth showing", tabs->getVisible());
+
+        tabs->setTabVisibility(first, false);
+        ensure("a container with nothing to show does not", !tabs->getVisible());
+        tabs->die();
+    }
+
     // The strip down the side names its buttons differently, and a tooltip
     // written for a page reaches the button either way.
     template<> template<>

@@ -26,6 +26,8 @@
 
 #include "../llspinctrl.h"
 
+#include "../lllineeditor.h"
+#include "../lluictrlfactory.h"
 #include "../llxuiparser.h"
 
 #include "alheadlessui_fixture.h"
@@ -135,5 +137,46 @@ namespace tut
                       LLSpinCtrl::scrubbedValue(0.f, 1, 1.f, MASK_NONE, 0, -100.f, 100.f), 0.f);
         ensure_equals("kept where it shows it",
                       LLSpinCtrl::scrubbedValue(0.f, 2, 1.f, MASK_NONE, 1, -100.f, 100.f), 0.5f);
+    }
+
+    // A number nobody wrote sits behind the box rather than in it. Without
+    // this an unset number reads exactly like a zero somebody chose, which
+    // is the whole of the complaint.
+    template<> template<>
+    void llspinctrl_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // No label, as the property grid builds them: a spinner with one
+        // measures its text, and this fixture carries metrics but no glyphs.
+        LLSpinCtrl::Params p(LLUICtrlFactory::getDefaultParams<LLSpinCtrl>());
+        p.name = "spin";
+        p.rect = LLRect(0, 20, 120, 0);
+        p.label_width = 0;
+        p.decimal_digits = 0;
+        p.initial_value = 42.0;
+        LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
+
+        LLLineEditor* editor = spin->getChild<LLLineEditor>("SpinCtrl Editor");
+        ensure("the spinner has its editor", editor != nullptr);
+        ensure_equals("a number somebody wrote is in the box", editor->getText(), std::string("42"));
+        ensure("and nothing is behind it", editor->getLabel().empty());
+
+        spin->setUnset(true);
+        ensure("nobody wrote it, so the box is empty", editor->getText().empty());
+        ensure_equals("and the number in force is behind it", editor->getLabel(), std::string("42"));
+        ensure("which the spinner says of itself", spin->isUnset());
+
+        // Choosing the number puts it back in the box. Stepping, dragging and
+        // typing each do exactly this and are not driven from here: they read
+        // the keyboard for their modifiers, and this fixture has none.
+        spin->setUnset(false);
+        ensure_equals("chosen, it is in the box", editor->getText(), std::string("42"));
+        ensure("and nothing is behind it", editor->getLabel().empty());
+
+        spin->die();
     }
 }

@@ -333,6 +333,7 @@ private:
     void refreshInspectors();
     void refreshAttributes(LLView* view);
     void onFieldCommit(const std::string& name, const std::string& value);
+    void onFieldRemove(const std::string& name);
 
     // --- the shape of the file -----------------------------------------------
     // Order among siblings, reparenting and removal, and the palette of
@@ -349,6 +350,9 @@ private:
     void refreshBindings(LLView* view);
     void refreshState(LLView* view);
     void refreshSelectionFindings();
+    // Which inspectors are offered for what is selected, and what each has
+    // to say about it before it is opened.
+    void refreshInspectorStrip();
     void onJumpToSource();
     void openInEditor(const std::string& path, S32 line);
 

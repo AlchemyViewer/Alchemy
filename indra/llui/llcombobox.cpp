@@ -454,6 +454,15 @@ void LLComboBox::setLabel(const LLStringExplicit& name)
     }
 }
 
+void LLComboBox::setUnset(bool unset)
+{
+    mUnset = unset;
+    if (mTextEntry)
+    {
+        mTextEntry->setTentative(unset);
+    }
+}
+
 void LLComboBox::updateLabel()
 {
     // Update the combo editor with the selected

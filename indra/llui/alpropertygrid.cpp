@@ -32,6 +32,7 @@
 #include "alcolorfield.h"
 #include "alflagsfield.h"
 #include "alfontfield.h"
+#include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "lllineeditor.h"
@@ -50,6 +51,8 @@ namespace
     // edge of a scrolling container loses its first letter to the border,
     // which is what the container is drawn with.
     constexpr S32 MARGIN = 8;
+    // The way back sits in the right margin of every row that has one.
+    constexpr S32 REMOVE_WIDTH = 16;
     constexpr S32 GUTTER = 10;      // between the label and its editor
 
     // A number written the way a file writes one, which is not the way a
@@ -367,7 +370,11 @@ S32 ALPropertyGrid::editorLeft() const
 
 S32 ALPropertyGrid::editorWidth(S32 width) const
 {
-    const S32 right = width - MARGIN - (mShowSource ? mSourceWidth + GUTTER : 0);
+    // The right column ends where the source column starts, and short of the
+    // way back where a row has one. Every row leaves the room whether it has
+    // the button or not, so the editors down the pane keep one right edge.
+    const S32 right = width - MARGIN - REMOVE_WIDTH - GUTTER
+                    - (mShowSource ? mSourceWidth + GUTTER : 0);
     return llmax(60, right - editorLeft());
 }
 
@@ -566,6 +573,9 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
             combo->add(value);
         }
         combo->setValue(field.value);
+        // Nobody wrote this one: what is shown is what is in force, not a
+        // choice made here.
+        combo->setUnset(!field.authored);
         editor = combo;
     }
     else if (field.kind == ALParamType::INTEGER || field.kind == ALParamType::UNSIGNED
@@ -580,7 +590,12 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
         p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
         p.max_value = 100000.f;
         p.initial_value = numberOf(field.value);
-        editor = LLUICtrlFactory::create<LLSpinCtrl>(p);
+        LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
+        // Nobody wrote this one, so the number in force goes behind the box
+        // rather than in it: an unset number and a chosen zero read exactly
+        // alike otherwise, which is the oldest complaint about this pane.
+        spin->setUnset(!field.authored);
+        editor = spin;
     }
     else
     {
@@ -621,11 +636,29 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, bool shaded)
                                                 : (FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT));
     row->addChild(editor);
 
+    // The way back, on the rows that have one. A field this file writes can
+    // be taken out again, and what was in force before is in force after --
+    // which the document has always been able to do and this pane has never
+    // had a way to ask for.
+    if (field.authored && !field.ignored)
+    {
+        LLButton::Params p(LLUICtrlFactory::getDefaultParams<LLButton>());
+        p.name = field.name + "_remove";
+        p.label = std::string("x");
+        p.rect = LLRect(width - MARGIN - REMOVE_WIDTH, top - 2, width - MARGIN, bottom);
+        p.tool_tip = field.name + " is written here; take it out and let whatever was in force before be in force";
+        p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
+        LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
+        remove->setCommitCallback([this, name](LLUICtrl*, const LLSD&) { mFieldRemove(name); });
+        row->addChild(remove);
+    }
+
     if (mShowSource)
     {
         LLTextBox::Params p;
         p.name = field.name + "_source";
-        p.rect = LLRect(width - MARGIN - mSourceWidth, top - 2, width - MARGIN, bottom);
+        p.rect = LLRect(width - MARGIN - REMOVE_WIDTH - GUTTER - mSourceWidth, top - 2,
+                        width - MARGIN - REMOVE_WIDTH - GUTTER, bottom);
         p.initial_value = field.source;
         p.tool_tip = field.source;
         p.font_valign = LLFontGL::VCENTER;

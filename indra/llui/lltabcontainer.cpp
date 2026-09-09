@@ -2243,22 +2243,36 @@ void LLTabContainer::setTabVisibility( LLPanel const *aPanel, bool aVisible )
         }
     }
 
-    bool foundTab( false );
-    for( tuple_list_t::const_iterator itr = mTabList.begin(); itr != mTabList.end(); ++itr )
+    // Hiding one tab is not a reason to leave the tab being read. Only the
+    // tab that has just gone sends the container elsewhere, and then to the
+    // first one left. This used to select the first showing tab whatever was
+    // hidden, so a container that hides a tab as the selection changes threw
+    // the reader back to the front every time it did.
+    const LLPanel* current = getCurrentPanel();
+    bool current_showing( false );
+    bool found_tab( false );
+    for( LLTabTuple const *pTT : mTabList )
     {
-        LLTabTuple const *pTT = *itr;
         if( pTT->mVisible )
         {
-            this->selectTab((S32)(itr - mTabList.begin()));
-            foundTab = true;
-            break;
+            found_tab = true;
+            current_showing |= (pTT->mTabPanel == current);
         }
     }
 
-    if( foundTab )
-        this->setVisible( true );
-    else
-        this->setVisible( false );
+    if( found_tab && !current_showing )
+    {
+        for( tuple_list_t::const_iterator itr = mTabList.begin(); itr != mTabList.end(); ++itr )
+        {
+            if( (*itr)->mVisible )
+            {
+                this->selectTab((S32)(itr - mTabList.begin()));
+                break;
+            }
+        }
+    }
+
+    this->setVisible( found_tab );
 
     updateMaxScrollPos();
 }

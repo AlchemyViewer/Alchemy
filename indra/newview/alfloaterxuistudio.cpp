@@ -1694,6 +1694,7 @@ bool ALFloaterXUIStudio::postBuild()
     mNotifications = getChild<LLScrollListCtrl>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
     mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
+    mAttributeGrid->onFieldRemove(boost::bind(&ALFloaterXUIStudio::onFieldRemove, this, _1));
     getChild<LLCheckBoxCtrl>("attributes_authored")->setCommitCallback(
         [this](LLUICtrl* ctrl, const LLSD&)
         {
@@ -6103,8 +6104,34 @@ void ALFloaterXUIStudio::onHoverChanged()
 // ---------------------------------------------------------------------------
 // The inspectors
 // ---------------------------------------------------------------------------
+// Only the inspectors that mean something for what is selected. Bindings are
+// what a file wrote, so an element no file wrote has none to show and is not
+// offered a page that would be empty every time. The findings page says how
+// many are about this element, since a page that is usually empty is worth
+// looking at on the occasions it is not.
+void ALFloaterXUIStudio::refreshInspectorStrip()
+{
+    LLView* view = selectedView();
+    const bool authored = view && mPreviews[PRIMARY].sourceMap.isFromXML(view);
+    if (LLPanel* bindings = mInspectors->getPanelByName("bindings_tab"))
+    {
+        mInspectors->setTabVisibility(bindings, authored);
+    }
+    if (LLPanel* findings = mInspectors->getPanelByName("findings_tab"))
+    {
+        // The page shows what is at the selection and under it, so the count
+        // beside its name counts the same thing.
+        const S32 n = mSelection.hasSelection()
+                    ? (S32)mPreviews[PRIMARY].lint.countUnder(mSelection.selection()) : 0;
+        mInspectors->setPanelTitle(mInspectors->getIndexForPanel(findings),
+                                   n > 0 ? findings->getLabel() + " " + std::to_string(n)
+                                         : findings->getLabel());
+    }
+}
+
 void ALFloaterXUIStudio::refreshInspectors()
 {
+    refreshInspectorStrip();
     LLView* view = selectedView();
     LLPanel* current = mInspectors->getCurrentPanel();
     const std::string tab = current ? current->getName() : std::string();
@@ -6301,6 +6328,48 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditWrote", args));
+}
+
+// The way back: this file writes this field, take it out again. What was in
+// force before the file wrote it is in force after, which is the whole point
+// -- an attribute removed is not an attribute set to its default, and the
+// grid says so by turning the row back to the quiet ink.
+void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
+{
+    if (!mSelection.hasSelection())
+    {
+        setStatus(getString("EditNoSelection"));
+        return;
+    }
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
+    {
+        const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+        const std::vector<const ALXUICatalog::Layer*> layers = entry
+            ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
+            : std::vector<const ALXUICatalog::Layer*>();
+        layer = layers.empty() ? nullptr : layers.front();
+    }
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return;
+    }
+    ALXUIEdit* held = document(*layer);
+    if (!held)
+    {
+        return;
+    }
+    if (!held->removeAttribute(mSelection.selection(), name))
+    {
+        setStatus(held->error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = name;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    documentChanged(getString("EditTookOut", args));
 }
 
 // A layer's skin and language, read off its path: the segments around

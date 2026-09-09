@@ -206,6 +206,9 @@ F32 clamp_precision(F32 value, S32 decimal_precision)
 
 void LLSpinCtrl::onUpBtn( const LLSD& data )
 {
+    // Stepped, dragged or typed: the number is chosen now, whoever had
+    // written it before.
+    setUnset(false);
     if( getEnabled() )
     {
         std::string text = mEditor->getText();
@@ -250,6 +253,9 @@ void LLSpinCtrl::onUpBtn( const LLSD& data )
 
 void LLSpinCtrl::onDownBtn( const LLSD& data )
 {
+    // Stepped, dragged or typed: the number is chosen now, whoever had
+    // written it before.
+    setUnset(false);
     if( getEnabled() )
     {
         std::string text = mEditor->getText();
@@ -434,6 +440,9 @@ void LLSpinCtrl::endScrub()
 
 void LLSpinCtrl::scrubTo(S32 x, S32 y, MASK mask)
 {
+    // Stepped, dragged or typed: the number is chosen now, whoever had
+    // written it before.
+    setUnset(false);
     const S32 travel = scrubVertical() ? (y - mScrubStartY) : (x - mScrubStartX);
     const F32 val = scrubbedValue(mScrubStartValue, travel, mIncrement, mask,
                                   mPrecision, mMinValue, mMaxValue);
@@ -560,11 +569,38 @@ void LLSpinCtrl::updateEditor()
 
     std::string format = llformat("%%.%df", mPrecision);
     std::string text = llformat(format.c_str(), displayed_value);
-    mEditor->setText( text );
+    if (mUnset)
+    {
+        // The number is in force but nobody wrote it: it belongs behind the
+        // box rather than in it, where the line editor already knows how to
+        // draw what nobody typed.
+        mEditor->setLabel(text);
+        mEditor->setText(LLStringUtil::null);
+    }
+    else
+    {
+        mEditor->setText( text );
+    }
+}
+
+void LLSpinCtrl::setUnset(bool unset)
+{
+    if (mUnset != unset)
+    {
+        mUnset = unset;
+        if (!unset)
+        {
+            mEditor->setLabel(LLStringUtil::null);
+        }
+        updateEditor();
+    }
 }
 
 void LLSpinCtrl::onEditorCommit( const LLSD& data )
 {
+    // Stepped, dragged or typed: the number is chosen now, whoever had
+    // written it before.
+    setUnset(false);
     bool success = false;
 
     if( mEditor->evaluateFloat() )

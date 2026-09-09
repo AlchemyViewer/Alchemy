@@ -92,6 +92,14 @@ public:
 
     virtual void    setPrecision(S32 precision);
 
+    // A number nobody wrote, shown as the number in force rather than as one
+    // this control holds: the box reads empty and the value sits behind it in
+    // the ink of a placeholder. Without this an unset number reads exactly
+    // like a zero somebody chose. Typing or stepping makes it a value again,
+    // which is what choosing it means.
+    void            setUnset(bool unset);
+    bool            isUnset() const { return mUnset; }
+
     void            setLabel(const LLStringExplicit& label);
     void            setLabelColor(const LLUIColor& c)            { mTextEnabledColor = c; updateLabelColor(); }
     void            setDisabledLabelColor(const LLUIColor& c)    { mTextDisabledColor = c; updateLabelColor();}
@@ -137,6 +145,7 @@ public:
 private:
     void            updateLabelColor();
     void            updateEditor();
+    bool            mUnset { false };
     void            reportInvalidData();
 
     // The label carries the drag where there is one; a spinner that draws its

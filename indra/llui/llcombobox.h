@@ -163,6 +163,13 @@ public:
     // This is probably a UI abuse.
 // [SL:KB] - Patch: Control-ComboBox | Checked: Catznip-6.4
     virtual void    setLabel(const LLStringExplicit& name);
+
+    // A value nobody chose here, shown as the value in force: the same
+    // distinction a spinner draws for an unset number, in the ink this
+    // control already keeps for a value it is not sure of. Set after the
+    // value, since setting a value the list has is a choice.
+    void            setUnset(bool unset);
+    bool            isUnset() const { return mUnset; }
 // [/SL:KB]
 //  void            setLabel(const LLStringExplicit& name);
 
@@ -260,6 +267,7 @@ private:
     bool                mAllowNewValues;
     S32                 mMaxChars;
     bool                mTextEntryTentative;
+    bool                mUnset { false };
     commit_callback_t   mPrearrangeCallback;
     commit_callback_t   mTextEntryCallback;
     commit_callback_t   mTextChangedCallback;

@@ -183,4 +183,35 @@ namespace tut
         }
         combo->die();
     }
+
+    // A value nobody chose here is shown as the value in force: the ink this
+    // control already keeps for a value it is not sure of, which is the same
+    // distinction the spinner draws for an unset number.
+    template<> template<>
+    void llcombobox_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLComboBox* combo = build(LLRect(0, 22, 160, 0));
+        combo->add("left");
+        combo->add("right");
+        combo->setValue("left");
+
+        LLLineEditor* text = combo->findChild<LLLineEditor>("Combo Text Entry", true);
+        ensure("a combo that takes typing has an editor", text != nullptr);
+        ensure("a value chosen here is not tentative", !text->getTentative());
+
+        // Set after the value, because setting a value the list has is a
+        // choice and would take the mark off again.
+        combo->setUnset(true);
+        ensure("the combo says nobody chose it", combo->isUnset());
+        ensure("so what is shown is not sure of itself", text->getTentative());
+
+        combo->setUnset(false);
+        ensure("and choosing it settles it", !text->getTentative());
+        combo->die();
+    }
 }

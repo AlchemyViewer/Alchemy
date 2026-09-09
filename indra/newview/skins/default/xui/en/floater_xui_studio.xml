@@ -32,6 +32,7 @@
     <floater.string name="EditNoTarget">Select an element to move it.</floater.string>
     <floater.string name="EditNoSelection">Nothing is selected.</floater.string>
     <floater.string name="EditWrote">Wrote [ATTRS] to [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditTookOut">Took [ATTRS] out of [FILE] in [LAYER]; whatever was in force before it is in force again</floater.string>
     <floater.string name="EditWroteNotMoved">Wrote [ATTRS] to [FILE] in [LAYER]; the preview's own frame is placed here, not by the file</floater.string>
     <floater.string name="EditRootMoved">Moved the preview on its canvas. Where it sits here is not in the file, so nothing was written.</floater.string>
     <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
