@@ -27,6 +27,7 @@
 #include "alparamtype.h"
 #include "llpanel.h"
 
+class ALEmptyState;
 class LLAccordionCtrl;
 class LLAccordionCtrlTab;
 class LLTextBox;
@@ -142,8 +143,20 @@ public:
     // What is said when there are no rows, which is three different things:
     // nothing is selected, the element writes nothing, or the filter matches
     // nothing. Given rather than written here, because this library has no
-    // file for a translator to open.
-    void setNotices(std::string nothing_selected, std::string nothing_written, std::string no_match);
+    // file for a translator to open -- and each is a headline saying what is
+    // missing, a sentence saying how to get some, and, where one thing would
+    // fix it, the button that does that thing.
+    struct Notice
+    {
+        std::string headline;
+        std::string sentence;
+        std::string action;
+    };
+    void setNotices(Notice nothing_selected, Notice nothing_written, Notice no_match);
+
+    // The button on whichever notice is showing, pressed.
+    typedef boost::signals2::signal<void()> notice_signal_t;
+    boost::signals2::connection onNoticeAction(const notice_signal_t::slot_type& cb);
 
     // The words a row is explained in, for the same reason: each may carry
     // [NAME], [TYPE] and [SOURCE] -- the field's own name, the C++ type
@@ -266,13 +279,13 @@ private:
     std::vector<std::string>    mGroups;
     std::vector<Section>        mSections;
     LLAccordionCtrl*            mAccordion = nullptr;
-    LLTextBox*                  mEmpty = nullptr;
+    ALEmptyState*               mEmpty = nullptr;
     std::string                 mFilter;
     Tips                        mTips;
     std::vector<std::string>    mEdgeTips;
-    std::string                 mNothingSelected;
-    std::string                 mNothingWritten;
-    std::string                 mNoMatch;
+    Notice                      mNothingSelected;
+    Notice                      mNothingWritten;
+    Notice                      mNoMatch;
     commit_signal_t             mFieldCommit;
     remove_signal_t             mFieldRemove;
     gutter_signal_t             mFieldGutter;

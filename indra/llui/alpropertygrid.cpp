@@ -31,6 +31,7 @@
 #include "llaccordionctrltab.h"
 #include "alcolorfield.h"
 #include "alflagsfield.h"
+#include "alemptystate.h"
 #include "alfollowscontrol.h"
 #include "alfontfield.h"
 #include "llbutton.h"
@@ -225,16 +226,17 @@ ALPropertyGrid::ALPropertyGrid(const Params& p)
     mAccordion = LLUICtrlFactory::create<LLAccordionCtrl>(ap);
     addChild(mAccordion);
 
-    // An empty grid and a broken one look the same, so it says which. Over
-    // the accordion rather than in it, because what it is saying is that
-    // there are no sections.
-    LLTextBox::Params tp;
-    tp.name = "empty";
-    tp.rect = LLRect(MARGIN, getRect().getHeight(), getRect().getWidth(), getRect().getHeight() - mRowHeight);
-    tp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
-    tp.font_valign = LLFontGL::VCENTER;
-    tp.use_ellipses = true;
-    mEmpty = LLUICtrlFactory::create<LLTextBox>(tp);
+    // An empty grid and a broken one look the same, so it says which -- and
+    // says what to do about it, since every one of the three reasons a grid
+    // is empty has something the reader can do next. Over the accordion
+    // rather than in it, because what it is saying is that there are no
+    // sections at all.
+    ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+    ep.name = "empty";
+    ep.rect = getLocalRect();
+    ep.follows.flags = FOLLOWS_ALL;
+    ep.background_visible = false;
+    mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
     addChild(mEmpty);
 }
 
@@ -334,13 +336,17 @@ void ALPropertyGrid::setNested(bool nested)
     }
 }
 
-void ALPropertyGrid::setNotices(std::string nothing_selected, std::string nothing_written,
-                                std::string no_match)
+void ALPropertyGrid::setNotices(Notice nothing_selected, Notice nothing_written, Notice no_match)
 {
     mNothingSelected = std::move(nothing_selected);
     mNothingWritten = std::move(nothing_written);
     mNoMatch = std::move(no_match);
     rebuild();
+}
+
+boost::signals2::connection ALPropertyGrid::onNoticeAction(const notice_signal_t::slot_type& cb)
+{
+    return mEmpty->onAction(cb);
 }
 
 void ALPropertyGrid::setTips(Tips tips)
@@ -545,9 +551,10 @@ void ALPropertyGrid::rebuild()
     mEmpty->setVisible(shown == 0);
     if (!shown)
     {
-        mEmpty->setText(mFields.empty() ? mNothingSelected
-                      : !mFilter.empty() ? mNoMatch
-                                         : mNothingWritten);
+        const Notice& says = mFields.empty()  ? mNothingSelected
+                           : !mFilter.empty() ? mNoMatch
+                                              : mNothingWritten;
+        mEmpty->say(says.headline, says.sentence, says.action);
     }
 }
 

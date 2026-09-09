@@ -111,6 +111,7 @@ target_sources(llui
     alcanvasview.cpp
     alcolorfield.cpp
     aldockpanel.cpp
+    alemptystate.cpp
     alflagsfield.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
@@ -255,6 +256,7 @@ target_sources(llui
     alcanvasview.h
     alcolorfield.h
     aldockpanel.h
+    alemptystate.h
     alflagsfield.h
     alfollowscontrol.h
     alfontfield.h
@@ -372,6 +374,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(alfollowscontrol "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alcanvasview "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(aldockpanel "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alemptystate "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuioverlay "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuifill "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
@@ -389,7 +392,7 @@ if(BUILD_TESTING)
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
-  foreach(ui_test lllayoutstack llresizebar llfloater llaccordionctrltab llspinctrl llcombobox lltabcontainer alpropertygrid alfollowscontrol alcanvasview aldockpanel alxuifill alviewtype alxuidiagnostics alxuishellbuild
+  foreach(ui_test lllayoutstack llresizebar llfloater llaccordionctrltab llspinctrl llcombobox lltabcontainer alpropertygrid alfollowscontrol alcanvasview aldockpanel alemptystate alxuifill alviewtype alxuidiagnostics alxuishellbuild
                   alxuicatalog alxuiselection alxuisourcemap alxuitreemodel alxuilint
                   alxuiedit alxuischema)
     if (TARGET INTEGRATION_TEST_${ui_test})

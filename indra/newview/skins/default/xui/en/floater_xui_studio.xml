@@ -74,9 +74,13 @@
     <floater.string name="AttributeWhat">[NAME]   &lt;[TAG]&gt;   [CLASS]</floater.string>
     <floater.string name="AttributeWhatCodeBuilt">[NAME]   built in code   [CLASS]</floater.string>
     <floater.string name="AttributeWhatNone">Nothing selected</floater.string>
-    <floater.string name="AttributeNothingSelected">Nothing selected.</floater.string>
-    <floater.string name="AttributeNothingWritten">This element writes nothing. Take the switch off to see every field the tag answers to.</floater.string>
-    <floater.string name="AttributeNoMatch">No field of that name.</floater.string>
+    <floater.string name="AttributeNothingSelected">Nothing selected</floater.string>
+    <floater.string name="AttributeNothingSelectedHow">Choose an element in the outline, or control-click one on the canvas.</floater.string>
+    <floater.string name="AttributeNothingWritten">This element writes nothing</floater.string>
+    <floater.string name="AttributeNothingWrittenHow">Every value it has is in force from somewhere else: the widget's own defaults, or a layer under this one.</floater.string>
+    <floater.string name="AttributeShowEvery">Show every field</floater.string>
+    <floater.string name="AttributeNoMatch">No field of that name</floater.string>
+    <floater.string name="AttributeNoMatchHow">The filter matches the names a file writes, dots and all. Clear it to see the rest.</floater.string>
     <floater.string name="AttributeAlsoWritten">[ATTR] is written over in   [LAYERS]</floater.string>
     <floater.string name="PaneNavigator">XUI Studio: Navigator</floater.string>
     <floater.string name="PaneBottom">XUI Studio: Findings and Tables</floater.string>

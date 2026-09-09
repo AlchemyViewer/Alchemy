@@ -1599,9 +1599,21 @@ bool ALFloaterXUIStudio::postBuild()
         mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
         tab->addChild(mAttributeGrid);
         mAttributeGrid->setGroups(attributeGroupNames());
-        mAttributeGrid->setNotices(getString("AttributeNothingSelected"),
-                                   getString("AttributeNothingWritten"),
-                                   getString("AttributeNoMatch"));
+        mAttributeGrid->setNotices(
+            { getString("AttributeNothingSelected"), getString("AttributeNothingSelectedHow"), "" },
+            { getString("AttributeNothingWritten"), getString("AttributeNothingWrittenHow"),
+              getString("AttributeShowEvery") },
+            { getString("AttributeNoMatch"), getString("AttributeNoMatchHow"), "" });
+        // The one thing that would fix an element that writes nothing is to
+        // stop asking only for what the files write.
+        mAttributeGrid->onNoticeAction([this]()
+        {
+            if (LLCheckBoxCtrl* box = findChild<LLCheckBoxCtrl>("attributes_authored", true))
+            {
+                box->set(false);
+            }
+            mAttributeGrid->setAuthoredOnly(false);
+        });
         // The words the rows explain themselves in. They live in the skin
         // rather than in llui, which has no file for a translator to open.
         ALPropertyGrid::Tips tips;
@@ -1956,17 +1968,54 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         mTreeFilter->setFocus(true);
         return true;
     }
-    // A developer who works in one mode reaches it without the mouse, and
-    // the number is the mode's place in the strip rather than a name to
-    // learn: Files, Find, Findings, Translation, Notices, Library,
-    // Channels, in the order they are read down the side of the pane.
-    if (mask == MASK_CONTROL && key >= '1' && key <= '9' && mModes)
+    // Open quickly: the catalog, with whatever was typed there before it
+    // selected, so the next thing typed replaces it. A developer looking for
+    // a file is looking for it by name.
+    if (key == 'O' && mask == MASK_CONTROL)
     {
-        const S32 which = key - '1';
-        if (which < mModes->getTabCount())
+        if (mModes)
         {
-            mModes->selectTab(which);
+            mModes->selectTabByName("files_mode");
             onMode();
+        }
+        mCatalogFilter->setFocus(true);
+        return true;
+    }
+    // Nothing selected, which is the way out of a selection rather than a
+    // way to another one -- and the way to see the whole of a preview with
+    // no marks over it.
+    if (key == KEY_ESCAPE && mask == MASK_NONE && mSelection.hasSelection())
+    {
+        mSelection.clearSelection();
+        return true;
+    }
+    // A developer who works in one region reaches it without the mouse, and
+    // the number is its place in the strip rather than a name to learn.
+    // Control for the navigator's modes, and control with shift for the
+    // inspectors, which are the two strips a developer moves between.
+    const auto pick = [](LLTabContainer* tabs, S32 which)
+    {
+        if (tabs && which < tabs->getTabCount())
+        {
+            tabs->selectTab(which);
+            return true;
+        }
+        return false;
+    };
+    if (key >= '1' && key <= '9')
+    {
+        if (mask == MASK_CONTROL && pick(mModes, key - '1'))
+        {
+            onMode();
+            return true;
+        }
+        if (mask == (MASK_CONTROL | MASK_SHIFT) && pick(mInspectors, key - '1'))
+        {
+            refreshInspectors();
+            return true;
+        }
+        if (mask == (MASK_CONTROL | MASK_ALT) && pick(mBottom, key - '1'))
+        {
             return true;
         }
     }
