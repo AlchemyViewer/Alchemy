@@ -165,6 +165,10 @@ public:
     // Read the catalog and the previews again, for the button that says so.
     void reloadAll();
 
+    // What has been read of the skin. The library asks for this rather than
+    // reading the tree a second time to answer how often a tag is used.
+    const ALXUICatalog& catalog() const { return mCatalog; }
+
 private:
     ALFloaterXUIStudio(const LLSD& key);
     ~ALFloaterXUIStudio() override;

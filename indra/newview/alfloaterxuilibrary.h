@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+class ALXUICatalog;
 class LLFilterEditor;
 class LLPanel;
 class LLScrollListCtrl;
@@ -74,6 +75,10 @@ private:
     // Containers, controls, text, lists, chrome: the five a developer looks
     // in, decided from what the tag does rather than from what it is called.
     static std::string groupOf(const std::string& tag);
+
+    // The catalog the studio has already read, where the studio is open.
+    // The library is its companion and does not scan the skin itself.
+    static const ALXUICatalog* catalogOf();
 
     LLFilterEditor*     mFilter = nullptr;
     LLScrollListCtrl*   mTags = nullptr;

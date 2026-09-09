@@ -26,12 +26,15 @@
 
 #include "alfloaterxuilibrary.h"
 
+#include "alfloaterxuistudio.h"
+#include "alxuicatalog.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
 #include "llfiltereditor.h"
 #include "llpanel.h"
 #include "llscrolllistctrl.h"
 #include "lltexteditor.h"
+#include "llfloaterreg.h"
 #include "lluictrlfactory.h"
 #include "llxmlnode.h"
 
@@ -55,6 +58,13 @@ namespace
         };
         return skipped.count(tag) == 0 && LLDefaultChildRegistry::instance().getValue(tag) != nullptr;
     }
+}
+
+const ALXUICatalog* ALFloaterXUILibrary::catalogOf()
+{
+    const ALFloaterXUIStudio* studio =
+        LLFloaterReg::findTypedInstance<ALFloaterXUIStudio>("xui_studio");
+    return studio ? &studio->catalog() : nullptr;
 }
 
 ALFloaterXUILibrary::ALFloaterXUILibrary(const LLSD& key)
@@ -281,6 +291,21 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
             out += (i ? ", " : " ") + takers[i];
         }
         out += "\n";
+    }
+
+    // The honest answer to "is this thing still used". The studio has read
+    // the whole skin already, so this asks it rather than reading it again;
+    // with the studio closed there is nothing to count and the line is left
+    // off rather than guessed at.
+    if (const ALXUICatalog* catalog = ALFloaterXUILibrary::catalogOf())
+    {
+        std::set<const ALXUICatalog::Entry*> files;
+        for (const ALXUICatalog::Hit& hit : catalog->find(tag, ALXUICatalog::Field::Tag))
+        {
+            files.insert(hit.entry);
+        }
+        out += "\nUsed in " + std::to_string(files.size())
+             + (files.size() == 1 ? " file\n" : " files\n");
     }
 
     // Real, valid and pasteable: the attributes every element needs and
