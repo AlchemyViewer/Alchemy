@@ -50,7 +50,7 @@
 class ALXUILiveFile;
 class ALPropertyGrid;
 class ALXUICanvas;
-class ALXUICanvasRow;
+class ALCanvasRow;
 class ALXUIPreviewHost;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -443,7 +443,7 @@ private:
     // inspector: one per variant, side by side on the row, unless the
     // developer has asked for the preview in a window of its own.
     LLScrollContainer*  mCanvasArea = nullptr;
-    ALXUICanvasRow*     mCanvasRow = nullptr;
+    ALCanvasRow*        mCanvasRow = nullptr;
     ALXUICanvas*        mCanvases[PREVIEWS] = {};
     bool                mFloatPreview = false;
     // The pill above the canvas. Hidden, the region is given over to the

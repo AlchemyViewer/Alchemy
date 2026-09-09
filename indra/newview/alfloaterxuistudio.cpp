@@ -59,6 +59,7 @@
 #include "llsdparam.h"
 #include "llrender2dutils.h"
 #include "llaccordionctrltab.h"
+#include "alcanvasview.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
 #include "llspinctrl.h"
@@ -364,230 +365,26 @@ namespace
 // be a region of a window as readily as the contents of a floater -- what
 // it needs is a root view and a rect, and nothing else it does is about
 // being a window.
-class ALXUICanvas final : public LLPanel
+class ALXUICanvas final : public ALCanvasView
 {
 public:
-    AL_VIEW_TYPE(ALXUICanvas, LLPanel);
+    AL_VIEW_TYPE(ALXUICanvas, ALCanvasView);
 
     ALXUICanvas(ALFloaterXUIStudio* tool, S32 which, const LLPanel::Params& p)
-    :   LLPanel(p),
+    :   ALCanvasView(p),
         mTool(tool),
         mWhich(which)
     {
     }
 
     void detach() { mTool = nullptr; }
-    LLView* root() const { return mRoot; }
 
-    // What was built, and where on the surface it was put. The surface
-    // changes size under it -- the region is shared out again, the zoom
-    // changes, the window is resized -- and a view keeps its distance from
-    // the bottom of what holds it, so where the root goes is written again
-    // rather than followed.
-    void setRoot(LLView* root)
+    // Rules are the canvas's own furniture: they stay their own size at
+    // the edges of what can be seen, and it is the numbers on them that
+    // follow the preview.
+    void drawChrome() override
     {
-        mRoot = root;
-        rememberRoot();
-    }
-
-    // Where the preview sits, and how far past itself it draws. Called when
-    // a preview is built and again when the developer moves it: where it
-    // sits there is not in the file and is remembered nowhere else, so
-    // without this the next change of size puts it back where it was built.
-    void rememberRoot()
-    {
-        mNeedWidth = 0;
-        mNeedHeight = 0;
-        if (!mRoot)
-        {
-            return;
-        }
-        const LLView* parent = mRoot->getParent();
-        const LLRect placed = mRoot->getRect();
-        mAnchorLeft = placed.mLeft;
-        mAnchorTop = (parent == this ? surfaceHeight() : parent->getRect().getHeight()) - placed.mTop;
-
-        // What the preview actually draws, which is not always the rect it
-        // claims: a child placed past its parent's edge is drawn past it,
-        // and a surface cut to the rect leaves that drawing clipped with
-        // nowhere to scroll to -- which is the one thing a canvas that
-        // scrolls exists to prevent.
-        mRoot->setUseBoundingRect(true);
-        mRoot->updateBoundingRect();
-        LLRect drawn(placed);
-        drawn.unionWith(mRoot->getBoundingRect());
-        // What spills off the near sides is room the preview has to be
-        // moved over by, and a preview cannot be dragged off the top left
-        // of the surface it is on -- there is no growing that way.
-        mAnchorLeft = llmax(mAnchorLeft, placed.mLeft - drawn.mLeft);
-        mAnchorTop = llmax(mAnchorTop, drawn.mTop - placed.mTop);
-        // So the surface reaches from its own top left corner to the far
-        // side of everything the preview draws, wherever it has been put.
-        mNeedWidth = mAnchorLeft + placed.getWidth() + (drawn.mRight - placed.mRight) + CANVAS_MARGIN;
-        mNeedHeight = mAnchorTop + placed.getHeight() + (placed.mBottom - drawn.mBottom) + CANVAS_MARGIN;
-
-        resurface();
-        anchorRoot();
-    }
-
-    // A canvas in a window of its own is as big as what it shows. A canvas
-    // that is a region of a window is as big as the region, and what it
-    // shows sits at the top of it -- which is why nothing is placed from
-    // the bottom edge.
-    void setSizable(bool sizable) { mSizable = sizable; }
-
-    // The least a surface may be, whatever is on it: its share of the room
-    // the row is shown in. A canvas that stopped at the edge of its content
-    // had nowhere to draw a rule along, nowhere to drag an element to and
-    // nothing to drop onto. Set before a build, because what is built is
-    // then placed against the surface's final height.
-    void setLeastSurface(S32 width, S32 height)
-    {
-        if (mLeastWidth != width || mLeastHeight != height)
-        {
-            mLeastWidth = width;
-            mLeastHeight = height;
-            resurface();
-        }
-    }
-
-    void fitContent(S32 width, S32 height)
-    {
-        mContentWidth = llmax(width, 120);
-        mContentHeight = llmax(height, 40);
-        resurface();
-    }
-
-    S32 contentWidth() const { return mContentWidth; }
-    S32 contentHeight() const { return mContentHeight; }
-
-    // A surface has two sizes, and at any zoom but a hundred per cent they
-    // are different numbers. What is on it is built, hit and measured in the
-    // file's own coordinates: that is the surface rect, and it is what the
-    // room comes to at this zoom. What the row places and the container
-    // scrolls is what the surface is drawn as, which is the view's own rect.
-    S32 surfaceWidth() const
-    {
-        return llmax(mContentWidth, mNeedWidth, ll_round((F32)mLeastWidth / mZoom));
-    }
-    S32 surfaceHeight() const
-    {
-        return llmax(mContentHeight, mNeedHeight, ll_round((F32)mLeastHeight / mZoom));
-    }
-    LLRect surfaceRect() const { return LLRect(0, surfaceHeight(), surfaceWidth(), 0); }
-
-    void resurface()
-    {
-        if (mSizable)
-        {
-            // The surface takes up what it is drawn as, so a zoomed preview
-            // scrolls by what it covers rather than by what it measures.
-            reshape(ll_round((F32)surfaceWidth() * mZoom), ll_round((F32)surfaceHeight() * mZoom));
-        }
-    }
-
-    // The surface changes size; what is on it does not. A view carries its
-    // children through a reshape by their follows flags, which would stretch
-    // a previewed floater to the size of the thing it is being previewed on.
-    void reshape(S32 width, S32 height, bool called_from_parent = true) override
-    {
-        if (width == getRect().getWidth() && height == getRect().getHeight())
-        {
-            return;
-        }
-        LLRect r(getRect());
-        r.mRight = r.mLeft + width;
-        r.mTop = r.mBottom + height;
-        setRect(r);
-        if (!called_from_parent && getParent())
-        {
-            getParent()->reshape(getParent()->getRect().getWidth(),
-                                 getParent()->getRect().getHeight(), false);
-        }
-        updateBoundingRect();
-        dirtyRect();
-        anchorRoot();
-    }
-
-    // Where the root was put, put again against the surface as it is now.
-    void anchorRoot()
-    {
-        if (!mRoot)
-        {
-            return;
-        }
-        LLView* held = mRoot;
-        while (held && held->getParent() != this)
-        {
-            held = held->getParent();
-        }
-        if (!held)
-        {
-            return;
-        }
-        const LLRect surface = surfaceRect();
-        if (held != mRoot)
-        {
-            // A holder covers the whole surface and the root sits in it.
-            held->setShape(surface);
-        }
-        const S32 room = held == mRoot ? surface.getHeight() : held->getRect().getHeight();
-        mRoot->setOrigin(mAnchorLeft, room - mAnchorTop - mRoot->getRect().getHeight());
-    }
-
-    // How much bigger than life the preview is drawn. The content keeps the
-    // numbers the file gives it: what changes is the transform it is drawn
-    // through, and the surface it needs, and what a pointer at a place means.
-    F32 zoom() const { return mZoom; }
-    void setZoom(F32 zoom)
-    {
-        zoom = llclamp(zoom, 0.2f, 4.f);
-        if (mZoom != zoom)
-        {
-            mZoom = zoom;
-            resurface();
-            // A surface whose size in the file's coordinates did not change
-            // was not reshaped, and then nothing has put the root back.
-            anchorRoot();
-        }
-    }
-
-    // The pointer in the coordinates the preview is laid out in. Everything
-    // that finds, measures or moves an element works in those: only the
-    // drawing and the mouse know about the zoom.
-    void toContent(S32& x, S32& y) const
-    {
-        if (mZoom != 1.f)
-        {
-            x = ll_round((F32)x / mZoom);
-            y = ll_round((F32)y / mZoom);
-        }
-    }
-
-    // Everything on the canvas goes, and the canvas forgets what it held.
-    void clear()
-    {
-        deleteAllChildren();
-        mRoot = nullptr;
-    }
-
-    void draw() override
-    {
-        const bool zoomed = mZoom != 1.f;
-        if (zoomed)
-        {
-            LLRender2D::pushMatrix();
-            LLRender2D::scale(mZoom, mZoom);
-        }
-        drawContent();
-        if (zoomed)
-        {
-            LLRender2D::popMatrix();
-        }
-        // A rule is the canvas's own chrome: it stays its own size at the
-        // edges of what can be seen, and it is the numbers on it that follow
-        // the preview.
-        if (mTool && mRoot && mTool->showRulers())
+        if (mTool && root() && mTool->showRulers())
         {
             drawRulers();
         }
@@ -595,10 +392,10 @@ public:
 
     // Everything that lives in the preview's own coordinates: the preview,
     // and every mark drawn over it.
-    void drawContent()
+    void drawContent() override
     {
         LLPanel::draw();
-        if (!mTool || !mRoot)
+        if (!mTool || !root())
         {
             return;
         }
@@ -613,7 +410,7 @@ public:
         if (selection.hasHover() && mTool->hoverHighlight())
         {
             static const LLUIColor hover_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-            if (LLView* view = ALXUISelection::resolve(mRoot, selection.hover()))
+            if (LLView* view = ALXUISelection::resolve(root(), selection.hover()))
             {
                 drawBox(view, hover_color.get(), true);
             }
@@ -626,12 +423,12 @@ public:
             static const LLColor4 also_color(1.f, 0.4f, 0.4f, 0.7f);
             for (const ALXUISelection::path_t& path : selection.also())
             {
-                if (LLView* other = ALXUISelection::resolve(mRoot, path))
+                if (LLView* other = ALXUISelection::resolve(root(), path))
                 {
                     drawBox(other, also_color, false);
                 }
             }
-            if (LLView* view = ALXUISelection::resolve(mRoot, selection.selection()))
+            if (LLView* view = ALXUISelection::resolve(root(), selection.selection()))
             {
                 drawBox(view, LLColor4::red, true);
                 if (gKeyboard && (gKeyboard->currentMask(false) & MASK_ALT))
@@ -698,7 +495,7 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
         toContent(x, y);
-        if (!mTool || !mRoot)
+        if (!mTool || !root())
         {
             return LLPanel::handleMouseDown(x, y, mask);
         }
@@ -706,7 +503,7 @@ public:
         // A handle answers before the widget under it does, with or
         // without the modifier: a button in a preview is a picture of a
         // button, and the handle on its corner is a handle.
-        LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+        LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection());
         if (editable(selected))
         {
             // An anchor is a click and not a drag: it says which edge of
@@ -757,10 +554,10 @@ public:
             setGripCursor(mGrip);
             return true;
         }
-        if (mTool && mRoot)
+        if (mTool && root())
         {
             mTool->canvasHover(mWhich, hitTest(x, y));
-            LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+            LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection());
             if (editable(selected))
             {
                 const S32 grip = gripAt(x, y, localRectOf(selected), mask);
@@ -797,7 +594,7 @@ public:
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override
     {
         toContent(x, y);
-        if (mTool && mRoot && (mask & MASK_CONTROL))
+        if (mTool && root() && (mask & MASK_CONTROL))
         {
             LLView* view = hitTest(x, y);
             mTool->canvasSelect(mWhich, view);
@@ -1076,7 +873,7 @@ private:
 
     S32 gripAt(S32 x, S32 y, const LLRect& r, MASK mask) const
     {
-        const S32 axis = stackAxisOf(ALXUISelection::resolve(mRoot, mTool->selection().selection()));
+        const S32 axis = stackAxisOf(ALXUISelection::resolve(root(), mTool->selection().selection()));
         LLRect grips[8];
         gripRects(r, grips);
         for (S32 i = 0; i < 8; ++i)
@@ -1119,7 +916,7 @@ private:
         // not where a pixel of this window happens to be.
         if (mTool && mTool->snapToGrid())
         {
-            LLView* view = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+            LLView* view = ALXUISelection::resolve(root(), mTool->selection().selection());
             const LLView* parent = view ? view->getParent() : nullptr;
             if (view && parent)
             {
@@ -1165,7 +962,7 @@ private:
         {
             return;
         }
-        LLView* moving = ALXUISelection::resolve(mRoot, mTool->selection().selection());
+        LLView* moving = ALXUISelection::resolve(root(), mTool->selection().selection());
         if (LLView* into = mTool->dropTarget(mWhich, hitTest(x, y), moving))
         {
             mDrop = into->getHandle();
@@ -1213,9 +1010,9 @@ private:
     {
         LLRect screen;
         localRectToScreen(LLRect(x, y, x, y), &screen);
-        LLView* view = mRoot ? pickDrawn(mRoot, screen.mLeft, screen.mBottom) : nullptr;
+        LLView* view = root() ? pickDrawn(root(), screen.mLeft, screen.mBottom) : nullptr;
         const ALXUISourceMap& map = mTool->sourceMap(mWhich);
-        while (view && view != mRoot && !map.isFromXML(view))
+        while (view && view != root() && !map.isFromXML(view))
         {
             view = view->getParent();
         }
@@ -1228,7 +1025,7 @@ private:
     void drawGrid() const
     {
         const S32 grid = mTool->gridSize();
-        const LLRect r = mRoot == this ? getLocalRect() : localRectOf(mRoot);
+        const LLRect r = root() == this ? getLocalRect() : localRectOf(root());
         if (grid < 2 || r.getWidth() <= 0)
         {
             return;
@@ -1261,23 +1058,6 @@ private:
     // What of the canvas can be seen, in the canvas's own coordinates. A
     // canvas is as big as what is on it and the container scrolls it, so the
     // surface's own top-left is often somewhere off screen.
-    LLRect viewportRect()
-    {
-        if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
-        {
-            LLRect screen;
-            scroller->localRectToScreen(scroller->getContentWindowRect(), &screen);
-            LLRect local;
-            screenRectToLocal(screen, &local);
-            local.intersectWith(getLocalRect());
-            if (local.getWidth() > 0 && local.getHeight() > 0)
-            {
-                return local;
-            }
-        }
-        return getLocalRect();
-    }
-
     // The rules belong to the canvas, along the edges of what can be seen.
     // They were drawn against the preview's own rect, which put them outside
     // it, moved them whenever it moved, and took them off the surface
@@ -1293,7 +1073,7 @@ private:
         {
             return;
         }
-        const LLRect origin = (mRoot && mRoot != this) ? localRectOf(mRoot) : getLocalRect();
+        const LLRect origin = (root() && root() != this) ? localRectOf(root()) : getLocalRect();
 
         static const LLUIColor back = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::black);
         static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
@@ -1351,7 +1131,7 @@ private:
         }
 
         // Where the selection sits, on both rules.
-        if (LLView* selected = ALXUISelection::resolve(mRoot, mTool->selection().selection()))
+        if (LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection()))
         {
             const LLRect content = localRectOf(selected);
             const LLRect box(onCanvas(content.mLeft), onCanvas(content.mTop),
@@ -1361,13 +1141,6 @@ private:
             gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
                        LLColor4::red, false);
         }
-    }
-
-    LLRect localRectOf(const LLView* view) const
-    {
-        LLRect local;
-        screenRectToLocal(view->calcScreenRect(), &local);
-        return local;
     }
 
     void drawBox(const LLView* view, const LLColor4& color, bool label)
@@ -1433,19 +1206,8 @@ private:
         }
     }
 
-    ALFloaterXUIStudio*   mTool;
-    LLView*             mRoot = nullptr;
+    ALFloaterXUIStudio* mTool;
     S32                 mWhich;
-    bool                mSizable = false;
-    S32                 mContentWidth = 0;
-    S32                 mContentHeight = 0;
-    S32                 mLeastWidth = 0;
-    S32                 mLeastHeight = 0;
-    S32                 mAnchorLeft = 0;        // where the root was put, from
-    S32                 mAnchorTop = 0;         // the surface's top left corner
-    S32                 mNeedWidth = 0;         // to the far side of what it
-    S32                 mNeedHeight = 0;        // draws, from the top left
-    F32                 mZoom = 1.f;
 
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
     S32                 mDragX = 0;
@@ -1454,172 +1216,13 @@ private:
     LLHandle<LLView>    mDrop;                  // the container a held element would land in
 };
 
-// The variants, side by side. Each is a canvas of its own, with its own
-// skin and its own language, and they share one selection: what is selected
-// is an element of the file, not of any one build of it, so a click on the
+// The variants, side by side: each a surface of its own, with its own skin
+// and its own language, sharing one selection -- what is selected is an
+// element of the file and not of any one build of it, so a click on the
 // German one puts the marks round the same element of the English one.
 //
-// The row is as wide as what is on it and as tall as its tallest, and the
-// container it sits in scrolls: a variant that does not fit is scrolled to,
-// which is what a canvas is for. Nothing here is placed from the bottom,
-// because the two canvases are read across and their tops are what line up.
-class ALXUICanvasRow final : public LLPanel
-{
-public:
-    AL_VIEW_TYPE(ALXUICanvasRow, LLPanel);
-
-    static constexpr S32 GUTTER = 12;
-
-    explicit ALXUICanvasRow(const LLPanel::Params& p) : LLPanel(p) {}
-
-    void addCanvas(ALXUICanvas* canvas)
-    {
-        mCanvases.push_back(canvas);
-        addChild(canvas);
-    }
-
-    // A canvas comes and goes with the variant on it, and the room is shared
-    // out again when it does. This is told before a build rather than after,
-    // because what is built is placed against the surface it lands on.
-    void show(ALXUICanvas* canvas, bool visible)
-    {
-        canvas->setVisible(visible);
-        shareRoom();
-    }
-
-    void shareRoom()
-    {
-        S32 showing = 0;
-        for (const ALXUICanvas* canvas : mCanvases)
-        {
-            showing += canvas->getVisible() ? 1 : 0;
-        }
-        if (showing == 0)
-        {
-            return;
-        }
-        const LLRect room = regionRect();
-        const S32 share = (room.getWidth() - GUTTER * (showing - 1)) / showing;
-        for (ALXUICanvas* canvas : mCanvases)
-        {
-            canvas->setLeastSurface(llmax(share, 0), room.getHeight());
-        }
-    }
-
-    // The room is shared out again whenever there is a different amount of
-    // it: the window resized, a region folded away, a scrollbar arriving or
-    // going. The container is asked rather than told, because it answers
-    // after its own scrollbars have been worked out.
-    void draw() override
-    {
-        const LLRect room = regionRect();
-        if (room.getWidth() != mRoomWidth || room.getHeight() != mRoomHeight)
-        {
-            mRoomWidth = room.getWidth();
-            mRoomHeight = room.getHeight();
-            shareRoom();
-            layout();
-        }
-        else
-        {
-            // A canvas that changed size on its own -- a preview rebuilt, a
-            // preview moved towards an edge -- is a document of a different
-            // size, and what the container scrolls is this. Cheaper to ask
-            // every frame than to be wrong about it for one.
-            S32 width = 0;
-            S32 height = 0;
-            wanted(width, height);
-            if (width != getRect().getWidth() || height != getRect().getHeight())
-            {
-                layout();
-            }
-        }
-        LLPanel::draw();
-    }
-
-    // The gutter between two canvases and any slack around them are still
-    // the canvas region, so control and the wheel zooms there as well. What
-    // it does is the canvas's, so that there is one of it.
-    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override
-    {
-        if (LLPanel::handleScrollWheel(x, y, delta))
-        {
-            return true;
-        }
-        // Only the zoom: a wheel over the slack around a canvas is not a
-        // wheel over anything on it, so nothing on it is scrolled by it.
-        const MASK held = gKeyboard ? gKeyboard->currentMask(false) : MASK_NONE;
-        if (held & MASK_CONTROL)
-        {
-            for (ALXUICanvas* canvas : mCanvases)
-            {
-                if (canvas->getVisible())
-                {
-                    return canvas->handleScrollWheel(0, 0, delta);
-                }
-            }
-        }
-        return false;
-    }
-
-    // A canvas sizes itself to what was built on it, so this runs after a
-    // build and not before one.
-    // What the row has to be: as wide as what is on it, as tall as its
-    // tallest, and never smaller than the region it is shown in -- the row
-    // covers the region whatever is on it, so a wheel over the part of it
-    // nothing was built on is still a wheel over the canvas, and a row of no
-    // area is one the container has nothing to place.
-    void wanted(S32& width, S32& height) const
-    {
-        width = 0;
-        height = 0;
-        for (const ALXUICanvas* canvas : mCanvases)
-        {
-            if (canvas->getVisible())
-            {
-                width += (width > 0 ? GUTTER : 0) + canvas->getRect().getWidth();
-                height = llmax(height, canvas->getRect().getHeight());
-            }
-        }
-        width = llmax(width, mRoomWidth, 1);
-        height = llmax(height, mRoomHeight, 1);
-    }
-
-    void layout()
-    {
-        S32 width = 0;
-        S32 height = 0;
-        wanted(width, height);
-        LLPanel::reshape(width, height, false);
-
-        S32 left = 0;
-        for (ALXUICanvas* canvas : mCanvases)
-        {
-            if (canvas->getVisible())
-            {
-                canvas->setOrigin(left, height - canvas->getRect().getHeight());
-                left += canvas->getRect().getWidth() + GUTTER;
-            }
-        }
-    }
-
-private:
-    // The room the row is shown in, which is the container's window rather
-    // than the row's own rect: the row is the thing being sized here, so its
-    // rect is the answer from last time.
-    LLRect regionRect()
-    {
-        if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
-        {
-            return scroller->getContentWindowRect();
-        }
-        return getLocalRect();
-    }
-
-    std::vector<ALXUICanvas*> mCanvases;
-    S32 mRoomWidth = 0;
-    S32 mRoomHeight = 0;
-};
+// What a row is and how it shares its room is `ALCanvasRow`; nothing about
+// it is about XUI.
 
 // A canvas in a window of its own, which is where a preview lives until the
 // studio has a region to put one in -- and afterwards, for the developer
@@ -2092,7 +1695,7 @@ bool ALFloaterXUIStudio::postBuild()
         rp.rect = area->getLocalRect();
         rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
         rp.background_visible = false;
-        mCanvasRow = new ALXUICanvasRow(rp);
+        mCanvasRow = new ALCanvasRow(rp);
         mCanvasRow->initFromParams(rp);
         area->addChild(mCanvasRow);
 
