@@ -84,6 +84,14 @@ public:
     // The root put back where it was put, against the surface as it is now.
     void anchorRoot();
 
+    // Where the last root was put, from the surface's top left corner, for
+    // whoever builds the next one. A rebuild of what is already shown is not
+    // a new thing to show: it goes back where it was left rather than to the
+    // corner it was first built at, so that editing a field does not also
+    // move the window the field is about. False until something has been put
+    // on this surface at all.
+    bool keptPlace(S32& left, S32& down) const;
+
     // What is on a surface can move itself: a previewed window dragged by
     // its own title bar does, and nothing tells the surface. So the surface
     // asks, every time it draws -- otherwise the next change of size puts
@@ -135,6 +143,15 @@ public:
     // Where a view inside this one is, in the surface's coordinates.
     LLRect localRectOf(const LLView* view) const;
 
+    // Nothing on a surface has an edge of the surface to line up with. A
+    // surface reaches to a margin past what is on it, so the far edges sit
+    // right against whatever was last dragged towards them -- inside the
+    // distance a drag snaps from -- and lining a window up with one of those
+    // moves the window, which moves the edge, which lines it up again. The
+    // near edges are the same fight from the other side: what is pushed off
+    // the top left corner is put back at it.
+    LLRect getSnapRect() const override;
+
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     void draw() override;
 
@@ -161,6 +178,7 @@ private:
     S32     mAnchorTop = 0;         // surface's top left corner
     S32     mNeedWidth = 0;         // to the far side of what it draws,
     S32     mNeedHeight = 0;        // from that same corner
+    bool    mPlaced = false;        // something has been put on it
 };
 
 // The surfaces of one document side by side, sharing the room they are shown
@@ -195,6 +213,12 @@ public:
 
     // What the row has to be, which is not always what it is.
     void wanted(S32& width, S32& height) const;
+
+    // The row brought into line with the room and with what is on it. Runs
+    // before every frame is drawn, because everything that changes either of
+    // those -- a region folded away, a window dragged, a file built -- does
+    // it between frames and none of them tells the row.
+    void settle();
 
     void draw() override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;

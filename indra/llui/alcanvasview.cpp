@@ -92,9 +92,22 @@ void ALCanvasView::rememberRoot()
     // everything that is drawn, wherever the root has been put.
     mNeedWidth = mAnchorLeft + placed.getWidth() + (drawn.mRight - placed.mRight) + SURFACE_MARGIN;
     mNeedHeight = mAnchorTop + placed.getHeight() + (placed.mBottom - drawn.mBottom) + SURFACE_MARGIN;
+    mPlaced = true;
 
     resurface();
     anchorRoot();
+}
+
+// Held across a clear, because a clear is what a rebuild starts with.
+bool ALCanvasView::keptPlace(S32& left, S32& down) const
+{
+    if (!mPlaced)
+    {
+        return false;
+    }
+    left = mAnchorLeft;
+    down = mAnchorTop;
+    return true;
 }
 
 // Where anchorRoot would put it against where it is: the two differ exactly
@@ -205,6 +218,18 @@ void ALCanvasView::toContent(S32& x, S32& y) const
         x = ll_round((F32)x / mZoom);
         y = ll_round((F32)y / mZoom);
     }
+}
+
+LLRect ALCanvasView::getSnapRect() const
+{
+    // Held out past every edge rather than turned off, because a child asks
+    // its parent where its edges are and there is no answer for "nowhere".
+    // Far enough that none of them is within snapping distance of anything on
+    // the surface, whatever that distance has been set to.
+    constexpr S32 OUT_OF_REACH = 1 << 20;
+    LLRect nothing_to_line_up_with(getRect());
+    nothing_to_line_up_with.stretch(OUT_OF_REACH);
+    return nothing_to_line_up_with;
 }
 
 // The surface changes size; what is on it does not. A view carries its
@@ -347,7 +372,7 @@ void ALCanvasRow::layout()
     }
 }
 
-void ALCanvasRow::draw()
+void ALCanvasRow::settle()
 {
     // The room is shared out again whenever there is a different amount of
     // it: the window resized, a region folded away, a scrollbar arriving or
@@ -375,6 +400,11 @@ void ALCanvasRow::draw()
             layout();
         }
     }
+}
+
+void ALCanvasRow::draw()
+{
+    settle();
     LLPanel::draw();
 }
 

@@ -26,6 +26,7 @@
 
 #include "../alcanvasview.h"
 
+#include "../llfloater.h"
 #include "../llscrollbar.h"
 #include "../llscrollcontainer.h"
 #include "../lluictrlfactory.h"
@@ -311,6 +312,48 @@ namespace tut
         canvas->die();
     }
 
+    // A surface reaches to a margin past what is on it, so whatever was last
+    // dragged towards a far edge is sitting right against that edge -- well
+    // inside the distance a drag snaps from. Line the window up with the edge
+    // and the surface grows to keep its margin, which puts the edge back
+    // against the window, which lines it up again. A drag is offered the
+    // pointer every frame whether it moved or not, so this runs on its own: a
+    // window that shakes where it is held, over a surface that grows without
+    // end under it.
+    template<> template<>
+    void alcanvasview_object::test<17>()
+    {
+        // How far a drag snaps from: LLDragHandle::sSnapMargin.
+        constexpr S32 SNAP_FROM = 5;
+
+        ALCanvasView* canvas = surface();
+        canvas->setLeastSurface(300, 200);
+        LLPanel* root = place(canvas, 200, 100);
+
+        // Far enough down that the surface has had to grow to hold it, which
+        // is what brings its bottom edge up against the root's.
+        root->translate(40, -160);
+        canvas->rememberRoot();
+        ensure("the surface reaches just under it " + where(root->getRect()),
+               root->getRect().mBottom > 0 && root->getRect().mBottom <= SNAP_FROM);
+
+        const LLRect held = root->getRect();
+        const S32 was = canvas->surfaceHeight();
+        for (S32 frame = 0; frame < 8; ++frame)
+        {
+            LLRect snapped;
+            LLView* to = root->findSnapRect(snapped, LLCoordGL(0, -1),
+                                            LLView::SNAP_PARENT_AND_SIBLINGS, SNAP_FROM);
+            ensure("frame " + std::to_string(frame)
+                   + ": nothing on a surface has an edge of it to line up with", to == nullptr);
+            root->setShape(snapped, true);
+            canvas->refresh();
+        }
+        ensure_equals("it is still where it was held", where(root->getRect()), where(held));
+        ensure_equals("and the surface did not grow under it", canvas->surfaceHeight(), was);
+        canvas->die();
+    }
+
     // There is no growing off the top left of a canvas, so what is dragged
     // that way stops at the corner rather than disappearing over it.
     template<> template<>
@@ -486,6 +529,244 @@ namespace tut
             }
         }
         area->die();
+    }
+
+    // The tables under a canvas fold away and come back, which is the region
+    // growing and shrinking under a surface that is sized to what is on it.
+    // A surface pins its own bottom when it resizes itself, so a surface that
+    // has grown reaches past the top of the row until the row places it
+    // again. What hangs over the row is drawn nowhere and clicked on by
+    // nobody: a preview whose window is up there cannot be picked up by its
+    // title bar, however many times it is dragged at.
+    template<> template<>
+    void alcanvasview_object::test<18>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        ALCanvasRow* row = new ALCanvasRow(rp);
+        row->initFromParams(rp);
+        area->addChild(row);
+
+        ALCanvasView* canvas = surface();
+        row->addCanvas(canvas);
+        row->show(canvas, true);
+        LLPanel* root = place(canvas, 300, 200);
+        row->settle();
+
+        for (S32 turn = 0; turn < 6; ++turn)
+        {
+            const std::string which = "turn " + std::to_string(turn) + ": ";
+
+            // The band folding away and coming back.
+            area->reshape(ROOM_W, (turn % 2) ? ROOM_H : ROOM_H / 2);
+            row->settle();
+
+            // And the window nudged across the surface, which is a drag.
+            root->translate(0, -12);
+            canvas->refresh();
+            row->settle();
+
+            ensure(which + "the surface is inside the row, " + where(canvas->getRect())
+                   + " in " + where(row->getLocalRect()),
+                   row->getLocalRect().contains(canvas->getRect()));
+            ensure(which + "and the window is on the surface, " + where(root->getRect())
+                   + " on " + where(canvas->getLocalRect()),
+                   canvas->getLocalRect().contains(root->getRect()));
+        }
+        area->die();
+    }
+
+    // The one that is reported: a window on the canvas, the tables under it
+    // folded away, and the window can no longer be picked up by its title
+    // bar. Folding the tables is the region growing taller under a preview
+    // that was bigger than it, so what was scrolled to becomes what fits --
+    // and wherever that leaves the window, it has to be somewhere the
+    // pointer can reach it.
+    template<> template<>
+    void alcanvasview_object::test<19>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        ALCanvasRow* row = new ALCanvasRow(rp);
+        row->initFromParams(rp);
+        area->addChild(row);
+
+        ALCanvasView* canvas = surface();
+        row->addCanvas(canvas);
+        row->show(canvas, true);
+
+        // Taller than the region, which is what the tables being there means.
+        LLPanel* root = place(canvas, 600, ROOM_H + 120);
+        row->settle();
+
+        // The title bar: the top of the window, which is what is grabbed.
+        const auto title = [root]()
+        {
+            LLRect bar(root->calcScreenRect());
+            bar.mBottom = bar.mTop - 16;
+            return bar;
+        };
+        ensure("with the tables there, the title bar can be reached",
+               area->calcScreenRect().overlaps(title()));
+
+        // The tables folded away: the region grows and the preview fits.
+        area->reshape(ROOM_W, ROOM_H * 2);
+        row->settle();
+
+        LLRect window;
+        area->localRectToScreen(area->getContentWindowRect(), &window);
+        ensure("with them folded away it still can, " + where(title()) + " in " + where(window),
+               window.overlaps(title()));
+        area->die();
+    }
+
+    // A window on the canvas picked up by its own title bar. That is not a
+    // translate: a drag handle hands the floater a whole new rect and says a
+    // person put it there, and a floater answers that with more than a panel
+    // does. It has to land the same whether the surface is bigger than the
+    // region it is shown in or smaller, because folding the tables away
+    // underneath changes which of those it is and nothing else.
+    template<> template<>
+    void alcanvasview_object::test<20>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        ALCanvasRow* row = new ALCanvasRow(rp);
+        row->initFromParams(rp);
+        area->addChild(row);
+
+        ALCanvasView* canvas = surface();
+        row->addCanvas(canvas);
+        row->show(canvas, true);
+
+        // Built the way the studio builds a floater preview: parented first,
+        // so nothing else claims it, then placed at the surface's corner.
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name = "preview";
+        fp.rect = LLRect(0, 300, 400, 0);
+        LLFloater* floater = new LLFloater(LLSD(), fp);
+        canvas->addChild(floater);
+        floater->setVisible(true);
+        canvas->fitContent(408, 308);
+        floater->setOrigin(4, canvas->surfaceHeight() - 300 - 4);
+        canvas->setRoot(floater);
+        row->settle();
+
+        // What a drag handle does with the pointer, and what the surface is
+        // given the chance to do about it.
+        const auto drag_down = [&](S32 by)
+        {
+            LLRect moved(floater->getRect());
+            moved.translate(0, -by);
+            floater->setShape(moved, true);
+            canvas->refresh();
+            row->settle();
+        };
+        // Where it sits, counted from the corner a surface grows out of: its
+        // own y is not that, because a surface that grows does so downwards.
+        const auto down_from_top = [&]()
+        {
+            return canvas->surfaceHeight() - floater->getRect().mTop;
+        };
+
+        // Whether a press on the title bar reaches the window at all, which
+        // is what has to be true before any of the rest of it matters.
+        const auto title_reached = [&]()
+        {
+            const LLRect& r = floater->getRect();
+            const S32 on_the_bar_x = r.mLeft + r.getWidth() / 2;
+            const S32 on_the_bar_y = r.mTop - 8;
+            return canvas->childFromPoint(on_the_bar_x, on_the_bar_y, false) == floater
+                && floater->pointInView(on_the_bar_x - r.mLeft, on_the_bar_y - r.mBottom);
+        };
+        ensure("a press on the title bar reaches the window", title_reached());
+
+        // The tables there: the surface is taller than the region, and what
+        // does not fit is scrolled to.
+        area->reshape(ROOM_W, 200);
+        row->settle();
+        ensure("with the tables there it still reaches it", title_reached());
+        S32 was = down_from_top();
+        drag_down(20);
+        ensure_equals("with the tables there it moves", down_from_top(), was + 20);
+
+        // Folded away: the region is taller than the surface.
+        area->reshape(ROOM_W, 800);
+        row->settle();
+        ensure("with them folded away it still reaches it", title_reached());
+        was = down_from_top();
+        drag_down(20);
+        ensure_equals("with them folded away it moves too", down_from_top(), was + 20);
+        area->die();
+    }
+
+    // An edit rebuilds what is on the surface, and a rebuild starts by
+    // clearing it. Where the last root was left has to outlive that, or
+    // writing one field sends the window it is about back to the corner.
+    template<> template<>
+    void alcanvasview_object::test<21>()
+    {
+        ALCanvasView* canvas = surface();
+        S32 left = -1;
+        S32 down = -1;
+        ensure("a surface with nothing on it has no place to keep",
+               !canvas->keptPlace(left, down));
+
+        canvas->setLeastSurface(300, 200);
+        LLPanel* root = place(canvas, 200, 100);
+        root->translate(40, -60);
+        canvas->rememberRoot();
+        ensure("once something has been put on it, it has", canvas->keptPlace(left, down));
+        ensure_equals("across", left, root->getRect().mLeft);
+        ensure_equals("and down from the top", down,
+                      canvas->surfaceHeight() - root->getRect().mTop);
+
+        // The rebuild: everything on it goes, and what is built next asks.
+        const S32 was_left = left;
+        const S32 was_down = down;
+        canvas->clear();
+        left = -1;
+        down = -1;
+        ensure("and still has it once the surface is cleared", canvas->keptPlace(left, down));
+        ensure_equals("the same place, across", left, was_left);
+        ensure_equals("and down", down, was_down);
+        canvas->die();
     }
 
     // A region with nothing built on it yet is still the canvas's: the row
