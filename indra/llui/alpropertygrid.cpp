@@ -31,6 +31,7 @@
 #include "llaccordionctrltab.h"
 #include "alcolorfield.h"
 #include "alflagsfield.h"
+#include "alfollowscontrol.h"
 #include "alfontfield.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
@@ -47,6 +48,12 @@ static LLDefaultChildRegistry::Register<ALPropertyGrid> r("property_grid");
 
 namespace
 {
+    // The metrics, in one place, because a pane where each editor decided
+    // its own inset is a pane whose columns do not line up. Everything
+    // between the left edge and the right is one of these; the row height
+    // and the label column are the caller's, since only the caller knows
+    // what its labels say.
+    //
     // The left margin of the whole grid. A label written hard against the
     // edge of a scrolling container loses its first letter to the border,
     // which is what the container is drawn with.
@@ -54,6 +61,12 @@ namespace
     // The way back sits in the right margin of every row that has one.
     constexpr S32 REMOVE_WIDTH = 16;
     constexpr S32 GUTTER = 10;      // between the label and its editor
+    // A control narrower than its column sits at the column's left rather
+    // than being stretched across it: a number is as wide as a number.
+    constexpr S32 NUMBER_WIDTH = 120;
+    // A row that carries a picture rather than a value is as tall as the
+    // picture, and its label sits in the ordinary row at the top of it.
+    constexpr S32 PICTURE_HEIGHT = 84;
 
     // A number written the way a file writes one, which is not the way a
     // spinner holds it: three point zero is 3, and a value that carries a
@@ -116,9 +129,8 @@ class ALPropertyGrid::Rows final : public LLPanel
 public:
     AL_VIEW_TYPE(Rows, LLPanel);
 
-    Rows(const LLPanel::Params& p, S32 row_height)
-    :   LLPanel(p),
-        mRowHeight(row_height)
+    explicit Rows(const LLPanel::Params& p)
+    :   LLPanel(p)
     {
     }
 
@@ -128,7 +140,10 @@ public:
         stack();
     }
 
-    // The rows, oldest first: a view list is filled from the front.
+    // The rows, oldest first: a view list is filled from the front. A row
+    // keeps the height it was made at -- a row carrying a picture is taller
+    // than one carrying a value -- so what is stacked here is heights and
+    // not a count.
     void stack()
     {
         const S32 width = getRect().getWidth();
@@ -136,14 +151,12 @@ public:
         for (auto it = getChildList()->rbegin(); it != getChildList()->rend(); ++it)
         {
             LLView* row = *it;
-            row->reshape(width, mRowHeight);
-            row->setOrigin(0, top - mRowHeight);
-            top -= mRowHeight;
+            const S32 height = row->getRect().getHeight();
+            row->reshape(width, height);
+            row->setOrigin(0, top - height);
+            top -= height;
         }
     }
-
-private:
-    const S32 mRowHeight;
 };
 
 ALPropertyGrid::Params::Params()
@@ -207,7 +220,7 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
         rp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
         rp.background_visible = false;
         rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
-        Rows* rows = new Rows(rp, mRowHeight);
+        Rows* rows = new Rows(rp);
         rows->initFromParams(rp);
         tab->setAccordionView(rows);
 
@@ -332,6 +345,24 @@ bool ALPropertyGrid::shows(const Field& field) const
     return carries(field.name, mFilter);
 }
 
+S32 ALPropertyGrid::rowHeight(const Field& field) const
+{
+    return field.edges.size() == 4 ? llmax(mRowHeight, PICTURE_HEIGHT) : mRowHeight;
+}
+
+S32 ALPropertyGrid::sectionHeight(S32 group) const
+{
+    S32 height = 0;
+    for (const Field& field : mFields)
+    {
+        if (field.group == group && shows(field) && !isPartnered(field))
+        {
+            height += rowHeight(field);
+        }
+    }
+    return height;
+}
+
 S32 ALPropertyGrid::countShown(S32 group) const
 {
     S32 count = 0;
@@ -416,7 +447,7 @@ void ALPropertyGrid::rebuild()
         }
         shown += count;
 
-        const S32 height = count * mRowHeight;
+        const S32 height = sectionHeight((S32)group);
         rows->reshape(width, height, false);
 
         S32 within = 0;
@@ -483,6 +514,24 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         colour->setValue(field.value);
         editor = colour;
     }
+    else if (field.edges.size() == 4)
+    {
+        // Which edges of its parent a thing is tied to, drawn as what that
+        // does to it: four struts, two springs, and the same element in a
+        // parent that is larger and one that is smaller.
+        ALFollowsControl::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 2, box.mRight, box.mBottom + 2);
+        ALFollowsControl* follows = LLUICtrlFactory::create<ALFollowsControl>(p);
+        follows->setEdges(field.edges[0], field.edges[1], field.edges[2], field.edges[3],
+                          field.allWord, field.noneWord);
+        if (!field.subjectParent.isEmpty())
+        {
+            follows->setSubject(field.subject, field.subjectParent);
+        }
+        follows->setValue(field.value);
+        editor = follows;
+    }
     else if (field.flags)
     {
         // Four independent answers written as one word, so four boxes.
@@ -543,7 +592,7 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         const bool whole = field.kind != ALParamType::REAL;
         LLSpinCtrl::Params p;
         p.name = name;
-        p.rect = LLRect(box.mLeft, box.mTop - 1, llmin(box.mRight, box.mLeft + 120), box.mBottom + 1);
+        p.rect = LLRect(box.mLeft, box.mTop - 1, llmin(box.mRight, box.mLeft + NUMBER_WIDTH), box.mBottom + 1);
         p.label_width = 0;
         p.decimal_digits = whole ? 0 : 3;
         p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
@@ -642,13 +691,16 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
 
     const S32 width = host->getRect().getWidth();
     // Row-local: the section says where the row is, the row says where its
-    // parts are.
-    const S32 top = mRowHeight;
-    const S32 bottom = 0;
+    // parts are. A row carrying a picture is taller than one carrying a
+    // value, and everything but the picture sits in the ordinary row at the
+    // top of it, so the columns still line up down the pane.
+    const S32 height = rowHeight(field);
+    const S32 top = height;
+    const S32 bottom = height - mRowHeight;
 
     LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
     rp.name = field.name + "_row";
-    rp.rect = LLRect(0, mRowHeight, width, 0);
+    rp.rect = LLRect(0, height, width, 0);
     rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
     rp.mouse_opaque = false;
     // Alternate rows are banded, because a name and the value across from it
@@ -681,10 +733,15 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
     }
 
-    // The editor, or two of them where this field carries a partner.
+    // The editor, or two of them where this field carries a partner. A
+    // picture takes the whole of the row it made tall.
     const S32 left = editorLeft();
     const S32 editor_width = editorWidth(width);
-    if (partner)
+    if (field.edges.size() == 4)
+    {
+        makeEditor(field, LLRect(left, top, left + editor_width, 0), row);
+    }
+    else if (partner)
     {
         const S32 half = (editor_width - GUTTER) / 2;
         makeEditor(field, LLRect(left, top, left + half, bottom), row);

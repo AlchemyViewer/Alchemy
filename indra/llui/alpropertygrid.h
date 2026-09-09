@@ -106,6 +106,17 @@ public:
         // first of a pair names the other, and the named one gets no row of
         // its own.
         std::string                 pairWith;
+        // Four names, in the order left, bottom, right, top: a field whose
+        // value is which edges of its parent a thing is tied to, which is a
+        // picture rather than four words. The row it gets is as tall as the
+        // picture. Any other count is not one, and the field is edited the
+        // way its type says.
+        std::vector<std::string>    edges;
+        // What the picture is a picture of: the element and the thing it is
+        // in. Left empty it draws the rule rather than this element, which
+        // is what a caller with nothing on screen to point at should do.
+        LLRect                      subject;
+        LLRect                      subjectParent;
     };
 
     // name and the value committed, as the file would write it.
@@ -193,6 +204,12 @@ private:
     // which case it is on that row and needs none of its own.
     bool isPartnered(const Field& field) const;
     bool shows(const Field& field) const;
+    // How tall a field's row is: one row, or as tall as the picture it
+    // carries instead of a value.
+    S32 rowHeight(const Field& field) const;
+    // What the rows of a section come to, which is not the count of them
+    // times anything.
+    S32 sectionHeight(S32 group) const;
     // What another field of the same widget says, for an editor that is
     // for more than one attribute.
     std::string valueOf(const std::string& name) const;

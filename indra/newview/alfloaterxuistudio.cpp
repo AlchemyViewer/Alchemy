@@ -222,9 +222,11 @@ namespace
         else if (field.name == "follows")
         {
             // Which edges of its parent the element is tied to: four
-            // answers, written as one word.
+            // answers, written as one word, and drawn as what they do to
+            // it rather than spelled. The order is the one the picture is
+            // drawn in and not the one a file writes them in.
             field.values = { "left", "top", "right", "bottom" };
-            field.flags = true;
+            field.edges = { "left", "bottom", "right", "top" };
             field.allWord = "all";
             field.noneWord = "none";
         }
@@ -6682,6 +6684,14 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
                     : field.unknown ? GROUP_UNKNOWN
                                     : attributeGroupOf(name);
         vocabularyFor(field);
+        // A field drawn as a picture is drawn in the proportions of the
+        // element it is about: a rect and the rect it sits in, which are
+        // the same coordinates.
+        if (!field.edges.empty() && view->getParent())
+        {
+            field.subject = view->getRect();
+            field.subjectParent = view->getParent()->getLocalRect();
+        }
     };
 
     // Which layer last wrote each attribute, as the merge's observer

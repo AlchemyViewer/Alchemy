@@ -271,4 +271,53 @@ namespace tut
         ensure_equals("the section holds two rows", rows->getRect().getHeight(), 2 * ROW);
         grid->die();
     }
+
+    // A field whose value is a set of edges is a picture, and a picture
+    // needs a taller row than a value does. The rows below it are stacked
+    // under what it actually took, not under a row height.
+    template<> template<>
+    void alpropertygrid_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "position" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("left", 0));
+        fields.push_back(field("follows", 0));
+        fields.back().edges = { "left", "bottom", "right", "top" };
+        fields.back().value = "left|top";
+        fields.push_back(field("name", 0));
+        grid->setFields(fields);
+
+        // Rows are shown in the order the grid sorts them into, which for
+        // three fields nobody grouped apart is by name.
+        LLPanel* rows = grid->getChild<LLPanel>("position_rows", true);
+        const LLRect picture = rows->getChild<LLPanel>("follows_row", true)->getRect();
+        const LLRect second = rows->getChild<LLPanel>("left_row", true)->getRect();
+        const LLRect last = rows->getChild<LLPanel>("name_row", true)->getRect();
+
+        ensure_equals("an ordinary row is one row", second.getHeight(), ROW);
+        ensure("a picture takes more than one " + where(picture), picture.getHeight() > ROW);
+        ensure_equals("the picture starts at the top of the section",
+                      picture.mTop, rows->getRect().getHeight());
+        ensure_equals("the row after it begins where it ended", second.mTop, picture.mBottom);
+        ensure_equals("and the one after that where the second ended", last.mTop, second.mBottom);
+        ensure_equals("the section is as tall as the three of them",
+                      rows->getRect().getHeight(), picture.getHeight() + second.getHeight() + last.getHeight());
+
+        // The label still sits in the ordinary row at the top of the tall
+        // one, so the label column reads straight down the pane.
+        LLPanel* row = rows->getChild<LLPanel>("follows_row", true);
+        const LLRect label = row->getChild<LLTextBox>("follows_label", true)->getRect();
+        ensure("the label is in the top row of it " + where(label),
+               label.mBottom >= picture.getHeight() - ROW && label.mTop <= picture.getHeight());
+        ensure("the picture is on the row " + where(row->getLocalRect()),
+               row->findChild<LLView>("follows", true) != nullptr);
+        grid->die();
+    }
 }
