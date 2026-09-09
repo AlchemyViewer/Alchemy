@@ -58638,6 +58638,7 @@
     <xs:attribute name="rect.width" type="xs:integer"/>
     <xs:attribute name="requests_front" type="xs:boolean"/>
     <xs:attribute name="right" type="xs:integer"/>
+    <xs:attribute name="scrub" type="xs:boolean"/>
     <xs:attribute name="sound_flags" type="xs:integer"/>
     <xs:attribute name="tab_group" type="xs:integer"/>
     <xs:attribute name="tab_stop" type="xs:boolean"/>

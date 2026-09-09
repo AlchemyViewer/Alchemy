@@ -64,6 +64,7 @@ class LLLineEditor;
 class LLScrollContainer;
 class LLScrollListCtrl;
 class LLScrollListItem;
+class LLSpinCtrl;
 class LLMenuBarGL;
 class LLTabContainer;
 class LLTextBox;
@@ -128,8 +129,10 @@ public:
     // anchor the canvas draws outside that edge.
     void toggleFollows(S32 edge);
 
-    // A step along the zooms the canvas bar offers, for the wheel over the
-    // canvas: the two say the same thing about what the steps are.
+    // How much bigger than life the canvas draws, as a percentage, and one
+    // step of it: the wheel over the canvas takes the step the bar's own
+    // spinner takes, so the two cannot disagree about how far a step is.
+    void setZoom(S32 percent);
     void zoomBy(S32 steps);
 
     // --- the document under edit ---------------------------------------------
@@ -475,7 +478,7 @@ private:
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
     LLComboBox*         mGridCombo = nullptr;
-    LLComboBox*         mZoomCombo = nullptr;
+    LLSpinCtrl*         mZoomSpin = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
     LLTextBox*          mCanvasTitle = nullptr;
     LLButton*           mCanvasShown = nullptr;

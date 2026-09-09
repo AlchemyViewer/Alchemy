@@ -933,21 +933,21 @@
                  tool_tip="Read the catalog and the file again from disk"
                  top_delta="0"
                  width="58" />
-                <combo_box
+                <spinner
+                 decimal_digits="0"
                  follows="left|top"
                  height="22"
+                 increment="10"
+                 initial_value="100"
                  layout="topleft"
                  left_pad="16"
+                 max_val="400"
+                 min_val="20"
                  name="canvas_zoom"
-                 tool_tip="How much bigger than life the preview is drawn; the numbers in it stay the file's own. Control and the wheel over the canvas does the same."
+                 scrub="true"
+                 tool_tip="How much bigger than life the preview is drawn, as a percentage; the numbers in it stay the file's own. Control and the wheel over the canvas moves it by the same step."
                  top="2"
-                 width="60">
-                    <combo_box.item label="50%" name="zoom_50" value="50" />
-                    <combo_box.item label="100%" name="zoom_100" value="100" />
-                    <combo_box.item label="150%" name="zoom_150" value="150" />
-                    <combo_box.item label="200%" name="zoom_200" value="200" />
-                    <combo_box.item label="400%" name="zoom_400" value="400" />
-                </combo_box>
+                 width="60" />
                 <button
                  follows="left|top"
                  height="22"
