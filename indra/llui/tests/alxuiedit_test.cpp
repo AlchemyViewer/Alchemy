@@ -766,4 +766,49 @@ namespace tut
             ensure("and not top", !node.attribute("top"));
         }
     }
+
+    // A step says what it did, so a caller holding something built from this
+    // document can put one field of one element onto what it has rather than
+    // building it all again. A step that did more than that says so by
+    // saying nothing, since there is no one field for the caller to write.
+    template<> template<>
+    void alxuiedit_object::test<21>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"a\" left=\"1\" top=\"2\" width=\"9\" height=\"8\" />\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+
+        ensure("writes", edit.setAttribute({ "a" }, "width", "40"));
+        ensure("undo", edit.undo());
+        ensure("the step wrote one field", edit.lastChange().oneField);
+        ensure_equals("and says which", edit.lastChange().field, std::string("width"));
+        std::string value;
+        ensure("the element writes it still", edit.fieldText({ "a" }, "width", value));
+        ensure_equals("with what it read before the step", value, std::string("9"));
+
+        ensure("redo", edit.redo());
+        ensure("the same step, the other way", edit.lastChange().oneField);
+        ensure("and the field reads what the step wrote",
+               edit.fieldText({ "a" }, "width", value));
+        ensure_equals("which is what was written", value, std::string("40"));
+
+        // An attribute the file did not carry: undoing its arrival leaves
+        // the element writing nothing, and nothing is not a value to put
+        // onto anything.
+        ensure("adds one", edit.setAttribute({ "a" }, "tool_tip", "hello"));
+        ensure("undo", edit.undo());
+        ensure("still one field", edit.lastChange().oneField);
+        ensure("and the element no longer writes it",
+               !edit.fieldText({ "a" }, "tool_tip", value));
+
+        // A whole element arriving is not one field of one element.
+        const std::string before = edit.text();
+        ensure("inserts", edit.insertElement({}, "<panel name=\"b\" width=\"4\" height=\"4\"/>"));
+        ensure("undo", edit.undo());
+        ensure("which the step does not claim to be", !edit.lastChange().oneField);
+        ensure_equals("and the file is what it was", edit.text(), before);
+    }
 }

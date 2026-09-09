@@ -107,12 +107,32 @@ public:
     //
     // A step is one operation as a caller asked for it: a move is a
     // removal and an insertion, and undoing it puts back both.
+    //
+    // A step also says what it did, which the text it started from cannot.
+    // A caller holding something built from this document can put one field
+    // of one element onto what it has already; anything else it has to build
+    // again, and a step that changed more than that says so by leaving this
+    // empty.
+    struct Change
+    {
+        path_t      path;
+        std::string field;              // the attribute written
+        bool        oneField = false;   // and nothing else was
+    };
+
     bool canUndo() const { return !mUndo.empty(); }
     bool canRedo() const { return !mRedo.empty(); }
     bool undo();
     bool redo();
     void clearHistory();
     size_t undoDepth() const { return mUndo.size(); }
+
+    // What the last undo or redo put back.
+    const Change& lastChange() const { return mLastChange; }
+
+    // What the element at that path now writes for a field, which after an
+    // undo is what was in force before the step. False where it writes none.
+    bool fieldText(const path_t& path, std::string_view field, std::string& out) const;
 
     // An attribute's value as the file writes it, entity spellings and
     // all, which is not always what the parser read it as. False when the
@@ -233,8 +253,17 @@ private:
     std::string                     mError;
     std::unique_ptr<ALXmlDocument>  mDoc;
     std::vector<std::string>        mWritten;
+    // What this operation is doing, said by the operation itself before it
+    // changes anything. Only the outermost one says: a move is a removal and
+    // an insertion, and what a move did is neither of them.
+    void note(const path_t& path, std::string_view field);
+
     std::vector<std::string>        mUndo;
     std::vector<std::string>        mRedo;
+    std::vector<Change>             mUndoWhat;      // beside each step
+    std::vector<Change>             mRedoWhat;
+    Change                          mPending;       // of the operation in hand
+    Change                          mLastChange;    // of the last one put back
     S32                             mDepth = 0;     // operations in progress
     bool                            mStepOpen = false;
     bool                            mDirty = false;

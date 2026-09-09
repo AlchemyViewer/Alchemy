@@ -321,7 +321,20 @@ static constexpr size_t UNDO_BYTES = 4u << 20;
 ALXUIEdit::Step::Step(ALXUIEdit& doc)
 :   mDoc(doc)
 {
-    ++mDoc.mDepth;
+    if (++mDoc.mDepth == 1)
+    {
+        mDoc.mPending = Change();
+    }
+}
+
+void ALXUIEdit::note(const path_t& path, std::string_view field)
+{
+    if (mDepth == 1)
+    {
+        mPending.path = path;
+        mPending.field = field;
+        mPending.oneField = true;
+    }
 }
 
 ALXUIEdit::Step::~Step()
@@ -339,7 +352,9 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
     if (mDepth > 0 && !mStepOpen)
     {
         mUndo.push_back(mText);
+        mUndoWhat.push_back(mPending);
         mRedo.clear();
+        mRedoWhat.clear();
         mStepOpen = true;
 
         size_t held = 0;
@@ -351,6 +366,7 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
         {
             held -= mUndo.front().size();
             mUndo.erase(mUndo.begin());
+            mUndoWhat.erase(mUndoWhat.begin());
         }
     }
 
@@ -365,7 +381,12 @@ bool ALXUIEdit::undo()
     {
         return false;
     }
+    // The step being put back is the one that followed the text being
+    // restored, so what it did travels with it onto the other stack.
+    mLastChange = mUndoWhat.back();
     mRedo.push_back(std::move(mText));
+    mRedoWhat.push_back(mLastChange);
+    mUndoWhat.pop_back();
     mText = std::move(mUndo.back());
     mUndo.pop_back();
     mDirty = mText != mSaved;
@@ -378,7 +399,10 @@ bool ALXUIEdit::redo()
     {
         return false;
     }
+    mLastChange = mRedoWhat.back();
     mUndo.push_back(std::move(mText));
+    mUndoWhat.push_back(mLastChange);
+    mRedoWhat.pop_back();
     mText = std::move(mRedo.back());
     mRedo.pop_back();
     mDirty = mText != mSaved;
@@ -389,6 +413,15 @@ void ALXUIEdit::clearHistory()
 {
     mUndo.clear();
     mRedo.clear();
+    mUndoWhat.clear();
+    mRedoWhat.clear();
+    mLastChange = Change();
+}
+
+bool ALXUIEdit::fieldText(const path_t& path, std::string_view field, std::string& out) const
+{
+    const pugi::xml_node node = resolve(path);
+    return node && valueText(node, field, out);
 }
 
 // From the '<' of a tag to the '>' that ends it. An angle bracket inside
@@ -909,6 +942,8 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
         return false;
     }
 
+    note(path, name);
+
     Span span;
     Span whole;
     if (spanOf(node, name, span, whole))
@@ -947,6 +982,7 @@ bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
         mError = "the element does not carry " + name;
         return false;
     }
+    note(path, name);
     splice(whole, std::string_view());
     return true;
 }
