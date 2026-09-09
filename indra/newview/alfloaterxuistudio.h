@@ -103,6 +103,7 @@ public:
     void canvasHover(S32 which, const LLView* view);
     void canvasSelect(S32 which, const LLView* view);
     void canvasSelectAlso(S32 which, const LLView* view);
+    void canvasDeselect();
     void canvasDrag(S32 which, S32 dl, S32 db, S32 dr, S32 dt);
     void hostClosed(S32 which);
 

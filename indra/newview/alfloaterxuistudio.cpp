@@ -543,6 +543,7 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
         toContent(x, y);
+        mLetGo = false;
         if (!mTool || !root())
         {
             return LLPanel::handleMouseDown(x, y, mask);
@@ -581,10 +582,24 @@ public:
                 setFocus(true);
                 return true;
             }
-            mTool->canvasSelect(mWhich, view);
+            // Control on what is already selected lets it go again -- but
+            // control held through a drag moves it, and which of the two
+            // this is is not known until the button comes up. So the
+            // selection stands for now and the answer waits.
+            mLetGo = view && view == ALXUISelection::resolve(root(), mTool->selection().selection());
+            if (!mLetGo)
+            {
+                mTool->canvasSelect(mWhich, view);
+            }
             if (editable(view))
             {
                 return beginDrag(GRIP_MOVE, x, y);
+            }
+            if (mLetGo)
+            {
+                // Nothing here drags, so there is nothing to wait for.
+                mLetGo = false;
+                mTool->canvasDeselect();
             }
             setFocus(true);
             return true;
@@ -665,12 +680,20 @@ public:
             trackDrop(x, y);
             const S32 grip = mGrip;
             LLView* into = mDrop.get();
+            const bool let_go = mLetGo && !dragging();
             const S32 moved[EDGE_COUNT] = { mDelta[EDGE_L], mDelta[EDGE_B],
                                             mDelta[EDGE_R], mDelta[EDGE_T] };
             // The drag is over, so the drag's numbers are over: what is left
             // in them is what the outline of it goes on being drawn at, one
             // whole drag away from the element it is supposed to be around.
             endDrag();
+            if (let_go)
+            {
+                // A control click on what was already selected, and the hand
+                // did not move: it was a click and not the start of a drag.
+                mTool->canvasDeselect();
+                return true;
+            }
             if (mTool && grip != GRIP_NONE)
             {
                 // One operation for the whole drag, written when the
@@ -776,6 +799,7 @@ private:
     // Nothing is being dragged, and nothing is left over saying it is.
     void endDrag()
     {
+        mLetGo = false;
         mGrip = GRIP_NONE;
         mDrop.markDead();
         for (S32& d : mDelta)
@@ -1266,6 +1290,7 @@ private:
     ALFloaterXUIStudio* mTool;
     S32                 mWhich;
 
+    bool                mLetGo = false;         // a control press on what was selected
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
     S32                 mDragX = 0;
     S32                 mDragY = 0;
@@ -3898,6 +3923,13 @@ void ALFloaterXUIStudio::canvasSelect(S32 which, const LLView* view)
     {
         mSelection.select(path);
     }
+}
+
+// Letting go of what was selected. Every region follows the selection, so
+// the outline, the inspectors and the marks on every canvas go with it.
+void ALFloaterXUIStudio::canvasDeselect()
+{
+    mSelection.clearSelection();
 }
 
 void ALFloaterXUIStudio::canvasSelectAlso(S32 which, const LLView* view)
