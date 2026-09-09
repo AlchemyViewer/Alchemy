@@ -194,52 +194,6 @@
                 <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="hover" />
                 <menu_item_check.on_click function="XUIStudio.Menu" parameter="hover" />
             </menu_item_check>
-            <menu_item_check
-             label="Rulers"
-             layout="topleft"
-             name="rulers">
-                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="rulers" />
-                <menu_item_check.on_click function="XUIStudio.Menu" parameter="rulers" />
-            </menu_item_check>
-            <menu_item_check
-             label="Snap to Grid"
-             layout="topleft"
-             name="snap">
-                <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="snap" />
-                <menu_item_check.on_click function="XUIStudio.Menu" parameter="snap" />
-            </menu_item_check>
-            <menu
-             label="Grid Size"
-             layout="topleft"
-             mouse_opaque="false"
-             name="grid"
-             tear_off="false"
-             width="100">
-                <menu_item_check label="2" layout="topleft" name="grid_2">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:2" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:2" />
-                </menu_item_check>
-                <menu_item_check label="3" layout="topleft" name="grid_3">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:3" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:3" />
-                </menu_item_check>
-                <menu_item_check label="4" layout="topleft" name="grid_4">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:4" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:4" />
-                </menu_item_check>
-                <menu_item_check label="5" layout="topleft" name="grid_5">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:5" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:5" />
-                </menu_item_check>
-                <menu_item_check label="8" layout="topleft" name="grid_8">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:8" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:8" />
-                </menu_item_check>
-                <menu_item_check label="16" layout="topleft" name="grid_16">
-                    <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="grid:16" />
-                    <menu_item_check.on_click function="XUIStudio.Menu" parameter="grid:16" />
-                </menu_item_check>
-            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_check
              label="Navigator"
@@ -377,54 +331,6 @@
      name="language_combo"
      top_delta="-3"
      width="56" />
-    <check_box
-     follows="left|top"
-     height="16"
-     label="Second"
-     layout="topleft"
-     left_pad="10"
-     name="secondary_check"
-     tool_tip="Build the file a second time in another language, on the canvas beside the first, sharing its selection"
-     top_delta="3"
-     width="66" />
-    <combo_box
-     follows="left|top"
-     height="22"
-     layout="topleft"
-     left_pad="0"
-     name="language_combo_2"
-     top_delta="-3"
-     width="56" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Show"
-     layout="topleft"
-     left_pad="12"
-     name="show_btn"
-     tool_tip="Build and show the selected file"
-     top_delta="0"
-     width="60" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Hide"
-     layout="topleft"
-     left_pad="4"
-     name="hide_btn"
-     tool_tip="Close the previews"
-     top_delta="0"
-     width="60" />
-    <button
-     follows="left|top"
-     height="22"
-     label="Reload"
-     layout="topleft"
-     left_pad="4"
-     name="reload_btn"
-     tool_tip="Read the catalog and the previews again"
-     top_delta="0"
-     width="60" />
     <button
      follows="left|top"
      height="22"
@@ -962,6 +868,101 @@
                      top="0"
                      width="744" />
                 </layout_panel>
+
+            <layout_panel
+             auto_resize="false"
+             height="26"
+             layout="topleft"
+             min_dim="26"
+             name="canvas_foot"
+             width="744">
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Show"
+                 layout="topleft"
+                 left="0"
+                 name="show_btn"
+                 tool_tip="Build the selected file again"
+                 top="2"
+                 width="54" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Hide"
+                 layout="topleft"
+                 left_pad="2"
+                 name="hide_btn"
+                 tool_tip="Take what is on the canvas off it"
+                 top_delta="0"
+                 width="54" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 label="Reload"
+                 layout="topleft"
+                 left_pad="2"
+                 name="reload_btn"
+                 tool_tip="Read the catalog and the file again from disk"
+                 top_delta="0"
+                 width="58" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 is_toggle="true"
+                 label="Rulers"
+                 layout="topleft"
+                 left_pad="16"
+                 name="canvas_rulers"
+                 tool_tip="A rule along the top and the left of the canvas, numbered in the file's own coordinates"
+                 top_delta="0"
+                 width="58" />
+                <button
+                 follows="left|top"
+                 height="22"
+                 is_toggle="true"
+                 label="Snap"
+                 layout="topleft"
+                 left_pad="2"
+                 name="canvas_snap"
+                 tool_tip="A drag lands on the grid rather than where the pointer is"
+                 top_delta="0"
+                 width="50" />
+                <combo_box
+                 follows="left|top"
+                 height="22"
+                 layout="topleft"
+                 left_pad="2"
+                 name="canvas_grid"
+                 tool_tip="How far apart the grid is, and how far a snapped drag moves"
+                 top_delta="0"
+                 width="52">
+                    <combo_box.item label="2 px" name="grid_2" value="2" />
+                    <combo_box.item label="3 px" name="grid_3" value="3" />
+                    <combo_box.item label="4 px" name="grid_4" value="4" />
+                    <combo_box.item label="5 px" name="grid_5" value="5" />
+                    <combo_box.item label="8 px" name="grid_8" value="8" />
+                    <combo_box.item label="16 px" name="grid_16" value="16" />
+                </combo_box>
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Second"
+                 layout="topleft"
+                 left_pad="16"
+                 name="secondary_check"
+                 tool_tip="Build the file a second time in another language, on the canvas beside the first, sharing its selection"
+                 top_delta="3"
+                 width="66" />
+                <combo_box
+                 follows="left|top"
+                 height="22"
+                 layout="topleft"
+                 left_pad="0"
+                 name="language_combo_2"
+                 top_delta="-3"
+                 width="56" />
+            </layout_panel>
 
             <layout_panel
              auto_resize="false"

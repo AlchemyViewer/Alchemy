@@ -461,6 +461,7 @@ private:
     LLComboBox*         mSkinCombo = nullptr;
     LLComboBox*         mLanguageCombo = nullptr;
     LLComboBox*         mLanguageCombo2 = nullptr;
+    LLComboBox*         mGridCombo = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
     LLTextBox*          mCanvasTitle = nullptr;
     LLButton*           mCanvasShown = nullptr;

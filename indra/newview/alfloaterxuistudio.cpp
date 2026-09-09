@@ -1807,6 +1807,26 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
     getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
 
+    // The bar under the canvas: what the canvas is measured and drawn with,
+    // where the canvas is. These were on the View menu, which is not where
+    // anybody looks for a grid size, and they are no longer in both places.
+    getChild<LLButton>("canvas_rulers")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mRulers = ctrl->getValue().asBoolean();
+        saveState();
+    });
+    getChild<LLButton>("canvas_snap")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mSnap = ctrl->getValue().asBoolean();
+        saveState();
+    });
+    mGridCombo = getChild<LLComboBox>("canvas_grid");
+    mGridCombo->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mGrid = llmax(1, ctrl->getValue().asInteger());
+        saveState();
+    });
+
     getChild<LLButton>("show_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showPreviews, this));
     getChild<LLButton>("hide_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::closePreviews, this));
     getChild<LLButton>("reload_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::reloadAll, this));
@@ -1815,6 +1835,10 @@ bool ALFloaterXUIStudio::postBuild()
 
     mSecondaryCheck->setValue(mShowSecondary);
     mLanguageCombo2->setEnabled(mShowSecondary);
+    // The bar shows what the state says, once, after it has been read.
+    getChild<LLButton>("canvas_rulers")->setToggleState(mRulers);
+    getChild<LLButton>("canvas_snap")->setToggleState(mSnap);
+    mGridCombo->setValue(mGrid);
 
     mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
     mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
@@ -6749,8 +6773,6 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "repair_roots")  { onRepairRoots(); }
     else if (action == "repair_all")    { startRepairAll(); }
     else if (action == "hover")         { mHoverHighlight = !mHoverHighlight; saveState(); }
-    else if (action == "rulers")        { mRulers = !mRulers; saveState(); }
-    else if (action == "snap")          { mSnap = !mSnap; saveState(); }
     else if (action == "real_floater")
     {
         mRealFloater = !mRealFloater;
@@ -6781,11 +6803,6 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
         mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
         saveState();
     }
-    else if (action.compare(0, 5, "grid:") == 0)
-    {
-        mGrid = llmax(1, std::atoi(action.c_str() + 5));
-        saveState();
-    }
 }
 
 // Whether an item can be chosen at all: what the document has to say
@@ -6806,8 +6823,6 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     const std::string flag = param.asString();
 
     if (flag == "hover")        { return mHoverHighlight; }
-    if (flag == "rulers")       { return mRulers; }
-    if (flag == "snap")         { return mSnap; }
     if (flag == "code_built")   { return mShowCodeBuilt; }
     if (flag == "real_floater") { return mRealFloater; }
     if (flag == "float_preview") { return mFloatPreview; }
@@ -6816,10 +6831,6 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     if (flag == "pane_navigator")   { return !paneCollapsed("navigator_panel"); }
     if (flag == "pane_inspectors")  { return !paneCollapsed("inspector_panel"); }
     if (flag == "pane_bottom")      { return !paneCollapsed("bottom_panel"); }
-    if (flag.compare(0, 5, "grid:") == 0)
-    {
-        return mGrid == std::atoi(flag.c_str() + 5);
-    }
     return false;
 }
 
