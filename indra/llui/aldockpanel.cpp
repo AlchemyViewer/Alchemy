@@ -37,6 +37,10 @@ namespace
     // big as the pane was, where the pane was, and a little down and right
     // so it is not exactly over the hole it left.
     constexpr S32 OFFSET = 24;
+    // The least a window holding a pane may be dragged down to, below its
+    // own title bar.
+    constexpr S32 LEAST_WIDTH = 200;
+    constexpr S32 LEAST_HEIGHT = 80;
 }
 
 ALPanelFloater::ALPanelFloater(const LLFloater::Params& p, ALDockPanel* pane, LLFloater* home)
@@ -130,10 +134,16 @@ void ALDockPanel::popOut()
     mHomeRect = getRect();
     mHomeFollows = getFollows();
 
+    // The window is the pane AND a title bar: a window made the size of the
+    // pane has to put one of them over the other, and what the pane draws
+    // along its own top -- a row of tabs, most of the time -- then shares a
+    // band with the title and the window's own buttons.
+    const S32 header = LLFloater::getDefaultParams().header_height;
     LLRect where = mFloatingRect;
     if (where.isEmpty())
     {
         where = calcScreenRect();
+        where.mTop += header;
         where.translate(OFFSET, -OFFSET);
     }
 
@@ -146,6 +156,8 @@ void ALDockPanel::popOut()
     fp.can_close = true;
     fp.save_rect = false;
     fp.save_visibility = false;
+    fp.min_width = LEAST_WIDTH;
+    fp.min_height = header + LEAST_HEIGHT;
     ALPanelFloater* floater = new ALPanelFloater(fp, this, was_in);
     mFloater = floater->getHandle();
 
@@ -154,7 +166,7 @@ void ALDockPanel::popOut()
     home->removeChild(this);
     floater->addChild(this);
     setFollows(FOLLOWS_ALL);
-    setShape(floater->getLocalRect());
+    setShape(contentRect(floater));
     setVisible(true);
 
     // What is left in the window takes the room. The size the panel wants
@@ -206,6 +218,16 @@ void ALDockPanel::dock()
     {
         floater->closeFloater();
     }
+}
+
+// What is left of a window once its title bar has had its band: everything
+// a floater built from a file gets, and everything a pane should take.
+// static
+LLRect ALDockPanel::contentRect(const LLFloater* floater)
+{
+    LLRect r = floater->getLocalRect();
+    r.mTop -= floater->getHeaderHeight();
+    return r;
 }
 
 LLRect ALDockPanel::floatingRect() const

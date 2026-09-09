@@ -231,10 +231,36 @@ namespace tut
         w.floater->die();
     }
 
+    // A pane goes under the window's title bar, not over it. A pane given
+    // the whole of a floater covers the title, the buttons and the handle it
+    // is dragged by -- and whatever the pane draws along its own top shares
+    // a band with them.
+    template<> template<>
+    void aldockpanel_object::test<8>()
+    {
+        Window w = build();
+        ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        const S32 was = pane->getRect().getHeight();
+        pane->popOut();
+
+        LLFloater* window = pane->getParentByType<ALPanelFloater>();
+        ensure("there is a window", window != nullptr);
+        ensure("the title bar has a band of its own", window->getHeaderHeight() > 0);
+        ensure_equals("and the pane starts below it",
+                      pane->getRect().mTop, window->getRect().getHeight() - window->getHeaderHeight());
+        ensure_equals("the pane still starts at the left", pane->getRect().mLeft, 0);
+        ensure_equals("and reaches the right", pane->getRect().mRight, window->getRect().getWidth());
+
+        // The window is the pane and the bar, so the pane keeps the height
+        // it had rather than losing the bar's band out of it.
+        ensure_equals("the pane kept its height", pane->getRect().getHeight(), was);
+        w.floater->die();
+    }
+
     // Where it is while it is out survives going home and coming out again,
     // so a developer who put it on the other monitor finds it there.
     template<> template<>
-    void aldockpanel_object::test<7>()
+    void aldockpanel_object::test<9>()
     {
         Window w = build();
         ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");

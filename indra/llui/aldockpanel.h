@@ -105,6 +105,11 @@ public:
     void dock();
     bool poppedOut() const { return !mFloater.isDead(); }
 
+    // What is left of a window once its title bar has had its band. A pane
+    // given the whole of a floater covers the title, the buttons and the
+    // handle it is dragged by.
+    static LLRect contentRect(const LLFloater* floater);
+
     // Where it is while it is out, for whoever is saving that.
     LLRect floatingRect() const;
     void setFloatingRect(const LLRect& rect) { mFloatingRect = rect; }
