@@ -97,6 +97,30 @@ void ALCanvasView::rememberRoot()
     anchorRoot();
 }
 
+// Where anchorRoot would put it against where it is: the two differ exactly
+// when something other than this surface moved it.
+void ALCanvasView::refresh()
+{
+    if (!mRoot)
+    {
+        return;
+    }
+    const LLView* held = mRoot;
+    while (held && held->getParent() != this)
+    {
+        held = held->getParent();
+    }
+    if (!held)
+    {
+        return;
+    }
+    const S32 room = held == mRoot ? surfaceHeight() : held->getRect().getHeight();
+    if (mRoot->getRect().mLeft != mAnchorLeft || room - mRoot->getRect().mTop != mAnchorTop)
+    {
+        rememberRoot();
+    }
+}
+
 void ALCanvasView::anchorRoot()
 {
     if (!mRoot)
@@ -208,6 +232,7 @@ void ALCanvasView::reshape(S32 width, S32 height, bool called_from_parent)
 
 void ALCanvasView::draw()
 {
+    refresh();
     const bool zoomed = mZoom != 1.f;
     if (zoomed)
     {

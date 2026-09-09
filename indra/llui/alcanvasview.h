@@ -84,6 +84,13 @@ public:
     // The root put back where it was put, against the surface as it is now.
     void anchorRoot();
 
+    // What is on a surface can move itself: a previewed window dragged by
+    // its own title bar does, and nothing tells the surface. So the surface
+    // asks, every time it draws -- otherwise the next change of size puts
+    // the root back where the surface last put it, and a window cannot be
+    // dragged by the handle it is meant to be dragged by.
+    void refresh();
+
     // A surface in a window of its own is as big as what it shows. A surface
     // that is a region of a window is as big as the region, and what it
     // shows sits at the top of it. Only a sizable one resizes itself.

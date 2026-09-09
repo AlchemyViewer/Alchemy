@@ -665,9 +665,12 @@ public:
             trackDrop(x, y);
             const S32 grip = mGrip;
             LLView* into = mDrop.get();
-            mGrip = GRIP_NONE;
-            mDrop.markDead();
-            gFocusMgr.setMouseCapture(nullptr);
+            const S32 moved[EDGE_COUNT] = { mDelta[EDGE_L], mDelta[EDGE_B],
+                                            mDelta[EDGE_R], mDelta[EDGE_T] };
+            // The drag is over, so the drag's numbers are over: what is left
+            // in them is what the outline of it goes on being drawn at, one
+            // whole drag away from the element it is supposed to be around.
+            endDrag();
             if (mTool && grip != GRIP_NONE)
             {
                 // One operation for the whole drag, written when the
@@ -676,11 +679,11 @@ public:
                 // somewhere else to land.
                 if (into)
                 {
-                    mTool->canvasReparent(mWhich, into, mDelta[EDGE_L], mDelta[EDGE_B]);
+                    mTool->canvasReparent(mWhich, into, moved[EDGE_L], moved[EDGE_B]);
                 }
                 else
                 {
-                    mTool->canvasDrag(mWhich, mDelta[EDGE_L], mDelta[EDGE_B], mDelta[EDGE_R], mDelta[EDGE_T]);
+                    mTool->canvasDrag(mWhich, moved[EDGE_L], moved[EDGE_B], moved[EDGE_R], moved[EDGE_T]);
                 }
             }
             return true;
@@ -723,8 +726,7 @@ public:
 
     void onMouseCaptureLost() override
     {
-        mGrip = GRIP_NONE;
-        mDrop.markDead();
+        endDrag();
         LLPanel::onMouseCaptureLost();
     }
 
@@ -769,6 +771,18 @@ private:
     bool grabbed()
     {
         return mGrip != GRIP_NONE && hasMouseCapture();
+    }
+
+    // Nothing is being dragged, and nothing is left over saying it is.
+    void endDrag()
+    {
+        mGrip = GRIP_NONE;
+        mDrop.markDead();
+        for (S32& d : mDelta)
+        {
+            d = 0;
+        }
+        gFocusMgr.setMouseCapture(nullptr);
     }
 
     bool beginDrag(S32 grip, S32 x, S32 y)
@@ -4028,8 +4042,23 @@ void ALFloaterXUIStudio::onTreeFilter()
 
 void ALFloaterXUIStudio::onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action)
 {
-    if (mSyncingTree || items.empty() || !items.front())
+    if (mSyncingTree)
     {
+        return;
+    }
+    // Nothing chosen in the outline is nothing selected. Taking the last row
+    // out of the selection is how a reader says they are done with it, and
+    // the marks on the canvas go with it -- but only when a reader did it: a
+    // rebuild or a filter empties the outline too, and neither of those is
+    // anybody saying anything.
+    if (items.empty() || !items.front())
+    {
+        if (user_action)
+        {
+            mSyncingTree = true;
+            mSelection.clearSelection();
+            mSyncingTree = false;
+        }
         return;
     }
     ALXUITreeItem* item = static_cast<ALXUITreeItem*>(items.front()->getViewModelItem());

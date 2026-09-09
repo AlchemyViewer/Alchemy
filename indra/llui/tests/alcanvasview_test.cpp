@@ -278,6 +278,39 @@ namespace tut
         canvas->die();
     }
 
+    // What is on a surface can move itself. A previewed window dragged by
+    // its own title bar does: nothing tells the surface, so the surface asks
+    // -- and without that the next change of size puts the window back where
+    // the surface last put it, which is a window that cannot be dragged by
+    // the handle it is meant to be dragged by.
+    template<> template<>
+    void alcanvasview_object::test<16>()
+    {
+        ALCanvasView* canvas = surface();
+        canvas->setLeastSurface(300, 200);
+        LLPanel* root = place(canvas, 200, 100);
+
+        // Moved by something that is not the surface.
+        root->translate(70, -40);
+        const LLRect moved = root->getRect();
+        canvas->refresh();
+        ensure_equals("it is still where it was moved to, across",
+                      root->getRect().mLeft, moved.mLeft);
+
+        // And it stays there through the change of size that used to undo it.
+        const S32 from_top = canvas->surfaceHeight() - root->getRect().mTop;
+        canvas->setLeastSurface(600, 500);
+        ensure_equals("across a change of size, across", root->getRect().mLeft, moved.mLeft);
+        ensure_equals("and down from the top",
+                      canvas->surfaceHeight() - root->getRect().mTop, from_top);
+
+        // Asking again when nothing has moved changes nothing.
+        const LLRect settled = root->getRect();
+        canvas->refresh();
+        ensure_equals("asking twice is asking once", where(root->getRect()), where(settled));
+        canvas->die();
+    }
+
     // There is no growing off the top left of a canvas, so what is dragged
     // that way stops at the corner rather than disappearing over it.
     template<> template<>
