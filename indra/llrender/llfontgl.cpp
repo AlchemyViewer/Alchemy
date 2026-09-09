@@ -75,7 +75,7 @@ LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
 bool     LLFontGL::sEnableShaderShadow = false;
 LLFontRegistry* LLFontGL::sFontRegistry = NULL;
 
-LLCoordGL LLFontGL::sCurOrigin;
+LLFontGL::UIOrigin LLFontGL::sCurOrigin;
 F32 LLFontGL::sCurDepth;
 F32 LLFontGL::sCurScaleX = 1.f;
 F32 LLFontGL::sCurScaleY = 1.f;
@@ -373,8 +373,8 @@ ALTextTransform::ALTextTransform()
     // the renderer applies to every other UI vertex. The glyphs arrive in
     // local units, so the scale goes on the matrix under them rather than
     // into the placement.
-    gGL.translatef(floorf((F32)LLFontGL::sCurOrigin.mX * LLFontGL::sCurScaleX * LLFontGL::sScaleX),
-                   floorf((F32)LLFontGL::sCurOrigin.mY * LLFontGL::sCurScaleY * LLFontGL::sScaleY),
+    gGL.translatef(floorf(LLFontGL::sCurOrigin.mX * LLFontGL::sCurScaleX * LLFontGL::sScaleX),
+                   floorf(LLFontGL::sCurOrigin.mY * LLFontGL::sCurScaleY * LLFontGL::sScaleY),
                    LLFontGL::sCurDepth);
     if (LLFontGL::sCurScaleX != 1.f || LLFontGL::sCurScaleY != 1.f)
     {

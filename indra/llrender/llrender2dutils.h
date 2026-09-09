@@ -178,9 +178,11 @@ public:
     static void popMatrix();
     static void loadIdentity();
     static void translate(F32 x, F32 y, F32 z = 0.0f);
-    // Everything under this draws, clips and measures at this scale. The
-    // renderer has always been able to scale the UI; what this adds is the
-    // shadow of it that clipping, text and badges read.
+    // Everything under this draws, clips and measures at this scale, about
+    // the origin it is pushed at: what is under it grows where it already
+    // is, the way it would under a matrix stack. The renderer has always
+    // been able to scale the UI; what this adds is the shadow of it that
+    // clipping, text and badges read.
     static void scale(F32 x, F32 y);
 
     // Where a local rect lands on screen under the UI transform, which is

@@ -1335,6 +1335,20 @@ void LLView::drawChildren()
         S32 origin_x, origin_y;
         localPointToScreen(0, 0, &origin_x, &origin_y);
 
+        // Under a scale the view tree's answer is where a child would have
+        // been drawn at a hundred per cent, which is not where it is: the
+        // transform being drawn through says where that is. Nothing pushes a
+        // scale but a zoomed canvas, so everything else keeps the arithmetic
+        // it had.
+        const F32 scale_x = LLFontGL::sCurScaleX;
+        const F32 scale_y = LLFontGL::sCurScaleY;
+        const bool scaled = scale_x != 1.f || scale_y != 1.f;
+        if (scaled)
+        {
+            origin_x = ll_round(LLFontGL::sCurOrigin.mX * scale_x);
+            origin_y = ll_round(LLFontGL::sCurOrigin.mY * scale_y);
+        }
+
         // Whatever this view knows about its children that the two tests below
         // do not. Null for all but the few views that override it.
         const LLRect cull_rect = getChildCullRectScreen();
@@ -1359,6 +1373,13 @@ void LLView::drawChildren()
                 // above, and the child's is the only term left.
                 llassert(viewp->mParentView == this);
                 LLRect screen_rect = viewp->getRect();
+                if (scaled)
+                {
+                    screen_rect.set(ll_round((F32)screen_rect.mLeft * scale_x),
+                                    ll_round((F32)screen_rect.mTop * scale_y),
+                                    ll_round((F32)screen_rect.mRight * scale_x),
+                                    ll_round((F32)screen_rect.mBottom * scale_y));
+                }
                 screen_rect.translate(origin_x, origin_y);
 
                 if ( rootp->getLocalRect().overlaps(screen_rect)

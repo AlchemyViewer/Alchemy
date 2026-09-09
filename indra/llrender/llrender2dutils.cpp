@@ -1963,8 +1963,8 @@ LLRender2D::~LLRender2D()
 void LLRender2D::translate(F32 x, F32 y, F32 z)
 {
     gGL.translateUI(x,y,z);
-    LLFontGL::sCurOrigin.mX += (S32) x;
-    LLFontGL::sCurOrigin.mY += (S32) y;
+    LLFontGL::sCurOrigin.mX += x;
+    LLFontGL::sCurOrigin.mY += y;
     LLFontGL::sCurDepth += z;
 }
 
@@ -1972,9 +1972,24 @@ void LLRender2D::translate(F32 x, F32 y, F32 z)
 // The offset is in unscaled units, because a UI vertex is
 // (local + offset) * scale: a translation under a scale is not scaled here,
 // it is scaled where the transform is used.
+//
+// A nested transform scales about its own origin, the way a matrix stack
+// does: what is under it is drawn larger where it already is. There is one
+// offset for the whole stack and the scale is applied after it, so keeping
+// that origin means dividing the offset that led here by what is being
+// pushed. Without it the scale reaches all the way back to the window's
+// corner and carries the drawing off with it.
 void LLRender2D::scale(F32 x, F32 y)
 {
+    if (x <= 0.f || y <= 0.f)
+    {
+        return;
+    }
+    const F32 was_x = LLFontGL::sCurOrigin.mX;
+    const F32 was_y = LLFontGL::sCurOrigin.mY;
     gGL.scaleUI(x, y, 1.f);
+    gGL.translateUI(was_x / x - was_x, was_y / y - was_y, 0.f);
+    LLFontGL::sCurOrigin.set(was_x / x, was_y / y);
     LLFontGL::sCurScaleX *= x;
     LLFontGL::sCurScaleY *= y;
 }

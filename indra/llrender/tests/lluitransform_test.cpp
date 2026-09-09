@@ -134,4 +134,48 @@ namespace tut
         ensure_equals("the rect's corner is the same point", screen.mLeft, 36);
         ensure_equals("and the same on the other axis", screen.mBottom, 90);
     }
+
+    // A scale keeps the origin it was pushed at: what is under it is drawn
+    // larger where it already was, rather than being carried away from the
+    // window's corner in proportion to how far along it had got.
+    template<> template<>
+    void lluitransform_object::test<6>()
+    {
+        LLRender2D::pushMatrix();
+        LLRender2D::translate(300.f, 200.f);
+        LLRender2D::scale(2.f, 2.f);
+
+        F32 x = 0.f;
+        F32 y = 0.f;
+        LLRender2D::toScreen(0.f, 0.f, x, y);
+        ensure_equals("the corner it was pushed at is where it was", ll_round(x), 300);
+        ensure_equals("on both axes", ll_round(y), 200);
+
+        LLRender2D::toScreen(50.f, 40.f, x, y);
+        ensure_equals("and what is on it is twice as far along", ll_round(x), 400);
+        ensure_equals("in both directions", ll_round(y), 280);
+
+        LLRender2D::popMatrix();
+    }
+
+    // Taking the frame off takes the scale with it, and what it did to the
+    // offset to keep the origin.
+    template<> template<>
+    void lluitransform_object::test<7>()
+    {
+        LLRender2D::pushMatrix();
+        LLRender2D::translate(30.f, 40.f);
+        LLRender2D::pushMatrix();
+        LLRender2D::scale(4.f, 4.f);
+        LLRender2D::popMatrix();
+
+        F32 x = 0.f;
+        F32 y = 0.f;
+        LLRender2D::toScreen(10.f, 10.f, x, y);
+        ensure_equals("the offset is the one the frame was pushed on", ll_round(x), 40);
+        ensure_equals("on both axes", ll_round(y), 50);
+        ensure_equals("and the scale is off with it", LLFontGL::sCurScaleX, 1.f);
+
+        LLRender2D::popMatrix();
+    }
 }

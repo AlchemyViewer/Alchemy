@@ -328,15 +328,27 @@ public:
     // scale is applied at the point of use. It tracked the offset and not the
     // scale for years, which was invisible only because nothing pushed a UI
     // scale: a scale moved the drawing and left the scissor behind it.
+    // The offset is not always a whole pixel. A scale pushed under a
+    // translation keeps the origin it was pushed at by dividing the offset
+    // that led there, and rounding that division is how a drawing and its
+    // scissor would come to be a pixel apart.
+    struct UIOrigin
+    {
+        F32 mX = 0.f;
+        F32 mY = 0.f;
+
+        void set(F32 x, F32 y) { mX = x; mY = y; }
+    };
+
     struct UITransform
     {
-        LLCoordGL   origin;
+        UIOrigin    origin;
         F32         depth = 0.f;
         F32         scaleX = 1.f;
         F32         scaleY = 1.f;
     };
 
-    static LLCoordGL sCurOrigin;
+    static UIOrigin     sCurOrigin;
     static F32          sCurDepth;
     static F32          sCurScaleX;
     static F32          sCurScaleY;

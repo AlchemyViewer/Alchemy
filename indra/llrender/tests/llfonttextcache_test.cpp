@@ -737,7 +737,7 @@ namespace tut
         const std::string s = "Moved, not rebuilt";
         font->generateASCIIglyphs();
 
-        const LLCoordGL saved_origin = LLFontGL::sCurOrigin;
+        const LLFontGL::UIOrigin saved_origin = LLFontGL::sCurOrigin;
         LLFontGL::sCurOrigin.set(0, 0);
 
         LLFontTextCache vb;
