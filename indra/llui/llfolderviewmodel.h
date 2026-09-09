@@ -305,6 +305,16 @@ public:
 
     virtual void addChild(LLFolderViewModelItem* child) override
     {
+        // Nothing contains itself. Taken as a child it would become its own
+        // parent, and every walk up the parents from anywhere under it --
+        // dirtyFilter is one, and it starts here -- would never end. The
+        // caller has confused two items for one; hanging is a poor way to
+        // say so.
+        if (child == this)
+        {
+            LL_WARNS() << "a folder view item was told to contain itself" << LL_ENDL;
+            return;
+        }
         mChildren.push_back(child);
         child->setParent(this);
         dirtyFilter();

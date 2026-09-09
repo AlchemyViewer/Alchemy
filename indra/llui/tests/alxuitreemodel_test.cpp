@@ -296,4 +296,47 @@ namespace tut
         fv.reset();
         gFloaterView = nullptr;
     }
+
+    // An item told to contain itself is refused. Taken as its own child it
+    // becomes its own parent, and the walks up the parents -- dirtyFilter
+    // is one, and adding a child starts it -- never end. The studio hit
+    // this by handing a folder view and one of its rows the same item, and
+    // the window opened and never came back.
+    template<> template<>
+    void alxuitreemodel_object::test<3>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::unique_ptr<LLFloaterView> fv(floaterView());
+        gFloaterView = fv.get();
+
+        LLXMLNodePtr root;
+        LLFloater* floater = build(fv.get(), root);
+        ensure("built", floater != nullptr);
+
+        ALXUISourceMap map;
+        map.build(floater, root);
+
+        ALXUITreeModel model;
+        ALXUITreeItem* root_item = model.build(floater, map);
+        ensure("a root item", root_item != nullptr);
+
+        const auto before = root_item->getChildrenCount();
+        root_item->addChild(root_item);
+        ensure_equals("an item does not take itself as a child",
+                      root_item->getChildrenCount(), before);
+
+        // And what it refuses is only that: an item that is not this one is
+        // taken as before.
+        ALXUITreeItem* outer = model.itemFor(ALXUISelection::fromString("outer"));
+        ensure("a row to adopt", outer != nullptr);
+        root_item->addChild(outer);
+        ensure_equals("another item still is", root_item->getChildrenCount(), before + 1);
+
+        delete floater;
+        fv.reset();
+        gFloaterView = nullptr;
+    }
 }
