@@ -1704,7 +1704,10 @@ bool ALFloaterXUIStudio::postBuild()
     mChannelResponse = getChild<LLComboBox>("channel_response");
     mPalette = getChild<LLScrollListCtrl>("palette");
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
-    getChild<LLButton>("gallery_btn")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::showGallery, this));
+    getChild<LLButton>("library_btn")->setClickedCallback([](LLUICtrl*, const LLSD&)
+    {
+        LLFloaterReg::showInstance("xui_library");
+    });
     for (const auto& [button, pane] : FOLD_BUTTONS)
     {
         getChild<LLButton>(button)->setCommitCallback(
@@ -6767,6 +6770,7 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "undo")          { undoEdit(); }
     else if (action == "redo")          { redoEdit(); }
     else if (action == "gallery")       { showGallery(); }
+    else if (action == "library")       { LLFloaterReg::showInstance("xui_library"); }
     else if (action == "lint_all")      { startLintAll(); }
     else if (action == "census")        { startCensus(); }
     else if (action == "schema")        { onExportSchema(); }

@@ -250,6 +250,13 @@
          tear_off="false"
          width="220">
             <menu_item_call
+             label="Library"
+             layout="topleft"
+             name="library"
+             shortcut="control|shift|L">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="library" />
+            </menu_item_call>
+            <menu_item_call
              label="Widget Gallery"
              layout="topleft"
              name="gallery">
@@ -334,11 +341,11 @@
     <button
      follows="left|top"
      height="22"
-     label="Gallery"
+     label="Library"
      layout="topleft"
      left_pad="4"
-     name="gallery_btn"
-     tool_tip="Every registered widget with its template defaults, in the chosen skin"
+     name="library_btn"
+     tool_tip="Every tag a file may write, what the schema knows about each, and one of it built to look at (Control+Shift+L)"
      top_delta="0"
      width="66" />
     <button

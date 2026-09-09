@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_resize="true"
+ height="560"
+ layout="topleft"
+ legacy_header_height="18"
+ min_height="360"
+ min_width="620"
+ name="xui_library"
+ help_topic="xui_library"
+ save_rect="true"
+ single_instance="true"
+ title="XUI Library"
+ translate="false"
+ width="860">
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="516"
+     layout="topleft"
+     left="8"
+     name="library_stack"
+     orientation="horizontal"
+     top="24"
+     width="844">
+
+        <layout_panel
+         auto_resize="false"
+         expanded_min_dim="180"
+         height="516"
+         layout="topleft"
+         min_dim="0"
+         name="library_list"
+         user_resize="true"
+         width="240">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="516"
+             layout="topleft"
+             left="0"
+             name="library_list_stack"
+             orientation="vertical"
+             top="0"
+             width="240">
+                <layout_panel
+                 auto_resize="true"
+                 height="490"
+                 layout="topleft"
+                 min_dim="80"
+                 name="library_tags_area"
+                 width="240">
+                    <scroll_list
+                     column_padding="0"
+                     draw_heading="false"
+                     follows="all"
+                     height="490"
+                     layout="topleft"
+                     left="0"
+                     name="library_tags"
+                     tool_tip="Every tag a file may write, grouped by what it is"
+                     top="0"
+                     width="240">
+                        <scroll_list.columns
+                         dynamic_width="true"
+                         label="Tag"
+                         name="tag" />
+                    </scroll_list>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="26"
+                 layout="topleft"
+                 min_dim="26"
+                 name="library_filter_row"
+                 width="240">
+                    <filter_editor
+                     follows="left|top|right"
+                     height="22"
+                     label="Filter tags"
+                     layout="topleft"
+                     left="0"
+                     name="library_filter"
+                     top="2"
+                     width="240" />
+                </layout_panel>
+            </layout_stack>
+        </layout_panel>
+
+        <layout_panel
+         auto_resize="true"
+         height="516"
+         layout="topleft"
+         min_dim="300"
+         name="library_doc"
+         user_resize="true"
+         width="604">
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="516"
+             layout="topleft"
+             left="0"
+             name="library_doc_stack"
+             orientation="vertical"
+             top="0"
+             width="604">
+                <layout_panel
+                 auto_resize="false"
+                 height="48"
+                 layout="topleft"
+                 min_dim="48"
+                 name="library_specimen"
+                 width="604" />
+                <layout_panel
+                 auto_resize="true"
+                 height="468"
+                 layout="topleft"
+                 min_dim="100"
+                 name="library_about_area"
+                 width="604">
+                    <text_editor
+                     follows="all"
+                     height="468"
+                     layout="topleft"
+                     left="0"
+                     max_length="65536"
+                     name="library_about"
+                     read_only="true"
+                     top="0"
+                     width="604"
+                     word_wrap="true" />
+                </layout_panel>
+            </layout_stack>
+        </layout_panel>
+    </layout_stack>
+</floater>

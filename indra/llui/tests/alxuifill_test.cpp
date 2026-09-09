@@ -186,4 +186,30 @@ namespace tut
         ensure("every stack fills what it is in:" + report, gaps.empty());
         stage->die();
     }
+
+    // The library, which is the tool's other window: two panes and a foot,
+    // and the same rule about what a container owes what it is in.
+    template<> template<>
+    void alxuifill_object::test<2>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLPanel* stage = nullptr;
+        LLFloater* floater = build("floater_xui_library.xml", stage);
+        ensure("the library window builds", floater != nullptr);
+
+        std::vector<std::string> gaps;
+        ensureFills("floater_xui_library.xml", floater, gaps);
+
+        std::string report;
+        for (const std::string& gap : gaps)
+        {
+            report += "\n  " + gap;
+        }
+        ensure("every stack fills what it is in:" + report, gaps.empty());
+        stage->die();
+    }
 }
