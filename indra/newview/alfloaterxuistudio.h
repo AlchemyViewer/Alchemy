@@ -150,15 +150,20 @@ public:
     // stops rather than on every field written.
     void documentRead(const std::string& status);
 
+    // An undo or a redo put onto what is built, where the step it puts back
+    // wrote one field of one element. Anything else is a build.
+    void replayChange(const std::string& status);
+
     // A field put onto what is already built, where a built view can be told
     // about it. Answering false is not a failure: it says this field is not
     // one of those, so the preview has to be made again to show it.
-    bool applyLive(const std::string& name, const std::string& value);
+    bool applyLive(const ALXUISelection::path_t& path, const std::string& name, const std::string& value);
 
     // The rect the factory would have given the element, worked out again
-    // from the element as it now reads. Only where that answer does not
-    // depend on the order things were built in.
-    bool liveShape(LLView* view, const LLXMLNodePtr& node, const std::string& name);
+    // from the element as it now reads -- and the same for every element the
+    // file put in the same parent after it, since a pad and a delta are
+    // measured from the widget before.
+    bool liveShape(LLView* view, const LLXMLNodePtr& node);
 
     void saveDocument();
     void revertDocument();
