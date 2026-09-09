@@ -399,6 +399,62 @@ namespace tut
         area->die();
     }
 
+    // Asking a row to lay itself out twice gives the same answer twice.
+    // A row that says something different every time it is asked moves what
+    // is under the pointer on every frame, and then nothing on it can be
+    // dragged: the hand goes one way and the thing being dragged goes
+    // another, because the coordinates it is being dragged in have moved.
+    template<> template<>
+    void alcanvasview_object::test<15>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "row";
+        rp.rect = area->getLocalRect();
+        rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        ALCanvasRow* row = new ALCanvasRow(rp);
+        row->initFromParams(rp);
+        area->addChild(row);
+
+        ALCanvasView* canvas = surface();
+        row->addCanvas(canvas);
+        row->show(canvas, true);
+
+        // Big enough to want scrollbars, which is the case where the room
+        // the row is told about depends on what the row did last time.
+        place(canvas, ROOM_W * 2, ROOM_H * 2);
+
+        LLRect settled;
+        for (S32 pass = 0; pass < 6; ++pass)
+        {
+            row->shareRoom();
+            row->layout();
+            if (pass == 1)
+            {
+                settled = row->getRect();
+            }
+            else if (pass > 1)
+            {
+                ensure_equals("pass " + std::to_string(pass) + ": the row is where it was, across",
+                              row->getRect().getWidth(), settled.getWidth());
+                ensure_equals("pass " + std::to_string(pass) + ": and down",
+                              row->getRect().getHeight(), settled.getHeight());
+                ensure_equals("pass " + std::to_string(pass) + ": and so is what is on it",
+                              canvas->getRect().mLeft, 0);
+            }
+        }
+        area->die();
+    }
+
     // A region with nothing built on it yet is still the canvas's: the row
     // covers it, so a wheel or a drop there reaches a canvas rather than
     // falling through to whatever is behind.
