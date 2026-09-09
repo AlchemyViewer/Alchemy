@@ -245,6 +245,39 @@ namespace tut
         canvas->die();
     }
 
+    // Moved twice, which is what anybody moving anything does. The second
+    // move is measured against the surface the first one grew, so a surface
+    // that forgets what it needs before reading where the root is puts the
+    // root back higher than it was and grows under it again -- a preview
+    // that jumps on every drag and walks off the end of what can be
+    // scrolled to.
+    template<> template<>
+    void alcanvasview_object::test<14>()
+    {
+        ALCanvasView* canvas = surface();
+        canvas->setLeastSurface(300, 200);
+        LLPanel* root = place(canvas, 200, 100);
+
+        for (S32 again = 0; again < 3; ++again)
+        {
+            root->translate(60, -50);
+            // Where it was put, from the corner the surface grows out of.
+            // Its own y is not that: a surface that grows does so downwards,
+            // so everything on it counts from a new bottom.
+            const S32 want_left = root->getRect().mLeft;
+            const S32 want_down = canvas->surfaceHeight() - root->getRect().mTop;
+            canvas->rememberRoot();
+
+            const std::string which = "move " + std::to_string(again) + ": ";
+            ensure_equals(which + "it stayed where it was put, across", root->getRect().mLeft, want_left);
+            ensure_equals(which + "and down from the top",
+                          canvas->surfaceHeight() - root->getRect().mTop, want_down);
+            ensure(which + "and the surface reaches under it " + where(root->getRect()),
+                   root->getRect().mBottom >= 0 && root->getRect().mRight <= canvas->surfaceWidth());
+        }
+        canvas->die();
+    }
+
     // There is no growing off the top left of a canvas, so what is dragged
     // that way stops at the corner rather than disappearing over it.
     template<> template<>

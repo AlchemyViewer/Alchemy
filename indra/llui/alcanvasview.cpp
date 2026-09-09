@@ -57,12 +57,18 @@ void ALCanvasView::clear()
 
 void ALCanvasView::rememberRoot()
 {
-    mNeedWidth = 0;
-    mNeedHeight = 0;
     if (!mRoot)
     {
+        mNeedWidth = 0;
+        mNeedHeight = 0;
         return;
     }
+    // Measured against the surface as it is, because that is the surface the
+    // root is sitting on. Clearing what the surface needs before reading it
+    // measures the root against a smaller one, and then puts it back that
+    // much higher and larger -- which is a preview that jumps every time it
+    // is moved and grows the surface under itself until it is off the far
+    // end of what can be scrolled to.
     const LLView* parent = mRoot->getParent();
     const LLRect placed = mRoot->getRect();
     mAnchorLeft = placed.mLeft;
