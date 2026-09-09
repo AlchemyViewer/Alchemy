@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  One sentence per tag, for the Library and for the generated schema.
+
+  Everything else the tool knows about the widget vocabulary is read out of
+  the viewer's own registries, which is what keeps it true. A registry knows
+  that a button takes a label and cannot know what a button is for, and that
+  is the first question anybody asks of a vocabulary this size.
+
+  A tag with no line here falls back to its own name and the class it builds.
+  Nothing waits on prose: add a line when there is one to add.
+-->
+<xui_notes>
+    <tag name="accordion" note="A column of folding sections, one heading each, for a pane with more in it than fits." />
+    <tag name="accordion_tab" note="One folding section of an accordion: a heading that opens and closes, and whatever is under it." />
+    <tag name="asset_filtered_inv_panel" note="An inventory panel showing only one kind of asset, for a picker that wants animations or sounds and nothing else." />
+    <tag name="avatar_icon" note="One resident's picture, fetched by key and drawn at whatever size it is given." />
+    <tag name="avatar_list" note="A list of residents, each row a picture, a name and whatever the list was told to show beside them." />
+    <tag name="badge" note="A small count or mark placed on the corner of the thing it is about, drawn over its holder rather than inside it." />
+    <tag name="block_list" note="The residents this account has blocked, and what each block covers." />
+    <tag name="button" note="A thing to press. Its label, its image or both say what pressing it does." />
+    <tag name="chat_editor" note="The line chat is typed into: history on the arrow keys, and it grows as what is being written does." />
+    <tag name="chat_history" note="What has been said, in order, with names, times and links made clickable." />
+    <tag name="check_box" note="One answer that is yes or no, with the question written beside it." />
+    <tag name="chiclet_notification" note="The little marker in the toolbar for a notification waiting to be read." />
+    <tag name="chiclet_offer" note="The marker for an offer of an object or a folder, waiting to be taken or declined." />
+    <tag name="chiclet_panel" note="The strip the chiclets sit in, which shares its room out between them as they come and go." />
+    <tag name="chiclet_script" note="The marker for a script asking this account for something." />
+    <tag name="color_field" note="A colour written the way a file writes one: a swatch, the name it is called in the colour table, and the four numbers behind it." />
+    <tag name="color_picker" note="A wheel, a value slider and the numbers, for choosing a colour rather than naming one." />
+    <tag name="color_swatch" note="A block of one colour that opens a picker when it is clicked." />
+    <tag name="color_wheel" note="The hue and saturation of a colour, chosen by pointing at it." />
+    <tag name="combo_box" note="One choice out of a list, shown closed until it is asked to open." />
+    <tag name="console" note="Lines of text that arrive, are read and fade, for what the viewer is saying rather than what anybody typed." />
+    <tag name="container_view" note="A view whose only job is to hold others: it draws nothing of its own." />
+    <tag name="context_menu" note="The menu a right click opens, over the thing that was right-clicked." />
+    <tag name="conversation_log_list" note="Every conversation this account has had, most recent first." />
+    <tag name="conversation_view_participant" note="One person in a conversation, with what they can do in it and what they are doing." />
+    <tag name="conversation_view_session" note="One conversation in the list, with the people in it folded under it." />
+    <tag name="curve_editor" note="A curve dragged by its points, for a setting whose value is a shape rather than a number." />
+    <tag name="debug_view" note="What the viewer draws over the world for a developer: the stats, the outlines and the rest." />
+    <tag name="dnd_button" note="A button that also takes a drop, so a thing can be dragged onto what it does." />
+    <tag name="drop_target" note="A region that takes what is dragged onto it and says what it took." />
+    <tag name="emoji_complete" note="The list that offers emoji as they are typed, and puts the chosen one in." />
+    <tag name="expandable_text" note="Text cut to the room there is, with a way to open the rest of it." />
+    <tag name="favorites_bar" note="The landmarks kept on the bar, in the order they were put there." />
+    <tag name="favorites_inventory_panel" note="The favourites folder as an inventory panel, for the bar to be filled from." />
+    <tag name="filter_editor" note="A line that narrows a list to what carries what is typed, with a way to clear it." />
+    <tag name="flags_field" note="A set of independent answers written as one word with bars between them, shown as one box each." />
+    <tag name="flat_list_view" note="A list whose rows are views rather than text, kept in one flat column." />
+    <tag name="floater" note="A window of its own: a title bar, what is in it, and whatever it is allowed to do about being moved, sized or closed." />
+    <tag name="floater_view" note="What every floater is a child of, and what decides which of them is in front." />
+    <tag name="flyout_button" note="A button with a menu on its edge: press it for the usual thing, open it for the rest." />
+    <tag name="folder_view_item" note="One row of a tree: an icon, a name, and whatever is folded under it." />
+    <tag name="font_field" note="A font written the way a file writes one: the name from fonts.xml, its size and its style." />
+    <tag name="fs_virtual_trackpad" note="A pad dragged in two directions at once, for a value that is a point rather than a number." />
+    <tag name="group_drop_target" note="A region that takes a group dragged onto it." />
+    <tag name="group_icon" note="One group's picture, fetched by key." />
+    <tag name="group_list" note="The groups this account is in, each row a picture and a name." />
+    <tag name="hex_editor" note="Bytes as bytes: the offsets down the side, the values across, and the text of them beside." />
+    <tag name="hint_popup" note="A pointer at something on the screen, with a line saying what it is." />
+    <tag name="icon" note="A picture and nothing else: it does not take a click." />
+    <tag name="icons_combo_box" note="A combo box whose choices are pictures rather than words." />
+    <tag name="inbox_folder_view_folder" note="One folder of the received-items inbox." />
+    <tag name="inbox_folder_view_item" note="One item of the received-items inbox, with whether it has been looked at." />
+    <tag name="inbox_inventory_panel" note="The received-items inbox as an inventory panel." />
+    <tag name="inventory_gallery_item" note="One inventory item as a picture with its name under it, for the gallery rather than the tree." />
+    <tag name="inventory_link_replace_drop_target" note="A region that takes an inventory item, for saying which one a set of links should point at instead." />
+    <tag name="inventory_panel" note="Inventory as a tree: folders that open, items that can be dragged, and a filter over the whole of it." />
+    <tag name="joystick_quat" note="A control dragged in two directions that answers with a rotation." />
+    <tag name="joystick_rotate" note="The camera turned about what it is looking at." />
+    <tag name="joystick_slide" note="The camera moved sideways and up without turning." />
+    <tag name="joystick_track" note="The camera moved along its own line of sight." />
+    <tag name="joystick_turn" note="The camera turned where it stands." />
+    <tag name="labeled_back_button" note="A back button that says where back is." />
+    <tag name="layout_panel" note="One pane of a layout stack: it says how much room it wants and whether it gives any up." />
+    <tag name="layout_stack" note="Panes in a row or a column, sharing the room out between them and giving a bar to drag where two of them meet." />
+    <tag name="line_editor" note="One line of text to type in, with what it will take and what it will not." />
+    <tag name="list_view" note="Rows in a column, each a view of its own." />
+    <tag name="loading_indicator" note="A mark that says something is still coming, and nothing about how much of it." />
+    <tag name="locate" note="A mark drawn where something is, for pointing at a place." />
+    <tag name="location_input" note="The address bar: where this account is, and somewhere else to type." />
+    <tag name="menu" note="A list of things that can be done, opened from a bar, a button or a right click." />
+    <tag name="menu_bar" note="The row of menus along the top of a window, which also answers that window's keyboard shortcuts." />
+    <tag name="menu_button" note="A button that opens a menu instead of doing one thing." />
+    <tag name="menu_holder" note="What open menus are drawn in, above everything else in the window." />
+    <tag name="menu_item" note="One line of a menu." />
+    <tag name="menu_item_call" note="A menu line that does something when it is chosen." />
+    <tag name="menu_item_check" note="A menu line that is on or off, and says which." />
+    <tag name="menu_item_separator" note="A line across a menu, to say the things above it and below it are different things." />
+    <tag name="menu_item_tear_off" note="The line at the top of a menu that takes the menu out into a window of its own." />
+    <tag name="multi_floater" note="A window holding other windows as tabs, each of which can be torn back out." />
+    <tag name="multi_slider" note="One track with more than one thumb on it, for a set of values in the same range." />
+    <tag name="multi_slider_bar" note="The track a multi slider's thumbs run along, without the numbers beside it." />
+    <tag name="name_box" note="A resident's name, fetched by key and filled in when it arrives." />
+    <tag name="name_editor" note="A resident's name that can also be typed into." />
+    <tag name="name_list" note="A list of names fetched by key, which fill themselves in as they arrive." />
+    <tag name="net_map" note="The little map: this region and its neighbours, with what is on them." />
+    <tag name="notification_list_view" note="Notifications as a list, in the order they arrived." />
+    <tag name="outfit_gallery_item" note="One outfit as a picture with its name under it." />
+    <tag name="output_monitor" note="Whether a resident is speaking, and how loudly." />
+    <tag name="panel" note="A region of a window: something to put things in, with a background and a border if it wants them." />
+    <tag name="panel_camera_item" note="One camera preset as a row that can be chosen." />
+    <tag name="panel_container" note="A panel holding other panels, one of which is showing." />
+    <tag name="panel_inventory_object" note="One inventory object shown as a panel rather than as a row." />
+    <tag name="placeholder" note="A view that holds a space until something is put in it." />
+    <tag name="places_inventory_panel" note="Landmarks as an inventory panel." />
+    <tag name="profile_drop_target" note="A region that takes a resident dragged onto it." />
+    <tag name="profile_image" note="A profile picture, with a way to change it where that is allowed." />
+    <tag name="progress_bar" note="How far along something is, when that is known." />
+    <tag name="property_grid" note="One row per field of a thing, with the editor each field's type asks for, under headings." />
+    <tag name="pull_button" note="A button with a menu that opens by pulling it in a direction." />
+    <tag name="radio_group" note="One answer out of a few, all of them shown at once." />
+    <tag name="recent_inventory_panel" note="What has arrived in inventory lately, newest first." />
+    <tag name="script_editor" note="Script text, with its keywords coloured, its lines numbered and its errors pointed at." />
+    <tag name="scroll_bar" note="The bar that says how much of something is being seen and moves what part of it that is." />
+    <tag name="scroll_container" note="A window onto something bigger than itself, with bars for reaching the rest." />
+    <tag name="scroll_list" note="Rows and columns of text, sorted by a heading, with one or more of them chosen." />
+    <tag name="scrolling_panel_list" note="Panels stacked in a column that scrolls." />
+    <tag name="search_combo_box" note="A line to search in, with what has been searched for before under it." />
+    <tag name="search_editor" note="A line to search in, with the button that starts the search." />
+    <tag name="settings_drop_target" note="A region that takes an environment setting dragged onto it." />
+    <tag name="simple_text_editor" note="Text to type into, over more than one line, with nothing coloured." />
+    <tag name="single_folder_inventory_panel" note="One inventory folder at a time, rather than the whole tree." />
+    <tag name="slider" note="A number chosen by dragging along a track, with the number written beside it." />
+    <tag name="slider_bar" note="The track a slider's thumb runs along, without the number beside it." />
+    <tag name="snapshot_floater_view" note="What the snapshot window is drawn in, so it can be placed against the picture being taken." />
+    <tag name="sound_drop_target" note="A region that takes a sound dragged onto it." />
+    <tag name="spinner" note="A number typed in or stepped by its arrows, between the two ends it is given." />
+    <tag name="split_button" note="A button with a second half that offers the other things it could do." />
+    <tag name="stat_bar" note="One measurement over time, drawn as a bar or a line, with what it is called and what it is in." />
+    <tag name="stat_view" note="A group of measurements shown together, which folds away as one." />
+    <tag name="sun_moon_trackball" note="Where the sun and the moon are, dragged about the sky rather than typed." />
+    <tag name="tab_container" note="Pages sharing one region, with a strip of tabs saying which is showing." />
+    <tag name="teleport_history_menu_item" note="One place this account has been, as a menu line that goes back there." />
+    <tag name="text" note="Words to read: it is not typed into and it is not pressed." />
+    <tag name="text_chat" note="What has been said in chat, laid out for reading rather than for editing." />
+    <tag name="text_editor" note="Text to type into, over more than one line, with what it will take and what it will not." />
+    <tag name="texture_picker" note="A picture chosen out of inventory, with a swatch of what is chosen." />
+    <tag name="thumbnail" note="A small picture standing for a larger thing, with a way to change it." />
+    <tag name="toggleable_menu" note="A menu that closes when the thing that opened it is pressed again." />
+    <tag name="tool_tip" note="What is said about the thing under the pointer when it has rested there." />
+    <tag name="toolbar" note="Buttons in a strip, which can be arranged and can carry their labels or not." />
+    <tag name="toolbar_view" note="The four edges a toolbar can be docked to, and what is docked where." />
+    <tag name="tooltip_view" note="What tool tips are drawn in, above everything else in the window." />
+    <tag name="ui_ctrl" note="Anything that can be interacted with: it can take focus, hold a value and say when that value changed." />
+    <tag name="view" note="The plainest thing there is: a rect, children, and the rules for where it goes when its parent changes size." />
+    <tag name="view_border" note="A line round a region, for saying where one thing ends and the next begins." />
+    <tag name="wearable_items_list" note="What can be worn, as a list, with what is worn already marked." />
+    <tag name="web_browser" note="A page rendered in the viewer, with what it is allowed to do." />
+    <tag name="window_shade" note="A panel that rolls down over what it covers to say something about it." />
+    <tag name="xy_vector" note="Two numbers chosen at once by pointing at where they meet." />
+    <tag name="dock_panel" note="A pane that knows it can be in a window of its own, and how to come back." />
+    <tag name="empty_state" note="What a pane says when there is nothing in it: what is missing, how to get some, and the one thing that would fix it." />
+    <tag name="follows_control" note="Which edges of its parent an element is tied to, drawn as the four struts and two springs that says." />
+</xui_notes>

@@ -26,6 +26,8 @@
 
 #include "../alxuischema.h"
 
+#include "../alxuinotes.h"
+
 // Naming a widget's parameter block is what links the object that registers
 // it, so the tags below are in the schema this binary builds.
 #include "../llbutton.h"
@@ -374,5 +376,66 @@ namespace tut
         ensure("so is a font", find(*text, "font") != nullptr);
         ensure("and its parts", find(*text, "font.name") != nullptr);
         ensure("and an image", find(*schema().tag("button"), "image_unselected") != nullptr);
+    }
+
+    // A registry knows that a button takes a label and cannot know what a
+    // button is for. That sentence is written by a person, in a file beside
+    // the generated schema, and every tag the registries offer has one --
+    // because a vocabulary of a hundred and forty is only usable if the
+    // first question about each of them has an answer.
+    //
+    // What this reaches is the tags THIS BINARY registers, which is llui's
+    // share of them and not the viewer's: a widget that only newview
+    // registers is not in here to be asked. The wider net is the schema the
+    // viewer writes out -- every tag in xui.xsd carries its sentence, and
+    // that is what to check after adding a widget.
+    template<> template<>
+    void alxuischema_object::test<14>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        std::vector<std::string> unwritten;
+        for (const ALXUISchema::Tag& tag : schema().tags())
+        {
+            if (ALXUINotes::get().note(tag.name).empty())
+            {
+                unwritten.push_back(tag.name);
+            }
+        }
+        std::string missing;
+        for (const std::string& name : unwritten)
+        {
+            missing += (missing.empty() ? "" : ", ") + name;
+        }
+        ensure("every tag says what it is for; these do not: " + missing, unwritten.empty());
+
+        // And a tag nobody has written one for is not an error, it is one
+        // fewer line: the schema still knows the tag.
+        ensure("a name nobody wrote about has nothing to say",
+               ALXUINotes::get().note("not_a_tag_anybody_registered").empty());
+    }
+
+    // The generated schema carries them, so an editor pointed at xui.xsd
+    // says what a tag is for as well as what it takes.
+    template<> template<>
+    void alxuischema_object::test<15>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        pugi::xml_document document;
+        const std::string xsd = schema().asXSD();
+        ensure("the schema parses", document.load_string(xsd.c_str()).status == pugi::status_ok);
+
+        for (pugi::xml_node element : document.document_element().children("xs:element"))
+        {
+            const std::string name = element.attribute("name").as_string();
+            const std::string said = element.child("xs:annotation").child_value("xs:documentation");
+            ensure("<" + name + "> carries its sentence", !said.empty());
+            ensure_equals("and it is the one that was written", said, ALXUINotes::get().note(name));
+        }
     }
 }

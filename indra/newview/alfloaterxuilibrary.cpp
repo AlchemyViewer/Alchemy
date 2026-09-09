@@ -28,6 +28,7 @@
 
 #include "alfloaterxuistudio.h"
 #include "alxuicatalog.h"
+#include "alxuinotes.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
 #include "llfiltereditor.h"
@@ -210,6 +211,13 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
     }
 
     std::string out = "<" + tag + ">\n";
+    // What it is for, which is the first thing anybody asks of a vocabulary
+    // this size and the one thing a registry cannot answer. A tag nobody has
+    // written a line for simply has one fewer line.
+    if (const std::string& note = ALXUINotes::get().note(tag); !note.empty())
+    {
+        out += "\n" + note + "\n";
+    }
     if (declared->text)
     {
         out += "\nWhat is between its tags is read as its value.\n";

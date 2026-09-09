@@ -26,6 +26,7 @@
 
 #include "alxuischema.h"
 
+#include "alxuinotes.h"
 #include "llinitparam.h"
 #include "lluictrlfactory.h"
 #include "llxuiparser.h"
@@ -404,10 +405,24 @@ std::string ALXUISchema::asXSD() const
         << "    <xs:anyAttribute processContents=\"skip\"/>\n"
         << "  </xs:complexType>\n";
 
+    // Each tag, carrying what a person wrote about it where there is one: a
+    // schema that says what a tag is for is worth more to whoever opens it
+    // in an editor than one that only says what it takes.
     for (const Tag& tag : mTags)
     {
+        const std::string& note = ALXUINotes::get().note(tag.name);
         out << "\n  <xs:element name=\"" << escaped(tag.name)
-            << "\" type=\"" << typeName(tag.name) << "\"/>\n";
+            << "\" type=\"" << typeName(tag.name) << "\"";
+        if (note.empty())
+        {
+            out << "/>\n";
+            continue;
+        }
+        out << ">\n"
+            << "    <xs:annotation>\n"
+            << "      <xs:documentation>" << escaped(note) << "</xs:documentation>\n"
+            << "    </xs:annotation>\n"
+            << "  </xs:element>\n";
     }
 
     for (const Tag& tag : mTags)

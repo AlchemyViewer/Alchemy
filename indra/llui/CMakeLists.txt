@@ -121,6 +121,7 @@ target_sources(llui
     alxuidiagnostics.cpp
     alxuiedit.cpp
     alxuilint.cpp
+    alxuinotes.cpp
     alxuioverlay.cpp
     alxuischema.cpp
     alxuiselection.cpp
@@ -266,6 +267,7 @@ target_sources(llui
     alxuidiagnostics.h
     alxuiedit.h
     alxuilint.h
+    alxuinotes.h
     alxuioverlay.h
     alxuischema.h
     alxuiselection.h
