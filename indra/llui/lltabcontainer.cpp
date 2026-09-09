@@ -1132,6 +1132,15 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
         {
             btn = LLUICtrlFactory::create<LLButton>(p);
         }
+
+        // A tab that shows an icon and no words says nothing on its own, and
+        // a label clipped to the strip's width says half of something. What
+        // the file wrote about the panel is what the button that selects it
+        // says; a panel that wrote nothing is left as it was.
+        if (btn && !child->getToolTip().empty())
+        {
+            btn->setToolTip(child->getToolTip());
+        }
     }
 
     LLTabTuple* tuple = new LLTabTuple( this, child, btn, textbox );
@@ -1677,12 +1686,12 @@ void LLTabContainer::setTabPanelFlashing(LLPanel* child, bool state )
     }
 }
 
-void LLTabContainer::setTabImage(LLPanel* child, std::string image_name, const LLColor4& color)
+void LLTabContainer::setTabImage(LLPanel* child, std::string image_name, const LLColor4& color, LLFontGL::HAlign align)
 {
     LLTabTuple* tuple = getTabByPanel(child);
     if( tuple )
     {
-        tuple->mButton->setImageOverlay(image_name, LLFontGL::LEFT, color);
+        tuple->mButton->setImageOverlay(image_name, align, color);
         reshapeTuple(tuple);
     }
 }
@@ -1721,6 +1730,41 @@ void LLTabContainer::setTabImage(LLPanel* child, LLIconCtrl* icon)
         // leak.
         icon->die();
     }
+}
+
+void LLTabContainer::setTabBadge(LLPanel* child, const std::string& label)
+{
+    LLTabTuple* tuple = getTabByPanel(child);
+    LLButton* button = tuple ? tuple->mButton : nullptr;
+    if (!button)
+    {
+        return;
+    }
+
+    if (!button->hasBadge())
+    {
+        // Nothing to say and nothing said it before: a badge is not made to
+        // be hidden straight away.
+        if (label.empty())
+        {
+            return;
+        }
+        // A badge belongs to the button it marks, and a button clips what it
+        // holds: a count made that way comes out with its top cut off. The
+        // strip takes them instead -- a holder draws its badges itself, over
+        // everything it holds -- and it sits at the right of the tab, level
+        // with the middle of it, because the left is where a label starts
+        // and the top of a twenty pixel tab is not a place a badge fits.
+        setAcceptsBadge(true);
+        LLBadge::Params p;
+        p.label = label;
+        p.location = LLRelPos::RIGHT;
+        p.location_percent_hcenter = 70;
+        button->initBadgeParams(p);
+        button->addBadgeToParentHolder();
+    }
+    button->setBadgeLabel(label);
+    button->setBadgeVisibility(!label.empty());
 }
 
 void LLTabContainer::reshapeTuple(LLTabTuple* tuple)

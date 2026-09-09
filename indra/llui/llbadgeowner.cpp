@@ -56,6 +56,14 @@ void LLBadgeOwner::initBadgeParams(const LLBadge::Params& p)
     }
 }
 
+void LLBadgeOwner::setBadgeLabel(const LLStringExplicit& label)
+{
+    if (mBadge)
+    {
+        mBadge->setLabel(label);
+    }
+}
+
 void LLBadgeOwner::reshapeBadge(const LLRect& new_rect)
 {
     if (mBadge)

@@ -205,9 +205,17 @@ public:
 
     bool        getTabPanelFlashing(LLPanel* child);
     void        setTabPanelFlashing(LLPanel* child, bool state);
-    void        setTabImage(LLPanel* child, std::string img_name, const LLColor4& color = LLColor4::white);
+    // A tab with a picture on it. The alignment is where the picture sits
+    // against the label; a tab with no label wants it centred, which is what
+    // a strip of icons is.
+    void        setTabImage(LLPanel* child, std::string img_name, const LLColor4& color = LLColor4::white,
+                            LLFontGL::HAlign align = LLFontGL::LEFT);
     void        setTabImage(LLPanel* child, const LLUUID& img_id, const LLColor4& color = LLColor4::white);
     void        setTabImage(LLPanel* child, LLIconCtrl* icon);
+    // What a tab has to say beyond its name: a count, a state, a dot, on the
+    // button that selects it. An empty label takes it away again, so a tab
+    // with nothing to say looks like one that never had anything.
+    void        setTabBadge(LLPanel* child, const std::string& label);
     void        setTitle( const std::string& title );
     const std::string getPanelTitle(S32 index);
 

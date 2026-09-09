@@ -361,6 +361,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llaccordionctrltab "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llspinctrl "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llcombobox "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lltabcontainer "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alpropertygrid "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuifill "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
@@ -378,7 +379,7 @@ if(BUILD_TESTING)
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
-  foreach(ui_test lllayoutstack llresizebar llfloater llaccordionctrltab llspinctrl llcombobox alpropertygrid alxuifill alviewtype alxuidiagnostics alxuishellbuild
+  foreach(ui_test lllayoutstack llresizebar llfloater llaccordionctrltab llspinctrl llcombobox lltabcontainer alpropertygrid alxuifill alviewtype alxuidiagnostics alxuishellbuild
                   alxuicatalog alxuiselection alxuisourcemap alxuitreemodel alxuilint
                   alxuiedit alxuischema)
     if (TARGET INTEGRATION_TEST_${ui_test})

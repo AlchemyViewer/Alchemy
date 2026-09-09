@@ -44,6 +44,13 @@ public:
     void addBadgeToParentHolder();
 
     bool hasBadgeHolderParent() const { return mHasBadgeHolderParent; };
+    // Whether there is a badge at all: one is made from parameters that
+    // differ from the default, so an owner whose file said nothing has none
+    // and asking it to change its label would say nothing either.
+    bool hasBadge() const { return mBadge != nullptr; }
+    // What the badge reads. A count that changes is the usual reason: the
+    // badge is made once and told the new number, rather than remade.
+    void setBadgeLabel(const LLStringExplicit& label);
     void setBadgeVisibility(bool visible);
     void setDrawBadgeAtTop(bool draw_at_top);
     void reshapeBadge(const LLRect& new_rect);
