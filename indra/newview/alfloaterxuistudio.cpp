@@ -30,6 +30,7 @@
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
 #include "alpopover.h"
+#include "aljumpbar.h"
 #include "alscopebar.h"
 #include "alpropertygrid.h"
 #include "alxuischema.h"
@@ -1691,7 +1692,7 @@ bool ALFloaterXUIStudio::postBuild()
     mFindResults = getChild<LLScrollListCtrl>("find_results");
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
     mTreePanel = getChild<LLPanel>("tree_host");
-    mBreadcrumb = getChild<LLPanel>("breadcrumb");
+    mBreadcrumb = getChild<ALJumpBar>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
     mHistory = getChild<ALHistoryList>("history");
     mDocumentList = getChild<LLScrollListCtrl>("documents");
@@ -1911,6 +1912,7 @@ bool ALFloaterXUIStudio::postBuild()
     // Return runs it; changing a dropdown re-runs whatever is already typed,
     // since a sentence with a word changed is a different question about the
     // same words.
+    mBreadcrumb->onChose(boost::bind(&ALFloaterXUIStudio::onBreadcrumb, this, _1, _2));
     mFindBar->onRun(boost::bind(&ALFloaterXUIStudio::onFind, this));
     mFindBar->onChanged(boost::bind(&ALFloaterXUIStudio::onFindScope, this));
     mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindResult, this));
@@ -7264,75 +7266,72 @@ void ALFloaterXUIStudio::refreshSelectionFindings()
     }
 }
 
+// One crumb per ancestor from the root down, and on each of them what that
+// step could have been: its siblings in the tree. Walking back up was all a
+// breadcrumb ever did here; the useful direction is sideways, and the view
+// tree knows the answer at every level.
 void ALFloaterXUIStudio::refreshBreadcrumb()
 {
-    mBreadcrumb->deleteAllChildren();
     const Preview& pv = mPreviews[PRIMARY];
     if (!pv.root || !mSelection.hasSelection())
     {
+        mBreadcrumb->setPath({});
+        mBreadcrumb->setTrailer(LLStringUtil::null);
         return;
     }
 
-    // One crumb per ancestor from the root down, then the layer the
-    // element came from. The selection's end matters more than its
-    // start, so when the chain is wider than the panel the first crumbs
-    // fold into one that selects the last of them.
     const ALXUISelection::path_t& path = mSelection.selection();
-    const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-    const ALXUICatalog::Layer* layer = nullptr;
-    authoredElement(layer);
-    const std::string layer_text = layer ? layer->skin + "/" + layer->language : std::string("code-built");
-    const S32 layer_width = font->getWidth(layer_text) + 12;
-    const S32 available = mBreadcrumb->getRect().getWidth() - layer_width;
-
-    std::vector<std::string> labels;
-    std::vector<S32> widths;
-    S32 total = 0;
+    std::vector<ALJumpBar::Crumb> crumbs;
     for (size_t i = 0; i <= path.size(); ++i)
     {
-        labels.push_back(i == 0 ? pv.root->getName() : path[i - 1]);
-        widths.push_back(font->getWidth(labels.back()) + 12);
-        total += widths.back() + 2;
-    }
-    size_t first = 0;
-    const S32 fold_width = font->getWidth("...") + 12 + 2;
-    while (first + 1 < labels.size() && total + (first ? fold_width : 0) > available)
-    {
-        total -= widths[first] + 2;
-        ++first;
-    }
+        ALJumpBar::Crumb crumb;
+        crumb.label = i == 0 ? pv.root->getName() : path[i - 1];
+        // The value is the path to it, said as text: what a crumb chosen
+        // means is "select this", and a path is what a selection is.
+        const ALXUISelection::path_t prefix(path.begin(), path.begin() + i);
+        crumb.value = ALXUISelection::toString(prefix);
 
-    S32 x = 0;
-    const S32 height = mBreadcrumb->getRect().getHeight();
-    auto crumb = [&](const std::string& label, S32 width, size_t depth)
-    {
-        ALXUISelection::path_t prefix(path.begin(), path.begin() + depth);
-        LLButton::Params bp;
-        bp.name = "crumb_" + std::to_string(depth);
-        bp.label = label;
-        bp.rect = LLRect(x, height, x + width, 0);
-        bp.font = font;
-        bp.tab_stop = false;
-        LLButton* button = LLUICtrlFactory::create<LLButton>(bp);
-        button->setClickedCallback([this, prefix](LLUICtrl*, const LLSD&) { mSelection.select(prefix); });
-        mBreadcrumb->addChild(button);
-        x += width + 2;
-    };
-    if (first > 0)
-    {
-        crumb("...", fold_width - 2, first - 1);
+        // What else is in that parent. The root has no siblings, and a step
+        // whose parent has only it has none worth offering.
+        if (i > 0)
+        {
+            const ALXUISelection::path_t up(path.begin(), path.begin() + i - 1);
+            if (const LLView* parent = ALXUISelection::resolve(pv.root, up))
+            {
+                boost::unordered_map<std::string, S32> seen;
+                for (auto it = parent->getChildList()->rbegin();
+                     it != parent->getChildList()->rend(); ++it)
+                {
+                    if (!pv.sourceMap.isFromXML(*it))
+                    {
+                        continue;
+                    }
+                    const std::string& name = (*it)->getName();
+                    ALXUISelection::path_t beside(up);
+                    beside.push_back(ALXUISelection::step(name, seen[name]++));
+                    crumb.alternatives.emplace_back(name, ALXUISelection::toString(beside));
+                }
+                if (crumb.alternatives.size() < 2)
+                {
+                    crumb.alternatives.clear();
+                }
+            }
+        }
+        crumbs.push_back(std::move(crumb));
     }
-    for (size_t i = first; i < labels.size(); ++i)
-    {
-        crumb(labels[i], widths[i], i);
-    }
+    mBreadcrumb->setPath(std::move(crumbs));
 
-    LLTextBox::Params tp;
-    tp.name = "crumb_layer";
-    tp.rect = LLRect(x + 6, height - 3, x + 6 + layer_width, 0);
-    tp.font = font;
-    tp.initial_value = layer_text;
-    mBreadcrumb->addChild(LLUICtrlFactory::create<LLTextBox>(tp));
+    // Which layer the element came from, said past the end of the path: it is
+    // about where this element is written rather than about the way to it.
+    const ALXUICatalog::Layer* layer = nullptr;
+    authoredElement(layer);
+    mBreadcrumb->setTrailer(layer ? layer->skin + "/" + layer->language
+                                  : getString("BreadcrumbCodeBuilt"));
+}
+
+void ALFloaterXUIStudio::onBreadcrumb(size_t at, const std::string& value)
+{
+    mSelection.select(ALXUISelection::fromString(value));
 }
 
 // ---------------------------------------------------------------------------

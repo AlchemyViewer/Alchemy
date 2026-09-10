@@ -86,6 +86,7 @@
     <floater.string name="GutterLayer">Layer</floater.string>
     <floater.string name="GutterSays">Says</floater.string>
     <floater.string name="GutterWriteHere">Write here</floater.string>
+    <floater.string name="BreadcrumbCodeBuilt">code-built</floater.string>
     <floater.string name="FindWord">Find</floater.string>
     <floater.string name="FindIn">in</floater.string>
     <floater.string name="FindAny">anything</floater.string>
@@ -668,7 +669,7 @@
                          min_dim="26"
                          name="breadcrumb_row"
                          width="376">
-                            <panel
+                            <jump_bar
                              follows="left|top|right"
                              height="22"
                              layout="topleft"

@@ -29,6 +29,7 @@
 #include "alxuidocuments.h"
 #include "alxuiedit.h"
 #include "alhistorylist.h"
+#include "aljumpbar.h"
 #include "alscopebar.h"
 #include "alxuifindings.h"
 #include "alxuilint.h"
@@ -351,6 +352,9 @@ private:
     void fillFindings();
     void onFindingSelected();
     void refreshBreadcrumb();
+    // A crumb chosen: the path it stands for, selected. Going up the tree and
+    // going sideways in it are the same gesture with two answers.
+    void onBreadcrumb(size_t at, const std::string& value);
 
     // --- the history -----------------------------------------------------
     // Everything done, as a place rather than a keystroke: the set's actions,
@@ -662,7 +666,7 @@ private:
     LLFilterEditor*     mTreeFilter = nullptr;
     LLPanel*            mTreePanel = nullptr;
     LLFolderView*       mTree = nullptr;
-    LLPanel*            mBreadcrumb = nullptr;
+    ALJumpBar*          mBreadcrumb = nullptr;
     ALHistoryList*      mHistory = nullptr;
     LLScrollListCtrl*   mDocumentList = nullptr;
     LLScrollListCtrl*   mSourceLayerList = nullptr;
