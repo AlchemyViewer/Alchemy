@@ -163,6 +163,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
+    almotionpredictor.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
@@ -948,6 +949,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     algradehistory.h
     allegacynotificationwellwindow.h
+    almotionpredictor.h
     alobjectproperties.h
     alagentlocationformat.h
     alcrashreporter.h
@@ -2316,6 +2318,7 @@ if(AL_BUILD_TESTS)
     alcurvemodel
     aldaycyclelandmarks
     algradehistory
+    almotionpredictor
     alsceneexplorerpredicate
     alwhitebalancesolver
     llagentaccess
