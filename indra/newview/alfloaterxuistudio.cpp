@@ -32,6 +32,7 @@
 #include "alpopover.h"
 #include "aljumpbar.h"
 #include "alscopebar.h"
+#include "alspecimenlist.h"
 #include "alpropertygrid.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
@@ -1641,6 +1642,42 @@ namespace
     // The core tags the gallery shows: the ones that stand on their own
     // with defaults. The rest need a parent of a kind, children, or
     // parameters a template does not give.
+    // Where the specimen sits in its row, past the label.
+    constexpr S32 SPECIMEN_LEFT = 130;
+    constexpr S32 SPECIMEN_WIDTH = 150;
+
+    // Which heading a tag sits under in the Library. Five kinds, read off the
+    // name: a guess over a vocabulary, and a wrong one costs a reader one
+    // heading of looking rather than anything at all.
+    std::string paletteGroupOf(const std::string& tag)
+    {
+        static const std::set<std::string> containers = {
+            "panel", "layout_panel", "layout_stack", "tab_container", "accordion",
+            "accordion_tab", "scroll_container", "flat_list_view", "container_view",
+            "floater", "scrolling_panel_list", "dock_panel"
+        };
+        static const std::set<std::string> lists = {
+            "scroll_list", "combo_box", "flyout_button", "folder_view", "name_list",
+            "search_combo_box", "avatar_list", "inventory_panel", "specimen_list"
+        };
+        static const std::set<std::string> text = {
+            "text", "text_editor", "line_editor", "chat_editor", "textbox", "expandable_text",
+            "name_box", "name_editor", "spell_check", "text_chat"
+        };
+        static const std::set<std::string> chrome = {
+            "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check",
+            "menu_item_separator", "menu_item_tear_off", "toolbar", "context_menu",
+            "toggleable_menu", "tool_tip", "badge", "icon", "loading_indicator",
+            "view_border", "resize_bar", "resize_handle", "drag_handle_top",
+            "drag_handle_left", "progress_bar", "jump_bar", "scope_bar", "empty_state"
+        };
+        if (containers.count(tag)) { return "Containers"; }
+        if (lists.count(tag))      { return "Lists"; }
+        if (text.count(tag))       { return "Text"; }
+        if (chrome.count(tag))     { return "Chrome"; }
+        return "Controls";
+    }
+
     bool galleryTag(const std::string& tag)
     {
         static const std::set<std::string> skipped = {
@@ -1814,10 +1851,10 @@ bool ALFloaterXUIStudio::postBuild()
         });
     mChannels = getChild<LLScrollListCtrl>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
-    mPalette = getChild<LLScrollListCtrl>("palette");
+    mPalette = getChild<ALSpecimenList>("palette");
     mPaletteAttributes = getChild<LLScrollListCtrl>("palette_attributes");
     // The tag chosen above decides what is listed below it.
-    mPalette->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillPaletteAttributes, this));
+    mPalette->onChose([this](const std::string&) { fillPaletteAttributes(); });
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
     getChild<LLButton>("library_btn")->setClickedCallback([](LLUICtrl*, const LLSD&)
     {
@@ -3335,51 +3372,97 @@ LLNotificationPtr ALFloaterXUIStudio::selectedChannelNotification() const
 // as its children, which is what the factory will accept there and nothing
 // wider. A tag that takes text or holds other widgets says so, since that
 // is what decides which of them is wanted.
+// The tags the selected element may contain, each row carrying the widget
+// rather than its name. Where a catalogue would ship a thumbnail we can build
+// the thing: it is in this process, it draws itself, and it is a truer picture
+// of what the file will get than a screenshot of an older version of it.
+//
+// A tag whose widget will not build in a shell -- a viewer class wants a
+// notification, an agent, a plugin -- keeps its row and shows its name, which
+// is the honest answer rather than an empty box.
 void ALFloaterXUIStudio::fillPalette()
 {
     if (!mPalette)
     {
         return;
     }
-    const std::string chosen = mPalette->getSelectedValue().asString();
-    mPalette->deleteAllItems();
+    const std::string chosen = mPalette->chosen();
 
     LLView* view = selectedView();
     const std::string* tag = view ? LLUICtrlFactory::widgetTag(view->viewType()) : nullptr;
     const ALXUISchema::Tag* declared = tag ? ALXUISchema::get().tag(*tag) : nullptr;
     if (!declared)
     {
+        mPalette->setSpecimens({});
+        fillPaletteAttributes();
         return;
     }
-    for (const std::string& child : declared->children)
+
+    std::vector<ALSpecimenList::Specimen> specimens;
     {
-        const ALXUISchema::Tag* what = ALXUISchema::get().tag(child);
-        std::string takes;
-        if (what)
+        // Built in the skin the preview is in, so that a specimen looks like
+        // what the file would get, and inside a shell build so that a widget
+        // that asks the viewer for something is refused rather than obeyed.
+        ALXUISkinScope scope(mSkin, mLanguage);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+
+        for (const std::string& child : declared->children)
         {
-            if (what->text)
+            ALSpecimenList::Specimen specimen;
+            specimen.label = child;
+            specimen.value = child;
+            specimen.group = paletteGroupOf(child);
+
+            const ALXUISchema::Tag* what = ALXUISchema::get().tag(child);
+            std::string takes;
+            if (what)
             {
-                takes = "text";
+                if (what->text)
+                {
+                    takes = getString("PaletteTakesText");
+                }
+                if (!what->children.empty())
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[COUNT]"] = std::to_string((S32)what->children.size());
+                    takes += takes.empty() ? "" : ", ";
+                    takes += getString("PaletteTakesChildren", args);
+                }
             }
-            if (!what->children.empty())
+            specimen.toolTip = takes;
+
+            if (galleryTag(child) && LLDefaultChildRegistry::instance().getValue(child))
             {
-                takes += takes.empty() ? "" : ", ";
-                takes += std::to_string(what->children.size()) + " kinds of child";
+                const std::string xml = "<" + child + " name=\"" + child + "\" label=\"" + child
+                    + "\" layout=\"topleft\" left=\"0\" top=\"0\" width=\"" + std::to_string(SPECIMEN_WIDTH)
+                    + "\" height=\"22\"/>";
+                LLXMLNodePtr node;
+                if (LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
+                {
+                    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+                    factory.pushFileName("palette");
+                    specimen.view = factory.createFromXML(node, nullptr, "palette",
+                                                          LLDefaultChildRegistry::instance());
+                    factory.popFileName();
+                    if (specimen.view)
+                    {
+                        specimen.view->setShape(LLRect(SPECIMEN_LEFT, 26,
+                                                       SPECIMEN_LEFT + SPECIMEN_WIDTH, 4));
+                    }
+                }
             }
+            specimens.push_back(std::move(specimen));
         }
-        mPalette->addElement(row(child, { { "tag", child }, { "takes", takes } }));
     }
+
+    mPalette->setSpecimens(std::move(specimens));
     if (!chosen.empty())
     {
-        mPalette->selectByValue(chosen);
+        mPalette->choose(chosen);
     }
     fillPaletteAttributes();
 }
-
-// What the chosen tag takes, and what it already carries. The second is what
-// a reference is for: an attribute written as the value the widget carries
-// anyway says nothing the widget does not say itself, and the only way to
-// know which those are is to be told.
 void ALFloaterXUIStudio::fillPaletteAttributes()
 {
     if (!mPaletteAttributes)
@@ -3388,7 +3471,7 @@ void ALFloaterXUIStudio::fillPaletteAttributes()
     }
     mPaletteAttributes->deleteAllItems();
 
-    const std::string chosen = mPalette ? mPalette->getSelectedValue().asString() : std::string();
+    const std::string chosen = mPalette ? mPalette->chosen() : std::string();
     const ALXUISchema::Tag* declared = chosen.empty() ? nullptr : ALXUISchema::get().tag(chosen);
     if (!declared)
     {
@@ -3414,8 +3497,8 @@ void ALFloaterXUIStudio::fillPaletteAttributes()
 // already says is what makes a file hard to read.
 void ALFloaterXUIStudio::onInsertFromPalette()
 {
-    const LLSD chosen = mPalette->getSelectedValue();
-    if (!chosen.isDefined() || !mSelection.hasSelection())
+    const std::string chosen = mPalette->chosen();
+    if (chosen.empty() || !mSelection.hasSelection())
     {
         setStatus(getString("EditNoSelection"));
         return;
@@ -3441,7 +3524,7 @@ void ALFloaterXUIStudio::onInsertFromPalette()
     // A name of its own, since a name is identity to the merge, to
     // getChild and to every overlay, and two of one name is a defect the
     // lint already reports.
-    const std::string tag = chosen.asString();
+    const std::string& tag = chosen;
     std::string name = tag;
     for (S32 n = 2; held->resolve({ name }) && n < 100; ++n)
     {

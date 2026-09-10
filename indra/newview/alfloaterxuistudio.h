@@ -31,6 +31,7 @@
 #include "alhistorylist.h"
 #include "aljumpbar.h"
 #include "alscopebar.h"
+#include "alspecimenlist.h"
 #include "alxuifindings.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
@@ -692,7 +693,7 @@ private:
     ALPropertyGrid*     mAttributeGrid = nullptr;
     LLTextBox*          mAttributeWhat = nullptr;       // what is selected, in its own words
     LLFilterEditor*     mAttributeFilter = nullptr;
-    LLScrollListCtrl*   mPalette = nullptr;
+    ALSpecimenList*     mPalette = nullptr;
     LLScrollListCtrl*   mPaletteAttributes = nullptr;
     // The element named for reparenting, until somewhere is chosen for it.
     ALXUISelection::path_t mCutPath;
