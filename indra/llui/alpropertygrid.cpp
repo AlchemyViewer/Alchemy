@@ -458,6 +458,12 @@ std::string ALPropertyGrid::tipFor(const Field& field) const
     {
         text += "\n" + say(mTips.unwritten, field);
     }
+    // And what the caller has to say about this one, which no pattern
+    // over the vocabulary can know.
+    if (!field.description.empty())
+    {
+        text += "\n" + field.description;
+    }
     return text;
 }
 
@@ -632,8 +638,14 @@ void ALPropertyGrid::makeComponents(const Field& field, const LLRect& box, LLPan
 
     const std::vector<std::string> parts = numbersOf(field.value);
     const bool whole = field.kind != ALParamType::REAL;
+    // Every part inside the column they share. A floor wider than the room
+    // divided by the count is a row that overflows and is clipped, which
+    // reads as a row with nothing on it -- so the gutter closes up first,
+    // and then the boxes take what is left however narrow that is.
     const S32 room = box.getWidth();
-    const S32 each = llmax(NUMBER_MIN_WIDTH, (room - GUTTER * (S32)(count - 1)) / (S32)count);
+    const S32 gutter = (room - GUTTER * (S32)(count - 1)) / (S32)count >= NUMBER_MIN_WIDTH
+                     ? GUTTER : 2;
+    const S32 each = llmax(1, (room - gutter * (S32)(count - 1)) / (S32)count);
 
     // Held so that any one of them can read all of them: a part committed on
     // its own would say nothing about the other three.
@@ -641,7 +653,7 @@ void ALPropertyGrid::makeComponents(const Field& field, const LLRect& box, LLPan
 
     for (size_t i = 0; i < count; ++i)
     {
-        const S32 left = box.mLeft + (S32)i * (each + GUTTER);
+        const S32 left = box.mLeft + (S32)i * (each + gutter);
 
         LLSpinCtrl::Params p;
         p.name = field.name + "." + field.components[i];

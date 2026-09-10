@@ -15,6 +15,7 @@
     <floater.string name="SettingGroup">Setting</floater.string>
     <floater.string name="SettingChanged">changed</floater.string>
     <floater.string name="SettingDefault">as it shipped</floater.string>
+    <floater.string name="SettingTip">[NAME] is a [TYPE]</floater.string>
     <floater.string name="SettingRemoveTip">Put [NAME] back the way it shipped</floater.string>
 
   <filter_editor
@@ -83,7 +84,7 @@
   <property_grid
    follows="left|top|right"
    height="120"
-   label_width="0"
+   label_width="96"
    layout="topleft"
    left_delta="0"
    name="setting_editor"
@@ -96,7 +97,7 @@
       initial_value="true"
       label="Show changed settings only"
       layout="topleft"
-      top_pad="10"
+      top="325"
       left="10"
       follows="left|bottom"
       name="hide_default"

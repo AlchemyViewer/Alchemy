@@ -60,8 +60,12 @@ bool LLFloaterSettingsDebug::postBuild()
     mEditor->onFieldCommit(boost::bind(&LLFloaterSettingsDebug::onEditorCommit, this, _1, _2));
     mEditor->onFieldRemove(boost::bind(&LLFloaterSettingsDebug::onEditorRemove, this, _1));
 
+    // A tip that repeats the heading over the pane tells nobody anything,
+    // so a row says what kind of value it holds and then what the setting
+    // is for, which is the comment and is the only part worth reading.
     ALPropertyGrid::Tips tips;
     tips.field = "[NAME]";
+    tips.fieldTyped = getString("SettingTip");
     tips.remove = getString("SettingRemoveTip");
     mEditor->setTips(tips);
 
@@ -297,6 +301,10 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
     // what the "changed" column in the list says with an asterisk.
     field.authored = written;
     field.source = written ? getString("SettingChanged") : getString("SettingDefault");
+    // What the setting is for. It is in the box above as well, where it can
+    // be read at length; on the row it is what a pointer resting there is
+    // asking about.
+    field.description = controlp->getComment();
     mEditor->setEnabled(editable);
     mEditor->setFields({ field });
 }

@@ -133,6 +133,11 @@ public:
         // is what a caller with nothing on screen to point at should do.
         LLRect                      subject;
         LLRect                      subjectParent;
+        // What this field is, in the caller's own words: a sentence about the
+        // thing rather than about its type. Said under the row's own tip,
+        // because a name repeated from the heading above the pane is a tip
+        // that tells nobody anything.
+        std::string                 description;
         // Where else this value is written, one line each, as the caller
         // names them. A row with any is marked in the gutter beside its
         // label and this is what the mark says; a row with none leaves the
