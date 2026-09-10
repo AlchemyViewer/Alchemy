@@ -195,6 +195,44 @@ ALXUITreeItem* ALXUITreeModel::itemFor(const LLView* view) const
     return it == mByView.end() ? nullptr : it->second;
 }
 
+bool ALXUITreeModel::rebind(const ALXUISelection::path_t& path, LLView* root)
+{
+    ALXUITreeItem* item = itemFor(path);
+    if (!item || !root)
+    {
+        return false;
+    }
+    bool every = true;
+    // Depth first from the row the rebuilt element is on: it and everything
+    // under it were built from views that have gone.
+    std::vector<ALXUITreeItem*> waiting{ item };
+    while (!waiting.empty())
+    {
+        ALXUITreeItem* one = waiting.back();
+        waiting.pop_back();
+        LLView* now = ALXUISelection::resolve(root, one->getPath());
+        if (!now)
+        {
+            // The path names nothing here any more, so this row is showing a
+            // view that has gone and no walk of this tree will find what
+            // replaced it. Saying so is the whole of what the caller can act
+            // on: a row left pointing at a deleted view is drawn.
+            every = false;
+        }
+        else if (now != one->getView())
+        {
+            mByView.erase(one->getView());
+            one->setView(now);
+            mByView[now] = one;
+        }
+        for (auto child = one->getChildrenBegin(); child != one->getChildrenEnd(); ++child)
+        {
+            waiting.push_back(static_cast<ALXUITreeItem*>(child->get()));
+        }
+    }
+    return every;
+}
+
 void ALXUITreeModel::buildContextMenu(ALXUITreeItem& item, LLMenuGL& menu, U32 flags)
 {
     if (mContextMenu)

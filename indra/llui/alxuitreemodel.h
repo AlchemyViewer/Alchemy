@@ -120,6 +120,14 @@ public:
     ALXUITreeItem* itemFor(const LLView* view) const;
     size_t count() const { return mByView.size(); }
 
+    // A subtree built again, and the rows that were showing the old one
+    // pointed at what replaced it. This works because the document did not
+    // change shape: every row still answers to the path it did, and what
+    // changed is which view is at that path. False where a row's path names
+    // nothing any more, which leaves that row pointing at a view that has
+    // gone -- the caller has to make the rows again, and has to be told.
+    bool rebind(const ALXUISelection::path_t& path, LLView* root);
+
     void setContextMenuHandler(context_menu_fn_t fn) { mContextMenu = std::move(fn); }
     void buildContextMenu(ALXUITreeItem& item, LLMenuGL& menu, U32 flags);
 
@@ -163,6 +171,9 @@ public:
                   ALXUISelection::path_t path, ALXUITreeModel& model);
 
     LLView* getView() const { return mView; }
+    // Pointed at what replaced it, when the element this row is about was
+    // built again. The model keeps the other way round and does both.
+    void setView(LLView* view) { mView = view; }
     const std::string& getTag() const { return mTag; }
     bool isFromXML() const { return mFromXML; }
     S32 getOrder() const { return mOrder; }
