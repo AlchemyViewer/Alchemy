@@ -26,6 +26,8 @@
 
 #include "lluictrl.h"
 
+class LLFontGL;
+
 #include <string>
 #include <vector>
 
@@ -58,8 +60,6 @@ public:
         Optional<S32>           min_tab_width;
         Optional<S32>           max_tab_width;
         Optional<S32>           gap;
-        // The mark on a tab with unsaved work, before its name.
-        Optional<std::string>   dirty_mark;
         Params();
     };
 
@@ -122,15 +122,20 @@ private:
     // Every tab's width, decided together.
     void layout();
     std::string textOf(const Tab& tab) const;
+    // A preview is set in italic. The face that draws it is the one the
+    // font hands the style to, which is what the words are measured in.
+    static const LLFontGL* fontFor(const Tab& tab);
+    static U8 styleOf(const Tab& tab);
 
     std::vector<Tab>    mTabs;
     std::vector<S32>    mWidths;
     std::string         mChosen;
     S32                 mHover = -1;
+    S32                 mHoverX = 0;
+    S32                 mHoverY = 0;
     S32                 mMinTabWidth;
     S32                 mMaxTabWidth;
     S32                 mGap;
-    std::string         mDirtyMark;
     tab_signal_t        mChosenSignal;
     tab_signal_t        mClosedSignal;
 };

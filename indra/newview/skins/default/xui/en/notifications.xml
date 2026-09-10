@@ -13541,4 +13541,18 @@ Incoming instant messages from anyone who is not your friend will now be answere
      name="okignore"
      yestext="OK"/>
   </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="XUIStudioCloseDocument"
+   type="alertmodal">
+[FILE] has edits that are not saved.
+Save them before letting it go?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
+  </notification>
 </notifications>

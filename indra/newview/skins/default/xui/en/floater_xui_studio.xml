@@ -81,7 +81,6 @@
     <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsEveryRule">Every rule</floater.string>
     <floater.string name="DocumentDirtyMark">•</floater.string>
-    <floater.string name="DocumentCloseDirty">[FILE] has work in it; save it or revert it before letting go of it.</floater.string>
     <floater.string name="DocumentClosed">Let go of [FILE].</floater.string>
     <floater.string name="OverrideField">[ATTR], as each layer has it; writing puts the value in force into the chosen one.</floater.string>
     <floater.string name="OverrideNoField">No field chosen: click a gutter mark beside a row in Attributes.</floater.string>

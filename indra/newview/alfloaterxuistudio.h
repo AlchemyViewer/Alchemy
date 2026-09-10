@@ -548,6 +548,10 @@ private:
     void fillTabs();
     void onTabChosen(const std::string& value);
     void closeDocument(const std::string& path);
+    // Asked about the edits a document would take with it, and answered:
+    // save them first, let them go, or keep the document.
+    void closeDocumentAnswered(const std::string& path, S32 option);
+    void letGoOf(const std::string& path);
     // The two menu items say what they will take back or put on again, as
     // the history says it.
     void refreshUndoLabels(const std::vector<ALXUIDocuments::Entry>& history);

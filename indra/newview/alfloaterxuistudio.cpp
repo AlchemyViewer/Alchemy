@@ -61,6 +61,7 @@
 #include "lllineeditor.h"
 #include "lllivefile.h"
 #include "llmenugl.h"
+#include "llnotificationsutil.h"
 #include "llnotifications.h"
 #include "llnotificationtemplate.h"
 #include "llsdparam.h"
@@ -4790,8 +4791,8 @@ void ALFloaterXUIStudio::onDocumentClose()
     closeDocument(selectedDocument());
 }
 
-// Let go of a document. One with edits not yet saved is not let go of:
-// the edits would go with it, and a person who meant that has Revert.
+// Let go of a document. Edits not yet saved would go with it, so a document
+// with any asks first, with the answer that keeps them offered first.
 void ALFloaterXUIStudio::closeDocument(const std::string& path)
 {
     ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
@@ -4799,18 +4800,74 @@ void ALFloaterXUIStudio::closeDocument(const std::string& path)
     {
         return;
     }
-    if (held->dirty())
+    if (!held->dirty())
     {
-        LLStringUtil::format_map_t args;
-        args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
-        setStatus(getString("DocumentCloseDirty", args));
+        letGoOf(path);
         return;
     }
-    mDocuments.close(path);
+    LLSD args;
+    args["FILE"] = path.substr(path.find_last_of("/\\") + 1);
+    LLSD payload;
+    payload["path"] = path;
+    LLNotificationsUtil::add("XUIStudioCloseDocument", args, payload,
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const LLSD& notification, const LLSD& response)
+        {
+            if (ALFloaterXUIStudio* self = handle.get())
+            {
+                self->closeDocumentAnswered(notification["payload"]["path"].asString(),
+                                            LLNotificationsUtil::getSelectedOption(notification, response));
+            }
+            return false;
+        });
+}
+
+void ALFloaterXUIStudio::closeDocumentAnswered(const std::string& path, S32 option)
+{
+    ALXUIEdit* held = mDocuments.find(path);
+    if (!held)
+    {
+        return;
+    }
+    switch (option)
+    {
+    case 0:
+        // Save, then let go. A save that fails keeps the document, since
+        // its edits are then the only copy.
+        if (!held->save())
+        {
+            setStatus(held->error());
+            return;
+        }
+        letGoOf(path);
+        break;
+    case 1:
+        // The edits go with it, and what is on disk is what is shown.
+        letGoOf(path);
+        break;
+    default:
+        break;
+    }
+}
+
+void ALFloaterXUIStudio::letGoOf(const std::string& path)
+{
+    const bool dirty = mDocuments.find(path) && mDocuments.find(path)->dirty();
+    if (!mDocuments.close(path))
+    {
+        return;
+    }
     LLStringUtil::format_map_t args;
     args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    if (dirty)
+    {
+        // The file as the disk has it is not what the canvas was built
+        // from any more, so the build is made again from the disk.
+        documentChanged(getString("DocumentClosed", args));
+        return;
+    }
     setStatus(getString("DocumentClosed", args));
     fillDocuments();
+    fillHistory();
 }
 
 void ALFloaterXUIStudio::revertDocument()
