@@ -343,8 +343,13 @@ void LLFloaterSettingsDebug::onEditorCommit(const std::string& name, const std::
 
     // What was just written is what is shown, so the next frame does not
     // take the row down and build it again under whoever typed into it.
+    // The row is told what has changed about it instead: the first change
+    // from the default is what gives it a way back, and the row used to
+    // wait to be chosen again before offering one.
     mShownValue = settingText(controlp);
     mShownWritten = !controlp->isDefault();
+    mEditor->setAuthored(name, mShownWritten,
+                         getString(mShownWritten ? "SettingChanged" : "SettingDefault"));
     updateDefaultColumn(controlp);
 }
 

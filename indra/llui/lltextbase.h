@@ -432,6 +432,7 @@ public:
     // LLUICtrl interface
     /*virtual*/ bool        acceptsTextInput() const override { return !mReadOnly; }
     /*virtual*/ void        setColor(const LLUIColor& c) override;
+    const LLUIColor&        getColor() const { return mFgColor; }
     virtual     void        setReadOnlyColor(const LLUIColor& c);
     /*virtual*/ void        onVisibilityChange(bool new_visibility) override;
     void                    setBgReadOnlyColor(const LLUIColor& c) { mReadOnlyBgColor = c; }

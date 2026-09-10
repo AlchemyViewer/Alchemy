@@ -160,6 +160,12 @@ public:
     void clearFields();
     const std::vector<Field>& fields() const { return mFields; }
 
+    // A field's standing changed without the fields changing hands: the
+    // file writes it now, or has stopped, which is what the first commit
+    // on an unwritten row does. The row is told rather than made again,
+    // so the keyboard stays in whichever of its boxes it was in.
+    void setAuthored(const std::string& name, bool authored, const std::string& source);
+
     // The headings, in the order they are shown. Which one a field sits
     // under is the field's own; a grid given none shows one unheaded list.
     // Set once, before the fields: changing them forgets which were folded.
@@ -281,6 +287,9 @@ private:
 
     void rebuild();
     void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
+    // The way back, at the right end of the row; shown on the rows the
+    // file writes.
+    void addRemove(LLPanel* row, const Field& field);
     LLUICtrl* makeEditor(const Field& field, const LLRect& box, LLPanel* row);
     // A box per part, captioned, all of them committing the whole value.
     void makeComponents(const Field& field, const LLRect& box, LLPanel* row);

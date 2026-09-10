@@ -145,6 +145,16 @@ namespace
         return type.find("LLFontGL") != std::string_view::npos;
     }
 
+    // A field nothing writes is shown in the quieter ink, and so is one
+    // that is written and does nothing: what is on the row is what the
+    // widget is doing, not what the file says.
+    const LLUIColor& inkFor(const ALPropertyGrid::Field& field)
+    {
+        static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        return (field.authored && !field.ignored) ? written : unwritten;
+    }
+
     // A row's own words, out of the pattern the caller gave. A caller who
     // gave none gets the name of the field, which is the one thing this
     // library knows how to say about it.
@@ -925,8 +935,6 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     // one to set.
     static const LLUIColor stripe = LLUIColorTable::instance().getColor(
         "PropertyGridBandColor", LLColor4(0.169f, 0.169f, 0.169f, 0.25f));
-    static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
 
     const S32 width = host->getRect().getWidth();
     // Row-local: the section says where the row is, the row says where its
@@ -959,9 +967,6 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     const std::string tip = tipFor(field);
 
     {
-        // A field nothing writes is shown in the quieter ink, and so is one
-        // that is written and does nothing: what is on the row is what the
-        // widget is doing, not what the file says.
         LLTextBox::Params p;
         p.name = field.name + "_label";
         p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
@@ -971,7 +976,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
             : own;
         p.tool_tip = tip;
         p.font_valign = LLFontGL::VCENTER;
-        p.text_color = (field.authored && !field.ignored) ? written : unwritten;
+        p.text_color = inkFor(field);
         p.use_ellipses = true;
         p.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
         row->addChild(LLUICtrlFactory::create<LLTextBox>(p));
@@ -1010,19 +1015,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     // be taken out again, and what was in force before is in force after --
     // which the document has always been able to do and this pane has never
     // had a way to ask for.
-    if (field.authored && !field.ignored)
-    {
-        LLButton::Params p(LLUICtrlFactory::getDefaultParams<LLButton>());
-        p.name = field.name + "_remove";
-        p.label = mRemoveLabel;
-        p.rect = LLRect(width - MARGIN - mRemoveWidth, top - 2, width - MARGIN, bottom);
-        p.tool_tip = say(mTips.remove, field);
-        p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
-        LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
-        const std::string removed = field.name;
-        remove->setCommitCallback([this, removed](LLUICtrl*, const LLSD&) { mFieldRemove(removed); });
-        row->addChild(remove);
-    }
+    addRemove(row, field);
 
     // The gutter: a value some other skin or language disagrees about, said
     // once beside the row rather than as a column repeating the same word
@@ -1044,5 +1037,74 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         const std::string marked = field.name;
         mark->setCommitCallback([this, marked](LLUICtrl*, const LLSD&) { mFieldGutter(marked); });
         row->addChild(mark);
+    }
+}
+
+// Every row has the button, and the rows the file writes show it: a row
+// the file comes to write is the same row with the button shown, rather
+// than a new row under whoever was typing into the old one. A field that
+// is written and thrown away has nothing worth taking out.
+void ALPropertyGrid::addRemove(LLPanel* row, const Field& field)
+{
+    const S32 width = row->getRect().getWidth();
+    const S32 top = row->getRect().getHeight();
+    LLButton::Params p(LLUICtrlFactory::getDefaultParams<LLButton>());
+    p.name = field.name + "_remove";
+    p.label = mRemoveLabel;
+    p.rect = LLRect(width - MARGIN - mRemoveWidth, top - 2, width - MARGIN, top - mRowHeight);
+    p.tool_tip = say(mTips.remove, field);
+    p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
+    p.visible = field.authored && !field.ignored;
+    LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
+    const std::string removed = field.name;
+    remove->setCommitCallback([this, removed](LLUICtrl*, const LLSD&) { mFieldRemove(removed); });
+    row->addChild(remove);
+}
+
+void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const std::string& source)
+{
+    Field* field = nullptr;
+    for (Field& each : mFields)
+    {
+        if (each.name == name)
+        {
+            field = &each;
+            break;
+        }
+    }
+    if (!field || (field->authored == authored && field->source == source))
+    {
+        return;
+    }
+    field->authored = authored;
+    field->source = source;
+
+    // Whether the row is there at all is not the row's to decide: a grid
+    // showing only what the file writes has a row fewer or a row more.
+    if (mAuthoredOnly)
+    {
+        rebuild();
+        return;
+    }
+
+    // The row is this field's own, or the one it shares with the field it
+    // partners -- where the label and the way back are the other field's,
+    // and only the editor is this one's to tell.
+    const std::string tip = tipFor(*field);
+    if (LLPanel* row = findChild<LLPanel>(name + "_row", true))
+    {
+        if (LLTextBox* label = row->findChild<LLTextBox>(name + "_label"))
+        {
+            label->setColor(inkFor(*field));
+            label->setToolTip(tip);
+        }
+        if (LLView* remove = row->findChild<LLView>(name + "_remove"))
+        {
+            remove->setVisible(authored && !field->ignored);
+        }
+    }
+    if (LLView* editor = findChild<LLView>(name, true))
+    {
+        editor->setToolTip(tip);
     }
 }

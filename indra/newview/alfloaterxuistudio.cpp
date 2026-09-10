@@ -8401,10 +8401,13 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     const std::string said = getString("EditWrote", args);
     // A field the preview can be told about is told, and nothing is made
     // again: the window keeps its place, the outline keeps its rows, and
-    // the keyboard stays in the box the number was typed into.
+    // the keyboard stays in the box the number was typed into. The row is
+    // told as well, since a field this layer writes now is one it may not
+    // have written a moment ago.
     if (applyLive(mSelection.selection(), name, value)
         || rebuildElement(mSelection.selection(), name))
     {
+        mAttributeGrid->setAuthored(name, true, layer->skin + "/" + layer->language);
         documentRead(said);
         return;
     }

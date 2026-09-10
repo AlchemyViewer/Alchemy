@@ -420,7 +420,7 @@ namespace tut
                quiet.find("nobody wrote this") != std::string::npos);
         ensure("and it names no layer: " + quiet, quiet.find("written in") == std::string::npos);
         ensure("nor is there anything to take out",
-               unwritten->findChild<LLView>("height_remove", true) == nullptr);
+               !unwritten->getChild<LLView>("height_remove", true)->getVisible());
         grid->die();
     }
 
@@ -771,6 +771,70 @@ namespace tut
                           ->getChild<LLPanel>("width_row", true)
                           ->getChild<LLTextBox>("width_label", true)->getText(),
                       std::string("width"));
+        grid->die();
+    }
+
+    // The first commit on an unwritten row is what makes it a written one,
+    // and the row says so at once -- the ink, the way back, the words --
+    // without being made again under whoever typed into it. Debug Settings
+    // showed a setting changed from its default with no Reset until it was
+    // chosen again.
+    template<> template<>
+    void alpropertygrid_object::test<17>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+        ALPropertyGrid::Tips tips;
+        tips.source = "written in [SOURCE]";
+        tips.unwritten = "nobody wrote this";
+        grid->setTips(tips);
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("width", 0));
+        fields.back().authored = false;
+        fields.back().source.clear();
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
+                           ->getChild<LLPanel>("width_row", true);
+        LLView* editor = row->getChild<LLView>("width", true);
+        LLView* back = row->getChild<LLView>("width_remove", true);
+        LLTextBox* label = row->getChild<LLTextBox>("width_label", true);
+        ensure("unwritten, there is no way back to see", !back->getVisible());
+        const LLColor4 quiet = label->getColor().get();
+
+        grid->setAuthored("width", true, "base");
+        ensure("written now, the way back is there", back->getVisible());
+        ensure("in the other ink", label->getColor().get() != quiet);
+        ensure("saying where from: " + label->getToolTip(),
+               label->getToolTip().find("written in base") != std::string::npos);
+        ensure("and no longer that nobody did: " + label->getToolTip(),
+               label->getToolTip().find("nobody wrote this") == std::string::npos);
+        ensure_equals("the editor says the same", editor->getToolTip(), label->getToolTip());
+        ensure("and it is the same editor, not a new one in its place",
+               row->getChild<LLView>("width", true) == editor);
+        ensure("which the grid remembers", grid->fields().front().authored);
+
+        // And back, when what was written is taken out again.
+        grid->setAuthored("width", false, std::string());
+        ensure("unwritten again, the way back has gone", !back->getVisible());
+        ensure("in the quiet ink", label->getColor().get() == quiet);
+        ensure("saying so: " + label->getToolTip(),
+               label->getToolTip().find("nobody wrote this") != std::string::npos);
+
+        // A grid showing only what is written has a row fewer or more, and
+        // that is a rebuild's decision.
+        grid->setAuthoredOnly(true);
+        ensure("nothing written, nothing shown",
+               grid->findChild<LLPanel>("width_row", true) == nullptr);
+        grid->setAuthored("width", true, "base");
+        ensure("written, and the row is back",
+               grid->findChild<LLPanel>("width_row", true) != nullptr);
         grid->die();
     }
 }
