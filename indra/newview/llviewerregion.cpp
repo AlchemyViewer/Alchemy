@@ -917,7 +917,12 @@ void LLViewerRegion::updateRenderMatrix()
 
 void LLViewerRegion::setTimeDilation(F32 time_dilation)
 {
-    mTimeDilation = time_dilation;
+    // This scales the step every object in the region is predicted forward by, and it is only ever
+    // written from an incoming object update -- a region that goes quiet keeps whatever it last
+    // reported. A floor keeps a badly lagged or malformed report from stopping prediction outright
+    // and banking the whole stall as one step once updates resume.
+    constexpr F32 MIN_TIME_DILATION = 0.01f;
+    mTimeDilation = llclamp(time_dilation, MIN_TIME_DILATION, 1.f);
 }
 
 const LLVector3d & LLViewerRegion::getOriginGlobal() const
