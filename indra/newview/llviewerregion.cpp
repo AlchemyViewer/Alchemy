@@ -843,6 +843,10 @@ void LLViewerRegion::saveObjectCache()
         mGLTFOverridesDirty = false;
     }
 
+    // The map holds the only reference to its entries, and the eviction walk's
+    // cursor is a bare pointer into them.
+    mLastVisitedEntry = NULL;
+
     if (LLAppViewer::instance()->isQuitting())
     {
         mImpl->mCacheMap.clear();
@@ -1843,7 +1847,10 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 
     std::vector<LLDrawable*> delete_list;
     auto update_counter = llmin(max_update, mImpl->mActiveSet.size());
-    LLVOCacheEntry::vocache_entry_set_t::iterator iter = mImpl->mActiveSet.upper_bound(mLastVisitedEntry);
+    // The cursor is the first entry the previous walk did not reach. lower_bound
+    // resumes on it while it is still in the set and on its successor once it
+    // has left; upper_bound would step past it either way.
+    LLVOCacheEntry::vocache_entry_set_t::iterator iter = mImpl->mActiveSet.lower_bound(mLastVisitedEntry);
 
     for(; update_counter > 0; --update_counter, ++iter)
     {
@@ -1872,6 +1879,10 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 
         if(max_time < update_timer.getElapsedTimeF32()) //time out
         {
+            // The loop's own increment has not run yet, so step past the entry
+            // just visited: the cursor below is the first one not reached, on
+            // this exit as on the other.
+            ++iter;
             break;
         }
     }
