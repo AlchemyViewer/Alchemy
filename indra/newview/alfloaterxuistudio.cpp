@@ -34,6 +34,7 @@
 #include "aljumpbar.h"
 #include "alscopebar.h"
 #include "alspecimenlist.h"
+#include "altabstrip.h"
 #include "alpropertygrid.h"
 #include "alxuinotes.h"
 #include "alxuischema.h"
@@ -1816,6 +1817,8 @@ bool ALFloaterXUIStudio::postBuild()
         tips.unknown = getString("AttributeTipUnknown");
         tips.source = getString("AttributeTipSource");
         tips.unwritten = getString("AttributeTipUnwritten");
+        tips.deprecated = getString("AttributeTipDeprecated");
+        tips.deprecatedFor = getString("AttributeTipDeprecatedFor");
         tips.remove = getString("AttributeTipRemove");
         mAttributeGrid->setTips(tips);
         mAttributeGrid->setEdgeTips({ getString("FollowsTipLeft"), getString("FollowsTipBottom"),
@@ -1935,7 +1938,9 @@ bool ALFloaterXUIStudio::postBuild()
         }
     }
 
-    mCanvasTitle = getChild<LLTextBox>("canvas_title");
+    mCanvasTabs = getChild<ALTabStrip>("canvas_tabs");
+    mCanvasTabs->onChosen(boost::bind(&ALFloaterXUIStudio::onTabChosen, this, _1));
+    mCanvasTabs->onClosed(boost::bind(&ALFloaterXUIStudio::closeDocument, this, _1));
     mCanvasShown = getChild<LLButton>("canvas_shown");
     mCanvasPinned = getChild<LLButton>("canvas_pinned");
     mCanvasShown->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasShown, this));
@@ -2889,37 +2894,11 @@ void ALFloaterXUIStudio::layoutCanvases()
     }
 }
 
-// What is on the canvas, said above the canvas. A pinned canvas also names
-// the file waiting for it: the catalog has moved on by then, and the pill
-// is the only thing left in the window that knows the two are different.
+// What is on the canvas, said above the canvas: the tabs, and the two
+// buttons in the state they are in.
 void ALFloaterXUIStudio::refreshCanvasHead()
 {
-    if (!mCanvasTitle)
-    {
-        return;
-    }
-
-    std::string text;
-    if (mFile.empty())
-    {
-        text = getString("CanvasEmpty");
-    }
-    else
-    {
-        LLStringUtil::format_map_t args;
-        args["[FILE]"] = mFile;
-        args["[SKIN]"] = mSkin;
-        args["[LANG]"] = mLanguage;
-        args["[LANG2]"] = mLanguage2;
-        text = getString(mShowSecondary ? "CanvasVariants" : "CanvasOne", args);
-    }
-    if (mPinned && !mPendingFile.empty())
-    {
-        LLStringUtil::format_map_t args;
-        args["[FILE]"] = mPendingFile;
-        text += getString("CanvasWaiting", args);
-    }
-    mCanvasTitle->setText(text);
+    fillTabs();
     if (mCanvasShown)
     {
         mCanvasShown->setToggleState(!mPreviewHidden);
@@ -2965,6 +2944,158 @@ void ALFloaterXUIStudio::onToggleCanvasPinned()
     }
     saveState();
     refreshCanvasHead();
+}
+
+// One tab per document held, in the order they were opened, and the file on
+// the canvas as a tab in the other face where no document of it is held:
+// looked at, not kept, and replaced by the next file chosen. A pinned
+// canvas with a file waiting shows that file the same way, since the
+// catalog has moved on by then and the tab is what says the two differ.
+//
+// A tab is the file's name. Two documents of one file -- a base and an
+// overlay -- say which layer each is as well, and only then, because a
+// layer said on every tab is a word repeated across the whole strip.
+void ALFloaterXUIStudio::fillTabs()
+{
+    if (!mCanvasTabs)
+    {
+        return;
+    }
+    std::vector<ALTabStrip::Tab> tabs;
+    boost::unordered_map<std::string, S32> named;
+    for (const std::string& path : mDocuments.paths())
+    {
+        std::string file;
+        std::string layer;
+        describeDocument(path, file, layer);
+        ++named[file];
+    }
+
+    std::string chosen;
+    for (const std::string& path : mDocuments.paths())
+    {
+        const ALXUIEdit* held = mDocuments.find(path);
+        if (!held)
+        {
+            continue;
+        }
+        ALTabStrip::Tab tab;
+        std::string layer;
+        describeDocument(path, tab.label, layer);
+        tab.value = path;
+        tab.dirty = held->dirty();
+        if (named[tab.label] > 1)
+        {
+            tab.detail = layer;
+        }
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = tab.label;
+        args["[LAYER]"] = layer;
+        tab.toolTip = getString(tab.dirty ? "CanvasTabDirtyTip" : "CanvasTabTip", args);
+        // The tab shown is the active document, where it is a layer of the
+        // file on the canvas.
+        if (path == mDocuments.activePath() && tab.label == mFile)
+        {
+            chosen = path;
+        }
+        tabs.push_back(std::move(tab));
+    }
+
+    if (chosen.empty() && !mFile.empty())
+    {
+        // Shown without being held. Where some document of the file is held
+        // but is not the active one, that document is the tab rather than a
+        // second tab of the same name.
+        for (const ALTabStrip::Tab& tab : tabs)
+        {
+            if (tab.label == mFile)
+            {
+                chosen = tab.value;
+                break;
+            }
+        }
+        if (chosen.empty())
+        {
+            ALTabStrip::Tab tab;
+            tab.label = mFile;
+            tab.value = mFile;
+            tab.preview = true;
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = mFile;
+            args["[SKIN]"] = mSkin;
+            args["[LANG]"] = mLanguage;
+            tab.toolTip = getString("CanvasTabPreviewTip", args);
+            chosen = mFile;
+            tabs.push_back(std::move(tab));
+        }
+    }
+    if (mPinned && !mPendingFile.empty())
+    {
+        ALTabStrip::Tab tab;
+        tab.label = mPendingFile;
+        tab.detail = getString("CanvasTabWaiting");
+        tab.value = mPendingFile;
+        tab.preview = true;
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = mPendingFile;
+        tab.toolTip = getString("CanvasTabWaitingTip", args);
+        tabs.push_back(std::move(tab));
+    }
+    mCanvasTabs->setTabs(std::move(tabs), chosen);
+}
+
+// A tab pressed: a document is looked at in the skin and language of the
+// layer it is, and made the one an operation with no path of its own
+// means; the file waiting on a pin is taken by taking the pin off.
+void ALFloaterXUIStudio::onTabChosen(const std::string& value)
+{
+    if (mPinned && value == mPendingFile)
+    {
+        mCanvasPinned->setToggleState(false);
+        onToggleCanvasPinned();
+        return;
+    }
+    if (!mDocuments.find(value))
+    {
+        return;
+    }
+    mDocuments.makeActive(value);
+    std::string file;
+    std::string layer;
+    describeDocument(value, file, layer);
+    if (mDocumentList)
+    {
+        mDocumentList->setSelectedByValue(LLSD(value), true);
+    }
+
+    // The layer is "skin/language"; the canvas shows that variant.
+    const size_t slash = layer.find('/');
+    const std::string skin = slash == std::string::npos ? mSkin : layer.substr(0, slash);
+    const std::string language = slash == std::string::npos ? mLanguage : layer.substr(slash + 1);
+    const bool other_variant = skin != mSkin || language != mLanguage;
+    const bool other_file = !file.empty() && file != mFile;
+    if (other_file)
+    {
+        mFile = file;
+        mPendingFile.clear();
+        mSelection.clearSelection();
+        mFileList->setSelectedByValue(mFile, true);
+    }
+    if (other_variant)
+    {
+        mSkinCombo->setValue(skin);
+        mLanguageCombo->setValue(language);
+        onSkinOrLanguage();
+    }
+    else if (other_file)
+    {
+        saveState();
+        showPreviews();
+    }
+    else
+    {
+        fillTabs();
+    }
 }
 
 void ALFloaterXUIStudio::hostClosed(S32 which)
@@ -3464,19 +3595,23 @@ void ALFloaterXUIStudio::fillPalette()
             specimen.value = child;
             specimen.group = paletteGroupOf(child);
 
+            // What it is for, in the sentence the notes have for it, and
+            // then what it takes.
             const ALXUISchema::Tag* what = ALXUISchema::get().tag(child);
             std::string takes;
             if (what)
             {
+                takes = what->note;
                 if (what->text)
                 {
-                    takes = getString("PaletteTakesText");
+                    takes += takes.empty() ? "" : "\n";
+                    takes += getString("PaletteTakesText");
                 }
                 if (!what->children.empty())
                 {
                     LLStringUtil::format_map_t args;
                     args["[COUNT]"] = std::to_string((S32)what->children.size());
-                    takes += takes.empty() ? "" : ", ";
+                    takes += takes.empty() ? "" : (what->text ? ", " : "\n");
                     takes += getString("PaletteTakesChildren", args);
                 }
             }
@@ -3523,13 +3658,24 @@ void ALFloaterXUIStudio::fillPaletteAttributes()
 
     const std::string chosen = mPalette ? mPalette->chosen() : std::string();
     const ALXUISchema::Tag* declared = chosen.empty() ? nullptr : ALXUISchema::get().tag(chosen);
+    // What the chosen tag is for, over the table of what it takes: the one
+    // sentence the notes have for it, which is the prose a reference is
+    // read for.
+    if (LLTextBox* note = findChild<LLTextBox>("palette_note"))
+    {
+        note->setText(declared ? declared->note : LLStringUtil::null);
+        note->setToolTip(declared ? declared->note : LLStringUtil::null);
+    }
     if (!declared)
     {
         return;
     }
     for (const ALXUISchema::Attribute& attribute : declared->attributes)
     {
-        if (attribute.ignored)
+        // A reference lists the names to write. A name that works and
+        // should not be used is kept out of it, since the one to use is
+        // here already and this is where an author finds it.
+        if (attribute.ignored || attribute.deprecated)
         {
             continue;
         }
@@ -4402,8 +4548,10 @@ void ALFloaterXUIStudio::fillHistory()
     // is not an action yet and the list is one behind.
     mDocuments.settle();
 
+    const std::vector<ALXUIDocuments::Entry> history = mDocuments.history();
+    refreshUndoLabels(history);
     std::vector<ALHistoryList::Step> steps;
-    for (const ALXUIDocuments::Entry& entry : mDocuments.history())
+    for (const ALXUIDocuments::Entry& entry : history)
     {
         ALHistoryList::Step step;
         step.what = describeAction(entry);
@@ -4417,6 +4565,52 @@ void ALFloaterXUIStudio::fillHistory()
     }
     mHistory->setSteps(std::move(steps), mDocuments.inForce());
     refreshModeCounts();
+}
+
+// "Undo" on its own is a promise about nothing in particular. The next step
+// back and the next step forward are known, and each item says which it
+// is -- in the words the history list uses for the same step, so that the
+// menu and the list agree about what is about to happen.
+void ALFloaterXUIStudio::refreshUndoLabels(const std::vector<ALXUIDocuments::Entry>& history)
+{
+    if (!mMenuBar)
+    {
+        return;
+    }
+    const size_t in_force = mDocuments.inForce();
+    if (LLMenuItemGL* undo = mMenuBar->findChild<LLMenuItemGL>("undo", true))
+    {
+        LLStringUtil::format_map_t args;
+        if (in_force > 0 && in_force <= history.size())
+        {
+            args["[WHAT]"] = describeAction(history[in_force - 1]);
+            undo->setLabel(getString("MenuUndoWhat", args));
+        }
+        else if (!mWroteThroughPath.empty())
+        {
+            // The translation table writes through rather than holding, and
+            // its one way back is the file it replaced.
+            args["[FILE]"] = mWroteThroughPath.substr(mWroteThroughPath.find_last_of("/\\") + 1);
+            undo->setLabel(getString("MenuUndoWrite", args));
+        }
+        else
+        {
+            undo->setLabel(getString("MenuUndo"));
+        }
+    }
+    if (LLMenuItemGL* redo = mMenuBar->findChild<LLMenuItemGL>("redo", true))
+    {
+        if (in_force < history.size())
+        {
+            LLStringUtil::format_map_t args;
+            args["[WHAT]"] = describeAction(history[in_force]);
+            redo->setLabel(getString("MenuRedoWhat", args));
+        }
+        else
+        {
+            redo->setLabel(getString("MenuRedo"));
+        }
+    }
 }
 
 // A step chosen: put the documents back to just after it, however many undos
@@ -4531,6 +4725,7 @@ void ALFloaterXUIStudio::fillDocuments()
         mDocumentList->setSelectedByValue(LLSD(show), true);
     }
     refreshModeCounts();
+    fillTabs();
 }
 
 std::string ALFloaterXUIStudio::selectedDocument() const
@@ -4544,24 +4739,8 @@ std::string ALFloaterXUIStudio::selectedDocument() const
 // shows is what a person means by which one they are working on.
 void ALFloaterXUIStudio::onDocumentSelected()
 {
-    const std::string path = selectedDocument();
-    if (path.empty())
-    {
-        return;
-    }
-    mDocuments.makeActive(path);
-
-    std::string file;
-    std::string layer;
-    if (!describeDocument(path, file, layer) || file == mFile)
-    {
-        return;
-    }
-    mFile = file;
-    mPendingFile.clear();
-    mSelection.clearSelection();
-    mFileList->setSelectedByValue(mFile, true);
-    showPreviews();
+    // The same choice as a tab over the canvas, made from the list.
+    onTabChosen(selectedDocument());
 }
 
 void ALFloaterXUIStudio::onDocumentSave()
@@ -4608,7 +4787,13 @@ void ALFloaterXUIStudio::onDocumentRevert()
 // save it or revert it, and then it is only a file.
 void ALFloaterXUIStudio::onDocumentClose()
 {
-    const std::string path = selectedDocument();
+    closeDocument(selectedDocument());
+}
+
+// Let go of a document. One with edits not yet saved is not let go of:
+// the edits would go with it, and a person who meant that has Revert.
+void ALFloaterXUIStudio::closeDocument(const std::string& path)
+{
     ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
     if (!held)
     {
@@ -6567,6 +6752,8 @@ void ALFloaterXUIStudio::onTranslationWrite()
         mCatalog.reload(mFile);
     }
     fillTranslation();
+    // A write is a thing to undo, and the menu says so.
+    refreshUndoLabels(mDocuments.history());
     // The second preview is this language, so it shows what was written.
     if (mShowSecondary && mLanguage2 == language)
     {
@@ -8227,6 +8414,8 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.values = attribute->values;
             field.type = attribute->type;
             field.ignored = attribute->ignored;
+            field.deprecated = attribute->deprecated;
+            field.instead = attribute->instead;
             // What the element carries when the file says nothing about it,
             // which is the thing a row about an unwritten field is for. A
             // field with nothing in it read as a chosen nought, which is a
@@ -8300,7 +8489,11 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
     {
         for (const ALXUISchema::Attribute& attribute : declared->attributes)
         {
-            if (written.count(attribute.name))
+            // A name that works and should not be used is shown where a file
+            // uses it and offered nowhere: the name to write is in the list
+            // already, and a list offering both is telling an author that
+            // either will do.
+            if (written.count(attribute.name) || attribute.deprecated)
             {
                 continue;
             }

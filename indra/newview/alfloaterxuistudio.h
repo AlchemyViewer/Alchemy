@@ -58,6 +58,7 @@ class ALPropertyGrid;
 class ALDockPanel;
 class ALXUICanvas;
 class ALCanvasRow;
+class ALTabStrip;
 class ALXUIPreviewHost;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -542,6 +543,14 @@ private:
 
     static LLSD row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells);
     std::string layerLabel(S32 which, S32 layer) const;
+    // The tabs over the canvas: the documents held, and the file shown
+    // where it is not one of them.
+    void fillTabs();
+    void onTabChosen(const std::string& value);
+    void closeDocument(const std::string& path);
+    // The two menu items say what they will take back or put on again, as
+    // the history says it.
+    void refreshUndoLabels(const std::vector<ALXUIDocuments::Entry>& history);
 
     // Every list in the tool is a table someone will want in a message or
     // a bug report: shift and control extend the selection, and the right
@@ -663,7 +672,7 @@ private:
     LLComboBox*         mGridCombo = nullptr;
     LLSpinCtrl*         mZoomSpin = nullptr;
     LLCheckBoxCtrl*     mSecondaryCheck = nullptr;
-    LLTextBox*          mCanvasTitle = nullptr;
+    ALTabStrip*         mCanvasTabs = nullptr;
     LLButton*           mCanvasShown = nullptr;
     LLButton*           mCanvasPinned = nullptr;
     ALScopeBar*         mFindBar = nullptr;
