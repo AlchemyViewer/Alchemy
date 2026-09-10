@@ -165,6 +165,18 @@ public:
     // measured from the widget before.
     bool liveShape(LLView* view, const LLXMLNodePtr& node);
 
+    // One element made again in place, for a field no built view can be told
+    // about. False where that cannot be done and the whole preview has to be
+    // made instead: the element's own name, which is what every path to it
+    // and to everything under it is made of; the file's own root; a parent
+    // that keeps track of its children; or a build that produced nothing.
+    bool rebuildElement(const ALXUISelection::path_t& path, const std::string& field);
+
+    // The path that reaches the same element once it is called something
+    // else, for whoever was holding the one that reached it before.
+    ALXUISelection::path_t pathAfterRename(const ALXUISelection::path_t& path,
+                                           const std::string& name) const;
+
     void saveDocument();
     void revertDocument();
 

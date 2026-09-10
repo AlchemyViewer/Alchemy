@@ -3371,6 +3371,163 @@ void ALFloaterXUIStudio::documentChanged(const std::string& status)
 // or holding one down is not re-linting the file between presses.
 static constexpr F32 REREAD_SECONDS = 0.75f;
 
+// One element built again from its own node and put back where it was, for a
+// field no built view can be told about -- a label, a name, a colour, an
+// image. Everything else on the canvas stays as it was: the window keeps its
+// place, the rest of the tree keeps whatever state it holds, and only what
+// the field is about is made twice.
+// The same element, reached by the path it has once it is called something
+// else. A step is a name and which of the siblings of that name it is, so
+// renaming an element moves every path that ends at it -- and following it
+// there is what somebody renaming a thing means to happen.
+ALXUISelection::path_t ALFloaterXUIStudio::pathAfterRename(const ALXUISelection::path_t& path,
+                                                           const std::string& name) const
+{
+    ALXUISelection::path_t moved = path;
+    if (moved.empty())
+    {
+        return moved;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    LLView* view = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
+    LLView* parent = view ? view->getParent() : nullptr;
+    if (!parent)
+    {
+        return moved;
+    }
+
+    // Counted the way a build counts them, which is the order the file has
+    // them: the child list reads backwards from that.
+    std::vector<LLView*> children;
+    for (LLView* child : *parent->getChildList())
+    {
+        children.push_back(child);
+    }
+    std::reverse(children.begin(), children.end());
+
+    S32 ordinal = 0;
+    for (const LLView* child : children)
+    {
+        if (child == view)
+        {
+            break;
+        }
+        const ALXUISourceMap::Origin* origin = pv.sourceMap.find(child);
+        std::string other;
+        if (origin && origin->node.notNull()
+            && origin->node->getAttributeString("name", other) && other == name)
+        {
+            ++ordinal;
+        }
+    }
+    moved.back() = ALXUISelection::step(name, ordinal);
+    return moved;
+}
+
+bool ALFloaterXUIStudio::rebuildElement(const ALXUISelection::path_t& path, const std::string& field)
+{
+    // A path is made of names, so an element's name is its identity here.
+    // Change it and every path at and under it names something the document
+    // no longer has: the selection, the rows and the map all point at an
+    // element that is not there to be found again.
+    if (field == "name")
+    {
+        return false;
+    }
+
+    Preview& pv = mPreviews[PRIMARY];
+    LLView* old = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
+    if (!old || old == pv.root)
+    {
+        // A file's root is the preview, and building it again is building the
+        // preview: there is nothing smaller to do.
+        return false;
+    }
+    LLView* parent = old->getParent();
+    const ALXUISourceMap::Origin* origin = pv.sourceMap.find(old);
+    if (!parent || !origin || origin->node.isNull())
+    {
+        return false;
+    }
+
+    // What the parent takes as children, which is a thing about its tag
+    // rather than about it: a container with a registry of its own refuses
+    // every tag the registry does not name.
+    const std::string* tag = LLUICtrlFactory::widgetTag(parent->viewType());
+    const widget_registry_t* const* held =
+        tag ? LLChildRegistryRegistry::instance().getValue(*tag) : nullptr;
+    const widget_registry_t* registry = held ? *held : nullptr;
+    if (!registry)
+    {
+        return false;
+    }
+    // A container that names its own children is one that keeps track of
+    // them: a stack holds its panels, a tab container holds its tabs, and a
+    // menu holds its items. Putting one of those back is not a matter of
+    // adding a child, so those are built the long way.
+    if (registry != &LLDefaultChildRegistry::instance())
+    {
+        return false;
+    }
+
+    // Where it sits among what the file put in this parent. A build adds
+    // each child to the front of the list, so the list reads backwards from
+    // the file and the new one arrives at the wrong end of it.
+    std::vector<LLView*> children;
+    for (LLView* child : *parent->getChildList())
+    {
+        children.push_back(child);
+    }
+    const size_t at = std::distance(children.begin(), std::find(children.begin(), children.end(), old));
+    if (at >= children.size())
+    {
+        return false;
+    }
+
+    const LLXMLNodePtr node = origin->node;
+    parent->removeChild(old);
+    delete old;
+
+    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+    factory.pushFileName(mFile);
+    LLView* fresh = factory.createFromXML(node, parent, mFile, *registry);
+    factory.popFileName();
+    if (!fresh)
+    {
+        // The parent is now short an element, so the preview no longer says
+        // what the file says. Only a build puts that right.
+        return false;
+    }
+
+    // Put back in the order the file has them, which is the order everything
+    // that reads this list depends on.
+    children[at] = fresh;
+    for (auto one = children.rbegin(); one != children.rend(); ++one)
+    {
+        parent->sendChildToFront(*one);
+    }
+
+    // What was paired with the views that have gone: the map first, since
+    // the rows are re-pointed by resolving paths through it.
+    pv.sourceMap.build(pv.root, pv.node);
+    if (!mModel.rebind(path, pv.root))
+    {
+        // A row is left showing a view that has gone, and the only way out of
+        // that is to make the rows again. The preview itself is sound: what
+        // follows is a build the tool did not need but is safe to do.
+        return false;
+    }
+    for (const auto& [row_path, widget] : mRows)
+    {
+        if (widget)
+        {
+            widget->refreshSuffix();
+        }
+    }
+    liveShape(fresh, node);
+    return true;
+}
+
 // An undo or a redo of one field of one element is that field written again,
 // and the preview can be told about it the same way the edit was. Anything
 // else -- an element added, moved or taken out, or a step from before the
@@ -3378,10 +3535,30 @@ static constexpr F32 REREAD_SECONDS = 0.75f;
 void ALFloaterXUIStudio::replayChange(const std::string& status)
 {
     const ALXUIEdit::Change& change = mDocument.lastChange();
+    const ALXUISelection::path_t& where = mDocument.lastPath();
+
+    // A step that wrote a name moved the element, so a step put back or put
+    // on again moves it too. What is selected is the same element either way,
+    // and goes with it rather than being let go of.
+    if (change.oneField && change.field == "name" && mSelection.hasSelection())
+    {
+        const ALXUISelection::path_t& from = where == change.path ? change.after : change.path;
+        if (mSelection.selection() == from)
+        {
+            mSelection.select(where);
+        }
+    }
+
     std::string value;
-    if (change.oneField && !change.field.empty()
-        && mDocument.fieldText(change.path, change.field, value)
-        && applyLive(change.path, change.field, value))
+    // The element as the document now reads it is what to show, whether the
+    // field can be put onto the view or the element has to be made again --
+    // and an undo that leaves the element writing nothing is the second, since
+    // what it falls back to is known only to a build.
+    if (change.oneField
+        && ((!change.field.empty()
+             && mDocument.fieldText(where, change.field, value)
+             && applyLive(where, change.field, value))
+            || rebuildElement(where, change.field)))
     {
         documentRead(status);
         // The row the value is shown on is not always the row it was written
@@ -7163,10 +7340,18 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     // A field the preview can be told about is told, and nothing is made
     // again: the window keeps its place, the outline keeps its rows, and
     // the keyboard stays in the box the number was typed into.
-    if (applyLive(mSelection.selection(), name, value))
+    if (applyLive(mSelection.selection(), name, value)
+        || rebuildElement(mSelection.selection(), name))
     {
         documentRead(said);
         return;
+    }
+    // Renaming an element moves it, as far as everything that finds one by
+    // name is concerned. What is selected is the same element, so what is
+    // selected goes with it rather than being let go of.
+    if (name == "name" && mSelection.hasSelection())
+    {
+        mSelection.select(pathAfterRename(mSelection.selection(), value));
     }
     documentChanged(said);
 }
