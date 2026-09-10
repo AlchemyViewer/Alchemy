@@ -7526,6 +7526,9 @@ void ALFloaterXUIStudio::stepCensus()
         {
             continue;
         }
+        // The base is the same for every language of the file.
+        const std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
+        const pugi::xml_node base = base_layers.empty() ? pugi::xml_node() : base_layers.front()->root();
         for (const std::string& language : mCatalog.languages())
         {
             if (language == mLanguage)
@@ -7537,13 +7540,11 @@ void ALFloaterXUIStudio::stepCensus()
             {
                 continue;
             }
-            std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(*entry, mSkin, mLanguage);
-            if (base_layers.empty() || !base_layers.front()->root())
+            if (!base)
             {
                 ++mCensus[language]["orphan_file"];
                 continue;
             }
-            const pugi::xml_node base = base_layers.front()->root();
 
             std::map<std::string, S32>& counts = mCensus[language];
             ++counts["files"];

@@ -85,20 +85,52 @@ namespace
         return lower;
     }
 
+    // Compared in place: a search runs this over every name, tag, attribute
+    // and text in seven hundred files, and lowering each into a string of
+    // its own was most of what a search cost.
+    char asciiLower(char c)
+    {
+        return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
+    }
+
+    bool sameLowered(std::string_view text, size_t at, const std::string& lower_needle)
+    {
+        for (size_t i = 0; i < lower_needle.size(); ++i)
+        {
+            if (asciiLower(text[at + i]) != lower_needle[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     bool matches(std::string_view haystack, const std::string& lower_needle,
                  ALXUICatalog::Match how)
     {
-        const std::string in = asciiLower(haystack);
+        if (haystack.size() < lower_needle.size())
+        {
+            return false;
+        }
         switch (how)
         {
-        case ALXUICatalog::Match::Matching:  return in == lower_needle;
-        case ALXUICatalog::Match::Starting:  return in.rfind(lower_needle, 0) == 0;
+        case ALXUICatalog::Match::Matching:
+            return haystack.size() == lower_needle.size() && sameLowered(haystack, 0, lower_needle);
+        case ALXUICatalog::Match::Starting:
+            return sameLowered(haystack, 0, lower_needle);
         case ALXUICatalog::Match::Ending:
-            return in.size() >= lower_needle.size()
-                && in.compare(in.size() - lower_needle.size(), lower_needle.size(), lower_needle) == 0;
-        case ALXUICatalog::Match::Containing: break;
+            return sameLowered(haystack, haystack.size() - lower_needle.size(), lower_needle);
+        case ALXUICatalog::Match::Containing:
+            break;
         }
-        return in.find(lower_needle) != std::string::npos;
+        for (size_t at = 0; at + lower_needle.size() <= haystack.size(); ++at)
+        {
+            if (sameLowered(haystack, at, lower_needle))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void sortFirst(std::vector<std::string>& names, const char* first)
