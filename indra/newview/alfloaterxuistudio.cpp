@@ -1684,6 +1684,16 @@ bool ALFloaterXUIStudio::postBuild()
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
+    mFindingScope = getChild<LLComboBox>("finding_scope");
+    mFindingRule = getChild<LLComboBox>("finding_rule");
+    mFindingSeverity = getChild<LLComboBox>("finding_severity");
+    mFindingFixable = getChild<LLCheckBoxCtrl>("finding_fixable");
+    mFindingFilter = getChild<LLFilterEditor>("finding_filter");
+    mFindingCount = getChild<LLTextBox>("finding_count");
+    // A combo nobody has chosen in answers with whatever it feels like, and
+    // what these two answer decides what the list is showing.
+    mFindingScope->selectFirstItem();
+    mFindingSeverity->selectFirstItem();
     mFixButton = getChild<LLButton>("finding_fix");
     mFixAllButton = getChild<LLButton>("finding_fix_all");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
@@ -1885,6 +1895,12 @@ bool ALFloaterXUIStudio::postBuild()
     mFindings->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshFixButtons, this));
     mFixButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixSelected, this));
     mFixAllButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixAll, this));
+    for (LLUICtrl* filter : { (LLUICtrl*)mFindingScope, (LLUICtrl*)mFindingRule,
+                              (LLUICtrl*)mFindingSeverity, (LLUICtrl*)mFindingFixable,
+                              (LLUICtrl*)mFindingFilter })
+    {
+        filter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFindingFilter, this));
+    }
 
     // Every table in the tool copies the same way.
     for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings,
@@ -5178,36 +5194,53 @@ void ALFloaterXUIStudio::writeCapture(const std::vector<std::string>& filenames)
     mCapture = nullptr;
 }
 
-// Every file in the catalog, checked a few per frame. The status line
-// counts down and the report lands beside the log, which is the form an
-// author can read a whole tree's worth of findings in.
+// Every file in the catalog, checked a few per frame. What each of them said
+// goes into the store under its own name, so the pass fills in around the
+// file being worked on rather than replacing what is known about it; the
+// report beside the log is written from the store at the end.
 void ALFloaterXUIStudio::startLintAll()
 {
     if (!mLintQueue.empty())
     {
         mLintQueue.clear();
-        setStatus("Lint all: stopped.");
+        setStatus(getString("LintStopped"));
         return;
     }
-    mLintReport.clear();
-    mLintByRule.clear();
     mLintFiles = 0;
     mLintFindings = 0;
+    mLintCatalogFindings.clear();
+    // Everything that was known before this is from an older reading of the
+    // tree, and a pass that leaves some of it behind is a store nobody can
+    // trust a count from.
+    mFindingStore.clear();
     for (const ALXUICatalog::Entry& entry : mCatalog.entries())
     {
         mLintQueue.push_back(entry.name);
     }
     mLintTotal = (S32)mLintQueue.size();
 
-    // The rule that needs no build, once, before the files are walked.
+    // The rules that need no build, once, before the files are walked. They
+    // name the layer they are about and the store is keyed by the file that
+    // layer belongs to, so each finding is put with the rest of what is known
+    // about its file.
+    boost::unordered_map<std::string, std::string> owner;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        for (const ALXUICatalog::Layer& layer : entry.layers)
+        {
+            owner[layer.path] = entry.name;
+        }
+    }
     for (const ALXUILint::Finding& f : ALXUILint::checkCatalog(mCatalog))
     {
-        ++mLintByRule[ALXUILint::ruleName(f.rule)];
+        const auto named = owner.find(f.file);
+        mLintCatalogFindings[named == owner.end() ? f.file : named->second].push_back(f);
         ++mLintFindings;
-        mLintReport.push_back(std::string(ALXUILint::severityName(f.severity)) + " " + ALXUILint::ruleName(f.rule)
-                              + " " + f.file + ":" + std::to_string(f.line) + " " + f.message);
     }
-    setStatus("Lint all: " + std::to_string(mLintTotal) + " files...");
+
+    LLStringUtil::format_map_t args;
+    args["[TOTAL]"] = std::to_string(mLintTotal);
+    setStatus(getString("LintStarted", args));
 }
 
 void ALFloaterXUIStudio::stepLintAll()
@@ -5223,7 +5256,7 @@ void ALFloaterXUIStudio::stepLintAll()
         if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
         {
             ++mLintFiles;
-            mLintFindings += lintOneFile(*entry, mLintReport);
+            mLintFindings += lintOneFile(*entry);
         }
     }
 
@@ -5233,13 +5266,25 @@ void ALFloaterXUIStudio::stepLintAll()
     }
     else
     {
-        setStatus("Lint all: " + std::to_string(mLintTotal - (S32)mLintQueue.size()) + " of "
-                  + std::to_string(mLintTotal) + " files, " + std::to_string(mLintFindings) + " findings...");
+        LLStringUtil::format_map_t args;
+        args["[DONE]"] = std::to_string(mLintTotal - (S32)mLintQueue.size());
+        args["[TOTAL]"] = std::to_string(mLintTotal);
+        args["[FOUND]"] = std::to_string(mLintFindings);
+        setStatus(getString("LintStepped", args));
     }
 }
 
-S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines)
+S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
 {
+    // What the rules that need no build already said about this file, which
+    // is everything known about one that cannot be built at all.
+    std::vector<ALXUILint::Finding> found;
+    if (const auto already = mLintCatalogFindings.find(entry.name);
+        already != mLintCatalogFindings.end())
+    {
+        found = already->second;
+    }
+
     std::string widget_tag;
     if (entry.kind == ALXUICatalog::Kind::Widget)
     {
@@ -5252,6 +5297,9 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vecto
     }
     if (!isBuilt(entry.kind) || (!widget_tag.empty() && !isCoreWidgetTag(widget_tag)))
     {
+        // Looked at and nothing more to say, which is not the same answer as
+        // never looked at: the store keeps the difference.
+        mFindingStore.replace(entry.name, std::move(found));
         return 0;
     }
 
@@ -5293,7 +5341,7 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vecto
         entries = sink.entries();
     }
 
-    S32 found = 0;
+    S32 counted = 0;
     if (root)
     {
         ALXUISourceMap map;
@@ -5315,42 +5363,52 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry, std::vecto
         }
         lint.run(input);
 
-        for (const ALXUILint::Finding& f : lint.findings())
-        {
-            ++mLintByRule[ALXUILint::ruleName(f.rule)];
-            ++found;
-            lines.push_back(std::string(ALXUILint::severityName(f.severity)) + " " + ALXUILint::ruleName(f.rule)
-                            + " " + entry.name + ":" + std::to_string(f.line) + " "
-                            + ALXUISelection::toString(f.path) + " " + f.what + ": " + f.message);
-        }
+        counted = (S32)lint.findings().size();
+        found.insert(found.end(), lint.findings().begin(), lint.findings().end());
     }
+    mFindingStore.replace(entry.name, std::move(found));
     if (host)
     {
         host->closeFloater();
     }
-    return found;
+    return counted;
 }
 
+// The pass is over. What it found is in the store, where the list can be
+// asked about it; the text file beside the log is written out of the store
+// as well, because a whole tree's worth of findings is also a thing to read
+// somewhere that is not this window.
 void ALFloaterXUIStudio::finishLintAll()
 {
+    mLintCatalogFindings.clear();
+
     const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "xui_lint.txt");
     llofstream out(path, std::ios::binary);
     out << mLintFiles << " files built in " << mSkin << "/" << mLanguage << ", "
-        << mLintFindings << " findings\n\n";
-    for (const auto& [rule, count] : mLintByRule)
+        << mFindingStore.size() << " findings over " << mFindingStore.files().size()
+        << " files checked\n\n";
+    for (const auto& [rule, count] : mFindingStore.byRule())
     {
         out << "  " << count << "\t" << rule << "\n";
     }
     out << "\n";
-    for (const std::string& line : mLintReport)
+    for (const ALXUILint::Finding* f : mFindingStore.select(ALXUIFindings::Query()).found)
     {
-        out << line << "\n";
+        out << ALXUILint::severityName(f->severity) << " " << ALXUILint::ruleName(f->rule)
+            << " " << f->file << ":" << f->line << " " << ALXUISelection::toString(f->path)
+            << " " << f->what << ": " << f->message << "\n";
     }
 
-    setStatus("Lint all: " + std::to_string(mLintFindings) + " findings over " + std::to_string(mLintFiles)
-              + " files; the report is " + path);
-    LL_INFOS("XUIStudio") << "lint all: " << mLintFindings << " findings over " << mLintFiles
+    LLStringUtil::format_map_t args;
+    args["[FOUND]"] = std::to_string((S32)mFindingStore.size());
+    args["[FILES]"] = std::to_string(mLintFiles);
+    args["[PATH]"] = path;
+    setStatus(getString("LintFinished", args));
+    LL_INFOS("XUIStudio") << "lint all: " << mFindingStore.size() << " findings over " << mLintFiles
                         << " files, report at " << path << LL_ENDL;
+
+    // And the list, which had only this file behind it, now has a tree.
+    fillFindings();
 }
 
 // A list's rows are a table, and where a copied table is going is a bug
@@ -6333,15 +6391,65 @@ void ALFloaterXUIStudio::runLint()
         }
     }
     pv.lint.run(input);
+    // The file in front of the developer, re-checked on every build; the
+    // rest of the tree is whatever a pass has filled in around it.
+    mFindingStore.replace(mFile, pv.lint.findings());
 }
 
 // One row per finding: the severity and rule, where it is, and what it
 // says. The path is what a double-click selects by, since a finding from
 // a layer carries that layer's line and not the base's.
+// How many rows the list will take. A pass over the tree finds tens of
+// thousands; a scroll list asked to hold them all spends a second building
+// rows nobody will reach, and the answer to "there are more than this" is a
+// narrower filter rather than a longer list.
+static constexpr size_t FINDINGS_SHOWN = 2000;
+
+ALXUIFindings::Query ALFloaterXUIStudio::findingQuery() const
+{
+    ALXUIFindings::Query query;
+    query.limit = FINDINGS_SHOWN;
+    // The scope combo says which file, and the file it means is this one:
+    // the value is empty for every file that has been checked.
+    if (mFindingScope && mFindingScope->getValue().asString() == "file")
+    {
+        query.file = mFile;
+    }
+    if (mFindingRule)
+    {
+        query.rule = mFindingRule->getValue().asString();
+    }
+    if (mFindingSeverity)
+    {
+        const std::string want = mFindingSeverity->getValue().asString();
+        query.errors = true;
+        query.warnings = want != "errors";
+        query.notes = want.empty();
+    }
+    if (mFindingFixable)
+    {
+        query.fixable = mFindingFixable->get();
+    }
+    if (mFindingFilter)
+    {
+        query.text = mFindingFilter->getText();
+    }
+    return query;
+}
+
 void ALFloaterXUIStudio::fillFindings()
 {
+    refreshFindingRules();
+
+    const ALXUIFindings::Selected selected = mFindingStore.select(findingQuery());
     mFindings->deleteAllItems();
-    mShownFindings = mPreviews[PRIMARY].lint.findings();
+    mShownFindings.clear();
+    mShownFindings.reserve(selected.found.size());
+    for (const ALXUILint::Finding* found : selected.found)
+    {
+        mShownFindings.push_back(*found);
+    }
+
     for (S32 at = 0; at < (S32)mShownFindings.size(); ++at)
     {
         const ALXUILint::Finding& f = mShownFindings[at];
@@ -6372,8 +6480,62 @@ void ALFloaterXUIStudio::fillFindings()
             { "message", f.what.empty() ? f.message : f.what + ": " + f.message },
             { "fix", describeFix(f) } }));
     }
+
+    if (mFindingCount)
+    {
+        LLStringUtil::format_map_t args;
+        args["[SHOWN]"] = std::to_string((S32)mShownFindings.size());
+        args["[TOTAL]"] = std::to_string((S32)selected.total);
+        args["[FILES]"] = std::to_string((S32)mFindingStore.files().size());
+        args["[HELD]"] = std::to_string((S32)mFindingStore.size());
+        mFindingCount->setText(getString(selected.total > mShownFindings.size()
+                                         ? "FindingsSome" : "FindingsAll", args));
+    }
     refreshFixButtons();
     refreshModeCounts();
+}
+
+// The rules that have said something, with how many of each, so that a
+// filter offers what is there rather than the whole list of nineteen. The
+// one in force is kept where it is still one of them.
+void ALFloaterXUIStudio::refreshFindingRules()
+{
+    if (!mFindingRule)
+    {
+        return;
+    }
+    const std::vector<std::pair<std::string, S32> > rules = mFindingStore.byRule();
+    std::string signature;
+    for (const auto& [rule, count] : rules)
+    {
+        signature += rule + std::to_string(count) + ",";
+    }
+    if (signature == mFindingRulesShown)
+    {
+        return;     // the same rules and the same counts: nothing to rebuild
+    }
+    mFindingRulesShown = signature;
+
+    const std::string was = mFindingRule->getValue().asString();
+    mFindingRule->removeall();
+    mFindingRule->add(getString("FindingsEveryRule"), LLSD(std::string()));
+    for (const auto& [rule, count] : rules)
+    {
+        mFindingRule->add(rule + " (" + std::to_string(count) + ")", LLSD(rule));
+    }
+    if (!was.empty() && !mFindingRule->setSelectedByValue(LLSD(was), true))
+    {
+        mFindingRule->selectFirstItem();
+    }
+    else if (was.empty())
+    {
+        mFindingRule->selectFirstItem();
+    }
+}
+
+void ALFloaterXUIStudio::onFindingFilter()
+{
+    fillFindings();
 }
 
 void ALFloaterXUIStudio::onFindingSelected()
@@ -6383,7 +6545,22 @@ void ALFloaterXUIStudio::onFindingSelected()
     {
         return;
     }
+    // Read before anything moves: going to another file rebuilds the list,
+    // and the row this came from goes with it.
     const LLSD id = item->getValue();
+    const ALXUILint::Finding* about = findingForRow(item);
+    const std::string in_file = about ? about->file : std::string();
+
+    // A list over the whole tree names findings in files nobody is looking
+    // at, and going to one means going to its file first.
+    if (!in_file.empty() && in_file != mFile && mCatalog.find(in_file))
+    {
+        mFile = in_file;
+        mPendingFile.clear();
+        mFileList->setSelectedByValue(mFile, true);
+        showPreviews();
+    }
+
     const Preview& pv = mPreviews[PRIMARY];
     const std::string path = id["path"].asString();
     if (!path.empty())
@@ -6505,9 +6682,12 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
 
 void ALFloaterXUIStudio::onFixSelected()
 {
+    // Copied: applying it is what fills the list again, and the finding is
+    // in the list.
     if (const ALXUILint::Finding* f = findingForRow(mFindings->getFirstSelected()))
     {
-        applyFix(*f);
+        const ALXUILint::Finding held = *f;
+        applyFix(held);
     }
 }
 

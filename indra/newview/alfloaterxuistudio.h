@@ -28,6 +28,7 @@
 #include "alxuidiagnostics.h"
 #include "alxuidocuments.h"
 #include "alxuiedit.h"
+#include "alxuifindings.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
 #include "alxuiselection.h"
@@ -344,6 +345,12 @@ private:
     void onFindingSelected();
     void refreshBreadcrumb();
 
+    // What the findings list is asking the store for, built from the
+    // filter row above it.
+    ALXUIFindings::Query findingQuery() const;
+    void onFindingFilter();
+    void refreshFindingRules();
+
     // --- findings that put themselves right --------------------------------
     // A rule that can say what is wrong can sometimes say what right would
     // be, and the tool already knows how to make the edit. Applying one is
@@ -363,7 +370,7 @@ private:
     void startLintAll();
     void stepLintAll();
     void finishLintAll();
-    S32 lintOneFile(const ALXUICatalog::Entry& entry, std::vector<std::string>& lines);
+    S32 lintOneFile(const ALXUICatalog::Entry& entry);
 
     // The preview as an image, which is what a review of a translation
     // needs without the viewer. The picker names the file and its
@@ -557,9 +564,21 @@ private:
     // the one it is about and a fix can be applied to it.
     std::vector<ALXUILint::Finding> mShownFindings;
 
+    // Everything the rules have found, over as many files as have been
+    // checked: this file replaced on every rebuild, and the rest of the tree
+    // filled in by a pass that runs a few files a frame. What the list shows
+    // is a question asked of this rather than a run of its own.
+    ALXUIFindings                   mFindingStore;
+    // The rules the filter is offering, so that it is rebuilt when they
+    // change and left alone -- with whatever is chosen in it -- when they
+    // do not.
+    std::string                     mFindingRulesShown;
+
     std::deque<std::string>         mLintQueue;     // files still to check
-    std::vector<std::string>        mLintReport;
-    std::map<std::string, S32>      mLintByRule;
+    // What the rules that need no build said, kept until the file each is
+    // about comes round: those run once over the whole catalog and the store
+    // is filled a file at a time.
+    boost::unordered_map<std::string, std::vector<ALXUILint::Finding> > mLintCatalogFindings;
     S32                             mLintFiles = 0;
     S32                             mLintTotal = 0;
     S32                             mLintFindings = 0;
@@ -583,6 +602,12 @@ private:
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
     LLScrollListCtrl*   mFindings = nullptr;
+    LLComboBox*         mFindingScope = nullptr;
+    LLComboBox*         mFindingRule = nullptr;
+    LLComboBox*         mFindingSeverity = nullptr;
+    LLCheckBoxCtrl*     mFindingFixable = nullptr;
+    LLFilterEditor*     mFindingFilter = nullptr;
+    LLTextBox*          mFindingCount = nullptr;
     LLButton*           mFixButton = nullptr;
     LLButton*           mFixAllButton = nullptr;
     LLTabContainer*     mInspectors = nullptr;

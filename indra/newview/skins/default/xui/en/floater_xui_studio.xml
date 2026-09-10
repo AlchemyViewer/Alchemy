@@ -63,6 +63,13 @@
     <floater.string name="FixNone">Nothing here offers a fix.</floater.string>
     <floater.string name="FixGone">That is not written here any more.</floater.string>
     <floater.string name="FixOtherFile">That finding is about [FILE]; open it to fix it.</floater.string>
+    <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>
+    <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
+    <floater.string name="FindingsEveryRule">Every rule</floater.string>
+    <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
+    <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
+    <floater.string name="LintStopped">Lint all: stopped.</floater.string>
+    <floater.string name="LintFinished">Lint all: [FOUND] findings over [FILES] files; the report is [PATH]</floater.string>
     <floater.string name="TranslateImpactNone">No translation stops applying because of this.</floater.string>
     <floater.string name="TranslateImpact">[COUNT] translations stop applying if this is written as it stands: [LANGS]. Save and Repair Translations moves them.</floater.string>
     <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
@@ -1217,8 +1224,70 @@
                          top="0"
                          width="742">
                             <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="findings_head"
+                             width="742">
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left="0"
+                                 name="finding_scope"
+                                 tool_tip="This file, or every file a Lint All has checked"
+                                 top="2"
+                                 width="120">
+                                    <combo_box.item label="This file" name="file" value="file" />
+                                    <combo_box.item label="Every file" name="all" value="" />
+                                </combo_box>
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_rule"
+                                 tool_tip="One rule, with how many it found"
+                                 top_delta="0"
+                                 width="190" />
+                                <combo_box
+                                 follows="left|top"
+                                 height="22"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_severity"
+                                 tool_tip="How much of it to show"
+                                 top_delta="0"
+                                 width="150">
+                                    <combo_box.item label="Everything" name="everything" value="" />
+                                    <combo_box.item label="Errors and warnings" name="loud" value="loud" />
+                                    <combo_box.item label="Errors only" name="errors" value="errors" />
+                                </combo_box>
+                                <check_box
+                                 follows="left|top"
+                                 height="16"
+                                 label="Fixable"
+                                 layout="topleft"
+                                 left_pad="8"
+                                 name="finding_fixable"
+                                 tool_tip="Only the ones this tool offers to put right"
+                                 top_delta="4"
+                                 width="70" />
+                                <filter_editor
+                                 follows="left|top|right"
+                                 height="22"
+                                 label="Filter"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_filter"
+                                 tool_tip="A word in the message, the name at fault, the element or the file"
+                                 top_delta="-4"
+                                 width="180" />
+                            </layout_panel>
+                            <layout_panel
                              auto_resize="true"
-                             height="130"
+                             height="104"
                              layout="topleft"
                              name="findings_list_panel"
                              width="742">
@@ -1227,7 +1296,7 @@
                                  draw_heading="true"
                                  multi_select="true"
                                  follows="all"
-                                 height="130"
+                                 height="104"
                                  layout="topleft"
                                  left="0"
                                  name="findings"
@@ -1289,6 +1358,14 @@
                                  tool_tip="Every finding in this file that offers one, each its own edit"
                                  top_delta="0"
                                  width="70" />
+                                <text
+                                 follows="left|top|right"
+                                 height="16"
+                                 layout="topleft"
+                                 left_pad="10"
+                                 name="finding_count"
+                                 top_delta="4"
+                                 width="440" />
                             </layout_panel>
                         </layout_stack>
                     </panel>
