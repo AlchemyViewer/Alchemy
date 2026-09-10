@@ -79,6 +79,14 @@ public:
     bool setAttribute(const path_t& path, const std::string& name, const std::string& value);
     bool removeAttribute(const path_t& path, const std::string& name);
 
+    // The same value under another name, written where the old name was: an
+    // attribute spelt wrongly is the author's value under a name nothing
+    // reads, and taking it out and putting it back would move it to the end
+    // of the element and respell whatever the file wrote between the quotes.
+    // Only the name is touched, so the value keeps the entity spellings, the
+    // quoting and the place the author gave it.
+    bool renameAttribute(const path_t& path, const std::string& from, const std::string& to);
+
     // Naming an element is not writing a field of it: a path is made of
     // names, so this moves the element and everything under it as far as
     // anything holding a path is concerned. Where it moved to is answered
@@ -128,6 +136,7 @@ public:
         Something,          // a step from before a step said, or more than one thing
         WroteField,
         TookFieldOut,
+        SpeltFieldAgain,    // the same value, under the name it should have had
         WroteText,
         Renamed,            // the name, which moves the element
         AddedElement,

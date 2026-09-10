@@ -63,6 +63,11 @@
     <floater.string name="FixNone">Nothing here offers a fix.</floater.string>
     <floater.string name="FixGone">That is not written here any more.</floater.string>
     <floater.string name="FixOtherFile">That finding is about [FILE]; open it to fix it.</floater.string>
+    <floater.string name="FixDidTakeOut">Took [ATTR] off [WHERE] in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidSpell">[ATTR] on [WHERE] is [NAME] now, in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidMove">Moved [WHERE] inside its parent in [FILE], [LAYER]</floater.string>
+    <floater.string name="FixDidWiden">Widened [WHERE] by [DX] in [FILE], [LAYER]</floater.string>
+    <floater.string name="StepSpeltFieldAgain">[WHAT] on [WHERE]</floater.string>
     <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsEveryRule">Every rule</floater.string>

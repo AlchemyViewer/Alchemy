@@ -911,4 +911,47 @@ namespace tut
         ensure("which the step does not claim to be", !edit.lastChange().oneField);
         ensure_equals("and the file is what it was", edit.text(), before);
     }
+
+    // An attribute spelt wrongly holds the author's value under a name
+    // nothing reads. Taking it out and putting it back would move it to the
+    // end of the element and rewrite whatever the file had between the
+    // quotes, so only the name is spliced.
+    template<> template<>
+    void alxuiedit_object::test<22>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <!-- a comment nobody may touch -->\n"
+            "    <panel name=\"a\"  tool_tp='say &amp; do'  width=\"9\" />\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+
+        ensure("spelt again", edit.renameAttribute({ "a" }, "tool_tp", "tool_tip"));
+        ensure_equals("only the name moved", edit.text(),
+            "<panel name=\"root\">\n"
+            "    <!-- a comment nobody may touch -->\n"
+            "    <panel name=\"a\"  tool_tip='say &amp; do'  width=\"9\" />\n"
+            "</panel>\n");
+
+        // One step, because it is one thing done.
+        ensure("says what it did", edit.nextUndo() != nullptr);
+        ensure("which is a name written again",
+               edit.nextUndo()->did == ALXUIEdit::Did::SpeltFieldAgain);
+        ensure_equals("under the name it now has", edit.nextUndo()->field, std::string("tool_tip"));
+        ensure("put back", edit.undo());
+        ensure_equals("the whole of it", edit.text(), source);
+        ensure("and there is nothing else to put back", !edit.canUndo());
+
+        // Two of a name on one element is one value chosen by which the
+        // parser reads last, which is not a state to leave a file in.
+        ensure("refuses to make a second width",
+               !edit.renameAttribute({ "a" }, "tool_tp", "width"));
+        ensure("and says why", !edit.error().empty());
+        ensure_equals("having changed nothing", edit.text(), source);
+        ensure("a name the element does not carry",
+               !edit.renameAttribute({ "a" }, "height", "width"));
+        ensure("the name it has", !edit.renameAttribute({ "a" }, "width", "width"));
+        ensure("no element", !edit.renameAttribute({ "nowhere" }, "width", "height"));
+    }
 }

@@ -55,8 +55,8 @@ namespace tut
     // Every element here is a panel. The rules that read the document
     // read it whatever the tag is, and a widget that draws text cannot be
     // built at all in this fixture: measuring a glyph asserts, since the
-    // fonts stand up without their textures. The truncation rule is the
-    // one this cannot reach, and the viewer's Lint all is where it runs.
+    // fonts stand up without their textures -- the atlas owns the GL, so
+    // text is measured here and the truncation rule runs like the rest.
     struct alxuilint_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
@@ -85,6 +85,7 @@ namespace tut
             ALXmlDocument   authored;
             ALXUISourceMap  map;
             ALXUILint       lint;
+            std::string     source;     // the bytes the rules were run over
 
             ~Run() { delete panel; }
 
@@ -94,6 +95,7 @@ namespace tut
                 // file that does not is laid out from the bottom.
                 const std::string xml =
                     "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n" + body + "\n</panel>\n";
+                source = xml;
                 if (!LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
                 {
                     return false;
@@ -145,6 +147,26 @@ namespace tut
                     }
                 }
                 return nullptr;
+            }
+
+            // The element as the built tree has it, which is what a fix that
+            // moves or sizes something is measured from.
+            ALXUIEdit::Anchor anchorFor(const ALXUISelection::path_t& path) const
+            {
+                ALXUIEdit::Anchor now;
+                LLView* view = ALXUISelection::resolve(panel, path);
+                if (!view || !view->getParent())
+                {
+                    return now;
+                }
+                const LLRect& rect = view->getRect();
+                now.left = rect.mLeft;
+                now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+                now.bottom = rect.mBottom;
+                now.width = rect.getWidth();
+                now.height = rect.getHeight();
+                now.topLeft = view->isLayoutTopLeft();
+                return now;
             }
 
             std::string describe() const
@@ -517,5 +539,146 @@ namespace tut
         const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
         ensure("it is still reported", out != nullptr);
         ensure("and offers nothing", out->fix.did == ALXUILint::Fix::Do::Nothing);
+    }
+
+    // A fix that fixes the wrong thing writes its wrongness into the file
+    // instead of reporting it, so what each of them puts in the file is
+    // watched byte for byte. These two write an attribute.
+    template<> template<>
+    void alxuilint_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // Written as the value it already carries: it comes off, and the
+        // whitespace that separated it comes off with it.
+        {
+            Run run;
+            ensure("built", run.build(
+                "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>"));
+            const ALXUILint::Finding* f = run.first(ALXUILint::Rule::WroteTheDefault);
+            ensure("found", f != nullptr);
+
+            ALXUIEdit edit;
+            ensure("loads the same bytes", edit.loadBuffer(run.source));
+            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
+            ensure_equals("the height is gone and nothing else moved", edit.text(),
+                "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
+                "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\"/>\n"
+                "</panel>\n");
+            ensure("as one step", edit.undo());
+            ensure_equals("put back whole", edit.text(), run.source);
+        }
+
+        // A name one slip from a real one: the name changes where it stands
+        // and the author's value is untouched.
+        {
+            Run run;
+            ensure("built", run.build(
+                "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>"));
+            const ALXUILint::Finding* f = run.first(ALXUILint::Rule::UnknownAttribute);
+            ensure("found", f != nullptr);
+            ensure("and it is the one", f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+
+            ALXUIEdit edit;
+            ensure("loads the same bytes", edit.loadBuffer(run.source));
+            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
+            ensure_equals("spelt right, in place", edit.text(),
+                "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
+                "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tip=\"near\"/>\n"
+                "</panel>\n");
+            ensure("as one step", edit.undo());
+            ensure_equals("put back whole", edit.text(), run.source);
+        }
+    }
+
+    // And these two write a number, worked out from where the element is in
+    // the tree that was built. The attribute that moves is the one the author
+    // used: no positioning form is ever converted into another.
+    template<> template<>
+    void alxuilint_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        {
+            Run run;
+            ensure("built", run.build(
+                "  <panel name=\"out\" left=\"150\" top=\"60\" width=\"90\" height=\"20\"/>"));
+            const ALXUILint::Finding* f = run.first(ALXUILint::Rule::OutOfBounds);
+            ensure("found", f != nullptr);
+            ensure_equals("forty pixels over", f->fix.dx, -40);
+
+            ALXUIEdit edit;
+            ensure("loads the same bytes", edit.loadBuffer(run.source));
+            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
+            ensure_equals("the left it was written with is the left that moved", edit.text(),
+                "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
+                "  <panel name=\"out\" left=\"110\" top=\"60\" width=\"90\" height=\"20\"/>\n"
+                "</panel>\n");
+            ensure("as one step", edit.undo());
+            ensure_equals("put back whole", edit.text(), run.source);
+        }
+
+        // How wide the text needs to be is the font's answer and not this
+        // test's, so the width asserted is the one the rule worked out. What
+        // is being watched is that it lands on `width` and nowhere else.
+        {
+            Run run;
+            ensure("built", run.build(
+                "  <text name=\"long\" left=\"0\" top=\"0\" width=\"10\" height=\"16\">A good deal of text</text>"));
+            const ALXUILint::Finding* f = run.first(ALXUILint::Rule::Truncation);
+            ensure("found: " + run.describe(), f != nullptr);
+            ensure("and it can be widened", f->fix.did == ALXUILint::Fix::Do::WidenBy);
+            ensure("by something", f->fix.dx > 0);
+
+            ALXUIEdit edit;
+            ensure("loads the same bytes", edit.loadBuffer(run.source));
+            ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
+            ensure_equals("only the width moved", edit.text(),
+                "<panel name=\"root\" layout=\"topleft\" width=\"200\" height=\"100\">\n"
+                "  <text name=\"long\" left=\"0\" top=\"0\" width=\"" + std::to_string(10 + f->fix.dx)
+                + "\" height=\"16\">A good deal of text</text>\n"
+                "</panel>\n");
+            ensure("as one step", edit.undo());
+            ensure_equals("put back whole", edit.text(), run.source);
+        }
+    }
+
+    // A parent that lays its children out itself reads no position from them,
+    // and the file's own root sits where the tool put it. Both are still
+    // reported; neither is offered a fix, because the fix would write a
+    // number nothing reads.
+    template<> template<>
+    void alxuilint_object::test<13>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "  <layout_stack name=\"stack\" orientation=\"vertical\" left=\"0\" top=\"0\""
+            " width=\"200\" height=\"60\">\n"
+            "    <layout_panel name=\"tall\" auto_resize=\"false\" height=\"40\"/>\n"
+            "    <layout_panel name=\"also\" auto_resize=\"false\" height=\"40\"/>\n"
+            "  </layout_stack>"));
+
+        S32 placed = 0;
+        for (const ALXUILint::Finding& f : run.lint.findings())
+        {
+            if (f.rule == ALXUILint::Rule::OutOfBounds || f.rule == ALXUILint::Rule::Truncation)
+            {
+                ++placed;
+                ensure("nothing a stack places is offered a move",
+                       f.fix.did == ALXUILint::Fix::Do::Nothing);
+            }
+        }
+        ensure("and there is one to have refused: " + run.describe(), placed > 0);
     }
 }

@@ -1093,6 +1093,51 @@ bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
     return true;
 }
 
+bool ALXUIEdit::renameAttribute(const path_t& path, const std::string& from, const std::string& to)
+{
+    Step step(*this);
+    mError.clear();
+    if (from == to)
+    {
+        mError = "that is the name it has";
+        return false;
+    }
+    pugi::xml_node node = resolve(path);
+    if (!node)
+    {
+        mError = "no element at that path";
+        return false;
+    }
+
+    Span span;
+    Span whole;
+    if (!spanOf(node, from, span, whole))
+    {
+        mError = "the element does not carry " + from;
+        return false;
+    }
+    // Two of a name on one element is one value chosen by which the parser
+    // reads last, which is not a thing to leave a file in.
+    Span taken;
+    Span taken_whole;
+    if (spanOf(node, to, taken, taken_whole))
+    {
+        mError = "the element already carries " + to;
+        return false;
+    }
+
+    // The name begins at the first byte of the attribute that is not the
+    // whitespace separating it from the one before.
+    size_t at = whole.offset;
+    while (at < mText.size() && isSpace(mText[at]))
+    {
+        ++at;
+    }
+    note(Did::SpeltFieldAgain, path, to);
+    splice(Span{ at, from.size() }, to);
+    return true;
+}
+
 bool ALXUIEdit::isGeometryAttribute(std::string_view name)
 {
     return name == "left" || name == "right" || name == "top" || name == "bottom"

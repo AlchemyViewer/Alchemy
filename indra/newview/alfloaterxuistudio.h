@@ -359,8 +359,10 @@ private:
     void applyFix(const ALXUILint::Finding& finding);
     void onFixSelected();
     void onFixAll();
-    // What pressing it would do, for the button's label and for the row.
+    // What pressing it would do, for the button's label and for the row --
+    // and what it did, once it has.
     std::string describeFix(const ALXUILint::Finding& finding) const;
+    std::string saidFix(const ALXUILint::Finding& finding, const ALXUICatalog::Layer& layer) const;
     // The finding a row of the findings list is about, or null.
     const ALXUILint::Finding* findingForRow(const LLScrollListItem* item) const;
     void refreshFixButtons();

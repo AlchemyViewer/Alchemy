@@ -63,6 +63,16 @@ namespace
             && b.mBottom <= a.mTop - OVERLAP_TOLERANCE;
     }
 
+    // A parent that lays its children out itself reads no position from
+    // them, so a fix that moved or sized one would write a number nothing
+    // reads -- and the file's own root sits wherever the tool put it. Both
+    // are still worth reporting; neither is worth offering to mend.
+    bool placedBySomethingElse(const LLView* view, const LLView* root)
+    {
+        const LLView* parent = view->getParent();
+        return view == root || !parent || parent->as<LLLayoutStack>() != nullptr;
+    }
+
     // A widget's own furniture, which sits over its box by design.
     bool isFurniture(const LLView* view)
     {
@@ -205,6 +215,19 @@ bool ALXUILint::controlExists(const std::string& name, std::string* group)
             }
             return true;
         }
+    }
+    return false;
+}
+
+bool ALXUILint::Finding::applyFix(ALXUIEdit& document, const ALXUIEdit::Anchor& now) const
+{
+    switch (fix.did)
+    {
+    case Fix::Do::TakeAttributeOut: return document.removeAttribute(path, what);
+    case Fix::Do::SpellAttribute:   return document.renameAttribute(path, what, fix.spelling);
+    case Fix::Do::MoveInside:       return document.translate(path, fix.dx, fix.dy, now);
+    case Fix::Do::WidenBy:          return document.resize(path, fix.dx, 0, now);
+    case Fix::Do::Nothing:          break;
     }
     return false;
 }
@@ -371,7 +394,8 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
             // Moving it in only works where it fits: something wider than
             // what holds it leaves by the other edge whichever way it goes,
             // and offering to move that is offering to move it forever.
-            if (rect.getWidth() <= bounds.getWidth() && rect.getHeight() <= bounds.getHeight())
+            if (rect.getWidth() <= bounds.getWidth() && rect.getHeight() <= bounds.getHeight()
+                && !placedBySomethingElse(view, input.root))
             {
                 f.fix.did = Fix::Do::MoveInside;
                 f.fix.dx = rect.mLeft < bounds.mLeft ? bounds.mLeft - rect.mLeft
@@ -409,8 +433,11 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
         {
             Finding& f = add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
                 "the text needs " + std::to_string(width) + " pixels and has " + std::to_string(room));
-            f.fix.did = Fix::Do::WidenBy;
-            f.fix.dx = width - room;
+            if (!placedBySomethingElse(view, input.root))
+            {
+                f.fix.did = Fix::Do::WidenBy;
+                f.fix.dx = width - room;
+            }
         }
     }
 }

@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alxuidiagnostics.h"
+#include "alxuiedit.h"
 #include "alxuiselection.h"
 
 #include <string>
@@ -115,6 +116,15 @@ public:
         // Empty for most of them: a rule that can say what is wrong cannot
         // always say what right would be.
         Fix                     fix;
+
+        // The fix, done, on the document that writes this element. One step,
+        // so one undo puts it back; false where the element or the attribute
+        // is not there any anymore, and the document says why.
+        //
+        // The anchor is what the element occupies now, read from the built
+        // view by whoever has one; only the fixes that move or size something
+        // look at it.
+        bool applyFix(ALXUIEdit& document, const ALXUIEdit::Anchor& now) const;
     };
 
     // What a run has to look at. The tree and the source map are the file

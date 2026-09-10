@@ -3544,6 +3544,7 @@ std::string ALFloaterXUIStudio::describeStep(const ALXUIEdit::Change& change) co
     static const std::map<ALXUIEdit::Did, const char*> said = {
         { ALXUIEdit::Did::WroteField,       "StepWroteField" },
         { ALXUIEdit::Did::TookFieldOut,     "StepTookFieldOut" },
+        { ALXUIEdit::Did::SpeltFieldAgain,  "StepSpeltFieldAgain" },
         { ALXUIEdit::Did::WroteText,        "StepWroteText" },
         { ALXUIEdit::Did::Renamed,          "StepRenamed" },
         { ALXUIEdit::Did::AddedElement,     "StepAddedElement" },
@@ -6620,6 +6621,36 @@ std::string ALFloaterXUIStudio::describeFix(const ALXUILint::Finding& f) const
 // nobody watched happen is one they have to go and find, and the fix writes
 // through the same path a hand edit does -- the same layer, the same live
 // apply, the same history.
+// What the tool says it did, once it has. The words are chosen here for the
+// same reason the operation is named in the library: a document says what it
+// did in its own terms, and English is not one of them.
+std::string ALFloaterXUIStudio::saidFix(const ALXUILint::Finding& f,
+                                        const ALXUICatalog::Layer& layer) const
+{
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = f.what;
+    args["[NAME]"] = f.fix.spelling;
+    args["[DX]"] = std::to_string(f.fix.dx);
+    args["[DY]"] = std::to_string(f.fix.dy);
+    args["[WHERE]"] = f.path.empty() ? mFile : f.path.back();
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer.skin + "/" + layer.language;
+    switch (f.fix.did)
+    {
+    case ALXUILint::Fix::Do::TakeAttributeOut: return getString("FixDidTakeOut", args);
+    case ALXUILint::Fix::Do::SpellAttribute:   return getString("FixDidSpell", args);
+    case ALXUILint::Fix::Do::MoveInside:       return getString("FixDidMove", args);
+    case ALXUILint::Fix::Do::WidenBy:          return getString("FixDidWiden", args);
+    case ALXUILint::Fix::Do::Nothing:          break;
+    }
+    return std::string();
+}
+
+// One finding, put right. The element it is about is selected first: an edit
+// nobody watched happen is one they have to go and find. The operation itself
+// belongs to the finding, so what is pressed here is what the tests watch
+// write bytes; this chooses the layer it is written into and says what
+// happened, which are the two things a library has no business deciding.
 void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
 {
     if (f.fix.did == ALXUILint::Fix::Do::Nothing)
@@ -6635,49 +6666,48 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
         setStatus(getString("FixOtherFile", args));
         return;
     }
-    if (f.path.empty() && f.fix.did != ALXUILint::Fix::Do::TakeAttributeOut)
-    {
-        return;
-    }
     mSelection.select(f.path);
 
-    switch (f.fix.did)
+    // Where it is written: the layer that already positions the element when
+    // there is one, else the file's own base layer. The same choice a hand
+    // edit makes, because a fix is a hand edit the tool typed out.
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer)
     {
-    case ALXUILint::Fix::Do::TakeAttributeOut:
-        onFieldRemove(f.what);
-        break;
-
-    case ALXUILint::Fix::Do::SpellAttribute:
+        const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+        const std::vector<const ALXUICatalog::Layer*> layers = entry
+            ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
+            : std::vector<const ALXUICatalog::Layer*>();
+        layer = layers.empty() ? nullptr : layers.front();
+    }
+    ALXUIEdit* held = layer ? document(*layer) : nullptr;
+    if (!held)
     {
-        // Two operations and one thing done: what the author wrote is kept
-        // and only the name it was written under changes, so putting it back
-        // has to put back both.
-        const ALXUICatalog::Layer* layer = editTarget();
-        ALXUIEdit* held = layer ? document(*layer) : nullptr;
-        std::string value;
-        if (!held || !held->fieldText(f.path, f.what, value))
-        {
-            setStatus(getString("FixGone"));
-            return;
-        }
-        ALXUIDocuments::Action together(mDocuments);
-        onFieldRemove(f.what);
-        onFieldCommit(f.fix.spelling, value);
-        break;
+        setStatus(getString("EditNoTarget"));
+        return;
     }
 
-    case ALXUILint::Fix::Do::MoveInside:
-        // Every edge by the same amount, which is what a move is.
-        applyEdges(f.fix.dx, f.fix.dy, f.fix.dx, f.fix.dy);
-        break;
-
-    case ALXUILint::Fix::Do::WidenBy:
-        applyEdges(0, 0, f.fix.dx, 0);
-        break;
-
-    case ALXUILint::Fix::Do::Nothing:
-        break;
+    // What the element occupies now, which is what a move or a resize is
+    // measured from. The rules do not offer either where the element's place
+    // is not the file's to write, so a fix that needs this has a view.
+    ALXUIEdit::Anchor now;
+    if (LLView* view = selectedView(); view && view->getParent())
+    {
+        const LLRect& rect = view->getRect();
+        now.left = rect.mLeft;
+        now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+        now.bottom = rect.mBottom;
+        now.width = rect.getWidth();
+        now.height = rect.getHeight();
+        now.topLeft = view->isLayoutTopLeft();
     }
+
+    if (!f.applyFix(*held, now))
+    {
+        setStatus(held->error().empty() ? getString("FixGone") : held->error());
+        return;
+    }
+    documentChanged(saidFix(f, *layer));
 }
 
 void ALFloaterXUIStudio::onFixSelected()
