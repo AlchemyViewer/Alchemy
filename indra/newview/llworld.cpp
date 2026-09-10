@@ -364,17 +364,28 @@ LLVector3d  LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLV
     LLVector3 region_coord = regionp->getPosRegionFromGlobal(end_pos);
     F64 clip_factor = 1.0;
     F32 region_width = regionp->getWidth();
+
+    // How far back along the travel to walk to land on the border. The axis that left the region
+    // is not always the axis that moved: a position that was already outside on one axis and is
+    // travelling purely along the other divides by a zero delta here, and the resulting infinity
+    // survives llclamp as a NaN that ends up in the object's position and then in the octree.
+    // With no motion on the offending axis there is no crossing to solve for, so hold still.
+    auto clip_along = [](F64 excess, F64 travel) -> F64
+    {
+        return (travel > 0.0) ? (excess / travel) : 0.0;
+    };
+
     if (region_coord.mV[VX] < 0.f)
     {
         if (region_coord.mV[VY] < region_coord.mV[VX])
         {
             // clip along y -
-            clip_factor = -(region_coord.mV[VY] / delta_pos_abs.mdV[VY]);
+            clip_factor = clip_along(-region_coord.mV[VY], delta_pos_abs.mdV[VY]);
         }
         else
         {
             // clip along x -
-            clip_factor = -(region_coord.mV[VX] / delta_pos_abs.mdV[VX]);
+            clip_factor = clip_along(-region_coord.mV[VX], delta_pos_abs.mdV[VX]);
         }
     }
     else if (region_coord.mV[VX] > region_width)
@@ -382,23 +393,23 @@ LLVector3d  LLWorld::clipToVisibleRegions(const LLVector3d &start_pos, const LLV
         if (region_coord.mV[VY] > region_coord.mV[VX])
         {
             // clip along y +
-            clip_factor = (region_coord.mV[VY] - region_width) / delta_pos_abs.mdV[VY];
+            clip_factor = clip_along(region_coord.mV[VY] - region_width, delta_pos_abs.mdV[VY]);
         }
         else
         {
             //clip along x +
-            clip_factor = (region_coord.mV[VX] - region_width) / delta_pos_abs.mdV[VX];
+            clip_factor = clip_along(region_coord.mV[VX] - region_width, delta_pos_abs.mdV[VX]);
         }
     }
     else if (region_coord.mV[VY] < 0.f)
     {
         // clip along y -
-        clip_factor = -(region_coord.mV[VY] / delta_pos_abs.mdV[VY]);
+        clip_factor = clip_along(-region_coord.mV[VY], delta_pos_abs.mdV[VY]);
     }
     else if (region_coord.mV[VY] > region_width)
     {
         // clip along y +
-        clip_factor = (region_coord.mV[VY] - region_width) / delta_pos_abs.mdV[VY];
+        clip_factor = clip_along(region_coord.mV[VY] - region_width, delta_pos_abs.mdV[VY]);
     }
 
     // clamp to within region dimensions
