@@ -208,11 +208,15 @@ void ALJumpBar::buildNow()
     if (first > 0)
     {
         std::vector<std::pair<std::string, std::string> > swallowed;
+        std::string names;
         for (size_t i = 0; i < first && i < mCrumbs.size(); ++i)
         {
             swallowed.emplace_back(mCrumbs[i].label, mCrumbs[i].value);
+            names += (names.empty() ? "" : " > ") + mCrumbs[i].label;
         }
-        crumb(first - 1, FOLD_LABEL, swallowed, mCrumbs[first - 1].value, std::string());
+        // Its tip is the path it swallowed: names, which are the file's
+        // words and not this library's.
+        crumb(first - 1, FOLD_LABEL, swallowed, mCrumbs[first - 1].value, names);
     }
 
     for (size_t i = first; i < mCrumbs.size(); ++i)

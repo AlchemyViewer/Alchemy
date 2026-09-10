@@ -1987,6 +1987,7 @@ bool ALFloaterXUIStudio::postBuild()
     cp.name = "find_count";
     cp.rect = LLRect(0, 22, 110, 0);
     cp.font_halign = LLFontGL::RIGHT;
+    cp.tool_tip = getString("FindCountTip");
     mFindCount = LLUICtrlFactory::create<LLTextBox>(cp);
     mFindBar->setAdornment(mFindCount);
     // Return runs it; changing a dropdown re-runs whatever is already typed,
@@ -2574,6 +2575,7 @@ void ALFloaterXUIStudio::buildFindBar()
     query.kind = ALScopeBar::Segment::Kind::Field;
     query.name = "query";
     query.text = getString("FindPlaceholder");
+    query.toolTip = getString("FindQueryTip");
     said.push_back(query);
 
     ALScopeBar::Segment in;
@@ -8248,6 +8250,9 @@ void ALFloaterXUIStudio::refreshBreadcrumb()
     {
         ALJumpBar::Crumb crumb;
         crumb.label = i == 0 ? pv.root->getName() : path[i - 1];
+        LLStringUtil::format_map_t crumb_args;
+        crumb_args["[NAME]"] = crumb.label;
+        crumb.toolTip = getString(i == 0 ? "CrumbRootTip" : "CrumbTip", crumb_args);
         // The value is the path to it, said as text: what a crumb chosen
         // means is "select this", and a path is what a selection is.
         const ALXUISelection::path_t prefix(path.begin(), path.begin() + i);
@@ -8276,6 +8281,11 @@ void ALFloaterXUIStudio::refreshBreadcrumb()
                 if (crumb.alternatives.size() < 2)
                 {
                     crumb.alternatives.clear();
+                }
+                else
+                {
+                    crumb_args["[COUNT]"] = std::to_string(crumb.alternatives.size() - 1);
+                    crumb.toolTip = getString("CrumbSiblingsTip", crumb_args);
                 }
             }
         }
@@ -9509,31 +9519,39 @@ void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
     lp.draw_heading = true;
     lp.multi_select = false;
     lp.column_padding = 0;
+    LLStringUtil::format_map_t tip_args;
+    tip_args["[ATTR]"] = field;
+    lp.tool_tip = getString("GutterListTip", tip_args);
     mGutterList = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
     content->addChild(mGutterList);
 
     LLScrollListColumn::Params force;
     force.name = "force";
+    force.tool_tip = getString("GutterForceTip");
     force.width.pixel_width = 16;
     mGutterList->addColumn(force);
     LLScrollListColumn::Params layer;
     layer.name = "layer";
     layer.header.label = getString("GutterLayer");
+    layer.tool_tip = getString("GutterLayerTip");
     layer.width.pixel_width = 110;
     mGutterList->addColumn(layer);
     LLScrollListColumn::Params value;
     value.name = "value";
     value.header.label = getString("GutterSays");
+    value.tool_tip = getString("GutterSaysTip", tip_args);
     value.width.dynamic_width = true;
     mGutterList->addColumn(value);
     LLScrollListColumn::Params line;
     line.name = "line";
+    line.tool_tip = getString("GutterLineTip");
     line.width.pixel_width = 40;
     mGutterList->addColumn(line);
 
     LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
     bp.name = "write_here";
     bp.label = getString("GutterWriteHere");
+    bp.tool_tip = getString("GutterWriteHereTip", tip_args);
     bp.rect = LLRect(0, FOOT - 2, 100, 2);
     bp.follows.flags = FOLLOWS_LEFT | FOLLOWS_BOTTOM;
     LLButton* write = LLUICtrlFactory::create<LLButton>(bp);

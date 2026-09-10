@@ -99,6 +99,17 @@
     <floater.string name="GutterLayer">Layer</floater.string>
     <floater.string name="GutterSays">Says</floater.string>
     <floater.string name="GutterWriteHere">Write here</floater.string>
+    <floater.string name="GutterListTip">Every layer of this file, and what each says about [ATTR]; a dot marks the one the merge takes. Choose a layer and press Write here to give it the value in force.</floater.string>
+    <floater.string name="GutterForceTip">A dot marks the layer whose value is in force</floater.string>
+    <floater.string name="GutterLayerTip">The skin and the language the layer belongs to, in the order they are merged</floater.string>
+    <floater.string name="GutterSaysTip">What this layer writes for [ATTR], or nothing where it does not write it</floater.string>
+    <floater.string name="GutterLineTip">The line the element starts on in that layer</floater.string>
+    <floater.string name="GutterWriteHereTip">Write the value of [ATTR] that is in force into the chosen layer, so that layer has the last word about it</floater.string>
+    <floater.string name="FindCountTip">How many places the words were found, in how many files</floater.string>
+    <floater.string name="FindQueryTip">The words to look for. Return runs the search; the results list where they were found, by file.</floater.string>
+    <floater.string name="CrumbRootTip">The root of the file: press to select it</floater.string>
+    <floater.string name="CrumbTip">Press to select [NAME]</floater.string>
+    <floater.string name="CrumbSiblingsTip">Press to select [NAME]; the arrow offers the [COUNT] other elements beside it</floater.string>
     <floater.string name="BreadcrumbCodeBuilt">code-built</floater.string>
     <floater.string name="QuickOpenTitle">Open quickly</floater.string>
     <floater.string name="QuickOpenPlaceholder">a few letters of the file name</floater.string>
@@ -810,6 +821,7 @@
                              layout="topleft"
                              left="0"
                              name="breadcrumb"
+                             tool_tip="Where the selected element is, from the root of the file down. Press a step to select it; press its arrow to pick one of the elements beside it instead."
                              top="0"
                              width="376" />
                         </layout_panel>
@@ -930,6 +942,7 @@
                              layout="topleft"
                              left="0"
                              name="find_bar"
+                             tool_tip="A search said as a sentence: what kind of thing to look for, how the words have to match, the words, and which layers to look in. Return runs it, and changing a word runs it again."
                              top="0"
                              width="376" />
                         </layout_panel>
@@ -1131,6 +1144,7 @@
                              left="2"
                              name="palette_note"
                              right="-2"
+                             tool_tip="What the chosen tag is for, in a sentence from xui_notes.xml; a tag nobody has written one for says nothing here"
                              top="2"
                              use_ellipses="true"
                              word_wrap="true" />
@@ -1536,7 +1550,7 @@
                                  layout="topleft"
                                  left_pad="4"
                                  name="finding_rule"
-                                 tool_tip="One rule, with how many it found"
+                                 tool_tip="Only the findings of one rule; each rule that found something is listed with how many"
                                  top_delta="0"
                                  width="190" />
                                 <combo_box
@@ -1545,7 +1559,7 @@
                                  layout="topleft"
                                  left_pad="4"
                                  name="finding_severity"
-                                 tool_tip="How much of it to show"
+                                 tool_tip="The least severe finding to show: errors alone, warnings and errors, or everything down to notes"
                                  top_delta="0"
                                  width="150">
                                     <combo_box.item label="Everything" name="everything" value="" />
@@ -1594,7 +1608,7 @@
                                     <scroll_list.columns
                                      label=""
                                      name="severity"
-                                     tool_tip="error, warning or note"
+                                     tool_tip="How bad it is: an error means the element does not work, a warning that it probably does not do what the file says, and a note is worth a look and often on purpose"
                                      width="52" />
                                     <scroll_list.columns
                                      label="Rule"
@@ -1652,6 +1666,7 @@
                                  layout="topleft"
                                  left_pad="10"
                                  name="finding_count"
+                                 tool_tip="How many findings the list shows, of how many it could, and how many files a Lint All has read"
                                  top_delta="4"
                                  width="440" />
                             </layout_panel>
@@ -1735,6 +1750,7 @@
                                  layout="topleft"
                                  left_pad="12"
                                  name="translate_counts"
+                                 tool_tip="The rows by what state they are in: translated, missing from the language, written at a path the base has moved on from, translated but with different placeholders, or marked not to be translated"
                                  top_delta="3"
                                  use_ellipses="true"
                                  width="284" />
@@ -1918,6 +1934,7 @@
                          layout="topleft"
                          left="0"
                          name="history"
+                         tool_tip="Everything done to the open files, newest first, with a mark on the present. Click a step to see the element it was about; double-click one to put the files back the way they were just after it."
                          top="0"
                          width="742" />
                     </panel>
@@ -2066,6 +2083,7 @@
                      left="8"
                      name="attributes_what"
                      text_color="EmphasisColor"
+                     tool_tip="The selected element: its name, its tag as the file writes it, and the class the viewer built for it"
                      top="6"
                      use_ellipses="true"
                      width="300">Nothing selected</text>
@@ -2163,6 +2181,7 @@
                              layout="topleft"
                              left="2"
                              name="source_layers"
+                             tool_tip="Every layer of this file, with the line the selected element starts on in each, in the order they are merged; a dash where the layer does not carry it"
                              top="4"
                              use_ellipses="true"
                              width="380" />
@@ -2237,6 +2256,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="override_field"
+                             tool_tip="The field the list below is about, and what Write here writes: the value in force, into the layer chosen there"
                              top_delta="4"
                              use_ellipses="true"
                              width="380" />

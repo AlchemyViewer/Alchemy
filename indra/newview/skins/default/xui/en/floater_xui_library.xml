@@ -135,6 +135,7 @@
                  layout="topleft"
                  min_dim="48"
                  name="library_specimen"
+                 tool_tip="One of the chosen tag, built from nothing but a name and a size, so the word has the widget beside it; a tag that needs more than that to build leaves this empty"
                  width="604" />
                 <layout_panel
                  auto_resize="true"
