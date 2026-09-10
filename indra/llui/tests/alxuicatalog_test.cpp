@@ -218,7 +218,7 @@ namespace tut
         ensure_equals("buttons by tag: two in en, one in de, the template", hits.size(), 4u);
         ensure_equals("in floater_a", hitsIn(hits, "floater_a.xml"), 3u);
 
-        hits = catalog.find("button", ALXUICatalog::Field::Tag, "default", "en");
+        hits = catalog.find("button", ALXUICatalog::Field::Tag, ALXUICatalog::Match::Containing, "default", "en");
         ensure_equals("scoped to a skin and language", hits.size(), 3u);
 
         hits = catalog.find("title", ALXUICatalog::Field::Attribute);
