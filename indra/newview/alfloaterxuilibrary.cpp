@@ -140,7 +140,9 @@ std::string ALFloaterXUILibrary::groupOf(const std::string& tag)
 void ALFloaterXUILibrary::fillTags()
 {
     const std::string chosen = mTags->getSelectedValue().asString();
-    const std::string filter = mFilter ? mFilter->getText() : std::string();
+    // Every tag is lower case; what is typed to find one need not be.
+    std::string filter = mFilter ? mFilter->getText() : std::string();
+    LLStringUtil::toLower(filter);
     mTags->deleteAllItems();
 
     // Grouped, and each group in one place: the list is read down, so a tag
@@ -175,9 +177,13 @@ void ALFloaterXUILibrary::fillTags()
         row["columns"][0]["value"] = "    " + tag;
         mTags->addElement(row);
     }
+    // Put back without being chosen again, then described once: choosing
+    // it again would describe it, and so would the line after.
     if (!chosen.empty())
     {
+        mTags->setCommitOnSelectionChange(false);
         mTags->setSelectedByValue(chosen, true);
+        mTags->setCommitOnSelectionChange(true);
     }
     onTagSelected();
 }
@@ -320,7 +326,8 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
     if (const ALXUICatalog* catalog = ALFloaterXUILibrary::catalogOf())
     {
         std::set<const ALXUICatalog::Entry*> files;
-        for (const ALXUICatalog::Hit& hit : catalog->find(tag, ALXUICatalog::Field::Tag))
+        for (const ALXUICatalog::Hit& hit : catalog->find(tag, ALXUICatalog::Field::Tag,
+                                                          ALXUICatalog::Match::Matching))
         {
             files.insert(hit.entry);
         }

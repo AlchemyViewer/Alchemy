@@ -2183,20 +2183,14 @@ void ALFloaterXUIStudio::draw()
         }
         mReloadEntryOnly = false;
         // A rebuild is not a new preview: it stays where it was put, and it
-        // keeps the keyboard. Without this the arrows move an element once
-        // and then nothing -- whatever they were going to is gone, and its
-        // replacement has never been focused.
-        //
-        // Both places a preview can be: a window of its own, and the canvas
-        // in this one, which is where it is unless somebody asked otherwise.
-        // Only the first of those was put back, so a nudge on the canvas --
-        // which is every nudge, most days -- worked exactly once.
+        // keeps the keyboard, wherever the keyboard was -- a window of its
+        // own, the canvas in this one, or the outline, which is made again
+        // with the preview. An arrow key moves an element by way of a
+        // rebuild, and the next arrow has to reach the same place.
         const LLFloater* was_host = mPreviews[PRIMARY].host.get();
         const LLView* was_canvas = mCanvases[PRIMARY];
         const bool host_had = was_host && gFocusMgr.childHasKeyboardFocus(was_host);
         const bool canvas_had = was_canvas && gFocusMgr.childHasKeyboardFocus(was_canvas);
-        // And the outline, which is made again with the preview: an arrow
-        // pressed in it moved an element and then the next one went nowhere.
         const bool tree_had = mTree && gFocusMgr.childHasKeyboardFocus(mTree);
         mKeepPlace = true;
         showPreviews();
@@ -2525,9 +2519,17 @@ void ALFloaterXUIStudio::onFileSelected()
 
 void ALFloaterXUIStudio::onSkinOrLanguage()
 {
+    const bool renamed = mSkin != mSkinCombo->getValue().asString()
+                      || mLanguage != mLanguageCombo->getValue().asString();
     mSkin = mSkinCombo->getValue().asString();
     mLanguage = mLanguageCombo->getValue().asString();
     mLanguage2 = mLanguageCombo2->getValue().asString();
+    if (renamed && mFindBar)
+    {
+        // Two of the scopes are named after this skin and this language;
+        // the sentence keeps what is chosen and says the new names.
+        buildFindBar();
+    }
     saveState();
     fillCatalog();
     if (!mFile.empty())
@@ -5723,7 +5725,11 @@ void ALFloaterXUIStudio::showGallery()
     host->center();
     gFloaterView->adjustToFitScreen(host, false);
     host->openFloater();
-    setStatus("Gallery: " + std::to_string(built) + " widgets in " + mSkin + "/" + mLanguage);
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(built);
+    args["[SKIN]"] = mSkin;
+    args["[LANG]"] = mLanguage;
+    setStatus(getString("GalleryBuilt", args));
 }
 
 // ---------------------------------------------------------------------------
@@ -6450,7 +6456,7 @@ void ALFloaterXUIStudio::capturePreview()
     if (!gViewerWindow->rawSnapshot(shot, window_width, window_height, /*keep_window_aspect=*/true,
                                     /*is_texture=*/false, /*show_ui=*/true, /*show_hud=*/false))
     {
-        setStatus("The window would not give a snapshot.");
+        setStatus(getString("CaptureNoSnapshot"));
         return;
     }
 
@@ -6467,7 +6473,7 @@ void ALFloaterXUIStudio::capturePreview()
     const S32 height = top - bottom;
     if (width <= 0 || height <= 0)
     {
-        setStatus("The preview is off screen.");
+        setStatus(getString("CaptureOffScreen"));
         return;
     }
 
@@ -6501,14 +6507,25 @@ void ALFloaterXUIStudio::capturePreview()
 
 void ALFloaterXUIStudio::writeCapture(const std::vector<std::string>& filenames)
 {
-    if (filenames.empty() || mCapture.isNull())
+    // Whichever way this goes the picture is not wanted afterwards: a
+    // picker cancelled is a capture nobody wants written.
+    const LLPointer<LLImageRaw> capture = mCapture;
+    mCapture = nullptr;
+    if (filenames.empty() || capture.isNull())
     {
         return;
     }
-    const std::string path = filenames.front();
+    std::string path = filenames.front();
 
     std::string extension = gDirUtilp->getExtension(path);
     LLStringUtil::toLower(extension);
+    if (extension.empty())
+    {
+        // A picture of a floater is a PNG unless the author says
+        // otherwise, and the file says what it is.
+        extension = "png";
+        path += ".png";
+    }
     LLPointer<LLImageFormatted> image;
     if (extension == "jpg" || extension == "jpeg")
     {
@@ -6528,19 +6545,19 @@ void ALFloaterXUIStudio::writeCapture(const std::vector<std::string>& filenames)
     }
     else
     {
-        // Including no extension at all: a picture of a floater is a PNG
-        // unless the author says otherwise.
         image = new LLImagePNG;
     }
 
-    if (!image->encode(mCapture, 0.f) || !image->save(path))
+    LLStringUtil::format_map_t args;
+    args["[PATH]"] = path;
+    if (!image->encode(capture, 0.f) || !image->save(path))
     {
-        setStatus("Could not write " + path);
+        setStatus(getString("CaptureWriteFailed", args));
         return;
     }
-    setStatus("Captured " + std::to_string(mCapture->getWidth()) + " by "
-              + std::to_string(mCapture->getHeight()) + " to " + path);
-    mCapture = nullptr;
+    args["[WIDTH]"] = std::to_string(capture->getWidth());
+    args["[HEIGHT]"] = std::to_string(capture->getHeight());
+    setStatus(getString("CaptureWritten", args));
 }
 
 // Every file in the catalog, checked a few per frame. What each of them said
@@ -10111,7 +10128,10 @@ void ALFloaterXUIStudio::openInEditor(const std::string& path, S32 line)
         setStatus(LLExternalEditor::getErrorMessage(status));
         return;
     }
-    setStatus("Opened " + path + ":" + std::to_string(line));
+    LLStringUtil::format_map_t args;
+    args["[PATH]"] = path;
+    args["[LINE]"] = std::to_string(line);
+    setStatus(getString("EditorOpened", args));
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,12 @@
  width="1620">
     <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
     <floater.string name="NoFile">Select a file.</floater.string>
+    <floater.string name="CaptureNoSnapshot">The window would not give a snapshot.</floater.string>
+    <floater.string name="CaptureOffScreen">The preview is off screen.</floater.string>
+    <floater.string name="CaptureWriteFailed">Could not write [PATH]</floater.string>
+    <floater.string name="CaptureWritten">Captured [WIDTH] by [HEIGHT] to [PATH]</floater.string>
+    <floater.string name="GalleryBuilt">Gallery: [COUNT] widgets in [SKIN]/[LANG]</floater.string>
+    <floater.string name="EditorOpened">Opened [PATH]:[LINE]</floater.string>
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
     <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
     <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]</floater.string>
