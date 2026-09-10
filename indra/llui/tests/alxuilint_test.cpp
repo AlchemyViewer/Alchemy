@@ -421,4 +421,32 @@ namespace tut
         ensure("the cross-axis name is the one reported", first != nullptr);
         ensure_equals("named by attribute", first->what, std::string("min_height"));
     }
+
+    // An attribute written as the value the element already carries. The
+    // schema knows what that is because it serializes the block a widget is
+    // built from, so this is a thing the tool could not say at all until it
+    // did. Worth a look rather than a fault: a number written where a reader
+    // would otherwise have to know it is a reasonable thing to write.
+    template<> template<>
+    void alxuilint_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
+            "  <button name=\"said\" left=\"0\" top=\"0\" width=\"80\" height=\"23\"/>\n"
+            "  <button name=\"quiet\" left=\"0\" top=\"40\" width=\"80\"/>\n"
+            "</panel>"));
+
+        ensure_equals(run.describe(), run.count(ALXUILint::Rule::WroteTheDefault), 1);
+        const ALXUILint::Finding* said = run.first(ALXUILint::Rule::WroteTheDefault);
+        ensure("the one that wrote it is the one reported", said != nullptr);
+        ensure_equals("named by attribute", said->what, std::string("height"));
+        ensure("and it is worth a look rather than a fault",
+               said->severity == ALXUILint::Severity::Note);
+    }
 }

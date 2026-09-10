@@ -689,7 +689,11 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         LLLineEditor::Params p;
         p.name = name;
         p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
-        p.initial_value = field.value;
+        // Nobody wrote this one, so what the element carries goes behind the
+        // box rather than in it: a value in the box is one the file writes,
+        // and reading it as one is reading the file wrong.
+        p.initial_value = field.authored ? field.value : LLStringUtil::null;
+        p.label = field.authored ? LLStringUtil::null : field.value;
         p.commit_on_focus_lost = true;
         editor = LLUICtrlFactory::create<LLLineEditor>(p);
     }

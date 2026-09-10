@@ -162,6 +162,7 @@ const char* ALXUILint::ruleName(Rule rule)
     case Rule::Truncation:              return "truncation";
     case Rule::TemplateRootMismatch:    return "template root";
     case Rule::UnknownAttribute:        return "unknown attribute";
+    case Rule::WroteTheDefault:         return "wrote the default";
     case Rule::DanglingImage:           return "dangling image";
     case Rule::DanglingColor:           return "dangling colour";
     case Rule::DanglingFont:            return "dangling font";
@@ -476,6 +477,22 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
         {
             add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
                 "<" + schema->name + "> has no parameter named \"" + name + "\"");
+        }
+
+        // Written as the value this widget already carries -- and carries
+        // because somebody chose it for this widget, not because it is where
+        // the type starts: `left="0"` says where a thing goes and repeats
+        // nobody. Often on purpose even so, a number written where a reader
+        // would otherwise have to know it, so this is worth a look rather
+        // than a fault. Compared as the two files spell it, so a value spelt
+        // another way than the template spells it is passed over rather than
+        // guessed at.
+        if (const ALXUISchema::Attribute* declared =
+                schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
+            declared && declared->declared && declared->held == value)
+        {
+            add(Rule::WroteTheDefault, Severity::Note, path, input.file, line, name,
+                "\"" + name + "\" is written as what it already is");
         }
 
         if (!looksLikeName(value))
