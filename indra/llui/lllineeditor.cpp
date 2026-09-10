@@ -2377,7 +2377,10 @@ void LLLineEditor::draw()
 
                 ime_pos.mX = (S32) (ime_pos.mX * LLUI::getScaleFactor().mV[VX]);
                 ime_pos.mY = (S32) (ime_pos.mY * LLUI::getScaleFactor().mV[VY]);
-                getWindow()->setLanguageTextInput( ime_pos );
+                if (LLWindow* window = getWindow())
+                {
+                    window->setLanguageTextInput(ime_pos);
+                }
             }
         }
 

@@ -358,13 +358,19 @@ bool LLDragHandle::handleHover(S32 x, S32 y, MASK mask)
         mDragLastScreenX += delta_x;
         mDragLastScreenY += delta_y;
 
-        getWindow()->setCursor(UI_CURSOR_ARROW);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (active)" <<LL_ENDL;
         handled = true;
     }
     else
     {
-        getWindow()->setCursor(UI_CURSOR_ARROW);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
         LL_DEBUGS("UserInput") << "hover handled by " << getName() << " (inactive)" << LL_ENDL;
         handled = true;
     }

@@ -793,7 +793,10 @@ void LLTextBase::drawCursor()
 
             ime_pos.mX = (S32) (ime_pos.mX * LLUI::getScaleFactor().mV[VX]);
             ime_pos.mY = (S32) (ime_pos.mY * LLUI::getScaleFactor().mV[VY]);
-            getWindow()->setLanguageTextInput( ime_pos );
+            if (LLWindow* window = getWindow())
+            {
+                window->setLanguageTextInput(ime_pos);
+            }
         }
     }
 }
@@ -4192,7 +4195,10 @@ bool LLNormalTextSegment::handleHover(S32 x, S32 y, MASK mask)
         // Only process the click if it's actually in this segment, not to the right of the end-of-line.
         if(mEditor.getSegmentAtLocalPos(x, y, false) == this)
         {
-            LLUI::getInstance()->getWindow()->setCursor(UI_CURSOR_HAND);
+            if (LLWindow* window = LLUI::getInstance()->getWindow())
+            {
+                window->setCursor(UI_CURSOR_HAND);
+            }
             return true;
         }
     }

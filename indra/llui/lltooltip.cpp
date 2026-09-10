@@ -360,7 +360,10 @@ bool LLToolTip::handleHover(S32 x, S32 y, MASK mask)
     LLPanel::handleHover(x, y, mask);
     if (mHasClickCallback)
     {
-        getWindow()->setCursor(UI_CURSOR_HAND);
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_HAND);
+        }
     }
     return true;
 }

@@ -681,7 +681,10 @@ void LLComboBox::showList()
 {
     // Make sure we don't go off top of screen.
     LLCoordWindow window_size;
-    getWindow()->getSize(&window_size);
+    if (LLWindow* window = getWindow())
+    {
+        window->getSize(&window_size);
+    }
     //HACK: shouldn't have to know about scale here
     mList->fitContents( 192, llfloor((F32)window_size.mY / LLUI::getScaleFactor().mV[VY]) - 50 );
 
