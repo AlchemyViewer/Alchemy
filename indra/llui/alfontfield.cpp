@@ -55,6 +55,7 @@ namespace
     // and nothing here is a sentence, which is the point -- what is being
     // looked at is the shapes.
     const std::string SPECIMEN("Aa Bb Cc Gg 0123");
+    const std::string SAMPLE("Aa");
 
     // What files write, which is not what LLFontGL::getStringFromStyle
     // writes: that leads every spelling with NORMAL, and the shipped files
@@ -92,6 +93,13 @@ namespace
             mChose(std::move(chose))
         {
             mAll = LLFontGL::getDeclaredFontNames();
+            // Each name's face, found once: a registry lookup builds a
+            // descriptor of three strings, and the list is drawn every frame.
+            mFonts.reserve(mAll.size());
+            for (const std::string& name : mAll)
+            {
+                mFonts.push_back(fontOf(name, LLStringUtil::null, LLStringUtil::null));
+            }
             filter(LLStringUtil::null);
         }
 
@@ -102,13 +110,13 @@ namespace
             std::string wanted(text);
             LLStringUtil::toLower(wanted);
             mShown.clear();
-            for (const std::string& name : mAll)
+            for (size_t i = 0; i < mAll.size(); ++i)
             {
-                std::string lower(name);
+                std::string lower(mAll[i]);
                 LLStringUtil::toLower(lower);
                 if (wanted.empty() || lower.find(wanted) != std::string::npos)
                 {
-                    mShown.push_back(&name);
+                    mShown.push_back(i);
                 }
             }
             reshape(getRect().getWidth(), llmax<S32>(1, (S32)mShown.size()) * ROW, false);
@@ -123,17 +131,17 @@ namespace
             for (size_t i = 0; i < mShown.size(); ++i)
             {
                 const LLRect row = rectOf((S32)i);
-                if (*mShown[i] == mChosen || (S32)i == mHover)
+                const std::string& name = mAll[mShown[i]];
+                if (name == mChosen || (S32)i == mHover)
                 {
-                    gl_rect_2d(row, picked.get(), *mShown[i] == mChosen);
+                    gl_rect_2d(row, picked.get(), name == mChosen);
                 }
-                label_font->renderUTF8(*mShown[i], 0, row.mLeft + 4, row.mBottom + 5,
+                label_font->renderUTF8(name, 0, row.mLeft + 4, row.mBottom + 5,
                                        ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
                 // The specimen: the same letters on every row, so that what
                 // differs between two of them is the only thing that differs.
-                const LLFontGL* font = fontOf(*mShown[i], LLStringUtil::null, LLStringUtil::null);
-                font->renderUTF8(SPECIMEN, 0, row.mLeft + 150, row.mBottom + 5,
-                                 ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+                mFonts[mShown[i]]->renderUTF8(SPECIMEN, 0, row.mLeft + 150, row.mBottom + 5,
+                                              ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
             }
         }
 
@@ -148,7 +156,7 @@ namespace
             const S32 which = at(x, y);
             if (which >= 0)
             {
-                mChosen = *mShown[which];
+                mChosen = mAll[mShown[which]];
                 mChose(mChosen);
                 return true;
             }
@@ -175,7 +183,8 @@ namespace
         }
 
         std::vector<std::string>            mAll;
-        std::vector<const std::string*>     mShown;
+        std::vector<const LLFontGL*>        mFonts;     // one per name, found once
+        std::vector<size_t>                 mShown;     // into mAll
         std::string                         mChosen;
         chose_t                             mChose;
         S32                                 mHover = -1;
@@ -417,9 +426,16 @@ void ALFontField::draw()
     static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
     const LLRect sample(0, getRect().getHeight() - 2, mSampleWidth, 2);
     gl_rect_2d(sample, edge.get(), false);
-    const LLFontGL* font = fontOf(mName, mSize, mStyle);
-    font->renderUTF8(std::string("Aa"), 0, sample.mLeft + 3, sample.mBottom + 2,
-                     ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+    // Found again only when a part has changed: a lookup builds a
+    // descriptor, and a name nobody declared would have the registry try
+    // to make a font of it, and say so, on every frame it was drawn.
+    if (!mFont || mFontOf != mName + "|" + mSize + "|" + mStyle)
+    {
+        mFont = fontOf(mName, mSize, mStyle);
+        mFontOf = mName + "|" + mSize + "|" + mStyle;
+    }
+    mFont->renderUTF8(SAMPLE, 0, sample.mLeft + 3, sample.mBottom + 2,
+                      ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
     LLUICtrl::draw();
 }
 

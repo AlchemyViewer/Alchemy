@@ -192,7 +192,11 @@ void ALDockPanel::dock()
     // not come round again through it.
     mFloater.markDead();
 
+    // And home forgotten once it is back: the window's close comes round
+    // through here as well, and a pane put back twice is taken out of its
+    // home and put in again for nothing.
     LLView* home = mHome.get();
+    mHome.markDead();
     if (home)
     {
         if (floater)

@@ -447,11 +447,20 @@ ALColorField::~ALColorField()
 
 void ALColorField::setValue(const LLSD& value)
 {
-    mText = value.asString();
+    setText(value.asString());
     if (mEditor)
     {
         mEditor->setText(mText);
     }
+}
+
+// What the text comes to is worked out when the text changes, not on
+// every frame the swatch is drawn: a name is a table lookup and four
+// numbers are a parse, and neither is what a draw should be doing.
+void ALColorField::setText(const std::string& text)
+{
+    mText = text;
+    mHasColor = resolve(mText, mColor);
 }
 
 LLSD ALColorField::getValue() const
@@ -461,7 +470,8 @@ LLSD ALColorField::getValue() const
 
 bool ALColorField::resolved(LLColor4& color) const
 {
-    return resolve(mText, color);
+    color = mColor;
+    return mHasColor;
 }
 
 void ALColorField::draw()
@@ -495,7 +505,7 @@ void ALColorField::onFocusLost()
 
 void ALColorField::onTextCommit()
 {
-    mText = mEditor->getText();
+    setText(mEditor->getText());
     onCommit();
 }
 

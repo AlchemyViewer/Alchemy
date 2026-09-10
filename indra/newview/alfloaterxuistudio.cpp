@@ -1551,23 +1551,6 @@ namespace
         return n;
     }
 
-    S32 widestLine(const LLFontGL* font, const std::string& text)
-    {
-        S32 widest = 0;
-        size_t start = 0;
-        while (start <= text.size())
-        {
-            size_t end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                end = text.size();
-            }
-            widest = llmax(widest, font->getWidth(std::string_view(text).substr(start, end - start)));
-            start = end + 1;
-        }
-        return widest;
-    }
-
     // From the first '<' on a line, the bytes of the element that starts
     // there: tags open and close it, and comments and declarations are
     // skipped over.
@@ -1808,15 +1791,12 @@ bool ALFloaterXUIStudio::postBuild()
     mFixButton = getChild<LLButton>("finding_fix");
     mFixAllButton = getChild<LLButton>("finding_fix_all");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
-    // Built here rather than named in the file: a tag registered by a
-    // static in a library is only there if the linker kept the object it
-    // sits in, and a widget the factory cannot name comes back as a stray
-    // that is not in the tree and draws nowhere.
     {
-        // Built here rather than named in the file, because a tag a library
-        // registers is only there if the linker kept the object it sits in.
-        // It holds an accordion of its own, so it goes straight into the
-        // tab: what scrolls the sections is the accordion.
+        // Built here rather than named in the file: a tag a library registers
+        // is only there if the linker kept the object it sits in, and a widget
+        // the factory cannot name comes back as a stray that is in no tree
+        // and draws nowhere. It holds an accordion of its own, so it goes
+        // straight into the tab: what scrolls the sections is the accordion.
         LLPanel* tab = getChild<LLPanel>("attributes_tab");
         ALPropertyGrid::Params p;
         p.name = "attributes_grid";
@@ -1989,7 +1969,10 @@ bool ALFloaterXUIStudio::postBuild()
     {
         if (LLLayoutPanel* panel = findChild<LLLayoutPanel>(region, true))
         {
-            mPanes.push_back(ALDockPanel::wrap(panel, getString(title)));
+            if (ALDockPanel* pane = ALDockPanel::wrap(panel, getString(title)))
+            {
+                mPanes.push_back(pane->getHandle());
+            }
         }
     }
 
@@ -2212,6 +2195,9 @@ void ALFloaterXUIStudio::draw()
         const LLView* was_canvas = mCanvases[PRIMARY];
         const bool host_had = was_host && gFocusMgr.childHasKeyboardFocus(was_host);
         const bool canvas_had = was_canvas && gFocusMgr.childHasKeyboardFocus(was_canvas);
+        // And the outline, which is made again with the preview: an arrow
+        // pressed in it moved an element and then the next one went nowhere.
+        const bool tree_had = mTree && gFocusMgr.childHasKeyboardFocus(mTree);
         mKeepPlace = true;
         showPreviews();
         mKeepPlace = false;
@@ -2228,6 +2214,10 @@ void ALFloaterXUIStudio::draw()
             {
                 canvas->setFocus(true);
             }
+        }
+        else if (tree_had && mTree)
+        {
+            mTree->setFocus(true);
         }
         if (mReloadFromDisk)
         {
@@ -2827,8 +2817,9 @@ void ALFloaterXUIStudio::togglePane(std::string_view name)
 ALDockPanel* ALFloaterXUIStudio::paneOf(std::string_view name) const
 {
     const std::string want = std::string(name) + "_pane";
-    for (ALDockPanel* pane : mPanes)
+    for (const LLHandle<LLView>& held : mPanes)
     {
+        ALDockPanel* pane = held.get() ? held.get()->as<ALDockPanel>() : nullptr;
         if (pane && pane->getName() == want)
         {
             return pane;
@@ -2864,8 +2855,9 @@ void ALFloaterXUIStudio::togglePaneOut(std::string_view name)
 // a pane left in a window the tool does not own is destroyed with it.
 void ALFloaterXUIStudio::dockPanes()
 {
-    for (ALDockPanel* pane : mPanes)
+    for (const LLHandle<LLView>& held : mPanes)
     {
+        ALDockPanel* pane = held.get() ? held.get()->as<ALDockPanel>() : nullptr;
         if (pane && pane->poppedOut())
         {
             pane->dock();
@@ -7168,6 +7160,19 @@ void ALFloaterXUIStudio::fillTranslation()
     // language this table is about.
     const Preview& second = mPreviews[SECONDARY];
     const bool measured = mShowSecondary && second.root && second.language == language;
+    // The elements whose text does not fit, gathered once: a row per unit
+    // against a walk of every finding is the two lists multiplied.
+    boost::unordered_set<std::string> truncated;
+    if (measured)
+    {
+        for (const ALXUILint::Finding& f : second.lint.findings())
+        {
+            if (f.rule == ALXUILint::Rule::Truncation)
+            {
+                truncated.insert(ALXUISelection::toString(f.path));
+            }
+        }
+    }
 
     S32 index = 0;
     for (const ALXUITranslate::Unit& unit : mTranslate.units())
@@ -7199,15 +7204,7 @@ void ALFloaterXUIStudio::fillTranslation()
         std::string fits;
         if (measured && unit.applies())
         {
-            fits = "yes";
-            for (const ALXUILint::Finding& f : second.lint.findings())
-            {
-                if (f.rule == ALXUILint::Rule::Truncation && f.path == unit.path)
-                {
-                    fits = "no";
-                    break;
-                }
-            }
+            fits = truncated.count(where) ? "no" : "yes";
         }
         mTranslateList->addElement(row(index++, {
             { "path", where },
@@ -9376,10 +9373,10 @@ void ALFloaterXUIStudio::openQuickly()
     }
     quick->setCandidates(std::move(candidates));
 
+    // The popover takes the content, and takes it even when it cannot show.
     ALPopover* popover = ALPopover::show(this, quick, getString("QuickOpenTitle"));
     if (!popover)
     {
-        delete quick;
         return;
     }
     mQuickPopover = popover->getHandle();
@@ -9491,7 +9488,6 @@ void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
     if (!popover)
     {
         mGutterList = nullptr;
-        delete content;
         return;
     }
     mGutterPopover = popover->getHandle();
@@ -9535,9 +9531,9 @@ ALFloaterXUIStudio::layersSaying(const std::string& field) const
     {
         LayerSays one;
         one.layer = layer;
-        const pugi::xml_node node = ALXUICatalog::resolve(layer->root(), mSelection.selection());
+        pugi::xml_node node;
+        elementIn(*layer, mSelection.selection(), node, one.line);
         one.has = (bool)node;
-        one.line = node ? ALXUICatalog::lineOf(*layer, node) : 0;
         if (node && !field.empty())
         {
             const pugi::xml_attribute attribute = node.attribute(field.c_str());
@@ -9842,6 +9838,22 @@ void ALFloaterXUIStudio::refreshLayout(LLView* view)
     }
 }
 
+// The selected element in one layer of the file, and the line it starts
+// on: out of the document where the layer is held, since that is the text
+// the preview was built from, and out of the catalog where it is not.
+void ALFloaterXUIStudio::elementIn(const ALXUICatalog::Layer& layer, const ALXUISelection::path_t& path,
+                                   pugi::xml_node& node, S32& line) const
+{
+    if (const ALXUIEdit* held = mDocuments.find(layer.path))
+    {
+        node = held->resolve(path);
+        line = held->lineOf(node);
+        return;
+    }
+    node = ALXUICatalog::resolve(layer.root(), path);
+    line = node ? ALXUICatalog::lineOf(layer, node) : 0;
+}
+
 void ALFloaterXUIStudio::refreshSource(LLView* view)
 {
     mSourceLayers->setText(std::string());
@@ -9861,12 +9873,15 @@ void ALFloaterXUIStudio::refreshSource(LLView* view)
     const Preview& pv = mPreviews[PRIMARY];
 
     // Every layer of the file, with the line the element is on in each.
+    // A layer held as a document is read from the document: the disk is
+    // what it was before the edits, and the lines have moved since.
     std::string layers_text;
     std::string text;
     for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
     {
-        pugi::xml_node node = ALXUICatalog::resolve(layer->root(), mSelection.selection());
-        const S32 line = ALXUICatalog::lineOf(*layer, node);
+        pugi::xml_node node;
+        S32 line = 0;
+        elementIn(*layer, mSelection.selection(), node, line);
         if (!layers_text.empty())
         {
             layers_text += "   ";
@@ -9876,7 +9891,8 @@ void ALFloaterXUIStudio::refreshSource(LLView* view)
         {
             continue;
         }
-        const std::string file_text = LLFile::getContents(layer->path);
+        const std::string* held = mDocuments.textFor(layer->path);
+        const std::string file_text = held ? *held : LLFile::getContents(layer->path);
         text += "--- " + layer->path + ":" + std::to_string(line) + "\n";
         text += numbered(elementTextAt(file_text, line), line);
         text += "\n";
@@ -10017,7 +10033,7 @@ void ALFloaterXUIStudio::refreshState(LLView* view)
         text = box->getText();
         const LLFontGL* font = box->getFont();
         truncated = font && !box->getWordWrap() && !text.empty()
-            && widestLine(font, text) > box->getRect().getWidth() - 2 * box->getHPad();
+            && ALXUILint::widestLine(font, text) > box->getRect().getWidth() - 2 * box->getHPad();
     }
     else if (const LLButton* button = view->as<LLButton>())
     {

@@ -138,6 +138,11 @@ pugi::xml_node ALXUIEdit::resolve(const path_t& path) const
     return path.empty() ? root() : ALXUICatalog::resolve(root(), path, /*any_tag=*/true);
 }
 
+S32 ALXUIEdit::lineOf(pugi::xml_node node) const
+{
+    return mDoc && node ? mDoc->lineOf(node.offset_debug()) : 0;
+}
+
 bool ALXUIEdit::save()
 {
     return saveAs(mPath);

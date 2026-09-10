@@ -31,6 +31,7 @@
 #include <boost/signals2.hpp>
 
 class LLFloater;
+class LLFontGL;
 class LLLineEditor;
 
 // A font in XUI is three attributes -- `font`, `font.size` and
@@ -95,6 +96,9 @@ private:
     std::string             mSize;
     std::string             mStyle;
     S32                     mSampleWidth;
+    // The face the three parts name, and the parts it was found for.
+    const LLFontGL*         mFont = nullptr;
+    std::string             mFontOf;
     LLLineEditor*           mEditor = nullptr;
     part_signal_t           mPartCommit;
     LLHandle<LLFloater>     mPopover;

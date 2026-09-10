@@ -264,6 +264,13 @@ void ALQuickOpen::setQuery(const std::string& query)
 void ALQuickOpen::fill()
 {
     mRanked = rank(mCandidates, mQuery);
+    // As many as were asked for: the answer meant is at the top, and a
+    // list of seven hundred rows made again on every letter typed is
+    // what the ranking exists to spare.
+    if (mRows > 0 && mRanked.size() > (size_t)mRows)
+    {
+        mRanked.resize((size_t)mRows);
+    }
     mList->deleteAllItems();
     for (size_t at : mRanked)
     {

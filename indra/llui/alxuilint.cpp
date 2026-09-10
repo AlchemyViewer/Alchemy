@@ -80,23 +80,6 @@ namespace
             || view->as<LLResizeBar>() || view->as<LLResizeHandle>();
     }
 
-    S32 widestLine(const LLFontGL* font, const std::string& text)
-    {
-        S32 widest = 0;
-        size_t start = 0;
-        while (start <= text.size())
-        {
-            size_t end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                end = text.size();
-            }
-            widest = llmax(widest, font->getWidth(std::string_view(text).substr(start, end - start)));
-            start = end + 1;
-        }
-        return widest;
-    }
-
     bool endsWith(const std::string& text, const char* suffix)
     {
         const size_t n = std::strlen(suffix);
@@ -194,6 +177,24 @@ const char* ALXUILint::severityName(Severity severity)
     case Severity::Note:    return "note";
     }
     return "?";
+}
+
+// static
+S32 ALXUILint::widestLine(const LLFontGL* font, const std::string& text)
+{
+    S32 widest = 0;
+    size_t start = 0;
+    while (start <= text.size())
+    {
+        size_t end = text.find('\n', start);
+        if (end == std::string::npos)
+        {
+            end = text.size();
+        }
+        widest = llmax(widest, font->getWidth(std::string_view(text).substr(start, end - start)));
+        start = end + 1;
+    }
+    return widest;
 }
 
 // static

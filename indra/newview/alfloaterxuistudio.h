@@ -563,6 +563,10 @@ private:
     void revealInContainers(LLView* view);
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
+    // The selected element in a layer and its line, out of the document
+    // where the layer is held and out of the catalog where it is not.
+    void elementIn(const ALXUICatalog::Layer& layer, const ALXUISelection::path_t& path,
+                   pugi::xml_node& node, S32& line) const;
     void refreshBindings(LLView* view);
     void refreshState(LLView* view);
     void refreshSelectionFindings();
@@ -673,7 +677,10 @@ private:
     // developer has asked for the preview in a window of its own.
     LLScrollContainer*  mCanvasArea = nullptr;
     ALCanvasRow*        mCanvasRow = nullptr;
-    std::vector<ALDockPanel*> mPanes;
+    // By handle: a pane in a window of its own goes with that window when
+    // the application quits, and whether it or this window is closed
+    // first is not this window's to say.
+    std::vector<LLHandle<LLView> > mPanes;
     ALXUICanvas*        mCanvases[PREVIEWS] = {};
     bool                mFloatPreview = false;
     // The pill above the canvas. Hidden, the region is given over to the

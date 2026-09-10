@@ -38,6 +38,7 @@
 class ALXUICatalog;
 class ALXUIOverlay;
 class ALXUISourceMap;
+class LLFontGL;
 class LLView;
 class LLXMLNode;
 
@@ -177,6 +178,9 @@ public:
     // so both answer from the same place.
     static bool callbackRegistered(const std::string& name);
     static bool controlExists(const std::string& name, std::string* group = nullptr);
+    // The widest line of a text that may run to several, in a font: what
+    // a box has to be for the text not to be cut.
+    static S32 widestLine(const LLFontGL* font, const std::string& text);
     bool fontDeclared(const std::string& name);
 
 private:

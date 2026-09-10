@@ -79,7 +79,12 @@ private:
     bool resolved(LLColor4& color) const;
 
     std::string             mText;
+    // What the text comes to, worked out when it changes.
+    LLColor4                mColor;
+    bool                    mHasColor = false;
     S32                     mSwatchWidth;
     LLLineEditor*           mEditor = nullptr;
     LLHandle<LLFloater>     mPopover;
+
+    void setText(const std::string& text);
 };

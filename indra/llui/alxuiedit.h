@@ -72,6 +72,9 @@ public:
 
     pugi::xml_node root() const;
     pugi::xml_node resolve(const path_t& path) const;
+    // The line an element starts on, in the text as it stands here rather
+    // than as the disk has it.
+    S32 lineOf(pugi::xml_node node) const;
 
     // The two operations. A value is written escaped and an attribute the
     // element does not carry is added after the last one it does, spaced
