@@ -808,6 +808,12 @@
     </xs:annotation>
   </xs:element>
 
+  <xs:element name="tab_strip" type="tab_strip_t">
+    <xs:annotation>
+      <xs:documentation>The documents a window holds, one tab each over the one it shows, with a dot for unsaved work and a way to close each.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
   <xs:element name="teleport_history_menu_item" type="teleport_history_menu_item_t">
     <xs:annotation>
       <xs:documentation>One place this account has been, as a menu line that goes back there.</xs:documentation>
@@ -1038,6 +1044,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -1822,6 +1829,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -2472,6 +2480,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -3250,6 +3259,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -3926,6 +3936,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -4604,6 +4615,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -5186,6 +5198,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -5635,6 +5648,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -6292,6 +6306,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -7074,6 +7089,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -7852,6 +7868,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -8680,6 +8697,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -9065,6 +9083,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -9876,6 +9895,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -10142,6 +10162,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -10408,6 +10429,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -10978,6 +11000,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -11272,6 +11295,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -12841,6 +12865,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -13678,6 +13703,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -14398,6 +14424,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -14624,6 +14651,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -14929,6 +14957,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -15109,6 +15138,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -15691,6 +15721,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -16073,6 +16104,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -16255,6 +16287,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -16529,6 +16562,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -16915,6 +16949,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -17578,6 +17613,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -18246,6 +18282,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -19023,6 +19060,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -20200,6 +20238,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -20825,6 +20864,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -21317,6 +21357,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -21582,6 +21623,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -23462,6 +23504,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -23688,6 +23731,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -23953,6 +23997,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -24219,6 +24264,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -24590,6 +24636,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -24773,6 +24820,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -25421,6 +25469,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -25686,6 +25735,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -26111,6 +26161,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -26495,6 +26546,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -26777,6 +26829,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -28348,6 +28401,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -28721,6 +28775,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -29094,6 +29149,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -29871,6 +29927,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -30253,6 +30310,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -30803,6 +30861,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -31579,6 +31638,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -32171,6 +32231,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -32763,6 +32824,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -33355,6 +33417,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -33947,6 +34010,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -34540,6 +34604,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -34922,6 +34987,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -35504,6 +35570,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -35795,6 +35862,8 @@
     <xs:attribute name="drag_handle_color.red" type="al_real"/>
     <xs:attribute name="drag_handle_first_indent" type="xs:integer"/>
     <xs:attribute name="drag_handle_gap" type="xs:integer"/>
+    <xs:attribute name="drag_handle_on_hover" type="xs:boolean"/>
+    <xs:attribute name="drag_handle_reach" type="xs:integer"/>
     <xs:attribute name="drag_handle_second_indent" type="xs:integer"/>
     <xs:attribute name="drag_handle_shift" type="xs:integer"/>
     <xs:attribute name="drag_handle_thickness" type="xs:integer"/>
@@ -35964,6 +36033,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -36514,6 +36584,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -36800,6 +36871,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -37070,6 +37142,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -37335,6 +37408,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -41749,6 +41823,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -42352,6 +42427,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -42734,6 +42810,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -43023,6 +43100,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -43336,6 +43414,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -43657,6 +43736,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -43954,6 +44034,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -44243,6 +44324,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -44734,6 +44816,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -45055,6 +45138,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -45393,6 +45477,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -45778,6 +45863,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -46330,6 +46416,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -46854,6 +46941,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -47486,6 +47574,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -47868,6 +47957,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -48076,6 +48166,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -48458,6 +48549,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text_chat"/>
       <xs:element ref="text_editor"/>
@@ -49515,6 +49607,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -49989,6 +50082,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -50372,6 +50466,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -50754,6 +50849,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -51532,6 +51628,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -51714,6 +51811,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -51996,6 +52094,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -52283,6 +52382,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -52480,6 +52580,7 @@
     <xs:attribute name="rect.right" type="xs:integer"/>
     <xs:attribute name="rect.top" type="xs:integer"/>
     <xs:attribute name="rect.width" type="xs:integer"/>
+    <xs:attribute name="remove_label" type="xs:string"/>
     <xs:attribute name="requests_front" type="xs:boolean"/>
     <xs:attribute name="right" type="xs:integer"/>
     <xs:attribute name="row_height" type="xs:integer"/>
@@ -52666,6 +52767,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -53249,6 +53351,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -53633,6 +53736,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -53719,7 +53823,334 @@
     <xs:attribute name="initial_value" type="xs:string"/>
     <xs:attribute name="invisibility_control" type="xs:string"/>
     <xs:attribute name="invisiblity_control" type="xs:string"/>
-    <xs:attribute name="item" type="xs:string"/>
+    <xs:attribute name="item.bottom" type="xs:integer"/>
+    <xs:attribute name="item.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="item.check_button.auto_resize" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.badge" type="xs:string"/>
+    <xs:attribute name="item.check_button.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="item.check_button.button_flash_count" type="xs:integer"/>
+    <xs:attribute name="item.check_button.button_flash_enable" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.button_flash_rate" type="al_real"/>
+    <xs:attribute name="item.check_button.chrome" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.click_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.commit_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.commit_on_capture_lost" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.commit_on_return" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.control_name" type="xs:string"/>
+    <xs:attribute name="item.check_button.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="item.check_button.display_pressed_state" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.draw_focus_border" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.enabled" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.flash_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.focus_root" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.follows" type="xs:string"/>
+    <xs:attribute name="item.check_button.font" type="xs:string"/>
+    <xs:attribute name="item.check_button.from_xui" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.check_button.handle_right_mouse" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.hover_cursor" type="xs:string"/>
+    <xs:attribute name="item.check_button.hover_glow_amount" type="al_real"/>
+    <xs:attribute name="item.check_button.hover_hand_cursor" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.image_bottom_pad" type="xs:integer"/>
+    <xs:attribute name="item.check_button.image_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_color_disabled" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_disabled" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_disabled_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_hover_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_hover_unselected" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_overlay" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_overlay_alignment" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_overlay_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_overlay_disabled_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_overlay_enable" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.image_overlay_right_delta" type="xs:integer"/>
+    <xs:attribute name="item.check_button.image_overlay_selected_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_pressed" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_pressed_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.image_top_pad" type="xs:integer"/>
+    <xs:attribute name="item.check_button.image_unselected" type="xs:string"/>
+    <xs:attribute name="item.check_button.imgoverlay_label_space" type="xs:integer"/>
+    <xs:attribute name="item.check_button.init_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.initial_value" type="xs:string"/>
+    <xs:attribute name="item.check_button.is_toggle" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.label" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_color" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_color_disabled" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_color_disabled_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_color_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_selected" type="xs:string"/>
+    <xs:attribute name="item.check_button.label_shadow" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.layout" type="xs:string"/>
+    <xs:attribute name="item.check_button.left_delta" type="xs:integer"/>
+    <xs:attribute name="item.check_button.left_pad" type="xs:integer"/>
+    <xs:attribute name="item.check_button.length" type="xs:string"/>
+    <xs:attribute name="item.check_button.mouse_down_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.mouse_held_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.mouse_up_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.name" type="xs:string"/>
+    <xs:attribute name="item.check_button.pad_bottom" type="xs:integer"/>
+    <xs:attribute name="item.check_button.pad_left" type="xs:integer"/>
+    <xs:attribute name="item.check_button.pad_right" type="xs:integer"/>
+    <xs:attribute name="item.check_button.rect" type="xs:string"/>
+    <xs:attribute name="item.check_button.requests_front" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.scale_image" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.sound_flags" type="xs:integer"/>
+    <xs:attribute name="item.check_button.tab_group" type="xs:integer"/>
+    <xs:attribute name="item.check_button.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.toggle" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.tool_tip" type="xs:string"/>
+    <xs:attribute name="item.check_button.top_delta" type="xs:integer"/>
+    <xs:attribute name="item.check_button.top_pad" type="xs:integer"/>
+    <xs:attribute name="item.check_button.translate" type="xs:string"/>
+    <xs:attribute name="item.check_button.type" type="xs:string"/>
+    <xs:attribute name="item.check_button.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.use_draw_context_alpha" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.use_ellipses" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.use_font_color" type="xs:boolean"/>
+    <xs:attribute name="item.check_button.validate_callback" type="xs:string"/>
+    <xs:attribute name="item.check_button.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.check_button.value" type="xs:string"/>
+    <xs:attribute name="item.check_button.visible" type="xs:boolean"/>
+    <xs:attribute name="item.chrome" type="xs:boolean"/>
+    <xs:attribute name="item.commit_callback" type="xs:string"/>
+    <xs:attribute name="item.commit_callback.control" type="xs:string"/>
+    <xs:attribute name="item.commit_callback.function" type="xs:string"/>
+    <xs:attribute name="item.commit_callback.name" type="xs:string"/>
+    <xs:attribute name="item.commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="item.commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="item.control_name" type="xs:string"/>
+    <xs:attribute name="item.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="item.disabled_control" type="xs:string"/>
+    <xs:attribute name="item.enabled" type="xs:boolean"/>
+    <xs:attribute name="item.enabled_control" type="xs:string"/>
+    <xs:attribute name="item.focus_root" type="xs:boolean"/>
+    <xs:attribute name="item.follows" type="xs:string"/>
+    <xs:attribute name="item.follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="item.font" type="xs:string"/>
+    <xs:attribute name="item.font.name" type="xs:string"/>
+    <xs:attribute name="item.font.size" type="xs:string"/>
+    <xs:attribute name="item.font.style" type="xs:string"/>
+    <xs:attribute name="item.from_xui" type="xs:boolean"/>
+    <xs:attribute name="item.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.height" type="xs:integer"/>
+    <xs:attribute name="item.hover_cursor" type="xs:string"/>
+    <xs:attribute name="item.init_callback" type="xs:string"/>
+    <xs:attribute name="item.init_callback.control" type="xs:string"/>
+    <xs:attribute name="item.init_callback.function" type="xs:string"/>
+    <xs:attribute name="item.init_callback.name" type="xs:string"/>
+    <xs:attribute name="item.init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="item.init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="item.initial_value" type="xs:string"/>
+    <xs:attribute name="item.invisibility_control" type="xs:string"/>
+    <xs:attribute name="item.invisiblity_control" type="xs:string"/>
+    <xs:attribute name="item.label" type="xs:string"/>
+    <xs:attribute name="item.label_text.allow_html" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.allow_scroll" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.always_show_icons" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.bg_focus_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.bg_highlighted_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.bg_readonly_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.bg_selected_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.bg_visible" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.bg_writeable_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.border_visible" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="item.label_text.chrome" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.clip" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.clip_partial" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.commit_callback" type="xs:string"/>
+    <xs:attribute name="item.label_text.control_name" type="xs:string"/>
+    <xs:attribute name="item.label_text.cursor_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="item.label_text.enabled" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.focus_root" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.follows" type="xs:string"/>
+    <xs:attribute name="item.label_text.font" type="xs:string"/>
+    <xs:attribute name="item.label_text.font_shadow">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="hard"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="soft"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.label_text.force_urls_external" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.from_xui" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.h_pad" type="xs:integer"/>
+    <xs:attribute name="item.label_text.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.label_text.hover_cursor" type="xs:string"/>
+    <xs:attribute name="item.label_text.init_callback" type="xs:string"/>
+    <xs:attribute name="item.label_text.initial_value" type="xs:string"/>
+    <xs:attribute name="item.label_text.label" type="xs:string"/>
+    <xs:attribute name="item.label_text.layout" type="xs:string"/>
+    <xs:attribute name="item.label_text.left_delta" type="xs:integer"/>
+    <xs:attribute name="item.label_text.left_pad" type="xs:integer"/>
+    <xs:attribute name="item.label_text.length" type="xs:string"/>
+    <xs:attribute name="item.label_text.max_length" type="xs:integer"/>
+    <xs:attribute name="item.label_text.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="item.label_text.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="item.label_text.name" type="xs:string"/>
+    <xs:attribute name="item.label_text.parse_highlights" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.parse_urls" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.plain_text" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.read_only" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.rect" type="xs:string"/>
+    <xs:attribute name="item.label_text.requests_front" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.skip_link_underline" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.sound_flags" type="xs:integer"/>
+    <xs:attribute name="item.label_text.spellcheck" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.tab_group" type="xs:integer"/>
+    <xs:attribute name="item.label_text.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.text_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.text_readonly_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.text_selected_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.text_tentative_color" type="xs:string"/>
+    <xs:attribute name="item.label_text.text_valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.label_text.tool_tip" type="xs:string"/>
+    <xs:attribute name="item.label_text.top_delta" type="xs:integer"/>
+    <xs:attribute name="item.label_text.top_pad" type="xs:integer"/>
+    <xs:attribute name="item.label_text.track_bottom" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.track_end" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.translate" type="xs:string"/>
+    <xs:attribute name="item.label_text.trusted_content" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.type" type="xs:string"/>
+    <xs:attribute name="item.label_text.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.use_color" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.use_ellipses" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.use_emoji" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.v_pad" type="xs:integer"/>
+    <xs:attribute name="item.label_text.validate_callback" type="xs:string"/>
+    <xs:attribute name="item.label_text.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.label_text.value" type="xs:string"/>
+    <xs:attribute name="item.label_text.visible" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.word_wrap" type="xs:boolean"/>
+    <xs:attribute name="item.label_text.wrap" type="xs:boolean"/>
+    <xs:attribute name="item.layout" type="xs:string"/>
+    <xs:attribute name="item.left" type="xs:integer"/>
+    <xs:attribute name="item.left_delta" type="xs:integer"/>
+    <xs:attribute name="item.left_pad" type="xs:integer"/>
+    <xs:attribute name="item.length" type="xs:string"/>
+    <xs:attribute name="item.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="item.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="item.mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="item.mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="item.mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="item.mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="item.mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="item.mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="item.name" type="xs:string"/>
+    <xs:attribute name="item.radio_style" type="xs:string"/>
+    <xs:attribute name="item.rect" type="xs:string"/>
+    <xs:attribute name="item.rect.bottom" type="xs:integer"/>
+    <xs:attribute name="item.rect.height" type="xs:integer"/>
+    <xs:attribute name="item.rect.left" type="xs:integer"/>
+    <xs:attribute name="item.rect.right" type="xs:integer"/>
+    <xs:attribute name="item.rect.top" type="xs:integer"/>
+    <xs:attribute name="item.rect.width" type="xs:integer"/>
+    <xs:attribute name="item.requests_front" type="xs:boolean"/>
+    <xs:attribute name="item.right" type="xs:integer"/>
+    <xs:attribute name="item.sound_flags" type="xs:integer"/>
+    <xs:attribute name="item.tab_group" type="xs:integer"/>
+    <xs:attribute name="item.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="item.tool_tip" type="xs:string"/>
+    <xs:attribute name="item.top" type="xs:integer"/>
+    <xs:attribute name="item.top_delta" type="xs:integer"/>
+    <xs:attribute name="item.top_pad" type="xs:integer"/>
+    <xs:attribute name="item.translate" type="xs:string"/>
+    <xs:attribute name="item.type" type="xs:string"/>
+    <xs:attribute name="item.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="item.validate_callback" type="xs:string"/>
+    <xs:attribute name="item.validate_callback.control" type="xs:string"/>
+    <xs:attribute name="item.validate_callback.function" type="xs:string"/>
+    <xs:attribute name="item.validate_callback.name" type="xs:string"/>
+    <xs:attribute name="item.validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="item.validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="item.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="item.value" type="xs:string"/>
+    <xs:attribute name="item.visibility_control" type="xs:string"/>
+    <xs:attribute name="item.visible" type="xs:boolean"/>
+    <xs:attribute name="item.visiblity_control" type="xs:string"/>
+    <xs:attribute name="item.width" type="xs:integer"/>
+    <xs:attribute name="item.word_wrap">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="down"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="up"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
     <xs:attribute name="label" type="xs:string"/>
     <xs:attribute name="layout" type="xs:string"/>
     <xs:attribute name="left" type="xs:integer"/>
@@ -53740,7 +54171,334 @@
     <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
     <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
     <xs:attribute name="name" type="xs:string"/>
-    <xs:attribute name="radio_item" type="xs:string"/>
+    <xs:attribute name="radio_item.bottom" type="xs:integer"/>
+    <xs:attribute name="radio_item.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.auto_resize" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.badge" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.button_flash_count" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.button_flash_enable" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.button_flash_rate" type="al_real"/>
+    <xs:attribute name="radio_item.check_button.chrome" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.click_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.commit_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.commit_on_capture_lost" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.commit_on_return" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.control_name" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.display_pressed_state" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.draw_focus_border" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.enabled" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.flash_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.focus_root" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.follows" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.font" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.from_xui" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.check_button.handle_right_mouse" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.hover_cursor" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.hover_glow_amount" type="al_real"/>
+    <xs:attribute name="radio_item.check_button.hover_hand_cursor" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.image_bottom_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.image_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_color_disabled" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_disabled" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_disabled_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_hover_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_hover_unselected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_overlay" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_alignment" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_disabled_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_enable" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_right_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.image_overlay_selected_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_pressed" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_pressed_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.image_top_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.image_unselected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.imgoverlay_label_space" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.init_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.initial_value" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.is_toggle" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.label" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_color" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_color_disabled" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_color_disabled_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_color_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_selected" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.label_shadow" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.layout" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.left_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.left_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.length" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.mouse_down_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.mouse_held_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.mouse_up_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.name" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.pad_bottom" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.pad_left" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.pad_right" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.rect" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.requests_front" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.scale_image" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.sound_flags" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.toggle" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.tool_tip" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.top_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.top_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.check_button.translate" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.type" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.use_draw_context_alpha" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.use_ellipses" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.use_font_color" type="xs:boolean"/>
+    <xs:attribute name="radio_item.check_button.validate_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.check_button.value" type="xs:string"/>
+    <xs:attribute name="radio_item.check_button.visible" type="xs:boolean"/>
+    <xs:attribute name="radio_item.chrome" type="xs:boolean"/>
+    <xs:attribute name="radio_item.commit_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.commit_callback.control" type="xs:string"/>
+    <xs:attribute name="radio_item.commit_callback.function" type="xs:string"/>
+    <xs:attribute name="radio_item.commit_callback.name" type="xs:string"/>
+    <xs:attribute name="radio_item.commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="radio_item.commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="radio_item.control_name" type="xs:string"/>
+    <xs:attribute name="radio_item.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.disabled_control" type="xs:string"/>
+    <xs:attribute name="radio_item.enabled" type="xs:boolean"/>
+    <xs:attribute name="radio_item.enabled_control" type="xs:string"/>
+    <xs:attribute name="radio_item.focus_root" type="xs:boolean"/>
+    <xs:attribute name="radio_item.follows" type="xs:string"/>
+    <xs:attribute name="radio_item.follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="radio_item.font" type="xs:string"/>
+    <xs:attribute name="radio_item.font.name" type="xs:string"/>
+    <xs:attribute name="radio_item.font.size" type="xs:string"/>
+    <xs:attribute name="radio_item.font.style" type="xs:string"/>
+    <xs:attribute name="radio_item.from_xui" type="xs:boolean"/>
+    <xs:attribute name="radio_item.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.height" type="xs:integer"/>
+    <xs:attribute name="radio_item.hover_cursor" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback.control" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback.function" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback.name" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="radio_item.init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="radio_item.initial_value" type="xs:string"/>
+    <xs:attribute name="radio_item.invisibility_control" type="xs:string"/>
+    <xs:attribute name="radio_item.invisiblity_control" type="xs:string"/>
+    <xs:attribute name="radio_item.label" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.allow_html" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.allow_scroll" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.always_show_icons" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.bg_focus_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.bg_highlighted_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.bg_readonly_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.bg_selected_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.bg_visible" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.bg_writeable_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.border_visible" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.bottom_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.chrome" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.clip" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.clip_partial" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.commit_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.control_name" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.cursor_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.default_tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.enabled" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.focus_root" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.follows" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.font" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.font_shadow">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="hard"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="soft"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.label_text.force_urls_external" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.from_xui" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.h_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.label_text.hover_cursor" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.init_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.initial_value" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.label" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.layout" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.left_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.left_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.length" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.max_length" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.name" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.parse_highlights" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.parse_urls" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.plain_text" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.read_only" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.rect" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.requests_front" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.skip_link_underline" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.sound_flags" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.spellcheck" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.text_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.text_readonly_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.text_selected_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.text_tentative_color" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.text_valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.label_text.tool_tip" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.top_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.top_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.track_bottom" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.track_end" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.translate" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.trusted_content" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.type" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.use_color" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.use_ellipses" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.use_emoji" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.v_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.label_text.validate_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.label_text.value" type="xs:string"/>
+    <xs:attribute name="radio_item.label_text.visible" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.word_wrap" type="xs:boolean"/>
+    <xs:attribute name="radio_item.label_text.wrap" type="xs:boolean"/>
+    <xs:attribute name="radio_item.layout" type="xs:string"/>
+    <xs:attribute name="radio_item.left" type="xs:integer"/>
+    <xs:attribute name="radio_item.left_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.left_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.length" type="xs:string"/>
+    <xs:attribute name="radio_item.mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="radio_item.mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="radio_item.mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="radio_item.name" type="xs:string"/>
+    <xs:attribute name="radio_item.radio_style" type="xs:string"/>
+    <xs:attribute name="radio_item.rect" type="xs:string"/>
+    <xs:attribute name="radio_item.rect.bottom" type="xs:integer"/>
+    <xs:attribute name="radio_item.rect.height" type="xs:integer"/>
+    <xs:attribute name="radio_item.rect.left" type="xs:integer"/>
+    <xs:attribute name="radio_item.rect.right" type="xs:integer"/>
+    <xs:attribute name="radio_item.rect.top" type="xs:integer"/>
+    <xs:attribute name="radio_item.rect.width" type="xs:integer"/>
+    <xs:attribute name="radio_item.requests_front" type="xs:boolean"/>
+    <xs:attribute name="radio_item.right" type="xs:integer"/>
+    <xs:attribute name="radio_item.sound_flags" type="xs:integer"/>
+    <xs:attribute name="radio_item.tab_group" type="xs:integer"/>
+    <xs:attribute name="radio_item.tab_stop" type="xs:boolean"/>
+    <xs:attribute name="radio_item.tool_tip" type="xs:string"/>
+    <xs:attribute name="radio_item.top" type="xs:integer"/>
+    <xs:attribute name="radio_item.top_delta" type="xs:integer"/>
+    <xs:attribute name="radio_item.top_pad" type="xs:integer"/>
+    <xs:attribute name="radio_item.translate" type="xs:string"/>
+    <xs:attribute name="radio_item.type" type="xs:string"/>
+    <xs:attribute name="radio_item.use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="radio_item.validate_callback" type="xs:string"/>
+    <xs:attribute name="radio_item.validate_callback.control" type="xs:string"/>
+    <xs:attribute name="radio_item.validate_callback.function" type="xs:string"/>
+    <xs:attribute name="radio_item.validate_callback.name" type="xs:string"/>
+    <xs:attribute name="radio_item.validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="radio_item.validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="radio_item.valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="radio_item.value" type="xs:string"/>
+    <xs:attribute name="radio_item.visibility_control" type="xs:string"/>
+    <xs:attribute name="radio_item.visible" type="xs:boolean"/>
+    <xs:attribute name="radio_item.visiblity_control" type="xs:string"/>
+    <xs:attribute name="radio_item.width" type="xs:integer"/>
+    <xs:attribute name="radio_item.word_wrap">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="down"/>
+          <xs:enumeration value="none"/>
+          <xs:enumeration value="up"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
     <xs:attribute name="rect" type="xs:string"/>
     <xs:attribute name="rect.bottom" type="xs:integer"/>
     <xs:attribute name="rect.height" type="xs:integer"/>
@@ -53905,6 +54663,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -54682,6 +55441,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -55066,6 +55826,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -55514,6 +56275,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -57217,6 +57979,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -57737,6 +58500,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -58005,6 +58769,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -59885,6 +60650,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -61062,6 +61828,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -61243,6 +62010,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -61689,6 +62457,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -62465,6 +63234,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -63628,6 +64398,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -63955,6 +64726,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -64220,6 +64992,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -64401,6 +65174,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -64787,6 +65561,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -65711,6 +66486,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -66478,6 +67254,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -66730,6 +67507,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -69142,6 +69920,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -69493,6 +70272,275 @@
     <xs:attribute name="width" type="xs:integer"/>
   </xs:complexType>
 
+  <xs:complexType name="tab_strip_t" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="accordion"/>
+      <xs:element ref="accordion_tab"/>
+      <xs:element ref="asset_filtered_inv_panel"/>
+      <xs:element ref="avatar_icon"/>
+      <xs:element ref="avatar_list"/>
+      <xs:element ref="badge"/>
+      <xs:element ref="block_list"/>
+      <xs:element ref="button"/>
+      <xs:element ref="chat_editor"/>
+      <xs:element ref="chat_history"/>
+      <xs:element ref="check_box"/>
+      <xs:element ref="chiclet_notification"/>
+      <xs:element ref="chiclet_offer"/>
+      <xs:element ref="chiclet_panel"/>
+      <xs:element ref="chiclet_script"/>
+      <xs:element ref="color_field"/>
+      <xs:element ref="color_picker"/>
+      <xs:element ref="color_swatch"/>
+      <xs:element ref="color_wheel"/>
+      <xs:element ref="combo_box"/>
+      <xs:element ref="console"/>
+      <xs:element ref="container_view"/>
+      <xs:element ref="context_menu"/>
+      <xs:element ref="conversation_log_list"/>
+      <xs:element ref="conversation_view_participant"/>
+      <xs:element ref="conversation_view_session"/>
+      <xs:element ref="curve_editor"/>
+      <xs:element ref="debug_view"/>
+      <xs:element ref="dnd_button"/>
+      <xs:element ref="dock_panel"/>
+      <xs:element ref="drop_target"/>
+      <xs:element ref="emoji_complete"/>
+      <xs:element ref="empty_state"/>
+      <xs:element ref="expandable_text"/>
+      <xs:element ref="favorites_bar"/>
+      <xs:element ref="favorites_inventory_panel"/>
+      <xs:element ref="filter_editor"/>
+      <xs:element ref="flags_field"/>
+      <xs:element ref="flat_list_view"/>
+      <xs:element ref="floater_view"/>
+      <xs:element ref="flyout_button"/>
+      <xs:element ref="folder_view_item"/>
+      <xs:element ref="follows_control"/>
+      <xs:element ref="font_field"/>
+      <xs:element ref="fs_virtual_trackpad"/>
+      <xs:element ref="group_drop_target"/>
+      <xs:element ref="group_icon"/>
+      <xs:element ref="group_list"/>
+      <xs:element ref="hex_editor"/>
+      <xs:element ref="hint_popup"/>
+      <xs:element ref="history_list"/>
+      <xs:element ref="icon"/>
+      <xs:element ref="icons_combo_box"/>
+      <xs:element ref="inbox_folder_view_folder"/>
+      <xs:element ref="inbox_folder_view_item"/>
+      <xs:element ref="inbox_inventory_panel"/>
+      <xs:element ref="inventory_gallery_item"/>
+      <xs:element ref="inventory_link_replace_drop_target"/>
+      <xs:element ref="inventory_panel"/>
+      <xs:element ref="joystick_quat"/>
+      <xs:element ref="joystick_rotate"/>
+      <xs:element ref="joystick_slide"/>
+      <xs:element ref="joystick_track"/>
+      <xs:element ref="joystick_turn"/>
+      <xs:element ref="jump_bar"/>
+      <xs:element ref="labeled_back_button"/>
+      <xs:element ref="layout_stack"/>
+      <xs:element ref="line_editor"/>
+      <xs:element ref="list_view"/>
+      <xs:element ref="loading_indicator"/>
+      <xs:element ref="locate"/>
+      <xs:element ref="location_input"/>
+      <xs:element ref="menu"/>
+      <xs:element ref="menu_bar"/>
+      <xs:element ref="menu_button"/>
+      <xs:element ref="menu_holder"/>
+      <xs:element ref="multi_slider"/>
+      <xs:element ref="multi_slider_bar"/>
+      <xs:element ref="name_box"/>
+      <xs:element ref="name_editor"/>
+      <xs:element ref="name_list"/>
+      <xs:element ref="net_map"/>
+      <xs:element ref="notification_list_view"/>
+      <xs:element ref="outfit_gallery_item"/>
+      <xs:element ref="output_monitor"/>
+      <xs:element ref="panel"/>
+      <xs:element ref="panel_camera_item"/>
+      <xs:element ref="panel_container"/>
+      <xs:element ref="panel_inventory_object"/>
+      <xs:element ref="placeholder"/>
+      <xs:element ref="places_inventory_panel"/>
+      <xs:element ref="profile_drop_target"/>
+      <xs:element ref="profile_image"/>
+      <xs:element ref="progress_bar"/>
+      <xs:element ref="property_grid"/>
+      <xs:element ref="pull_button"/>
+      <xs:element ref="quick_open"/>
+      <xs:element ref="radio_group"/>
+      <xs:element ref="recent_inventory_panel"/>
+      <xs:element ref="scope_bar"/>
+      <xs:element ref="script_editor"/>
+      <xs:element ref="scroll_bar"/>
+      <xs:element ref="scroll_container"/>
+      <xs:element ref="scroll_list"/>
+      <xs:element ref="scrolling_panel_list"/>
+      <xs:element ref="search_combo_box"/>
+      <xs:element ref="search_editor"/>
+      <xs:element ref="settings_drop_target"/>
+      <xs:element ref="simple_text_editor"/>
+      <xs:element ref="single_folder_inventory_panel"/>
+      <xs:element ref="slider"/>
+      <xs:element ref="slider_bar"/>
+      <xs:element ref="snapshot_floater_view"/>
+      <xs:element ref="sound_drop_target"/>
+      <xs:element ref="specimen_list"/>
+      <xs:element ref="spinner"/>
+      <xs:element ref="split_button"/>
+      <xs:element ref="stat_view"/>
+      <xs:element ref="sun_moon_trackball"/>
+      <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
+      <xs:element ref="teleport_history_menu_item"/>
+      <xs:element ref="text"/>
+      <xs:element ref="text_chat"/>
+      <xs:element ref="text_editor"/>
+      <xs:element ref="texture_picker"/>
+      <xs:element ref="thumbnail"/>
+      <xs:element ref="toggleable_menu"/>
+      <xs:element ref="tool_tip"/>
+      <xs:element ref="toolbar"/>
+      <xs:element ref="toolbar_view"/>
+      <xs:element ref="tooltip_view"/>
+      <xs:element ref="ui_ctrl"/>
+      <xs:element ref="view"/>
+      <xs:element ref="view_border"/>
+      <xs:element ref="wearable_items_list"/>
+      <xs:element ref="web_browser"/>
+      <xs:element ref="window_shade"/>
+      <xs:element ref="xy_vector"/>
+      <xs:element name="commit_callback" type="al_any"/>
+      <xs:element name="follows" type="al_any"/>
+      <xs:element name="font" type="al_any"/>
+      <xs:element name="init_callback" type="al_any"/>
+      <xs:element name="initial_value" type="al_any"/>
+      <xs:element name="mouseenter_callback" type="al_any"/>
+      <xs:element name="mouseleave_callback" type="al_any"/>
+      <xs:element name="rect" type="al_any"/>
+      <xs:element name="tab_strip.commit_callback" type="al_any"/>
+      <xs:element name="tab_strip.follows" type="al_any"/>
+      <xs:element name="tab_strip.font" type="al_any"/>
+      <xs:element name="tab_strip.init_callback" type="al_any"/>
+      <xs:element name="tab_strip.initial_value" type="al_any"/>
+      <xs:element name="tab_strip.mouseenter_callback" type="al_any"/>
+      <xs:element name="tab_strip.mouseleave_callback" type="al_any"/>
+      <xs:element name="tab_strip.rect" type="al_any"/>
+      <xs:element name="tab_strip.validate_callback" type="al_any"/>
+      <xs:element name="tab_strip.value" type="al_any"/>
+      <xs:element name="validate_callback" type="al_any"/>
+      <xs:element name="value" type="al_any"/>
+    </xs:choice>
+    <xs:attribute name="bottom" type="xs:integer"/>
+    <xs:attribute name="bottom_delta" type="xs:integer"/>
+    <xs:attribute name="chrome" type="xs:boolean"/>
+    <xs:attribute name="commit_callback" type="xs:string"/>
+    <xs:attribute name="commit_callback.control" type="xs:string"/>
+    <xs:attribute name="commit_callback.function" type="xs:string"/>
+    <xs:attribute name="commit_callback.name" type="xs:string"/>
+    <xs:attribute name="commit_callback.parameter" type="xs:string"/>
+    <xs:attribute name="commit_callback.userdata" type="xs:string"/>
+    <xs:attribute name="control_name" type="xs:string"/>
+    <xs:attribute name="default_tab_group" type="xs:integer"/>
+    <xs:attribute name="disabled_control" type="xs:string"/>
+    <xs:attribute name="enabled" type="xs:boolean"/>
+    <xs:attribute name="enabled_control" type="xs:string"/>
+    <xs:attribute name="focus_root" type="xs:boolean"/>
+    <xs:attribute name="follows" type="xs:string"/>
+    <xs:attribute name="follows.flags" type="xs:nonNegativeInteger"/>
+    <xs:attribute name="font" type="xs:string"/>
+    <xs:attribute name="font.name" type="xs:string"/>
+    <xs:attribute name="font.size" type="xs:string"/>
+    <xs:attribute name="font.style" type="xs:string"/>
+    <xs:attribute name="from_xui" type="xs:boolean"/>
+    <xs:attribute name="gap" type="xs:integer"/>
+    <xs:attribute name="halign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="left"/>
+          <xs:enumeration value="right"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="height" type="xs:integer"/>
+    <xs:attribute name="hover_cursor" type="xs:string"/>
+    <xs:attribute name="init_callback" type="xs:string"/>
+    <xs:attribute name="init_callback.control" type="xs:string"/>
+    <xs:attribute name="init_callback.function" type="xs:string"/>
+    <xs:attribute name="init_callback.name" type="xs:string"/>
+    <xs:attribute name="init_callback.parameter" type="xs:string"/>
+    <xs:attribute name="init_callback.userdata" type="xs:string"/>
+    <xs:attribute name="initial_value" type="xs:string"/>
+    <xs:attribute name="invisibility_control" type="xs:string"/>
+    <xs:attribute name="invisiblity_control" type="xs:string"/>
+    <xs:attribute name="label" type="xs:string"/>
+    <xs:attribute name="layout" type="xs:string"/>
+    <xs:attribute name="left" type="xs:integer"/>
+    <xs:attribute name="left_delta" type="xs:integer"/>
+    <xs:attribute name="left_pad" type="xs:integer"/>
+    <xs:attribute name="length" type="xs:string"/>
+    <xs:attribute name="max_tab_width" type="xs:integer"/>
+    <xs:attribute name="min_tab_width" type="xs:integer"/>
+    <xs:attribute name="mouse_opaque" type="xs:boolean"/>
+    <xs:attribute name="mouseenter_callback" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseenter_callback.userdata" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.control" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.function" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.name" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
+    <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="rect" type="xs:string"/>
+    <xs:attribute name="rect.bottom" type="xs:integer"/>
+    <xs:attribute name="rect.height" type="xs:integer"/>
+    <xs:attribute name="rect.left" type="xs:integer"/>
+    <xs:attribute name="rect.right" type="xs:integer"/>
+    <xs:attribute name="rect.top" type="xs:integer"/>
+    <xs:attribute name="rect.width" type="xs:integer"/>
+    <xs:attribute name="requests_front" type="xs:boolean"/>
+    <xs:attribute name="right" type="xs:integer"/>
+    <xs:attribute name="sound_flags" type="xs:integer"/>
+    <xs:attribute name="tab_group" type="xs:integer"/>
+    <xs:attribute name="tab_stop" type="xs:boolean"/>
+    <xs:attribute name="tool_tip" type="xs:string"/>
+    <xs:attribute name="top" type="xs:integer"/>
+    <xs:attribute name="top_delta" type="xs:integer"/>
+    <xs:attribute name="top_pad" type="xs:integer"/>
+    <xs:attribute name="translate" type="xs:string"/>
+    <xs:attribute name="type" type="xs:string"/>
+    <xs:attribute name="use_bounding_rect" type="xs:boolean"/>
+    <xs:attribute name="validate_callback" type="xs:string"/>
+    <xs:attribute name="validate_callback.control" type="xs:string"/>
+    <xs:attribute name="validate_callback.function" type="xs:string"/>
+    <xs:attribute name="validate_callback.name" type="xs:string"/>
+    <xs:attribute name="validate_callback.parameter" type="xs:string"/>
+    <xs:attribute name="validate_callback.userdata" type="xs:string"/>
+    <xs:attribute name="valign">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="baseline"/>
+          <xs:enumeration value="bottom"/>
+          <xs:enumeration value="center"/>
+          <xs:enumeration value="top"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="value" type="xs:string"/>
+    <xs:attribute name="visibility_control" type="xs:string"/>
+    <xs:attribute name="visible" type="xs:boolean"/>
+    <xs:attribute name="visiblity_control" type="xs:string"/>
+    <xs:attribute name="width" type="xs:integer"/>
+  </xs:complexType>
+
   <xs:complexType name="teleport_history_menu_item_t" mixed="true">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element ref="accordion"/>
@@ -69615,6 +70663,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -69950,6 +70999,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -70333,6 +71383,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -70717,6 +71768,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -71163,6 +72215,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -71939,6 +72992,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -72464,6 +73518,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -72877,6 +73932,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -74616,6 +75672,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -74881,6 +75938,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -75062,6 +76120,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -75327,6 +76386,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -75508,6 +76568,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -76110,6 +77171,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -76508,6 +77570,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
@@ -76793,6 +77856,7 @@
       <xs:element ref="stat_view"/>
       <xs:element ref="sun_moon_trackball"/>
       <xs:element ref="tab_container"/>
+      <xs:element ref="tab_strip"/>
       <xs:element ref="teleport_history_menu_item"/>
       <xs:element ref="text"/>
       <xs:element ref="text_chat"/>
