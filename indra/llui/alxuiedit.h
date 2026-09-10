@@ -115,7 +115,8 @@ public:
     // empty.
     struct Change
     {
-        path_t      path;
+        path_t      path;               // where the element was before it
+        path_t      after;              // and where the step leaves it
         std::string field;              // the attribute written
         bool        oneField = false;   // and nothing else was
     };
@@ -129,6 +130,13 @@ public:
 
     // What the last undo or redo put back.
     const Change& lastChange() const { return mLastChange; }
+
+    // And where the element it was about is to be found now: an undo leaves
+    // it where it was before the step, a redo where the step put it. The two
+    // differ only for a step that wrote a name, since a path is made of
+    // names -- but a caller that reads the element again has to use this one
+    // rather than either end of the record.
+    const path_t& lastPath() const { return mLastPath; }
 
     // What the element at that path now writes for a field, which after an
     // undo is what was in force before the step. False where it writes none.
@@ -258,12 +266,16 @@ private:
     // an insertion, and what a move did is neither of them.
     void note(const path_t& path, std::string_view field);
 
+    // And where a step that writes a name leaves the element it renames.
+    void noteRename(pugi::xml_node node, const std::string& name);
+
     std::vector<std::string>        mUndo;
     std::vector<std::string>        mRedo;
     std::vector<Change>             mUndoWhat;      // beside each step
     std::vector<Change>             mRedoWhat;
     Change                          mPending;       // of the operation in hand
     Change                          mLastChange;    // of the last one put back
+    path_t                          mLastPath;      // where that leaves it
     S32                             mDepth = 0;     // operations in progress
     bool                            mStepOpen = false;
     bool                            mDirty = false;

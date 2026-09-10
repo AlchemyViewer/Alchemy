@@ -26,6 +26,8 @@
 
 #include "../alxuiedit.h"
 
+#include "../alxuiselection.h"
+
 #include "../alxuicatalog.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
@@ -803,6 +805,29 @@ namespace tut
         ensure("still one field", edit.lastChange().oneField);
         ensure("and the element no longer writes it",
                !edit.fieldText({ "a" }, "tool_tip", value));
+
+        // A name is what a path is made of, so writing one moves the element
+        // as far as anything holding a path to it is concerned. A step says
+        // where it was and where it now is, and an undo and a redo each say
+        // which of the two the element is at.
+        {
+            ALXUIEdit named;
+            ensure("loads", named.loadBuffer(
+                "<panel name=\"root\">\n"
+                "    <panel name=\"a\" width=\"9\" height=\"8\" />\n"
+                "    <panel name=\"b\" width=\"9\" height=\"8\" />\n"
+                "</panel>\n"));
+            ensure("renames", named.setAttribute({ "b" }, "name", "a"));
+            ensure("undo", named.undo());
+            ensure_equals("undone, it is where it was",
+                          ALXUISelection::toString(named.lastPath()), std::string("b"));
+            ensure("redo", named.redo());
+            // Its new name is one a sibling before it already carries, so it
+            // is the second of that name and the step says so.
+            ensure_equals("done again, it is where the step put it",
+                          ALXUISelection::toString(named.lastPath()),
+                          ALXUISelection::step("a", 1));
+        }
 
         // A whole element arriving is not one field of one element.
         const std::string before = edit.text();

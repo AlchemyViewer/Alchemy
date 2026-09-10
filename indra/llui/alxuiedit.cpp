@@ -332,9 +332,33 @@ void ALXUIEdit::note(const path_t& path, std::string_view field)
     if (mDepth == 1)
     {
         mPending.path = path;
+        mPending.after = path;
         mPending.field = field;
         mPending.oneField = true;
     }
+}
+
+// Where a step that writes a name leaves the element it renames. A step is
+// the name and which of the siblings of that name it is, counted in the
+// order the file has them, so a rename into a name a sibling already carries
+// still says which of the two it means.
+void ALXUIEdit::noteRename(pugi::xml_node node, const std::string& name)
+{
+    if (mDepth != 1 || mPending.after.empty())
+    {
+        return;
+    }
+    S32 ordinal = 0;
+    for (pugi::xml_node sibling = node.parent().first_child();
+         sibling && sibling != node;
+         sibling = sibling.next_sibling())
+    {
+        if (name == sibling.attribute("name").value())
+        {
+            ++ordinal;
+        }
+    }
+    mPending.after.back() = ALXUISelection::step(name, ordinal);
 }
 
 ALXUIEdit::Step::~Step()
@@ -384,6 +408,8 @@ bool ALXUIEdit::undo()
     // The step being put back is the one that followed the text being
     // restored, so what it did travels with it onto the other stack.
     mLastChange = mUndoWhat.back();
+    // The step is taken back, so the element reads as it did before it.
+    mLastPath = mLastChange.path;
     mRedo.push_back(std::move(mText));
     mRedoWhat.push_back(mLastChange);
     mUndoWhat.pop_back();
@@ -400,6 +426,8 @@ bool ALXUIEdit::redo()
         return false;
     }
     mLastChange = mRedoWhat.back();
+    // The step is applied again, so the element is where the step put it.
+    mLastPath = mLastChange.after;
     mUndo.push_back(std::move(mText));
     mUndoWhat.push_back(mLastChange);
     mRedoWhat.pop_back();
@@ -416,6 +444,7 @@ void ALXUIEdit::clearHistory()
     mUndoWhat.clear();
     mRedoWhat.clear();
     mLastChange = Change();
+    mLastPath.clear();
 }
 
 bool ALXUIEdit::fieldText(const path_t& path, std::string_view field, std::string& out) const
@@ -943,6 +972,10 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
     }
 
     note(path, name);
+    if (name == "name")
+    {
+        noteRename(node, value);
+    }
 
     Span span;
     Span whole;
