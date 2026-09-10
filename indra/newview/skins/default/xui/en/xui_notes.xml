@@ -164,6 +164,19 @@
     <tag name="scope_bar" note="A query written as a sentence: fixed words, dropdowns, and one field for what is looked for." />
     <tag name="specimen_list" note="A list whose rows carry the things themselves rather than words about them." />
 
+    <tag name="time" note="A time of day, chosen as hours and minutes with a pair of arrows and typed if the file allows it." />
+    <tag name="inspector" note="A tooltip that is a panel: what a hover says when it has more to say than one line." />
+    <tag name="radio_item" note="One choice of a radio group, written as a child of the group it belongs to." />
+    <tag name="scroll_column_header" note="The heading over one column of a scroll list, which sorts by it and can be dragged to widen it." />
+    <tag name="textbase" note="The parameters every text widget shares, named so that a file may configure one it does not otherwise reach." />
+    <tag name="avatar_list_item" note="One resident's row in a list of them: a picture, a name, and the buttons the list was told to show." />
+    <tag name="inventory_list_item" note="One inventory item's row, with its icon, its name and whatever the list puts beside them." />
+    <tag name="wearable_outfit_list_item" note="One outfit's row in My Outfits, with what wearing it would take." />
+    <tag name="clothing_list_item" note="One worn piece of clothing, with the buttons that edit, move and take it off." />
+    <tag name="bodyparts_list_item" note="One worn body part, which can be replaced but never simply taken off." />
+    <tag name="deletable_wearable_list_item" note="A worn thing with a button to take it off, for the lists where that is allowed." />
+    <tag name="dummy_clothing_list_item" note="A place in the list for a kind of clothing nothing is worn for, greyed, with the way to add some." />
+
     <!--
       The second thing no registry knows: a name that exists, works, and
       should not be used.
