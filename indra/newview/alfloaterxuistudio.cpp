@@ -571,17 +571,25 @@ public:
             const S32 anchor = anchorAt(x, y, localRectOf(selected));
             if (anchor >= 0)
             {
+                setFocus(true);
                 mTool->toggleFollows(anchor);
                 return true;
             }
             const S32 grip = gripAt(x, y, localRectOf(selected), mask);
             if (grip != GRIP_NONE)
             {
+                setFocus(true);
                 return beginDrag(grip, x, y);
             }
         }
         if (mask & MASK_CONTROL)
         {
+            // Whatever this click turns out to be, the canvas is where the
+            // keyboard now is: choosing an element here is how a person says
+            // that the arrows are about to be about that element. Taken
+            // before the branches, because every one of them used to be able
+            // to return without it and the commonest one did.
+            setFocus(true);
             LLView* view = hitTest(x, y);
             // Shift adds to the selection rather than replacing it, and a
             // second shift-click takes it out again. What is added is not
@@ -2069,20 +2077,34 @@ void ALFloaterXUIStudio::draw()
             scanCatalog();
         }
         mReloadEntryOnly = false;
-        // A rebuild is not a new preview: it stays where it was put, and
-        // it keeps the keyboard. Without this the arrows move an element
-        // once and then nothing: the floater they were going to is gone,
-        // and its replacement has never been focused.
-        const LLFloater* was = mPreviews[PRIMARY].host.get();
-        const bool had_keyboard = was && gFocusMgr.childHasKeyboardFocus(was);
+        // A rebuild is not a new preview: it stays where it was put, and it
+        // keeps the keyboard. Without this the arrows move an element once
+        // and then nothing -- whatever they were going to is gone, and its
+        // replacement has never been focused.
+        //
+        // Both places a preview can be: a window of its own, and the canvas
+        // in this one, which is where it is unless somebody asked otherwise.
+        // Only the first of those was put back, so a nudge on the canvas --
+        // which is every nudge, most days -- worked exactly once.
+        const LLFloater* was_host = mPreviews[PRIMARY].host.get();
+        const LLView* was_canvas = mCanvases[PRIMARY];
+        const bool host_had = was_host && gFocusMgr.childHasKeyboardFocus(was_host);
+        const bool canvas_had = was_canvas && gFocusMgr.childHasKeyboardFocus(was_canvas);
         mKeepPlace = true;
         showPreviews();
         mKeepPlace = false;
-        if (had_keyboard)
+        if (host_had)
         {
             if (LLFloater* host = mPreviews[PRIMARY].host.get())
             {
                 host->setFocus(true);
+            }
+        }
+        else if (canvas_had)
+        {
+            if (ALXUICanvas* canvas = mCanvases[PRIMARY])
+            {
+                canvas->setFocus(true);
             }
         }
         if (mReloadFromDisk)
@@ -2225,9 +2247,17 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     // arrows and a list scrolls with them, and a list that happens to
     // ignore one is not asking for a file to be written. The arrows move
     // the element when the tool itself holds the keyboard, and when the
-    // preview does, which is where they are wanted.
+    // preview does, which is where they are wanted -- and the second of
+    // those is what this used to say and not do.
     const LLFocusableElement* focus = gFocusMgr.getKeyboardFocus();
-    if ((!focus || focus == static_cast<const LLFocusableElement*>(this)) && nudge(key, mask))
+    bool ours = !focus || focus == static_cast<const LLFocusableElement*>(this);
+    for (S32 which = 0; !ours && which < PREVIEWS; ++which)
+    {
+        // A widget in a preview is a picture of a widget: the arrows over it
+        // move the element rather than its contents.
+        ours = mCanvases[which] && gFocusMgr.childHasKeyboardFocus(mCanvases[which]);
+    }
+    if (ours && nudge(key, mask))
     {
         return true;
     }
