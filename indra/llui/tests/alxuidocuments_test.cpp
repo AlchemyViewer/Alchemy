@@ -251,4 +251,52 @@ namespace tut
         ensure_equals("nothing was opened", open.count(), 0u);
         ensure("nor is one made by an empty path", open.open(std::string()) == nullptr);
     }
+
+    // The whole stack as one timeline: everything done, then everything put
+    // back, with a mark saying where the present is. Putting a step back does
+    // not make it never have happened.
+    template<> template<>
+    void alxuidocuments_object::test<7>()
+    {
+        const std::string base = write("base.xml", panel("a"));
+        const std::string other = write("other.xml", panel("b"));
+
+        ALXUIDocuments open;
+        ALXUIEdit* first = open.open(base);
+        ALXUIEdit* second = open.open(other);
+        ensure("opens", first && second);
+        ensure("nothing yet", open.history().empty());
+
+        ensure("writes", first->setAttribute({ "a" }, "width", "40"));
+        open.settle();
+        {
+            ALXUIDocuments::Action together(open);
+            ensure("writes", first->setAttribute({ "a" }, "height", "41"));
+            ensure("and to the other", second->setAttribute({ "b" }, "width", "50"));
+        }
+
+        std::vector<ALXUIDocuments::Entry> all = open.history();
+        ensure_equals("two actions", all.size(), 2u);
+        ensure_equals("and both are in force", open.inForce(), 2u);
+
+        ensure_equals("the first was one step", all[0].steps, 1);
+        ensure_equals("in one document", all[0].documents, 1);
+        ensure_equals("which it names", all[0].document, base);
+        ensure("and says what it did", all[0].change.did == ALXUIEdit::Did::WroteField);
+        ensure_equals("on which field", all[0].change.field, std::string("width"));
+
+        ensure_equals("the second was two steps", all[1].steps, 2);
+        ensure_equals("over two documents", all[1].documents, 2);
+        ensure("so it names none of them", all[1].document.empty());
+
+        // Put back, and it is still listed: the present moved, not the past.
+        ensure("undone", open.undo());
+        all = open.history();
+        ensure_equals("both still listed", all.size(), 2u);
+        ensure_equals("with one of them in force", open.inForce(), 1u);
+        ensure_equals("and the one put back is still the second", all[1].steps, 2);
+
+        ensure("done again", open.redo());
+        ensure_equals("back where it was", open.inForce(), 2u);
+    }
 }

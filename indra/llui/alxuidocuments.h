@@ -117,6 +117,25 @@ public:
     bool undo();
     bool redo();
 
+    // One action, as something listing them reads it.
+    struct Entry
+    {
+        // What its last step did, which for an action of one step is what
+        // the action did. A caller says it in words.
+        ALXUIEdit::Change   change;
+        // The document it touched, where it touched exactly one.
+        std::string         document;
+        S32                 steps = 0;
+        S32                 documents = 0;
+    };
+
+    // Everything done, oldest first, and then everything put back -- one
+    // list, with inForce() saying where the present is in it. Putting a step
+    // back does not make it never have happened, and a stack a person can
+    // see is the whole reason to keep them in one place.
+    std::vector<Entry> history() const;
+    size_t inForce() const { return mDone.size(); }
+
     // What the last undo or redo put back, where it was one step of one
     // document. An action over more than that says only that it was more
     // than that, since there is no one field for a caller to write.
@@ -145,6 +164,10 @@ private:
     struct Taken
     {
         std::vector<std::pair<std::string, S32> > steps;
+        // What the last of them did, read as the action closed: a caller
+        // listing actions has to say what each one was, and the steps
+        // themselves are in the documents rather than here.
+        ALXUIEdit::Change what;
     };
 
     // How deep each document's own stack was when this last looked.

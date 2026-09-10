@@ -173,6 +173,13 @@ void ALXUIDocuments::settle()
         if (held->undoDepth() > before)
         {
             taken.steps.emplace_back(path, (S32)(held->undoDepth() - before));
+            // The step on top is the last one this action took, which is
+            // what an action of one step did and the nearest thing to a
+            // description of one that took several.
+            if (const ALXUIEdit::Change* what = held->nextUndo())
+            {
+                taken.what = *what;
+            }
         }
     }
     remember();
@@ -251,6 +258,40 @@ bool ALXUIDocuments::redo()
     mDone.push_back(taken);
     remember();
     return true;
+}
+
+std::vector<ALXUIDocuments::Entry> ALXUIDocuments::history() const
+{
+    std::vector<Entry> all;
+    all.reserve(mDone.size() + mUndone.size());
+
+    const auto describe = [&all](const Taken& taken)
+    {
+        Entry entry;
+        entry.change = taken.what;
+        entry.documents = (S32)taken.steps.size();
+        for (const auto& [path, count] : taken.steps)
+        {
+            entry.steps += count;
+        }
+        if (taken.steps.size() == 1)
+        {
+            entry.document = taken.steps.front().first;
+        }
+        all.push_back(std::move(entry));
+    };
+
+    for (const Taken& taken : mDone)
+    {
+        describe(taken);
+    }
+    // The most recently put back is the one nearest the present, so it comes
+    // first of those: read forwards, the list is one timeline.
+    for (auto it = mUndone.rbegin(); it != mUndone.rend(); ++it)
+    {
+        describe(*it);
+    }
+    return all;
 }
 
 S32 ALXUIDocuments::dirtyCount() const

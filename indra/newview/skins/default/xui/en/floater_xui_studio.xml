@@ -68,6 +68,9 @@
     <floater.string name="FixDidMove">Moved [WHERE] inside its parent in [FILE], [LAYER]</floater.string>
     <floater.string name="FixDidWiden">Widened [WHERE] by [DX] in [FILE], [LAYER]</floater.string>
     <floater.string name="StepSpeltFieldAgain">[WHAT] on [WHERE]</floater.string>
+    <floater.string name="StepManySteps">[STEPS] edits</floater.string>
+    <floater.string name="StepManyFiles">[STEPS] edits over [FILES] files</floater.string>
+    <floater.string name="HistoryWentTo">Put the files back to [COUNT] edits in.</floater.string>
     <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsEveryRule">Every rule</floater.string>
@@ -1730,6 +1733,25 @@
                                  width="64" />
                             </layout_panel>
                         </layout_stack>
+                    </panel>
+                    <panel
+                     follows="all"
+                     height="158"
+                     label="History"
+                     layout="topleft"
+                     name="history_mode"
+                     tool_tip="Everything done to the files this tool has open, with a mark where the present is"
+                     width="742">
+                        <history_list
+                         empty_headline="Nothing done yet."
+                         empty_sentence="Edits show up here as you make them, newest first. Double-click one to put the files back the way they were just after it."
+                         follows="all"
+                         height="158"
+                         layout="topleft"
+                         left="0"
+                         name="history"
+                         top="0"
+                         width="742" />
                     </panel>
                     <panel
                      follows="all"

@@ -28,6 +28,7 @@
 #include "alxuidiagnostics.h"
 #include "alxuidocuments.h"
 #include "alxuiedit.h"
+#include "alhistorylist.h"
 #include "alxuifindings.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
@@ -345,6 +346,15 @@ private:
     void onFindingSelected();
     void refreshBreadcrumb();
 
+    // --- the history -----------------------------------------------------
+    // Everything done, as a place rather than a keystroke: the set's actions,
+    // said in this tool's words, with a mark where the present is. Choosing
+    // one puts the documents back to just after it.
+    void fillHistory();
+    void onHistoryGoTo(size_t in_force);
+    void onHistoryStepChosen(size_t at);
+    std::string describeAction(const ALXUIDocuments::Entry& entry) const;
+
     // --- the documents this tool has open ------------------------------------
     // The set can hold as many as a person opens, each with its own work in
     // it, and a document nobody is looking at is a document nobody can see
@@ -625,6 +635,7 @@ private:
     LLPanel*            mTreePanel = nullptr;
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
+    ALHistoryList*      mHistory = nullptr;
     LLScrollListCtrl*   mDocumentList = nullptr;
     LLScrollListCtrl*   mSourceLayerList = nullptr;
     LLTextBox*          mOverrideField = nullptr;

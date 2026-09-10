@@ -1684,6 +1684,7 @@ bool ALFloaterXUIStudio::postBuild()
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
+    mHistory = getChild<ALHistoryList>("history");
     mDocumentList = getChild<LLScrollListCtrl>("documents");
     mSourceLayerList = getChild<LLScrollListCtrl>("source_layer_list");
     mOverrideField = getChild<LLTextBox>("override_field");
@@ -1897,6 +1898,8 @@ bool ALFloaterXUIStudio::postBuild()
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
     mFindings->setCommitOnSelectionChange(true);
     mFindings->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshFixButtons, this));
+    mHistory->onGoTo(boost::bind(&ALFloaterXUIStudio::onHistoryGoTo, this, _1));
+    mHistory->onStepChosen(boost::bind(&ALFloaterXUIStudio::onHistoryStepChosen, this, _1));
     mDocumentList->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSelected, this));
     getChild<LLButton>("write_override")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onWriteOverride, this));
     getChild<LLButton>("document_save")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSave, this));
@@ -3365,6 +3368,7 @@ void ALFloaterXUIStudio::refreshModeCounts()
     // is a fact and an unsaved one is a thing to do something about.
     count(mModes, "documents_mode", mDocuments.dirtyCount());
     count(mBottom, "findings_mode", mFindings->getItemCount());
+    count(mBottom, "history_mode", mHistory ? (S32)mHistory->count() : 0);
     count(mBottom, "channels_mode", mChannels->getItemCount());
 }
 
@@ -3426,6 +3430,7 @@ void ALFloaterXUIStudio::documentChanged(const std::string& status)
     // put back, however many files it wrote to.
     mDocuments.settle();
     fillDocuments();
+    fillHistory();
     mPendingStatus = status;
     setStatus(status);
     mReloadEntryOnly = true;
@@ -3623,6 +3628,7 @@ void ALFloaterXUIStudio::documentRead(const std::string& status)
 {
     mDocuments.settle();
     fillDocuments();
+    fillHistory();
     setStatus(status);
     mRereadPending = true;
     mRereadAt.setTimerExpirySec(REREAD_SECONDS);
@@ -4062,6 +4068,106 @@ void ALFloaterXUIStudio::saveAllDocuments()
         return;
     }
     documentChanged(getString("EditSavedAll", args));
+}
+
+// ---------------------------------------------------------------------------
+// The history
+// ---------------------------------------------------------------------------
+
+// An action said in words. One step of one document is what that step did;
+// anything larger is said by its size, because a repair that wrote five files
+// is not any of the five things it wrote.
+std::string ALFloaterXUIStudio::describeAction(const ALXUIDocuments::Entry& entry) const
+{
+    if (entry.steps == 1 && entry.documents == 1)
+    {
+        const std::string said = describeStep(entry.change);
+        if (!said.empty())
+        {
+            return said;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[STEPS]"] = std::to_string(entry.steps);
+    args["[FILES]"] = std::to_string(entry.documents);
+    return getString(entry.documents > 1 ? "StepManyFiles" : "StepManySteps", args);
+}
+
+void ALFloaterXUIStudio::fillHistory()
+{
+    if (!mHistory)
+    {
+        return;
+    }
+    // Whatever is still open has to be settled first, or the edit just made
+    // is not an action yet and the list is one behind.
+    mDocuments.settle();
+
+    std::vector<ALHistoryList::Step> steps;
+    for (const ALXUIDocuments::Entry& entry : mDocuments.history())
+    {
+        ALHistoryList::Step step;
+        step.what = describeAction(entry);
+        std::string file;
+        std::string layer;
+        if (!entry.document.empty() && describeDocument(entry.document, file, layer))
+        {
+            step.where = file;
+        }
+        steps.push_back(std::move(step));
+    }
+    mHistory->setSteps(std::move(steps), mDocuments.inForce());
+    refreshModeCounts();
+}
+
+// A step chosen: put the documents back to just after it, however many undos
+// or redos that is. The set knows what each action touched, so this only has
+// to say how far.
+void ALFloaterXUIStudio::onHistoryGoTo(size_t in_force)
+{
+    // A bound, so that a set that stops answering does not spin here.
+    for (S32 guard = 0; guard < 1024 && mDocuments.inForce() > in_force; ++guard)
+    {
+        if (!mDocuments.undo())
+        {
+            break;
+        }
+    }
+    for (S32 guard = 0; guard < 1024 && mDocuments.inForce() < in_force; ++guard)
+    {
+        if (!mDocuments.redo())
+        {
+            break;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string((S32)mDocuments.inForce());
+    replayChange(getString("HistoryWentTo", args));
+    fillHistory();
+}
+
+// A row pointed at: the element that step was about, selected, so that
+// reading the list is also looking at what it is a list of.
+void ALFloaterXUIStudio::onHistoryStepChosen(size_t at)
+{
+    const std::vector<ALXUIDocuments::Entry> all = mDocuments.history();
+    if (at >= all.size())
+    {
+        return;
+    }
+    const ALXUIDocuments::Entry& entry = all[at];
+    // Only where the step named one element of the file being looked at:
+    // selecting in a file nobody has open would be a jump nobody asked for.
+    if (entry.steps != 1 || entry.documents != 1 || entry.change.path.empty())
+    {
+        return;
+    }
+    std::string file;
+    std::string layer;
+    if (describeDocument(entry.document, file, layer) && file == mFile)
+    {
+        mSelection.select(at < mDocuments.inForce() ? entry.change.after : entry.change.path);
+    }
 }
 
 // ---------------------------------------------------------------------------
