@@ -85,9 +85,20 @@ namespace
         return lower;
     }
 
-    bool contains(std::string_view haystack, const std::string& lower_needle)
+    bool matches(std::string_view haystack, const std::string& lower_needle,
+                 ALXUICatalog::Match how)
     {
-        return asciiLower(haystack).find(lower_needle) != std::string::npos;
+        const std::string in = asciiLower(haystack);
+        switch (how)
+        {
+        case ALXUICatalog::Match::Matching:  return in == lower_needle;
+        case ALXUICatalog::Match::Starting:  return in.rfind(lower_needle, 0) == 0;
+        case ALXUICatalog::Match::Ending:
+            return in.size() >= lower_needle.size()
+                && in.compare(in.size() - lower_needle.size(), lower_needle.size(), lower_needle) == 0;
+        case ALXUICatalog::Match::Containing: break;
+        }
+        return in.find(lower_needle) != std::string::npos;
     }
 
     void sortFirst(std::vector<std::string>& names, const char* first)
@@ -454,7 +465,7 @@ S32 ALXUICatalog::lineOf(const Layer& layer, pugi::xml_node node)
     return layer.doc && node ? layer.doc->lineOf(node.offset_debug()) : 0;
 }
 
-std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field field,
+std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field field, Match match,
                                                   std::string_view skin, std::string_view language) const
 {
     std::vector<Hit> hits;
@@ -484,7 +495,7 @@ std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field 
 
                 if (any || field == Field::Tag)
                 {
-                    if (contains(node.name(), needle))
+                    if (matches(node.name(), needle, match))
                     {
                         matched = true;
                         snippet = std::string("<") + node.name() + ">";
@@ -493,7 +504,7 @@ std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field 
                 if (!matched && (any || field == Field::Name))
                 {
                     const pugi::xml_attribute name = node.attribute("name");
-                    if (name && contains(name.value(), needle))
+                    if (name && matches(name.value(), needle, match))
                     {
                         matched = true;
                         snippet = std::string("name=\"") + name.value() + "\"";
@@ -503,8 +514,8 @@ std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field 
                 {
                     for (pugi::xml_attribute attr = node.first_attribute(); attr; attr = attr.next_attribute())
                     {
-                        const bool by_name = (any || field == Field::Attribute) && contains(attr.name(), needle);
-                        const bool by_value = (any || field == Field::Value) && contains(attr.value(), needle);
+                        const bool by_name = (any || field == Field::Attribute) && matches(attr.name(), needle, match);
+                        const bool by_value = (any || field == Field::Value) && matches(attr.value(), needle, match);
                         if (by_name || by_value)
                         {
                             matched = true;
@@ -516,7 +527,7 @@ std::vector<ALXUICatalog::Hit> ALXUICatalog::find(std::string_view query, Field 
                 if (!matched && (any || field == Field::Text))
                 {
                     const std::string text = utf8str_trim(elementText(node));
-                    if (!text.empty() && contains(text, needle))
+                    if (!text.empty() && matches(text, needle, match))
                     {
                         matched = true;
                         snippet = text;

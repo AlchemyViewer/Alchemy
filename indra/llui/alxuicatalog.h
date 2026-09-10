@@ -123,6 +123,17 @@ public:
         Any
     };
 
+    // How the words are compared with what is in the file. A search over six
+    // hundred files finds a hundred things containing "close" and one whose
+    // name is it, and only the reader knows which they meant.
+    enum class Match : U8
+    {
+        Containing,
+        Matching,       // the whole of it and nothing else
+        Starting,
+        Ending
+    };
+
     struct Hit
     {
         const Entry*    entry = nullptr;
@@ -136,6 +147,7 @@ public:
     // A case-insensitive substring search over every parsed layer, or over
     // one skin's and one language's when given.
     std::vector<Hit> find(std::string_view query, Field field,
+                          Match match = Match::Containing,
                           std::string_view skin = std::string_view(),
                           std::string_view language = std::string_view()) const;
 

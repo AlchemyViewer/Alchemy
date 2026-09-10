@@ -29,6 +29,7 @@
 #include "alxuidocuments.h"
 #include "alxuiedit.h"
 #include "alhistorylist.h"
+#include "alscopebar.h"
 #include "alxuifindings.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
@@ -341,6 +342,11 @@ private:
     void onTreeAction(const LLSD& param);
     bool onTreeActionEnabled(const LLSD& param);
     void onTreeHover(const ALXUITreeItem* item);
+    // Find, said as a sentence. Built here rather than in the file because
+    // two of its dropdowns name the skin and language in force.
+    void buildFindBar();
+    void onFindScope();
+
     void runLint();
     void fillFindings();
     void onFindingSelected();
@@ -650,8 +656,8 @@ private:
     LLTextBox*          mCanvasTitle = nullptr;
     LLButton*           mCanvasShown = nullptr;
     LLButton*           mCanvasPinned = nullptr;
-    LLLineEditor*       mFindQuery = nullptr;
-    LLComboBox*         mFindField = nullptr;
+    ALScopeBar*         mFindBar = nullptr;
+    LLTextBox*          mFindCount = nullptr;
     LLScrollListCtrl*   mFindResults = nullptr;
     LLFilterEditor*     mTreeFilter = nullptr;
     LLPanel*            mTreePanel = nullptr;

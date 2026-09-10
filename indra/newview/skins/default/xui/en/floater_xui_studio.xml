@@ -86,6 +86,28 @@
     <floater.string name="GutterLayer">Layer</floater.string>
     <floater.string name="GutterSays">Says</floater.string>
     <floater.string name="GutterWriteHere">Write here</floater.string>
+    <floater.string name="FindWord">Find</floater.string>
+    <floater.string name="FindIn">in</floater.string>
+    <floater.string name="FindAny">anything</floater.string>
+    <floater.string name="FindTag">a tag</floater.string>
+    <floater.string name="FindAttribute">an attribute name</floater.string>
+    <floater.string name="FindValue">an attribute value</floater.string>
+    <floater.string name="FindName">an element name</floater.string>
+    <floater.string name="FindText">the text between tags</floater.string>
+    <floater.string name="FindContaining">containing</floater.string>
+    <floater.string name="FindMatching">matching</floater.string>
+    <floater.string name="FindStarting">starting with</floater.string>
+    <floater.string name="FindEnding">ending with</floater.string>
+    <floater.string name="FindEverywhere">every skin</floater.string>
+    <floater.string name="FindThisSkin">the [SKIN] skin</floater.string>
+    <floater.string name="FindThisLanguage">[SKIN]/[LANG]</floater.string>
+    <floater.string name="FindThisFile">this file</floater.string>
+    <floater.string name="FindPlaceholder">what to look for</floater.string>
+    <floater.string name="FindFieldTip">Which part of a file the words are looked for in</floater.string>
+    <floater.string name="FindHowTip">How the words are compared with what is in the file</floater.string>
+    <floater.string name="FindScopeTip">Which layers are looked at</floater.string>
+    <floater.string name="FindResults">[COUNT] in [FILES] files</floater.string>
+    <floater.string name="FindSomeResults">[COUNT] in [FILES] files, first [SHOWN]</floater.string>
     <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
     <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
     <floater.string name="LintStopped">Lint all: stopped.</floater.string>
@@ -766,39 +788,14 @@
                          min_dim="30"
                          name="find_row"
                          width="376">
-                            <text
-                             follows="left|top"
-                             height="16"
+                            <scope_bar
+                             follows="left|top|right"
+                             height="30"
                              layout="topleft"
                              left="0"
-                             name="find_label"
-                             top="7"
-                             width="34">Find</text>
-                            <combo_box
-                             follows="left|top"
-                             height="22"
-                             layout="topleft"
-                             left_pad="2"
-                             name="find_field"
-                             tool_tip="Which part of a file the words are looked for in: anywhere, a tag, an attribute's name, an attribute's value, an element's name, or the text between the tags"
-                             top_delta="-3"
-                             width="84">
-                                <combo_box.item label="Any" name="any" value="any" />
-                                <combo_box.item label="Tag" name="tag" value="tag" />
-                                <combo_box.item label="Attribute" name="attribute" value="attribute" />
-                                <combo_box.item label="Value" name="value" value="value" />
-                                <combo_box.item label="Name" name="name" value="name" />
-                                <combo_box.item label="Text" name="text" value="text" />
-                            </combo_box>
-                            <line_editor
-                             follows="left|top|right"
-                             height="22"
-                             layout="topleft"
-                             left_pad="4"
-                             name="find_query"
-                             tool_tip="Search every file and layer; Enter runs it"
-                             top_delta="0"
-                             width="252" />
+                             name="find_bar"
+                             top="0"
+                             width="376" />
                         </layout_panel>
                         <layout_panel
                          auto_resize="true"

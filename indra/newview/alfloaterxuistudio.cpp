@@ -30,6 +30,7 @@
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
 #include "alpopover.h"
+#include "alscopebar.h"
 #include "alpropertygrid.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
@@ -1686,8 +1687,7 @@ bool ALFloaterXUIStudio::postBuild()
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
     mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
-    mFindQuery = getChild<LLLineEditor>("find_query");
-    mFindField = getChild<LLComboBox>("find_field");
+    mFindBar = getChild<ALScopeBar>("find_bar");
     mFindResults = getChild<LLScrollListCtrl>("find_results");
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
     mTreePanel = getChild<LLPanel>("tree_host");
@@ -1900,8 +1900,19 @@ bool ALFloaterXUIStudio::postBuild()
     mLanguageCombo->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
     mLanguageCombo2->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onSkinOrLanguage, this));
     mSecondaryCheck->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleSecondary, this));
-    mFindQuery->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFind, this));
-    mFindField->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFind, this));
+    buildFindBar();
+    // The summary under the sentence, in the slot at its right end.
+    LLTextBox::Params cp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
+    cp.name = "find_count";
+    cp.rect = LLRect(0, 22, 110, 0);
+    cp.font_halign = LLFontGL::RIGHT;
+    mFindCount = LLUICtrlFactory::create<LLTextBox>(cp);
+    mFindBar->setAdornment(mFindCount);
+    // Return runs it; changing a dropdown re-runs whatever is already typed,
+    // since a sentence with a word changed is a different question about the
+    // same words.
+    mFindBar->onRun(boost::bind(&ALFloaterXUIStudio::onFind, this));
+    mFindBar->onChanged(boost::bind(&ALFloaterXUIStudio::onFindScope, this));
     mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindResult, this));
     mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTreeFilter, this));
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
@@ -2402,22 +2413,135 @@ void ALFloaterXUIStudio::onSkinOrLanguage()
     }
 }
 
+// Find, said as a sentence rather than as a form:
+//
+//     Find [Anything] [containing] `close` in [every skin]
+//
+// A form of the same query is four labelled boxes and a reader working out
+// which applies to which. The sentence says how they compose by being one,
+// and it fits in a pane a form would not.
+void ALFloaterXUIStudio::buildFindBar()
+{
+    std::vector<ALScopeBar::Segment> said;
+
+    ALScopeBar::Segment find;
+    find.kind = ALScopeBar::Segment::Kind::Word;
+    find.text = getString("FindWord");
+    said.push_back(find);
+
+    ALScopeBar::Segment what;
+    what.kind = ALScopeBar::Segment::Kind::Choice;
+    what.name = "field";
+    what.toolTip = getString("FindFieldTip");
+    what.choices = { { getString("FindAny"), "any" },
+                     { getString("FindTag"), "tag" },
+                     { getString("FindAttribute"), "attribute" },
+                     { getString("FindValue"), "value" },
+                     { getString("FindName"), "name" },
+                     { getString("FindText"), "text" } };
+    said.push_back(what);
+
+    ALScopeBar::Segment how;
+    how.kind = ALScopeBar::Segment::Kind::Choice;
+    how.name = "how";
+    how.toolTip = getString("FindHowTip");
+    how.choices = { { getString("FindContaining"), "containing" },
+                    { getString("FindMatching"), "matching" },
+                    { getString("FindStarting"), "starting" },
+                    { getString("FindEnding"), "ending" } };
+    said.push_back(how);
+
+    ALScopeBar::Segment query;
+    query.kind = ALScopeBar::Segment::Kind::Field;
+    query.name = "query";
+    query.text = getString("FindPlaceholder");
+    said.push_back(query);
+
+    ALScopeBar::Segment in;
+    in.kind = ALScopeBar::Segment::Kind::Word;
+    in.text = getString("FindIn");
+    said.push_back(in);
+
+    // Which layers are looked at. The two that name this skin and this
+    // language are what a developer working in one of them means; every skin
+    // is what somebody asking where a name is used means.
+    ALScopeBar::Segment where;
+    where.kind = ALScopeBar::Segment::Kind::Choice;
+    where.name = "scope";
+    where.toolTip = getString("FindScopeTip");
+    LLStringUtil::format_map_t args;
+    args["[SKIN]"] = mSkin;
+    args["[LANG]"] = mLanguage;
+    where.choices = { { getString("FindEverywhere"), "all" },
+                      { getString("FindThisSkin", args), "skin" },
+                      { getString("FindThisLanguage", args), "language" },
+                      { getString("FindThisFile"), "file" } };
+    said.push_back(where);
+
+    mFindBar->setSentence(std::move(said));
+}
+
+namespace
+{
+    ALXUICatalog::Match matchFrom(const std::string& value)
+    {
+        if (value == "matching") return ALXUICatalog::Match::Matching;
+        if (value == "starting") return ALXUICatalog::Match::Starting;
+        if (value == "ending")   return ALXUICatalog::Match::Ending;
+        return ALXUICatalog::Match::Containing;
+    }
+}
+
+// A dropdown moved. Whatever is already typed is asked again, since a
+// sentence with one word changed is a different question about the same
+// words -- and an empty field asks nothing, so it costs nothing to try.
+void ALFloaterXUIStudio::onFindScope()
+{
+    if (!mFindBar->valueOf("query").empty())
+    {
+        onFind();
+    }
+}
+
 void ALFloaterXUIStudio::onFind()
 {
-    const std::string query = mFindQuery->getText();
+    const std::string query = mFindBar->valueOf("query");
     mFindResults->deleteAllItems();
     if (query.empty())
     {
+        mFindCount->setText(LLStringUtil::null);
         refreshModeCounts();
         return;
     }
-    std::vector<ALXUICatalog::Hit> hits = mCatalog.find(query, fieldFrom(mFindField->getValue().asString()));
+
+    // What the scope names, in the terms the catalog takes: a skin, a
+    // language, both or neither.
+    const std::string scope = mFindBar->valueOf("scope");
+    const std::string skin = scope == "skin" || scope == "file" ? mSkin : std::string();
+    const std::string language = scope == "language" || scope == "file" ? mLanguage : std::string();
+
+    std::vector<ALXUICatalog::Hit> hits =
+        mCatalog.find(query, fieldFrom(mFindBar->valueOf("field")),
+                      matchFrom(mFindBar->valueOf("how")), skin, language);
+
+    // One file is not a thing the catalog searches by, since a search over
+    // one file is a search over its layers: it is the scope, applied here.
+    if (scope == "file")
+    {
+        std::erase_if(hits, [this](const ALXUICatalog::Hit& hit)
+        {
+            return !hit.entry || hit.entry->name != mFile;
+        });
+    }
+
+    boost::unordered_set<std::string> files;
     S32 shown = 0;
     for (const ALXUICatalog::Hit& hit : hits)
     {
+        files.insert(hit.entry->name);
         if (shown++ >= MAX_FIND_ROWS)
         {
-            break;
+            continue;
         }
         LLSD id;
         id["file"] = hit.entry->name;
@@ -2431,8 +2555,17 @@ void ALFloaterXUIStudio::onFind()
             { "layer", hit.layer->skin + "/" + hit.layer->language },
             { "snippet", hit.snippet } }));
     }
-    setStatus(std::to_string(hits.size()) + (hits.size() == 1 ? " match" : " matches")
-              + (hits.size() > (size_t)MAX_FIND_ROWS ? ", the first " + std::to_string(MAX_FIND_ROWS) + " listed" : ""));
+
+    // The summary under the sentence: how many, and in how many files, which
+    // is the question a search over six hundred files is really asking.
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string((S32)hits.size());
+    args["[FILES]"] = std::to_string((S32)files.size());
+    args["[SHOWN]"] = std::to_string(MAX_FIND_ROWS);
+    const std::string said = getString(hits.size() > (size_t)MAX_FIND_ROWS
+                                       ? "FindSomeResults" : "FindResults", args);
+    mFindCount->setText(said);
+    setStatus(said);
     refreshModeCounts();
 }
 
@@ -5786,8 +5919,8 @@ std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
     }
     if (list == mFindResults)
     {
-        return "Search for \"" + mFindQuery->getText() + "\" in "
-             + utf8str_tolower(mFindField->getSelectedItemLabel()) + ", " + mSkin + "/" + mLanguage;
+        return "Search for \"" + mFindBar->valueOf("query") + "\" in "
+             + mFindBar->valueOf("field") + ", " + mSkin + "/" + mLanguage;
     }
 
     const Preview& pv = mPreviews[PRIMARY];
