@@ -43,7 +43,9 @@
 #include <sstream>
 
 //static variables
-U32 LLVOCacheEntry::sMinFrameRange = 0;
+// The least aggressive of the values updateDebugSettings can pick, so that a
+// read before the first update keeps entries rather than dropping them.
+U32 LLVOCacheEntry::sMinFrameRange = 64;
 F32 LLVOCacheEntry::sNearRadius = 1.0f;
 F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
@@ -486,11 +488,16 @@ F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 he
 //static
 void LLVOCacheEntry::updateDebugSettings()
 {
+    // A default-constructed LLFrameTimer reads no elapsed time, so the once-a-
+    // second throttle used to skip the first call and leave the statics at their
+    // initial values for a second of scene loading.
     static LLFrameTimer timer;
-    if(timer.getElapsedTimeF32() < 1.0f) //update frequency once per second.
+    static bool first_update = true;
+    if(!first_update && timer.getElapsedTimeF32() < 1.0f) //update frequency once per second.
     {
         return;
     }
+    first_update = false;
     timer.reset();
 
     //objects within the view frustum whose visible area is greater than this threshold will be loaded
@@ -1040,7 +1047,10 @@ void LLVOCachePartition::selectBackObjects(LLCamera &camera, F32 pixel_threshold
 
     if(mBackSlectionEnabled < 0)
     {
-        mBackSlectionEnabled = LLVOCacheEntry::sMinFrameRange - 1;
+        // sMinFrameRange is unsigned, so subtracting from zero wrapped to
+        // U32_MAX and narrowed to -1, which the llmax below then read as one
+        // pass instead of sixty-three.
+        mBackSlectionEnabled = (S32)llmax(LLVOCacheEntry::sMinFrameRange, 1u) - 1;
         mBackSlectionEnabled = llmax(mBackSlectionEnabled, (S32)1);
     }
 

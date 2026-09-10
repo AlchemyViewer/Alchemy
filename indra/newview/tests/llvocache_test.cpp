@@ -780,8 +780,8 @@ namespace tut
         }
 
         // A zero window evicts an object that was visible this very frame. The
-        // radii are only set once a second and start at nothing, so this is what
-        // a scene load looks like if the statics are left at their initial values.
+        // settings are read once a second, which is why sMinFrameRange starts at
+        // the widest window they can produce rather than at zero.
         {
             LLVOCacheEntry::VisibilityFacts facts = forgotten();
             facts.mMinFrameRange = 0;
