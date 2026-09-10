@@ -290,7 +290,10 @@ void LLLineEditor::onFocusLost()
         gEditMenuHandler = NULL;
     }
 
-    getWindow()->showCursorFromMouseMove();
+    if (LLWindow* window = getWindow())
+    {
+        window->showCursorFromMouseMove();
+    }
 
     LLUICtrl::onFocusLost();
 }
@@ -1266,7 +1269,10 @@ void LLLineEditor::addChar(const llwchar uni_char)
         }
     }
 
-    getWindow()->hideCursorUntilMouseMove();
+    if (LLWindow* window = getWindow())
+    {
+        window->hideCursorUntilMouseMove();
+    }
 }
 
 // Extends the selection box to the new cursor position

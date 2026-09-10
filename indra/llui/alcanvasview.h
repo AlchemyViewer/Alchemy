@@ -92,6 +92,14 @@ public:
     // on this surface at all.
     bool keptPlace(S32& left, S32& down) const;
 
+    // The keyboard given to a surface stays on the surface. A panel handed
+    // it passes it on to the first thing in it that will take it, and here
+    // that is a widget in the picture, which would then keep the arrows
+    // meant to move it. What is on the surface can still be given the
+    // keyboard by name, or by a plain click on it, which is the picture
+    // working.
+    void setFocus(bool b) override { LLUICtrl::setFocus(b); }
+
     // What is on a surface can move itself: a previewed window dragged by
     // its own title bar does, and nothing tells the surface. So the surface
     // asks, every time it draws -- otherwise the next change of size puts

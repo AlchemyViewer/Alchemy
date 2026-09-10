@@ -27,6 +27,7 @@
 #include "../alcanvasview.h"
 
 #include "../llfloater.h"
+#include "../lllineeditor.h"
 #include "../llscrollbar.h"
 #include "../llscrollcontainer.h"
 #include "../lluictrlfactory.h"
@@ -802,5 +803,40 @@ namespace tut
         ensure_equals("the row covers the region across", row->getRect().getWidth(), region.getWidth());
         ensure_equals("and down", row->getRect().getHeight(), region.getHeight());
         area->die();
+    }
+
+    // The keyboard given to a surface stays on the surface. A panel handed
+    // the keyboard passes it to the first thing in it that will take it,
+    // which here is a widget in the picture -- and a line editor in the
+    // picture keeps the arrows, so the element they were meant to move
+    // stayed put while the caret in a previewed box went left and right.
+    template<> template<>
+    void alcanvasview_object::test<22>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALCanvasView* canvas = surface();
+        gFloaterView->addChild(canvas);
+        LLPanel* root = place(canvas, 200, 100);
+
+        LLLineEditor::Params ep(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+        ep.name = "box";
+        ep.rect = LLRect(10, 60, 150, 40);
+        LLLineEditor* box = LLUICtrlFactory::create<LLLineEditor>(ep);
+        root->addChild(box);
+
+        canvas->setFocus(true);
+        ensure("the surface has the keyboard", canvas->hasFocus());
+        ensure("and the box in the picture does not", !box->hasFocus());
+
+        // A box in the picture can still be given the keyboard on purpose:
+        // a plain click on a previewed widget is the preview working.
+        box->setFocus(true);
+        ensure("asked for directly, the box takes it", box->hasFocus());
+        box->setFocus(false);
+        canvas->die();
     }
 }
