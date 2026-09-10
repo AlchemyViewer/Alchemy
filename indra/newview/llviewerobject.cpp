@@ -333,7 +333,11 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     LLPrimitive::init_primitive(pcode);
 
     // CP: added 12/2/2005 - this was being initialised to 0, not the current frame time
+    // Both clocks need it: an object whose first update is rejected before the timestamps are
+    // stamped otherwise measures its update age from the start of the session, which is instantly
+    // past every phase-out threshold.
     mLastInterpUpdateSecs = LLFrameTimer::getElapsedSeconds();
+    mLastMessageUpdateSecs = mLastInterpUpdateSecs;
 
     mPositionRegion = LLVector3(0.f, 0.f, 0.f);
 
@@ -2586,9 +2590,11 @@ void LLViewerObject::idleUpdate(LLAgent &agent, const F64 &frame_time)
             applyAngularVelocity(dt);
 
             if (isAttachment())
-            {
+            {   // An attachment rides its joint, so there is no linear motion to predict -- but it
+                // still needs the drawable pass below. Returning here skipped clearChanged(SHIFTED),
+                // and a still attachment present at a region shift has no other route back into
+                // updateDrawable, so the flag latched and forced undamped motion from then on.
                 mLastInterpUpdateSecs = (F64Seconds)frame_time;
-                return;
             }
             else
             {   // Move object based on it's velocity and rotation
