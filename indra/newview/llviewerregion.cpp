@@ -1854,15 +1854,18 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
                 break;
             }
         }
-        if((*iter)->getParentID() > 0)
-        {
-            continue; //skip child objects, they are removed with their parent.
-        }
-
+        // An entry can lose its octree entry while it is still in the active set
+        // -- clearCachedVisibleObjects walks this same set and skips those -- and
+        // a child is removed with its parent rather than on its own. Neither is a
+        // reason to stop reading the clock, so the deadline is checked below for
+        // every entry the walk visits, skipped or not.
         LLVOCacheEntry* vo_entry = *iter;
-        if(!vo_entry->isAnyVisible(camera_origin, local_origin, back_threshold) && vo_entry->mLastCameraUpdated < sLastCameraUpdated)
+        if(vo_entry && vo_entry->getEntry() && !vo_entry->getParentID())
         {
-            killObject(vo_entry, delete_list);
+            if(!vo_entry->isAnyVisible(camera_origin, local_origin, back_threshold) && vo_entry->mLastCameraUpdated < sLastCameraUpdated)
+            {
+                killObject(vo_entry, delete_list);
+            }
         }
 
         if(max_time < update_timer.getElapsedTimeF32()) //time out
@@ -1897,14 +1900,28 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 
 void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list)
 {
+    // An active entry can be without an octree entry, and a drawable can outlive
+    // the object it drew: addNewObject guards both before it touches a cached
+    // entry's drawable, and llassert is compiled out of a release build.
+    LLViewerOctreeEntry* oct_entry = entry->getEntry();
+    if(!oct_entry)
+    {
+        return;
+    }
+
     //kill the object.
-    LLDrawable* drawablep = (LLDrawable*)entry->getEntry()->getDrawable();
+    LLDrawable* drawablep = (LLDrawable*)oct_entry->getDrawable();
     llassert(drawablep);
-    llassert(drawablep->getRegion() == this);
+    llassert(!drawablep || drawablep->getRegion() == this);
 
     if(drawablep && !drawablep->getParent())
     {
         LLViewerObject* v_obj = drawablep->getVObj();
+        if(!v_obj || drawablep->isDead())
+        {
+            return;
+        }
+
         if (v_obj->isSelected()
             || (v_obj->flagAnimSource() && isAgentAvatarValid() && gAgentAvatarp->hasMotionFromSource(v_obj->getID())))
         {
