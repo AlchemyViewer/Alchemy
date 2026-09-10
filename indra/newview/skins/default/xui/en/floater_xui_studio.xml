@@ -71,6 +71,9 @@
     <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsSome">[SHOWN] of [TOTAL] shown; [HELD] findings over [FILES] files checked</floater.string>
     <floater.string name="FindingsEveryRule">Every rule</floater.string>
+    <floater.string name="DocumentDirtyMark">•</floater.string>
+    <floater.string name="DocumentCloseDirty">[FILE] has work in it; save it or revert it before letting go of it.</floater.string>
+    <floater.string name="DocumentClosed">Let go of [FILE].</floater.string>
     <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
     <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
     <floater.string name="LintStopped">Lint all: stopped.</floater.string>
@@ -821,6 +824,112 @@
                                  label="Match"
                                  name="snippet" />
                             </scroll_list>
+                        </layout_panel>
+                    </layout_stack>
+                </panel>
+                <panel
+                 follows="all"
+                 height="444"
+                 label=""
+                 layout="topleft"
+                 name="documents_mode"
+                 tool_tip="Documents: every file this tool has open, and which of them have work the disk has not heard about"
+                 width="376">
+                    <layout_stack
+                     animate="false"
+                     follows="all"
+                     height="444"
+                     layout="topleft"
+                     left="0"
+                     name="documents_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="376">
+                        <layout_panel
+                         auto_resize="true"
+                         height="418"
+                         layout="topleft"
+                         min_dim="80"
+                         name="documents_area"
+                         width="376">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="418"
+                             layout="topleft"
+                             left="0"
+                             name="documents"
+                             tool_tip="Double-click to look at one; a dot means it has work the disk has not heard about"
+                             top="0"
+                             width="376">
+                                <scroll_list.columns
+                                 label=""
+                                 name="dirty"
+                                 tool_tip="a dot means unsaved"
+                                 width="16" />
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="File"
+                                 name="file" />
+                                <scroll_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="90" />
+                                <scroll_list.columns
+                                 label="Steps"
+                                 name="steps"
+                                 tool_tip="how many edits are in it to put back"
+                                 width="46" />
+                            </scroll_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="documents_foot"
+                         width="376">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Save"
+                             layout="topleft"
+                             left="0"
+                             name="document_save"
+                             tool_tip="Write this one"
+                             top="2"
+                             width="60" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Revert"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_revert"
+                             tool_tip="Read it back off the disk, losing the work in it"
+                             top_delta="0"
+                             width="64" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Close"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_close"
+                             tool_tip="Let go of it; a document with work in it has to be saved or reverted first"
+                             top_delta="0"
+                             width="60" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Save All"
+                             layout="topleft"
+                             left_pad="4"
+                             name="document_save_all"
+                             tool_tip="Write every one that has work in it"
+                             top_delta="0"
+                             width="74" />
                         </layout_panel>
                     </layout_stack>
                 </panel>

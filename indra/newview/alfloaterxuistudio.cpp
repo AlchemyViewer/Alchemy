@@ -1684,6 +1684,7 @@ bool ALFloaterXUIStudio::postBuild()
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
+    mDocumentList = getChild<LLScrollListCtrl>("documents");
     mFindingScope = getChild<LLComboBox>("finding_scope");
     mFindingRule = getChild<LLComboBox>("finding_rule");
     mFindingSeverity = getChild<LLComboBox>("finding_severity");
@@ -1776,6 +1777,7 @@ bool ALFloaterXUIStudio::postBuild()
     // for. The band's tabs have room for their names and keep them.
     static constexpr std::pair<const char*, const char*> MODE_ICONS[] = {
         { "files_mode",   "Command_Scripts_Icon" },
+        { "documents_mode", "Command_LocalAssets_Icon" },
         { "outline_mode", "Command_Inventory_Icon" },
         { "find_mode",    "Command_Search_Icon" },
         { "palette_mode", "Command_Build_Icon" },
@@ -1893,6 +1895,11 @@ bool ALFloaterXUIStudio::postBuild()
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
     mFindings->setCommitOnSelectionChange(true);
     mFindings->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshFixButtons, this));
+    mDocumentList->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSelected, this));
+    getChild<LLButton>("document_save")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentSave, this));
+    getChild<LLButton>("document_revert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentRevert, this));
+    getChild<LLButton>("document_close")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onDocumentClose, this));
+    getChild<LLButton>("document_save_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::saveAllDocuments, this));
     mFixButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixSelected, this));
     mFixAllButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixAll, this));
     for (LLUICtrl* filter : { (LLUICtrl*)mFindingScope, (LLUICtrl*)mFindingRule,
@@ -1903,7 +1910,7 @@ bool ALFloaterXUIStudio::postBuild()
     }
 
     // Every table in the tool copies the same way.
-    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings,
+    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mDocumentList,
                                     mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
     {
         watchList(list);
@@ -3351,6 +3358,9 @@ void ALFloaterXUIStudio::refreshModeCounts()
         }
     };
     count(mModes, "find_mode", mFindResults->getItemCount());
+    // Not how many are open but how many have work in them: an open document
+    // is a fact and an unsaved one is a thing to do something about.
+    count(mModes, "documents_mode", mDocuments.dirtyCount());
     count(mBottom, "findings_mode", mFindings->getItemCount());
     count(mBottom, "channels_mode", mChannels->getItemCount());
 }
@@ -3412,6 +3422,7 @@ void ALFloaterXUIStudio::documentChanged(const std::string& status)
     // Whatever was just done is done: from here it is one thing that can be
     // put back, however many files it wrote to.
     mDocuments.settle();
+    fillDocuments();
     mPendingStatus = status;
     setStatus(status);
     mReloadEntryOnly = true;
@@ -3608,6 +3619,7 @@ void ALFloaterXUIStudio::replayChange(const std::string& status)
 void ALFloaterXUIStudio::documentRead(const std::string& status)
 {
     mDocuments.settle();
+    fillDocuments();
     setStatus(status);
     mRereadPending = true;
     mRereadAt.setTimerExpirySec(REREAD_SECONDS);
@@ -4047,6 +4059,165 @@ void ALFloaterXUIStudio::saveAllDocuments()
         return;
     }
     documentChanged(getString("EditSavedAll", args));
+}
+
+// ---------------------------------------------------------------------------
+// The documents this tool has open
+// ---------------------------------------------------------------------------
+
+// A document is a layer of a file, and its path says so in a form nobody
+// reads: the catalog knows which file the layer belongs to and which layer it
+// is, so the row says that instead.
+bool ALFloaterXUIStudio::describeDocument(const std::string& path, std::string& file,
+                                          std::string& layer) const
+{
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        for (const ALXUICatalog::Layer& one : entry.layers)
+        {
+            if (one.path == path)
+            {
+                file = entry.name;
+                layer = one.skin + "/" + one.language;
+                return true;
+            }
+        }
+    }
+    // A file the catalog does not have -- one written since it was read, or
+    // one from outside the skins -- is still a document, and its own name is
+    // the best thing to call it.
+    file = path.substr(path.find_last_of("/\\") + 1);
+    layer.clear();
+    return false;
+}
+
+void ALFloaterXUIStudio::fillDocuments()
+{
+    if (!mDocumentList)
+    {
+        return;
+    }
+    const std::string was = selectedDocument();
+    mDocumentList->deleteAllItems();
+    for (const std::string& path : mDocuments.paths())
+    {
+        const ALXUIEdit* held = mDocuments.find(path);
+        if (!held)
+        {
+            continue;
+        }
+        std::string file;
+        std::string layer;
+        describeDocument(path, file, layer);
+        mDocumentList->addElement(row(path, {
+            { "dirty", held->dirty() ? getString("DocumentDirtyMark") : std::string() },
+            { "file", file },
+            { "layer", layer },
+            { "steps", held->undoDepth() ? std::to_string((S32)held->undoDepth()) : std::string() } }));
+    }
+    // Whatever was selected stays selected; with nothing selected the row is
+    // the one an operation with no path of its own would mean.
+    const std::string& show = was.empty() ? mDocuments.activePath() : was;
+    if (!show.empty())
+    {
+        mDocumentList->setSelectedByValue(LLSD(show), true);
+    }
+    refreshModeCounts();
+}
+
+std::string ALFloaterXUIStudio::selectedDocument() const
+{
+    const LLScrollListItem* item = mDocumentList ? mDocumentList->getFirstSelected() : nullptr;
+    return item ? item->getValue().asString() : std::string();
+}
+
+// Looking at a document is looking at the file it is a layer of, in the skin
+// and language that layer is: the set holds it either way, and what the canvas
+// shows is what a person means by which one they are working on.
+void ALFloaterXUIStudio::onDocumentSelected()
+{
+    const std::string path = selectedDocument();
+    if (path.empty())
+    {
+        return;
+    }
+    mDocuments.makeActive(path);
+
+    std::string file;
+    std::string layer;
+    if (!describeDocument(path, file, layer) || file == mFile)
+    {
+        return;
+    }
+    mFile = file;
+    mPendingFile.clear();
+    mSelection.clearSelection();
+    mFileList->setSelectedByValue(mFile, true);
+    showPreviews();
+}
+
+void ALFloaterXUIStudio::onDocumentSave()
+{
+    const std::string path = selectedDocument();
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held || !held->dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    documentChanged(getString("EditSaved", args));
+}
+
+void ALFloaterXUIStudio::onDocumentRevert()
+{
+    const std::string path = selectedDocument();
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held || !held->dirty())
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    if (!held->loadFile(path))
+    {
+        setStatus(held->error());
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    documentChanged(getString("EditReverted", args));
+}
+
+// Letting go of one takes its edits with it, and takes the whole history with
+// it as well -- an action naming a document that has gone cannot be put back.
+// So a document with work in it is not one to let go of on a single click:
+// save it or revert it, and then it is only a file.
+void ALFloaterXUIStudio::onDocumentClose()
+{
+    const std::string path = selectedDocument();
+    ALXUIEdit* held = path.empty() ? nullptr : mDocuments.find(path);
+    if (!held)
+    {
+        return;
+    }
+    if (held->dirty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+        setStatus(getString("DocumentCloseDirty", args));
+        return;
+    }
+    mDocuments.close(path);
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    setStatus(getString("DocumentClosed", args));
+    fillDocuments();
 }
 
 void ALFloaterXUIStudio::revertDocument()

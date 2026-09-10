@@ -345,6 +345,21 @@ private:
     void onFindingSelected();
     void refreshBreadcrumb();
 
+    // --- the documents this tool has open ------------------------------------
+    // The set can hold as many as a person opens, each with its own work in
+    // it, and a document nobody is looking at is a document nobody can see
+    // is unsaved. One row each, and the count of unsaved ones on the mode.
+    void fillDocuments();
+    void onDocumentSelected();
+    void onDocumentSave();
+    void onDocumentRevert();
+    void onDocumentClose();
+    // The path a row is about, or empty.
+    std::string selectedDocument() const;
+    // A document's path said the way a person names the file: the entry it
+    // is a layer of, and which layer.
+    bool describeDocument(const std::string& path, std::string& file, std::string& layer) const;
+
     // What the findings list is asking the store for, built from the
     // filter row above it.
     ALXUIFindings::Query findingQuery() const;
@@ -603,6 +618,7 @@ private:
     LLPanel*            mTreePanel = nullptr;
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
+    LLScrollListCtrl*   mDocumentList = nullptr;
     LLScrollListCtrl*   mFindings = nullptr;
     LLComboBox*         mFindingScope = nullptr;
     LLComboBox*         mFindingRule = nullptr;
