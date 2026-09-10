@@ -1266,6 +1266,43 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
         return retval;
     }
 
+    // Has this message been overtaken by one already applied? Decided here, before the decode can
+    // run setRegion() and zero the counter, and against the sender rather than the counter alone:
+    // packet ids are per circuit, so they only order messages from the sim that issued them, and
+    // the first message after a handoff must not be measured against the old sim's sequence.
+    //
+    // What a stale message loses depends on what it carries. A terse update is nothing but motion,
+    // and a newer packet has already said where this object is and how it moves, so the whole
+    // thing is dropped -- and dropped now, before any of it is read. A full update also carries the
+    // state the simulator only sends on change (parenting, textures, scale, flags, extra params),
+    // which no later packet repeats; that part is still applied below, and only the motion and the
+    // position are withheld. The full decode also has to run to the end for a subclass's sake:
+    // LLVOVolume reads its volume parameters and texture entries from the same data packer,
+    // starting wherever this function leaves it.
+    bool stale_update = false;
+    if (mesgsys != NULL)
+    {
+        U32 packet_id = mesgsys->getCurrentRecvPacketID();
+        if (mesgsys->getSender() != mRegionp->getHost())
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+        else if (packet_id < mLatestRecvPacketID &&
+                 mLatestRecvPacketID - packet_id < 65536)
+        {
+            stale_update = true;
+        }
+        else
+        {
+            mLatestRecvPacketID = packet_id;
+        }
+
+        if (stale_update && update_type == OUT_TERSE_IMPROVED)
+        {
+            return retval;
+        }
+    }
+
     // Coordinates of objects on simulators are region-local.
     U64 region_handle = 0;
 
@@ -1341,6 +1378,11 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     LLVector3 old_angv = getAngularVelocity();
     LLQuaternion new_rot;
     LLVector3 new_scale = getScale();
+
+    // The decode writes velocity and acceleration straight into the object. These are what a stale
+    // full update hands back once it has been decoded for everything else.
+    const LLVector3 old_vel = getVelocity();
+    const LLVector3 old_acc = getAcceleration();
 
     U32 parent_id = 0;
     U8  material = 0;
@@ -2318,18 +2360,16 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     //
     //
 
-    // If we're going to skip this message, why are we
-    // doing all the parenting, etc above?
-    if(mesgsys != NULL)
+    // A stale full update stops here, with its parenting, textures, flags and extra params applied
+    // and its motion handed back. A newer packet has already reported this object's velocity, and
+    // that is what prediction continues from; the scale, position and rotation below are likewise
+    // older than what the object already holds.
+    if (stale_update)
     {
-    U32 packet_id = mesgsys->getCurrentRecvPacketID();
-    if (packet_id < mLatestRecvPacketID &&
-        mLatestRecvPacketID - packet_id < 65536)
-    {
-        //skip application of this message, it's old
+        setVelocity(old_vel);
+        setAcceleration(old_acc);
+        setAngularVelocity(old_angv);
         return retval;
-    }
-    mLatestRecvPacketID = packet_id;
     }
 
     // Set the change flags for scale
