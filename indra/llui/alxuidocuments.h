@@ -151,6 +151,14 @@ public:
     // How many have work in them the disk has not heard about.
     S32 dirtyCount() const;
 
+    // The disk changed under what is held. A document with no edits in
+    // hand is read again, since the disk is the newer copy; one with
+    // edits is left as it is, and the caller says so. A document read
+    // again has no history, and an action that named it cannot be put
+    // back: the history goes where any of them had one. Answers how many
+    // were read again.
+    S32 rereadClean();
+
     // Every one of those written. Answers how many, and stops at the first
     // that refuses -- a caller told "three of five" with no word about the
     // fourth has been told nothing it can act on.

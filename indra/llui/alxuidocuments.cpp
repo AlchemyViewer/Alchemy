@@ -304,6 +304,32 @@ S32 ALXUIDocuments::dirtyCount() const
     return count;
 }
 
+S32 ALXUIDocuments::rereadClean()
+{
+    S32 read = 0;
+    bool had_history = false;
+    for (const std::string& path : mPaths)
+    {
+        ALXUIEdit* held = find(path);
+        if (!held || held->dirty())
+        {
+            continue;
+        }
+        had_history = had_history || held->undoDepth() > 0 || held->canRedo();
+        if (held->loadFile(path))
+        {
+            ++read;
+        }
+    }
+    if (had_history)
+    {
+        mDone.clear();
+        mUndone.clear();
+    }
+    remember();
+    return read;
+}
+
 S32 ALXUIDocuments::saveAll()
 {
     mError.clear();
