@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  Every sentence the XUI lint can say, by name, with the names it is about in
+  brackets. The lint names a sentence and fills the brackets; this file is
+  where the words are, so a translated copy of it beside the other language
+  files says the same findings in that language.
+
+  The layer merge matches children by their name attribute, so no name is
+  used twice here; keep it that way.
+-->
+<xui_lint>
+    <!-- The three weights a finding can carry. -->
+    <string name="LintSeverityError">error</string>
+    <string name="LintSeverityWarning">warning</string>
+    <string name="LintSeverityNote">note</string>
+    <!-- The rules, as the findings list names them. -->
+    <string name="LintRuleParseError">parse</string>
+    <string name="LintRuleBuildFailed">build failed</string>
+    <string name="LintRuleOverlayDrop">overlay drop</string>
+    <string name="LintRuleOverlap">overlap</string>
+    <string name="LintRuleAlternatives">alternatives</string>
+    <string name="LintRuleOutOfBounds">out of bounds</string>
+    <string name="LintRuleNameCollision">name collision</string>
+    <string name="LintRuleLayoutDimension">layout dimension</string>
+    <string name="LintRuleEmptyRect">empty rect</string>
+    <string name="LintRuleTruncation">truncation</string>
+    <string name="LintRuleTemplateRootMismatch">template root</string>
+    <string name="LintRuleUnknownAttribute">unknown attribute</string>
+    <string name="LintRuleWroteTheDefault">wrote the default</string>
+    <string name="LintRuleDeprecatedAttribute">deprecated attribute</string>
+    <string name="LintRuleDanglingImage">dangling image</string>
+    <string name="LintRuleDanglingColor">dangling colour</string>
+    <string name="LintRuleDanglingFont">dangling font</string>
+    <string name="LintRuleCallbackNotRegistered">callback</string>
+    <string name="LintRuleControlMissing">control</string>
+    <string name="LintRuleFileMissing">file</string>
+    <!-- What each finding says. -->
+    <string name="LintDiagParseError">the parser refused it: [MESSAGE]</string>
+    <string name="LintDiagParseWarning">the parser warned: [MESSAGE]</string>
+    <string name="LintDiagUnknownAttribute">"[MESSAGE]" is an attribute no parameter answers to</string>
+    <string name="LintDiagMisScopedElement">a dotted element whose head is not [MESSAGE], the element it sits in</string>
+    <string name="LintDiagInvalidChild">a widget [MESSAGE] does not take as a child</string>
+    <string name="LintDiagCreateFailed">could not be built under [MESSAGE]</string>
+    <string name="LintDropFileUnparsed">the file did not parse: [REASON]</string>
+    <string name="LintDropRootName">the root is named "[OVERLAY]" where the base says "[BASE]"; merged all the same</string>
+    <string name="LintDropRootTag">the root is &lt;[OVERLAY]&gt; where the base says &lt;[BASE]&gt;; merged all the same</string>
+    <string name="LintDropUnnamed">has no name to match by</string>
+    <string name="LintDropDuplicate">every element of this name under [PARENT] is already translated</string>
+    <string name="LintDropAmbiguous">several elements of this name below [PARENT], so which one is a guess</string>
+    <string name="LintDropNotBelow">nothing of this name below [PARENT]</string>
+    <string name="LintDropTextEmpty">the text is empty in this layer; the base's text is kept</string>
+    <string name="LintDropAttribute">the base element has no such attribute</string>
+    <string name="LintEmptyRect">shown with a rect of [WIDTH] by [HEIGHT]</string>
+    <string name="LintOutOfBounds">sits outside [PARENT], which is [WIDTH] by [HEIGHT]</string>
+    <string name="LintTruncation">the text needs [NEEDED] pixels and has [ROOM]</string>
+    <string name="LintNameCollision">a second child of [PARENT] named this; getChild answers the first</string>
+    <string name="LintOverlap">overlaps [OTHER]</string>
+    <string name="LintOverlapHidden">overlaps the hidden [OTHER]</string>
+    <string name="LintUnknownAttribute">&lt;[TAG]&gt; has no parameter named "[NAME]"</string>
+    <string name="LintUnknownAttributeSlip">&lt;[TAG]&gt; has no parameter named "[NAME]", and "[MEANT]" is one slip away</string>
+    <string name="LintDeprecated">"[NAME]" is a name nothing new should use</string>
+    <string name="LintDeprecatedFor">"[NAME]" still works; "[INSTEAD]" is the one to write</string>
+    <string name="LintWroteTheDefault">"[NAME]" is written as what it already is</string>
+    <string name="LintFileMissing">no XUI file is named "[VALUE]"</string>
+    <string name="LintDanglingFont">no font is named "[VALUE]"</string>
+    <string name="LintDanglingColor">no colour is named "[VALUE]"</string>
+    <string name="LintDanglingImage">textures.xml declares no "[VALUE]"</string>
+    <string name="LintControlMissing">no control group has a setting named "[VALUE]"</string>
+    <string name="LintLayoutTwoNames">"[NAME]" and "[WINNER]" are two names for one parameter; "[WINNER]" is the one that takes effect</string>
+    <string name="LintLayoutHorizontalMin">this stack runs horizontally, so "[NAME]" sets the panel's minimum width</string>
+    <string name="LintLayoutHorizontalMax">this stack runs horizontally, so "[NAME]" sets the panel's maximum width</string>
+    <string name="LintLayoutVerticalMin">this stack runs vertically, so "[NAME]" sets the panel's minimum height</string>
+    <string name="LintLayoutVerticalMax">this stack runs vertically, so "[NAME]" sets the panel's maximum height</string>
+    <string name="LintCallbackUnknown">no registry knows "[FUNCTION]", so it does nothing</string>
+    <string name="LintCallbackNotGlobal">no global registry knows "[FUNCTION]"; a floater's own are not registered here</string>
+    <string name="LintLayerUnparsed">[MESSAGE]</string>
+    <string name="LintTemplateRoot">the defaults for &lt;[TAG]&gt; are written under &lt;[ROOT]&gt;, which the parser does not check and a reader cannot tell from a mistake</string>
+</xui_lint>

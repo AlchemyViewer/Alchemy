@@ -27,6 +27,7 @@
 #include "alxuidiagnostics.h"
 #include "alxuiedit.h"
 #include "alxuiselection.h"
+#include "llstring.h"
 
 #include <string>
 #include <vector>
@@ -115,7 +116,14 @@ public:
         std::string             file;
         S32                     line = 0;
         std::string             what;       // the attribute, tag or name at fault
+        // What is wrong, as xui_lint.xml says it in the language in force.
         std::string             message;
+        // The same sentence as the name of its line in that file and the
+        // names it is about, for anything that wants to say it otherwise:
+        // the key names the line, the values fill its brackets. Every key
+        // the lint can ask for is in keys().
+        std::string             key;
+        LLStringUtil::format_map_t args;
         // Empty for most of them: a rule that can say what is wrong cannot
         // always say what right would be.
         Fix                     fix;
@@ -173,6 +181,29 @@ public:
 
     static const char* ruleName(Rule rule);
     static const char* severityName(Severity severity);
+    // The rule a name stands for, for a caller that was handed the name.
+    static bool ruleNamed(std::string_view name, Rule& rule);
+    // The words. The lint says nothing in English of its own: every
+    // sentence it can say is a line in xui_lint.xml, a skin file in a
+    // language directory, so it layers and translates the way everything
+    // else anybody reads in this viewer does. A finding names its line and
+    // the names in it, and the line is read here.
+    //
+    // Read once, the first time anything asks, from the skin and language
+    // in force then: a tool that builds previews under other languages
+    // asks before it does, since the file is found through the same
+    // directories a preview is.
+    static void readWords();
+    // A line, filled. Where the file has no line of that name the key is
+    // said with the values after it, so nothing arrives blank.
+    static std::string wording(std::string_view key, const LLStringUtil::format_map_t& args);
+    // The names of the lines for a rule and a severity, and the lines.
+    static const char* ruleKey(Rule rule);
+    static const char* severityKey(Severity severity);
+    static std::string ruleLabel(Rule rule);
+    static std::string severityLabel(Severity severity);
+    // Every line the lint can ask for, for a test that the file has them.
+    static const std::vector<const char*>& keys();
 
     // The evidence the reference rules and the Bindings inspector share,
     // so both answer from the same place.
@@ -185,7 +216,8 @@ public:
 
 private:
     Finding& add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
-                 std::string file, S32 line, std::string what, std::string message);
+                 std::string file, S32 line, std::string what, const char* key,
+                 LLStringUtil::format_map_t args = LLStringUtil::format_map_t());
     void fromDiagnostics(const Input& input);
     void fromOverlay(const Input& input);
     void walkViews(const Input& input, LLView* view, const ALXUISelection::path_t& path);

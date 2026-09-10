@@ -241,12 +241,6 @@ namespace
         GROUP_UNKNOWN
     };
 
-    std::vector<std::string> attributeGroupNames()
-    {
-        return { "Identity", "Position and size", "Appearance", "Behaviour", "Other",
-                 "Read and thrown away", "Declared by nothing" };
-    }
-
     // The vocabulary of the few fields whose values are a list the viewer
     // holds rather than an enumeration the schema can read. A font is
     // named in fonts.xml, its size is named there too, and its style is a
@@ -1519,13 +1513,6 @@ namespace
         return text.empty() ? std::string("none") : text;
     }
 
-    std::string rectText(const LLRect& r)
-    {
-        return "left " + std::to_string(r.mLeft) + "  top " + std::to_string(r.mTop)
-             + "  right " + std::to_string(r.mRight) + "  bottom " + std::to_string(r.mBottom)
-             + "  (" + std::to_string(r.getWidth()) + " x " + std::to_string(r.getHeight()) + ")";
-    }
-
     bool isBuilt(ALXUICatalog::Kind kind)
     {
         switch (kind)
@@ -1768,6 +1755,9 @@ bool ALFloaterXUIStudio::postBuild()
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
     mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
+    // The lint's words, read now, in this viewer's language: a preview built
+    // under another one would otherwise be the first to ask, and get that.
+    ALXUILint::readWords();
     mFindBar = getChild<ALScopeBar>("find_bar");
     mFindResults = getChild<LLScrollListCtrl>("find_results");
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
@@ -1805,7 +1795,11 @@ bool ALFloaterXUIStudio::postBuild()
         p.follows.flags = FOLLOWS_ALL;
         mAttributeGrid = LLUICtrlFactory::create<ALPropertyGrid>(p);
         tab->addChild(mAttributeGrid);
-        mAttributeGrid->setGroups(attributeGroupNames());
+        // One heading per group, in the order the groups are numbered.
+        mAttributeGrid->setGroups({ getString("SectionIdentity"), getString("SectionGeometry"),
+                                    getString("SectionAppearance"), getString("SectionBehaviour"),
+                                    getString("SectionOther"), getString("SectionIgnored"),
+                                    getString("SectionUnknown") });
         mAttributeGrid->setNotices(
             { getString("AttributeNothingSelected"), getString("AttributeNothingSelectedHow"), "" },
             { getString("AttributeNothingWritten"), getString("AttributeNothingWrittenHow"),
@@ -5654,7 +5648,10 @@ void ALFloaterXUIStudio::showGallery()
         host = new ALXUIPreviewHost(this, SECONDARY, p);
         host->sizeToCanvas(900, 640);
         host->setCanResize(true);
-        host->setTitle("Widget gallery [" + mSkin + "/" + mLanguage + "]");
+        LLStringUtil::format_map_t title_args;
+        title_args["[SKIN]"] = mSkin;
+        title_args["[LANG]"] = mLanguage;
+        host->setTitle(getString("GalleryTitle", title_args));
 
         // A child registry keeps its static registrations in a scope of
         // their own; the widget type registry lists every tag, and the
@@ -6755,14 +6752,14 @@ void ALFloaterXUIStudio::finishLintAll()
         << " files checked\n\n";
     for (const auto& [rule, count] : mFindingStore.byRule())
     {
-        out << "  " << count << "\t" << rule << "\n";
+        out << "  " << count << "\t" << sayRule(rule) << "\n";
     }
     out << "\n";
     for (const ALXUILint::Finding* f : mFindingStore.select(ALXUIFindings::Query()).found)
     {
-        out << ALXUILint::severityName(f->severity) << " " << ALXUILint::ruleName(f->rule)
+        out << ALXUILint::severityLabel(f->severity) << " " << ALXUILint::ruleLabel(f->rule)
             << " " << f->file << ":" << f->line << " " << ALXUISelection::toString(f->path)
-            << " " << f->what << ": " << f->message << "\n";
+            << " " << sayFinding(*f) << "\n";
     }
 
     LLStringUtil::format_map_t args;
@@ -6833,38 +6830,44 @@ LLScrollListCtrl* ALFloaterXUIStudio::focusedList() const
 
 std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
 {
+    LLStringUtil::format_map_t args;
     if (list == mFileList)
     {
         const std::string filter = mCatalogFilter->getText();
-        return filter.empty() ? "XUI files" : "XUI files matching \"" + filter + "\"";
+        args["[FILTER]"] = filter;
+        return getString(filter.empty() ? "CaptionFiles" : "CaptionFilesMatching", args);
     }
     if (list == mFindResults)
     {
-        return "Search for \"" + mFindBar->valueOf("query") + "\" in "
-             + mFindBar->valueOf("field") + ", " + mSkin + "/" + mLanguage;
+        args["[QUERY]"] = mFindBar->valueOf("query");
+        args["[FIELD]"] = mFindBar->valueOf("field");
+        args["[SKIN]"] = mSkin;
+        args["[LANG]"] = mLanguage;
+        return getString("CaptionSearch", args);
     }
 
     const Preview& pv = mPreviews[PRIMARY];
-    std::string where = mFile.empty() ? std::string("no file") : mFile;
-    if (!pv.skin.empty())
-    {
-        where += " (" + pv.skin + "/" + pv.language + ")";
-    }
+    args["[FILE]"] = mFile.empty() ? getString("CaptionNoFile") : mFile;
+    args["[SKIN]"] = pv.skin;
+    args["[LANG]"] = pv.language;
+    args["[WHERE]"] = getString(pv.skin.empty() ? "CaptionWhereFile" : "CaptionWhere", args);
     if (list == mFindings)
     {
-        return "Findings in " + where;
+        return getString("CaptionFindings", args);
     }
 
-    std::string what = "Rows";
-    if (list == mLayout)                  { what = "Layout"; }
-    else if (list == mBindings)           { what = "Bindings"; }
-    else if (list == mState)              { what = "State"; }
-    else if (list == mSelectionFindings)  { what = "Findings"; }
+    const char* what = "CaptionRows";
+    if (list == mLayout)                  { what = "CaptionLayout"; }
+    else if (list == mBindings)           { what = "CaptionBindings"; }
+    else if (list == mState)              { what = "CaptionState"; }
+    else if (list == mSelectionFindings)  { what = "CaptionSelectionFindings"; }
+    args["[WHAT]"] = getString(what);
     if (mSelection.hasSelection())
     {
-        what += " of " + ALXUISelection::toString(mSelection.selection());
+        args["[PATH]"] = ALXUISelection::toString(mSelection.selection());
+        args["[WHAT]"] = getString("CaptionOf", args);
     }
-    return what + " in " + where;
+    return getString("CaptionIn", args);
 }
 
 std::string ALFloaterXUIStudio::listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
@@ -7110,7 +7113,7 @@ bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std
     }
     if (!base)
     {
-        error = "there is no base file to translate";
+        error = getString("OverlayNoBase");
         return false;
     }
 
@@ -7120,7 +7123,7 @@ bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std
     const size_t file_at = base->path.find_last_of("/\\");
     if (file_at == std::string::npos)
     {
-        error = "the base file is in no directory";
+        error = getString("OverlayNoDirectory");
         return false;
     }
     std::string dir = base->path.substr(0, file_at);
@@ -7135,7 +7138,7 @@ bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std
     const size_t lang_at = dir.find_last_of("/\\");
     if (lang_at == std::string::npos)
     {
-        error = "the base file is in no language directory";
+        error = getString("OverlayNoLanguageDirectory");
         return false;
     }
     dir = dir.substr(0, lang_at) + delim + language;
@@ -7145,7 +7148,9 @@ bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std
     }
     if (LLFile::mkdir(dir) != 0 && !gDirUtilp->fileExists(dir))
     {
-        error = "could not make " + dir;
+        LLStringUtil::format_map_t args;
+        args["[DIR]"] = dir;
+        error = getString("OverlayMkdirFailed", args);
         return false;
     }
 
@@ -7216,36 +7221,36 @@ void ALFloaterXUIStudio::fillTranslation()
         {
             where = entry->rootTag;
         }
-        std::string state;
+        const char* state = "TranslateStateNotApplied";
         switch (unit.state)
         {
-        case ALXUITranslate::State::Translated:   state = "translated"; break;
-        case ALXUITranslate::State::Missing:      state = "missing"; break;
-        case ALXUITranslate::State::Placeholders: state = "placeholders differ"; break;
-        case ALXUITranslate::State::Forbidden:    state = "translate=\"false\""; break;
+        case ALXUITranslate::State::Translated:   state = "TranslateStateTranslated"; break;
+        case ALXUITranslate::State::Missing:      state = "TranslateStateMissing"; break;
+        case ALXUITranslate::State::Placeholders: state = "TranslateStatePlaceholders"; break;
+        case ALXUITranslate::State::Forbidden:    state = "TranslateStateForbidden"; break;
         case ALXUITranslate::State::NotApplied:
             switch (unit.miss)
             {
-            case ALXUITranslate::Miss::Moved:           state = "applies to nothing: moved"; break;
-            case ALXUITranslate::Miss::Absent:          state = "applies to nothing: absent"; break;
-            case ALXUITranslate::Miss::Unnamed:         state = "applies to nothing: unnamed"; break;
-            case ALXUITranslate::Miss::Ambiguous:       state = "applies to nothing: ambiguous"; break;
-            case ALXUITranslate::Miss::AttributeAbsent: state = "applies to nothing: no such field"; break;
-            default:                                    state = "applies to nothing"; break;
+            case ALXUITranslate::Miss::Moved:           state = "TranslateStateMoved"; break;
+            case ALXUITranslate::Miss::Absent:          state = "TranslateStateAbsent"; break;
+            case ALXUITranslate::Miss::Unnamed:         state = "TranslateStateUnnamed"; break;
+            case ALXUITranslate::Miss::Ambiguous:       state = "TranslateStateAmbiguous"; break;
+            case ALXUITranslate::Miss::AttributeAbsent: state = "TranslateStateNoSuchField"; break;
+            default:                                    break;
             }
             break;
         }
         std::string fits;
         if (measured && unit.applies())
         {
-            fits = truncated.count(where) ? "no" : "yes";
+            fits = getString(truncated.count(where) ? "No" : "Yes");
         }
         mTranslateList->addElement(row(index++, {
             { "path", where },
             { "field", unit.field.empty() ? std::string("text") : unit.field },
             { "english", unit.english },
             { "translation", unit.translation },
-            { "state", state },
+            { "state", getString(state) },
             { "fits", fits } }));
     }
 
@@ -7870,11 +7875,11 @@ void ALFloaterXUIStudio::fillFindings()
         id["path"] = ALXUISelection::toString(f.path);
         id["line"] = f.line;
         mFindings->addElement(row(id, {
-            { "severity", ALXUILint::severityName(f.severity) },
-            { "rule", ALXUILint::ruleName(f.rule) },
+            { "severity", ALXUILint::severityLabel(f.severity) },
+            { "rule", ALXUILint::ruleLabel(f.rule) },
             { "line", f.line > 0 ? std::to_string(f.line) : std::string() },
             { "where", where },
-            { "message", f.what.empty() ? f.message : f.what + ": " + f.message },
+            { "message", sayFinding(f) },
             { "fix", describeFix(f) } }));
     }
 
@@ -7918,7 +7923,10 @@ void ALFloaterXUIStudio::refreshFindingRules()
     mFindingRule->add(getString("FindingsEveryRule"), LLSD(std::string()));
     for (const auto& [rule, count] : rules)
     {
-        mFindingRule->add(rule + " (" + std::to_string(count) + ")", LLSD(rule));
+        LLStringUtil::format_map_t args;
+        args["[RULE]"] = sayRule(rule);
+        args["[COUNT]"] = std::to_string(count);
+        mFindingRule->add(getString("FindingsRuleCount", args), LLSD(rule));
     }
     if (!was.empty() && !mFindingRule->setSelectedByValue(LLSD(was), true))
     {
@@ -7990,6 +7998,20 @@ const ALXUILint::Finding* ALFloaterXUIStudio::findingForRow(const LLScrollListIt
     }
     const S32 at = id["at"].asInteger();
     return at >= 0 && at < (S32)mShownFindings.size() ? &mShownFindings[at] : nullptr;
+}
+
+// What is wrong, as the lint says it, with the name at fault in front
+// where there is one, since the sentence is about it.
+std::string ALFloaterXUIStudio::sayFinding(const ALXUILint::Finding& f) const
+{
+    return f.what.empty() ? f.message : f.what + ": " + f.message;
+}
+
+// A rule by the name the store files it under, as the lint says it.
+std::string ALFloaterXUIStudio::sayRule(const std::string& rule_name) const
+{
+    ALXUILint::Rule rule;
+    return ALXUILint::ruleNamed(rule_name, rule) ? ALXUILint::ruleLabel(rule) : rule_name;
 }
 
 // What pressing it would do, said in this tool's words. The library says
@@ -8198,11 +8220,11 @@ void ALFloaterXUIStudio::refreshSelectionFindings()
         }
         const bool here = f.path.size() == selected.size();
         mSelectionFindings->addElement(row(ALXUISelection::toString(f.path), {
-            { "severity", ALXUILint::severityName(f.severity) },
-            { "rule", ALXUILint::ruleName(f.rule) },
-            { "where", here ? std::string("here")
+            { "severity", ALXUILint::severityLabel(f.severity) },
+            { "rule", ALXUILint::ruleLabel(f.rule) },
+            { "where", here ? getString("FindingsHere")
                             : ALXUISelection::toString(ALXUISelection::path_t(f.path.begin() + selected.size(), f.path.end())) },
-            { "message", f.what.empty() ? f.message : f.what + ": " + f.message } }));
+            { "message", sayFinding(f) } }));
     }
 }
 
@@ -9810,30 +9832,62 @@ void ALFloaterXUIStudio::refreshLayout(LLView* view)
     {
         return;
     }
-    auto add = [&](const std::string& property, const std::string& value)
+    // Each row is a property named in the floater's strings and a value
+    // said the same way, so the table reads in whatever language the
+    // rest of the window does.
+    auto add = [&](const char* property, const std::string& value)
     {
-        mLayout->addElement(row(property, { { "property", property }, { "value", value } }));
+        const std::string name = getString(property);
+        mLayout->addElement(row(name, { { "property", name }, { "value", value } }));
+    };
+    auto size_of = [&](S32 width, S32 height)
+    {
+        LLStringUtil::format_map_t args;
+        args["[WIDTH]"] = std::to_string(width);
+        args["[HEIGHT]"] = std::to_string(height);
+        return getString("LayoutSizeValue", args);
+    };
+    auto pair_of = [&](S32 a, S32 b)
+    {
+        LLStringUtil::format_map_t args;
+        args["[A]"] = std::to_string(a);
+        args["[B]"] = std::to_string(b);
+        return getString("LayoutPairValue", args);
+    };
+    auto rect_of = [&](const LLRect& rect)
+    {
+        LLStringUtil::format_map_t args;
+        args["[LEFT]"] = std::to_string(rect.mLeft);
+        args["[TOP]"] = std::to_string(rect.mTop);
+        args["[RIGHT]"] = std::to_string(rect.mRight);
+        args["[BOTTOM]"] = std::to_string(rect.mBottom);
+        args["[WIDTH]"] = std::to_string(rect.getWidth());
+        args["[HEIGHT]"] = std::to_string(rect.getHeight());
+        return getString("LayoutRectValue", args);
     };
 
     const LLRect& r = view->getRect();
     const LLView* parent = view->getParent();
-    add("size", std::to_string(r.getWidth()) + " x " + std::to_string(r.getHeight()));
+    add("LayoutSize", size_of(r.getWidth(), r.getHeight()));
     if (parent)
     {
         const S32 ph = parent->getRect().getHeight();
         const S32 pw = parent->getRect().getWidth();
-        add("left / top (from parent's top-left)", std::to_string(r.mLeft) + " / " + std::to_string(ph - r.mTop));
-        add("right / bottom (from parent's top-left)", std::to_string(r.mRight) + " / " + std::to_string(ph - r.mBottom));
-        add("gap to parent's right / bottom", std::to_string(pw - r.mRight) + " / " + std::to_string(r.mBottom));
-        add("parent", parent->getName() + "  " + std::to_string(pw) + " x " + std::to_string(ph));
+        add("LayoutLeftTop", pair_of(r.mLeft, ph - r.mTop));
+        add("LayoutRightBottom", pair_of(r.mRight, ph - r.mBottom));
+        add("LayoutGap", pair_of(pw - r.mRight, r.mBottom));
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = parent->getName();
+        args["[SIZE]"] = size_of(pw, ph);
+        add("LayoutParent", getString("LayoutParentValue", args));
     }
-    add("rect (parent space, bottom-left origin)", rectText(r));
-    add("rect (screen)", rectText(view->calcScreenRect()));
+    add("LayoutRect", rect_of(r));
+    add("LayoutRectScreen", rect_of(view->calcScreenRect()));
     if (view->getUseBoundingRect() && view->getBoundingRect() != r)
     {
-        add("bounding rect", rectText(view->getBoundingRect()));
+        add("LayoutBoundingRect", rect_of(view->getBoundingRect()));
     }
-    add("follows", followsText(view->getFollows()));
+    add("LayoutFollows", followsText(view->getFollows()));
 
     const ALXUICatalog::Layer* layer = nullptr;
     pugi::xml_node element = authoredElement(layer);
@@ -9851,9 +9905,9 @@ void ALFloaterXUIStudio::refreshLayout(LLView* view)
                 form += std::string(attr) + "=\"" + a.value() + "\"";
             }
         }
-        add("authored", form.empty() ? std::string("(none: the widget's defaults)") : form);
-        add("layout", element.attribute("layout").as_string("(default)"));
-        add("follows (authored)", element.attribute("follows").as_string("(none)"));
+        add("LayoutAuthored", form.empty() ? getString("LayoutAuthoredNone") : form);
+        add("LayoutLayout", element.attribute("layout").as_string(getString("LayoutDefault").c_str()));
+        add("LayoutFollowsAuthored", element.attribute("follows").as_string(getString("LayoutNone").c_str()));
         if (element.attribute("left_pad") || element.attribute("left_delta")
             || element.attribute("top_pad") || element.attribute("top_delta"))
         {
@@ -9864,15 +9918,18 @@ void ALFloaterXUIStudio::refreshLayout(LLView* view)
             {
                 sibling = sibling.previous_sibling();
             }
-            add("relative to", sibling ? std::string(sibling.attribute("name").as_string("unnamed")) + " <" + sibling.name() + ">"
-                                       : std::string("(no widget before it: the parent)"));
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = sibling.attribute("name").as_string(getString("LayoutUnnamed").c_str());
+            args["[TAG]"] = sibling.name();
+            add("LayoutRelativeTo", sibling ? getString("LayoutRelativeToValue", args)
+                                            : getString("LayoutRelativeToParent"));
         }
     }
 
     if (const LLFloater* floater = view->as<LLFloater>())
     {
-        add("resizable", floater->isResizable() ? "yes" : "no");
-        add("min size", std::to_string(floater->getMinWidth()) + " x " + std::to_string(floater->getMinHeight()));
+        add("LayoutResizable", getString(floater->isResizable() ? "Yes" : "No"));
+        add("LayoutMinSize", size_of(floater->getMinWidth(), floater->getMinHeight()));
     }
 }
 
@@ -9994,11 +10051,11 @@ void ALFloaterXUIStudio::refreshBindings(LLView* view)
         const bool own = real
                       && (real->getCommitCallbackRegistrar().getValueFromScope(function.value()) != nullptr
                        || real->getEnableCallbackRegistrar().getValueFromScope(function.value()) != nullptr);
-        std::string status = commit  ? "commit registry"
-                           : enable  ? "enable registry"
-                           : own     ? "the floater's own"
-                           : real    ? "registered nowhere"
-                                     : "not global";
+        const std::string status = getString(commit ? "BindingCommitRegistry"
+                                           : enable ? "BindingEnableRegistry"
+                                           : own    ? "BindingFloaterOwn"
+                                           : real   ? "BindingNowhere"
+                                                    : "BindingNotGlobal");
         std::string name = function.value();
         if (pugi::xml_attribute parameter = child.attribute("parameter"))
         {
@@ -10013,7 +10070,7 @@ void ALFloaterXUIStudio::refreshBindings(LLView* view)
         {
             const bool global = gSavedSettings.controlExists(a.value());
             const bool account = gSavedPerAccountSettings.controlExists(a.value());
-            add(attr, a.value(), global ? "config" : account ? "account" : "no such control");
+            add(attr, a.value(), getString(global ? "BindingConfig" : account ? "BindingAccount" : "BindingNoControl"));
         }
     };
     control("control_name");
@@ -10027,7 +10084,7 @@ void ALFloaterXUIStudio::refreshBindings(LLView* view)
     {
         if (pugi::xml_attribute a = element.attribute(attr))
         {
-            add(attr, a.value(), mCatalog.find(a.value()) ? "in the catalog" : "no such file");
+            add(attr, a.value(), getString(mCatalog.find(a.value()) ? "BindingInCatalog" : "BindingNoFile"));
         }
     };
     file("menu_filename");
@@ -10047,22 +10104,23 @@ void ALFloaterXUIStudio::refreshState(LLView* view)
     {
         return;
     }
-    auto add = [&](const std::string& property, const std::string& value)
+    auto add = [&](const char* property, const std::string& value)
     {
-        mState->addElement(row(property, { { "property", property }, { "value", value } }));
+        const std::string name = getString(property);
+        mState->addElement(row(name, { { "property", name }, { "value", value } }));
     };
-    auto yes = [](bool b) { return std::string(b ? "yes" : "no"); };
+    auto yes = [&](bool b) { return getString(b ? "Yes" : "No"); };
 
-    add("visible", yes(view->getVisible()));
-    add("in visible chain", yes(view->isInVisibleChain()));
-    add("enabled", yes(view->getEnabled()));
+    add("StateVisible", yes(view->getVisible()));
+    add("StateInVisibleChain", yes(view->isInVisibleChain()));
+    add("StateEnabled", yes(view->getEnabled()));
     S32 mx, my;
     LLUI::getInstance()->getMousePositionLocal(view, &mx, &my);
-    add("mouse over", yes(view->pointInView(mx, my)));
+    add("StateMouseOver", yes(view->pointInView(mx, my)));
     if (LLUICtrl* ctrl = view->as<LLUICtrl>())
     {
-        add("focus", yes(ctrl->hasFocus()));
-        add("value", ctrl->getValue().asString());
+        add("StateFocus", yes(ctrl->hasFocus()));
+        add("StateValue", ctrl->getValue().asString());
     }
     std::string text;
     bool truncated = false;
@@ -10081,12 +10139,12 @@ void ALFloaterXUIStudio::refreshState(LLView* view)
     }
     if (!text.empty())
     {
-        add("text", text);
-        add("truncated", yes(truncated));
+        add("StateText", text);
+        add("StateTruncated", yes(truncated));
     }
-    add("tooltip", view->getToolTip());
-    add("name", view->getName());
-    add("class", view->viewType()->mName);
+    add("StateTooltip", view->getToolTip());
+    add("StateName", view->getName());
+    add("StateClass", view->viewType()->mName);
     mState->setScrollPos(scroll);
 }
 

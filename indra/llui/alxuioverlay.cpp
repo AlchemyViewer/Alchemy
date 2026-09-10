@@ -83,14 +83,16 @@ std::string ALXUIOverlay::namePath(const LLXMLNode* node)
     return path;
 }
 
-void ALXUIOverlay::drop(S32 layer, const LLXMLNode* overlay_node, std::string what, std::string why)
+void ALXUIOverlay::drop(S32 layer, const LLXMLNode* overlay_node, std::string what, const char* key,
+                        LLStringUtil::format_map_t args)
 {
     Drop& d = mDrops.emplace_back();
     d.layer = layer;
     d.line = overlay_node ? overlay_node->getLineNumber() : 0;
     d.path = overlay_node ? namePath(overlay_node->mIsAttribute ? overlay_node->mParent : overlay_node) : std::string();
     d.what = std::move(what);
-    d.why = std::move(why);
+    d.key = key;
+    d.args = std::move(args);
 }
 
 void ALXUIOverlay::layerParsed(S32 layer, const std::string& path)
@@ -108,8 +110,8 @@ void ALXUIOverlay::layerSkipped(S32 layer, const std::string& path, const std::s
     Drop& d = mDrops.emplace_back();
     d.layer = layer;
     d.line = line;
-    d.what = "the file";
-    d.why = "did not parse: " + reason;
+    d.key = "LintDropFileUnparsed";
+    d.args["[REASON]"] = reason;
 }
 
 void ALXUIOverlay::rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
@@ -118,13 +120,14 @@ void ALXUIOverlay::rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overla
     std::string overlay_name;
     base->getAttributeString("name", base_name);
     overlay->getAttributeString("name", overlay_name);
-    drop(layer, overlay, "the root's name", "\"" + overlay_name + "\" where the base says \"" + base_name + "\"; merged all the same");
+    drop(layer, overlay, std::string(), "LintDropRootName",
+         { { "[OVERLAY]", overlay_name }, { "[BASE]", base_name } });
 }
 
 void ALXUIOverlay::rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
-    drop(layer, overlay, "the root's tag",
-         std::string("<") + overlay->getName()->mString + "> where the base says <" + base->getName()->mString + ">; merged all the same");
+    drop(layer, overlay, std::string(), "LintDropRootTag",
+         { { "[OVERLAY]", overlay->getName()->mString }, { "[BASE]", base->getName()->mString } });
 }
 
 void ALXUIOverlay::childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
@@ -138,23 +141,16 @@ void ALXUIOverlay::childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 
 void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* overlay, Miss why)
 {
-    std::string why_text;
+    const char* key = "LintDropNotBelow";
     switch (why)
     {
-    case Miss::Unnamed:
-        why_text = "has no name to match by";
-        break;
-    case Miss::Duplicate:
-        why_text = "every element of this name under " + namePath(base_parent) + " is already translated";
-        break;
-    case Miss::Ambiguous:
-        why_text = "several elements of this name below " + namePath(base_parent) + ", so which one is a guess";
-        break;
-    case Miss::NotBelow:
-        why_text = "nothing of this name below " + namePath(base_parent);
-        break;
+    case Miss::Unnamed:     key = "LintDropUnnamed"; break;
+    case Miss::Duplicate:   key = "LintDropDuplicate"; break;
+    case Miss::Ambiguous:   key = "LintDropAmbiguous"; break;
+    case Miss::NotBelow:    break;
     }
-    drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">", why_text);
+    drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">", key,
+         { { "[PARENT]", namePath(base_parent) } });
 }
 
 void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
@@ -166,7 +162,7 @@ void ALXUIOverlay::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
     if (overlay->getFirstChild().isNull())
     {
-        drop(layer, overlay, "the text", "empty in this layer; the base's text is kept");
+        drop(layer, overlay, std::string(), "LintDropTextEmpty");
     }
 }
 
@@ -188,5 +184,5 @@ void ALXUIOverlay::attributeApplied(S32 layer, LLXMLNode* base_attribute, LLXMLN
 
 void ALXUIOverlay::attributeDropped(S32 layer, LLXMLNode* base, LLXMLNode* overlay_attribute)
 {
-    drop(layer, overlay_attribute, overlay_attribute->getName()->mString, "the base element has no such attribute");
+    drop(layer, overlay_attribute, overlay_attribute->getName()->mString, "LintDropAttribute");
 }

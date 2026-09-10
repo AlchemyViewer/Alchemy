@@ -119,22 +119,22 @@ std::string ALFloaterXUILibrary::groupOf(const std::string& tag)
     };
     if (chrome.count(tag))
     {
-        return "Chrome";
+        return "GroupChrome";
     }
     if (lists.count(tag))
     {
-        return "Lists";
+        return "GroupLists";
     }
     if (text.count(tag))
     {
-        return "Text";
+        return "GroupText";
     }
     const ALXUISchema::Tag* declared = ALXUISchema::get().tag(tag);
     if (declared && !declared->children.empty())
     {
-        return "Containers";
+        return "GroupContainers";
     }
-    return "Controls";
+    return "GroupControls";
 }
 
 void ALFloaterXUILibrary::fillTags()
@@ -166,7 +166,7 @@ void ALFloaterXUILibrary::fillTags()
             group = in_group;
             LLSD heading;
             heading["columns"][0]["column"] = "tag";
-            heading["columns"][0]["value"] = group;
+            heading["columns"][0]["value"] = getString(group);
             heading["columns"][0]["font"]["style"] = "BOLD";
             LLScrollListItem* item = mTags->addElement(heading);
             item->setEnabled(false);
@@ -211,10 +211,24 @@ std::vector<std::string> ALFloaterXUILibrary::acceptedBy(const std::string& tag)
 std::string ALFloaterXUILibrary::describe(const std::string& tag) const
 {
     const ALXUISchema::Tag* declared = ALXUISchema::get().tag(tag);
+    LLStringUtil::format_map_t args;
+    args["[TAG]"] = tag;
     if (!declared)
     {
-        return tag + " is not a tag the schema knows.";
+        return getString("LibraryUnknownTag", args);
     }
+
+    // Each part in the floater's words, with the counts and names put in.
+    const auto said = [&](const char* name, const std::string& value = LLStringUtil::null)
+    {
+        LLStringUtil::format_map_t with(args);
+        with["[VALUE]"] = value;
+        return getString(name, with);
+    };
+    const auto counted = [&](const char* name, size_t count)
+    {
+        return said(name, std::to_string(count));
+    };
 
     std::string out = "<" + tag + ">\n";
     // What it is for, which is the first thing anybody asks of a vocabulary
@@ -226,10 +240,10 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
     }
     if (declared->text)
     {
-        out += "\nWhat is between its tags is read as its value.\n";
+        out += "\n" + said("LibraryTakesText") + "\n";
     }
 
-    out += "\nAttributes (" + std::to_string(declared->attributes.size()) + ")\n";
+    out += "\n" + counted("LibraryAttributes", declared->attributes.size()) + "\n";
     for (const ALXUISchema::Attribute& a : declared->attributes)
     {
         out += "    " + a.name;
@@ -239,27 +253,27 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
         }
         if (a.required)
         {
-            out += "   required";
+            out += "   " + said("LibraryRequired");
         }
         if (a.ignored)
         {
-            out += "   read and thrown away";
+            out += "   " + said("LibraryIgnored");
         }
         // A name that works and should not be used, and the one to use
         // instead. Both of them go on working: what is said here is which of
         // them anything new should be written with.
         if (a.deprecated)
         {
-            out += a.instead.empty() ? "   deprecated"
-                                     : "   deprecated, write " + a.instead;
+            out += "   " + (a.instead.empty() ? said("LibraryDeprecated")
+                                              : said("LibraryDeprecatedFor", a.instead));
         }
         else if (!a.alias.empty())
         {
-            out += "   also written " + a.alias;
+            out += "   " + said("LibraryAlias", a.alias);
         }
         if (!a.values.empty())
         {
-            out += "\n        one of: ";
+            out += "\n        " + said("LibraryOneOf") + " ";
             for (size_t i = 0; i < a.values.size(); ++i)
             {
                 out += (i ? ", " : "") + a.values[i];
@@ -270,26 +284,26 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
 
     if (!declared->elements.empty())
     {
-        out += "\nParameter elements (" + std::to_string(declared->elements.size()) + ")\n";
+        out += "\n" + counted("LibraryElements", declared->elements.size()) + "\n";
         for (const ALXUISchema::Element& e : declared->elements)
         {
             out += "    <" + e.name + ">";
             if (e.maxCount > 1)
             {
-                out += "   any number";
+                out += "   " + said("LibraryAnyNumber");
             }
             if (e.minCount > 0)
             {
-                out += "   required";
+                out += "   " + said("LibraryRequired");
             }
             out += "\n";
         }
     }
 
-    out += "\nMay contain (" + std::to_string(declared->children.size()) + ")\n";
+    out += "\n" + counted("LibraryMayContain", declared->children.size()) + "\n";
     if (declared->children.empty())
     {
-        out += "    nothing\n";
+        out += "    " + said("LibraryNothing") + "\n";
     }
     else
     {
@@ -304,10 +318,10 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
     // The question the tool could not answer before this: a developer with a
     // tag in hand wants to know where it is allowed to go.
     const std::vector<std::string> takers = acceptedBy(tag);
-    out += "\nMay go inside (" + std::to_string(takers.size()) + ")\n";
+    out += "\n" + counted("LibraryMayGoInside", takers.size()) + "\n";
     if (takers.empty())
     {
-        out += "    nothing, so it is a root\n";
+        out += "    " + said("LibraryRoot") + "\n";
     }
     else
     {
@@ -331,13 +345,12 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
         {
             files.insert(hit.entry);
         }
-        out += "\nUsed in " + std::to_string(files.size())
-             + (files.size() == 1 ? " file\n" : " files\n");
+        out += "\n" + counted(files.size() == 1 ? "LibraryUsedInOne" : "LibraryUsedIn", files.size()) + "\n";
     }
 
     // Real, valid and pasteable: the attributes every element needs and
     // nothing the tag would ignore.
-    out += "\nTo write one\n    <" + tag + " name=\"\" layout=\"topleft\""
+    out += "\n" + said("LibraryToWrite") + "\n    <" + tag + " name=\"\" layout=\"topleft\""
            " left=\"0\" top=\"0\" width=\"100\" height=\"20\"";
     out += declared->text ? ">text</" + tag + ">\n" : "/>\n";
     return out;

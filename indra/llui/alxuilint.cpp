@@ -38,6 +38,11 @@
 #include "lllayoutstack.h"
 #include "llresizebar.h"
 #include "llresizehandle.h"
+#include "llstl.h"
+#include "lluictrlfactory.h"
+#include "llxmlnode.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 #include "lltextbox.h"
 #include "llui.h"
 #include "lluicolortable.h"
@@ -168,6 +173,175 @@ const char* ALXUILint::ruleName(Rule rule)
 }
 
 // static
+bool ALXUILint::ruleNamed(std::string_view name, Rule& rule)
+{
+    for (U8 i = 0; i <= (U8)Rule::FileMissing; ++i)
+    {
+        if (name == ruleName((Rule)i))
+        {
+            rule = (Rule)i;
+            return true;
+        }
+    }
+    return false;
+}
+
+// static
+const char* ALXUILint::ruleKey(Rule rule)
+{
+    switch (rule)
+    {
+    case Rule::ParseError:              return "LintRuleParseError";
+    case Rule::BuildFailed:             return "LintRuleBuildFailed";
+    case Rule::OverlayDrop:             return "LintRuleOverlayDrop";
+    case Rule::Overlap:                 return "LintRuleOverlap";
+    case Rule::Alternatives:            return "LintRuleAlternatives";
+    case Rule::OutOfBounds:             return "LintRuleOutOfBounds";
+    case Rule::NameCollision:           return "LintRuleNameCollision";
+    case Rule::LayoutDimension:         return "LintRuleLayoutDimension";
+    case Rule::EmptyRect:               return "LintRuleEmptyRect";
+    case Rule::Truncation:              return "LintRuleTruncation";
+    case Rule::TemplateRootMismatch:    return "LintRuleTemplateRootMismatch";
+    case Rule::UnknownAttribute:        return "LintRuleUnknownAttribute";
+    case Rule::WroteTheDefault:         return "LintRuleWroteTheDefault";
+    case Rule::DeprecatedAttribute:     return "LintRuleDeprecatedAttribute";
+    case Rule::DanglingImage:           return "LintRuleDanglingImage";
+    case Rule::DanglingColor:           return "LintRuleDanglingColor";
+    case Rule::DanglingFont:            return "LintRuleDanglingFont";
+    case Rule::CallbackNotRegistered:   return "LintRuleCallbackNotRegistered";
+    case Rule::ControlMissing:          return "LintRuleControlMissing";
+    case Rule::FileMissing:             return "LintRuleFileMissing";
+    }
+    return "LintRuleParseError";
+}
+
+// static
+const char* ALXUILint::severityKey(Severity severity)
+{
+    switch (severity)
+    {
+    case Severity::Error:   return "LintSeverityError";
+    case Severity::Warning: return "LintSeverityWarning";
+    case Severity::Note:    return "LintSeverityNote";
+    }
+    return "LintSeverityNote";
+}
+
+// static
+const std::vector<const char*>& ALXUILint::keys()
+{
+    static const std::vector<const char*> said = {
+        "LintDiagParseError",
+        "LintDiagParseWarning",
+        "LintDiagUnknownAttribute",
+        "LintDiagMisScopedElement",
+        "LintDiagInvalidChild",
+        "LintDiagCreateFailed",
+        "LintDropFileUnparsed",
+        "LintDropRootName",
+        "LintDropRootTag",
+        "LintDropUnnamed",
+        "LintDropDuplicate",
+        "LintDropAmbiguous",
+        "LintDropNotBelow",
+        "LintDropTextEmpty",
+        "LintDropAttribute",
+        "LintEmptyRect",
+        "LintOutOfBounds",
+        "LintTruncation",
+        "LintNameCollision",
+        "LintOverlap",
+        "LintOverlapHidden",
+        "LintUnknownAttribute",
+        "LintUnknownAttributeSlip",
+        "LintDeprecated",
+        "LintDeprecatedFor",
+        "LintWroteTheDefault",
+        "LintFileMissing",
+        "LintDanglingFont",
+        "LintDanglingColor",
+        "LintDanglingImage",
+        "LintControlMissing",
+        "LintLayoutTwoNames",
+        "LintLayoutHorizontalMin",
+        "LintLayoutHorizontalMax",
+        "LintLayoutVerticalMin",
+        "LintLayoutVerticalMax",
+        "LintCallbackUnknown",
+        "LintCallbackNotGlobal",
+        "LintLayerUnparsed",
+        "LintTemplateRoot",
+    };
+    return said;
+}
+
+namespace
+{
+    const char* const WORDS_FILE = "xui_lint.xml";
+
+    boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<> >& wordsHeld()
+    {
+        static boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<> > held;
+        return held;
+    }
+    bool sWordsRead = false;
+}
+
+// static
+void ALXUILint::readWords()
+{
+    if (sWordsRead)
+    {
+        return;
+    }
+    sWordsRead = true;
+    LLXMLNodePtr root;
+    if (!LLUICtrlFactory::getLayeredXMLNode(WORDS_FILE, root) || root.isNull())
+    {
+        return;
+    }
+    for (LLXMLNodePtr child = root->getFirstChild(); child.notNull(); child = child->getNextSibling())
+    {
+        std::string name;
+        if (child->hasName("string") && child->getAttributeString("name", name) && !name.empty())
+        {
+            wordsHeld()[name] = child->getTextContents();
+        }
+    }
+}
+
+// static
+std::string ALXUILint::wording(std::string_view key, const LLStringUtil::format_map_t& args)
+{
+    readWords();
+    const auto found = wordsHeld().find(key);
+    if (found == wordsHeld().end())
+    {
+        std::string bare(key);
+        for (const auto& [name, value] : args)
+        {
+            bare += " " + value();
+        }
+        return bare;
+    }
+    std::string text = found->second;
+    LLStringUtil::format(text, args);
+    return text;
+}
+
+// static
+std::string ALXUILint::ruleLabel(Rule rule)
+{
+    return wording(ruleKey(rule), LLStringUtil::format_map_t());
+}
+
+// static
+std::string ALXUILint::severityLabel(Severity severity)
+{
+    return wording(severityKey(severity), LLStringUtil::format_map_t());
+}
+
+// static
 const char* ALXUILint::severityName(Severity severity)
 {
     switch (severity)
@@ -242,7 +416,8 @@ void ALXUILint::clear()
 }
 
 ALXUILint::Finding& ALXUILint::add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
-                                   std::string file, S32 line, std::string what, std::string message)
+                                   std::string file, S32 line, std::string what, const char* key,
+                                   LLStringUtil::format_map_t args)
 {
     Finding& f = mFindings.emplace_back();
     f.rule = rule;
@@ -251,7 +426,9 @@ ALXUILint::Finding& ALXUILint::add(Rule rule, Severity severity, const ALXUISele
     f.file = std::move(file);
     f.line = line;
     f.what = std::move(what);
-    f.message = std::move(message);
+    f.key = key;
+    f.args = std::move(args);
+    f.message = wording(f.key, f.args);
 
     // The element and every ancestor, so a collapsed row carries what is
     // under it.
@@ -317,10 +494,20 @@ void ALXUILint::fromDiagnostics(const Input& input)
         const bool fatal = e.kind == ALXUIDiagnostics::Kind::ParseError
                         || e.kind == ALXUIDiagnostics::Kind::CreateFailed
                         || e.kind == ALXUIDiagnostics::Kind::InvalidChild;
+        const char* key = "LintDiagParseError";
+        switch (e.kind)
+        {
+        case ALXUIDiagnostics::Kind::ParseError:       break;
+        case ALXUIDiagnostics::Kind::ParseWarning:     key = "LintDiagParseWarning"; break;
+        case ALXUIDiagnostics::Kind::UnknownAttribute: key = "LintDiagUnknownAttribute"; break;
+        case ALXUIDiagnostics::Kind::MisScopedElement: key = "LintDiagMisScopedElement"; break;
+        case ALXUIDiagnostics::Kind::InvalidChild:     key = "LintDiagInvalidChild"; break;
+        case ALXUIDiagnostics::Kind::CreateFailed:     key = "LintDiagCreateFailed"; break;
+        }
         add(fatal ? Rule::BuildFailed : Rule::ParseError,
             fatal ? Severity::Error : Severity::Warning,
             ALXUISelection::path_t(), e.file.empty() ? input.file : e.file, e.line, e.path,
-            std::string(ALXUIDiagnostics::kindName(e.kind)) + (e.message.empty() ? "" : ": " + e.message));
+            key, { { "[MESSAGE]", e.message } });
     }
 }
 
@@ -333,7 +520,7 @@ void ALXUILint::fromOverlay(const Input& input)
     for (const ALXUIOverlay::Drop& d : input.overlay->drops())
     {
         add(Rule::OverlayDrop, Severity::Warning, ALXUISelection::fromString(d.path),
-            input.overlay->layerPath(d.layer), d.line, d.what, d.why);
+            input.overlay->layerPath(d.layer), d.line, d.what, d.key.c_str(), d.args);
     }
 }
 
@@ -376,8 +563,8 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
 
     if (view->getVisible() && (rect.getWidth() <= 0 || rect.getHeight() <= 0))
     {
-        add(Rule::EmptyRect, Severity::Warning, path, input.file, line, view->getName(),
-            "shown with a rect of " + std::to_string(rect.getWidth()) + " by " + std::to_string(rect.getHeight()));
+        add(Rule::EmptyRect, Severity::Warning, path, input.file, line, view->getName(), "LintEmptyRect",
+            { { "[WIDTH]", std::to_string(rect.getWidth()) }, { "[HEIGHT]", std::to_string(rect.getHeight()) } });
     }
 
     // The root's parent is whatever the tool built it into -- a canvas, a
@@ -391,8 +578,9 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
                 || rect.mRight > bounds.mRight || rect.mTop > bounds.mTop))
         {
             Finding& f = add(Rule::OutOfBounds, Severity::Warning, path, input.file, line, view->getName(),
-                "sits outside " + parent->getName() + ", which is "
-                + std::to_string(bounds.getWidth()) + " by " + std::to_string(bounds.getHeight()));
+                "LintOutOfBounds", { { "[PARENT]", parent->getName() },
+                                     { "[WIDTH]", std::to_string(bounds.getWidth()) },
+                                     { "[HEIGHT]", std::to_string(bounds.getHeight()) } });
 
             // Moving it in only works where it fits: something wider than
             // what holds it leaves by the other edge whichever way it goes,
@@ -435,7 +623,7 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
         if (width > room)
         {
             Finding& f = add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
-                "the text needs " + std::to_string(width) + " pixels and has " + std::to_string(room));
+                "LintTruncation", { { "[NEEDED]", std::to_string(width) }, { "[ROOM]", std::to_string(room) } });
             if (!placedBySomethingElse(view, input.root))
             {
                 f.fix.did = Fix::Do::WidenBy;
@@ -479,7 +667,7 @@ void ALXUILint::checkChildren(const Input& input, LLView* view, const ALXUISelec
             }
             add(Rule::NameCollision, Severity::Warning, child_path, input.file,
                 origin ? origin->line : 0, child->getName(),
-                "a second child of " + view->getName() + " named this; getChild answers the first");
+                "LintNameCollision", { { "[PARENT]", view->getName() } });
         }
     }
 
@@ -504,7 +692,7 @@ void ALXUILint::checkChildren(const Input& input, LLView* view, const ALXUISelec
             add(both_shown ? Rule::Overlap : Rule::Alternatives,
                 both_shown ? Severity::Warning : Severity::Note,
                 child_path, input.file, origin ? origin->line : 0, named[i]->getName(),
-                (both_shown ? "overlaps " : "overlaps the hidden ") + named[j]->getName());
+                both_shown ? "LintOverlap" : "LintOverlapHidden", { { "[OTHER]", named[j]->getName() } });
         }
     }
 }
@@ -527,19 +715,18 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
 
         if (schema && !ALXUISchema::get().accepts(schema->name, name))
         {
-            Finding& f = add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
-                "<" + schema->name + "> has no parameter named \"" + name + "\"");
-
             // A name one edit from a real one was meant to be that one, and
             // spelling it right keeps what the author wrote. Nothing near
             // enough, and all that is left is that the file says something
             // nothing reads.
             const std::string meant = ALXUISchema::get().nearestSpelling(schema->name, name);
+            Finding& f = add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
+                meant.empty() ? "LintUnknownAttribute" : "LintUnknownAttributeSlip",
+                { { "[TAG]", schema->name }, { "[NAME]", name }, { "[MEANT]", meant } });
             if (!meant.empty())
             {
                 f.fix.did = Fix::Do::SpellAttribute;
                 f.fix.spelling = meant;
-                f.message += ", and \"" + meant + "\" is one slip away";
             }
             else
             {
@@ -558,9 +745,8 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
         if (said && said->deprecated)
         {
             Finding& f = add(Rule::DeprecatedAttribute, Severity::Note, path, input.file, line, name,
-                said->instead.empty()
-                    ? "\"" + name + "\" is a name nothing new should use"
-                    : "\"" + name + "\" still works; \"" + said->instead + "\" is the one to write");
+                said->instead.empty() ? "LintDeprecated" : "LintDeprecatedFor",
+                { { "[NAME]", name }, { "[INSTEAD]", said->instead } });
             if (!said->instead.empty() && !node->hasAttribute(said->instead.c_str()))
             {
                 f.fix.did = Fix::Do::SpellAttribute;
@@ -579,7 +765,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
         if (said && said->declared && said->held == value)
         {
             add(Rule::WroteTheDefault, Severity::Note, path, input.file, line, name,
-                "\"" + name + "\" is written as what it already is")
+                "LintWroteTheDefault", { { "[NAME]", name } })
                 .fix.did = Fix::Do::TakeAttributeOut;
         }
 
@@ -590,7 +776,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             if (!value.empty() && !input.catalog->find(value))
             {
                 add(Rule::FileMissing, Severity::Error, path, input.file, line, name,
-                    "no XUI file is named \"" + value + "\"");
+                    "LintFileMissing", { { "[VALUE]", value } });
             }
             continue;
         }
@@ -611,7 +797,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             if (!LLFontGL::getFontByName(value) && !fontDeclared(value))
             {
                 add(Rule::DanglingFont, Severity::Warning, path, input.file, line, name,
-                    "no font is named \"" + value + "\"");
+                    "LintDanglingFont", { { "[VALUE]", value } });
             }
         }
         else if (name == "color" || endsWith(name, "_color"))
@@ -619,7 +805,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             if (!isColorLiteral(value) && !LLUIColorTable::instance().colorExists(value))
             {
                 add(Rule::DanglingColor, Severity::Warning, path, input.file, line, name,
-                    "no colour is named \"" + value + "\"");
+                    "LintDanglingColor", { { "[VALUE]", value } });
             }
         }
         else if (name.find("image") != std::string::npos && name != "image_overlay_alignment")
@@ -627,7 +813,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             if (!LLUI::hasUIImage(value))
             {
                 add(Rule::DanglingImage, Severity::Warning, path, input.file, line, name,
-                    "textures.xml declares no \"" + value + "\"");
+                    "LintDanglingImage", { { "[VALUE]", value } });
             }
         }
         else if (name == "control_name" || name == "control" || endsWith(name, "_control"))
@@ -635,7 +821,7 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             if (!controlExists(value))
             {
                 add(Rule::ControlMissing, Severity::Warning, path, input.file, line, name,
-                    "no control group has a setting named \"" + value + "\"");
+                    "LintControlMissing", { { "[VALUE]", value } });
             }
         }
     }
@@ -672,7 +858,6 @@ void ALXUILint::checkLayoutDimensions(const Input& input, LLView* view, const AL
     }
 
     const bool horizontal = stackp->getOrientation() == LLView::HORIZONTAL;
-    const char* const along = horizontal ? "width" : "height";
     const char* const across = horizontal ? "height" : "width";
 
     // The node holds its attributes sorted by name, which is the order the
@@ -702,14 +887,15 @@ void ALXUILint::checkLayoutDimensions(const Input& input, LLView* view, const AL
             if (name != winner)
             {
                 add(Rule::LayoutDimension, Severity::Warning, path, input.file, line, name,
-                    "\"" + name + "\" and \"" + winner + "\" are two names for one parameter; \""
-                        + winner + "\" is the one that takes effect");
+                    "LintLayoutTwoNames", { { "[NAME]", name }, { "[WINNER]", winner } });
             }
             else if (name == std::string(bound) + "_" + across)
             {
+                const bool least = std::string_view(bound) == "min";
                 add(Rule::LayoutDimension, Severity::Warning, path, input.file, line, name,
-                    std::string("this stack runs ") + (horizontal ? "horizontally" : "vertically")
-                        + ", so \"" + name + "\" sets the panel's " + bound + "imum " + along);
+                    horizontal ? (least ? "LintLayoutHorizontalMin" : "LintLayoutHorizontalMax")
+                               : (least ? "LintLayoutVerticalMin" : "LintLayoutVerticalMax"),
+                    { { "[NAME]", name } });
             }
         }
     }
@@ -752,9 +938,8 @@ void ALXUILint::checkCallbacks(const Input& input, const ALXUISelection::path_t&
         add(Rule::CallbackNotRegistered,
             input.callbacksAreDecisive ? Severity::Error : Severity::Note,
             path, input.file, line, tag,
-            input.callbacksAreDecisive
-                ? "no registry knows \"" + function + "\", so it does nothing"
-                : "no global registry knows \"" + function + "\"; a floater's own are not registered here");
+            input.callbacksAreDecisive ? "LintCallbackUnknown" : "LintCallbackNotGlobal",
+            { { "[FUNCTION]", function } });
     }
 }
 
@@ -774,7 +959,9 @@ std::vector<ALXUILint::Finding> ALXUILint::checkCatalog(const ALXUICatalog& cata
                 f.file = layer.path;
                 f.line = layer.errorLine;
                 f.what = entry.name;
-                f.message = layer.error;
+                f.key = "LintLayerUnparsed";
+                f.args["[MESSAGE]"] = layer.error;
+                f.message = wording(f.key, f.args);
             }
         }
 
@@ -798,8 +985,10 @@ std::vector<ALXUILint::Finding> ALXUILint::checkCatalog(const ALXUICatalog& cata
             f.file = entry.layers.empty() ? entry.name : entry.layers.front().path;
             f.line = 1;
             f.what = entry.rootTag;
-            f.message = "the defaults for <" + tag + "> are written under <" + entry.rootTag
-                      + ">, which the parser does not check and a reader cannot tell from a mistake";
+            f.key = "LintTemplateRoot";
+            f.args["[TAG]"] = tag;
+            f.args["[ROOT]"] = entry.rootTag;
+            f.message = wording(f.key, f.args);
         }
     }
     return findings;

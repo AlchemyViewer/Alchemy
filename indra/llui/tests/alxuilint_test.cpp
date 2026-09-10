@@ -41,6 +41,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <cstring>
 
 class LLAvatarName;
@@ -795,5 +796,85 @@ namespace tut
             ensure_equals("named", run.first(ALXUILint::Rule::FileMissing)->what, std::string("filename"));
         }
         gDirUtilp->deleteDirAndContents(skins);
+    }
+
+    // Every finding names its sentence and the names in it, and says it
+    // as the file has it, filled: what a person reads and what a filter
+    // matches are the same words.
+    template<> template<>
+    void alxuilint_object::test<17>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Run run;
+        ensure("builds", run.build(
+            "  <panel name=\"a\" tool_tp=\"slip\" left=\"0\" top=\"0\" width=\"300\" height=\"20\"/>\n"
+            "  <panel name=\"a\" left=\"0\" top=\"30\" width=\"20\" height=\"0\"/>\n"
+            "  <panel name=\"b\" color=\"NoSuchColour\" left=\"0\" top=\"40\" width=\"20\" height=\"20\"/>"));
+        ensure("there are findings to check: " + run.describe(), !run.lint.findings().empty());
+        for (const ALXUILint::Finding& f : run.lint.findings())
+        {
+            ensure("every finding names its sentence: " + f.message, !f.key.empty());
+            ensure("and the sentence is one the lint asks for: " + f.key,
+                   std::any_of(ALXUILint::keys().begin(), ALXUILint::keys().end(),
+                               [&f](const char* key) { return f.key == key; }));
+            ensure_equals("and the words are that sentence, filled: " + f.key,
+                          f.message, ALXUILint::wording(f.key, f.args));
+            ensure("which is not the key said bare: " + f.message, f.message.rfind(f.key, 0) != 0);
+        }
+
+        const ALXUILint::Finding* slip = run.first(ALXUILint::Rule::UnknownAttribute);
+        ensure("the slip was found", slip != nullptr);
+        ensure_equals("as the sentence with the spelling in it", slip->key, std::string("LintUnknownAttributeSlip"));
+        ensure_equals("which names the tag", slip->args.at("[TAG]")(), std::string("panel"));
+        ensure_equals("the name", slip->args.at("[NAME]")(), std::string("tool_tp"));
+        ensure_equals("and the one meant", slip->args.at("[MEANT]")(), std::string("tool_tip"));
+
+        const ALXUILint::Finding* empty = run.first(ALXUILint::Rule::EmptyRect);
+        ensure("the empty rect was found", empty != nullptr);
+        ensure_equals("with its height", empty->args.at("[HEIGHT]")(), std::string("0"));
+    }
+
+    // Every sentence the lint can ask for, every rule and every severity
+    // is a line in xui_lint.xml, so nothing it says arrives as the bare
+    // name of a line nobody wrote.
+    template<> template<>
+    void alxuilint_object::test<18>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const LLStringUtil::format_map_t none;
+        for (const char* key : ALXUILint::keys())
+        {
+            const std::string said = ALXUILint::wording(key, none);
+            ensure("the file has a line for " + std::string(key), !said.empty() && said != key);
+        }
+        for (U8 i = 0; i <= (U8)ALXUILint::Rule::FileMissing; ++i)
+        {
+            const ALXUILint::Rule rule = (ALXUILint::Rule)i;
+            const std::string label = ALXUILint::ruleLabel(rule);
+            ensure("the file names the rule " + std::string(ALXUILint::ruleKey(rule)),
+                   !label.empty() && label != ALXUILint::ruleKey(rule));
+            ALXUILint::Rule back;
+            ensure("and the rule's name comes back to it",
+                   ALXUILint::ruleNamed(ALXUILint::ruleName(rule), back) && back == rule);
+        }
+        for (ALXUILint::Severity severity : { ALXUILint::Severity::Error, ALXUILint::Severity::Warning,
+                                              ALXUILint::Severity::Note })
+        {
+            const std::string label = ALXUILint::severityLabel(severity);
+            ensure("the file names the severity " + std::string(ALXUILint::severityKey(severity)),
+                   !label.empty() && label != ALXUILint::severityKey(severity));
+        }
+
+        // And a line, filled: the brackets take the names the finding gives.
+        LLStringUtil::format_map_t args;
+        args["[WIDTH]"] = "3";
+        args["[HEIGHT]"] = "4";
+        ensure_equals("filled", ALXUILint::wording("LintEmptyRect", args), std::string("shown with a rect of 3 by 4"));
     }
 }

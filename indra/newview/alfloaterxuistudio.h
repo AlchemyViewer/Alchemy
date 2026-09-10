@@ -429,6 +429,9 @@ private:
     // be, and the tool already knows how to make the edit. Applying one is
     // an edit like any other: it goes in the history, it can be undone, and
     // the words for it are the tool's rather than the library's.
+    // A finding with the name at fault in front, and a rule by its name.
+    std::string sayFinding(const ALXUILint::Finding& finding) const;
+    std::string sayRule(const std::string& rule_name) const;
     // True where the document was written.
     bool applyFix(const ALXUILint::Finding& finding);
     void onFixSelected();

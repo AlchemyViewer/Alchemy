@@ -26,6 +26,8 @@
 
 #include "alxmllayermerge.h"
 
+#include "llstring.h"
+
 #include <string>
 #include <vector>
 
@@ -55,8 +57,12 @@ public:
         S32         layer = 0;
         S32         line = 0;
         std::string path;       // the overlay element's name path
-        std::string what;       // the attribute or element
-        std::string why;
+        std::string what;       // the attribute or element, where it has a name
+        // Why, as the name of a sentence in the lint's words and the names
+        // that sentence is about: what a person reads is said by whoever is
+        // showing it, in their language.
+        std::string key;
+        LLStringUtil::format_map_t args;
     };
 
     // An element the layer wrote at a path the base no longer has, applied
@@ -107,7 +113,8 @@ public:
     static std::string namePath(const LLXMLNode* node);
 
 private:
-    void drop(S32 layer, const LLXMLNode* overlay_node, std::string what, std::string why);
+    void drop(S32 layer, const LLXMLNode* overlay_node, std::string what, const char* key,
+              LLStringUtil::format_map_t args = LLStringUtil::format_map_t());
 
     std::vector<std::string>                                    mLayers;
     boost::unordered_map<const LLXMLNode*, std::vector<Origin>> mOrigins;

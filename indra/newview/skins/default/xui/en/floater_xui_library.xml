@@ -11,8 +11,30 @@
  save_rect="true"
  single_instance="true"
  title="XUI Library"
- translate="false"
  width="860">
+    <floater.string name="GroupChrome">Chrome</floater.string>
+    <floater.string name="GroupContainers">Containers</floater.string>
+    <floater.string name="GroupControls">Controls</floater.string>
+    <floater.string name="GroupLists">Lists</floater.string>
+    <floater.string name="GroupText">Text</floater.string>
+    <floater.string name="LibraryUnknownTag">[TAG] is not a tag the schema knows.</floater.string>
+    <floater.string name="LibraryTakesText">What is between its tags is read as its value.</floater.string>
+    <floater.string name="LibraryAttributes">Attributes ([VALUE])</floater.string>
+    <floater.string name="LibraryRequired">required</floater.string>
+    <floater.string name="LibraryIgnored">read and thrown away</floater.string>
+    <floater.string name="LibraryDeprecated">deprecated</floater.string>
+    <floater.string name="LibraryDeprecatedFor">deprecated, write [VALUE]</floater.string>
+    <floater.string name="LibraryAlias">also written [VALUE]</floater.string>
+    <floater.string name="LibraryOneOf">one of:</floater.string>
+    <floater.string name="LibraryElements">Parameter elements ([VALUE])</floater.string>
+    <floater.string name="LibraryAnyNumber">any number</floater.string>
+    <floater.string name="LibraryMayContain">May contain ([VALUE])</floater.string>
+    <floater.string name="LibraryNothing">nothing</floater.string>
+    <floater.string name="LibraryMayGoInside">May go inside ([VALUE])</floater.string>
+    <floater.string name="LibraryRoot">nothing, so it is a root</floater.string>
+    <floater.string name="LibraryUsedInOne">Used in [VALUE] file</floater.string>
+    <floater.string name="LibraryUsedIn">Used in [VALUE] files</floater.string>
+    <floater.string name="LibraryToWrite">To write one</floater.string>
 
     <layout_stack
      animate="false"
