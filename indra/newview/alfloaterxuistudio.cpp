@@ -3593,6 +3593,23 @@ bool ALFloaterXUIStudio::onChannelChanged(const std::string& channel, const LLSD
             { "name", note->getName() },
             { "time", LLDate(LLTimer::getTotalSeconds()).toHTTPDateString("%H:%M:%S") },
             { "message", message } }));
+        // A session's worth of notifications through ten channels is not a
+        // list anybody reads to the bottom of, and the pointers held for
+        // the rows would otherwise be held for the rest of the session. The
+        // oldest row goes, and its notification with it once no row is
+        // about it any more.
+        constexpr S32 CHANNEL_ROWS = 500;
+        while (mChannels->getItemCount() > CHANNEL_ROWS)
+        {
+            const std::string gone = mChannels->getFirstData()->getValue().asString();
+            mChannels->deleteSingleItem(0);
+            // The same notification is a row in every channel it passed
+            // through; the pointer goes when the last of those has.
+            if (!mChannels->getItem(LLSD(gone)))
+            {
+                mChannelNotifications.erase(gone);
+            }
+        }
         refreshModeCounts();
     }
     return false;
