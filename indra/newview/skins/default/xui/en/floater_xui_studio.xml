@@ -434,6 +434,25 @@
         </menu>
     </menu_bar>
 
+    <!-- Behind the row above the regions, so the controls that say which skin
+         and which language read as one band of chrome rather than as loose
+         things on the window. Declared first because children draw in the
+         order they are declared, and it must be under them; opaque to the eye
+         and not to the mouse, because it is a background and every click on
+         it belongs to whatever is on top. -->
+    <panel
+     background_visible="true"
+     background_opaque="true"
+     bg_opaque_color="MouseGray"
+     follows="left|top|right"
+     height="30"
+     layout="topleft"
+     left="4"
+     mouse_opaque="false"
+     name="header_bar"
+     top="40"
+     width="1612" />
+
     <text
      follows="left|top"
      height="16"
@@ -532,7 +551,13 @@
      name="main_stack"
      orientation="horizontal"
      top="70"
-     width="1604">
+     width="1604"
+     border_size="10"
+     show_drag_handle="true"
+     drag_handle_thickness="4"
+     drag_handle_first_indent="10"
+     drag_handle_second_indent="10"
+     drag_handle_color="DkGray0">
 
         <layout_panel
          auto_resize="false"
@@ -542,7 +567,11 @@
          min_dim="0"
          name="navigator_panel"
          user_resize="true"
-         width="380">
+         width="380"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
             <tab_container
              follows="all"
              height="474"
@@ -1058,7 +1087,13 @@
              name="centre_stack"
              orientation="vertical"
              top="0"
-             width="744">
+             width="744"
+             border_size="10"
+             show_drag_handle="true"
+             drag_handle_thickness="4"
+             drag_handle_first_indent="10"
+             drag_handle_second_indent="10"
+             drag_handle_color="DkGray0">
 
 
                 <layout_panel
@@ -1067,7 +1102,11 @@
                  layout="topleft"
                  min_dim="24"
                  name="canvas_head"
-                 width="744">
+                 width="744"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="MouseGray"
+                 border="true">
                     <button
                      follows="left|top"
                      height="20"
@@ -1123,7 +1162,11 @@
                  layout="topleft"
                  min_dim="80"
                  name="canvas_body"
-                 width="744">
+                 width="744"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="PanelDark"
+                 border="true">
                     <scroll_container
                      follows="all"
                      height="450"
@@ -1140,7 +1183,11 @@
              layout="topleft"
              min_dim="26"
              name="canvas_foot"
-             width="744">
+             width="744"
+             background_visible="true"
+             background_opaque="true"
+             bg_opaque_color="MouseGray"
+             border="true">
                 <button
                  follows="left|top"
                  height="22"
@@ -1315,7 +1362,11 @@
              min_dim="0"
              name="bottom_panel"
              user_resize="true"
-             width="744">
+             width="744"
+             background_visible="true"
+             background_opaque="true"
+             bg_opaque_color="DkGray2"
+             border="true">
                 <tab_container
                  follows="all"
                  height="180"
@@ -1867,7 +1918,11 @@
          min_dim="0"
          name="inspector_panel"
          user_resize="true"
-         width="480">
+         width="480"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
             <tab_container
              follows="all"
              height="474"
