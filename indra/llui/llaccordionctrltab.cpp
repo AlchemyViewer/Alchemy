@@ -492,7 +492,10 @@ void LLAccordionCtrlTab::setDisplayChildren(bool display)
     mDisplayChildren = display;
     LLRect rect = getRect();
 
-    rect.mBottom = rect.mTop - (getDisplayChildren() ? mExpandedHeight : HEADER_HEIGHT);
+    // Folded, a tab is its header and nothing else -- which is nothing at
+    // all where the header is hidden, rather than a blank strip as tall
+    // as the header would have been.
+    rect.mBottom = rect.mTop - (getDisplayChildren() ? mExpandedHeight : getHeaderHeight());
     setRect(rect);
 
     if (mContainerPanel)
@@ -675,7 +678,7 @@ bool LLAccordionCtrlTab::addChild(LLView* child, S32 tab_group)
 {
     if (DD_HEADER_NAME != child->getName())
     {
-        reshape(child->getRect().getWidth() , child->getRect().getHeight() + HEADER_HEIGHT );
+        reshape(child->getRect().getWidth() , child->getRect().getHeight() + getHeaderHeight() );
         mExpandedHeight = getRect().getHeight();
     }
 

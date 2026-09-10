@@ -644,4 +644,84 @@ namespace tut
                       row->getRect().getHeight(), ROW);
         grid->die();
     }
+
+    // The field Debug Settings hands the grid for a colour, in the grid the
+    // way Debug Settings has it: a colour at its default, in a pane two
+    // hundred and forty wide with a labelled row of one section.
+    template<> template<>
+    void alpropertygrid_object::test<14>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid::Params p(LLUICtrlFactory::getDefaultParams<ALPropertyGrid>());
+        p.name = "setting_editor";
+        p.rect = LLRect(0, 120, 240, 0);
+        p.label_width = 96;
+        p.row_height = 24;
+        ALPropertyGrid* grid = LLUICtrlFactory::create<ALPropertyGrid>(p);
+        grid->setGroups({ "Setting" });
+        grid->setEnabled(true);
+
+        ALPropertyGrid::Field field;
+        field.name = "RenderVignetteColor";
+        field.value = "1 1 1";
+        field.kind = ALParamType::REAL;
+        field.type = "LLColor3";
+        field.authored = false;
+        field.source = "as it shipped";
+        field.description = "Vignette edge color";
+        grid->setFields({ field });
+
+        LLPanel* row = grid->findChild<LLPanel>("RenderVignetteColor_row", true);
+        ensure("the row is there", row != nullptr);
+        ensure("and shown", row->getVisible());
+        LLView* editor = row->findChild<ALColorField>("RenderVignetteColor", true);
+        ensure("with the colour editor on it", editor != nullptr);
+        ensure("shown", editor->getVisible());
+        ensure("and somewhere to be seen: " + std::to_string(editor->getRect().getWidth()),
+               editor->getRect().getWidth() > 0 && editor->getRect().getHeight() > 0);
+
+        // The part that was actually wrong. A section nothing is written in
+        // arrives folded, which is right for a page of eighty fields and is
+        // hiding the grid when the section is the only one -- and a grid of
+        // one section draws no heading, so nothing could unfold it. A value
+        // at its default showed a blank strip and nothing else.
+        LLAccordionCtrlTab* tab = grid->getChild<LLAccordionCtrlTab>("Setting", true);
+        ensure("the only section is open, written in or not", tab->getDisplayChildren());
+        ensure("and the row is inside a tab tall enough to hold it",
+               tab->getRect().getHeight() >= row->getRect().getHeight());
+        grid->die();
+    }
+
+    // And with more than one section the rule stands: what is written is
+    // open and what is not is folded under its heading, which is there to
+    // unfold it with.
+    template<> template<>
+    void alpropertygrid_object::test<15>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "written", "quiet" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("name", 0));
+        fields.back().authored = true;
+        fields.push_back(field("width", 1));
+        fields.back().authored = false;
+        grid->setFields(fields);
+
+        ensure("the written section is open",
+               grid->getChild<LLAccordionCtrlTab>("written", true)->getDisplayChildren());
+        ensure("and the quiet one arrives folded",
+               !grid->getChild<LLAccordionCtrlTab>("quiet", true)->getDisplayChildren());
+        ensure("under a heading that can open it",
+               grid->getChild<LLAccordionCtrlTab>("quiet", true)->getHeaderHeight() > 0);
+        grid->die();
+    }
 }

@@ -339,12 +339,18 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
     // here, and what is in the file is what is in front of you. Choosing
     // another widget is a fresh view of a different thing, which is why
     // this is done here and not on every rebuild.
+    //
+    // Unless there is only one. Folding the only section is hiding the
+    // grid, and a grid of one section draws no heading, so there would be
+    // nothing to unfold it with: a setting at its default showed a blank
+    // strip and nothing else. Folding and headings are one decision.
+    const bool folds = mSections.size() > 1;
     for (size_t group = 0; group < mSections.size(); ++group)
     {
         const bool written = std::any_of(mFields.begin(), mFields.end(),
                                          [group](const Field& field)
                                          { return field.group == (S32)group && field.authored; });
-        mSections[group].tab->setDisplayChildren(written);
+        mSections[group].tab->setDisplayChildren(!folds || written);
     }
     rebuild();
 }
