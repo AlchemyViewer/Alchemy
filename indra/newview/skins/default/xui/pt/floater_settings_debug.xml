@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="settings_debug" title="CONFIGURAÇÕES DE DEPURAÇÃO">
 	<filter_editor label="Digite o texto de busca" name="filter_input"/>
-	<scroll_list name="setting_list">
-		<scroll_list.columns label="Configuração" name="setting"/>
-	</scroll_list>
-	<text name="setting_name_txt">Nome da configuração de depuração</text>
+	<layout_stack name="panes">
+		<layout_panel name="list_pane">
+			<scroll_list name="setting_list">
+				<scroll_list.columns label="Configuração" name="setting"/>
+			</scroll_list>
+		</layout_panel>
+		<layout_panel name="setting_pane">
+			<text name="setting_name_txt">Nome da configuração de depuração</text>
+		</layout_panel>
+	</layout_stack>
 	<check_box label="Mostrar apenas configurações alteradas" name="hide_default"/>
 </floater>

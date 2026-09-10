@@ -53,8 +53,6 @@ LLFloaterSettingsDebug::~LLFloaterSettingsDebug()
 
 bool LLFloaterSettingsDebug::postBuild()
 {
-    enableResizeCtrls(true, false, true);
-
     mEditor = getChild<ALPropertyGrid>("setting_editor");
     mEditor->setGroups({ getString("SettingGroup") });
     mEditor->onFieldCommit(boost::bind(&LLFloaterSettingsDebug::onEditorCommit, this, _1, _2));

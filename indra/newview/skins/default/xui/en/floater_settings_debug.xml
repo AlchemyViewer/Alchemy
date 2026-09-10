@@ -3,14 +3,14 @@
  legacy_header_height="18"
  can_minimize="false"
  height="360"
- min_height="367"
+ min_height="300"
  layout="topleft"
  name="settings_debug"
  help_topic="settings_debug"
  title="DEBUG SETTINGS"
  reuse_instance="true"
  can_resize="true"
- min_width="550"
+ min_width="480"
  width="570">
     <floater.string name="SettingGroup">Setting</floater.string>
     <floater.string name="SettingChanged">changed</floater.string>
@@ -29,78 +29,120 @@
    name="filter_input"
    text_pad_left="10"
    top="30" />
-  <scroll_list
-   column_padding="0"
-   draw_heading="true"
-   draw_stripes="false"
-   heading_height="23"
-   height="266"
+
+  <!-- Two panes with a divider: the list, which a person widens when the
+       names are long, and the setting, which takes the rest. Everything in
+       each is anchored to its pane rather than to whatever was declared
+       before it, so the window can be any size and nothing lands on anything
+       else. -->
+  <layout_stack
+   animate="false"
+   border_size="8"
+   drag_handle_thickness="4"
+   drag_handle_first_indent="8"
+   drag_handle_second_indent="8"
+   follows="all"
+   height="265"
    layout="topleft"
-   search_column="1"
    left="10"
-   follows="left|top|bottom"
-   name="setting_list"
+   name="panes"
+   orientation="horizontal"
+   show_drag_handle="true"
    top_pad="2"
-   width="300">
-    <scroll_list.columns
-     name="changed_setting"
-     relative_width="0.05"  />
-    <scroll_list.columns
-     label="Setting"
-     name="setting" />
-  </scroll_list>
-  <text
-   type="string"
-   length="1"
-   follows="left|top"
+   width="550">
+
+    <layout_panel
+     auto_resize="false"
+     height="265"
+     layout="topleft"
+     min_dim="160"
+     name="list_pane"
+     user_resize="true"
+     width="300">
+      <scroll_list
+       column_padding="0"
+       draw_heading="true"
+       draw_stripes="false"
+       follows="all"
+       heading_height="23"
+       height="265"
+       layout="topleft"
+       left="0"
+       name="setting_list"
+       search_column="1"
+       top="0"
+       width="300">
+        <scroll_list.columns
+         name="changed_setting"
+         relative_width="0.05"  />
+        <scroll_list.columns
+         label="Setting"
+         name="setting" />
+      </scroll_list>
+    </layout_panel>
+
+    <layout_panel
+     auto_resize="true"
+     height="265"
+     layout="topleft"
+     min_dim="180"
+     name="setting_pane"
+     width="242">
+      <text
+       type="string"
+       length="1"
+       follows="left|top|right"
+       height="16"
+       layout="topleft"
+       left="0"
+       name="setting_name_txt"
+       font="SansSerifSmallBold"
+       top="6"
+       visible="false"
+       use_ellipses="true"
+       text_color="White"
+       width="242">
+        Debug setting name
+      </text>
+      <text_editor
+       enabled="false"
+       follows="left|top|right"
+       height="75"
+       layout="topleft"
+       left="0"
+       max_length="1024"
+       name="comment_text"
+       top_pad="4"
+       visible="false"
+       width="242"
+       word_wrap="true" />
+      <!-- The editor a setting gets is the editor its type asks for, which is
+           what a property grid is. This pane made one of each by hand (a
+           boolean pair, a text box, four spinners and a colour swatch) and
+           showed the right ones per type; the grid decides now, and a value
+           that is several numbers gets a captioned box each. -->
+      <property_grid
+       follows="all"
+       height="156"
+       label_width="96"
+       layout="topleft"
+       left="0"
+       name="setting_editor"
+       row_height="24"
+       top_pad="8"
+       width="242" />
+    </layout_panel>
+  </layout_stack>
+
+  <check_box
+   control_name="DebugSettingsHideDefault"
+   follows="left|bottom"
    height="16"
+   initial_value="true"
+   label="Show changed settings only"
    layout="topleft"
-   name="setting_name_txt"
-   font="SansSerifSmallBold"
-   top_delta="8"
-   left_pad="10"
-   visible="false"
-   use_ellipses="true"
-   text_color="White"
-   width="240">
-    Debug setting name
-  </text>
-  <text_editor
-   enabled="false"
-   height="75"
-   layout="topleft"
-   visible="false"
-   name="comment_text"
-   follows="left|top"
-   max_length="1024"
-   width="240"
-   top_delta="20"
-   word_wrap="true" />
-  <!-- The editor a setting gets is the editor its type asks for, which is
-       what a property grid is. This pane made one of each by hand (a boolean
-       pair, a text box, four spinners and a colour swatch) and showed the
-       right ones per type; the grid decides now, and a value that is several
-       numbers gets a captioned box each. -->
-  <property_grid
-   follows="left|top|right"
-   height="120"
-   label_width="96"
-   layout="topleft"
-   left_delta="0"
-   name="setting_editor"
-   row_height="24"
-   top_pad="8"
-   width="240" />
-    <check_box
-      control_name="DebugSettingsHideDefault"
-      height="16"
-      initial_value="true"
-      label="Show changed settings only"
-      layout="topleft"
-      top="325"
-      left="10"
-      follows="left|bottom"
-      name="hide_default"
-      width="330">
-    </check_box>
+   left="10"
+   name="hide_default"
+   top_pad="4"
+   width="330" />
 </floater>
