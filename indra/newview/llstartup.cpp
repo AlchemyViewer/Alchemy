@@ -639,7 +639,7 @@ bool idle_startup()
                 std::string value = root->getValue();
                 F32 version = 0.0f;
                 LLStringUtil::convertToF32(value, version);
-                if (version >= 1.0f)
+                if (version >= 2.0f)
                 {
                     xml_ok = true;
                 }
