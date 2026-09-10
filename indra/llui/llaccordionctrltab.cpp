@@ -887,7 +887,12 @@ S32 LLAccordionCtrlTab::notifyParent(const LLSD& info)
         if (str_action == "size_changes")
         {
             S32 height = info["height"];
-            height = llmax(height, 10) + HEADER_HEIGHT + getPaddingTop() + getPaddingBottom();
+            // What the header actually takes, which is nothing when there is
+            // no header. Every other place in this file asks; this one had
+            // the constant, so a tab with its header hidden was told to be a
+            // header taller than it needed and handed the difference to its
+            // panel as blank space under the last row.
+            height = llmax(height, 10) + getHeaderHeight() + getPaddingTop() + getPaddingBottom();
 
             mExpandedHeight = height;
 

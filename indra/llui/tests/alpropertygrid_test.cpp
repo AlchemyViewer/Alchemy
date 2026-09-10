@@ -26,6 +26,8 @@
 
 #include "../alpropertygrid.h"
 
+#include "../llaccordionctrltab.h"
+
 #include "../llaccordionctrl.h"
 #include "../llaccordionctrltab.h"
 #include "../llspinctrl.h"
@@ -566,5 +568,45 @@ namespace tut
                                ->getChild<LLPanel>("short_row", true)
                                ->getChild<LLSpinCtrl>("short.Z", true)->getValue().asReal(), 0.f);
         grid->die();
+    }
+
+    // A grid of one section has nothing to fold it away from, so the heading
+    // is a bar with no job: it names the only thing there and offers to hide
+    // the only thing there. And a section with no heading is as tall as its
+    // rows -- the tab used to be told to leave room for a header it was not
+    // drawing, and handed the difference to its panel as blank space.
+    template<> template<>
+    void alpropertygrid_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* one = build();
+        one->setGroups({ "only" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("name", 0));
+        one->setFields(fields);
+
+        LLAccordionCtrlTab* tab = one->getChild<LLAccordionCtrlTab>("only", true);
+        ensure("the section is there", tab != nullptr);
+        ensure("and says nothing over it", tab->getHeaderHeight() == 0);
+        ensure_equals("so it is as tall as its one row",
+                      one->getChild<LLPanel>("only_rows", true)->getRect().getHeight(), ROW);
+
+        // Two sections is where a heading starts doing something: it says
+        // which of them you are looking at, and folds one away from the other.
+        ALPropertyGrid* two = build();
+        two->setGroups({ "first", "second" });
+        std::vector<ALPropertyGrid::Field> both;
+        both.push_back(field("name", 0));
+        both.push_back(field("width", 1));
+        two->setFields(both);
+        ensure("a heading over each",
+               two->getChild<LLAccordionCtrlTab>("first", true)->getHeaderHeight() > 0);
+
+        one->die();
+        two->die();
     }
 }

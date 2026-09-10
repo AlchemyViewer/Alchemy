@@ -290,6 +290,11 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
         tp.name = name;
         tp.title = name;
         tp.display_children = true;
+        // A grid of one section has nothing to fold it away from, so the
+        // heading is a bar with no job: it names the only thing there and
+        // offers to hide the only thing there. Sections are how a long list
+        // of fields is read, and one field is not a long list.
+        tp.header_visible = mGroups.size() > 1;
         tp.rect = LLRect(0, mRowHeight, getRect().getWidth(), 0);
 
         LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);

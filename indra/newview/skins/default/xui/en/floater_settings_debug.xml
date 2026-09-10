@@ -89,7 +89,7 @@
    name="setting_editor"
    row_height="24"
    top_pad="8"
-   width="330" />
+   width="240" />
     <check_box
       control_name="DebugSettingsHideDefault"
       height="16"
