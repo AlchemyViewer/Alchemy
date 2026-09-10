@@ -25,6 +25,8 @@
 #include "linden_common.h"
 
 #include "../lllayoutstack.h"
+
+#include "../llresizebar.h"
 #include "../lluictrlfactory.h"
 
 #include "llcriticaldamp.h"
@@ -470,5 +472,69 @@ namespace tut
                    !grows->getResizeBar()->getVisible());
             s->die();
         }
+    }
+
+    // A divider is furniture: worth finding when a hand is going for it, and
+    // worth nothing the rest of the time. A stack that says so draws its
+    // handles only near the mouse -- the bar itself is where it always was
+    // and takes the mouse the same way; what appears is the mark saying so.
+    template<> template<>
+    void lllayoutstack_object::test<13>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLLayoutStack::Params p;
+        p.name = "stack";
+        p.rect = LLRect(0, 100, 300, 0);
+        p.orientation = LLLayoutStack::HORIZONTAL;
+        p.border_size = 12;
+        p.animate = false;
+        p.show_drag_handle = true;
+        p.drag_handle_on_hover = true;
+        p.drag_handle_reach = 10;
+        LLLayoutStack* stack = LLUICtrlFactory::create<LLLayoutStack>(p);
+
+        stack->addChild(panel("left"));
+        stack->addChild(panel("right"));
+        stack->updateLayout();
+
+        LLView* handle = stack->findChild<LLView>("resize_handle_bg_panel", true);
+        ensure("a handle was made", handle != nullptr);
+        ensure("and it is not drawn until a hand goes for it", !handle->getVisible());
+
+        // Where the bar is, which is where a hand going for it would be.
+        const LLResizeBar* bar = stack->findChild<LLResizeBar>("resize", true);
+        ensure("the bar is there", bar != nullptr);
+        const LLRect on_it = bar->getRect();
+
+        stack->showDragHandlesNear(on_it.getCenterX(), on_it.getCenterY());
+        ensure("a hand on it brings it out", handle->getVisible());
+
+        // Near it counts too, because a bar is a few pixels wide and a hand
+        // is not that accurate.
+        stack->showDragHandlesNear(on_it.mRight + 6, on_it.getCenterY());
+        ensure("and so does a hand beside it", handle->getVisible());
+
+        stack->showDragHandlesNear(on_it.mRight + 60, on_it.getCenterY());
+        ensure("a hand somewhere else does not", !handle->getVisible());
+
+        // A stack that draws its handles always is not affected by where the
+        // mouse is: saying so is what turns this on.
+        LLLayoutStack::Params always(p);
+        always.drag_handle_on_hover = false;
+        LLLayoutStack* other = LLUICtrlFactory::create<LLLayoutStack>(always);
+        other->addChild(panel("a"));
+        other->addChild(panel("b"));
+        other->updateLayout();
+        LLView* shown = other->findChild<LLView>("resize_handle_bg_panel", true);
+        ensure("drawn from the start", shown != nullptr && shown->getVisible());
+        other->showDragHandlesNear(-100, -100);
+        ensure("and still drawn wherever the mouse is", shown->getVisible());
+
+        delete stack;
+        delete other;
     }
 }

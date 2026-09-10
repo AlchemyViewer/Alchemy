@@ -231,6 +231,8 @@ LLLayoutStack::Params::Params()
     resize_bar_overlap("resize_bar_overlap", 1),
     border_size("border_size", LLUI::getInstance()->getControlControlGroup("UIResizeBarHeight").getS32("UIResizeBarHeight")),
     show_drag_handle("show_drag_handle", false),
+    drag_handle_on_hover("drag_handle_on_hover", false),
+    drag_handle_reach("drag_handle_reach", 12),
     drag_handle_first_indent("drag_handle_first_indent", 0),
     drag_handle_second_indent("drag_handle_second_indent", 0),
     drag_handle_thickness("drag_handle_thickness", 5),
@@ -252,6 +254,8 @@ LLLayoutStack::LLLayoutStack(const LLLayoutStack::Params& p)
     mNeedsLayout(true),
     mResizeBarOverlap(p.resize_bar_overlap),
     mShowDragHandle(p.show_drag_handle),
+    mDragHandleOnHover(p.drag_handle_on_hover),
+    mDragHandleReach(p.drag_handle_reach),
     mDragHandleFirstIndent(p.drag_handle_first_indent),
     mDragHandleSecondIndent(p.drag_handle_second_indent),
     mDragHandleThickness(p.drag_handle_thickness),
@@ -265,9 +269,51 @@ LLLayoutStack::~LLLayoutStack()
 }
 
 // virtual
+// A hand goes to a divider before it drags one, so the divider is worth
+// drawing then and not before: three of them announcing themselves across
+// a window is three lines that are not about what is in the panes.
+//
+// The bar itself is where it always was and takes the mouse the same way;
+// what appears is the mark saying so.
+void LLLayoutStack::showDragHandlesNear(S32 x, S32 y)
+{
+    if (!mShowDragHandle || !mDragHandleOnHover)
+    {
+        return;
+    }
+    for (LLLayoutPanel* panelp : mPanels)
+    {
+        if (!panelp->mResizeBar)
+        {
+            continue;
+        }
+        LLView* handle = panelp->mResizeBar->findChild<LLView>("resize_handle_bg_panel");
+        if (!handle)
+        {
+            continue;
+        }
+        // The bar is a few pixels wide and a hand is not that accurate,
+        // so what counts as going for it is the bar with a reach around
+        // it -- and a bar being dragged keeps its mark wherever the
+        // mouse has got to.
+        LLRect reach = panelp->mResizeBar->getRect();
+        reach.stretch(mDragHandleReach);
+        handle->setVisible(panelp->mResizeBar->hasMouseCapture()
+                           || reach.pointInRect(x, y));
+    }
+}
+
 void LLLayoutStack::draw()
 {
     updateLayout();
+
+    if (mDragHandleOnHover)
+    {
+        S32 x = 0;
+        S32 y = 0;
+        LLUI::getInstance()->getMousePositionLocal(this, &x, &y);
+        showDragHandlesNear(x, y);
+    }
 
     // always clip to stack itself
     LLLocalClipRect clip(getLocalRect());
@@ -663,6 +709,7 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
             icon_p.image = LLUI::getUIImage(mOrientation == HORIZONTAL ? "Vertical Drag Handle" : "Horizontal Drag Handle");
             resize_bar_bg_panel->addChild(LLUICtrlFactory::create<LLIconCtrl>(icon_p));
 
+            resize_bar_bg_panel->setVisible(!mDragHandleOnHover);
             resize_bar->addChild(resize_bar_bg_panel);
         }
 

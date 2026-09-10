@@ -55,6 +55,12 @@ public:
                                 close_time_constant;
         Optional<S32>           resize_bar_overlap;
         Optional<bool>          show_drag_handle;
+        // A handle drawn only while the mouse is near the bar it belongs
+        // to. A pane divider is furniture: it is worth finding when a
+        // hand is going for it and worth nothing the rest of the time,
+        // and a window of four panes has three of them saying so at once.
+        Optional<bool>          drag_handle_on_hover;
+        Optional<S32>           drag_handle_reach;
         Optional<S32>           drag_handle_first_indent;
         Optional<S32>           drag_handle_second_indent;
         // A handle of this thickness, sitting this far past the panel it
@@ -76,6 +82,12 @@ public:
     ~LLLayoutStack() override;
 
     void draw() override;
+
+    // Which handles a hand at this point is going for, in this stack's
+    // own coordinates. Called with the mouse while drawing; a caller
+    // with a point of its own may say so instead. Does nothing on a
+    // stack whose handles are always drawn.
+    void showDragHandlesNear(S32 x, S32 y);
     void deleteAllChildren() override;
     void removeChild(LLView*) override;
     bool postBuild() override;
@@ -138,6 +150,8 @@ private:
     bool mNeedsLayout;
     S32  mResizeBarOverlap;
     bool mShowDragHandle;
+    bool mDragHandleOnHover;
+    S32  mDragHandleReach;
     S32  mDragHandleFirstIndent;
     S32  mDragHandleSecondIndent;
     S32  mDragHandleThickness;

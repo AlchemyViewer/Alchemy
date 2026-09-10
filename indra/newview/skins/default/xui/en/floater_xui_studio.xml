@@ -557,7 +557,8 @@
      drag_handle_thickness="4"
      drag_handle_first_indent="10"
      drag_handle_second_indent="10"
-     drag_handle_color="DkGray0">
+     drag_handle_color="DkGray0"
+     drag_handle_on_hover="true">
 
         <layout_panel
          auto_resize="false"
@@ -1093,7 +1094,8 @@
              drag_handle_thickness="4"
              drag_handle_first_indent="10"
              drag_handle_second_indent="10"
-             drag_handle_color="DkGray0">
+             drag_handle_color="DkGray0"
+             drag_handle_on_hover="true">
 
 
                 <layout_panel
