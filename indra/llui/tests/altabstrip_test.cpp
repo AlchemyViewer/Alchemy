@@ -28,6 +28,9 @@
 
 #include "../lluictrlfactory.h"
 
+#include "llfontfreetype.h"
+#include "llfontgl.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -233,5 +236,28 @@ namespace tut
         ensure_equals("nothing asks a preview to go", closed, 0);
         ensure_equals("and it stays chosen", strip->chosen(), std::string("c"));
         strip->die();
+    }
+
+    // A preview is set in italic, and italic is a face and not a slant put
+    // on the upright one: asked for the style, the upright font hands it to
+    // the face the registry has for it, which carries the style itself.
+    template<> template<>
+    void altabstrip_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const LLFontGL* upright = LLFontGL::getFontSansSerifSmall();
+        ensure("the upright face is upright",
+               !(upright->getFontFreetype()->getStyle() & LLFontGL::ITALIC));
+        ensure("and asked for nothing, answers itself", upright->faceFor(LLFontGL::NORMAL) == upright);
+
+        const LLFontGL* italic = upright->faceFor(LLFontGL::ITALIC);
+        ensure("asked for italic, it hands over to another face", italic != upright);
+        ensure("which carries the style itself",
+               (italic->getFontFreetype()->getStyle() & LLFontGL::ITALIC) != 0);
+        ensure("and has nothing further to hand over to", italic->faceFor(LLFontGL::ITALIC) == italic);
+        ensure("asked twice, the answer is the same face", upright->faceFor(LLFontGL::ITALIC) == italic);
     }
 }

@@ -233,6 +233,14 @@ S32 LLFontTextCache::renderImpl(
     {
         return static_cast<S32>(text.length());
     }
+    // The face that will draw this, so that what is recorded is keyed on
+    // the glyph sheets it was drawn from: a style the font hands to
+    // another face would otherwise be replayed against a generation that
+    // never moves.
+    if (fontp)
+    {
+        fontp = fontp->faceFor(style);
+    }
     if (!sEnableBufferCollection)
     {
         // For debug purposes and performance testing

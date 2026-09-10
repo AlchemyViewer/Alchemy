@@ -421,6 +421,15 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // and could evict a sheet while this call still holds glyph pointers into
     // it.
 
+    // A style this face does not carry is another face's to draw, where
+    // the registry has one that does.
+    if (const LLFontGL* face = faceFor(style); face != this)
+    {
+        return face->renderBytes(utf8text, begin_offset, x, y, color, halign, valign, style, shadow,
+                                 max_bytes, max_pixels, right_x, use_ellipses, use_color,
+                                 std::move(on_pass_boundary));
+    }
+
     S32 scaled_max_pixels = max_pixels == S32_MAX ? S32_MAX : llceil((F32)max_pixels * sScaleX);
 
     // determine which style flags need to be added programmatically by stripping off the
@@ -2073,6 +2082,46 @@ LLFontGL* LLFontGL::getFontSansSerifBold()
 {
     static LLFontGL* fontp = getFont(LLFontDescriptor("SansSerif","Medium",BOLD));
     return fontp;
+}
+
+const LLFontGL* LLFontGL::faceFor(U8 style) const
+{
+    // Only the bits this face does not carry are worth asking about.
+    if (!mFontFreetype || !sFontRegistry)
+    {
+        return this;
+    }
+    const U8 want = (style | mFontDescriptor.getStyle()) & (BOLD | ITALIC) & ~mFontFreetype->getStyle();
+    if (!want)
+    {
+        return this;
+    }
+    const LLFontGL*& kept = mFaces[want];
+    if (!kept)
+    {
+        kept = this;
+        LLFontDescriptor desc(mFontDescriptor);
+        desc.setStyle(mFontDescriptor.getStyle() | want);
+        // The registry answers with the nearest face it has, which with
+        // nothing wired up for the style is this face again under another
+        // name. Only one carrying a bit this one lacks is better; what it
+        // lacks in turn it synthesizes itself, so each hop asks for less.
+        const LLFontGL* other = sFontRegistry->getFont(desc);
+        if (other && other != this && other->mFontFreetype
+            && (other->mFontFreetype->getStyle() & want))
+        {
+            kept = other;
+        }
+    }
+    return kept;
+}
+
+void LLFontGL::forgetFaces()
+{
+    for (const LLFontGL*& face : mFaces)
+    {
+        face = nullptr;
+    }
 }
 
 //static

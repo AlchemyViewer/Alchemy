@@ -98,6 +98,20 @@ public:
     U64 getCacheGeneration() const;
     const LLFontFreetype* getFontFreetype() const { return mFontFreetype.get(); }
 
+    // The face that draws a style asked for at render time. A file that
+    // wants italic asks the registry for the italic face by name; a caller
+    // passing ITALIC to render got a shear put on the upright one instead,
+    // whether or not an italic face was there to be had. This answers with
+    // the registry's face for the style where that face carries it, and
+    // with this one where nothing better is wired up -- in which case the
+    // shear, or the second pass a pixel over for bold, is still what is
+    // drawn. Asked once per style and kept: the registry's fonts live as
+    // long as it does, and a reload swaps their faces in place.
+    const LLFontGL* faceFor(U8 style) const;
+    // What was kept, let go of: a reload may have wired a face up or
+    // taken one away.
+    void forgetFaces();
+
     // on_pass_boundary, if non-null, is invoked once between the shadow pass and
     // the foreground pass when shadow != NO_SHADOW. LLFontTextCache uses it to
     // close one captured display list and open another so each pass lands in its
@@ -410,6 +424,10 @@ private:
     mutable S32    mCacheGenGlobal = 0;
     mutable size_t mCacheGenChain  = 0;
     mutable bool   mCacheGenValid  = false;
+
+    // faceFor's answers, by the BOLD and ITALIC bits asked for. Null is
+    // not asked yet; this font is asked and found nothing better.
+    mutable const LLFontGL* mFaces[4] = {};
 
     void renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const;
     // Caller hoists shadow_color and italic slant_offset out of the glyph loop and

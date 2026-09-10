@@ -2064,6 +2064,14 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
         }
     }
 
+    // Which face draws a style asked for at render time was decided over
+    // the old wiring; the new fonts.xml may have a face for it now, or
+    // have lost the one it had.
+    for (auto& [desc, head] : heads)
+    {
+        head->forgetFaces();
+    }
+
     // pinned_old_fallbacks goes out of scope here. Any shared fallback
     // instance no longer referenced by a (rebuilt) head's mFontFreetype
     // chain hits refcount 0; ~ALFontFace fires on its ALFontFace and
