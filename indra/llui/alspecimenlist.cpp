@@ -27,11 +27,13 @@
 #include "alspecimenlist.h"
 
 #include "alemptystate.h"
+#include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llscrollcontainer.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+#include "llui.h"
 
 #include <algorithm>
 #include <functional>
@@ -65,10 +67,10 @@ class ALSpecimenList::Row final : public LLPanel
 public:
     AL_VIEW_TYPE(ALSpecimenList::Row, LLPanel);
 
-    Row(const LLPanel::Params& p, std::string value, std::function<void(const std::string&)> chose)
+    Row(const LLPanel::Params& p, std::string value, ALSpecimenList& list)
     :   LLPanel(p),
         mValue(std::move(value)),
-        mChose(std::move(chose))
+        mList(list)
     {
     }
 
@@ -76,9 +78,39 @@ public:
     {
         // Not LLPanel::handleMouseDown, which would offer it to the specimen
         // first and let a button in the list be pressed.
-        if (mChose)
+        mList.choose(mValue);
+        // Held from here, so that a press that goes on to move is seen
+        // moving by this row and not by whatever it moved over.
+        mPressX = x;
+        mPressY = y;
+        gFocusMgr.setMouseCapture(this);
+        return true;
+    }
+
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override
+    {
+        if (hasMouseCapture())
         {
-            mChose(mValue);
+            gFocusMgr.setMouseCapture(nullptr);
+            return true;
+        }
+        return LLPanel::handleMouseUp(x, y, mask);
+    }
+
+    // A press that has moved far enough is a drag, and the row lets go of
+    // the mouse so that the drag tool, which the caller starts, has it.
+    bool handleHover(S32 x, S32 y, MASK mask) override
+    {
+        if (!hasMouseCapture())
+        {
+            return LLPanel::handleHover(x, y, mask);
+        }
+        const S32 dx = x - mPressX;
+        const S32 dy = y - mPressY;
+        if (dx * dx + dy * dy > DRAG_N_DROP_DISTANCE_THRESHOLD * DRAG_N_DROP_DISTANCE_THRESHOLD)
+        {
+            gFocusMgr.setMouseCapture(nullptr);
+            mList.startDrag(mValue);
         }
         return true;
     }
@@ -98,9 +130,11 @@ public:
     const std::string& value() const { return mValue; }
 
 private:
-    std::string                             mValue;
-    std::function<void(const std::string&)> mChose;
-    bool                                    mMarked = false;
+    std::string         mValue;
+    ALSpecimenList&     mList;
+    bool                mMarked = false;
+    S32                 mPressX = 0;
+    S32                 mPressY = 0;
 };
 
 ALSpecimenList::Params::Params()
@@ -195,7 +229,7 @@ void ALSpecimenList::setSpecimens(std::vector<Specimen> specimens)
         rp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
         rp.tool_tip = specimen.toolTip;
         const std::string value = specimen.value;
-        Row* row = new Row(rp, value, [this](const std::string& chosen) { choose(chosen); });
+        Row* row = new Row(rp, value, *this);
         row->initFromParams(rp);
 
         LLTextBox::Params lp(LLUICtrlFactory::getDefaultParams<LLTextBox>());

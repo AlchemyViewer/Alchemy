@@ -145,7 +145,38 @@ public:
     void setCanvasHover(const ALXUITreeItem* item) { mCanvasHover = item; }
     const ALXUITreeItem* canvasHover() const { return mCanvasHover; }
 
-    bool startDrag(std::vector<LLFolderViewModelItem*>& items) override { return false; }
+    // Dragging a row. The outline holds no document and starts no drag of
+    // its own: it says which element is being picked up, and the caller,
+    // who has the drag tool and the document, starts the one and later
+    // edits the other. A tree given no starter has rows that do not move.
+    typedef std::function<bool(const ALXUISelection::path_t& path)> drag_fn_t;
+    void setDragStarter(drag_fn_t fn) { mDragStart = std::move(fn); }
+    bool canDrag() const { return mDragStart != nullptr; }
+    bool startDrag(std::vector<LLFolderViewModelItem*>& items) override;
+
+    // Where on a row a drag is: over its top edge, over the row itself,
+    // or over its bottom edge. An element dropped before or after a row
+    // becomes its sibling; dropped into it, its child. A row divides
+    // itself in three where its element takes children and in two where
+    // it does not, and only the caller knows which.
+    enum class DropZone : U8 { Before, Into, After };
+    typedef std::function<bool(const ALXUISelection::path_t& path)> container_fn_t;
+    void setContainerTest(container_fn_t fn) { mIsContainer = std::move(fn); }
+    bool isContainer(const ALXUISelection::path_t& path) const
+    {
+        return mIsContainer && mIsContainer(path);
+    }
+    // A drag over a row, or a drop on it, with what is being carried as
+    // the drag tool describes it. True where the row takes it -- which is
+    // what draws the mark on the row -- and, on a drop, once it has.
+    typedef std::function<bool(const ALXUISelection::path_t& path, DropZone zone, bool drop,
+                               EDragAndDropType type, void* cargo, std::string& tip)> drop_fn_t;
+    void setDropHandler(drop_fn_t fn) { mDrop = std::move(fn); }
+    bool dropAt(const ALXUISelection::path_t& path, DropZone zone, bool drop,
+                EDragAndDropType type, void* cargo, std::string& tip) const
+    {
+        return mDrop && mDrop(path, zone, drop, type, cargo, tip);
+    }
 
 private:
     ALXUITreeItem* buildItem(LLView* view, const ALXUISourceMap& source_map,
@@ -157,6 +188,9 @@ private:
     context_menu_fn_t                                   mContextMenu;
     hover_fn_t                                          mHover;
     badge_fn_t                                          mBadge;
+    drag_fn_t                                           mDragStart;
+    container_fn_t                                      mIsContainer;
+    drop_fn_t                                           mDrop;
     const ALXUITreeItem*                                mCanvasHover = nullptr;
     const ALXUITreeItem*                                mRowHover = nullptr;
 };
@@ -178,6 +212,7 @@ public:
     bool isFromXML() const { return mFromXML; }
     S32 getOrder() const { return mOrder; }
     const ALXUISelection::path_t& getPath() const { return mPath; }
+    const ALXUITreeModel& model() const { return mModel; }
     ALXUITreeModel& getModel() const { return mModel; }
 
     // Visibility the tool flipped for the session, against what the file
@@ -207,7 +242,9 @@ public:
     bool isFavorite() const override { return false; }
     bool isItemRenameable() const override { return false; }
     bool renameItem(const std::string& new_name) override { return false; }
-    bool isItemMovable() const override { return false; }
+    // A row the file wrote can be picked up, where the tree has been
+    // given something to pick it up with.
+    bool isItemMovable() const override;
     void move(LLFolderViewModelItem* parent_listener) override {}
     bool isItemRemovable(bool check_worn = true) const override { return false; }
     bool isItemInTrash() const override { return false; }
@@ -261,6 +298,11 @@ public:
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                           void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
+
+private:
+    S8 mDropZone = -1;
 };
 
 class ALXUITreeRow final : public LLFolderViewItem
@@ -276,6 +318,11 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                           void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
+
+private:
+    S8 mDropZone = -1;
 };
 
 // Shared by both widgets: the eye's rectangle within a row, its drawing,
@@ -289,4 +336,17 @@ namespace ALXUITreeEye
     bool hit(const LLFolderViewItem& row, S32 x, S32 y);
     void drawCanvasHover(const LLFolderViewItem& row);
     void reportHover(const LLFolderViewItem& row, S32 y, bool inside);
+}
+
+// Shared as well: where on a row's own line a drag is, and the mark drawn
+// there. The line is the top of the row's rect, which for a folder is
+// above the rows it holds.
+namespace ALXUITreeDrop
+{
+    // Which zone a point is in, given whether the row divides in three.
+    ALXUITreeModel::DropZone zoneAt(const LLFolderViewItem& row, S32 y, bool container);
+    // The row asks its item; the mark is what the answer is drawn as.
+    bool dragOver(LLFolderViewItem& row, S8& zone, S32 y, bool drop, EDragAndDropType type,
+                  void* cargo, EAcceptance* accept, std::string& tip);
+    void draw(const LLFolderViewItem& row, S8& zone);
 }

@@ -233,6 +233,22 @@ bool ALXUITreeModel::rebind(const ALXUISelection::path_t& path, LLView* root)
     return every;
 }
 
+bool ALXUITreeModel::startDrag(std::vector<LLFolderViewModelItem*>& items)
+{
+    // One element at a time: a drag carries the row it began on, and what
+    // else was selected stays where it is.
+    if (!mDragStart || items.empty() || !items.front())
+    {
+        return false;
+    }
+    return mDragStart(static_cast<ALXUITreeItem*>(items.front())->getPath());
+}
+
+bool ALXUITreeItem::isItemMovable() const
+{
+    return mFromXML && !mPath.empty() && mModel.canDrag();
+}
+
 void ALXUITreeModel::buildContextMenu(ALXUITreeItem& item, LLMenuGL& menu, U32 flags)
 {
     if (mContextMenu)
@@ -482,6 +498,20 @@ void ALXUITreeFolder::draw()
     ALXUITreeEye::drawCanvasHover(*this);
     LLFolderViewFolder::draw();
     ALXUITreeEye::draw(*this);
+    ALXUITreeDrop::draw(*this, mDropZone);
+}
+
+// Over the rows it holds, the drag is theirs; over its own line, it is
+// about this element -- before it, into it, or after it.
+bool ALXUITreeFolder::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                                        void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
+{
+    if (isOpen() && y < getRect().getHeight() - getItemHeight())
+    {
+        return LLFolderViewFolder::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data,
+                                                     accept, tooltip_msg);
+    }
+    return ALXUITreeDrop::dragOver(*this, mDropZone, y, drop, cargo_type, cargo_data, accept, tooltip_msg);
 }
 
 bool ALXUITreeFolder::handleHover(S32 x, S32 y, MASK mask)
@@ -524,6 +554,80 @@ void ALXUITreeRow::draw()
     ALXUITreeEye::drawCanvasHover(*this);
     LLFolderViewItem::draw();
     ALXUITreeEye::draw(*this);
+    ALXUITreeDrop::draw(*this, mDropZone);
+}
+
+bool ALXUITreeRow::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                                     void* cargo_data, EAcceptance* accept, std::string& tooltip_msg)
+{
+    return ALXUITreeDrop::dragOver(*this, mDropZone, y, drop, cargo_type, cargo_data, accept, tooltip_msg);
+}
+
+namespace ALXUITreeDrop
+{
+    // How much of a row's line each edge takes: a third where the middle
+    // means into, a half where there is no middle.
+    ALXUITreeModel::DropZone zoneAt(const LLFolderViewItem& row, S32 y, bool container)
+    {
+        const S32 top = row.getRect().getHeight();
+        const S32 height = row.getItemHeight();
+        const S32 from_top = top - y;
+        if (container)
+        {
+            if (from_top < height / 3)
+            {
+                return ALXUITreeModel::DropZone::Before;
+            }
+            if (from_top > height - height / 3)
+            {
+                return ALXUITreeModel::DropZone::After;
+            }
+            return ALXUITreeModel::DropZone::Into;
+        }
+        return from_top < height / 2 ? ALXUITreeModel::DropZone::Before : ALXUITreeModel::DropZone::After;
+    }
+
+    bool dragOver(LLFolderViewItem& row, S8& zone, S32 y, bool drop, EDragAndDropType type,
+                  void* cargo, EAcceptance* accept, std::string& tip)
+    {
+        ALXUITreeItem* item = static_cast<ALXUITreeItem*>(row.getViewModelItem());
+        const ALXUITreeModel& model = item->model();
+        const ALXUITreeModel::DropZone where = zoneAt(row, y, model.isContainer(item->getPath()));
+        const bool taken = model.dropAt(item->getPath(), where, drop, type, cargo, tip);
+        zone = taken && !drop ? (S8)where : -1;
+        *accept = taken ? ACCEPT_YES_SINGLE : ACCEPT_NO;
+        return true;
+    }
+
+    // A line along the edge the element would go beside, or a box around
+    // the row it would go into. Drawn for the one frame after the drag
+    // said so, since nothing says when it has moved on.
+    void draw(const LLFolderViewItem& row, S8& zone)
+    {
+        if (zone < 0)
+        {
+            return;
+        }
+        static const LLUIColor ink = LLUIColorTable::instance().getColor("MenuItemHighlightColor", LLColor4::white);
+        const S32 top = row.getRect().getHeight();
+        const S32 bottom = top - row.getItemHeight();
+        const S32 left = row.getIndentation();
+        const S32 right = row.getRect().getWidth() - 2;
+        gGL.getTextureSlot(0)->unbind();
+        switch ((ALXUITreeModel::DropZone)zone)
+        {
+        case ALXUITreeModel::DropZone::Before:
+            gl_rect_2d(left, top, right, top - 2, ink.get(), true);
+            break;
+        case ALXUITreeModel::DropZone::After:
+            gl_rect_2d(left, bottom + 2, right, bottom, ink.get(), true);
+            break;
+        case ALXUITreeModel::DropZone::Into:
+            gl_rect_2d(left, top, right, bottom, ink.get(), false);
+            break;
+        }
+        zone = -1;
+    }
 }
 
 bool ALXUITreeRow::handleHover(S32 x, S32 y, MASK mask)

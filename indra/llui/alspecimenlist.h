@@ -26,6 +26,7 @@
 
 #include "llpanel.h"
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -98,6 +99,15 @@ public:
         return mChose.connect(cb);
     }
 
+    // A row carried off the list. The list holds nothing a drop could
+    // use and starts no drag of its own: it says which specimen was
+    // picked up, once the press has moved far enough to be a drag, and
+    // the caller with the drag tool starts the one. A list given no
+    // starter has rows that are chosen and never carried.
+    typedef std::function<bool(const std::string& value)> drag_fn_t;
+    void setDragStarter(drag_fn_t fn) { mDragStart = std::move(fn); }
+    bool startDrag(const std::string& value) { return mDragStart && mDragStart(value); }
+
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     ~ALSpecimenList() override;
 
@@ -129,4 +139,5 @@ private:
     S32                     mLabelWidth;
     size_t                  mShown = 0;
     chose_signal_t          mChose;
+    drag_fn_t               mDragStart;
 };

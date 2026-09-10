@@ -38,6 +38,9 @@
 #include "../test/lltut.h"
 
 #include <cstring>
+#include <memory>
+
+#include <boost/unordered_map.hpp>
 
 class LLAvatarName;
 const std::string gTreeModelTestAnonName("Anon");
@@ -335,6 +338,160 @@ namespace tut
         root_item->addChild(outer);
         ensure_equals("another item still is", root_item->getChildrenCount(), before + 1);
 
+        delete floater;
+        fv.reset();
+        gFloaterView = nullptr;
+    }
+
+    // A drag over a row lands before it, into it or after it by where on the
+    // row's line it is, and the row says so -- path, zone, and whether this
+    // is the drop -- to whoever holds the document. A row whose element
+    // takes children divides in three; one whose does not, in two. And a
+    // row moves only where the tree was given something to move it with.
+    template<> template<>
+    void alxuitreemodel_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::unique_ptr<LLFloaterView> fv(floaterView());
+        gFloaterView = fv.get();
+
+        LLXMLNodePtr root;
+        LLFloater* floater = build(fv.get(), root);
+        ensure("built", floater != nullptr);
+        ALXUISourceMap map;
+        map.build(floater, root);
+        ALXUITreeModel model;
+        ALXUITreeItem* root_item = model.build(floater, map);
+        ensure("a root item", root_item != nullptr);
+
+        // A tree of rows over the items, the way the studio builds one.
+        LLPanel::Params hp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        hp.name = "host";
+        hp.rect = LLRect(0, 400, 300, 0);
+        LLPanel* host = LLUICtrlFactory::create<LLPanel>(hp);
+        LLPointer<ALXUITreeItem> document = new ALXUITreeItem(floater, root_item->getTag(), false, 0,
+                                                              ALXUISelection::path_t(), model);
+        LLFolderView::Params tp(LLUICtrlFactory::getDefaultParams<LLFolderView>());
+        tp.name = "tree";
+        tp.title = root_item->getName();
+        tp.rect = LLRect(0, 400, 300, 0);
+        tp.parent_panel = host;
+        tp.listener = document.get();
+        tp.view_model = &model;
+        tp.root = nullptr;
+        tp.use_label_suffix = true;
+        LLFolderView* tree = LLUICtrlFactory::create<LLFolderView>(tp);
+        host->addChild(tree);
+        model.setFolderView(tree);
+
+        boost::unordered_map<std::string, LLFolderViewItem*> rows;
+        const auto row_for = [&](auto&& self, ALXUITreeItem* item, LLFolderViewFolder* parent) -> LLFolderViewItem*
+        {
+            LLFolderViewItem::Params rp(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+            rp.name = item->getName();
+            rp.root = tree;
+            rp.listener = item;
+            LLFolderViewItem* widget;
+            if (item->hasChildren())
+            {
+                ALXUITreeFolder* folder = LLUICtrlFactory::create<ALXUITreeFolder>(rp);
+                folder->setChildrenInited(true);
+                widget = folder;
+                widget->addToFolder(parent);
+                for (auto it = item->getChildrenBegin(); it != item->getChildrenEnd(); ++it)
+                {
+                    self(self, static_cast<ALXUITreeItem*>(it->get()), folder);
+                }
+            }
+            else
+            {
+                widget = LLUICtrlFactory::create<ALXUITreeRow>(rp);
+                widget->addToFolder(parent);
+            }
+            rows[ALXUISelection::toString(item->getPath())] = widget;
+            return widget;
+        };
+        row_for(row_for, root_item, tree);
+        tree->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_DOWN);
+        tree->arrangeAll();
+
+        LLFolderViewItem* outer = rows["outer"];
+        LLFolderViewItem* inner = rows["outer/inner"];
+        ensure("a row for the container", outer != nullptr);
+        ensure("and one for the leaf", inner != nullptr);
+        ensure("the container's row is a folder", outer->as<LLFolderViewFolder>() != nullptr);
+
+        // Nothing moves until the tree has something to move rows with.
+        ensure("a row does not move on its own", !inner->isMovable());
+        std::vector<ALXUISelection::path_t> picked;
+        model.setDragStarter([&picked](const ALXUISelection::path_t& path)
+        {
+            picked.push_back(path);
+            return true;
+        });
+        ensure("given a starter, a row the file wrote moves", inner->isMovable());
+        std::vector<LLFolderViewModelItem*> items { inner->getViewModelItem() };
+        ensure("and starting a drag says which", model.startDrag(items));
+        ensure_equals("by path", ALXUISelection::toString(picked.front()), std::string("outer/inner"));
+
+        // Where a drag over each row is, as the document is told.
+        struct Asked
+        {
+            std::string path;
+            ALXUITreeModel::DropZone zone;
+            bool drop;
+        };
+        std::vector<Asked> asked;
+        bool take = true;
+        model.setContainerTest([](const ALXUISelection::path_t& path)
+        {
+            return path.size() == 1 && path.front() == "outer";
+        });
+        model.setDropHandler([&](const ALXUISelection::path_t& path, ALXUITreeModel::DropZone zone, bool drop,
+                                 EDragAndDropType type, void* cargo, std::string& tip)
+        {
+            asked.push_back({ ALXUISelection::toString(path), zone, drop });
+            return take;
+        });
+
+        LLUUID cargo;
+        cargo.generate();
+        EAcceptance accept = ACCEPT_NO;
+        std::string tip;
+        const auto over = [&](LLFolderViewItem* row, S32 from_top, bool drop = false)
+        {
+            asked.clear();
+            const S32 top = row->getRect().getHeight();
+            row->handleDragAndDrop(20, top - from_top, MASK_NONE, drop, DAD_WIDGET, &cargo, &accept, tip);
+            ensure("the row asked the document once", asked.size() == 1);
+            return asked.front();
+        };
+        const S32 line = inner->getItemHeight();
+
+        ensure("the leaf's top half is before it", over(inner, 1).zone == ALXUITreeModel::DropZone::Before);
+        ensure("and its bottom half is after it", over(inner, line - 1).zone == ALXUITreeModel::DropZone::After);
+        ensure("a leaf has no middle", over(inner, line / 2).zone != ALXUITreeModel::DropZone::Into);
+        ensure_equals("and names itself", over(inner, 1).path, std::string("outer/inner"));
+        ensure("which the drag is told it may", accept == ACCEPT_YES_SINGLE);
+
+        ensure("the container's top third is before it", over(outer, 1).zone == ALXUITreeModel::DropZone::Before);
+        ensure("its middle is into it", over(outer, line / 2).zone == ALXUITreeModel::DropZone::Into);
+        ensure("and its bottom third is after it", over(outer, line - 1).zone == ALXUITreeModel::DropZone::After);
+        ensure_equals("by its own path", over(outer, 1).path, std::string("outer"));
+
+        // The drop itself is the same question with the answer meant.
+        ensure("a drop says it is one", over(inner, 1, /*drop=*/true).drop);
+        ensure("and a hover says it is not", !over(inner, 1).drop);
+
+        // Refused, the drag is told so.
+        take = false;
+        over(inner, 1);
+        ensure("what the document refuses the drag may not do", accept == ACCEPT_NO);
+
+        delete host;
         delete floater;
         fv.reset();
         gFloaterView = nullptr;

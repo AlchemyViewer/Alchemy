@@ -200,4 +200,45 @@ namespace tut
                list->findChild<LLView>("empty", true)->getVisible());
         delete list;
     }
+
+    // A press that moves is a drag: the row says which specimen was picked
+    // up, once, and only where the list was given something to carry it
+    // with. A press that stays put is the click it always was.
+    template<> template<>
+    void alspecimenlist_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList* list = make();
+        list->setSpecimens(three());
+        LLView* row = list->findChild<LLView>("row_check_box", true);
+        const LLRect r = row->getLocalRect();
+        const S32 x = r.getCenterX();
+        const S32 y = r.getCenterY();
+
+        // Without a starter, moving the press carries nothing.
+        row->handleMouseDown(x, y, MASK_NONE);
+        row->handleHover(x + 20, y, MASK_NONE);
+        row->handleMouseUp(x + 20, y, MASK_NONE);
+
+        std::vector<std::string> carried;
+        list->setDragStarter([&carried](const std::string& value)
+        {
+            carried.push_back(value);
+            return true;
+        });
+        row->handleMouseDown(x, y, MASK_NONE);
+        ensure("a press chooses", list->chosen() == "check_box");
+        row->handleHover(x + 1, y, MASK_NONE);
+        ensure("a press that has barely moved carries nothing", carried.empty());
+        row->handleHover(x + 20, y, MASK_NONE);
+        ensure_equals("moved far enough, it carries the specimen", carried.size(), 1u);
+        ensure_equals("by value", carried.front(), std::string("check_box"));
+        row->handleHover(x + 40, y, MASK_NONE);
+        ensure_equals("once", carried.size(), 1u);
+        row->handleMouseUp(x + 40, y, MASK_NONE);
+        delete list;
+    }
 }
