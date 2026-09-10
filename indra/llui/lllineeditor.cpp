@@ -2538,9 +2538,11 @@ void LLLineEditor::setFocus( bool new_state )
 {
     bool old_state = hasFocus();
 
-    if (!new_state)
+    // Language input is the window's to allow, where there is one.
+    LLWindow* window = getWindow();
+    if (!new_state && window)
     {
-        getWindow()->allowLanguageTextInput(this, false);
+        window->allowLanguageTextInput(this, false);
     }
 
 
@@ -2575,14 +2577,14 @@ void LLLineEditor::setFocus( bool new_state )
 
     LLUICtrl::setFocus( new_state );
 
-    if (new_state)
+    if (new_state && window)
     {
         // Allow Language Text Input only when this LineEditor has
         // no prevalidate function attached.  This criterion works
         // fine on 1.15.0.2, since all prevalidate func reject any
         // non-ASCII characters.  I'm not sure on future versions,
         // however.
-        getWindow()->allowLanguageTextInput(this, !mPrevalidator);
+        window->allowLanguageTextInput(this, !mPrevalidator);
     }
 }
 

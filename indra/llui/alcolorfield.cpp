@@ -314,7 +314,10 @@ namespace
             mGrid = new ALColorSwatchGrid(gp, [this](const std::string& name) { chose(name); });
             mGrid->setChosen(mValue);
             scroll->addChild(mGrid);
-            tabs->addTabPanel(names);
+            // A tab container picks its first tab when it is built, and this
+            // one was built with none; a tab added afterwards is added
+            // hidden, so the one to open on has to be asked for.
+            tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(names).select_tab(true));
 
             // The other way a file writes a colour, for the times the
             // table has no name for what is wanted.
