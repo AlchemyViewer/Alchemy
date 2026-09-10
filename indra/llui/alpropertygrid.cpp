@@ -241,14 +241,19 @@ public:
 
 ALPropertyGrid::Params::Params()
 :   row_height("row_height", 22),
-    label_width("label_width", 150)
+    label_width("label_width", 150),
+    remove_label("remove_label", "x")
 {
 }
 
 ALPropertyGrid::ALPropertyGrid(const Params& p)
 :   LLPanel(p),
     mRowHeight(p.row_height),
-    mLabelWidth(p.label_width)
+    mLabelWidth(p.label_width),
+    mRemoveLabel(p.remove_label),
+    // As wide as its word, and never narrower than the letter it was.
+    mRemoveWidth(llmax(REMOVE_WIDTH,
+                       LLFontGL::getFontSansSerifSmall()->getWidth(p.remove_label()) + 10))
 {
     LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
     ap.name = "sections";
@@ -543,7 +548,7 @@ S32 ALPropertyGrid::editorWidth(S32 width) const
     // The right column ends short of the way back, where a row has one.
     // Every row leaves the room whether it has the button or not, so the
     // editors down the pane keep one right edge.
-    const S32 right = width - MARGIN - REMOVE_WIDTH - GUTTER;
+    const S32 right = width - MARGIN - mRemoveWidth - GUTTER;
     return llmax(60, right - editorLeft());
 }
 
@@ -960,7 +965,10 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         LLTextBox::Params p;
         p.name = field.name + "_label";
         p.rect = LLRect(MARGIN, top - 2, MARGIN + mLabelWidth, bottom);
-        p.initial_value = partner ? field.name + ", " + partner->name : field.name;
+        const std::string& own = field.label.empty() ? field.name : field.label;
+        p.initial_value = partner
+            ? own + ", " + (partner->label.empty() ? partner->name : partner->label)
+            : own;
         p.tool_tip = tip;
         p.font_valign = LLFontGL::VCENTER;
         p.text_color = (field.authored && !field.ignored) ? written : unwritten;
@@ -1006,8 +1014,8 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     {
         LLButton::Params p(LLUICtrlFactory::getDefaultParams<LLButton>());
         p.name = field.name + "_remove";
-        p.label = std::string("x");
-        p.rect = LLRect(width - MARGIN - REMOVE_WIDTH, top - 2, width - MARGIN, bottom);
+        p.label = mRemoveLabel;
+        p.rect = LLRect(width - MARGIN - mRemoveWidth, top - 2, width - MARGIN, bottom);
         p.tool_tip = say(mTips.remove, field);
         p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
         LLButton* remove = LLUICtrlFactory::create<LLButton>(p);

@@ -269,7 +269,10 @@ namespace
             mSettled(std::move(settled))
         {
             const S32 width = getRect().getWidth();
-            const S32 height = getRect().getHeight();
+            // A floater draws its own title across the top of its rect, and
+            // what is laid out from the top of the rect is laid out under
+            // it. The preview line starts where the title ends.
+            const S32 height = getRect().getHeight() - getHeaderHeight();
 
             LLFilterEditor::Params fp;
             fp.name = "filter";
@@ -351,7 +354,8 @@ namespace
             // What would be written, drawn where it can be compared with
             // what is under the pointer.
             static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
-            const LLRect swatch(4, getRect().getHeight() - 4, 4 + HEADER - 8, getRect().getHeight() - 4 - (ROW - 2));
+            const S32 top = getRect().getHeight() - getHeaderHeight();
+            const LLRect swatch(4, top - 4, 4 + HEADER - 8, top - 4 - (ROW - 2));
             LLColor4 color;
             if (resolve(mValue, color))
             {

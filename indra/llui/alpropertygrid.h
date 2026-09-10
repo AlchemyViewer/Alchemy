@@ -64,6 +64,10 @@ public:
     {
         Optional<S32>   row_height;
         Optional<S32>   label_width;
+        // What the way back on a row is called. One letter where the rows
+        // are many and the label is beside each; a word where there is one
+        // row and a letter on its own is a button nobody can name.
+        Optional<std::string> remove_label;
         Params();
     };
 
@@ -71,6 +75,10 @@ public:
     {
         // As a file writes it, dots and all.
         std::string                 name;
+        // What the row calls it, where that is not the name: a caller with
+        // the name said once already, over the pane, says something else
+        // here rather than the same word smaller. Empty says the name.
+        std::string                 label;
         // What is in force, whoever wrote it.
         std::string                 value;
         // Which layer wrote it, or where else it came from: shown as it is
@@ -319,6 +327,8 @@ private:
     gutter_signal_t             mFieldGutter;
     S32                         mRowHeight;
     S32                         mLabelWidth;
+    std::string                 mRemoveLabel;
+    S32                         mRemoveWidth;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
 };

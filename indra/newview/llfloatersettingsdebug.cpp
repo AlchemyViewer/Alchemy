@@ -289,6 +289,10 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
 
     ALPropertyGrid::Field field;
     field.name = name;
+    // The name is the bold line over the pane and the selected row beside
+    // it; a third copy, smaller and cut short, says nothing. The row says
+    // what kind of value it holds instead, which nothing else does.
+    field.label = settingTypeName(controlp->type());
     field.value = value;
     field.kind = settingKind(controlp->type());
     field.type = settingTypeName(controlp->type());

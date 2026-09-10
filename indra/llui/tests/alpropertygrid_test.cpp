@@ -26,6 +26,7 @@
 
 #include "../alpropertygrid.h"
 
+#include "../llbutton.h"
 #include "../alcolorfield.h"
 #include "../llaccordionctrltab.h"
 
@@ -722,6 +723,54 @@ namespace tut
                !grid->getChild<LLAccordionCtrlTab>("quiet", true)->getDisplayChildren());
         ensure("under a heading that can open it",
                grid->getChild<LLAccordionCtrlTab>("quiet", true)->getHeaderHeight() > 0);
+        grid->die();
+    }
+
+    // A row calls a field what the caller says, where that is not its name:
+    // a caller that has said the name once already, over the pane, says
+    // something else on the row rather than the same word smaller. And the
+    // way back is called what the caller says too, and is as wide as that.
+    template<> template<>
+    void alpropertygrid_object::test<16>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid::Params p(LLUICtrlFactory::getDefaultParams<ALPropertyGrid>());
+        p.name = "grid";
+        p.rect = LLRect(0, 300, 400, 0);
+        p.remove_label = "Reset";
+        ALPropertyGrid* grid = LLUICtrlFactory::create<ALPropertyGrid>(p);
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("EmojiSkinTonePreference", 0));
+        fields.back().label = "S32";
+        fields.back().authored = true;
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
+                           ->getChild<LLPanel>("EmojiSkinTonePreference_row", true);
+        LLTextBox* label = row->getChild<LLTextBox>("EmojiSkinTonePreference_label", true);
+        ensure_equals("the row says what the caller said", label->getText(), std::string("S32"));
+
+        LLButton* back = row->getChild<LLButton>("EmojiSkinTonePreference_remove", true);
+        ensure_equals("and so does the way back", back->getLabelUnselected(), std::string("Reset"));
+        ensure("which is wider than a letter", back->getRect().getWidth() > 16);
+        ensure("and still inside the row", row->getLocalRect().contains(back->getRect()));
+
+        // Left empty, the row says the name, which is what a row usually calls
+        // a field.
+        std::vector<ALPropertyGrid::Field> plain;
+        plain.push_back(field("width", 0));
+        grid->setFields(plain);
+        ensure_equals("the name by default",
+                      grid->getChild<LLPanel>("identity_rows", true)
+                          ->getChild<LLPanel>("width_row", true)
+                          ->getChild<LLTextBox>("width_label", true)->getText(),
+                      std::string("width"));
         grid->die();
     }
 }
