@@ -124,6 +124,28 @@ public:
     // point that the schema says takes its tag, and never the element
     // itself, anything inside it, or the parent it already has.
     LLView* dropTarget(S32 which, LLView* under, const LLView* moving) const;
+    // --- drag and drop ---------------------------------------------------
+    // An element picked up in the outline, or a tag picked up in the
+    // Library, carried by the viewer's drag tool under an id this window
+    // made, so that a drop knows the cargo is its own. A drop lands in
+    // the outline -- before, into or after a row -- or on the canvas, in
+    // the container under the pointer.
+    bool startTreeDrag(const ALXUISelection::path_t& path);
+    bool startPaletteDrag(const std::string& tag);
+    bool carrying(EDragAndDropType type, const void* cargo) const;
+    bool treeTakesChildren(const ALXUISelection::path_t& path) const;
+    bool treeDrop(const ALXUISelection::path_t& target, ALXUITreeModel::DropZone zone, bool drop,
+                  EDragAndDropType type, void* cargo, std::string& tip);
+    // The container a drop on the canvas would land in, or null; on a
+    // drop, the landing.
+    LLView* canvasDrop(S32 which, LLView* under, S32 x, S32 y, bool drop,
+                       EDragAndDropType type, void* cargo, std::string& tip);
+    // Whether an element of this tag may become a child at that path.
+    bool accepts(const ALXUISelection::path_t& parent, std::string_view tag) const;
+    // What the tag being carried is: the moved element's, or the new one's.
+    std::string carriedTag(const ALXUIEdit& held) const;
+    // A new element of a tag, named so that nothing else in the file is.
+    std::string newElementXml(const std::string& tag, const ALXUIEdit& held, S32 left, S32 top) const;
 
     // The same drag, landing somewhere else. The rect is converted into
     // the new parent's coordinates and written outright, since a form
@@ -736,6 +758,11 @@ private:
     LLScrollListCtrl*   mPaletteAttributes = nullptr;
     // The element named for reparenting, until somewhere is chosen for it.
     ALXUISelection::path_t mCutPath;
+    // What a drag is carrying: an element by path, or a tag from the
+    // Library, and the id the drag tool carries for it.
+    ALXUISelection::path_t mDragPath;
+    std::string         mDragTag;
+    LLUUID              mDragId;
     ALXUISelection::path_t mRenamedFrom;    // and where a rename moved it,
     ALXUISelection::path_t mRenamedTo;      // until the rows are made again
     LLScrollListCtrl*   mLayout = nullptr;

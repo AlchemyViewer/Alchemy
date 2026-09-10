@@ -61,6 +61,7 @@
 #include "lllineeditor.h"
 #include "lllivefile.h"
 #include "llmenugl.h"
+#include "lltooldraganddrop.h"
 #include "llnotificationsutil.h"
 #include "llnotifications.h"
 #include "llnotificationtemplate.h"
@@ -526,6 +527,13 @@ public:
                     if (axis < 0)
                     {
                         drawAnchors(view, r);
+                    }
+                    if (!dragging() && mDropFrame + 1 >= LLFrameTimer::getFrameCount())
+                    {
+                        if (LLView* into = mDrop.get())
+                        {
+                            drawLabelledBox(into, ink().dropTarget.get(), "into " + into->getName());
+                        }
                     }
                     if (dragging())
                     {
@@ -1101,6 +1109,29 @@ private:
         return grid > 1 ? ((value + (value >= 0 ? grid / 2 : -grid / 2)) / grid) * grid : value;
     }
 
+    // Something carried by the drag tool -- a row of the outline, or a tag
+    // from the Library -- over the canvas, or let go on it. The container
+    // under the pointer that takes it is marked while it hovers, the way
+    // a held element's landing is marked, and takes it when it drops.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
+                           void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override
+    {
+        toContent(x, y);
+        *accept = ACCEPT_NO;
+        if (!mTool || !root())
+        {
+            return false;
+        }
+        LLView* into = mTool->canvasDrop(mWhich, hitTest(x, y), x, y, drop, cargo_type, cargo_data, tooltip_msg);
+        if (into && !drop)
+        {
+            mDrop = into->getHandle();
+            mDropFrame = LLFrameTimer::getFrameCount();
+            *accept = ACCEPT_YES_SINGLE;
+        }
+        return true;
+    }
+
     // Where a held element would land if the button came up here: the
     // container under the pointer that takes its tag, and nothing while
     // an edge is being dragged, since a resize goes nowhere.
@@ -1359,6 +1390,7 @@ private:
     S32                 mDragY = 0;
     S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
     LLHandle<LLView>    mDrop;                  // the container a held element would land in
+    U32                 mDropFrame = 0;         // the frame a drag tool hover last said so
 };
 
 // The variants, side by side: each a surface of its own, with its own skin
@@ -1885,6 +1917,7 @@ bool ALFloaterXUIStudio::postBuild()
     mPaletteAttributes = getChild<LLScrollListCtrl>("palette_attributes");
     // The tag chosen above decides what is listed below it.
     mPalette->onChose([this](const std::string&) { fillPaletteAttributes(); });
+    mPalette->setDragStarter(boost::bind(&ALFloaterXUIStudio::startPaletteDrag, this, _1));
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
     getChild<LLButton>("library_btn")->setClickedCallback([](LLUICtrl*, const LLSD&)
     {
@@ -2094,6 +2127,9 @@ bool ALFloaterXUIStudio::postBuild()
     mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
     mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
     mModel.setHoverHandler(boost::bind(&ALFloaterXUIStudio::onTreeHover, this, _1));
+    mModel.setDragStarter(boost::bind(&ALFloaterXUIStudio::startTreeDrag, this, _1));
+    mModel.setContainerTest(boost::bind(&ALFloaterXUIStudio::treeTakesChildren, this, _1));
+    mModel.setDropHandler(boost::bind(&ALFloaterXUIStudio::treeDrop, this, _1, _2, _3, _4, _5, _6));
     mModel.setBadgeProvider([this](const ALXUISelection::path_t& path)
                             { return mPreviews[PRIMARY].lint.countUnder(path); });
     mModel.getFilter().setShowCodeBuilt(mShowCodeBuilt);
@@ -3793,19 +3829,8 @@ void ALFloaterXUIStudio::onInsertFromPalette()
         return;
     }
 
-    // A name of its own, since a name is identity to the merge, to
-    // getChild and to every overlay, and two of one name is a defect the
-    // lint already reports.
     const std::string& tag = chosen;
-    std::string name = tag;
-    for (S32 n = 2; held->resolve({ name }) && n < 100; ++n)
-    {
-        name = tag + "_" + std::to_string(n);
-    }
-
-    const std::string xml = "<" + tag + " name=\"" + name + "\" layout=\"topleft\""
-                            " left=\"8\" top=\"8\" width=\"100\" height=\"20\"/>";
-    if (!held->insertElement(mSelection.selection(), xml))
+    if (!held->insertElement(mSelection.selection(), newElementXml(tag, *held, 8, 8)))
     {
         setStatus(held->error());
         return;
@@ -3816,6 +3841,380 @@ void ALFloaterXUIStudio::onInsertFromPalette()
     args["[FILE]"] = mFile;
     args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
     documentChanged(getString("EditWrote", args));
+}
+
+// A name of its own, since a name is identity to the merge, to getChild and
+// to every overlay, and two of one name is a defect the lint already
+// reports. Where it goes is the caller's: a drop knows where the pointer
+// was, and the Insert button does not.
+std::string ALFloaterXUIStudio::newElementXml(const std::string& tag, const ALXUIEdit& held,
+                                              S32 left, S32 top) const
+{
+    std::string name = tag;
+    for (S32 n = 2; held.resolve({ name }) && n < 100; ++n)
+    {
+        name = tag + "_" + std::to_string(n);
+    }
+    return "<" + tag + " name=\"" + name + "\" layout=\"topleft\""
+           " left=\"" + std::to_string(left) + "\" top=\"" + std::to_string(top) + "\""
+           " width=\"100\" height=\"20\"/>";
+}
+
+// ---------------------------------------------------------------------------
+// Drag and drop
+// ---------------------------------------------------------------------------
+// The viewer's drag tool carries inventory; what it carries here is an id
+// this window made a moment ago, and what the id stands for -- an element
+// of the file, or a tag to make one from -- is held here. A drop that
+// arrives with anything else is somebody else's.
+bool ALFloaterXUIStudio::startTreeDrag(const ALXUISelection::path_t& path)
+{
+    if (path.empty())
+    {
+        return false;
+    }
+    mDragPath = path;
+    mDragTag.clear();
+    mDragId.generate();
+    LLToolDragAndDrop::getInstance()->beginMultiDrag({ DAD_WIDGET }, { mDragId },
+                                                     LLToolDragAndDrop::SOURCE_VIEWER);
+    return true;
+}
+
+bool ALFloaterXUIStudio::startPaletteDrag(const std::string& tag)
+{
+    if (tag.empty())
+    {
+        return false;
+    }
+    mDragPath.clear();
+    mDragTag = tag;
+    mDragId.generate();
+    LLToolDragAndDrop::getInstance()->beginMultiDrag({ DAD_WIDGET }, { mDragId },
+                                                     LLToolDragAndDrop::SOURCE_VIEWER);
+    return true;
+}
+
+bool ALFloaterXUIStudio::carrying(EDragAndDropType type, const void* cargo) const
+{
+    return type == DAD_WIDGET && cargo && *static_cast<const LLUUID*>(cargo) == mDragId
+        && (!mDragPath.empty() || !mDragTag.empty());
+}
+
+std::string ALFloaterXUIStudio::carriedTag(const ALXUIEdit& held) const
+{
+    if (!mDragTag.empty())
+    {
+        return mDragTag;
+    }
+    const pugi::xml_node node = held.resolve(mDragPath);
+    return node ? node.name() : std::string();
+}
+
+// The tag a container answers to is the class that was built, since that
+// is whose child registry the parser would consult; where nothing was
+// built at the path -- a widget the shell build does not run -- the word
+// the file wrote is what there is.
+bool ALFloaterXUIStudio::accepts(const ALXUISelection::path_t& parent, std::string_view tag) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    std::string container;
+    if (LLView* view = pv.root ? ALXUISelection::resolve(pv.root, parent) : nullptr)
+    {
+        if (const std::string* built = LLUICtrlFactory::widgetTag(view->viewType()))
+        {
+            container = *built;
+        }
+    }
+    if (container.empty())
+    {
+        const pugi::xml_node node = document().resolve(parent);
+        container = node ? node.name() : std::string();
+    }
+    return !container.empty() && ALXUISchema::get().acceptsChild(container, tag);
+}
+
+bool ALFloaterXUIStudio::treeTakesChildren(const ALXUISelection::path_t& path) const
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    LLView* view = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
+    const std::string* tag = view ? LLUICtrlFactory::widgetTag(view->viewType()) : nullptr;
+    const ALXUISchema::Tag* declared = tag ? ALXUISchema::get().tag(*tag) : nullptr;
+    return declared && !declared->children.empty();
+}
+
+// A drag over a row of the outline, or a drop on one. Before or after the
+// row makes the carried element its sibling; into it, its child. An
+// element cannot land in itself or under itself, the root has no
+// siblings, and whichever element would become the parent has to take
+// the tag.
+bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITreeModel::DropZone zone,
+                                  bool drop, EDragAndDropType type, void* cargo, std::string& tip)
+{
+    if (!carrying(type, cargo) || target.empty())
+    {
+        return false;
+    }
+    const bool into = zone == ALXUITreeModel::DropZone::Into;
+    if (!into && target.size() < 2)
+    {
+        return false;
+    }
+    const ALXUISelection::path_t parent = into ? target
+                                              : ALXUISelection::path_t(target.begin(), target.end() - 1);
+    if (!mDragPath.empty())
+    {
+        // Not onto itself, and not under itself.
+        if (target.size() >= mDragPath.size()
+            && std::equal(mDragPath.begin(), mDragPath.end(), target.begin()))
+        {
+            return false;
+        }
+    }
+
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const std::vector<const ALXUICatalog::Layer*> layers = entry
+        ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
+        : std::vector<const ALXUICatalog::Layer*>();
+    if (layers.empty())
+    {
+        return false;
+    }
+    // Asked of the document as it stands, without opening one: a hover is
+    // not an edit.
+    const ALXUIEdit* reading = mDocuments.find(layers.front()->path);
+    ALXUIEdit disk;
+    if (!reading)
+    {
+        if (!disk.loadFile(layers.front()->path))
+        {
+            return false;
+        }
+        reading = &disk;
+    }
+    const std::string tag = carriedTag(*reading);
+    if (tag.empty() || !accepts(parent, tag))
+    {
+        return false;
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = tag;
+    args["[WHERE]"] = target.back();
+    tip = getString(into ? "DropInto" : zone == ALXUITreeModel::DropZone::Before ? "DropBefore" : "DropAfter", args);
+    if (!drop)
+    {
+        return true;
+    }
+
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return false;
+    }
+    bool ok;
+    if (!mDragPath.empty())
+    {
+        ok = into ? held->moveElement(mDragPath, target)
+           : zone == ALXUITreeModel::DropZone::Before ? held->moveBefore(mDragPath, target)
+                                                       : held->moveAfter(mDragPath, target);
+    }
+    else
+    {
+        const std::string xml = newElementXml(mDragTag, *held, 8, 8);
+        ok = into ? held->insertElement(target, xml)
+           : zone == ALXUITreeModel::DropZone::Before ? held->insertBefore(target, xml)
+                                                       : held->insertAfter(target, xml);
+    }
+    if (!ok)
+    {
+        setStatus(held->error());
+        return false;
+    }
+
+    // Where it came to rest, read off the document: last among the
+    // parent's children, or beside the row it was dropped on.
+    pugi::xml_node landed;
+    if (into)
+    {
+        landed = held->resolve(target).last_child();
+        while (landed && landed.type() != pugi::node_element)
+        {
+            landed = landed.previous_sibling();
+        }
+    }
+    else
+    {
+        const pugi::xml_node beside = held->resolve(target);
+        landed = zone == ALXUITreeModel::DropZone::Before ? beside.previous_sibling() : beside.next_sibling();
+        while (landed && landed.type() != pugi::node_element)
+        {
+            landed = zone == ALXUITreeModel::DropZone::Before ? landed.previous_sibling() : landed.next_sibling();
+        }
+    }
+    const ALXUISelection::path_t moved = ALXUICatalog::namePath(landed, /*any_tag=*/true);
+    if (!moved.empty())
+    {
+        mSelection.select(moved);
+    }
+    mDragPath.clear();
+    mDragTag.clear();
+    args["[ATTRS]"] = tag;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    documentChanged(getString("EditWrote", args));
+    return true;
+}
+
+// The same cargo over the canvas. The container is the one under the
+// pointer that takes the tag, found the way a held element finds its
+// landing -- except that an empty container takes a new element, since a
+// drop from the Library is how an empty container is filled. What lands
+// is put where the pointer was, in the container's own coordinates.
+LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, bool drop,
+                                       EDragAndDropType type, void* cargo, std::string& tip)
+{
+    const Preview& pv = mPreviews[PRIMARY];
+    if (which != PRIMARY || !under || !pv.root || !carrying(type, cargo))
+    {
+        return nullptr;
+    }
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const std::vector<const ALXUICatalog::Layer*> layers = entry
+        ? mCatalog.layersFor(*entry, pv.skin, mLanguage)
+        : std::vector<const ALXUICatalog::Layer*>();
+    if (layers.empty())
+    {
+        return nullptr;
+    }
+
+    LLView* into = nullptr;
+    std::string tag;
+    if (!mDragPath.empty())
+    {
+        LLView* moving = ALXUISelection::resolve(pv.root, mDragPath);
+        into = dropTarget(which, under, moving);
+        const ALXUISourceMap::Origin* mine = moving ? pv.sourceMap.find(moving) : nullptr;
+        tag = mine ? mine->tag : std::string();
+    }
+    else
+    {
+        tag = mDragTag;
+        const ALXUISchema& schema = ALXUISchema::get();
+        for (LLView* view = under; view; view = view->getParent())
+        {
+            if (view != pv.root && !pv.sourceMap.isFromXML(view))
+            {
+                continue;
+            }
+            const std::string* container = LLUICtrlFactory::widgetTag(view->viewType());
+            if (container && schema.acceptsChild(*container, tag))
+            {
+                into = view;
+                break;
+            }
+            if (view == pv.root)
+            {
+                break;
+            }
+        }
+    }
+    if (!into || tag.empty())
+    {
+        return nullptr;
+    }
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = tag;
+    args["[WHERE]"] = into->getName();
+    tip = getString("DropInto", args);
+    if (!drop)
+    {
+        return into;
+    }
+
+    ALXUISelection::path_t target;
+    if (!ALXUISelection::pathOf(into, pv.root, target))
+    {
+        return nullptr;
+    }
+    ALXUIEdit* held = document(*layers.front());
+    if (!held)
+    {
+        return nullptr;
+    }
+
+    // Where the pointer was, from the container's top left, which is
+    // where the file counts from.
+    S32 local_x = x;
+    S32 local_y = y;
+    for (const LLView* view = under; view && view != into; view = view->getParent())
+    {
+        local_x += view->getRect().mLeft;
+        local_y += view->getRect().mBottom;
+    }
+    const S32 left = llmax(0, local_x);
+    const S32 top = llmax(0, into->getRect().getHeight() - local_y);
+
+    if (!mDragPath.empty())
+    {
+        LLView* moving = ALXUISelection::resolve(pv.root, mDragPath);
+        if (!moving || !held->moveElement(mDragPath, target))
+        {
+            setStatus(held ? held->error() : getString("EditNoTarget"));
+            return nullptr;
+        }
+        pugi::xml_node landed = held->resolve(target).last_child();
+        while (landed && landed.type() != pugi::node_element)
+        {
+            landed = landed.previous_sibling();
+        }
+        const ALXUISelection::path_t moved = ALXUICatalog::namePath(landed, /*any_tag=*/true);
+        // The rect is written outright for the new parent, since no
+        // positioning form survives a change of parent; it keeps its size.
+        ALXUIEdit::Anchor want;
+        want.left = left;
+        want.top = top;
+        want.width = moving->getRect().getWidth();
+        want.height = moving->getRect().getHeight();
+        want.bottom = into->getRect().getHeight() - top - want.height;
+        want.topLeft = true;
+        const bool stacked = into->as<LLLayoutStack>() != nullptr;
+        if (!moved.empty()
+            && !held->reauthor(moved, want, stacked ? ALXUIEdit::AUTHOR_SIZE : ALXUIEdit::AUTHOR_RECT))
+        {
+            setStatus(held->error());
+            return nullptr;
+        }
+        if (!moved.empty())
+        {
+            mSelection.select(moved);
+        }
+    }
+    else
+    {
+        if (!held->insertElement(target, newElementXml(tag, *held, left, top)))
+        {
+            setStatus(held->error());
+            return nullptr;
+        }
+        pugi::xml_node landed = held->resolve(target).last_child();
+        while (landed && landed.type() != pugi::node_element)
+        {
+            landed = landed.previous_sibling();
+        }
+        const ALXUISelection::path_t made = ALXUICatalog::namePath(landed, /*any_tag=*/true);
+        if (!made.empty())
+        {
+            mSelection.select(made);
+        }
+    }
+    mDragPath.clear();
+    mDragTag.clear();
+    args["[ATTRS]"] = tag;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    documentChanged(getString("EditWrote", args));
+    return into;
 }
 
 // The two tabs that fill themselves from something other than the preview.

@@ -72,6 +72,9 @@
     <floater.string name="StepManySteps">[STEPS] edits</floater.string>
     <floater.string name="StepManyFiles">[STEPS] edits over [FILES] files</floater.string>
     <floater.string name="HistoryWentTo">Put the files back to [COUNT] edits in.</floater.string>
+    <floater.string name="DropBefore">[WHAT] before [WHERE]</floater.string>
+    <floater.string name="DropInto">[WHAT] into [WHERE]</floater.string>
+    <floater.string name="DropAfter">[WHAT] after [WHERE]</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuUndoWrite">Undo writing [FILE]</floater.string>
