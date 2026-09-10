@@ -300,6 +300,11 @@ public:
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
                            void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override;
+    // A folder moves when its own element does. The base asks every row
+    // under it as well, which is the right question of an inventory folder
+    // and the wrong one of an element: moving it moves everything under
+    // it, including the rows no element describes.
+    bool isMovable() override { return getViewModelItem()->isItemMovable(); }
 
 private:
     S8 mDropZone = -1;

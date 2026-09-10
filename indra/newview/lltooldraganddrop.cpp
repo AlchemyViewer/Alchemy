@@ -622,7 +622,11 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, bool drop,
 
     // For people drag and drop we don't need an actual inventory object,
     // instead we need the current cargo id, which should be a person id.
-    bool is_uuid_dragged = (mSource == SOURCE_PEOPLE);
+    // A drag from the viewer itself carries an id too: the toolbar stands
+    // an item behind its command and takes the branch above, and a drag
+    // with nothing behind it -- an element of a file, say -- is handed
+    // the id it began with.
+    bool is_uuid_dragged = (mSource == SOURCE_PEOPLE) || (mSource == SOURCE_VIEWER);
 
     if (top_view)
     {
@@ -686,7 +690,7 @@ void LLToolDragAndDrop::dragOrDrop( S32 x, S32 y, MASK mask, bool drop,
                 }
                 else if (is_uuid_dragged)
                 {
-                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, false,
+                    handled = handled && top_view->handleDragAndDrop(local_x, local_y, mask, true,
                                                         mCargoTypes[mCurItemIndex],
                                                         (void*)&mCargoIDs[mCurItemIndex],
                                                         &item_acceptance,

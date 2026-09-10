@@ -83,9 +83,9 @@ namespace tut
             return LLUICtrlFactory::create<LLFloaterView>(p);
         }
 
-        static LLFloater* build(LLFloaterView* parent, LLXMLNodePtr& root)
+        static LLFloater* build(LLFloaterView* parent, LLXMLNodePtr& root, const char* xui = XUI)
         {
-            if (!LLXMLNode::parseBuffer(XUI, std::strlen(XUI), root))
+            if (!LLXMLNode::parseBuffer(xui, std::strlen(xui), root))
             {
                 return nullptr;
             }
@@ -358,8 +358,17 @@ namespace tut
         std::unique_ptr<LLFloaterView> fv(floaterView());
         gFloaterView = fv.get();
 
+        // A combo box builds a line editor and a button of its own, so its
+        // row is a folder holding rows no element describes.
+        static const char* WITH_COMBO =
+            "<floater name=\"f\" width=\"200\" height=\"100\">\n"
+            "  <panel name=\"outer\" width=\"100\" height=\"50\">\n"
+            "    <panel name=\"inner\" width=\"10\" height=\"10\"/>\n"
+            "    <combo_box name=\"combo\" width=\"60\" height=\"20\"/>\n"
+            "  </panel>\n"
+            "</floater>\n";
         LLXMLNodePtr root;
-        LLFloater* floater = build(fv.get(), root);
+        LLFloater* floater = build(fv.get(), root, WITH_COMBO);
         ensure("built", floater != nullptr);
         ALXUISourceMap map;
         map.build(floater, root);
@@ -433,6 +442,14 @@ namespace tut
             return true;
         });
         ensure("given a starter, a row the file wrote moves", inner->isMovable());
+        // And so does a folder, whatever built the rows under it: an element
+        // moved takes everything under it along.
+        LLFolderViewItem* combo = rows["outer/combo"];
+        ensure("the combo box's row is a folder", combo && combo->as<LLFolderViewFolder>() != nullptr);
+        ensure("holding rows nobody wrote", combo->as<LLFolderViewFolder>()->getItemsCount()
+                                              + combo->as<LLFolderViewFolder>()->getFoldersCount() > 0);
+        ensure("and it moves", combo->isMovable());
+        ensure("as does the panel holding it", outer->isMovable());
         std::vector<LLFolderViewModelItem*> items { inner->getViewModelItem() };
         ensure("and starting a drag says which", model.startDrag(items));
         ensure_equals("by path", ALXUISelection::toString(picked.front()), std::string("outer/inner"));
