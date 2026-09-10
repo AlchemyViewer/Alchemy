@@ -7232,11 +7232,21 @@ void LLViewerObject::applyAngularVelocity(F32 dt)
         // calculate the delta increment based on the object's angular velocity
         dQ.setQuat(angle, ang_vel);
 
+        // Quaternion multiplication does not renormalise, and both of these accumulate one product
+        // per frame for as long as the object spins. An llTargetOmega object that never receives a
+        // rotation update -- the common case, since the simulator has nothing to correct -- drifts
+        // off the unit sphere, and a rotation built from a quaternion of magnitude m scales the
+        // object by m*m. Measured at 8 h and 300 fps that is a fifth of the object's size.
+
         // accumulate the angular velocity rotations to re-apply in the case of an object update
         mAngularVelocityRot *= dQ;
+        mAngularVelocityRot.normalize();
 
         // Just apply the delta increment to the current rotation
-        setRotation(getRotation()*dQ);
+        LLQuaternion new_rot = getRotation() * dQ;
+        new_rot.normalize();
+        setRotation(new_rot);
+
         setChanged(MOVED | SILHOUETTE);
     }
 }
