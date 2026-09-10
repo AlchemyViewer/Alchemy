@@ -3055,6 +3055,39 @@
             <key>Value</key>
             <integer>4095</integer>
         </map>
+        <key>ALInterpolationCadenceAware</key>
+        <map>
+            <key>Comment</key>
+            <string>Experimental: measure how often each object actually sends updates, and taper off its predicted motion once it has been silent for several times its own interval (see ALInterpolationCadenceFactor). Off, the taper is gated on the object's circuit looking broken, which is the stock behaviour.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALInterpolationCadenceFactor</key>
+        <map>
+            <key>Comment</key>
+            <string>How many of an object's own update intervals of silence before its predicted motion starts tapering off. Bounded below by InterpolationPhaseOut and above by 10 seconds. Lower stops stale objects sooner at the cost of stopping ones the simulator simply had nothing to say about; higher lets them coast.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>4.0</real>
+        </map>
+        <key>ALInterpolationMaxFrameStep</key>
+        <map>
+            <key>Comment</key>
+            <string>Largest span of time, in seconds, that a single frame may carry a moving object forward. Bounds what happens when the viewer resumes from a stall -- a snapshot floater holding time frozen, a long hitch, a minimised window -- instead of advancing everything by the whole pause at once. 0 disables the limit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
         <key>ClickingAvatarKeepsCamera</key>
         <map>
             <key>Comment</key>
