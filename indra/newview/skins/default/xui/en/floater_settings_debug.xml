@@ -11,7 +11,7 @@
  reuse_instance="true"
  can_resize="true"
  min_width="480"
- width="570">
+ width="660">
     <floater.string name="SettingGroup">Setting</floater.string>
     <floater.string name="SettingChanged">changed</floater.string>
     <floater.string name="SettingDefault">as it shipped</floater.string>
@@ -49,7 +49,7 @@
    orientation="horizontal"
    show_drag_handle="true"
    top_pad="2"
-   width="550">
+   width="640">
 
     <layout_panel
      auto_resize="false"
@@ -87,7 +87,7 @@
      layout="topleft"
      min_dim="180"
      name="setting_pane"
-     width="242">
+     width="332">
       <text
        type="string"
        length="1"
@@ -101,7 +101,7 @@
        visible="false"
        use_ellipses="true"
        text_color="White"
-       width="242">
+       width="332">
         Debug setting name
       </text>
       <text_editor
@@ -114,7 +114,7 @@
        name="comment_text"
        top_pad="4"
        visible="false"
-       width="242"
+       width="332"
        word_wrap="true" />
       <!-- The editor a setting gets is the editor its type asks for, which is
            what a property grid is. This pane made one of each by hand (a
@@ -131,7 +131,7 @@
        remove_label="Reset"
        row_height="24"
        top_pad="8"
-       width="242" />
+       width="332" />
     </layout_panel>
   </layout_stack>
 
