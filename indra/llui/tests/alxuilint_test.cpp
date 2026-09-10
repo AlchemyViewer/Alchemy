@@ -86,6 +86,7 @@ namespace tut
             ALXUISourceMap  map;
             ALXUILint       lint;
             std::string     source;     // the bytes the rules were run over
+            const ALXUICatalog* catalog = nullptr;  // where a rule reads one
 
             ~Run() { delete panel; }
 
@@ -123,6 +124,7 @@ namespace tut
                 input.authored = authored.document().document_element();
                 input.file = "lint_test.xml";
                 input.callbacksAreDecisive = decisive;
+                input.catalog = catalog;
                 lint.run(input);
                 return true;
             }
@@ -740,5 +742,58 @@ namespace tut
         const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
         ensure("still reported", f != nullptr);
         ensure("but there is nothing to offer", f->fix.did == ALXUILint::Fix::Do::Nothing);
+    }
+
+    // A file an element names is a file the catalog has or has not. The
+    // rule was written after a gate that turns any value with a dot in it
+    // away as a path, and every file name has one, so it never ran.
+    //
+    // A panel naming a file builds only if the file loads, and it loads from
+    // the skins the fixture stands on rather than from the catalog asked
+    // here: so the file named is a real one, the catalog is a directory of
+    // this test's own, and whether the catalog has the name is the question.
+    template<> template<>
+    void alxuilint_object::test<16>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const std::string skins = gDirUtilp->add(gDirUtilp->getTempDir(), "alxuilint_file_test");
+        gDirUtilp->deleteDirAndContents(skins);
+        std::string dir = skins;
+        for (const char* step : { "default", "xui", "en" })
+        {
+            LLFile::mkdir(dir);
+            dir = gDirUtilp->add(dir, step);
+        }
+        LLFile::mkdir(dir);
+        static const char* const REAL = "panel_chat_separator.xml";
+        {
+            llofstream out(gDirUtilp->add(dir, REAL), std::ios::binary);
+            out << "<panel name=\"there\" width=\"10\" height=\"10\"/>\n";
+        }
+        ALXUICatalog has_it;
+        has_it.scan(skins);
+        ensure("the catalog has the file", has_it.find(REAL) != nullptr);
+        ALXUICatalog has_not;
+
+        const std::string body = std::string("  <panel name=\"a\" filename=\"") + REAL
+            + "\" left=\"0\" top=\"0\" width=\"90\" height=\"20\"/>";
+        {
+            Run run;
+            run.catalog = &has_it;
+            ensure("builds", run.build(body));
+            ensure("the panel was built", run.panel->getChildCount() > 0);
+            ensure_equals("a file the catalog has: " + run.describe(), run.count(ALXUILint::Rule::FileMissing), 0);
+        }
+        {
+            Run run;
+            run.catalog = &has_not;
+            ensure("builds", run.build(body));
+            ensure_equals("and one it has not: " + run.describe(), run.count(ALXUILint::Rule::FileMissing), 1);
+            ensure_equals("named", run.first(ALXUILint::Rule::FileMissing)->what, std::string("filename"));
+        }
+        gDirUtilp->deleteDirAndContents(skins);
     }
 }

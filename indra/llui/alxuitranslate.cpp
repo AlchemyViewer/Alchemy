@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <cctype>
 
+#include <boost/unordered_map.hpp>
+
 namespace
 {
     // The attributes the shipped overlays actually write.
@@ -178,10 +180,76 @@ namespace
         return false;
     }
 
-    // The one element carrying a name below a root, and whether more than
-    // one carries it.
-    pugi::xml_node findByName(pugi::xml_node root, std::string_view name, bool& ambiguous)
+    // The overlay's elements by name, for a scan that asks after every
+    // element of the base: the base has thousands, a language file that
+    // has fallen behind lacks most of them, and a walk of the whole
+    // overlay for each is the two files multiplied. Built once per scan
+    // and not kept past it, since a splice moves what it holds.
+    typedef boost::unordered_map<std::string, std::vector<pugi::xml_node> > name_index_t;
+
+    name_index_t indexNames(pugi::xml_node root)
     {
+        name_index_t index;
+        std::vector<pugi::xml_node> stack{ root };
+        while (!stack.empty())
+        {
+            const pugi::xml_node node = stack.back();
+            stack.pop_back();
+            for (pugi::xml_node child : node.children())
+            {
+                if (child.type() != pugi::node_element)
+                {
+                    continue;
+                }
+                stack.push_back(child);
+                if (const char* name = child.attribute("name").as_string(); *name)
+                {
+                    index[name].push_back(child);
+                }
+            }
+        }
+        return index;
+    }
+
+    // The one element carrying a name below a root, and whether more than
+    // one carries it. Out of the index where there is one, and out of the
+    // tree where there is not.
+    pugi::xml_node findByName(pugi::xml_node root, std::string_view name, bool& ambiguous,
+                              const name_index_t* index);
+
+    pugi::xml_node findByNameIndexed(pugi::xml_node root, std::string_view name, bool& ambiguous,
+                                     const name_index_t& index)
+    {
+        pugi::xml_node found;
+        ambiguous = false;
+        const auto held = index.find(std::string(name));
+        if (held == index.end())
+        {
+            return found;
+        }
+        for (pugi::xml_node candidate : held->second)
+        {
+            if (candidate == root || !contains(root, candidate))
+            {
+                continue;
+            }
+            if (found)
+            {
+                ambiguous = true;
+                return found;
+            }
+            found = candidate;
+        }
+        return found;
+    }
+
+    pugi::xml_node findByName(pugi::xml_node root, std::string_view name, bool& ambiguous,
+                              const name_index_t* index)
+    {
+        if (index)
+        {
+            return findByNameIndexed(root, name, ambiguous, *index);
+        }
         pugi::xml_node found;
         ambiguous = false;
         std::vector<pugi::xml_node> stack{ root };
@@ -222,7 +290,8 @@ namespace
 // when the answer was one level down all along.
 static pugi::xml_node findFor(pugi::xml_node overlay_root, pugi::xml_node base,
                               const std::vector<std::string>& path,
-                              std::string_view name, bool& ambiguous, bool& claimed)
+                              std::string_view name, bool& ambiguous, bool& claimed,
+                              const name_index_t* index = nullptr)
 {
     ambiguous = false;
     claimed = false;
@@ -241,7 +310,7 @@ static pugi::xml_node findFor(pugi::xml_node overlay_root, pugi::xml_node base,
             continue;
         }
         bool several = false;
-        pugi::xml_node found = findByName(under, name, several);
+        pugi::xml_node found = findByName(under, name, several, index);
         if (several)
         {
             ambiguous = true;
@@ -412,6 +481,7 @@ void ALXUITranslate::scan(pugi::xml_node base, pugi::xml_node overlay)
 // or nothing.
 void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
 {
+    const name_index_t index = overlay ? indexNames(overlay) : name_index_t();
     std::vector<pugi::xml_node> stack{ base };
     while (!stack.empty())
     {
@@ -428,6 +498,9 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
         const bool is_root = node == base;
         const path_t path = is_root ? path_t() : ALXUICatalog::namePath(node, /*any_tag=*/true);
         const std::string name = node.attribute("name").as_string();
+        // Whether translating this element is forbidden is a walk up its
+        // ancestors, asked once here rather than once per field of it.
+        const bool forbid = forbidden(node);
 
         // Where the language put this element, if anywhere.
         pugi::xml_node mine;
@@ -440,7 +513,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
             {
                 bool ambiguous = false;
                 bool claimed = false;
-                if (pugi::xml_node moved = findFor(overlay, base, path, name, ambiguous, claimed))
+                if (pugi::xml_node moved = findFor(overlay, base, path, name, ambiguous, claimed, &index))
                 {
                     mine = moved;
                     missed = Miss::Moved;
@@ -471,7 +544,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
             {
                 unit.state = State::Missing;
             }
-            else if (forbidden(node))
+            else if (forbid)
             {
                 unit.state = State::Forbidden;
             }
@@ -498,7 +571,6 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
                 continue;
             }
             const std::string english = attribute.value();
-            const bool forbid = forbidden(node);
             if (!forbid && !shouldTranslate(node, attribute.name(), english))
             {
                 continue;
@@ -513,7 +585,6 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
         }
 
         const std::string text = textOf(node);
-        const bool forbid = forbidden(node);
         if (!text.empty() && (forbid || shouldTranslate(node, std::string_view(), text)))
         {
             const std::string theirs = mine ? textOf(mine) : std::string();
@@ -565,7 +636,7 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
             else
             {
                 bool ambiguous = false;
-                pugi::xml_node moved = findByName(base, name, ambiguous);
+                pugi::xml_node moved = findByName(base, name, ambiguous, nullptr);
                 theirs = moved;
                 missed = !moved ? Miss::Absent : (ambiguous ? Miss::Ambiguous : Miss::Moved);
             }

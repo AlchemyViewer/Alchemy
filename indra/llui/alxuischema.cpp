@@ -373,28 +373,29 @@ void ALXUISchema::build()
         // Two names for one parameter. Both work and both always will --
         // that is what registering a synonym said -- so each is recorded as
         // the other's, and the notes say which of them a file should write.
-        for (size_t i = 0; i < seen.size(); ++i)
+        // Sorted by the parameter, so the names of one sit together and a
+        // tag's three hundred are read once rather than against each other.
+        std::sort(seen.begin(), seen.end());
+        seen.erase(std::unique(seen.begin(), seen.end()), seen.end());
+        const auto called_as = [&tag](const std::string& called) -> Attribute*
         {
-            for (size_t j = i + 1; j < seen.size(); ++j)
+            const auto at = std::lower_bound(tag.attributes.begin(), tag.attributes.end(), called,
+                                             [](const Attribute& a, const std::string& b)
+                                             { return a.name < b; });
+            return at != tag.attributes.end() && at->name == called ? &*at : nullptr;
+        };
+        for (size_t i = 0; i + 1 < seen.size(); ++i)
+        {
+            if (seen[i].first != seen[i + 1].first)
             {
-                if (seen[i].first != seen[j].first || seen[i].second == seen[j].second)
-                {
-                    continue;
-                }
-                const auto name = [&tag](const std::string& called) -> Attribute*
-                {
-                    const auto at = std::lower_bound(tag.attributes.begin(), tag.attributes.end(), called,
-                                                     [](const Attribute& a, const std::string& b)
-                                                     { return a.name < b; });
-                    return at != tag.attributes.end() && at->name == called ? &*at : nullptr;
-                };
-                Attribute* first = name(seen[i].second);
-                Attribute* second = name(seen[j].second);
-                if (first && second)
-                {
-                    first->alias = second->name;
-                    second->alias = first->name;
-                }
+                continue;
+            }
+            Attribute* first = called_as(seen[i].second);
+            Attribute* second = called_as(seen[i + 1].second);
+            if (first && second)
+            {
+                first->alias = second->name;
+                second->alias = first->name;
             }
         }
 
@@ -453,14 +454,18 @@ namespace
     // ceiling as an argument, since every comparison past the best so far is
     // work thrown away: a tag has three hundred attributes and this runs on
     // each of them.
+    constexpr size_t LONGEST_NAME = 96;
+
     S32 edit_distance(std::string_view a, std::string_view b, S32 ceiling)
     {
-        if ((S32)(a.size() > b.size() ? a.size() - b.size() : b.size() - a.size()) > ceiling)
+        if ((S32)(a.size() > b.size() ? a.size() - b.size() : b.size() - a.size()) > ceiling
+            || b.size() >= LONGEST_NAME)
         {
             return ceiling + 1;
         }
-        std::vector<S32> previous(b.size() + 1);
-        std::vector<S32> current(b.size() + 1);
+        S32 rows[2][LONGEST_NAME];
+        S32* previous = rows[0];
+        S32* current = rows[1];
         for (size_t j = 0; j <= b.size(); ++j)
         {
             previous[j] = (S32)j;
@@ -479,7 +484,7 @@ namespace
             {
                 return ceiling + 1;
             }
-            previous.swap(current);
+            std::swap(previous, current);
         }
         return previous[b.size()];
     }

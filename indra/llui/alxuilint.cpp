@@ -237,6 +237,7 @@ void ALXUILint::clear()
 {
     mFindings.clear();
     mCountByPath.clear();
+    mFontFamilies.clear();
 }
 
 ALXUILint::Finding& ALXUILint::add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
@@ -466,8 +467,15 @@ void ALXUILint::checkChildren(const Input& input, LLView* view, const ALXUISelec
         if (++counted[child->getName()] == 2)
         {
             const ALXUISourceMap::Origin* origin = input.sourceMap->find(child);
-            ALXUISelection::path_t child_path(path);
-            child_path.push_back(ALXUISelection::step(child->getName(), 1));
+            // Its path as every other path is counted, among all the
+            // siblings and not only the ones the file wrote: a widget's
+            // own child of the same name comes into the count.
+            ALXUISelection::path_t child_path;
+            if (!ALXUISelection::pathOf(child, input.root, child_path))
+            {
+                child_path = path;
+                child_path.push_back(ALXUISelection::step(child->getName(), 1));
+            }
             add(Rule::NameCollision, Severity::Warning, child_path, input.file,
                 origin ? origin->line : 0, child->getName(),
                 "a second child of " + view->getName() + " named this; getChild answers the first");
@@ -538,22 +546,15 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             }
         }
 
-        // Written as the value this widget already carries -- and carries
-        // because somebody chose it for this widget, not because it is where
-        // the type starts: `left="0"` says where a thing goes and repeats
-        // nobody. Often on purpose even so, a number written where a reader
-        // would otherwise have to know it, so this is worth a look rather
-        // than a fault. Compared as the two files spell it, so a value spelt
-        // another way than the template spells it is passed over rather than
-        // guessed at.
+        const ALXUISchema::Attribute* said =
+            schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
+
         // A name that works and should not be used. The block registered two
         // names for one parameter, which said that both work and will keep
         // working; a person wrote down which of them to write. Nothing is
         // broken here, so it is worth a look rather than a fault -- and it is
         // one edit away from being right, which the fix offers to make.
-        if (const ALXUISchema::Attribute* said =
-                schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
-            said && said->deprecated)
+        if (said && said->deprecated)
         {
             Finding& f = add(Rule::DeprecatedAttribute, Severity::Note, path, input.file, line, name,
                 said->instead.empty()
@@ -566,13 +567,31 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             }
         }
 
-        if (const ALXUISchema::Attribute* declared =
-                schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
-            declared && declared->declared && declared->held == value)
+        // Written as the value this widget already carries -- and carries
+        // because somebody chose it for this widget, not because it is where
+        // the type starts: `left="0"` says where a thing goes and repeats
+        // nobody. Often on purpose even so, a number written where a reader
+        // would otherwise have to know it, so this is worth a look rather
+        // than a fault. Compared as the two files spell it, so a value spelt
+        // another way than the template spells it is passed over rather than
+        // guessed at.
+        if (said && said->declared && said->held == value)
         {
             add(Rule::WroteTheDefault, Severity::Note, path, input.file, line, name,
                 "\"" + name + "\" is written as what it already is")
                 .fix.did = Fix::Do::TakeAttributeOut;
+        }
+
+        // A file named is a file the catalog has or has not: asked before
+        // the rule below turns a file name away for being one.
+        if (input.catalog && (name == "menu_filename" || name == "filename"))
+        {
+            if (!value.empty() && !input.catalog->find(value))
+            {
+                add(Rule::FileMissing, Severity::Error, path, input.file, line, name,
+                    "no XUI file is named \"" + value + "\"");
+            }
+            continue;
         }
 
         if (!looksLikeName(value))
@@ -583,11 +602,12 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
         if (name == "font")
         {
             // The two steps the font parameter takes, in its order: the
-            // four legacy names, then the registry by descriptor, which
-            // is what every name in fonts.xml answers to. Asking only the
-            // first calls every shipped font dangling.
-            if (!LLFontGL::getFontByName(value)
-                && !LLFontGL::getFont(LLFontDescriptor(value, LLStringUtil::null, 0)))
+            // four legacy names, then the registry by the family a name
+            // normalizes to, which is what every name in fonts.xml answers
+            // to. Asked of the list of families rather than for the font,
+            // since asking for one makes one, and a name nobody declared
+            // would be made and warned about on every pass.
+            if (!LLFontGL::getFontByName(value) && !fontDeclared(value))
             {
                 add(Rule::DanglingFont, Severity::Warning, path, input.file, line, name,
                     "no font is named \"" + value + "\"");
@@ -617,15 +637,21 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
                     "no control group has a setting named \"" + value + "\"");
             }
         }
-        else if (input.catalog && (name == "menu_filename" || name == "filename"))
-        {
-            if (!input.catalog->find(value))
-            {
-                add(Rule::FileMissing, Severity::Error, path, input.file, line, name,
-                    "no XUI file is named \"" + value + "\"");
-            }
-        }
     }
+}
+
+// Whether fonts.xml declares the family a name normalizes to. The list
+// is asked for once per run: a run is one file and a file names a font
+// on many of its elements.
+bool ALXUILint::fontDeclared(const std::string& name)
+{
+    if (mFontFamilies.empty())
+    {
+        const std::vector<std::string> declared = LLFontGL::getDeclaredFontNames();
+        mFontFamilies.insert(declared.begin(), declared.end());
+    }
+    const std::string family = LLFontDescriptor(name, LLStringUtil::null, 0).normalize().getName();
+    return !family.empty() && mFontFamilies.count(family) > 0;
 }
 
 // A layout panel has one dimension the stack reads -- the one along the axis

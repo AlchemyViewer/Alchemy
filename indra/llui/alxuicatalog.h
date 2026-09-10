@@ -33,6 +33,8 @@
 #include <string_view>
 #include <vector>
 
+#include <boost/unordered_map.hpp>
+
 class ALXmlDocument;
 
 // The files under <skins>/<skin>/xui/<language>/, one entry per file name
@@ -175,9 +177,14 @@ private:
     void scanLanguage(const std::string& skin, const std::string& language,
                       const std::string& dir, const std::string& prefix);
     Entry& entryFor(const std::string& name);
+    Entry* findEntry(std::string_view name);
     static void describe(Entry& entry, const Layer& layer);
 
+    // Sorted by name once a scan is over, which is what find looks them
+    // up by; while a scan runs they arrive in directory order and the
+    // index below says which is which.
     std::vector<Entry>          mEntries;
+    boost::unordered_map<std::string, size_t> mScanIndex;
     std::vector<std::string>    mSkins;
     std::vector<std::string>    mLanguages;
 };

@@ -169,6 +169,7 @@ ALXUICatalog::~ALXUICatalog() = default;
 void ALXUICatalog::clear()
 {
     mEntries.clear();
+    mScanIndex.clear();
     mSkins.clear();
     mLanguages.clear();
 }
@@ -203,16 +204,14 @@ void ALXUICatalog::scan(const std::string& skins_dir)
     sortFirst(mLanguages, "en");
     std::sort(mEntries.begin(), mEntries.end(),
               [](const Entry& a, const Entry& b) { return a.name < b.name; });
+    mScanIndex.clear();
 }
 
 bool ALXUICatalog::reload(std::string_view name)
 {
-    for (Entry& entry : mEntries)
+    if (Entry* found = findEntry(name))
     {
-        if (entry.name != name)
-        {
-            continue;
-        }
+        Entry& entry = *found;
         for (Layer& layer : entry.layers)
         {
             layer.error.clear();
@@ -278,30 +277,34 @@ void ALXUICatalog::describe(Entry& entry, const Layer& layer)
     }
 }
 
+// During a scan, when the entries are in the order the directories gave
+// them: seven hundred files, each looked up once per skin and language it
+// is written in.
 ALXUICatalog::Entry& ALXUICatalog::entryFor(const std::string& name)
 {
-    for (Entry& entry : mEntries)
+    if (const auto held = mScanIndex.find(name); held != mScanIndex.end())
     {
-        if (entry.name == name)
-        {
-            return entry;
-        }
+        return mEntries[held->second];
     }
+    mScanIndex.emplace(name, mEntries.size());
     Entry& entry = mEntries.emplace_back();
     entry.name = name;
     return entry;
 }
 
+// After one, when they are sorted by name. Asked on every hover of a drag,
+// every row of a list and every attribute a rule reads a file name off.
+ALXUICatalog::Entry* ALXUICatalog::findEntry(std::string_view name)
+{
+    const auto at = std::lower_bound(mEntries.begin(), mEntries.end(), name,
+                                     [](const Entry& entry, std::string_view wanted)
+                                     { return entry.name < wanted; });
+    return at != mEntries.end() && at->name == name ? &*at : nullptr;
+}
+
 const ALXUICatalog::Entry* ALXUICatalog::find(std::string_view name) const
 {
-    for (const Entry& entry : mEntries)
-    {
-        if (entry.name == name)
-        {
-            return &entry;
-        }
-    }
-    return nullptr;
+    return const_cast<ALXUICatalog*>(this)->findEntry(name);
 }
 
 std::vector<const ALXUICatalog::Layer*> ALXUICatalog::layersFor(const Entry& entry, std::string_view skin,

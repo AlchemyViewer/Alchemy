@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include <pugixml.hpp>
 
 class ALXUICatalog;
@@ -176,6 +177,7 @@ public:
     // so both answer from the same place.
     static bool callbackRegistered(const std::string& name);
     static bool controlExists(const std::string& name, std::string* group = nullptr);
+    bool fontDeclared(const std::string& name);
 
 private:
     Finding& add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
@@ -193,4 +195,5 @@ private:
 
     std::vector<Finding>                        mFindings;
     boost::unordered_map<std::string, S32>      mCountByPath;   // the element and everything below it
+    boost::unordered_set<std::string>           mFontFamilies;  // asked for once per run
 };
