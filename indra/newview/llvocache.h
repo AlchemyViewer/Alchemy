@@ -166,6 +166,28 @@ public:
     static F32  memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 heap_cap_MB,
                                    F32 low_setting_MB, F32 high_setting_MB,
                                    bool low_is_explicit = false, bool high_is_explicit = false);
+
+    // What isAnyVisible answers, with no octree to ask. The frame numbers are the
+    // octree's own counter; the distance is squared, from the camera to the entry's
+    // bounding centre, and the threshold is the radius of the sphere behind the
+    // camera. An entry stays in memory while its group was recently visible, while
+    // its frame window has not run out, or while it sits inside that sphere.
+    struct VisibilityFacts
+    {
+        bool mHasGroup             = false;
+        bool mGroupRecentlyVisible = false;
+        bool mGroupOccluded        = false;
+        S32  mGroupAnyVisibleFrame = 0;
+        S32  mEntryVisibleFrame    = 0;
+        S32  mCurrentFrame         = 0;
+        U32  mMinFrameRange        = 0;
+        bool mIsChild              = false;
+        F32  mDistanceSquared      = 0.f;
+        F32  mRadius               = 0.f;
+        F32  mDistThreshold        = 0.f;
+    };
+    static bool staysInMemory(const VisibilityFacts& facts);
+
     static F32  getSquaredPixelThreshold(bool is_front);
 
 private:

@@ -576,18 +576,39 @@ F32 LLVOCacheEntry::getSquaredPixelThreshold(bool is_front)
 
 extern bool gCubeSnapshot;
 
+// Eviction was switched off in 2024 for paging objects still within view distance
+// in and out of memory as the camera turned. The distance that decided that was
+// sRearFarRadius, which the memory bounds pinned to two metres on every 64-bit
+// machine until those bounds were repaired; whether that was the whole of it is
+// what AlchemyVOCacheEvictionMode exists to measure.
+
+//static
+bool LLVOCacheEntry::staysInMemory(const VisibilityFacts& facts)
+{
+    //any visible
+    bool vis = facts.mHasGroup && facts.mGroupRecentlyVisible;
+
+    //not ready to remove
+    if(!vis)
+    {
+        const S32 cur_vis = facts.mHasGroup
+            ? llmax(facts.mGroupAnyVisibleFrame, facts.mEntryVisibleFrame)
+            : facts.mEntryVisibleFrame;
+        vis = (cur_vis + (S32)facts.mMinFrameRange > facts.mCurrentFrame);
+    }
+
+    //within the back sphere
+    if(!vis && !facts.mIsChild && !facts.mGroupOccluded)
+    {
+        const F32 threshold = facts.mDistThreshold + facts.mRadius;
+        vis = (facts.mDistanceSquared < threshold * threshold);
+    }
+
+    return vis;
+}
+
 bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVector4a& local_camera_origin, F32 dist_threshold)
 {
-#if 0
-    // this is ill-conceived and should be removed pending QA
-    // In the name of saving memory, we evict objects that are still within view distance from memory
-    // This results in constant paging of objects in and out of memory, leading to poor performance
-    // and many unacceptable visual glitches when rotating the camera
-
-    // Honestly, the entire VOCache partition system needs to be removed since it doubles the overhead of
-    // the spatial partition system and is redundant to the object cache, but this is a start
-    //  - davep 2024.06.07
-
     // A drawable carries no group while it moves between spatial groups, and
     // LLSpatialBridge::cleanupReferences clears one for a whole child list.
     // Answering "invisible" there evicts objects mid-rebin, so ask the octree
@@ -595,39 +616,41 @@ bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVecto
     // the rest.
     LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)getGroup();
 
-    //any visible
-    bool vis = group && group->isAnyRecentlyVisible();
+    VisibilityFacts facts;
+    facts.mHasGroup             = (group != NULL);
+    facts.mGroupRecentlyVisible = group && group->isAnyRecentlyVisible();
+    facts.mGroupOccluded        = group && group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+    facts.mGroupAnyVisibleFrame = group ? group->getAnyVisible() : 0;
+    facts.mEntryVisibleFrame    = (S32)getVisible();
+    facts.mCurrentFrame         = LLViewerOctreeEntryData::getCurrentFrame();
+    facts.mMinFrameRange        = sMinFrameRange;
+    facts.mIsChild              = (mParentID > 0);
+    facts.mDistThreshold        = dist_threshold;
 
-    //not ready to remove
-    if(!vis)
-    {
-        S32 cur_vis = group ? llmax(group->getAnyVisible(), (S32)getVisible()) : (S32)getVisible();
-        vis = (cur_vis + (S32)sMinFrameRange > LLViewerOctreeEntryData::getCurrentFrame());
-    }
-
-    //within the back sphere
-    if(!vis && !mParentID && !(group && group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED)))
+    // The saved sphere is in region-local space and the octree entry is in agent
+    // space, so each is measured against its own camera origin. Measuring at all
+    // is a pointer chase into the octree, so it is skipped where the sphere test
+    // cannot be reached, and an entry with no place in the world is left
+    // infinitely far away so the sphere is never what keeps it.
+    facts.mDistanceSquared = F32_MAX;
+    if(!facts.mIsChild && !facts.mGroupOccluded)
     {
         LLVector4a lookAt;
-
         if(mBSphereRadius > 0.f)
         {
             lookAt.setSub(mBSphereCenter, local_camera_origin);
-            dist_threshold += mBSphereRadius;
+            facts.mRadius = mBSphereRadius;
+            facts.mDistanceSquared = lookAt.dot3(lookAt).getF32();
         }
-        else
+        else if(getEntry())
         {
             lookAt.setSub(getPositionGroup(), camera_origin);
-            dist_threshold += getBinRadius();
+            facts.mRadius = getBinRadius();
+            facts.mDistanceSquared = lookAt.dot3(lookAt).getF32();
         }
-
-        vis = (lookAt.dot3(lookAt).getF32() < dist_threshold * dist_threshold);
     }
 
-    return vis;
-#else
-    return true;
-#endif
+    return staysInMemory(facts);
 }
 
 void LLVOCacheEntry::calcSceneContribution(const LLVector4a& camera_origin, bool needs_update, U32 last_update, F32 max_dist)
