@@ -900,26 +900,47 @@ void LLViewerObjectList::update(LLAgent &agent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
-    // Update globals
-    LLViewerObject::setVelocityInterpolate( gSavedSettings.getBOOL("VelocityInterpolate") );
-    LLViewerObject::setPingInterpolate( gSavedSettings.getBOOL("PingInterpolate") );
+    // Update globals. These are read every frame for every object, so they come from cached
+    // controls rather than a string lookup per frame per key.
+    static LLCachedControl<bool> velocity_interpolate(gSavedSettings, "VelocityInterpolate", true);
+    static LLCachedControl<bool> ping_interpolate(gSavedSettings, "PingInterpolate", false);
+    static LLCachedControl<F32> interpolation_time(gSavedSettings, "InterpolationTime", 3.f);
+    static LLCachedControl<F32> interpolation_phase_out(gSavedSettings, "InterpolationPhaseOut", 1.f);
+    static LLCachedControl<F32> region_crossing_time(gSavedSettings, "RegionCrossingInterpolationTime", 1.f);
+    static LLCachedControl<bool> cadence_aware(gSavedSettings, "ALInterpolationCadenceAware", false);
+    static LLCachedControl<F32> cadence_factor(gSavedSettings, "ALInterpolationCadenceFactor", 4.f);
+    static LLCachedControl<F32> max_frame_step(gSavedSettings, "ALInterpolationMaxFrameStep", 0.5f);
 
-    F32 interp_time = gSavedSettings.getF32("InterpolationTime");
-    F32 phase_out_time = gSavedSettings.getF32("InterpolationPhaseOut");
-    F32 region_interp_time = llclamp(gSavedSettings.getF32("RegionCrossingInterpolationTime"), 0.5f, 5.f);
+    LLViewerObject::setVelocityInterpolate( velocity_interpolate );
+    LLViewerObject::setPingInterpolate( ping_interpolate );
+
+    F32 interp_time = interpolation_time;
+    F32 phase_out_time = interpolation_phase_out;
+    F32 region_interp_time = llclamp((F32)region_crossing_time, 0.5f, 5.f);
     if (interp_time < 0.0 ||
         phase_out_time < 0.0 ||
         phase_out_time > interp_time)
     {
-        LL_WARNS() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
+        // Warn once rather than once per frame for as long as the setting stays bad.
+        LL_WARNS_ONCE() << "Invalid values for InterpolationTime or InterpolationPhaseOut, resetting to defaults" << LL_ENDL;
         interp_time = 3.0f;
         phase_out_time = 1.0f;
     }
-    LLViewerObject::setPhaseOutUpdateInterpolationTime( interp_time );
-    LLViewerObject::setMaxUpdateInterpolationTime( phase_out_time );
+
+    LLViewerObject::setPredictionCadenceAware( cadence_aware );
+    LLViewerObject::setPredictionCadenceFactor( llmax((F32)cadence_factor, 1.f) );
+    LLViewerObject::setPredictionMaxFrameStep( llmax((F32)max_frame_step, 0.f) );
+    // InterpolationTime is the outer bound -- how long prediction may run at all -- and
+    // InterpolationPhaseOut is where the taper between the two begins. The setters had these
+    // crossed, which inverted the invariant LLViewerObject asserts on itself and left the taper
+    // unreachable: every phase-out evaluation found itself already past the (smaller) maximum and
+    // stopped the object dead in one frame.
+    LLViewerObject::setMaxUpdateInterpolationTime( interp_time );
+    LLViewerObject::setPhaseOutUpdateInterpolationTime( phase_out_time );
     LLViewerObject::setMaxRegionCrossingInterpolationTime(region_interp_time);
 
-    gAnimateTextures = gSavedSettings.getBOOL("AnimateTextures");
+    static LLCachedControl<bool> animate_textures(gSavedSettings, "AnimateTextures", true);
+    gAnimateTextures = animate_textures;
 
     // update global timer
     F32 last_time = gFrameTimeSeconds;
@@ -982,7 +1003,8 @@ void LLViewerObjectList::update(LLAgent &agent)
 
     std::vector<LLViewerObject*>::iterator idle_end = idle_list.begin()+idle_count;
 
-    if (gSavedSettings.getBOOL("FreezeTime"))
+    static LLCachedControl<bool> freeze_time(gSavedSettings, "FreezeTime", false);
+    if (freeze_time)
     {
 
         for (std::vector<LLViewerObject*>::iterator iter = idle_list.begin();
