@@ -837,4 +837,52 @@ namespace tut
                grid->findChild<LLPanel>("width_row", true) != nullptr);
         grid->die();
     }
+
+    // A name that works and should not be used says so on the row that uses
+    // it, and says what to write where the vocabulary has a word for it.
+    template<> template<>
+    void alpropertygrid_object::test<18>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+        ALPropertyGrid::Tips tips;
+        tips.field = "[NAME]";
+        tips.deprecated = "[NAME] works, and nothing new should use it";
+        tips.deprecatedFor = "[NAME] works, and nothing new should use it; write [INSTEAD]";
+        grid->setTips(tips);
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("dynamicwidth", 0));
+        fields.back().deprecated = true;
+        fields.back().instead = "dynamic_width";
+        fields.push_back(field("hover", 0));
+        fields.back().deprecated = true;
+        fields.push_back(field("width", 0));
+        grid->setFields(fields);
+
+        LLPanel* rows = grid->getChild<LLPanel>("identity_rows", true);
+        const std::string spelt = rows->getChild<LLPanel>("dynamicwidth_row", true)
+                                      ->getChild<LLTextBox>("dynamicwidth_label", true)->getToolTip();
+        ensure("a deprecated name says so: " + spelt,
+               spelt.find("nothing new should use it") != std::string::npos);
+        ensure("and says what to write: " + spelt,
+               spelt.find("write dynamic_width") != std::string::npos);
+
+        const std::string bare = rows->getChild<LLPanel>("hover_row", true)
+                                     ->getChild<LLTextBox>("hover_label", true)->getToolTip();
+        ensure("one with nothing to write instead says only that: " + bare,
+               bare.find("nothing new should use it") != std::string::npos
+               && bare.find("write") == std::string::npos);
+
+        const std::string fine = rows->getChild<LLPanel>("width_row", true)
+                                     ->getChild<LLTextBox>("width_label", true)->getToolTip();
+        ensure("and a name in good standing says nothing of the kind: " + fine,
+               fine.find("should") == std::string::npos);
+        grid->die();
+    }
 }

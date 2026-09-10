@@ -169,6 +169,7 @@ namespace
         args["[NAME]"] = field.name;
         args["[TYPE]"] = field.type;
         args["[SOURCE]"] = field.source;
+        args["[INSTEAD]"] = field.instead;
         LLStringUtil::format(text, args);
         return text;
     }
@@ -478,6 +479,17 @@ std::string ALPropertyGrid::tipFor(const Field& field) const
     if (!field.authored && !mTips.unwritten.empty())
     {
         text += "\n" + say(mTips.unwritten, field);
+    }
+    // A name that works and should not be used says so on the row that
+    // uses it, and says what to write where the vocabulary has a word.
+    if (field.deprecated)
+    {
+        const std::string& pattern = field.instead.empty() || mTips.deprecatedFor.empty()
+                                   ? mTips.deprecated : mTips.deprecatedFor;
+        if (!pattern.empty())
+        {
+            text += "\n" + say(pattern, field);
+        }
     }
     // And what the caller has to say about this one, which no pattern
     // over the vocabulary can know.

@@ -108,6 +108,11 @@ public:
         bool                        ignored = false;
         // Written by the file and declared by nothing.
         bool                        unknown = false;
+        // A name that exists, works, and should not be used: the row is
+        // shown because the file writes it, and says so. `instead` is the
+        // name to write, where there is one.
+        bool                        deprecated = false;
+        std::string                 instead;
         // The field that shares this one's row. Left and top are a position
         // and width and height are a size: read on one line each, they are
         // the two rows anybody actually thinks in rather than four. Only the
@@ -194,10 +199,11 @@ public:
     boost::signals2::connection onNoticeAction(const notice_signal_t::slot_type& cb);
 
     // The words a row is explained in, for the same reason: each may carry
-    // [NAME], [TYPE] and [SOURCE] -- the field's own name, the C++ type
-    // behind it, and the layer that wrote what is in force. A row's label,
-    // its editor and its way back all say one of these, so hovering
-    // anywhere along a row answers the same question.
+    // [NAME], [TYPE], [SOURCE] and [INSTEAD] -- the field's own name, the
+    // C++ type behind it, the layer that wrote what is in force, and the
+    // name to write in place of a deprecated one. A row's label, its
+    // editor and its way back all say one of these, so hovering anywhere
+    // along a row answers the same question.
     struct Tips
     {
         std::string field;          // a row whose type is not worth saying
@@ -206,6 +212,8 @@ public:
         std::string unknown;        // written by the file, declared by nothing
         std::string source;         // added where a row knows which layer wrote it
         std::string unwritten;      // added where nobody wrote it and it is in force anyway
+        std::string deprecated;     // added where the name works and should not be used
+        std::string deprecatedFor;  // and where there is a name to use instead
         std::string remove;         // the way back, on the rows that have one
     };
     void setTips(Tips tips);
