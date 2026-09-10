@@ -26,6 +26,8 @@
 
 #include "alfollowscontrol.h"
 
+#include "alflagsfield.h"
+
 #include "llrender2dutils.h"
 #include "lltooltip.h"
 #include "lluicolortable.h"
@@ -48,12 +50,6 @@ namespace
     constexpr F32 THUMB_SMALLER = 0.68f;
     constexpr F32 THUMB_LARGER = 1.f;
 
-    bool sameWord(std::string_view a, std::string_view b)
-    {
-        return a.size() == b.size()
-            && std::equal(a.begin(), a.end(), b.begin(),
-                          [](char x, char y) { return LLStringOps::toLower(x) == LLStringOps::toLower(y); });
-    }
 }
 
 ALFollowsControl::ALFollowsControl(const Params& p)
@@ -94,59 +90,25 @@ void ALFollowsControl::setSubject(const LLRect& child, const LLRect& parent)
     mMargin[TOP]    = llclamp((F32)(parent.mTop - child.mTop) / height, LEAST_MARGIN, MOST_MARGIN);
 }
 
+// The form is the flags field's: the same words, read and written the
+// same way, since a file does not know which widget is looking at them.
 void ALFollowsControl::setValue(const LLSD& value)
 {
-    const std::string text = value.asString();
-    std::fill(std::begin(mSet), std::end(mSet), false);
-
-    for (size_t start = 0; start <= text.size(); )
+    const U32 bits = ALFlagsField::read(value.asString(), mNames, mAll);
+    for (S32 edge = 0; edge < EDGES; ++edge)
     {
-        const size_t bar = text.find('|', start);
-        const std::string_view token(text.data() + start,
-                                     (bar == std::string::npos ? text.size() : bar) - start);
-        if (!mAll.empty() && sameWord(token, mAll))
-        {
-            std::fill(std::begin(mSet), std::end(mSet), true);
-        }
-        else
-        {
-            for (S32 edge = 0; edge < EDGES; ++edge)
-            {
-                if (!mNames[edge].empty() && sameWord(token, mNames[edge]))
-                {
-                    mSet[edge] = true;
-                }
-            }
-        }
-        if (bar == std::string::npos)
-        {
-            break;
-        }
-        start = bar + 1;
+        mSet[edge] = (bits & (1u << edge)) != 0;
     }
 }
 
 LLSD ALFollowsControl::getValue() const
 {
-    const bool every = std::all_of(std::begin(mSet), std::end(mSet), [](bool on) { return on; });
-    const bool any = std::any_of(std::begin(mSet), std::end(mSet), [](bool on) { return on; });
-    if (every && !mAll.empty())
-    {
-        return mAll;
-    }
-    if (!any)
-    {
-        return mNone;
-    }
-    std::string out;
+    U32 bits = 0;
     for (S32 edge = 0; edge < EDGES; ++edge)
     {
-        if (mSet[edge] && !mNames[edge].empty())
-        {
-            out += out.empty() ? mNames[edge] : "|" + mNames[edge];
-        }
+        bits |= mSet[edge] ? 1u << edge : 0u;
     }
-    return out;
+    return ALFlagsField::write(bits, mNames, mAll, mNone);
 }
 
 // static

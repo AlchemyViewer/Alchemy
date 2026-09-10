@@ -32,6 +32,8 @@
 #include "lltextbox.h"
 #include "lluictrlfactory.h"
 
+#include "llcallbacklist.h"
+
 static LLDefaultChildRegistry::Register<ALJumpBar> r("jump_bar");
 
 namespace
@@ -53,6 +55,11 @@ ALJumpBar::ALJumpBar(const Params& p)
 :   LLPanel(p),
     mTrailerText(p.trailer)
 {
+}
+
+ALJumpBar::~ALJumpBar()
+{
+    gIdleCallbacks.deleteFunction(buildIdle, this);
 }
 
 void ALJumpBar::setPath(std::vector<Crumb> crumbs)
@@ -100,6 +107,29 @@ size_t ALJumpBar::folded() const
 }
 
 void ALJumpBar::build()
+{
+    if (mFiring > 0)
+    {
+        if (!mBuildWaiting)
+        {
+            mBuildWaiting = true;
+            gIdleCallbacks.addFunction(buildIdle, this);
+        }
+        return;
+    }
+    buildNow();
+}
+
+// static
+void ALJumpBar::buildIdle(void* self)
+{
+    ALJumpBar* bar = static_cast<ALJumpBar*>(self);
+    gIdleCallbacks.deleteFunction(buildIdle, self);
+    bar->mBuildWaiting = false;
+    bar->buildNow();
+}
+
+void ALJumpBar::buildNow()
 {
     for (LLView* part : mParts)
     {
@@ -203,9 +233,12 @@ void ALJumpBar::build()
     }
 }
 
-void ALJumpBar::chose(size_t at, const std::string& value)
+// The value is copied first: what is chosen may be the path being replaced.
+void ALJumpBar::chose(size_t at, std::string value)
 {
+    ++mFiring;
     mChose(at, value);
+    --mFiring;
 }
 
 void ALJumpBar::reshape(S32 width, S32 height, bool called_from_parent)

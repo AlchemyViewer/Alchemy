@@ -30,7 +30,7 @@
 
 #include <boost/signals2.hpp>
 
-class LLFloater;
+class ALPopover;
 class LLFontGL;
 class LLLineEditor;
 
@@ -66,6 +66,9 @@ public:
     const std::string& size() const { return mSize; }
     const std::string& style() const { return mStyle; }
 
+    // The face the three name, as the specimen is drawn in it.
+    const LLFontGL* font() const;
+
     // Which of the three changed and what it now says: the part is empty
     // for the name, and otherwise `size` or `style`, which are the names a
     // file writes after the dot. Only what changed is reported.
@@ -96,10 +99,9 @@ private:
     std::string             mSize;
     std::string             mStyle;
     S32                     mSampleWidth;
-    // The face the three parts name, and the parts it was found for.
+    // The face the three parts name, found when one of them changes.
     const LLFontGL*         mFont = nullptr;
-    std::string             mFontOf;
     LLLineEditor*           mEditor = nullptr;
     part_signal_t           mPartCommit;
-    LLHandle<LLFloater>     mPopover;
+    LLHandle<ALPopover>     mPopover;
 };

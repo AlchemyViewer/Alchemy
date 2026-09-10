@@ -182,4 +182,25 @@ namespace tut
         ensure("and no content, none either", ALPopover::show(over, nullptr) == nullptr);
         over->die();
     }
+
+    // A control at the right edge of the screen opens its popover on the
+    // screen, not off the side of it.
+    template<> template<>
+    void alpopover_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const S32 screen_width = gFloaterView->getRect().getWidth();
+        LLPanel* over = anchor(screen_width - 40, 300);
+        ALPopover* popover = ALPopover::show(over, content(160, 90));
+        ensure("opens", popover != nullptr);
+        ensure("and is on the screen: right edge " + std::to_string(popover->getRect().mRight)
+                   + " of " + std::to_string(screen_width),
+               popover->getRect().mRight <= screen_width);
+        ensure("and no narrower for it", popover->getRect().getWidth() == 160);
+        popover->closeFloater();
+        over->die();
+    }
 }

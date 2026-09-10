@@ -26,7 +26,9 @@
 
 #include "lluictrl.h"
 
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class LLCheckBoxCtrl;
@@ -61,16 +63,31 @@ public:
     void setValue(const LLSD& value) override;
     LLSD getValue() const override;
 
+    // The form itself, for anything else that holds a set of named bits:
+    // bit i is the name at i. Reading sets each bit whose name is written,
+    // every bit where the word for all of them is, and passes over a name
+    // the list does not carry; names compare without regard to case, as
+    // the parsers compare them. Writing says the word for all where every
+    // bit is set and the word is given, the word for none where no bit is,
+    // and otherwise the names with bars between them.
+    static U32 read(std::string_view text, std::span<const std::string> names, std::string_view all_word);
+    static std::string write(U32 bits, std::span<const std::string> names,
+                             const std::string& all_word, const std::string& none_word);
+
+    // The boxes share the width, so a field given more of it gives them more.
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+
 protected:
     friend class LLUICtrlFactory;
     ALFlagsField(const Params& p);
 
 private:
     void rebuild();
+    void layout();
     void onToggle();
 
     std::vector<std::string>        mNames;
-    std::vector<bool>              mSet;
+    U32                             mBits = 0;
     std::vector<LLCheckBoxCtrl*>    mBoxes;
     std::string                     mAll;
     std::string                     mNone;

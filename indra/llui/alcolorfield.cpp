@@ -27,15 +27,16 @@
 #include "alcolorfield.h"
 
 #include "alcolorpicker.h"
+#include "alpopover.h"
 
 #include "llfiltereditor.h"
 #include "llfloater.h"
-#include "llfocusmgr.h"
 #include "lllineeditor.h"
 #include "llrender2dutils.h"
 #include "llscrollcontainer.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
+#include "lltrans.h"
 #include "lluictrlfactory.h"
 #include "lluicolortable.h"
 
@@ -256,17 +257,14 @@ namespace
     // abandons it. It resizes, and the size it is left at is the size it
     // opens at next time, because how much of a colour wheel someone wants
     // to see is not something this can decide for them.
-    class ALColorPopover final : public LLFloater
+    class ALColorPopover final : public ALPopover
     {
     public:
-        AL_VIEW_TYPE(ALColorPopover, LLFloater);
+        AL_VIEW_TYPE(ALColorPopover, ALPopover);
 
-        typedef std::function<void(const std::string&)> settled_t;
-
-        ALColorPopover(const LLFloater::Params& p, const std::string& value, settled_t settled)
-        :   LLFloater(LLSD(), p),
-            mValue(value),
-            mSettled(std::move(settled))
+        ALColorPopover(const LLFloater::Params& p, const std::string& value)
+        :   ALPopover(p),
+            mValue(value)
         {
             const S32 width = getRect().getWidth();
             // A floater draws its own title across the top of its rect, and
@@ -277,7 +275,7 @@ namespace
             LLFilterEditor::Params fp;
             fp.name = "filter";
             fp.rect = LLRect(HEADER + 8, height - 4, width - 4, height - 4 - ROW);
-            fp.label = "Filter";
+            fp.label = LLTrans::getString("ColorFieldFilter");
             fp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
             mFilter = LLUICtrlFactory::create<LLFilterEditor>(fp);
             addChild(mFilter);
@@ -295,7 +293,7 @@ namespace
 
             LLPanel::Params np;
             np.name = "names";
-            np.label = "Names";
+            np.label = LLTrans::getString("ColorFieldNames");
             np.rect = body;
             LLPanel* names = LLUICtrlFactory::create<LLPanel>(np);
 
@@ -323,7 +321,7 @@ namespace
             // table has no name for what is wanted.
             LLPanel::Params cp;
             cp.name = "custom";
-            cp.label = "Custom";
+            cp.label = LLTrans::getString("ColorFieldCustom");
             cp.rect = body;
             LLPanel* custom = LLUICtrlFactory::create<LLPanel>(cp);
 
@@ -347,13 +345,12 @@ namespace
             refreshPreview();
         }
 
-        // The field is going away and this with it: what was chosen has
-        // nowhere to be written to.
-        void abandon() { mKeep = false; }
+        // What was chosen, as the file writes it.
+        const std::string& value() const { return mValue; }
 
         void draw() override
         {
-            LLFloater::draw();
+            ALPopover::draw();
             // What would be written, drawn where it can be compared with
             // what is under the pointer.
             static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
@@ -367,36 +364,12 @@ namespace
             gl_rect_2d(swatch, edge.get(), false);
         }
 
+        // The size it is left at is the size it opens at next time.
         void onClose(bool app_quitting) override
         {
             sWidth = getRect().getWidth();
             sHeight = getRect().getHeight();
-            if (mKeep && mSettled)
-            {
-                mSettled(mValue);
-            }
-            LLFloater::onClose(app_quitting);
-        }
-
-        void onFocusLost() override
-        {
-            closeFloater();
-        }
-
-        bool handleKeyHere(KEY key, MASK mask) override
-        {
-            if (key == KEY_ESCAPE && mask == MASK_NONE)
-            {
-                mKeep = false;
-                closeFloater();
-                return true;
-            }
-            if (key == KEY_RETURN && mask == MASK_NONE)
-            {
-                closeFloater();
-                return true;
-            }
-            return LLFloater::handleKeyHere(key, mask);
+            ALPopover::onClose(app_quitting);
         }
 
     private:
@@ -413,11 +386,9 @@ namespace
         }
 
         std::string         mValue;
-        settled_t           mSettled;
         LLFilterEditor*     mFilter = nullptr;
         ALColorSwatchGrid*  mGrid = nullptr;
         ALColorPicker*      mPicker = nullptr;
-        bool                mKeep = true;
     };
 }
 
@@ -498,11 +469,6 @@ bool ALColorField::handleMouseDown(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleMouseDown(x, y, mask);
 }
 
-void ALColorField::onFocusLost()
-{
-    LLUICtrl::onFocusLost();
-}
-
 void ALColorField::onTextCommit()
 {
     setText(mEditor->getText());
@@ -520,30 +486,22 @@ void ALColorField::openPopover()
 {
     closePopover();
 
-    LLFloater::Params p(LLFloater::getDefaultParams());
-    p.can_close = false;
-    p.can_minimize = false;
-    p.can_resize = true;
+    LLFloater::Params p(ALPopover::paramsFor(sWidth, sHeight, mText, /*resizable=*/true));
     p.min_width = MIN_WIDTH;
     p.min_height = MIN_HEIGHT;
-    p.title = mText;
-    p.rect = LLRect(0, sHeight, sWidth, 0);
-
-    ALColorPopover* popover = new ALColorPopover(p, mText,
-        [this](const std::string& value) { chose(value); });
-    mPopover = popover->getHandle();
-
-    // Under the field, and shoved back on screen if that would put it off.
-    LLRect screen = calcScreenRect();
-    LLRect where = popover->getRect();
-    where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-    if (where.mBottom < 0)
+    ALColorPopover* popover = new ALColorPopover(p, mText);
+    mPopover = popover->getDerivedHandle<ALPopover>();
+    // Told as it goes, while it still holds what was chosen; escaped is
+    // the one way out that keeps what the field had.
+    popover->onClosed([this, held = popover->getDerivedHandle<ALColorPopover>()](bool escaped)
     {
-        where.translate(0, screen.getHeight() + where.getHeight());
-    }
-    popover->setRect(where);
-    popover->openFloater();
-    popover->setFocus(true);
+        if (ALColorPopover* said = held.get(); said && !escaped)
+        {
+            chose(said->value());
+        }
+        mPopover.markDead();
+    });
+    popover->openBeside(this);
 }
 
 // Closed from this side rather than from its own: whatever was chosen is
@@ -551,13 +509,9 @@ void ALColorField::openPopover()
 // deleted, and a popover closing itself is the path that keeps a choice.
 void ALColorField::closePopover()
 {
-    if (LLFloater* popover = mPopover.get())
+    if (ALPopover* popover = mPopover.get())
     {
-        if (ALColorPopover* colour = popover->as<ALColorPopover>())
-        {
-            colour->abandon();
-        }
-        popover->closeFloater();
+        popover->escape();
     }
     mPopover.markDead();
 }

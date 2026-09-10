@@ -91,22 +91,30 @@ public:
     }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    ~ALJumpBar() override;
 
 protected:
     friend class LLUICtrlFactory;
     ALJumpBar(const Params& p);
 
 private:
+    // A path set from inside a crumb's own press -- which is what going
+    // there does -- is built once the press is over, since building deletes
+    // the crumb that is still on the stack.
     void build();
+    void buildNow();
+    static void buildIdle(void* self);
     // How many crumbs from the front are swallowed so that the rest fit, and
     // the fold that offers them back.
     size_t folded() const;
     S32 widthOf(const Crumb& crumb) const;
-    void chose(size_t at, const std::string& value);
+    void chose(size_t at, std::string value);
 
     std::vector<Crumb>      mCrumbs;
     std::vector<LLView*>    mParts;
     LLTextBox*              mTrailer = nullptr;
     std::string             mTrailerText;
+    S32                     mFiring = 0;
+    bool                    mBuildWaiting = false;
     chose_signal_t          mChose;
 };

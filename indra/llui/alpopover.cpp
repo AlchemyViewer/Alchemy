@@ -44,36 +44,53 @@ ALPopover* ALPopover::show(LLView* anchor, LLPanel* content, const std::string& 
     }
 
     const LLRect wanted = content->getRect();
+    ALPopover* popover = new ALPopover(paramsFor(wanted.getWidth(), wanted.getHeight(), title));
+    content->setOrigin(0, 0);
+    content->setFollows(FOLLOWS_ALL);
+    popover->addChild(content);
+    popover->openBeside(anchor);
+    return popover;
+}
 
+// static
+LLFloater::Params ALPopover::paramsFor(S32 width, S32 height, const std::string& title, bool resizable)
+{
     LLFloater::Params p(LLFloater::getDefaultParams());
     p.can_close = false;
     p.can_minimize = false;
-    p.can_resize = false;
+    p.can_resize = resizable;
     p.can_tear_off = false;
     p.save_rect = false;
     p.save_visibility = false;
     p.title = title;
-    p.rect = LLRect(0, wanted.getHeight(), wanted.getWidth(), 0);
+    p.rect = LLRect(0, height, width, 0);
+    return p;
+}
 
-    ALPopover* popover = new ALPopover(p);
-    content->setOrigin(0, 0);
-    content->setFollows(FOLLOWS_ALL);
-    popover->addChild(content);
-
-    // Under the control, its left edge with the control's, and flipped above
-    // it where under would put it off the bottom: a panel a person cannot see
-    // the whole of is a panel that has not opened.
-    const LLRect screen = anchor->calcScreenRect();
-    LLRect where = popover->getRect();
-    where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-    if (where.mBottom < 0)
+// Under the control, its left edge with the control's, and flipped above it
+// where under would put it off the bottom: a panel a person cannot see the
+// whole of is a panel that has not opened. A side off the screen is put
+// back on it for the same reason, which is what the floater view does for
+// every window it holds.
+void ALPopover::openBeside(const LLView* anchor)
+{
+    if (anchor)
     {
-        where.translate(0, screen.getHeight() + where.getHeight());
+        const LLRect screen = anchor->calcScreenRect();
+        LLRect where = getRect();
+        where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
+        if (where.mBottom < 0)
+        {
+            where.translate(0, screen.getHeight() + where.getHeight());
+        }
+        setRect(where);
     }
-    popover->setRect(where);
-    popover->openFloater();
-    popover->setFocus(true);
-    return popover;
+    if (gFloaterView && getParent() == gFloaterView)
+    {
+        gFloaterView->adjustToFitScreen(this, false);
+    }
+    openFloater();
+    setFocus(true);
 }
 
 void ALPopover::settle()

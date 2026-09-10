@@ -46,7 +46,12 @@
 // The content is the caller's panel, given whole: this places it, shows it,
 // and deletes it. What is in it, how big it is and what choosing means are
 // none of this widget's business.
-class ALPopover final : public LLFloater
+//
+// A popover with more to it than a panel -- one that draws in its own
+// header, or resizes -- derives from this, builds its own content, and
+// opens with openBeside(): the placing and the three ways out are the same
+// for every one of them.
+class ALPopover : public LLFloater
 {
 public:
     AL_VIEW_TYPE(ALPopover, LLFloater);
@@ -59,6 +64,18 @@ public:
     // whole of it and there is no bar to drag it by.
     static ALPopover* show(LLView* anchor, LLPanel* content,
                            const std::string& title = LLStringUtil::null);
+
+    // What a popover this size is built from: no close box, no minimise,
+    // no tear-off, nothing saved, and a size a person may change only
+    // where asked.
+    static LLFloater::Params paramsFor(S32 width, S32 height,
+                                       const std::string& title = LLStringUtil::null,
+                                       bool resizable = false);
+
+    // Opened beside the anchor: under it with their left edges together,
+    // above it where under would run off the bottom, and shoved back on
+    // screen where a side would run off, then shown and given the keyboard.
+    void openBeside(const LLView* anchor);
 
     // Gone, having settled: what a caller calls when the thing in it has been
     // chosen. The closed signal says it was not escaped.

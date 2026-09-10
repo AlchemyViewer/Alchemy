@@ -33,6 +33,8 @@
 #include "lluictrl.h"
 #include "lluictrlfactory.h"
 
+#include "llcallbacklist.h"
+
 static LLDefaultChildRegistry::Register<ALScopeBar> r("scope_bar");
 
 namespace
@@ -59,6 +61,11 @@ ALScopeBar::ALScopeBar(const Params& p)
 {
 }
 
+ALScopeBar::~ALScopeBar()
+{
+    gIdleCallbacks.deleteFunction(buildIdle, this);
+}
+
 void ALScopeBar::setSentence(std::vector<Segment> segments)
 {
     // What is already chosen stays chosen, so that a caller rewriting the
@@ -75,8 +82,31 @@ void ALScopeBar::setSentence(std::vector<Segment> segments)
             segment.value = had;
         }
     }
+    // The parts answer for the sentence they were built from until they
+    // are built again, so a sentence that has to wait waits whole.
+    if (mFiring > 0)
+    {
+        mWaiting = std::move(segments);
+        if (!mBuildWaiting)
+        {
+            mBuildWaiting = true;
+            gIdleCallbacks.addFunction(buildIdle, this);
+        }
+        return;
+    }
     mSegments = std::move(segments);
     build();
+}
+
+// static
+void ALScopeBar::buildIdle(void* self)
+{
+    ALScopeBar* bar = static_cast<ALScopeBar*>(self);
+    gIdleCallbacks.deleteFunction(buildIdle, self);
+    bar->mBuildWaiting = false;
+    bar->mSegments = std::move(bar->mWaiting);
+    bar->mWaiting.clear();
+    bar->build();
 }
 
 void ALScopeBar::build()
@@ -124,7 +154,7 @@ void ALScopeBar::build()
                 choice->selectFirstItem();
                 segment.value = choice->getValue().asString();
             }
-            choice->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
+            choice->setCommitCallback([this](LLUICtrl*, const LLSD&) { fire(mChanged); });
             addChild(choice);
             mParts.push_back(choice);
             break;
@@ -141,8 +171,8 @@ void ALScopeBar::build()
             p.label = segment.text;
             LLLineEditor* field = LLUICtrlFactory::create<LLLineEditor>(p);
             field->setText(segment.value);
-            field->setCommitCallback([this](LLUICtrl*, const LLSD&) { mRun(); });
-            field->setKeystrokeCallback([this](LLLineEditor*, void*) { mChanged(); }, nullptr);
+            field->setCommitCallback([this](LLUICtrl*, const LLSD&) { fire(mRun); });
+            field->setKeystrokeCallback([this](LLLineEditor*, void*) { fire(mChanged); }, nullptr);
             addChild(field);
             mParts.push_back(field);
             break;

@@ -27,6 +27,7 @@
 #include "alfontfield.h"
 
 #include "llcheckboxctrl.h"
+#include "alpopover.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
 #include "llfloater.h"
@@ -37,6 +38,7 @@
 #include "llscrollcontainer.h"
 #include "llstyle.h"
 #include "lltextbox.h"
+#include "lltrans.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
@@ -192,21 +194,20 @@ namespace
 
     // The popover. The three parts are picked against a preview and given
     // back when it closes, so a visit to it is one change: escape abandons
-    // what was picked, and anything else keeps it.
-    class ALFontPopover final : public LLFloater
+    // what was picked, and anything else keeps it. The ways out and the
+    // placing are the popover's; this builds the three parts and holds
+    // what they say.
+    class ALFontPopover final : public ALPopover
     {
     public:
-        AL_VIEW_TYPE(ALFontPopover, LLFloater);
-
-        typedef std::function<void(const std::string&, const std::string&, const std::string&)> settled_t;
+        AL_VIEW_TYPE(ALFontPopover, ALPopover);
 
         ALFontPopover(const LLFloater::Params& p, const std::string& name, const std::string& size,
-                      const std::string& style, settled_t settled)
-        :   LLFloater(LLSD(), p),
+                      const std::string& style)
+        :   ALPopover(p),
             mName(name),
             mSize(size),
-            mStyle(style),
-            mSettled(std::move(settled))
+            mStyle(style)
         {
             const S32 right = POPOVER_WIDTH - 4;
             S32 top = getRect().getHeight() - 4;
@@ -214,7 +215,7 @@ namespace
             LLFilterEditor::Params fp;
             fp.name = "filter";
             fp.rect = LLRect(4, top, right, top - ROW);
-            fp.label = "Filter fonts";
+            fp.label = LLTrans::getString("FontFieldFilter");
             mFilter = LLUICtrlFactory::create<LLFilterEditor>(fp);
             mFilter->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
             {
@@ -245,7 +246,7 @@ namespace
             LLTextBox::Params tp;
             tp.name = "size_label";
             tp.rect = LLRect(4, top, 44, top - ROW);
-            tp.initial_value = "Size";
+            tp.initial_value = LLTrans::getString("FontFieldSize");
             tp.font_valign = LLFontGL::VCENTER;
             addChild(LLUICtrlFactory::create<LLTextBox>(tp));
 
@@ -274,13 +275,14 @@ namespace
             top -= ROW + 4;
 
             const U8 style_now = LLFontGL::getStyleFromString(mStyle);
-            static const char* labels[3] = { "Bold", "Italic", "Underline" };
+            static const char* const names[3] = { "bold", "italic", "underline" };
+            static const char* const labels[3] = { "FontFieldBold", "FontFieldItalic", "FontFieldUnderline" };
             static const U8 bits[3] = { LLFontGL::BOLD, LLFontGL::ITALIC, LLFontGL::UNDERLINE };
             for (S32 i = 0; i < 3; ++i)
             {
                 LLCheckBoxCtrl::Params bp;
-                bp.name = labels[i];
-                bp.label = labels[i];
+                bp.name = names[i];
+                bp.label = LLTrans::getString(labels[i]);
                 bp.rect = LLRect(4 + i * 100, top, 4 + i * 100 + 96, top - ROW);
                 bp.initial_value = (style_now & bits[i]) != 0;
                 LLCheckBoxCtrl* box = LLUICtrlFactory::create<LLCheckBoxCtrl>(bp);
@@ -307,40 +309,10 @@ namespace
             refreshPreview();
         }
 
-        // Closing settles it, unless escape said not to.
-        void onClose(bool app_quitting) override
-        {
-            if (mKeep && mSettled)
-            {
-                mSettled(mName, mSize, mStyle);
-            }
-            LLFloater::onClose(app_quitting);
-        }
-
-        // The field is going away and this is going with it: what was
-        // picked has nowhere to be written to.
-        void abandon() { mKeep = false; }
-
-        void onFocusLost() override
-        {
-            closeFloater();
-        }
-
-        bool handleKeyHere(KEY key, MASK mask) override
-        {
-            if (key == KEY_ESCAPE && mask == MASK_NONE)
-            {
-                mKeep = false;
-                closeFloater();
-                return true;
-            }
-            if (key == KEY_RETURN && mask == MASK_NONE)
-            {
-                closeFloater();
-                return true;
-            }
-            return LLFloater::handleKeyHere(key, mask);
-        }
+        // What was picked, as the three attributes it is.
+        const std::string& name() const { return mName; }
+        const std::string& size() const { return mSize; }
+        const std::string& style() const { return mStyle; }
 
     private:
         void refreshPreview()
@@ -354,12 +326,10 @@ namespace
         std::string         mName;
         std::string         mSize;
         std::string         mStyle;
-        settled_t           mSettled;
         LLFilterEditor*     mFilter = nullptr;
         ALFontList*         mList = nullptr;
         LLComboBox*         mSizes = nullptr;
         LLTextBox*          mPreview = nullptr;
-        bool                mKeep = true;
     };
 }
 
@@ -380,6 +350,7 @@ ALFontField::ALFontField(const Params& p)
     mEditor = LLUICtrlFactory::create<LLLineEditor>(ep);
     mEditor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onTextCommit(); });
     addChild(mEditor);
+    refreshText();
 }
 
 ALFontField::~ALFontField()
@@ -410,14 +381,24 @@ void ALFontField::setStyle(const std::string& style)
     refreshText();
 }
 
+const LLFontGL* ALFontField::font() const
+{
+    return mFont ? mFont : LLFontGL::getFontSansSerif();
+}
+
 // The line says the name, because that is the attribute this row is for.
-// What the size and the flags do is in the specimen beside it.
+// What the size and the flags do is in the specimen beside it, drawn in the
+// face the three of them name -- found here, when one of them changes,
+// rather than on every frame: a lookup builds a descriptor, and a name
+// nobody declared would have the registry try to make a font of it, and say
+// so, each time it was drawn.
 void ALFontField::refreshText()
 {
     if (mEditor)
     {
         mEditor->setText(mName);
     }
+    mFont = fontOf(mName, mSize, mStyle);
 }
 
 void ALFontField::draw()
@@ -426,16 +407,8 @@ void ALFontField::draw()
     static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
     const LLRect sample(0, getRect().getHeight() - 2, mSampleWidth, 2);
     gl_rect_2d(sample, edge.get(), false);
-    // Found again only when a part has changed: a lookup builds a
-    // descriptor, and a name nobody declared would have the registry try
-    // to make a font of it, and say so, on every frame it was drawn.
-    if (!mFont || mFontOf != mName + "|" + mSize + "|" + mStyle)
-    {
-        mFont = fontOf(mName, mSize, mStyle);
-        mFontOf = mName + "|" + mSize + "|" + mStyle;
-    }
-    mFont->renderUTF8(SAMPLE, 0, sample.mLeft + 3, sample.mBottom + 2,
-                      ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+    font()->renderUTF8(SAMPLE, 0, sample.mLeft + 3, sample.mBottom + 2,
+                       ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
     LLUICtrl::draw();
 }
 
@@ -455,6 +428,7 @@ void ALFontField::onTextCommit()
     mName = mEditor->getText();
     if (mName != was)
     {
+        mFont = fontOf(mName, mSize, mStyle);
         mPartCommit(LLStringUtil::null, mName);
     }
     onCommit();
@@ -482,32 +456,20 @@ void ALFontField::openPopover()
     closePopover();
 
     static constexpr S32 POPOVER_HEIGHT = 4 + ROW + 4 + LIST_HEIGHT + 6 + ROW + 4 + ROW + 4 + PREVIEW_HEIGHT + 4;
-
-    LLFloater::Params p(LLFloater::getDefaultParams());
-    p.can_close = false;
-    p.can_minimize = false;
-    p.can_resize = false;
-    p.title = LLStringUtil::null;
-    p.rect = LLRect(0, POPOVER_HEIGHT, POPOVER_WIDTH, 0);
-
-    ALFontPopover* popover = new ALFontPopover(p, mName, mSize, mStyle,
-        [this](const std::string& name, const std::string& size, const std::string& style)
-        {
-            apply(name, size, style);
-        });
-    mPopover = popover->getHandle();
-
-    // Under the field, and shoved back on screen if that would put it off.
-    LLRect screen = calcScreenRect();
-    LLRect where = popover->getRect();
-    where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-    if (where.mBottom < 0)
+    ALFontPopover* popover = new ALFontPopover(ALPopover::paramsFor(POPOVER_WIDTH, POPOVER_HEIGHT),
+                                               mName, mSize, mStyle);
+    mPopover = popover->getDerivedHandle<ALPopover>();
+    // Told as it goes, while it still holds what was picked; escaped is
+    // the one way out that keeps what the field had.
+    popover->onClosed([this, held = popover->getDerivedHandle<ALFontPopover>()](bool escaped)
     {
-        where.translate(0, screen.getHeight() + where.getHeight());
-    }
-    popover->setRect(where);
-    popover->openFloater();
-    popover->setFocus(true);
+        if (ALFontPopover* said = held.get(); said && !escaped)
+        {
+            apply(said->name(), said->size(), said->style());
+        }
+        mPopover.markDead();
+    });
+    popover->openBeside(this);
 }
 
 // Closed from this side rather than from its own: whatever was picked is
@@ -515,13 +477,9 @@ void ALFontField::openPopover()
 // deleted, and a popover closing itself is the path that keeps a choice.
 void ALFontField::closePopover()
 {
-    if (LLFloater* popover = mPopover.get())
+    if (ALPopover* popover = mPopover.get())
     {
-        if (ALFontPopover* font_popover = popover->as<ALFontPopover>())
-        {
-            font_popover->abandon();
-        }
-        popover->closeFloater();
+        popover->escape();
     }
     mPopover.markDead();
 }

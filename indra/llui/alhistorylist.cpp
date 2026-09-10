@@ -27,9 +27,12 @@
 #include "alhistorylist.h"
 
 #include "alemptystate.h"
+#include "llscrolllistcolumn.h"
 #include "llscrolllistctrl.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+
+#include <algorithm>
 
 static LLDefaultChildRegistry::Register<ALHistoryList> r("history_list");
 
@@ -120,6 +123,20 @@ void ALHistoryList::fill()
 
     mList->deleteAllItems();
 
+    // The column that says which document, only where some step names
+    // one: a caller with one document open has nothing to put in it.
+    const bool any_where = std::any_of(mSteps.begin(), mSteps.end(),
+                                       [](const Step& step) { return !step.where.empty(); });
+    if (LLScrollListColumn* where = mList->getColumn("where"))
+    {
+        const S32 width = any_where ? WHERE_WIDTH : 0;
+        if (where->getWidth() != width)
+        {
+            where->setWidth(width);
+            mList->updateColumns(true);
+        }
+    }
+
     // Newest first: the thing most likely to be undone is the thing most
     // recently done, and a list a person reaches for Control-Z instead of
     // should not need scrolling to reach it.
@@ -156,9 +173,13 @@ void ALHistoryList::fill()
         }
     }
 
+    // Kept without being chosen again: the row is where it was, and a
+    // caller told it had been pointed at would go and look at it.
     if (kept >= 0 && kept < (S32)mSteps.size())
     {
+        mList->setCommitOnSelectionChange(false);
         mList->setSelectedByValue(LLSD(kept), true);
+        mList->setCommitOnSelectionChange(true);
     }
 
     const bool anything = !mSteps.empty();

@@ -26,6 +26,7 @@
 
 #include "../alcolorfield.h"
 
+#include "../alpopover.h"
 #include "../llfloater.h"
 #include "../llscrollcontainer.h"
 #include "../lltabcontainer.h"
@@ -129,6 +130,50 @@ namespace tut
                    + ".." + std::to_string(window.mTop),
                rect.mTop > window.mBottom && rect.mTop <= window.mTop + 1);
 
+        field->die();
+    }
+
+    // Escaped, the popover gives back nothing; returned, it gives back what
+    // was chosen, once.
+    template<> template<>
+    void alcolorfield_object::test<2>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const auto popover_open = []() -> ALPopover*
+        {
+            ALPopover* found = nullptr;
+            for (LLView* child : *gFloaterView->getChildList())
+            {
+                if (ALPopover* popover = child->as<ALPopover>(); popover && popover->getVisible())
+                {
+                    found = popover;
+                }
+            }
+            return found;
+        };
+
+        ALColorField* field = make();
+        field->setValue("White");
+        S32 commits = 0;
+        field->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover* popover = popover_open();
+        ensure("the popover opened", popover != nullptr);
+        ensure("as a popover that resizes", popover->isResizable());
+        ensure("escape is taken", popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        ensure_equals("and nothing was written", commits, 0);
+        ensure_equals("the value is what it was", field->getValue().asString(), std::string("White"));
+
+        field->handleMouseDown(4, 10, MASK_NONE);
+        popover = popover_open();
+        ensure("opened again", popover != nullptr);
+        ensure("return is taken", popover->handleKeyHere(KEY_RETURN, MASK_NONE));
+        ensure_equals("and what it held was written once", commits, 1);
+        ensure_equals("which was the value it opened on", field->getValue().asString(), std::string("White"));
         field->die();
     }
 }

@@ -320,6 +320,16 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="BUTTON_DOCK">Dock</string>
 	<string name="BUTTON_HELP">Show Help</string>
 
+	<!-- The popovers over a colour field and a font field, alcolorfield.cpp and alfontfield.cpp -->
+	<string name="ColorFieldFilter">Filter</string>
+	<string name="ColorFieldNames">Names</string>
+	<string name="ColorFieldCustom">Custom</string>
+	<string name="FontFieldFilter">Filter fonts</string>
+	<string name="FontFieldSize">Size</string>
+	<string name="FontFieldBold">Bold</string>
+	<string name="FontFieldItalic">Italic</string>
+	<string name="FontFieldUnderline">Underline</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached

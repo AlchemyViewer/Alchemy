@@ -32,6 +32,9 @@
 #include "lluictrlfactory.h"
 #include "lluicolortable.h"
 
+#include <fmt/format.h>
+
+#include <array>
 #include <cmath>
 
 static LLDefaultChildRegistry::Register<ALColorPicker> r("color_picker");
@@ -95,13 +98,15 @@ namespace
         h = h - std::floor(h);
     }
 
-    std::string hexOf(const LLColor4& color)
+    // Written into the caller's buffer, since it is drawn every frame and
+    // the font takes a view.
+    typedef std::array<char, 8> hex_buf_t;
+    std::string_view hexOf(hex_buf_t& buf, const LLColor4& color)
     {
-        const auto byte = [](F32 v) { return (S32)llclamp((S32)llround(v * 255.f), 0, 255); };
-        char text[8] = { 0 };
-        snprintf(text, sizeof(text), "#%02x%02x%02x", byte(color.mV[VRED]),
-                 byte(color.mV[VGREEN]), byte(color.mV[VBLUE]));
-        return text;
+        const auto byte = [](F32 v) { return llclamp((S32)llround(v * 255.f), 0, 255); };
+        const auto result = fmt::format_to_n(buf.data(), buf.size(), "#{:02x}{:02x}{:02x}",
+                                             byte(color.mV[VRED]), byte(color.mV[VGREEN]), byte(color.mV[VBLUE]));
+        return std::string_view(buf.data(), llmin(result.size, buf.size()));
     }
 }
 
@@ -150,8 +155,8 @@ void ALColorPicker::setValue(const LLSD& value)
 
 LLSD ALColorPicker::getValue() const
 {
-    return llformat("%.3f, %.3f, %.3f, %.3f", mColor.mV[VRED], mColor.mV[VGREEN],
-                    mColor.mV[VBLUE], mColor.mV[VALPHA]);
+    return fmt::format("{:.3f}, {:.3f}, {:.3f}, {:.3f}", mColor.mV[VRED], mColor.mV[VGREEN],
+                       mColor.mV[VBLUE], mColor.mV[VALPHA]);
 }
 
 void ALColorPicker::reshape(S32 width, S32 height, bool called_from_parent)
@@ -390,7 +395,8 @@ void ALColorPicker::drawChannels() const
 
     static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
     const LLFontGL* font = LLFontGL::getFontMonospace();
-    font->renderUTF8(hexOf(mColor), 0, mChannels.mRight, mChannels.mBottom + 2, ink.get(),
+    hex_buf_t hex;
+    font->renderUTF8(hexOf(hex, mColor), 0, mChannels.mRight, mChannels.mBottom + 2, ink.get(),
                      LLFontGL::RIGHT, LLFontGL::BOTTOM);
 }
 

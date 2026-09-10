@@ -29,9 +29,8 @@
 
 #include <string>
 
+class ALPopover;
 class LLLineEditor;
-class LLScrollListCtrl;
-class LLFloater;
 
 // What a XUI file writes for a colour is almost always a name out of
 // colors.xml, and sometimes four numbers. So this holds the text, shows
@@ -59,7 +58,6 @@ public:
 
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
-    void onFocusLost() override;
 
     ~ALColorField() override;
 
@@ -84,7 +82,7 @@ private:
     bool                    mHasColor = false;
     S32                     mSwatchWidth;
     LLLineEditor*           mEditor = nullptr;
-    LLHandle<LLFloater>     mPopover;
+    LLHandle<ALPopover>     mPopover;
 
     void setText(const std::string& text);
 };

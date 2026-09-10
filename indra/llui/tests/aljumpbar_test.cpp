@@ -30,6 +30,8 @@
 #include "../llflyoutbutton.h"
 #include "../lluictrlfactory.h"
 
+#include "llcallbacklist.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -197,6 +199,44 @@ namespace tut
         ensure("past the end of the path",
                trailer->getRect().mLeft >= bar->getChild<LLView>("crumb_3")->getRect().mRight);
         ensure("and it is not a button", trailer->as<LLButton>() == nullptr);
+        delete bar;
+    }
+
+    // Going somewhere is a new path, and a caller sets it from inside the
+    // press on the crumb that chose it. The crumb is still on the stack, so
+    // the path is built again once the press is over.
+    template<> template<>
+    void aljumpbar_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALJumpBar* bar = make();
+        bar->setPath(path());
+
+        std::vector<std::string> went;
+        bar->onChose([bar, &went](size_t at, const std::string& value)
+        {
+            went.push_back(value);
+            // Where a crumb goes is a shorter path: up to it.
+            std::vector<ALJumpBar::Crumb> shorter = aljumpbar_data::path();
+            shorter.resize(at + 1);
+            bar->setPath(std::move(shorter));
+        });
+
+        LLButton* body = bar->getChild<LLButton>("crumb_1");
+        const S32 x = body->getRect().getWidth() / 2;
+        const S32 y = body->getRect().getHeight() / 2;
+        body->handleMouseDown(x, y, MASK_NONE);
+        body->handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("the crumb was chosen", went.size(), 1u);
+        ensure_equals("and said where", went.front(), std::string("body"));
+        ensure_equals("the path is still the old one while the press is over", crumbsIn(bar), 4);
+
+        gIdleCallbacks.callFunctions();
+        ensure_equals("and then the new one", crumbsIn(bar), 2);
+        ensure("of which the last is where it went", bar->findChild<LLView>("crumb_1") != nullptr);
         delete bar;
     }
 }

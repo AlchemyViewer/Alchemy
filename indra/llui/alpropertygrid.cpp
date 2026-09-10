@@ -43,6 +43,8 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 
 static LLDefaultChildRegistry::Register<ALPropertyGrid> r("property_grid");
@@ -87,7 +89,7 @@ namespace
         {
             return std::to_string((S32)llround(value));
         }
-        std::string text = llformat("%.4f", value);
+        std::string text = fmt::format("{:.4f}", value);
         while (text.size() > 1 && text.back() == '0')
         {
             text.pop_back();

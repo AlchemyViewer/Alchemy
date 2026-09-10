@@ -26,6 +26,7 @@
 
 #include "../alhistorylist.h"
 
+#include "../llscrolllistcolumn.h"
 #include "../llscrolllistctrl.h"
 #include "../lluictrlfactory.h"
 
@@ -198,6 +199,52 @@ namespace tut
                listOf(history)->getFirstSelected() != nullptr);
         ensure_equals("which is the same step",
                       listOf(history)->getFirstSelected()->getValue().asInteger(), 1);
+        delete history;
+    }
+
+    // A refill keeps the row a person was on without choosing it again: a
+    // caller told it had been pointed at would go and look at it, and the
+    // edit that caused the refill was about something else.
+    template<> template<>
+    void alhistorylist_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALHistoryList* history = make();
+        history->setSteps(three(), 3);
+        std::vector<size_t> chosen;
+        history->onStepChosen([&chosen](size_t at) { chosen.push_back(at); });
+
+        listOf(history)->setSelectedByValue(LLSD(1), true);
+        ensure_equals("choosing a row says so", chosen.size(), 1u);
+
+        std::vector<ALHistoryList::Step> more = three();
+        more.push_back({ "name on title", "floater_a.xml" });
+        history->setSteps(more, 4);
+        ensure_equals("the row is kept", listOf(history)->getFirstSelected()->getValue().asInteger(), 1);
+        ensure_equals("and not said again", chosen.size(), 1u);
+        delete history;
+    }
+
+    // The column that says which document is there only where a step names
+    // one.
+    template<> template<>
+    void alhistorylist_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALHistoryList* history = make();
+        history->setSteps({ { "width on close_btn", "" }, { "height on close_btn", "" } }, 2);
+        LLScrollListColumn* where = listOf(history)->getColumn("where");
+        ensure("the column exists", where != nullptr);
+        ensure_equals("and takes no room when nothing names a document", where->getWidth(), 0);
+
+        history->setSteps(three(), 3);
+        ensure("and is back when something does", where->getWidth() > 0);
         delete history;
     }
 }

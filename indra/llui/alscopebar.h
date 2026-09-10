@@ -112,6 +112,7 @@ public:
     }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    ~ALScopeBar() override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -121,15 +122,31 @@ private:
     // The parts, made and placed. The field is the one that flexes: every
     // other part is as wide as what is in it, which is what makes this read
     // as a sentence rather than as a row of columns.
+    //
+    // A sentence rewritten from inside one of its own parts' callbacks --
+    // which is what a caller answering one part by changing the others does
+    // -- is built again once the part has finished, since building deletes
+    // the part that is still on the stack.
     void build();
+    static void buildIdle(void* self);
+    // Around each signal: while it is up, a build waits.
+    template<typename SIGNAL> void fire(SIGNAL& signal)
+    {
+        ++mFiring;
+        signal();
+        --mFiring;
+    }
     void layout();
     S32 widthOf(const Segment& segment) const;
 
     std::vector<Segment>    mSegments;
+    std::vector<Segment>    mWaiting;       // the next sentence, while a part is mid-callback
     std::vector<LLView*>    mParts;         // one per segment, in order
     LLView*                 mAdornment = nullptr;
     S32                     mControlHeight;
     S32                     mGap;
+    S32                     mFiring = 0;
+    bool                    mBuildWaiting = false;
     changed_signal_t        mChanged;
     run_signal_t            mRun;
 };

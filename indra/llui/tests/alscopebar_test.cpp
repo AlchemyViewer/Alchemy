@@ -31,6 +31,8 @@
 #include "../lltextbox.h"
 #include "../lluictrlfactory.h"
 
+#include "llcallbacklist.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -238,6 +240,49 @@ namespace tut
         ensure_equals("keeping its width", count->getRect().getWidth(), 90);
         ensure("and the field gave up the room",
                bar->getChild<LLLineEditor>("query")->getRect().getWidth() < was);
+        delete bar;
+    }
+
+    // A caller answering one part by rewriting the sentence does it from
+    // inside that part's own callback. The part is still on the stack, so
+    // the sentence is built again once it has finished, and until then the
+    // old parts go on answering for the old sentence.
+    template<> template<>
+    void alscopebar_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALScopeBar* bar = make(500);
+        bar->setSentence(sentence());
+        bar->setValue("query", "close");
+
+        // The answer to a change: the same sentence without its last part.
+        S32 changed = 0;
+        bar->onChanged([bar, &changed]()
+        {
+            ++changed;
+            std::vector<ALScopeBar::Segment> shorter = alscopebar_data::sentence();
+            shorter.pop_back();
+            shorter.pop_back();
+            bar->setSentence(std::move(shorter));
+        });
+
+        LLComboBox* how = bar->getChild<LLComboBox>("how");
+        how->setValue("starting");
+        how->onCommit();
+        ensure_equals("the change was heard", changed, 1);
+        ensure("the part that was pressed is still there", bar->findChild<LLComboBox>("how") == how);
+        ensure("and so is the one the new sentence drops", bar->findChild<LLComboBox>("scope") != nullptr);
+        ensure_equals("and the query still answers", bar->valueOf("query"), std::string("close"));
+
+        gIdleCallbacks.callFunctions();
+        ensure("once the part has finished, the sentence is the new one",
+               bar->findChild<LLComboBox>("scope") == nullptr);
+        ensure_equals("with what was chosen kept", bar->valueOf("how"), std::string("starting"));
+        ensure_equals("and what was typed", bar->valueOf("query"), std::string("close"));
+        ensure_equals("and nothing heard twice", changed, 1);
         delete bar;
     }
 }
