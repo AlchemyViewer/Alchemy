@@ -1672,31 +1672,32 @@
                             </layout_panel>
                             <layout_panel
                              auto_resize="false"
-                             height="26"
+                             height="50"
                              layout="topleft"
-                             min_dim="26"
+                             min_dim="50"
                              name="translate_write_row"
                              width="742">
-                                <line_editor
+                                <text_editor
                                  follows="left|top|right"
-                                 height="22"
+                                 height="46"
+                                 word_wrap="true"
+                                 max_length="8192"
                                  label="Select a row above to translate it"
                                  layout="topleft"
                                  left="0"
                                  name="translate_value"
-                                 select_on_focus="true"
-                                 tool_tip="The translation for the selected row; Return writes it into the language's file"
+                                 tool_tip="The translation for the selected row. A translation may run to several lines, so return puts one in; the button beside it writes."
                                  top="2"
-                                 width="658" />
+                                 width="654" />
                                 <button
                                  follows="right|top"
                                  height="22"
                                  label="Write"
                                  layout="topleft"
-                                 left_pad="4"
+                                 left="658"
                                  name="translate_write"
                                  tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
-                                 top_delta="0"
+                                 top="2"
                                  width="80" />
                             </layout_panel>
                         </layout_stack>

@@ -26,6 +26,7 @@
 
 #include "../alpropertygrid.h"
 
+#include "../alcolorfield.h"
 #include "../llaccordionctrltab.h"
 
 #include "../llaccordionctrl.h"
@@ -608,5 +609,39 @@ namespace tut
 
         one->die();
         two->die();
+    }
+
+    // A colour is several numbers and is not a row of boxes: it has a swatch
+    // and a picker. A caller that names its parts as well -- because the
+    // value really is four numbers -- gets the better editor rather than the
+    // more literal one, and does not get the caption line either.
+    template<> template<>
+    void alpropertygrid_object::test<13>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("tint", 0));
+        fields.back().kind = ALParamType::REAL;
+        fields.back().type = "LLColor4";
+        fields.back().components = { "R", "G", "B", "A" };
+        fields.back().value = "0.5 0.25 1 1";
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
+                           ->getChild<LLPanel>("tint_row", true);
+        ensure("a colour gets the colour editor",
+               row->findChild<ALColorField>("tint", true) != nullptr);
+        ensure("and not a box per part",
+               row->findChild<LLSpinCtrl>("tint.R", true) == nullptr);
+        ensure_equals("nor the line that would have captioned them",
+                      row->getRect().getHeight(), ROW);
+        grid->die();
     }
 }

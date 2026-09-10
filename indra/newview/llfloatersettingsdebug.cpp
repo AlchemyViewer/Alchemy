@@ -28,6 +28,7 @@
 #include "llfloatersettingsdebug.h"
 
 #include "alpropertygrid.h"
+#include "lluicolortable.h"
 #include "llfloater.h"
 #include "llfiltereditor.h"
 #include "lluictrlfactory.h"
@@ -135,8 +136,9 @@ namespace
         case TYPE_VEC3:
         case TYPE_VEC3D:    return { "X", "Y", "Z" };
         case TYPE_QUAT:     return { "X", "Y", "Z", "W" };
-        case TYPE_COL3:     return { "R", "G", "B" };
-        case TYPE_COL4:     return { "R", "G", "B", "A" };
+        // A colour is not three or four numbers to a reader, whatever it is
+        // to the file: it has a swatch and a picker, which the grid reaches
+        // for on the type name. Boxes here would take that away.
         // In the order a rect is written down, which is the order it is
         // read back in: left, top, right, bottom.
         case TYPE_RECT:     return { "L", "T", "R", "B" };
@@ -189,17 +191,44 @@ namespace
     }
 
     // The parts of a value, read back off the one line the grid commits.
+    // Separated by spaces, which is how a file writes them, or by commas,
+    // which is how the colour picker writes them back.
     LLSD partsOf(const std::string& text, S32 count)
     {
         LLSD parts = LLSD::emptyArray();
-        std::istringstream reading(text);
+        const char* p = text.c_str();
         for (S32 i = 0; i < count; ++i)
         {
-            F64 number = 0.0;
-            reading >> number;
-            parts.append(number);
+            while (*p == ' ' || *p == ',' || *p == '	')
+            {
+                ++p;
+            }
+            char* end = nullptr;
+            const F64 number = std::strtod(p, &end);
+            parts.append(end == p ? 0.0 : number);
+            p = end == p ? p : end;
         }
         return parts;
+    }
+
+    // A colour comes back from the field as its numbers or as the name of one
+    // out of the colour table, because the field takes both. A setting holds
+    // neither: it holds what the name comes to, so a name is resolved before
+    // it is written and a file that said "EmphasisColor" is not written with
+    // the word in it.
+    LLSD colourOf(const std::string& text, S32 count)
+    {
+        if (LLUIColorTable::instance().colorExists(text))
+        {
+            const LLColor4 colour = LLUIColorTable::instance().getColor(text).get();
+            LLSD parts = LLSD::emptyArray();
+            for (S32 i = 0; i < count; ++i)
+            {
+                parts.append((F64)colour.mV[i]);
+            }
+            return parts;
+        }
+        return partsOf(text, count);
     }
 }
 
@@ -294,11 +323,11 @@ void LLFloaterSettingsDebug::onEditorCommit(const std::string& name, const std::
     case TYPE_F32:      controlp->set((F32)atof(text.c_str()));            break;
     case TYPE_BOOLEAN:  controlp->set(text == "true" || text == "1");      break;
     case TYPE_VEC3:
-    case TYPE_VEC3D:
-    case TYPE_COL3:     controlp->set(partsOf(text, 3));                   break;
+    case TYPE_VEC3D:    controlp->set(partsOf(text, 3));                   break;
     case TYPE_QUAT:
-    case TYPE_COL4:
     case TYPE_RECT:     controlp->set(partsOf(text, 4));                   break;
+    case TYPE_COL3:     controlp->set(colourOf(text, 3));                  break;
+    case TYPE_COL4:     controlp->set(colourOf(text, 4));                  break;
     default:            controlp->set(text);                               break;
     }
 

@@ -727,7 +727,7 @@ private:
     boost::unordered_map<std::string, LLNotificationPtr>     mChannelNotifications;
     LLComboBox*         mTranslateLanguage = nullptr;
     LLScrollListCtrl*   mTranslateList = nullptr;
-    LLLineEditor*       mTranslateValue = nullptr;
+    LLTextEditor*       mTranslateValue = nullptr;
     LLTextBox*          mTranslateCounts = nullptr;
     LLTextBox*          mEditTarget = nullptr;
     LLTextBox*          mStatus = nullptr;

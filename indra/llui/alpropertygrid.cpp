@@ -468,8 +468,10 @@ S32 ALPropertyGrid::rowHeight(const Field& field) const
         return llmax(mRowHeight, PICTURE_HEIGHT);
     }
     // A row whose parts are captioned is a caption taller than one whose
-    // value needs no saying which part it is.
-    return field.components.empty() ? mRowHeight : mRowHeight + CAPTION_HEIGHT;
+    // value needs no saying which part it is -- and a colour is never
+    // captioned, however its caller named its parts.
+    return field.components.empty() || isColorType(field.type)
+         ? mRowHeight : mRowHeight + CAPTION_HEIGHT;
 }
 
 S32 ALPropertyGrid::sectionHeight(S32 group) const
@@ -957,10 +959,14 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     {
         makeEditor(field, LLRect(left, top, left + editor_width, 0), row);
     }
-    else if (!field.components.empty())
+    else if (!field.components.empty() && !isColorType(field.type))
     {
         // Several numbers, as the numbers they are. The row was made a
         // caption taller for them, and the boxes sit above that.
+        //
+        // A colour is several numbers too and is not one of these: it has a
+        // swatch and a picker, and a caller who names its parts as well gets
+        // the better editor rather than the more literal one.
         makeComponents(field, LLRect(left, top, left + editor_width, bottom - CAPTION_HEIGHT), row);
     }
     else if (partner)

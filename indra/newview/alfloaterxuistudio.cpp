@@ -1897,7 +1897,7 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("tree_out")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_out"));
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
     mTranslateList = getChild<LLScrollListCtrl>("translate_list");
-    mTranslateValue = getChild<LLLineEditor>("translate_value");
+    mTranslateValue = getChild<LLTextEditor>("translate_value");
     mTranslateCounts = getChild<LLTextBox>("translate_counts");
     mEditTarget = getChild<LLTextBox>("edit_target");
     mStatus = getChild<LLTextBox>("status");
@@ -2025,7 +2025,9 @@ bool ALFloaterXUIStudio::postBuild()
     mTranslateLanguage->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationLanguage, this));
     mTranslateList->setCommitOnSelectionChange(true);
     mTranslateList->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationSelected, this));
-    mTranslateValue->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
+    // The button and nothing else: a translation may run to several lines --
+    // the About box's credits do -- so return in the box puts a line in it
+    // rather than writing what is there.
     getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
     getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
@@ -2391,6 +2393,15 @@ void ALFloaterXUIStudio::fillSkinsAndLanguages()
 }
 
 // static
+// A row of a list is one line, and a value with a line break in it is drawn
+// with a box where the break was -- a font has no glyph for a newline, so it
+// falls back to the one it draws for anything it has no glyph for. The text
+// of a `<text>` element runs to several lines often enough that a table of
+// them was mostly boxes.
+//
+// So a break becomes a space here, on the way into the cell. It is the cell
+// that is one line; what a row is about keeps every byte it had, and every
+// table in this tool goes through here.
 LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<const char*, std::string>> cells)
 {
     LLSD r;
@@ -2398,8 +2409,16 @@ LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<con
     S32 i = 0;
     for (const auto& [column, value] : cells)
     {
+        std::string oneLine = value;
+        for (char& c : oneLine)
+        {
+            if (c == '\n' || c == '\r' || c == '\t')
+            {
+                c = ' ';
+            }
+        }
         r["columns"][i]["column"] = column;
-        r["columns"][i]["value"] = value;
+        r["columns"][i]["value"] = oneLine;
         ++i;
     }
     return r;
