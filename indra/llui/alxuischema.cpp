@@ -394,6 +394,87 @@ bool ALXUISchema::accepts(std::string_view name, std::string_view attribute_name
     return attribute(name, attribute_name) != nullptr;
 }
 
+namespace
+{
+    // Levenshtein over two short names, two rows rather than a matrix. A
+    // ceiling as an argument, since every comparison past the best so far is
+    // work thrown away: a tag has three hundred attributes and this runs on
+    // each of them.
+    S32 edit_distance(std::string_view a, std::string_view b, S32 ceiling)
+    {
+        if ((S32)(a.size() > b.size() ? a.size() - b.size() : b.size() - a.size()) > ceiling)
+        {
+            return ceiling + 1;
+        }
+        std::vector<S32> previous(b.size() + 1);
+        std::vector<S32> current(b.size() + 1);
+        for (size_t j = 0; j <= b.size(); ++j)
+        {
+            previous[j] = (S32)j;
+        }
+        for (size_t i = 1; i <= a.size(); ++i)
+        {
+            current[0] = (S32)i;
+            S32 best_in_row = current[0];
+            for (size_t j = 1; j <= b.size(); ++j)
+            {
+                const S32 substitute = previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1);
+                current[j] = llmin(substitute, llmin(previous[j] + 1, current[j - 1] + 1));
+                best_in_row = llmin(best_in_row, current[j]);
+            }
+            if (best_in_row > ceiling)
+            {
+                return ceiling + 1;
+            }
+            previous.swap(current);
+        }
+        return previous[b.size()];
+    }
+}
+
+std::string ALXUISchema::nearestSpelling(std::string_view name, std::string_view attribute_name) const
+{
+    const Tag* found = tag(name);
+    if (!found || attribute_name.empty())
+    {
+        return std::string();
+    }
+
+    // A short name has no room to be wrong in: two edits over four
+    // characters is a different word, not a slip. One edit per four
+    // characters, and never more than two, which is where a suggestion
+    // stops being one.
+    const S32 ceiling = llmin(2, (S32)(attribute_name.size() / 4));
+    if (ceiling < 1)
+    {
+        return std::string();
+    }
+
+    S32 best = ceiling + 1;
+    const Attribute* nearest = nullptr;
+    bool tied = false;
+    for (const Attribute& candidate : found->attributes)
+    {
+        // A name a file is told not to write is not a name to send it to.
+        if (candidate.ignored)
+        {
+            continue;
+        }
+        const S32 distance = edit_distance(attribute_name, candidate.name, best);
+        if (distance < best)
+        {
+            best = distance;
+            nearest = &candidate;
+            tied = false;
+        }
+        else if (distance == best && nearest && candidate.name != nearest->name)
+        {
+            tied = true;
+        }
+    }
+    return nearest && !tied ? nearest->name : std::string();
+}
+
 bool ALXUISchema::acceptsChild(std::string_view name, std::string_view child) const
 {
     const Tag* container = tag(name);

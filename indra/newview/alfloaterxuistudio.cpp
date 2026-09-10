@@ -1684,6 +1684,8 @@ bool ALFloaterXUIStudio::postBuild()
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<LLPanel>("breadcrumb");
     mFindings = getChild<LLScrollListCtrl>("findings");
+    mFixButton = getChild<LLButton>("finding_fix");
+    mFixAllButton = getChild<LLButton>("finding_fix_all");
     mInspectors = getChild<LLTabContainer>("inspector_tabs");
     // Built here rather than named in the file: a tag registered by a
     // static in a library is only there if the linker kept the object it
@@ -1879,6 +1881,10 @@ bool ALFloaterXUIStudio::postBuild()
     mFindResults->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindResult, this));
     mTreeFilter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onTreeFilter, this));
     mFindings->setDoubleClickCallback(boost::bind(&ALFloaterXUIStudio::onFindingSelected, this));
+    mFindings->setCommitOnSelectionChange(true);
+    mFindings->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshFixButtons, this));
+    mFixButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixSelected, this));
+    mFixAllButton->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onFixAll, this));
 
     // Every table in the tool copies the same way.
     for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings,
@@ -6335,9 +6341,10 @@ void ALFloaterXUIStudio::runLint()
 void ALFloaterXUIStudio::fillFindings()
 {
     mFindings->deleteAllItems();
-    const Preview& pv = mPreviews[PRIMARY];
-    for (const ALXUILint::Finding& f : pv.lint.findings())
+    mShownFindings = mPreviews[PRIMARY].lint.findings();
+    for (S32 at = 0; at < (S32)mShownFindings.size(); ++at)
     {
+        const ALXUILint::Finding& f = mShownFindings[at];
         std::string where = ALXUISelection::toString(f.path);
         std::string file = f.file;
         const size_t slash = file.find_last_of("/\\");
@@ -6354,6 +6361,7 @@ void ALFloaterXUIStudio::fillFindings()
             where = file + ": " + where;
         }
         LLSD id;
+        id["at"] = at;
         id["path"] = ALXUISelection::toString(f.path);
         id["line"] = f.line;
         mFindings->addElement(row(id, {
@@ -6361,8 +6369,10 @@ void ALFloaterXUIStudio::fillFindings()
             { "rule", ALXUILint::ruleName(f.rule) },
             { "line", f.line > 0 ? std::to_string(f.line) : std::string() },
             { "where", where },
-            { "message", f.what.empty() ? f.message : f.what + ": " + f.message } }));
+            { "message", f.what.empty() ? f.message : f.what + ": " + f.message },
+            { "fix", describeFix(f) } }));
     }
+    refreshFixButtons();
     refreshModeCounts();
 }
 
@@ -6386,6 +6396,191 @@ void ALFloaterXUIStudio::onFindingSelected()
     if (view && ALXUISelection::pathOf(view, pv.root, found))
     {
         mSelection.select(found);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Findings that put themselves right
+// ---------------------------------------------------------------------------
+
+const ALXUILint::Finding* ALFloaterXUIStudio::findingForRow(const LLScrollListItem* item) const
+{
+    if (!item)
+    {
+        return nullptr;
+    }
+    const LLSD id = item->getValue();
+    if (!id.has("at"))
+    {
+        return nullptr;
+    }
+    const S32 at = id["at"].asInteger();
+    return at >= 0 && at < (S32)mShownFindings.size() ? &mShownFindings[at] : nullptr;
+}
+
+// What pressing it would do, said in this tool's words. The library says
+// which operation, because that is what a document works in; what a person
+// reads about it is chosen here, where the strings file is.
+std::string ALFloaterXUIStudio::describeFix(const ALXUILint::Finding& f) const
+{
+    LLStringUtil::format_map_t args;
+    args["[ATTR]"] = f.what;
+    args["[NAME]"] = f.fix.spelling;
+    args["[DX]"] = std::to_string(f.fix.dx);
+    args["[DY]"] = std::to_string(f.fix.dy);
+    switch (f.fix.did)
+    {
+    case ALXUILint::Fix::Do::TakeAttributeOut: return getString("FixTakeOut", args);
+    case ALXUILint::Fix::Do::SpellAttribute:   return getString("FixSpell", args);
+    case ALXUILint::Fix::Do::MoveInside:       return getString("FixMoveInside", args);
+    case ALXUILint::Fix::Do::WidenBy:          return getString("FixWidenBy", args);
+    case ALXUILint::Fix::Do::Nothing:          break;
+    }
+    return std::string();
+}
+
+// One finding, put right. The element it is about is selected first: an edit
+// nobody watched happen is one they have to go and find, and the fix writes
+// through the same path a hand edit does -- the same layer, the same live
+// apply, the same history.
+void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
+{
+    if (f.fix.did == ALXUILint::Fix::Do::Nothing)
+    {
+        return;
+    }
+    // A finding from another file names an element of that file, and this
+    // tool is looking at this one. Opening it is the way to fix it.
+    if (!f.file.empty() && f.file != mFile)
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = f.file;
+        setStatus(getString("FixOtherFile", args));
+        return;
+    }
+    if (f.path.empty() && f.fix.did != ALXUILint::Fix::Do::TakeAttributeOut)
+    {
+        return;
+    }
+    mSelection.select(f.path);
+
+    switch (f.fix.did)
+    {
+    case ALXUILint::Fix::Do::TakeAttributeOut:
+        onFieldRemove(f.what);
+        break;
+
+    case ALXUILint::Fix::Do::SpellAttribute:
+    {
+        // Two operations and one thing done: what the author wrote is kept
+        // and only the name it was written under changes, so putting it back
+        // has to put back both.
+        const ALXUICatalog::Layer* layer = editTarget();
+        ALXUIEdit* held = layer ? document(*layer) : nullptr;
+        std::string value;
+        if (!held || !held->fieldText(f.path, f.what, value))
+        {
+            setStatus(getString("FixGone"));
+            return;
+        }
+        ALXUIDocuments::Action together(mDocuments);
+        onFieldRemove(f.what);
+        onFieldCommit(f.fix.spelling, value);
+        break;
+    }
+
+    case ALXUILint::Fix::Do::MoveInside:
+        // Every edge by the same amount, which is what a move is.
+        applyEdges(f.fix.dx, f.fix.dy, f.fix.dx, f.fix.dy);
+        break;
+
+    case ALXUILint::Fix::Do::WidenBy:
+        applyEdges(0, 0, f.fix.dx, 0);
+        break;
+
+    case ALXUILint::Fix::Do::Nothing:
+        break;
+    }
+}
+
+void ALFloaterXUIStudio::onFixSelected()
+{
+    if (const ALXUILint::Finding* f = findingForRow(mFindings->getFirstSelected()))
+    {
+        applyFix(*f);
+    }
+}
+
+// Every finding in the file that offers one. A step per finding rather than
+// one step for the file: a pass over a file is the developer's to take back
+// piece by piece, since the reason to look at each of these was that some of
+// them are on purpose.
+//
+// One pass, and then the file is built again and checked again: an edit moves
+// what the next finding was measured against, so what still stands after this
+// is what the rules say about the file as it is now.
+void ALFloaterXUIStudio::onFixAll()
+{
+    // Copied, because applying one rebuilds and refills the list under it.
+    std::vector<ALXUILint::Finding> offered;
+    boost::unordered_set<std::string> moved;
+    for (const ALXUILint::Finding& f : mShownFindings)
+    {
+        if (f.fix.did == ALXUILint::Fix::Do::Nothing || (!f.file.empty() && f.file != mFile))
+        {
+            continue;
+        }
+        // A move and a widening are both worked out from where the element
+        // is now, and nothing is built again between one fix and the next:
+        // the second of them on one element would be measured against a rect
+        // that has already moved. One each per pass, and the pass repeats.
+        const bool geometry = f.fix.did == ALXUILint::Fix::Do::MoveInside
+                           || f.fix.did == ALXUILint::Fix::Do::WidenBy;
+        if (geometry && !moved.insert(ALXUISelection::toString(f.path)).second)
+        {
+            continue;
+        }
+        offered.push_back(f);
+    }
+    if (offered.empty())
+    {
+        setStatus(getString("FixNone"));
+        return;
+    }
+
+    const ALXUISelection::path_t was = mSelection.hasSelection() ? mSelection.selection()
+                                                                : ALXUISelection::path_t();
+    for (const ALXUILint::Finding& f : offered)
+    {
+        applyFix(f);
+    }
+    if (!was.empty())
+    {
+        mSelection.select(was);
+    }
+
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string((S32)offered.size());
+    args["[FILE]"] = mFile;
+    setStatus(getString("FixApplied", args));
+}
+
+void ALFloaterXUIStudio::refreshFixButtons()
+{
+    S32 offered = 0;
+    for (const ALXUILint::Finding& f : mShownFindings)
+    {
+        offered += f.fix.did != ALXUILint::Fix::Do::Nothing && (f.file.empty() || f.file == mFile);
+    }
+    if (mFixAllButton)
+    {
+        mFixAllButton->setEnabled(offered > 0);
+    }
+    if (mFixButton)
+    {
+        const ALXUILint::Finding* f = findingForRow(mFindings->getFirstSelected());
+        mFixButton->setEnabled(f && f->fix.did != ALXUILint::Fix::Do::Nothing
+                               && (f->file.empty() || f->file == mFile));
     }
 }
 

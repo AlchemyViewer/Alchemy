@@ -490,4 +490,39 @@ namespace tut
                std::any_of(button->attributes.begin(), button->attributes.end(),
                            [](const ALXUISchema::Attribute& a) { return !a.holds; }));
     }
+
+    // What a name was probably meant to be. The whole vocabulary of a tag is
+    // here, so a slip is one comparison away from the name it slipped from --
+    // and the same comparison has to refuse, because a suggestion nobody
+    // asked for that is wrong is worse than none at all.
+    template<> template<>
+    void alxuischema_object::test<17>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ensure_equals("a character missing", schema().nearestSpelling("button", "tool_tp"),
+                      std::string("tool_tip"));
+        ensure_equals("a character too many", schema().nearestSpelling("button", "tool_tiip"),
+                      std::string("tool_tip"));
+
+        // Near nothing, so nothing is offered.
+        ensure("a name near nothing", schema().nearestSpelling("button", "qqzzxwvu").empty());
+
+        // A short name has no room to be wrong in. Two letters swapped is
+        // two edits, and over five characters two edits reach a different
+        // word: `lable` is as near `label` as it is to `table`, and a guess
+        // between them is a coin toss with the file as the stake.
+        ensure("two swapped in a short name", schema().nearestSpelling("button", "lable").empty());
+
+        // And under four characters nothing is offered at all: `top` and
+        // `pad` are each one edit from a great many things, every one of
+        // which is a real name somebody meant.
+        ensure("a short name is never a slip", schema().nearestSpelling("button", "top").empty());
+
+        // A tag nobody knows has no vocabulary to compare against.
+        ensure("no tag, no suggestion", schema().nearestSpelling("no_such_tag", "labl").empty());
+    }
 }

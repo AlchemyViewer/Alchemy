@@ -215,8 +215,8 @@ void ALXUILint::clear()
     mCountByPath.clear();
 }
 
-void ALXUILint::add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
-                    std::string file, S32 line, std::string what, std::string message)
+ALXUILint::Finding& ALXUILint::add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
+                                   std::string file, S32 line, std::string what, std::string message)
 {
     Finding& f = mFindings.emplace_back();
     f.rule = rule;
@@ -239,6 +239,7 @@ void ALXUILint::add(Rule rule, Severity severity, const ALXUISelection::path_t& 
         }
         prefix.pop_back();
     }
+    return f;
 }
 
 S32 ALXUILint::countUnder(const ALXUISelection::path_t& path) const
@@ -363,9 +364,21 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
             && (rect.mLeft < bounds.mLeft || rect.mBottom < bounds.mBottom
                 || rect.mRight > bounds.mRight || rect.mTop > bounds.mTop))
         {
-            add(Rule::OutOfBounds, Severity::Warning, path, input.file, line, view->getName(),
+            Finding& f = add(Rule::OutOfBounds, Severity::Warning, path, input.file, line, view->getName(),
                 "sits outside " + parent->getName() + ", which is "
                 + std::to_string(bounds.getWidth()) + " by " + std::to_string(bounds.getHeight()));
+
+            // Moving it in only works where it fits: something wider than
+            // what holds it leaves by the other edge whichever way it goes,
+            // and offering to move that is offering to move it forever.
+            if (rect.getWidth() <= bounds.getWidth() && rect.getHeight() <= bounds.getHeight())
+            {
+                f.fix.did = Fix::Do::MoveInside;
+                f.fix.dx = rect.mLeft < bounds.mLeft ? bounds.mLeft - rect.mLeft
+                         : rect.mRight > bounds.mRight ? bounds.mRight - rect.mRight : 0;
+                f.fix.dy = rect.mBottom < bounds.mBottom ? bounds.mBottom - rect.mBottom
+                         : rect.mTop > bounds.mTop ? bounds.mTop - rect.mTop : 0;
+            }
         }
     }
 
@@ -394,8 +407,10 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
         const S32 width = widestLine(font, text);
         if (width > room)
         {
-            add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
+            Finding& f = add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
                 "the text needs " + std::to_string(width) + " pixels and has " + std::to_string(room));
+            f.fix.did = Fix::Do::WidenBy;
+            f.fix.dx = width - room;
         }
     }
 }
@@ -475,8 +490,24 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
 
         if (schema && !ALXUISchema::get().accepts(schema->name, name))
         {
-            add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
+            Finding& f = add(Rule::UnknownAttribute, Severity::Warning, path, input.file, line, name,
                 "<" + schema->name + "> has no parameter named \"" + name + "\"");
+
+            // A name one edit from a real one was meant to be that one, and
+            // spelling it right keeps what the author wrote. Nothing near
+            // enough, and all that is left is that the file says something
+            // nothing reads.
+            const std::string meant = ALXUISchema::get().nearestSpelling(schema->name, name);
+            if (!meant.empty())
+            {
+                f.fix.did = Fix::Do::SpellAttribute;
+                f.fix.spelling = meant;
+                f.message += ", and \"" + meant + "\" is one slip away";
+            }
+            else
+            {
+                f.fix.did = Fix::Do::TakeAttributeOut;
+            }
         }
 
         // Written as the value this widget already carries -- and carries
@@ -492,7 +523,8 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
             declared && declared->declared && declared->held == value)
         {
             add(Rule::WroteTheDefault, Severity::Note, path, input.file, line, name,
-                "\"" + name + "\" is written as what it already is");
+                "\"" + name + "\" is written as what it already is")
+                .fix.did = Fix::Do::TakeAttributeOut;
         }
 
         if (!looksLikeName(value))

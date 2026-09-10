@@ -77,6 +77,32 @@ public:
         Note        // worth a look, and often on purpose
     };
 
+    // What would put a finding right: one operation of the kinds ALXUIEdit
+    // already has, on the element the finding names.
+    //
+    // Said in the terms a document works in and not in words, because the
+    // words a person reads belong to whoever is showing them -- the same
+    // reason ALXUIEdit::Did says what a step did without saying it in
+    // English. A caller applies it as a step like any other, so it appears
+    // in the history and comes back off: a fix that cannot be undone is a
+    // fix nobody dares press.
+    struct Fix
+    {
+        enum class Do : U8
+        {
+            Nothing,
+            TakeAttributeOut,   // `what` comes off the element
+            SpellAttribute,     // `what` comes off and `spelling` goes on carrying its value
+            MoveInside,         // the element moves by `dx` and `dy`
+            WidenBy             // its width grows by `dx`
+        };
+
+        Do          did = Do::Nothing;
+        std::string spelling;   // the name the attribute was probably meant to have
+        S32         dx = 0;
+        S32         dy = 0;
+    };
+
     struct Finding
     {
         Rule                    rule = Rule::ParseError;
@@ -86,6 +112,9 @@ public:
         S32                     line = 0;
         std::string             what;       // the attribute, tag or name at fault
         std::string             message;
+        // Empty for most of them: a rule that can say what is wrong cannot
+        // always say what right would be.
+        Fix                     fix;
     };
 
     // What a run has to look at. The tree and the source map are the file
@@ -138,8 +167,8 @@ public:
     static bool controlExists(const std::string& name, std::string* group = nullptr);
 
 private:
-    void add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
-             std::string file, S32 line, std::string what, std::string message);
+    Finding& add(Rule rule, Severity severity, const ALXUISelection::path_t& path,
+                 std::string file, S32 line, std::string what, std::string message);
     void fromDiagnostics(const Input& input);
     void fromOverlay(const Input& input);
     void walkViews(const Input& input, LLView* view, const ALXUISelection::path_t& path);

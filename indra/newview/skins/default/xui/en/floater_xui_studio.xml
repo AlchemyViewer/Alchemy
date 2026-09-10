@@ -55,6 +55,14 @@
     <floater.string name="EditSavedSomeAll">Wrote [COUNT] files and stopped: [ERROR]</floater.string>
     <floater.string name="EditSavedAndRepaired">Wrote [FILE] and moved [MOVES] translations to where it now puts them.</floater.string>
     <floater.string name="RenameStrands">[COUNT] translations of this element stop applying; Save and Repair Translations moves them.</floater.string>
+    <floater.string name="FixTakeOut">Take [ATTR] out</floater.string>
+    <floater.string name="FixSpell">Spell it [NAME]</floater.string>
+    <floater.string name="FixMoveInside">Move it [DX], [DY]</floater.string>
+    <floater.string name="FixWidenBy">Widen it by [DX]</floater.string>
+    <floater.string name="FixApplied">Fixed [COUNT] findings in [FILE]; each one is its own edit to undo.</floater.string>
+    <floater.string name="FixNone">Nothing here offers a fix.</floater.string>
+    <floater.string name="FixGone">That is not written here any more.</floater.string>
+    <floater.string name="FixOtherFile">That finding is about [FILE]; open it to fix it.</floater.string>
     <floater.string name="TranslateImpactNone">No translation stops applying because of this.</floater.string>
     <floater.string name="TranslateImpact">[COUNT] translations stop applying if this is written as it stands: [LANGS]. Save and Repair Translations moves them.</floater.string>
     <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
@@ -1198,40 +1206,91 @@
                      name="findings_mode"
                      tool_tip="What the parser, the factory, the layer merge and the rules found in this file"
                      width="742">
-                        <scroll_list
-                         column_padding="0"
-                         draw_heading="true"
-                         multi_select="true"
+                        <layout_stack
+                         animate="false"
                          follows="all"
                          height="158"
                          layout="topleft"
                          left="0"
-                         name="findings"
-                         tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+                         name="findings_stack"
+                         orientation="vertical"
                          top="0"
                          width="742">
-                            <scroll_list.columns
-                             label=""
-                             name="severity"
-                             tool_tip="error, warning or note"
-                             width="52" />
-                            <scroll_list.columns
-                             label="Rule"
-                             name="rule"
-                             width="110" />
-                            <scroll_list.columns
-                             label="Line"
-                             name="line"
-                             width="44" />
-                            <scroll_list.columns
-                             dynamic_width="true"
-                             label="Where"
-                             name="where" />
-                            <scroll_list.columns
-                             dynamic_width="true"
-                             label="What"
-                             name="message" />
-                        </scroll_list>
+                            <layout_panel
+                             auto_resize="true"
+                             height="130"
+                             layout="topleft"
+                             name="findings_list_panel"
+                             width="742">
+                                <scroll_list
+                                 column_padding="0"
+                                 draw_heading="true"
+                                 multi_select="true"
+                                 follows="all"
+                                 height="130"
+                                 layout="topleft"
+                                 left="0"
+                                 name="findings"
+                                 tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
+                                 top="0"
+                                 width="742">
+                                    <scroll_list.columns
+                                     label=""
+                                     name="severity"
+                                     tool_tip="error, warning or note"
+                                     width="52" />
+                                    <scroll_list.columns
+                                     label="Rule"
+                                     name="rule"
+                                     width="110" />
+                                    <scroll_list.columns
+                                     label="Line"
+                                     name="line"
+                                     width="44" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="Where"
+                                     name="where" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="What"
+                                     name="message" />
+                                    <scroll_list.columns
+                                     dynamic_width="true"
+                                     label="Fix"
+                                     name="fix"
+                                     tool_tip="What this tool would do about it, where it knows" />
+                                </scroll_list>
+                            </layout_panel>
+                            <layout_panel
+                             auto_resize="false"
+                             height="26"
+                             layout="topleft"
+                             min_dim="26"
+                             name="findings_foot"
+                             width="742">
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Fix"
+                                 layout="topleft"
+                                 left="0"
+                                 name="finding_fix"
+                                 tool_tip="Do what the Fix column says, as one edit that can be undone"
+                                 top="2"
+                                 width="60" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Fix All"
+                                 layout="topleft"
+                                 left_pad="4"
+                                 name="finding_fix_all"
+                                 tool_tip="Every finding in this file that offers one, each its own edit"
+                                 top_delta="0"
+                                 width="70" />
+                            </layout_panel>
+                        </layout_stack>
                     </panel>
                     <panel
                      follows="all"

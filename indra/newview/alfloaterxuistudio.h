@@ -344,6 +344,20 @@ private:
     void onFindingSelected();
     void refreshBreadcrumb();
 
+    // --- findings that put themselves right --------------------------------
+    // A rule that can say what is wrong can sometimes say what right would
+    // be, and the tool already knows how to make the edit. Applying one is
+    // an edit like any other: it goes in the history, it can be undone, and
+    // the words for it are the tool's rather than the library's.
+    void applyFix(const ALXUILint::Finding& finding);
+    void onFixSelected();
+    void onFixAll();
+    // What pressing it would do, for the button's label and for the row.
+    std::string describeFix(const ALXUILint::Finding& finding) const;
+    // The finding a row of the findings list is about, or null.
+    const ALXUILint::Finding* findingForRow(const LLScrollListItem* item) const;
+    void refreshFixButtons();
+
     // Lint all: every file in the catalog, a few per frame so the viewer
     // keeps drawing, with a report beside the log.
     void startLintAll();
@@ -539,6 +553,10 @@ private:
     boost::unordered_map<std::string, std::map<std::string, S32>> mCensus;
     S32                             mCensusFiles = 0;
 
+    // The findings the list is showing, in its own order, so a row can name
+    // the one it is about and a fix can be applied to it.
+    std::vector<ALXUILint::Finding> mShownFindings;
+
     std::deque<std::string>         mLintQueue;     // files still to check
     std::vector<std::string>        mLintReport;
     std::map<std::string, S32>      mLintByRule;
@@ -565,6 +583,8 @@ private:
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
     LLScrollListCtrl*   mFindings = nullptr;
+    LLButton*           mFixButton = nullptr;
+    LLButton*           mFixAllButton = nullptr;
     LLTabContainer*     mInspectors = nullptr;
     ALPropertyGrid*     mAttributeGrid = nullptr;
     LLTextBox*          mAttributeWhat = nullptr;       // what is selected, in its own words

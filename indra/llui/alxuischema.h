@@ -121,6 +121,17 @@ public:
     // What a tag says about one attribute, or null where it says nothing.
     const Attribute*            attribute(std::string_view tag, std::string_view name) const;
 
+    // The declared attribute a name was probably meant to be. A typo is one
+    // or two edits away from a real name, and the whole vocabulary of the tag
+    // is here to compare against: `dynamicwidth` is `dynamic_width` with a
+    // character missing, and it has shipped in nineteen places for years
+    // because nothing was in a position to say so.
+    //
+    // Empty where nothing is near enough, and empty where two names are
+    // equally near -- a guess between two is not a suggestion, it is a coin
+    // toss with the file as the stake.
+    std::string                 nearestSpelling(std::string_view tag, std::string_view name) const;
+
     // Whether a container takes that tag as a child. The question a drop
     // asks: a container with a child registry of its own answers for the
     // few tags in it, and a container that never declared one answers for

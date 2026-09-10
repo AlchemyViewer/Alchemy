@@ -448,5 +448,74 @@ namespace tut
         ensure_equals("named by attribute", said->what, std::string("height"));
         ensure("and it is worth a look rather than a fault",
                said->severity == ALXUILint::Severity::Note);
+        ensure("which is one attribute away from not being said at all",
+               said->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
+    }
+
+    // A finding that says what right would be. A name one slip from a real
+    // one was meant to be that one; a name near nothing is a name nothing
+    // reads; and an element outside what holds it moves by a delta the rule
+    // has already worked out to say how far outside it is.
+    template<> template<>
+    void alxuilint_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "<panel name=\"root\" left=\"0\" top=\"0\" width=\"200\" height=\"100\">\n"
+            "  <button name=\"slip\" left=\"0\" top=\"0\" width=\"80\" tool_tp=\"near\"/>\n"
+            "  <button name=\"nothing\" left=\"0\" top=\"30\" width=\"80\" qqzzxw=\"far\"/>\n"
+            "  <panel name=\"out\" left=\"150\" top=\"60\" width=\"90\" height=\"20\"/>\n"
+            "</panel>"));
+
+        ensure_equals(run.describe(), run.count(ALXUILint::Rule::UnknownAttribute), 2);
+
+        const ALXUILint::Finding* slip = nullptr;
+        const ALXUILint::Finding* nothing = nullptr;
+        for (const ALXUILint::Finding& f : run.lint.findings())
+        {
+            if (f.rule != ALXUILint::Rule::UnknownAttribute) { continue; }
+            if (f.what == "tool_tp") { slip = &f; }
+            if (f.what == "qqzzxw") { nothing = &f; }
+        }
+
+        ensure("the near one is found", slip != nullptr);
+        ensure("and is offered the spelling it meant",
+               slip->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+        ensure_equals("which is the real name", slip->fix.spelling, std::string("tool_tip"));
+
+        ensure("the far one is found", nothing != nullptr);
+        ensure("and there is nothing to be but gone",
+               nothing->fix.did == ALXUILint::Fix::Do::TakeAttributeOut);
+
+        const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
+        ensure("the one outside is found", out != nullptr);
+        ensure("and can be moved in", out->fix.did == ALXUILint::Fix::Do::MoveInside);
+        ensure_equals("by exactly how far outside it is", out->fix.dx, -40);
+        ensure_equals("and not at all on the axis it is inside on", out->fix.dy, 0);
+    }
+
+    // Something wider than what holds it leaves by the far edge whichever
+    // way it goes, so there is no move to offer: a fix that does not fix it
+    // is worse than none, because it is a button that says it will.
+    template<> template<>
+    void alxuilint_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "<panel name=\"wider\" left=\"10\" top=\"0\" width=\"300\" height=\"20\"/>"));
+
+        const ALXUILint::Finding* out = run.first(ALXUILint::Rule::OutOfBounds);
+        ensure("it is still reported", out != nullptr);
+        ensure("and offers nothing", out->fix.did == ALXUILint::Fix::Do::Nothing);
     }
 }
