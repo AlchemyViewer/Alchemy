@@ -54,11 +54,39 @@ public:
     // written one.
     const std::string& note(std::string_view tag) const;
 
-    // How many tags have one, for whoever is counting what is left to write.
+    // And the two things about an attribute that no registry knows.
+    //
+    // Which heading it belongs under: the tool guesses from the name, which
+    // is a guess over a vocabulary, and a short list of corrections beats a
+    // longer heuristic.
+    //
+    // And whether it is a name that exists, works, and should not be used.
+    // A block that registers two names for one parameter has said that both
+    // work and will keep working; which of them a file should write is a
+    // judgement, and this is where it is written down. `instead` is the one
+    // to write, so the tool can offer to write it.
+    struct Attribute
+    {
+        std::string section;
+        bool        deprecated = false;
+        std::string instead;
+    };
+
+    // For the attribute of a tag, then for the attribute anywhere: a name
+    // like `watermark_text` is the same mistake under every tag that takes
+    // it, and a correction is written once.
+    const Attribute* attribute(std::string_view tag, std::string_view name) const;
+
+    // How many of each there are, for whoever is counting what is left to
+    // write.
     size_t count() const { return mNotes.size(); }
+    size_t attributeCount() const { return mAttributes.size(); }
 
 private:
     ALXUINotes();
 
     boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<> > mNotes;
+    // Keyed by "tag.name" where the line named a tag, and by the bare name
+    // where it did not.
+    boost::unordered_flat_map<std::string, Attribute, ll::string_hash, std::equal_to<> > mAttributes;
 };

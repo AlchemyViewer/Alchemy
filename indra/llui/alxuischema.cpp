@@ -146,10 +146,17 @@ namespace
         tag.elements.push_back({ name, descriptor.mMinCount, descriptor.mMaxCount });
     }
 
+    // Which parameter each attribute name came from. A block may register a
+    // second name for one parameter, and then both names are attributes and
+    // both always will be: the pair is a fact about the code, and which of
+    // the two to write is not.
+    using seen_t = std::vector<std::pair<const void*, std::string> >;
+
     void flatten(const LLInitParam::BlockDescriptor& block,
                  const std::string& prefix,
                  S32 depth,
-                 ALXUISchema::Tag& tag)
+                 ALXUISchema::Tag& tag,
+                 seen_t& seen)
     {
         for (const auto& named : block.namedParams())
         {
@@ -167,6 +174,7 @@ namespace
             case ALParamType::SCALAR:
             case ALParamType::IGNORED:
                 addAttribute(tag, name, *type, prefix.empty() && named.second->mMinCount > 0);
+                seen.emplace_back(&*named.second, name);
                 break;
 
             case ALParamType::MULTIPLE_SCALAR:
@@ -195,7 +203,7 @@ namespace
                     }
                     if (depth > 0)
                     {
-                        flatten(*type->mBlock, name, depth - 1, tag);
+                        flatten(*type->mBlock, name, depth - 1, tag, seen);
                     }
                 }
                 break;
@@ -210,7 +218,7 @@ namespace
             const ALParamType* type = ALParamTypes::find(descriptor);
             if (type && type->mBlock && depth > 0)
             {
-                flatten(*type->mBlock, prefix, depth - 1, tag);
+                flatten(*type->mBlock, prefix, depth - 1, tag, seen);
             }
         }
     }
@@ -279,7 +287,8 @@ void ALXUISchema::build()
         const LLInitParam::BaseBlock& block = (*defaults)();
         const LLInitParam::BlockDescriptor& descriptor = block.mostDerivedBlockDescriptor();
 
-        flatten(descriptor, std::string(), MAX_NESTING, tag);
+        seen_t seen;
+        flatten(descriptor, std::string(), MAX_NESTING, tag, seen);
         tag.text = descriptor.findNamedParam("value") != nullptr;
 
         if (const widget_registry_t* const* children =
@@ -360,6 +369,50 @@ void ALXUISchema::build()
                                                                  { return e.name == child; });
                                           }),
                            tag.children.end());
+
+        // Two names for one parameter. Both work and both always will --
+        // that is what registering a synonym said -- so each is recorded as
+        // the other's, and the notes say which of them a file should write.
+        for (size_t i = 0; i < seen.size(); ++i)
+        {
+            for (size_t j = i + 1; j < seen.size(); ++j)
+            {
+                if (seen[i].first != seen[j].first || seen[i].second == seen[j].second)
+                {
+                    continue;
+                }
+                const auto name = [&tag](const std::string& called) -> Attribute*
+                {
+                    const auto at = std::lower_bound(tag.attributes.begin(), tag.attributes.end(), called,
+                                                     [](const Attribute& a, const std::string& b)
+                                                     { return a.name < b; });
+                    return at != tag.attributes.end() && at->name == called ? &*at : nullptr;
+                };
+                Attribute* first = name(seen[i].second);
+                Attribute* second = name(seen[j].second);
+                if (first && second)
+                {
+                    first->alias = second->name;
+                    second->alias = first->name;
+                }
+            }
+        }
+
+        // And what a person has written down about this vocabulary, which no
+        // registry knows: one sentence per tag, which heading an attribute
+        // belongs under where the tool's guess is wrong, and which of two
+        // working names should not be written any more.
+        tag.note = ALXUINotes::get().note(tag.name);
+        for (Attribute& attribute : tag.attributes)
+        {
+            if (const ALXUINotes::Attribute* said =
+                    ALXUINotes::get().attribute(tag.name, attribute.name))
+            {
+                attribute.section = said->section;
+                attribute.deprecated = said->deprecated;
+                attribute.instead = said->instead;
+            }
+        }
 
         mTags.push_back(std::move(tag));
     });
@@ -529,7 +582,7 @@ std::string ALXUISchema::asXSD() const
     // in an editor than one that only says what it takes.
     for (const Tag& tag : mTags)
     {
-        const std::string& note = ALXUINotes::get().note(tag.name);
+        const std::string& note = tag.note;
         out << "\n  <xs:element name=\"" << escaped(tag.name)
             << "\" type=\"" << typeName(tag.name) << "\"";
         if (note.empty())

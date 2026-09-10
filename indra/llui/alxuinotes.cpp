@@ -54,13 +54,56 @@ ALXUINotes::ALXUINotes()
     for (LLXMLNodePtr child = root->getFirstChild(); child.notNull(); child = child->getNextSibling())
     {
         std::string name;
-        std::string note;
-        if (child->getAttributeString("name", name) && !name.empty()
-            && child->getAttributeString("note", note) && !note.empty())
+        if (!child->getAttributeString("name", name) || name.empty())
         {
-            mNotes.emplace(std::move(name), std::move(note));
+            continue;
         }
+        if (child->hasName("tag"))
+        {
+            std::string note;
+            if (child->getAttributeString("note", note) && !note.empty())
+            {
+                mNotes.emplace(std::move(name), std::move(note));
+            }
+            continue;
+        }
+        if (!child->hasName("attribute"))
+        {
+            continue;
+        }
+
+        Attribute said;
+        child->getAttributeString("section", said.section);
+        child->getAttributeString("instead", said.instead);
+        child->getAttributeBOOL("deprecated", said.deprecated);
+        // A name to write instead is a deprecation whether or not the line
+        // says so twice.
+        said.deprecated = said.deprecated || !said.instead.empty();
+        if (said.section.empty() && !said.deprecated)
+        {
+            continue;   // a line that says nothing
+        }
+        // Under one tag where the line names one, everywhere where it does
+        // not: `watermark_text` is the same mistake under every tag that
+        // takes it, and a correction is written once.
+        std::string tag;
+        const std::string key = child->getAttributeString("tag", tag) && !tag.empty()
+                              ? tag + "." + name : name;
+        mAttributes.emplace(key, std::move(said));
     }
+}
+
+const ALXUINotes::Attribute* ALXUINotes::attribute(std::string_view tag, std::string_view name) const
+{
+    std::string keyed;
+    keyed.reserve(tag.size() + 1 + name.size());
+    keyed.assign(tag).append(1, '.').append(name);
+    if (const auto found = mAttributes.find(keyed); found != mAttributes.end())
+    {
+        return &found->second;
+    }
+    const auto anywhere = mAttributes.find(name);
+    return anywhere == mAttributes.end() ? nullptr : &anywhere->second;
 }
 
 const std::string& ALXUINotes::note(std::string_view tag) const

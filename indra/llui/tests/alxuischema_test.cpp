@@ -525,4 +525,49 @@ namespace tut
         // A tag nobody knows has no vocabulary to compare against.
         ensure("no tag, no suggestion", schema().nearestSpelling("no_such_tag", "labl").empty());
     }
+
+    // The three things no registry knows, and where each of them comes from.
+    //
+    // The pair of names is read out of the code: a block that registered a
+    // synonym said that both work and will keep working. Which of the two to
+    // write is a judgement, and that is read out of the notes -- as is the
+    // sentence saying what a tag is for, and the heading an attribute belongs
+    // under where the tool's guess over the vocabulary is wrong.
+    template<> template<>
+    void alxuischema_object::test<18>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // Generated: <text> registers `word_wrap` as another name for `wrap`,
+        // so each is the other's and neither is invented here.
+        const ALXUISchema::Attribute* wrap = schema().attribute("text", "wrap");
+        const ALXUISchema::Attribute* old = schema().attribute("text", "word_wrap");
+        ensure("both names are attributes", wrap != nullptr && old != nullptr);
+        ensure_equals("and each names the other", wrap->alias, std::string("word_wrap"));
+        ensure_equals("both ways", old->alias, std::string("wrap"));
+
+        // Editorial: which of the pair a file should write.
+        ensure("the old spelling is the deprecated one", old->deprecated);
+        ensure_equals("and says what to write", old->instead, std::string("wrap"));
+        ensure("the one to write is not deprecated", !wrap->deprecated);
+
+        // A parameter with only one name has no alias and no opinion.
+        const ALXUISchema::Attribute* name = schema().attribute("text", "name");
+        ensure("name", name != nullptr);
+        ensure("one name, no pair", name->alias.empty());
+        ensure("and nothing said about it", !name->deprecated);
+
+        // One sentence per tag, for the Library and for the XSD.
+        const ALXUISchema::Tag* button = schema().tag("button");
+        ensure("button", button != nullptr);
+        ensure("has a sentence", !button->note.empty());
+
+        // A tag nobody has written one for falls back to what it did before
+        // there were sentences: nothing waits on prose.
+        ensure("and the notes do not have to be complete",
+               ALXUINotes::get().count() > 0);
+    }
 }

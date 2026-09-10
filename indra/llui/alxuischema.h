@@ -80,6 +80,18 @@ public:
         // two are told apart by asking whether anything is here at all.
         std::string                 held;
         bool                        holds = false;
+        // Another name for the same parameter, where the block registered
+        // one. Both work and both always will; which of the two a file
+        // should use is not something a registry can know, so the pair is
+        // read out of the code and the preference out of the notes.
+        std::string                 alias;
+        // What the notes say about it, or nothing where nobody has written
+        // any: which heading it belongs under when the tool's guess over the
+        // vocabulary is wrong, and whether it is a name that works and should
+        // not be used.
+        std::string                 section;
+        bool                        deprecated = false;
+        std::string                 instead;
         // And whether that is a value somebody chose for this widget rather
         // than the zero its type starts at. A button is twenty-three pixels
         // tall because its template says so; it is at left nought because
@@ -98,6 +110,9 @@ public:
     struct Tag
     {
         std::string              name;
+        // One sentence saying what it is for, from the notes; empty where
+        // nobody has written one.
+        std::string              note;
         std::vector<Attribute>   attributes;
         std::vector<Element>     elements;
         std::vector<std::string> children;

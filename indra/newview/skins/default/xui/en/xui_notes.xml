@@ -9,6 +9,11 @@
 
   A tag with no line here falls back to its own name and the class it builds.
   Nothing waits on prose: add a line when there is one to add.
+
+  One rule for whoever adds a line: the layer merge matches children by their
+  name attribute and not by their tag, so a <tag> and an <attribute> of the
+  same name would be one element to a translated copy of this file, and one of
+  them would quietly go. No name is used twice here; keep it that way.
 -->
 <xui_notes>
     <tag name="accordion" note="A column of folding sections, one heading each, for a pane with more in it than fits." />
@@ -153,4 +158,71 @@
     <tag name="dock_panel" note="A pane that knows it can be in a window of its own, and how to come back." />
     <tag name="empty_state" note="What a pane says when there is nothing in it: what is missing, how to get some, and the one thing that would fix it." />
     <tag name="follows_control" note="Which edges of its parent an element is tied to, drawn as the four struts and two springs that says." />
+    <tag name="history_list" note="Everything done to a document, newest first, with a mark where the present is." />
+    <tag name="jump_bar" note="The path to where you are, each step of it offering the steps it could have been." />
+    <tag name="quick_open" note="A few letters and a ranked list, for reaching a thing by name rather than by looking for it." />
+    <tag name="scope_bar" note="A query written as a sentence: fixed words, dropdowns, and one field for what is looked for." />
+    <tag name="specimen_list" note="A list whose rows carry the things themselves rather than words about them." />
+
+    <!--
+      The second thing no registry knows: a name that exists, works, and
+      should not be used.
+
+      A block that registers two names for one parameter has said that both
+      work and will keep working, and the schema reads that pair out of the
+      code. Which of the two a file should write is a judgement, and this is
+      where it is written down. `instead` is the one to write, so the tool can
+      offer to write it rather than only mention it.
+
+      A line with no tag= applies wherever the name appears, because
+      `watermark_text` is the same mistake under every tag that takes it.
+    -->
+    <attribute name="watermark_text" instead="label" />
+    <attribute name="bg_visible" instead="background_visible" />
+    <attribute name="border_visible" instead="border" />
+    <attribute name="word_wrap" instead="wrap" />
+    <attribute name="allow_html" instead="parse_urls" />
+    <attribute name="track_bottom" instead="track_end" />
+    <attribute name="select_all_on_focus_received" instead="select_on_focus" />
+    <attribute name="toggle" instead="is_toggle" />
+    <attribute name="userdata" instead="parameter" />
+    <attribute name="display_children" instead="expanded" />
+    <attribute name="drag_handle_gap" instead="border_size" />
+    <attribute name="prevalidate_callback" instead="prevalidator" />
+    <attribute name="prevalidate_input_callback" instead="input_prevalidator" />
+
+    <!-- A typo that was made a synonym rather than corrected, so both spellings
+         work and one of them is misspelt. -->
+    <attribute name="visiblity_control" instead="visibility_control" />
+
+    <!--
+      A layout stack reads one dimension of each panel: the one along the axis
+      it runs. min_width and min_height are the same parameter under names that
+      say an axis, and a panel carrying both has one value chosen by which name
+      sorts last. The lint says so already; this says what to write instead.
+    -->
+    <attribute name="min_width" tag="layout_panel" instead="min_dim" />
+    <attribute name="min_height" tag="layout_panel" instead="min_dim" />
+    <attribute name="max_width" tag="layout_panel" instead="max_dim" />
+    <attribute name="max_height" tag="layout_panel" instead="max_dim" />
+
+    <!--
+      The third: which heading an attribute belongs under. The tool guesses
+      from the name, which is a guess over a vocabulary; these are the ones it
+      gets wrong, and a short list of corrections beats a longer heuristic.
+    -->
+    <attribute name="chrome" section="appearance" />
+    <attribute name="title" section="identity" />
+    <attribute name="short_title" section="identity" />
+    <attribute name="help_topic" section="identity" />
+    <attribute name="layout" section="geometry" />
+    <attribute name="follows" section="geometry" />
+    <attribute name="halign" section="appearance" />
+    <attribute name="valign" section="appearance" />
+    <attribute name="use_ellipses" section="appearance" />
+    <attribute name="allow_scroll" section="behaviour" />
+    <attribute name="handle_edit_keys_directly" section="behaviour" />
+    <attribute name="commit_on_focus_lost" section="behaviour" />
+    <attribute name="mouse_opaque" section="behaviour" />
+    <attribute name="from_settings" section="behaviour" />
 </xui_notes>

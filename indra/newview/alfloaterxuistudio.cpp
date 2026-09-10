@@ -35,6 +35,7 @@
 #include "alscopebar.h"
 #include "alspecimenlist.h"
 #include "alpropertygrid.h"
+#include "alxuinotes.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
 #include "alxuitranslate.h"
@@ -307,8 +308,32 @@ namespace
     // words the name is built from. A name none of these rules recognise
     // is left in the last section rather than guessed at, which is what
     // that section is for.
-    S32 attributeGroupOf(std::string_view name)
+    // The heading a name written in the notes belongs under, or nothing
+    // where no one has written one.
+    S32 sectionFromNotes(std::string_view tag, std::string_view name)
     {
+        const ALXUINotes::Attribute* said = ALXUINotes::get().attribute(tag, name);
+        if (!said || said->section.empty())
+        {
+            return -1;
+        }
+        if (said->section == "identity")   { return GROUP_IDENTITY; }
+        if (said->section == "geometry")   { return GROUP_GEOMETRY; }
+        if (said->section == "appearance") { return GROUP_APPEARANCE; }
+        if (said->section == "behaviour")  { return GROUP_BEHAVIOUR; }
+        if (said->section == "other")      { return GROUP_OTHER; }
+        return -1;
+    }
+
+    // Which heading a name belongs under, guessed from the name. A guess over
+    // a vocabulary is wrong somewhere, and where it is, the notes say so and
+    // are asked first: a short list of corrections beats a longer heuristic.
+    S32 attributeGroupOf(std::string_view name, std::string_view tag = std::string_view())
+    {
+        if (const S32 said = sectionFromNotes(tag, name); said >= 0)
+        {
+            return said;
+        }
         // A nested leaf belongs where its block belongs: bg_alpha_color
         // .alpha is a colour and rect.left is a position.
         const std::string_view head = name.substr(0, name.find('.'));
@@ -8201,7 +8226,7 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         // that is thrown away is not a position however it is spelled.
         field.group = field.ignored ? GROUP_IGNORED
                     : field.unknown ? GROUP_UNKNOWN
-                                    : attributeGroupOf(name);
+                                    : attributeGroupOf(name, declared ? declared->name : std::string_view());
         vocabularyFor(field);
         // A field drawn as a picture is drawn in the proportions of the
         // element it is about: a rect and the rect it sits in, which are
@@ -8245,7 +8270,7 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         field.source = layerLabel(PRIMARY, from ? from->layer : 0);
         field.authored = true;
         field.kind = ALParamType::STRING;
-        field.group = attributeGroupOf(field.name);
+        field.group = attributeGroupOf(field.name, declared ? declared->name : std::string_view());
         written.insert(field.name);
         fields.push_back(std::move(field));
     }
@@ -8266,7 +8291,8 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.values = attribute.values;
             field.type = attribute.type;
             field.ignored = attribute.ignored;
-            field.group = field.ignored ? GROUP_IGNORED : attributeGroupOf(field.name);
+            field.group = field.ignored ? GROUP_IGNORED
+                                        : attributeGroupOf(field.name, declared->name);
             vocabularyFor(field);
             fields.push_back(std::move(field));
         }

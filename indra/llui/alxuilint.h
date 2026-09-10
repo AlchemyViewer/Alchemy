@@ -63,6 +63,7 @@ public:
         TemplateRootMismatch,   // a widgets/ file whose root is not the tag it configures
         UnknownAttribute,       // an attribute the widget's parameter block has no name for
         WroteTheDefault,        // an attribute written as the value it already carries
+        DeprecatedAttribute,    // a name that works, and that nothing new should use
         DanglingImage,          // an image name textures.xml does not declare
         DanglingColor,          // a colour name colors.xml does not declare
         DanglingFont,           // a font name the font registry does not know

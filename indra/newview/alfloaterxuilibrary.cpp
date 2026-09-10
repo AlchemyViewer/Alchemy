@@ -239,6 +239,18 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
         {
             out += "   read and thrown away";
         }
+        // A name that works and should not be used, and the one to use
+        // instead. Both of them go on working: what is said here is which of
+        // them anything new should be written with.
+        if (a.deprecated)
+        {
+            out += a.instead.empty() ? "   deprecated"
+                                     : "   deprecated, write " + a.instead;
+        }
+        else if (!a.alias.empty())
+        {
+            out += "   also written " + a.alias;
+        }
         if (!a.values.empty())
         {
             out += "\n        one of: ";

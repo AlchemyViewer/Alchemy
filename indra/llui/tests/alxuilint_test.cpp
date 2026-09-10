@@ -681,4 +681,64 @@ namespace tut
         }
         ensure("and there is one to have refused: " + run.describe(), placed > 0);
     }
+
+    // A name that exists, works, and should not be used. The block registered
+    // two names for one parameter -- which said that both work and will keep
+    // working -- and a person wrote down which of them to write. Nothing is
+    // broken, so it is worth a look rather than a fault, and it is one edit
+    // from being right.
+    template<> template<>
+    void alxuilint_object::test<14>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "  <text name=\"old\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
+            " word_wrap=\"true\">Hello</text>\n"
+            "  <text name=\"new\" left=\"0\" top=\"30\" width=\"80\" height=\"20\""
+            " wrap=\"true\">Hello</text>"));
+
+        ensure_equals(run.describe(), run.count(ALXUILint::Rule::DeprecatedAttribute), 1);
+        const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
+        ensure("found", f != nullptr);
+        ensure_equals("the old spelling is the one reported", f->what, std::string("word_wrap"));
+        ensure("nothing is broken, so it is worth a look",
+               f->severity == ALXUILint::Severity::Note);
+        ensure("and it offers the name to write instead",
+               f->fix.did == ALXUILint::Fix::Do::SpellAttribute);
+        ensure_equals("which is the one the notes name", f->fix.spelling, std::string("wrap"));
+
+        // Applied, it is the same edit as any other spelling fix.
+        ALXUIEdit edit;
+        ensure("loads the same bytes", edit.loadBuffer(run.source));
+        ensure("fixed", f->applyFix(edit, run.anchorFor(f->path)));
+        ensure("the old name is gone",
+               edit.text().find("word_wrap=\"true\"") == std::string::npos);
+        ensure("and the new one is where it was",
+               edit.text().find("wrap=\"true\">Hello</text>") != std::string::npos);
+    }
+
+    // An element already carrying both names is not one to write a second of:
+    // two of a name on one element is one value chosen by the parser.
+    template<> template<>
+    void alxuilint_object::test<15>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        Run run;
+        ensure("built", run.build(
+            "  <text name=\"both\" left=\"0\" top=\"0\" width=\"80\" height=\"20\""
+            " word_wrap=\"true\" wrap=\"true\">Hello</text>"));
+
+        const ALXUILint::Finding* f = run.first(ALXUILint::Rule::DeprecatedAttribute);
+        ensure("still reported", f != nullptr);
+        ensure("but there is nothing to offer", f->fix.did == ALXUILint::Fix::Do::Nothing);
+    }
 }

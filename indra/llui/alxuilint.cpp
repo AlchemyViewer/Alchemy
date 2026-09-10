@@ -173,6 +173,7 @@ const char* ALXUILint::ruleName(Rule rule)
     case Rule::TemplateRootMismatch:    return "template root";
     case Rule::UnknownAttribute:        return "unknown attribute";
     case Rule::WroteTheDefault:         return "wrote the default";
+    case Rule::DeprecatedAttribute:     return "deprecated attribute";
     case Rule::DanglingImage:           return "dangling image";
     case Rule::DanglingColor:           return "dangling colour";
     case Rule::DanglingFont:            return "dangling font";
@@ -545,6 +546,26 @@ void ALXUILint::checkAttributes(const Input& input, LLView* view, const ALXUISel
         // than a fault. Compared as the two files spell it, so a value spelt
         // another way than the template spells it is passed over rather than
         // guessed at.
+        // A name that works and should not be used. The block registered two
+        // names for one parameter, which said that both work and will keep
+        // working; a person wrote down which of them to write. Nothing is
+        // broken here, so it is worth a look rather than a fault -- and it is
+        // one edit away from being right, which the fix offers to make.
+        if (const ALXUISchema::Attribute* said =
+                schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
+            said && said->deprecated)
+        {
+            Finding& f = add(Rule::DeprecatedAttribute, Severity::Note, path, input.file, line, name,
+                said->instead.empty()
+                    ? "\"" + name + "\" is a name nothing new should use"
+                    : "\"" + name + "\" still works; \"" + said->instead + "\" is the one to write");
+            if (!said->instead.empty() && !node->hasAttribute(said->instead.c_str()))
+            {
+                f.fix.did = Fix::Do::SpellAttribute;
+                f.fix.spelling = said->instead;
+            }
+        }
+
         if (const ALXUISchema::Attribute* declared =
                 schema ? ALXUISchema::get().attribute(schema->name, name) : nullptr;
             declared && declared->declared && declared->held == value)
