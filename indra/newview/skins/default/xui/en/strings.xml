@@ -330,6 +330,11 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="FontFieldItalic">Italic</string>
 	<string name="FontFieldUnderline">Underline</string>
 
+	<!-- XUI Studio's outline, beside a row's name -->
+	<string name="XUITreeHidden">hidden</string>
+	<string name="XUITreeHiddenHere">hidden here</string>
+	<string name="XUITreeDisabled">disabled</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached

@@ -147,9 +147,10 @@
     <floater.string name="EditNothingToSave">Nothing has been changed.</floater.string>
     <floater.string name="EditUnsaved">[FILE] has changes that are not written. Save or revert first.</floater.string>
     <floater.string name="EditChangedOnDisk">[FILE] changed on disk, and there are changes here that are not written. Save to keep these, or revert to take those.</floater.string>
-    <floater.string name="TranslateCounts">[TRANSLATED] translated, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
+    <floater.string name="TranslateCounts">[TRANSLATED] translated, [RESCUED] applied after a move, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
     <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
     <floater.string name="TranslateWrote">Wrote [FIELD] into [FILE]</floater.string>
+    <floater.string name="TranslateTheText">the text</floater.string>
     <floater.string name="TranslateRepaired">Moved [MOVES] values into place in [FILE]</floater.string>
     <floater.string name="TranslateRepairedAll">Moved [MOVES] values into place across [FILES] files in [LANG]</floater.string>
     <floater.string name="TranslateNothingToRepair">Nothing in [FILE] is written at a path the base has moved on from.</floater.string>
@@ -279,6 +280,7 @@
     <floater.string name="TranslateStateMissing">missing</floater.string>
     <floater.string name="TranslateStatePlaceholders">placeholders differ</floater.string>
     <floater.string name="TranslateStateForbidden">translate="false"</floater.string>
+    <floater.string name="TranslateStateRescued">applied where the base moved it</floater.string>
     <floater.string name="TranslateStateNotApplied">applies to nothing</floater.string>
     <floater.string name="TranslateStateMoved">applies to nothing: moved</floater.string>
     <floater.string name="TranslateStateAbsent">applies to nothing: absent</floater.string>

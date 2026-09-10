@@ -341,6 +341,72 @@ static pugi::xml_node findFor(pugi::xml_node overlay_root, pugi::xml_node base,
     return pugi::xml_node();
 }
 
+// The base element the merge applies an overlay element to, worked out
+// the way ALXmlLayerMerge works it out: the overlay's parent is paired
+// first, and under that pairing the element matches a child of the
+// same name, or, where no child carries it, the one element of that
+// name below at any depth. Two or more below is a guess the merge does
+// not make, and nothing below is a name the base no longer has.
+static pugi::xml_node mergeTarget(pugi::xml_node base, pugi::xml_node overlay_root, pugi::xml_node overlay)
+{
+    if (overlay == overlay_root)
+    {
+        return base;
+    }
+    const pugi::xml_node parent = mergeTarget(base, overlay_root, overlay.parent());
+    if (!parent)
+    {
+        return pugi::xml_node();
+    }
+    // The name a child is matched by: its name, or its value where it has
+    // no name, which is how a combo box's items are told apart.
+    const char* key = overlay.attribute("name").as_string();
+    if (!*key)
+    {
+        key = overlay.attribute("value").as_string();
+    }
+    if (!*key)
+    {
+        return pugi::xml_node();
+    }
+    const auto keyOf = [](pugi::xml_node node) -> std::string_view
+    {
+        const char* name = node.attribute("name").as_string();
+        return *name ? name : node.attribute("value").as_string();
+    };
+    for (pugi::xml_node child : parent.children())
+    {
+        if (child.type() == pugi::node_element && keyOf(child) == key)
+        {
+            return child;
+        }
+    }
+    pugi::xml_node only;
+    std::vector<pugi::xml_node> stack{ parent };
+    while (!stack.empty())
+    {
+        const pugi::xml_node node = stack.back();
+        stack.pop_back();
+        for (pugi::xml_node child : node.children())
+        {
+            if (child.type() != pugi::node_element)
+            {
+                continue;
+            }
+            stack.push_back(child);
+            if (keyOf(child) == key)
+            {
+                if (only)
+                {
+                    return pugi::xml_node();
+                }
+                only = child;
+            }
+        }
+    }
+    return only;
+}
+
 // static
 bool ALXUITranslate::isTranslatableField(std::string_view name)
 {
@@ -435,6 +501,7 @@ void ALXUITranslate::weigh(S32& arrives, S32& absent) const
         {
         case State::Translated:
         case State::Placeholders:
+        case State::Rescued:
             ++arrives;
             break;
         case State::NotApplied:
@@ -502,10 +569,12 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
         // ancestors, asked once here rather than once per field of it.
         const bool forbid = forbidden(node);
 
-        // Where the language put this element, if anywhere.
+        // Where the language put this element, if anywhere -- and, where
+        // that is not its path, whether the merge finds it there anyway.
         pugi::xml_node mine;
         std::string elsewhere;
         Miss missed = Miss::None;
+        bool rescued = false;
         if (overlay)
         {
             mine = is_root ? overlay : ALXUICatalog::resolve(overlay, path, /*any_tag=*/true);
@@ -517,6 +586,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
                 {
                     mine = moved;
                     missed = Miss::Moved;
+                    rescued = mergeTarget(base, overlay, moved) == node;
                     const path_t at = ALXUICatalog::namePath(moved, /*any_tag=*/true);
                     for (const std::string& step : at)
                     {
@@ -548,7 +618,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
             {
                 unit.state = State::Forbidden;
             }
-            else if (missed != Miss::None)
+            else if (missed != Miss::None && !rescued)
             {
                 unit.state = State::NotApplied;
                 unit.miss = missed;
@@ -556,10 +626,12 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
             else if (placeholders(english) != placeholders(translation))
             {
                 unit.state = State::Placeholders;
+                unit.miss = missed;
             }
             else
             {
-                unit.state = State::Translated;
+                unit.state = rescued ? State::Rescued : State::Translated;
+                unit.miss = missed;
             }
             mUnits.push_back(std::move(unit));
         };
@@ -849,10 +921,13 @@ S32 ALXUITranslate::movePass(ALXUIEdit& overlay, pugi::xml_node base, std::strin
     ALXUITranslate units;
     units.scan(base, overlay.root());
 
+    // Every value at a path the base has moved on from, whether the merge
+    // rescues it there or drops it: a rescue holds only until the base
+    // grows another element of the name.
     std::vector<Unit> moved;
     for (const Unit& unit : units.units())
     {
-        if (unit.state == State::NotApplied && unit.miss == Miss::Moved
+        if (unit.miss == Miss::Moved
             && !unit.translation.empty() && !unit.path.empty()
             && !repeatsAName(unit.path))
         {

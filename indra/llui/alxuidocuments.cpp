@@ -137,19 +137,32 @@ ALXUIDocuments::Action::Action(ALXUIDocuments& documents)
 
 ALXUIDocuments::Action::~Action()
 {
+    close();
+}
+
+void ALXUIDocuments::Action::close()
+{
+    if (!mOpen)
+    {
+        return;
+    }
+    mOpen = false;
     if (--mDocuments.mOpenActions == 0)
     {
         mDocuments.settle();
     }
 }
 
+// Counted as steps taken rather than as the depth of the stack, since the
+// stack is capped by what it weighs and stops deepening once it is full,
+// while the steps go on being taken.
 void ALXUIDocuments::remember()
 {
     mSeen.clear();
     for (const std::string& path : mPaths)
     {
         const ALXUIEdit* held = find(path);
-        mSeen.emplace(path, held ? held->undoDepth() : 0u);
+        mSeen.emplace(path, held ? held->stepsTaken() : 0u);
     }
 }
 
@@ -170,9 +183,9 @@ void ALXUIDocuments::settle()
         }
         const auto seen = mSeen.find(path);
         const size_t before = seen == mSeen.end() ? 0u : seen->second;
-        if (held->undoDepth() > before)
+        if (held->stepsTaken() > before)
         {
-            taken.steps.emplace_back(path, (S32)(held->undoDepth() - before));
+            taken.steps.emplace_back(path, (S32)(held->stepsTaken() - before));
             // The step on top is the last one this action took, which is
             // what an action of one step did and the nearest thing to a
             // description of one that took several.

@@ -978,4 +978,100 @@ namespace tut
         ensure("with nothing to undo", !edit.canUndo());
         ensure("and a reason given", !edit.error().empty());
     }
+
+    // A step says where it leaves the element it moved or made, read off
+    // the file once the step is taken. Among siblings of one name that is
+    // the only place the answer is right: the element before the sibling a
+    // move went before is the moved element itself when the two share a
+    // name, and the sibling has become the second of them.
+    template<> template<>
+    void alxuiedit_object::test<24>()
+    {
+        ALXUIEdit doc;
+        ensure("loads", doc.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"a\" width=\"1\"/>\n"
+            "    <panel name=\"a\" width=\"2\"/>\n"
+            "    <panel name=\"b\"/>\n"
+            "</panel>\n"));
+
+        const auto after = [&doc]()
+        {
+            const ALXUIEdit::Change* step = doc.nextUndo();
+            return step ? ALXUISelection::toString(step->after) : std::string("(no step)");
+        };
+        const auto widthAt = [&doc](const std::string& path)
+        {
+            return std::string(doc.resolve(ALXUISelection::fromString(path)).attribute("width").as_string("?"));
+        };
+
+        // Up, before a sibling of its own name: it takes that sibling's
+        // place among them.
+        ensure("moves up", doc.moveBefore({ ALXUISelection::step("a", 1) }, { "a" }));
+        ensure_equals("and is the first of the name now", after(), std::string("a"));
+        ensure_equals("which is the one that moved", widthAt("a"), std::string("2"));
+        ensure_equals("and the other is the second", widthAt(ALXUISelection::step("a", 1)), std::string("1"));
+
+        // After another sibling, past the other of its name.
+        ensure("moves after b", doc.moveAfter({ "a" }, { "b" }));
+        ensure_equals("and is the second of the name again", after(), ALXUISelection::step("a", 1));
+        ensure_equals("the same element", widthAt(ALXUISelection::step("a", 1)), std::string("2"));
+
+        // Into another element.
+        ensure("moves into b", doc.moveElement({ ALXUISelection::step("a", 1) }, { "b" }));
+        ensure_equals("and is under it", after(), std::string("b/a"));
+        ensure_equals("still itself", widthAt("b/a"), std::string("2"));
+
+        // Made, last among a parent's children; before a sibling; after one.
+        ensure("adds last", doc.insertElement({}, "<panel name=\"a\" width=\"3\"/>"));
+        ensure_equals("which is the second of that name among the root's children",
+                      after(), ALXUISelection::step("a", 1));
+        ensure_equals("and is the new one", widthAt(ALXUISelection::step("a", 1)), std::string("3"));
+        ensure("adds before", doc.insertBefore({ "a" }, "<panel name=\"a\" width=\"4\"/>"));
+        ensure_equals("which is now the first of them", after(), std::string("a"));
+        ensure_equals("and is the new one", widthAt("a"), std::string("4"));
+        ensure("adds after", doc.insertAfter({ "b" }, "<panel name=\"c\"/>"));
+        ensure_equals("where it was put", after(), std::string("c"));
+
+        // Taken out: what is left where it was is what held it.
+        ensure("removes", doc.removeElement({ "b", "a" }));
+        ensure_equals("leaving its parent", after(), std::string("b"));
+
+        // The record travels with the step: put back, the element reads as
+        // it did before; done again, it is where the step put it.
+        ensure("undo the removal", doc.undo());
+        ensure_equals("undone, the element is where it was",
+                      ALXUISelection::toString(doc.lastPath()), std::string("b/a"));
+        ensure("redo", doc.redo());
+        ensure_equals("done again, its parent is what is left",
+                      ALXUISelection::toString(doc.lastPath()), std::string("b"));
+    }
+
+    // The undo stack is capped by what it weighs, so past the cap a step
+    // taken is a step the stack does not deepen for. The count of steps
+    // taken goes on counting, which is what a caller keeping a history of
+    // its own across several documents has to count.
+    template<> template<>
+    void alxuiedit_object::test<25>()
+    {
+        const std::string heavy =
+            "<panel name=\"root\">\n"
+            "    <!-- " + std::string(2500000, 'x') + " -->\n"
+            "    <panel name=\"a\" width=\"1\"/>\n"
+            "</panel>\n";
+        ALXUIEdit doc;
+        ensure("loads", doc.loadBuffer(heavy));
+        ensure_equals("nothing taken yet", doc.stepsTaken(), 0u);
+        ensure("one", doc.setAttribute({ "a" }, "width", "2"));
+        ensure_equals("one taken", doc.stepsTaken(), 1u);
+        ensure_equals("and one held", doc.undoDepth(), 1u);
+        ensure("two", doc.setAttribute({ "a" }, "width", "3"));
+        ensure_equals("two taken", doc.stepsTaken(), 2u);
+        ensure_equals("but the stack is full, so still one held", doc.undoDepth(), 1u);
+        ensure("undo", doc.undo());
+        ensure_equals("which puts back the last of them", doc.resolve({ "a" }).attribute("width").as_int(), 2);
+        ensure_equals("and takes back none of the count", doc.stepsTaken(), 2u);
+        ensure("read again", doc.loadBuffer(heavy));
+        ensure_equals("which starts the count over", doc.stepsTaken(), 0u);
+    }
 }

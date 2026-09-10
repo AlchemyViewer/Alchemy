@@ -144,10 +144,9 @@ public:
     bool accepts(const ALXUISelection::path_t& parent, std::string_view tag) const;
     // What the tag being carried is: the moved element's, or the new one's.
     std::string carriedTag(const ALXUIEdit& held) const;
-    // Where an element came to rest after a move or an insertion: last in
-    // `parent` where `where` is 0, else before (-1) or after (+1) `beside`.
-    static ALXUISelection::path_t landedAt(const ALXUIEdit& held, const ALXUISelection::path_t& parent,
-                                           const ALXUISelection::path_t& beside, S32 where);
+    // Where the document's last step left the element it moved or made,
+    // which the document read off the file once the step was taken.
+    static ALXUISelection::path_t landing(const ALXUIEdit& held);
     // A new element of a tag, named so that nothing beside it is.
     std::string newElementXml(const std::string& tag, const ALXUIEdit& held,
                               const ALXUISelection::path_t& parent, S32 left, S32 top) const;

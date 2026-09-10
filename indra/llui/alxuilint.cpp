@@ -687,8 +687,14 @@ void ALXUILint::checkChildren(const Input& input, LLView* view, const ALXUISelec
             // worth listing and are not defects.
             const bool both_shown = named[i]->getVisible() && named[j]->getVisible();
             const ALXUISourceMap::Origin* origin = input.sourceMap->find(named[i]);
-            ALXUISelection::path_t child_path(path);
-            child_path.push_back(ALXUISelection::step(named[i]->getName(), 0));
+            // Its own path, ordinal and all: the second of two siblings of
+            // one name is not the first of them.
+            ALXUISelection::path_t child_path;
+            if (!ALXUISelection::pathOf(named[i], input.root, child_path))
+            {
+                child_path = path;
+                child_path.push_back(ALXUISelection::step(named[i]->getName(), 0));
+            }
             add(both_shown ? Rule::Overlap : Rule::Alternatives,
                 both_shown ? Severity::Warning : Severity::Note,
                 child_path, input.file, origin ? origin->line : 0, named[i]->getName(),

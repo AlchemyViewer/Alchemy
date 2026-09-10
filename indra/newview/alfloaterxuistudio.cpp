@@ -1755,9 +1755,11 @@ bool ALFloaterXUIStudio::postBuild()
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
     mSecondaryCheck = getChild<LLCheckBoxCtrl>("secondary_check");
-    // The lint's words, read now, in this viewer's language: a preview built
-    // under another one would otherwise be the first to ask, and get that.
+    // The lint's words and the notes, read now, in this viewer's language:
+    // a preview built under another one would otherwise be the first to
+    // ask, and get that.
     ALXUILint::readWords();
+    ALXUINotes::get();
     mFindBar = getChild<ALScopeBar>("find_bar");
     mFindResults = getChild<LLScrollListCtrl>("find_results");
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
@@ -4036,8 +4038,7 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
         return false;
     }
 
-    const ALXUISelection::path_t moved =
-        landedAt(*held, target, target, into ? 0 : zone == ALXUITreeModel::DropZone::Before ? -1 : +1);
+    const ALXUISelection::path_t moved = landing(*held);
     if (!moved.empty())
     {
         mSelection.select(moved);
@@ -4135,13 +4136,16 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
 
     if (!mDragPath.empty())
     {
+        // The move and the rect written for the new parent are one drop,
+        // and one undo puts back both.
+        ALXUIDocuments::Action dropping(mDocuments);
         LLView* moving = ALXUISelection::resolve(pv.root, mDragPath);
         if (!moving || !held->moveElement(mDragPath, target))
         {
             setStatus(held ? held->error() : getString("EditNoTarget"));
             return nullptr;
         }
-        const ALXUISelection::path_t moved = landedAt(*held, target, target, 0);
+        const ALXUISelection::path_t moved = landing(*held);
         // The rect is written outright for the new parent, since no
         // positioning form survives a change of parent; it keeps its size.
         ALXUIEdit::Anchor want;
@@ -4170,7 +4174,7 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
             setStatus(held->error());
             return nullptr;
         }
-        const ALXUISelection::path_t made = landedAt(*held, target, target, 0);
+        const ALXUISelection::path_t made = landing(*held);
         if (!made.empty())
         {
             mSelection.select(made);
@@ -4566,14 +4570,20 @@ bool ALFloaterXUIStudio::applyLive(const ALXUISelection::path_t& path,
     origin->node->setAttributeString(name.c_str(), value);
 
     bool done = false;
-    if (name == "visible")
+    if (name == "visible" || name == "enabled")
     {
-        view->setVisible(value == "true");
-        done = true;
-    }
-    else if (name == "enabled")
-    {
-        view->setEnabled(value == "true");
+        // Read back off the node, so that a value is read the way the
+        // parser reads one rather than as the one spelling of it.
+        bool on = false;
+        origin->node->getAttributeBOOL(name.c_str(), on);
+        if (name == "visible")
+        {
+            view->setVisible(on);
+        }
+        else
+        {
+            view->setEnabled(on);
+        }
         done = true;
     }
     else if (name == "tool_tip")
@@ -4908,6 +4918,7 @@ void ALFloaterXUIStudio::saveAndRepair()
         }
     }
     mCatalog.reload(mFile);
+    repairing.close();
 
     LLStringUtil::format_map_t args;
     args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
@@ -5607,8 +5618,19 @@ void ALFloaterXUIStudio::fileChanged()
     // author is told instead, and chooses which of the two to keep.
     if (documentDirty())
     {
+        // Named for the file with the work in it, which is not always the
+        // one an operation with no path of its own means.
+        std::string dirty = documentPath();
+        for (const std::string& path : mDocuments.paths())
+        {
+            if (const ALXUIEdit* held = mDocuments.find(path); held && held->dirty())
+            {
+                dirty = path;
+                break;
+            }
+        }
         LLStringUtil::format_map_t args;
-        args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+        args["[FILE]"] = dirty.substr(dirty.find_last_of("/\\") + 1);
         setStatus(getString("EditChangedOnDisk", args));
         return;
     }
@@ -6304,7 +6326,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         what = "moved";
         if (ok)
         {
-            afterwards = landedAt(*held, path, path, 0);
+            afterwards = landing(*held);
         }
     }
     else if (action == "move_in")
@@ -6321,7 +6343,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         what = "moved";
         if (ok)
         {
-            afterwards = landedAt(*held, sibling, sibling, 0);
+            afterwards = landing(*held);
         }
     }
     else if (action == "move_out")
@@ -6338,7 +6360,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         what = "moved";
         if (ok)
         {
-            afterwards = landedAt(*held, parent, parent, +1);
+            afterwards = landing(*held);
         }
     }
     else
@@ -6357,7 +6379,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         what = "moved";
         if (ok)
         {
-            afterwards = landedAt(*held, sibling, sibling, action == "move_up" ? -1 : +1);
+            afterwards = landing(*held);
         }
     }
 
@@ -6385,34 +6407,15 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
     documentChanged(getString("EditWrote", args));
 }
 
-// Where an element came to rest, read off the document after a move or an
-// insertion: last among a parent's children, or beside the sibling it was
-// put before or after. The path it had names a place it has left, and a
-// path is what the selection and everything else the tool holds is.
-ALXUISelection::path_t ALFloaterXUIStudio::landedAt(const ALXUIEdit& held,
-                                                    const ALXUISelection::path_t& parent,
-                                                    const ALXUISelection::path_t& beside,
-                                                    S32 where)
+// Where an element came to rest, as the document says: the path it had
+// names a place it has left, and a path is what the selection and
+// everything else the tool holds is. The document knows because it read
+// the element off the file after the splice, which is the only place the
+// answer is right when the element shares its name with a sibling.
+ALXUISelection::path_t ALFloaterXUIStudio::landing(const ALXUIEdit& held)
 {
-    pugi::xml_node landed;
-    if (where == 0)
-    {
-        landed = held.resolve(parent).last_child();
-        while (landed && landed.type() != pugi::node_element)
-        {
-            landed = landed.previous_sibling();
-        }
-    }
-    else
-    {
-        const pugi::xml_node next_to = held.resolve(beside);
-        landed = where < 0 ? next_to.previous_sibling() : next_to.next_sibling();
-        while (landed && landed.type() != pugi::node_element)
-        {
-            landed = where < 0 ? landed.previous_sibling() : landed.next_sibling();
-        }
-    }
-    return landed ? ALXUICatalog::namePath(landed, /*any_tag=*/true) : ALXUISelection::path_t();
+    const ALXUIEdit::Change* step = held.nextUndo();
+    return step ? step->after : ALXUISelection::path_t();
 }
 
 // The element before or after this one among its parent's children, in
@@ -7143,17 +7146,22 @@ bool ALFloaterXUIStudio::overlayPath(const ALXUICatalog::Entry& entry, const std
         error = getString("OverlayNoLanguageDirectory");
         return false;
     }
+    // The language's directory first, since a skin may have no directory
+    // for this language at all, and then the widgets directory under it.
     dir = dir.substr(0, lang_at) + delim + language;
-    if (!prefix.empty())
+    for (S32 level = 0; level < (prefix.empty() ? 1 : 2); ++level)
     {
-        dir += delim + prefix;
-    }
-    if (LLFile::mkdir(dir) != 0 && !gDirUtilp->fileExists(dir))
-    {
-        LLStringUtil::format_map_t args;
-        args["[DIR]"] = dir;
-        error = getString("OverlayMkdirFailed", args);
-        return false;
+        if (level == 1)
+        {
+            dir += delim + prefix;
+        }
+        if (LLFile::mkdir(dir) != 0 && !gDirUtilp->fileExists(dir))
+        {
+            LLStringUtil::format_map_t args;
+            args["[DIR]"] = dir;
+            error = getString("OverlayMkdirFailed", args);
+            return false;
+        }
     }
 
     // A file with nothing in it but the root the base names, which is
@@ -7230,6 +7238,7 @@ void ALFloaterXUIStudio::fillTranslation()
         case ALXUITranslate::State::Missing:      state = "TranslateStateMissing"; break;
         case ALXUITranslate::State::Placeholders: state = "TranslateStatePlaceholders"; break;
         case ALXUITranslate::State::Forbidden:    state = "TranslateStateForbidden"; break;
+        case ALXUITranslate::State::Rescued:      state = "TranslateStateRescued"; break;
         case ALXUITranslate::State::NotApplied:
             switch (unit.miss)
             {
@@ -7258,6 +7267,7 @@ void ALFloaterXUIStudio::fillTranslation()
 
     LLStringUtil::format_map_t args;
     args["[TRANSLATED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Translated));
+    args["[RESCUED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Rescued));
     args["[MISSING]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Missing));
     args["[NOTAPPLIED]"] = std::to_string(mTranslate.count(ALXUITranslate::State::NotApplied));
     args["[PLACEHOLDERS]"] = std::to_string(mTranslate.count(ALXUITranslate::State::Placeholders));
@@ -7371,7 +7381,7 @@ void ALFloaterXUIStudio::onTranslationWrite()
         mWroteThroughText = before;
     }
     LLStringUtil::format_map_t args;
-    args["[FIELD]"] = unit.field.empty() ? std::string("the text") : unit.field;
+    args["[FIELD]"] = unit.field.empty() ? getString("TranslateTheText") : unit.field;
     args["[FILE]"] = language + "/" + mFile;
     mPendingStatus = getString("TranslateWrote", args);
     setStatus(mPendingStatus);
@@ -7602,6 +7612,7 @@ void ALFloaterXUIStudio::stepCensus()
                 case ALXUITranslate::State::Missing:      ++counts["missing"]; break;
                 case ALXUITranslate::State::Placeholders: ++counts["placeholders_differ"]; break;
                 case ALXUITranslate::State::Forbidden:    ++counts["translated_despite_false"]; break;
+                case ALXUITranslate::State::Rescued:      ++counts["rescued"]; break;
                 case ALXUITranslate::State::NotApplied:
                     ++counts["applies_to_nothing"];
                     switch (unit.miss)
@@ -7634,7 +7645,7 @@ void ALFloaterXUIStudio::finishCensus()
 {
     // The columns every language has a number for, in the order they read
     // best: what arrived, what did not, and why not.
-    static const char* COLUMNS[] = { "files", "covered", "missing", "applies_to_nothing",
+    static const char* COLUMNS[] = { "files", "covered", "rescued", "missing", "applies_to_nothing",
                                      "moved", "absent", "unnamed", "ambiguous", "field_absent",
                                      "placeholders_differ", "translated_despite_false",
                                      "root_name_differs", "orphan_file" };
@@ -8364,7 +8375,11 @@ const ALXUICatalog::Layer* ALFloaterXUIStudio::editTarget() const
     const ALXUICatalog::Layer* target = nullptr;
     for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
     {
-        const pugi::xml_node node = ALXUICatalog::resolve(layer->root(), mSelection.selection());
+        // As held, where the layer is one of the documents open: an
+        // attribute taken out a moment ago is not still on the disk's say-so.
+        pugi::xml_node node;
+        S32 line = 0;
+        elementIn(*layer, mSelection.selection(), node, line);
         if (!node)
         {
             continue;
@@ -8548,10 +8563,6 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
         setStatus(getString("EditNoTarget"));
         return;
     }
-    // Lining up a selection writes an attribute on each of several elements,
-    // and it is one thing the developer asked for: undoing it a step at a
-    // time would leave a selection half lined up, which nobody asked for.
-    ALXUIDocuments::Action lining_up(mDocuments);
     ALXUIEdit* held = document(*layer);
     if (!held)
     {
@@ -8561,6 +8572,12 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
     const LLRect a = anchor->calcScreenRect();
     LLView* root = mPreviews[PRIMARY].root;
     S32 moved = 0;
+    // Lining up a selection writes an attribute on each of several elements,
+    // and it is one thing the developer asked for: undoing it a step at a
+    // time would leave a selection half lined up, which nobody asked for.
+    // The action closes before the history is filled, or the list is one
+    // behind what was just done.
+    ALXUIDocuments::Action lining_up(mDocuments);
     for (const ALXUISelection::path_t& path : mSelection.also())
     {
         LLView* view = ALXUISelection::resolve(root, path);
@@ -8595,6 +8612,7 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
         }
         ++moved;
     }
+    lining_up.close();
 
     if (!moved)
     {
@@ -8826,15 +8844,18 @@ void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 d
     const pugi::xml_attribute layout = node.attribute("layout");
     want.topLeft = layout ? std::string_view(layout.value()) == "topleft" : parent->isLayoutTopLeft();
 
+    // The move and the rect written for the new parent are one gesture,
+    // and one undo puts back both.
+    ALXUIDocuments::Action reparenting(mDocuments);
     if (!held->moveElement(path, target))
     {
         setStatus(held->error());
         return;
     }
 
-    // The move puts it last among the target's children, which is where
-    // its new path is read from: the old one names a place it has left.
-    ALXUISelection::path_t moved = landedAt(*held, target, target, 0);
+    // The move puts it last among the target's children, and the document
+    // says where that is: the old path names a place it has left.
+    ALXUISelection::path_t moved = landing(*held);
     if (moved.empty())
     {
         setStatus(getString("EditNoTarget"));
@@ -8848,6 +8869,7 @@ void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 d
         setStatus(held->error());
         return;
     }
+    reparenting.close();
 
     mSelection.select(moved);
     LLStringUtil::format_map_t args;
@@ -9250,9 +9272,22 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     {
         return;
     }
-    const bool ok = name == "value"
-        ? held->setText(mSelection.selection(), value)
-        : held->setAttribute(mSelection.selection(), name, value);
+    // A value is written in whichever form the element already uses. The
+    // parser reads the text between the tags over a value attribute, so
+    // text written onto an element that carries the attribute leaves the
+    // attribute in the file with nothing reading it.
+    bool ok;
+    if (name == "value")
+    {
+        const pugi::xml_node element = held->resolve(mSelection.selection());
+        ok = element && element.attribute("value")
+           ? held->setAttribute(mSelection.selection(), name, value)
+           : held->setText(mSelection.selection(), value);
+    }
+    else
+    {
+        ok = held->setAttribute(mSelection.selection(), name, value);
+    }
     if (!ok)
     {
         setStatus(held->error());
@@ -9382,7 +9417,15 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
     {
         return;
     }
-    if (!held->removeAttribute(mSelection.selection(), name))
+    // A value the element carries as its text rather than as an attribute
+    // comes off by emptying the text: an element with nothing between its
+    // tags says nothing to the parser, as one without the attribute does.
+    const pugi::xml_node element = held->resolve(mSelection.selection());
+    const bool as_text = name == "value" && element && !element.attribute("value")
+                      && element.first_child() && !element.first_child().next_sibling()
+                      && element.first_child().type() == pugi::node_pcdata;
+    if (!(as_text ? held->setText(mSelection.selection(), std::string())
+                  : held->removeAttribute(mSelection.selection(), name)))
     {
         setStatus(held->error());
         return;
@@ -9780,6 +9823,7 @@ void ALFloaterXUIStudio::writeOverrideInto(const ALXUICatalog::Layer& layer, con
         setStatus(held->error());
         return;
     }
+    together.close();
     LLStringUtil::format_map_t args;
     args["[ATTRS]"] = field;
     args["[FILE]"] = mFile;
@@ -10293,8 +10337,10 @@ bool ALFloaterXUIStudio::onMenuEnable(const LLSD& param)
     const std::string what = param.asString();
 
     if (what == "dirty")    { return documentDirty(); }
-    if (what == "undo")     { return document().canUndo() || !mWroteThroughPath.empty(); }
-    if (what == "redo")     { return document().canRedo(); }
+    // The set's history rather than the active document's: the last thing
+    // done may have been to another file, and the label beside this says so.
+    if (what == "undo")     { return mDocuments.canUndo() || !mWroteThroughPath.empty(); }
+    if (what == "redo")     { return mDocuments.canRedo(); }
     if (what == "nested")   { return !nestedFile(selectedView()).empty(); }
     return true;
 }

@@ -877,4 +877,26 @@ namespace tut
         args["[HEIGHT]"] = "4";
         ensure_equals("filled", ALXUILint::wording("LintEmptyRect", args), std::string("shown with a rect of 3 by 4"));
     }
+
+    // An overlap is reported on the element's own path. The second of two
+    // siblings of one name is the second of them, and a finding that named
+    // the first would badge and select the wrong element.
+    template<> template<>
+    void alxuilint_object::test<19>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Run run;
+        ensure("builds", run.build(
+            "  <panel name=\"a\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
+            "  <panel name=\"a\" left=\"100\" top=\"0\" width=\"20\" height=\"20\"/>\n"
+            "  <panel name=\"b\" left=\"110\" top=\"0\" width=\"20\" height=\"20\"/>"));
+        ensure_equals("one overlap: " + run.describe(), run.count(ALXUILint::Rule::Overlap), 1);
+        const ALXUILint::Finding* overlap = run.first(ALXUILint::Rule::Overlap);
+        ensure_equals("on the second of the name", ALXUISelection::toString(overlap->path),
+                      ALXUISelection::step("a", 1));
+        ensure_equals("with the other named", overlap->args.at("[OTHER]")(), std::string("b"));
+    }
 }

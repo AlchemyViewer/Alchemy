@@ -151,7 +151,12 @@ public:
     {
         Did         did = Did::Something;
         path_t      path;               // where the element was before it
-        path_t      after;              // and where the step leaves it
+        // And where the step leaves it: a renamed element under its new
+        // name, a moved or an added element where it now sits, a removed
+        // one's parent, which is what is left where it was. Read off the
+        // file once the step is made, since where an element lands among
+        // siblings of its name is not known until it has.
+        path_t      after;
         std::string field;              // the attribute written
         bool        oneField = false;   // and nothing else was
     };
@@ -162,6 +167,10 @@ public:
     bool redo();
     void clearHistory();
     size_t undoDepth() const { return mUndo.size(); }
+    // How many steps have been taken since the file was read, undone or
+    // not. The stack is capped by what it weighs, so its depth stops
+    // growing once it is full; a caller counting steps counts this.
+    size_t stepsTaken() const { return mTaken; }
 
     // What the last undo or redo put back.
     const Change& lastChange() const { return mLastChange; }
@@ -316,6 +325,11 @@ private:
     // And where a step that writes a name leaves the element it renames.
     void noteRename(pugi::xml_node node, const std::string& name);
 
+    // Where a step leaves the element it moved or made: the one whose tag
+    // now begins at that offset in the text, found after the splice.
+    void landed(size_t name_offset);
+    pugi::xml_node elementNamedAt(size_t name_offset) const;
+
     std::vector<std::string>        mUndo;
     std::vector<std::string>        mRedo;
     std::vector<Change>             mUndoWhat;      // beside each step
@@ -324,6 +338,7 @@ private:
     Change                          mLastChange;    // of the last one put back
     path_t                          mLastPath;      // where that leaves it
     S32                             mDepth = 0;     // operations in progress
+    size_t                          mTaken = 0;
     bool                            mStepOpen = false;
     bool                            mDirty = false;
 };

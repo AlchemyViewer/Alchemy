@@ -92,12 +92,15 @@ ALXUIEdit::~ALXUIEdit() = default;
 bool ALXUIEdit::loadFile(const std::string& path)
 {
     std::error_code ec;
-    mText = LLFile::getContents(path, ec);
+    std::string text = LLFile::getContents(path, ec);
     if (ec)
     {
+        // What is held stays held: a file that cannot be read again is
+        // not a reason to lose what was read the first time.
         mError = ec.message();
         return false;
     }
+    mText = std::move(text);
     mPath = path;
     mSaved = mText;
     mDirty = false;
@@ -376,8 +379,46 @@ ALXUIEdit::Step::~Step()
 {
     if (--mDoc.mDepth == 0)
     {
+        // What the step did is settled only now: where an element landed
+        // is read after the splice that put it there, and the record was
+        // taken at the first splice.
+        if (mDoc.mStepOpen && !mDoc.mUndoWhat.empty())
+        {
+            mDoc.mUndoWhat.back() = mDoc.mPending;
+        }
         mDoc.mStepOpen = false;
     }
+}
+
+void ALXUIEdit::landed(size_t name_offset)
+{
+    if (const pugi::xml_node node = elementNamedAt(name_offset))
+    {
+        mPending.after = ALXUICatalog::namePath(node, /*any_tag=*/true);
+    }
+}
+
+pugi::xml_node ALXUIEdit::elementNamedAt(size_t name_offset) const
+{
+    std::vector<pugi::xml_node> waiting{ root() };
+    while (!waiting.empty())
+    {
+        const pugi::xml_node node = waiting.back();
+        waiting.pop_back();
+        if (!node || node.type() != pugi::node_element)
+        {
+            continue;
+        }
+        if ((size_t)node.offset_debug() == name_offset)
+        {
+            return node;
+        }
+        for (pugi::xml_node child : node.children())
+        {
+            waiting.push_back(child);
+        }
+    }
+    return pugi::xml_node();
 }
 
 void ALXUIEdit::splice(const Span& span, std::string_view text)
@@ -391,6 +432,7 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
         mRedo.clear();
         mRedoWhat.clear();
         mStepOpen = true;
+        ++mTaken;
 
         size_t held = 0;
         for (const std::string& step : mUndo)
@@ -456,6 +498,7 @@ void ALXUIEdit::clearHistory()
     mRedoWhat.clear();
     mLastChange = Change();
     mLastPath.clear();
+    mTaken = 0;
 }
 
 bool ALXUIEdit::fieldText(const path_t& path, std::string_view field, std::string& out) const
@@ -761,15 +804,19 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
         block.insert(line + 1, indent);
     }
 
+    // Where the element's own '<' lands, so the step can say where it is.
+    const size_t lead = llmin(block.size(), block.find_first_not_of(" \t\r\n"));
     if (opens)
     {
         // The parent closed itself, so it opens for its first child and
         // closes on a line of its own.
         const std::string own = indentAt((size_t)node.offset_debug() - 1);
         splice({ at, length }, ">" + eol + indent + block + eol + own + "</" + std::string(node.name()) + ">");
+        landed(at + 1 + eol.size() + indent.size() + lead + 1);
         return true;
     }
     splice({ at, 0 }, eol + indent + block);
+    landed(at + eol.size() + indent.size() + lead + 1);
     return true;
 }
 
@@ -792,6 +839,11 @@ bool ALXUIEdit::removeElement(const path_t& path)
         return false;
     }
     splice(whole, std::string_view());
+    // What is left where it was is what held it.
+    if (!path.empty())
+    {
+        mPending.after.assign(path.begin(), path.end() - 1);
+    }
     return true;
 }
 
@@ -994,13 +1046,17 @@ bool ALXUIEdit::insertBeside(const path_t& sibling, const std::string& xml, bool
         block.insert(line + 1, indent);
     }
 
+    const size_t lead = llmin(block.size(), block.find_first_not_of(" \t\r\n"));
     if (before)
     {
         splice({ start, 0 }, block + eol + indent);
+        landed(start + lead + 1);
     }
     else
     {
-        splice({ whole.offset + whole.length, 0 }, eol + indent + block);
+        const size_t at = whole.offset + whole.length;
+        splice({ at, 0 }, eol + indent + block);
+        landed(at + eol.size() + indent.size() + lead + 1);
     }
     return true;
 }

@@ -108,8 +108,14 @@ public:
         ~Action();
         Action(const Action&) = delete;
         Action& operator=(const Action&) = delete;
+
+        // Closed here rather than at the end of its scope, for a caller
+        // that lists the history before the scope ends: nothing settles
+        // while an action is open, and a list filled then is one behind.
+        void close();
     private:
         ALXUIDocuments& mDocuments;
+        bool            mOpen = true;
     };
 
     bool canUndo() const { return !mDone.empty(); }
@@ -178,7 +184,7 @@ private:
         ALXUIEdit::Change what;
     };
 
-    // How deep each document's own stack was when this last looked.
+    // How many steps each document had taken when this last looked.
     void remember();
 
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<> > mSeen;

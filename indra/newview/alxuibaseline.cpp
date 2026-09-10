@@ -27,20 +27,18 @@
 #include "alxuibaseline.h"
 
 #include "alxmldocument.h"
+#include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
+#include "alxuilint.h"
 #include "alxuishellbuild.h"
 #include "llbutton.h"
-#include "llcontainerview.h"
 #include "lldir.h"
 #include "lldiriterator.h"
 #include "lldraghandle.h"
 #include "llfile.h"
 #include "lllayoutstack.h"
-#include "llmenugl.h"
 #include "llpanel.h"
 #include "llresizebar.h"
-#include "llscrollcontainer.h"
-#include "llstatview.h"
 #include "lltextbox.h"
 #include "lltimer.h"
 #include "lluictrlfactory.h"
@@ -57,12 +55,7 @@ namespace
     // knows is either a parameter element or a mistake.
     bool isWidgetTag(const std::string& tag)
     {
-        return LLDefaultChildRegistry::instance().getValue(tag)
-            || MenuRegistry::instance().getValue(tag)
-            || LLLayoutStack::LayoutStackRegistry::instance().getValue(tag)
-            || ScrollContainerRegistry::instance().getValue(tag)
-            || ContainerViewRegistry::instance().getValue(tag)
-            || StatViewRegistry::instance().getValue(tag);
+        return ALXUICatalog::isWidgetTag(tag);
     }
 
     std::string firstToken(const std::string& path)
@@ -118,23 +111,6 @@ namespace
         }
     }
 
-    S32 widestLine(const LLFontGL* font, const std::string& text)
-    {
-        S32 widest = 0;
-        size_t start = 0;
-        while (start <= text.size())
-        {
-            size_t end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                end = text.size();
-            }
-            widest = llmax(widest, font->getWidth(std::string_view(text).substr(start, end - start)));
-            start = end + 1;
-        }
-        return widest;
-    }
-
     // A label wider than the box it sits in. Text boxes that wrap are
     // skipped; buttons allow the default horizontal padding on each side.
     // A view whose name the file never mentions was built by a widget's
@@ -147,7 +123,7 @@ namespace
         {
             const LLFontGL* font = text->getFont();
             truncated = font && !text->getWordWrap() && !text->getText().empty()
-                && widestLine(font, text->getText()) > text->getRect().getWidth() - 2 * text->getHPad();
+                && ALXUILint::widestLine(font, text->getText()) > text->getRect().getWidth() - 2 * text->getHPad();
         }
         else if (const LLButton* button = view->as<LLButton>())
         {

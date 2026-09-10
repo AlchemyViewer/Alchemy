@@ -299,4 +299,51 @@ namespace tut
         ensure("done again", open.redo());
         ensure_equals("back where it was", open.inForce(), 2u);
     }
+
+    // A document's own stack is capped by what it weighs, and a file heavy
+    // enough fills it in one step. The history here is of steps taken, not
+    // of the stack's depth, so the second edit to such a file is an action
+    // like the first rather than one the set never saw.
+    template<> template<>
+    void alxuidocuments_object::test<8>()
+    {
+        const std::string heavy = write("heavy.xml",
+            "<panel name=\"root\">\n"
+            "    <!-- " + std::string(2500000, 'x') + " -->\n"
+            "    <panel name=\"a\" width=\"1\"/>\n"
+            "</panel>\n");
+
+        ALXUIDocuments open;
+        ALXUIEdit* held = open.open(heavy);
+        ensure("opens", held != nullptr);
+        ensure("one", held->setAttribute({ "a" }, "width", "2"));
+        open.settle();
+        ensure("two", held->setAttribute({ "a" }, "width", "3"));
+        open.settle();
+        ensure_equals("the stack held one of them", held->undoDepth(), 1u);
+        ensure_equals("and the history both", open.history().size(), 2u);
+        ensure_equals("in force", open.inForce(), 2u);
+        ensure("undo", open.undo());
+        ensure_equals("puts back the second", held->resolve({ "a" }).attribute("width").as_int(), 2);
+        ensure_equals("and lists it as put back", open.inForce(), 1u);
+    }
+
+    // A file that has gone from the disk is not read again: what was read
+    // the first time stays, and the merge that reads the document in place
+    // of the file goes on reading a document rather than nothing.
+    template<> template<>
+    void alxuidocuments_object::test<9>()
+    {
+        const std::string path = write("going.xml", panel("a"));
+        ALXUIDocuments open;
+        ALXUIEdit* held = open.open(path);
+        ensure("opens", held != nullptr);
+        const std::string was = held->text();
+
+        LLFile::remove(path);
+        ensure_equals("nothing was read again", open.rereadClean(), 0);
+        ensure_equals("and the text is what it was", held->text(), was);
+        ensure("which the merge is still given", open.textFor(path) != nullptr);
+        ensure("and the document says why", !held->error().empty());
+    }
 }

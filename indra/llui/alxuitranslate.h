@@ -53,7 +53,13 @@ public:
         Missing,        // the base has it, the language does not
         NotApplied,     // the language has it and the merge drops it
         Placeholders,   // applied, but its [KEY] tokens are not the base's
-        Forbidden       // translated under translate="false"
+        Forbidden,      // translated under translate="false"
+        // The language wrote it where the base used to have the element,
+        // and the merge applied it where the base has it now: the one
+        // element of that name below. Applied, and worth moving all the
+        // same, since the next element of that name the base grows makes
+        // it a guess the merge does not take.
+        Rescued
     };
 
     // Why a value the language wrote applies to nothing.
@@ -80,7 +86,10 @@ public:
         S32         baseLine = 0;
         S32         overlayLine = 0;
 
-        bool applies() const { return state == State::Translated || state == State::Placeholders; }
+        bool applies() const
+        {
+            return state == State::Translated || state == State::Placeholders || state == State::Rescued;
+        }
     };
 
     // Every translatable field of the base with what the overlay has for

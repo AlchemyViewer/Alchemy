@@ -28,6 +28,7 @@
 
 #include "alxuisourcemap.h"
 #include "llrender2dutils.h"
+#include "lltrans.h"
 #include "llui.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -314,13 +315,18 @@ std::string ALXUITreeItem::getLabelSuffix() const
         suffix += "  [" + std::to_string(findings) + "]";
     }
     suffix += "  " + mTag + "  " + std::to_string(rect.getWidth()) + "x" + std::to_string(rect.getHeight());
+    // Read once: this is asked of every row on every frame the outline
+    // is drawn.
+    static const std::string hidden = LLTrans::getString("XUITreeHidden");
+    static const std::string hidden_here = LLTrans::getString("XUITreeHiddenHere");
+    static const std::string disabled = LLTrans::getString("XUITreeDisabled");
     if (!isShown())
     {
-        suffix += isAuthoredVisible() ? "  hidden here" : "  hidden";
+        suffix += "  " + (isAuthoredVisible() ? hidden_here : hidden);
     }
     if (!mView->getEnabled())
     {
-        suffix += "  disabled";
+        suffix += "  " + disabled;
     }
     return suffix;
 }

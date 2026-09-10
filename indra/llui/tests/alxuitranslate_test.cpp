@@ -161,12 +161,18 @@ namespace tut
         ensure("the tool tip is there", tip);
         ensure_equals("and lost its placeholder", (int)tip->state, (int)ALXUITranslate::State::Placeholders);
 
+        // Written where the base used to have the element. The merge looks
+        // below for the one element of that name, and there is one, so the
+        // value arrives -- and the unit says both that it arrives and that
+        // the base has moved on from where it was written.
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
         ensure("the nested one is there", deep);
-        ensure_equals("written at the wrong path, so it applies to nothing: " + describe(units),
-                      (int)deep->state, (int)ALXUITranslate::State::NotApplied);
-        ensure_equals("and the reason is that the base has it elsewhere",
+        ensure_equals("written at a path the base moved on from, and applied all the same: " + describe(units),
+                      (int)deep->state, (int)ALXUITranslate::State::Rescued);
+        ensure("which is applying", deep->applies());
+        ensure_equals("and the reason it is worth moving is that the base has it elsewhere",
                       (int)deep->miss, (int)ALXUITranslate::Miss::Moved);
+        ensure_equals("which is where the language put it", deep->where, std::string("deep"));
 
         const ALXUITranslate::Unit* code = find(units, "code", "value");
         ensure("what the file forbids, translated anyway, is shown", code);
@@ -224,8 +230,10 @@ namespace tut
         units.scan(root, overlay.root());
         const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
         ensure("the unit is there", deep);
-        ensure_equals("and the language has it in the wrong place",
-                      (int)deep->state, (int)ALXUITranslate::State::NotApplied);
+        ensure_equals("and the language has it in the wrong place, where the merge rescues it",
+                      (int)deep->state, (int)ALXUITranslate::State::Rescued);
+        ensure_equals("which is worth moving all the same",
+                      (int)deep->miss, (int)ALXUITranslate::Miss::Moved);
 
         std::string error;
         ensure("writes: " + error, ALXUITranslate::write(overlay, root, *deep, "Anidado", error));
@@ -569,5 +577,87 @@ namespace tut
         ensure("no base element, no chain",
                !ALXUITranslate::ensureChain(overlay, root, { "inner", "nowhere" }, error));
         ensure("and it says why", !error.empty());
+    }
+
+    // The merge rescues a moved element only where exactly one of its
+    // name sits below the element it matched the overlay's parent to.
+    // Two below is a guess it does not make, and the table says so: the
+    // value applies to nothing, and a repair moves it.
+    template<> template<>
+    void alxuitranslate_object::test<14>()
+    {
+        Doc base;
+        Doc other;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Nested\"/>\n"
+            "    </panel>\n"
+            "    <panel name=\"other\">\n"
+            "        <text name=\"deep\" value=\"Also nested\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+        pugi::xml_node overlay = other.load(
+            "<panel name=\"root\">\n"
+            "    <text name=\"deep\" value=\"Anidado\"/>\n"
+            "</panel>\n");
+
+        ALXUITranslate units;
+        units.scan(root, overlay);
+        const ALXUITranslate::Unit* one = find(units, "inner/deep", "value");
+        const ALXUITranslate::Unit* two = find(units, "other/deep", "value");
+        ensure("both of the base's are there: " + describe(units), one && two);
+        ensure_equals("neither is rescued, since the merge would be guessing",
+                      (int)one->state, (int)ALXUITranslate::State::NotApplied);
+        ensure_equals("neither of them", (int)two->state, (int)ALXUITranslate::State::NotApplied);
+        ensure_equals("and both say the base has the name elsewhere",
+                      (int)one->miss, (int)ALXUITranslate::Miss::Moved);
+        ensure("so neither applies", !one->applies() && !two->applies());
+
+        // Rescued under the parent the language did write: the merge pairs
+        // the parents first, and looks below the paired one only.
+        Doc placed;
+        pugi::xml_node under = placed.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"other\">\n"
+            "        <panel name=\"wrong\">\n"
+            "            <text name=\"deep\" value=\"Tambien\"/>\n"
+            "        </panel>\n"
+            "    </panel>\n"
+            "</panel>\n");
+        // The base has no `wrong` under `other`, so the merge drops the
+        // panel and everything in it: nothing rescues an element whose
+        // own parent applies to nothing.
+        units.scan(root, under);
+        two = find(units, "other/deep", "value");
+        ensure("the unit is there: " + describe(units), two);
+        ensure_equals("and applies to nothing, since its parent does",
+                      (int)two->state, (int)ALXUITranslate::State::NotApplied);
+
+        // And a repair moves a rescued value as it moves a dropped one,
+        // since the rescue lasts only until the base grows another of the
+        // name.
+        ALXUIEdit fix;
+        ensure("loads", fix.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <text name=\"deep\" value=\"Anidado\"/>\n"
+            "</panel>\n"));
+        Doc single;
+        pugi::xml_node one_below = single.load(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Nested\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+        units.scan(one_below, fix.root());
+        one = find(units, "inner/deep", "value");
+        ensure("rescued before the repair: " + describe(units),
+               one && one->state == ALXUITranslate::State::Rescued);
+        std::string error;
+        ensure_equals("the repair moves it: " + error, ALXUITranslate::repair(fix, one_below, error), 1);
+        units.scan(one_below, fix.root());
+        one = find(units, "inner/deep", "value");
+        ensure("and it is translated outright afterwards: " + describe(units),
+               one && one->state == ALXUITranslate::State::Translated);
     }
 }
