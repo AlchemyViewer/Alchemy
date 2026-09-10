@@ -817,6 +817,67 @@ bool ALXUIEdit::liftElement(const path_t& path, std::string& xml) const
 // in that parent each answer to one fewer.
 //
 //static
+bool ALXUIEdit::rename(const path_t& path, const std::string& name, path_t& moved)
+{
+    if (!setAttribute(path, "name", name))
+    {
+        return false;
+    }
+    // Worked out while the write was being made, when the element's siblings
+    // and their names were in front of it.
+    moved = mPending.after;
+    return true;
+}
+
+void ALXUIEdit::afterRenaming(const path_t& renamed, const path_t& to, path_t& other)
+{
+    if (renamed.empty() || to.size() != renamed.size() || other.size() < renamed.size())
+    {
+        return;
+    }
+    const size_t depth = renamed.size() - 1;
+    if (renamed[depth] == to[depth])
+    {
+        return;     // called something it is already called
+    }
+    for (size_t i = 0; i < depth; ++i)
+    {
+        if (renamed[i] != other[i])
+        {
+            return; // a different branch, so nothing here moved
+        }
+    }
+
+    // The element itself, and so everything under it.
+    if (other[depth] == renamed[depth])
+    {
+        other[depth] = to[depth];
+        return;
+    }
+
+    std::string_view was_name;
+    std::string_view now_name;
+    std::string_view mine_name;
+    S32 was_ordinal = 0;
+    S32 now_ordinal = 0;
+    S32 mine_ordinal = 0;
+    ALXUISelection::splitOrdinal(renamed[depth], was_name, was_ordinal);
+    ALXUISelection::splitOrdinal(to[depth], now_name, now_ordinal);
+    ALXUISelection::splitOrdinal(other[depth], mine_name, mine_ordinal);
+
+    // One fewer of the name it left behind.
+    if (mine_name == was_name && mine_ordinal > was_ordinal)
+    {
+        other[depth] = ALXUISelection::step(mine_name, mine_ordinal - 1);
+        return;
+    }
+    // And one more of the name it took, from where it now sits among them.
+    if (mine_name == now_name && mine_ordinal >= now_ordinal)
+    {
+        other[depth] = ALXUISelection::step(mine_name, mine_ordinal + 1);
+    }
+}
+
 void ALXUIEdit::afterRemoving(const path_t& removed, path_t& other)
 {
     const size_t depth = removed.size() - 1;

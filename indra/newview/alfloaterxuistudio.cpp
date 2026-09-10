@@ -3413,54 +3413,6 @@ static constexpr F32 REREAD_SECONDS = 0.75f;
 // image. Everything else on the canvas stays as it was: the window keeps its
 // place, the rest of the tree keeps whatever state it holds, and only what
 // the field is about is made twice.
-// The same element, reached by the path it has once it is called something
-// else. A step is a name and which of the siblings of that name it is, so
-// renaming an element moves every path that ends at it -- and following it
-// there is what somebody renaming a thing means to happen.
-ALXUISelection::path_t ALFloaterXUIStudio::pathAfterRename(const ALXUISelection::path_t& path,
-                                                           const std::string& name) const
-{
-    ALXUISelection::path_t moved = path;
-    if (moved.empty())
-    {
-        return moved;
-    }
-    const Preview& pv = mPreviews[PRIMARY];
-    LLView* view = pv.root ? ALXUISelection::resolve(pv.root, path) : nullptr;
-    LLView* parent = view ? view->getParent() : nullptr;
-    if (!parent)
-    {
-        return moved;
-    }
-
-    // Counted the way a build counts them, which is the order the file has
-    // them: the child list reads backwards from that.
-    std::vector<LLView*> children;
-    for (LLView* child : *parent->getChildList())
-    {
-        children.push_back(child);
-    }
-    std::reverse(children.begin(), children.end());
-
-    S32 ordinal = 0;
-    for (const LLView* child : children)
-    {
-        if (child == view)
-        {
-            break;
-        }
-        const ALXUISourceMap::Origin* origin = pv.sourceMap.find(child);
-        std::string other;
-        if (origin && origin->node.notNull()
-            && origin->node->getAttributeString("name", other) && other == name)
-        {
-            ++ordinal;
-        }
-    }
-    moved.back() = ALXUISelection::step(name, ordinal);
-    return moved;
-}
-
 bool ALFloaterXUIStudio::rebuildElement(const ALXUISelection::path_t& path, const std::string& field)
 {
     // A path is made of names, so an element's name is its identity here.
@@ -4509,7 +4461,16 @@ void ALFloaterXUIStudio::rebuildTree()
             if (const LLFolderViewFolder* folder = widget ? widget->as<LLFolderViewFolder>() : nullptr;
                 folder && folder->isOpen())
             {
-                was_open.insert(path);
+                // A row that was open is named by the path it had, and a
+                // rename since then moved that path: brought along here, so
+                // that renaming an element does not close it and everything
+                // under it.
+                ALXUISelection::path_t open = ALXUISelection::fromString(path);
+                if (!mRenamedFrom.empty())
+                {
+                    ALXUIEdit::afterRenaming(mRenamedFrom, mRenamedTo, open);
+                }
+                was_open.insert(ALXUISelection::toString(open));
             }
         }
         if (mTree)
@@ -4600,6 +4561,8 @@ void ALFloaterXUIStudio::rebuildTree()
     }
     mTree->arrangeAll();
     mModel.getFilter().setModified();
+    mRenamedFrom.clear();
+    mRenamedTo.clear();
     if (was_scrolled > 0)
     {
         if (LLScrollContainer* scroller = mTree->getParentByType<LLScrollContainer>())
@@ -7341,6 +7304,13 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
         setStatus(getString("EditNoSelection"));
         return;
     }
+    // A name is not a field: it is what every path to the element is made of.
+    if (name == "name")
+    {
+        renameSelected(value);
+        return;
+    }
+
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
     if (!entry)
     {
@@ -7391,14 +7361,95 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
         documentRead(said);
         return;
     }
-    // Renaming an element moves it, as far as everything that finds one by
-    // name is concerned. What is selected is the same element, so what is
-    // selected goes with it rather than being let go of.
-    if (name == "name" && mSelection.hasSelection())
+    documentChanged(said);
+}
+
+// Naming an element is not writing a field of it: a path is made of names, so
+// this moves the element and everything under it, and every path the tool is
+// holding has to come along or name something that is not there.
+//
+// It is also the most destructive thing anybody can do to a translation. A
+// language's overlay applies because the base has an element of that name at
+// that place, and renaming it stops that without a word being said -- so the
+// word is said here, before the write, in the same terms Save and Repair uses
+// afterwards.
+void ALFloaterXUIStudio::renameSelected(const std::string& name)
+{
+    const ALXUISelection::path_t was = mSelection.selection();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    const ALXUICatalog::Layer* layer = editTarget();
+    if (!layer && entry)
     {
-        mSelection.select(pathAfterRename(mSelection.selection(), value));
+        const std::vector<const ALXUICatalog::Layer*> layers =
+            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+        layer = layers.empty() ? nullptr : layers.front();
+    }
+    ALXUIEdit* held = layer ? document(*layer) : nullptr;
+    if (!held)
+    {
+        setStatus(getString(layer ? "EditNoTarget" : "EditNoTarget"));
+        return;
+    }
+
+    // What this costs, counted before it is done: every language whose own
+    // file has an element at this path is a language that stops applying.
+    const S32 stranded = translationsAt(was);
+
+    ALXUISelection::path_t moved;
+    if (!held->rename(was, name, moved))
+    {
+        setStatus(held->error());
+        return;
+    }
+
+    // Everything the tool is holding a path with.
+    ALXUISelection::path_t selected = mSelection.selection();
+    ALXUIEdit::afterRenaming(was, moved, selected);
+    if (mSelection.hasSelection())
+    {
+        mSelection.select(selected);
+    }
+    ALXUIEdit::afterRenaming(was, moved, mCutPath);
+    mRenamedFrom = was;
+    mRenamedTo = moved;
+
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = "name";
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    std::string said = getString("EditWrote", args);
+    if (stranded > 0)
+    {
+        LLStringUtil::format_map_t cost;
+        cost["[COUNT]"] = std::to_string(stranded);
+        said += "  " + getString("RenameStrands", cost);
     }
     documentChanged(said);
+}
+
+// How many languages write something about the element at that path. Read
+// off the layers as the catalog has them, which is the disk: a language the
+// developer has not touched is the case this is about.
+S32 ALFloaterXUIStudio::translationsAt(const ALXUISelection::path_t& path) const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || path.empty())
+    {
+        return 0;
+    }
+    S32 count = 0;
+    for (const ALXUICatalog::Layer& layer : entry->layers)
+    {
+        if (layer.language == mLanguage || !layer.doc)
+        {
+            continue;
+        }
+        if (ALXUICatalog::resolve(layer.root(), path, /*any_tag=*/true))
+        {
+            ++count;
+        }
+    }
+    return count;
 }
 
 // The way back: this file writes this field, take it out again. What was in

@@ -79,6 +79,13 @@ public:
     bool setAttribute(const path_t& path, const std::string& name, const std::string& value);
     bool removeAttribute(const path_t& path, const std::string& name);
 
+    // Naming an element is not writing a field of it: a path is made of
+    // names, so this moves the element and everything under it as far as
+    // anything holding a path is concerned. Where it moved to is answered
+    // rather than left to be guessed at, and afterRenaming brings the rest
+    // of a caller's paths along.
+    bool rename(const path_t& path, const std::string& name, path_t& moved);
+
     // The element operations. Text is written into the element that holds
     // it, opening a self-closing tag when it has none; an element arrives
     // as the last child of its parent, on its own line, indented the way
@@ -193,6 +200,13 @@ public:
     // them once it is gone, which is what a caller holding a path across
     // a removal has to do to it.
     static void afterRemoving(const path_t& removed, path_t& other);
+
+    // And a path a rename leaves. A name is what a path is made of, so
+    // renaming an element moves it and every path that ran through it: the
+    // element's own step becomes the new one, a later sibling of the name it
+    // left counts one fewer of them, and a later sibling of the name it took
+    // counts one more.
+    static void afterRenaming(const path_t& renamed, const path_t& to, path_t& other);
 
     // Bytes to a file, as they are: what save writes with, and what a
     // caller holding an earlier text of its own puts back.

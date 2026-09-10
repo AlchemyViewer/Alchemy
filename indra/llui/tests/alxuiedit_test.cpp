@@ -829,6 +829,45 @@ namespace tut
                           ALXUISelection::step("a", 1));
         }
 
+        // Renaming as an operation: it says where the element went, and the
+        // paths a caller was holding are brought along -- the element's own,
+        // one under it, a later sibling of the name it left, and a later
+        // sibling of the name it took.
+        {
+            ALXUIEdit doc;
+            ensure("loads", doc.loadBuffer(
+                "<panel name=\"root\">\n"
+                "    <panel name=\"a\" width=\"9\" height=\"8\" />\n"
+                "    <panel name=\"b\" width=\"9\" height=\"8\">\n"
+                "        <panel name=\"inner\" width=\"4\" height=\"4\" />\n"
+                "    </panel>\n"
+                "    <panel name=\"b\" width=\"9\" height=\"8\" />\n"
+                "    <panel name=\"a\" width=\"9\" height=\"8\" />\n"
+                "</panel>\n"));
+
+            ALXUIEdit::path_t moved;
+            ensure("renames", doc.rename({ "b" }, "a", moved));
+            ensure_equals("and says where it went", ALXUISelection::toString(moved),
+                          ALXUISelection::step("a", 1));
+
+            const auto brought = [&moved](ALXUIEdit::path_t held)
+            {
+                ALXUIEdit::afterRenaming({ "b" }, moved, held);
+                return ALXUISelection::toString(held);
+            };
+            ensure_equals("a path under it comes along",
+                          brought({ "b", "inner" }),
+                          ALXUISelection::toString({ ALXUISelection::step("a", 1), "inner" }));
+            ensure_equals("the other of the name it left is now the first of them",
+                          brought({ ALXUISelection::step("b", 1) }), std::string("b"));
+            ensure_equals("and the later of the name it took counts one more",
+                          brought({ ALXUISelection::step("a", 1) }),
+                          ALXUISelection::step("a", 2));
+            ensure_equals("the one before it does not", brought({ "a" }), std::string("a"));
+            ensure_equals("nor does another branch entirely",
+                          brought({ "elsewhere", "b" }), std::string("elsewhere/b"));
+        }
+
         // A whole element arriving is not one field of one element.
         const std::string before = edit.text();
         ensure("inserts", edit.insertElement({}, "<panel name=\"b\" width=\"4\" height=\"4\"/>"));

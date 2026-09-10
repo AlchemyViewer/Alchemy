@@ -172,10 +172,11 @@ public:
     // that keeps track of its children; or a build that produced nothing.
     bool rebuildElement(const ALXUISelection::path_t& path, const std::string& field);
 
-    // The path that reaches the same element once it is called something
-    // else, for whoever was holding the one that reached it before.
-    ALXUISelection::path_t pathAfterRename(const ALXUISelection::path_t& path,
-                                           const std::string& name) const;
+    // Renaming the selected element, which is an operation on the tree and
+    // not a field written on it, and says what it costs the translations.
+    void renameSelected(const std::string& name);
+    S32 translationsAt(const ALXUISelection::path_t& path) const;
+
 
     void saveDocument();
     void revertDocument();
@@ -558,6 +559,8 @@ private:
     LLScrollListCtrl*   mPaletteAttributes = nullptr;
     // The element named for reparenting, until somewhere is chosen for it.
     ALXUISelection::path_t mCutPath;
+    ALXUISelection::path_t mRenamedFrom;    // and where a rename moved it,
+    ALXUISelection::path_t mRenamedTo;      // until the rows are made again
     LLScrollListCtrl*   mLayout = nullptr;
     LLTextBox*          mSourceLayers = nullptr;
     LLTextEditor*       mSourceText = nullptr;
