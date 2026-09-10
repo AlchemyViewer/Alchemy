@@ -831,6 +831,38 @@
                             </scroll_list>
                         </layout_panel>
                         <layout_panel
+                         auto_resize="true"
+                         height="180"
+                         layout="topleft"
+                         min_dim="60"
+                         name="palette_detail"
+                         width="376">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="180"
+                             layout="topleft"
+                             left="0"
+                             name="palette_attributes"
+                             tool_tip="What the chosen tag takes, and what it already carries: an attribute written as what it carries says nothing the widget does not say itself"
+                             top="0"
+                             width="376">
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="Attribute"
+                                 name="attribute" />
+                                <scroll_list.columns
+                                 label="Type"
+                                 name="type"
+                                 width="96" />
+                                <scroll_list.columns
+                                 label="Carries"
+                                 name="carries"
+                                 width="96" />
+                            </scroll_list>
+                        </layout_panel>
+                        <layout_panel
                          auto_resize="false"
                          height="26"
                          layout="topleft"

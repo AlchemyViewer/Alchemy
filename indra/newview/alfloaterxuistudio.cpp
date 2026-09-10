@@ -1788,6 +1788,9 @@ bool ALFloaterXUIStudio::postBuild()
     mChannels = getChild<LLScrollListCtrl>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
     mPalette = getChild<LLScrollListCtrl>("palette");
+    mPaletteAttributes = getChild<LLScrollListCtrl>("palette_attributes");
+    // The tag chosen above decides what is listed below it.
+    mPalette->setCommitCallback(boost::bind(&ALFloaterXUIStudio::fillPaletteAttributes, this));
     getChild<LLButton>("palette_insert")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onInsertFromPalette, this));
     getChild<LLButton>("library_btn")->setClickedCallback([](LLUICtrl*, const LLSD&)
     {
@@ -3168,6 +3171,40 @@ void ALFloaterXUIStudio::fillPalette()
     if (!chosen.empty())
     {
         mPalette->selectByValue(chosen);
+    }
+    fillPaletteAttributes();
+}
+
+// What the chosen tag takes, and what it already carries. The second is what
+// a reference is for: an attribute written as the value the widget carries
+// anyway says nothing the widget does not say itself, and the only way to
+// know which those are is to be told.
+void ALFloaterXUIStudio::fillPaletteAttributes()
+{
+    if (!mPaletteAttributes)
+    {
+        return;
+    }
+    mPaletteAttributes->deleteAllItems();
+
+    const std::string chosen = mPalette ? mPalette->getSelectedValue().asString() : std::string();
+    const ALXUISchema::Tag* declared = chosen.empty() ? nullptr : ALXUISchema::get().tag(chosen);
+    if (!declared)
+    {
+        return;
+    }
+    for (const ALXUISchema::Attribute& attribute : declared->attributes)
+    {
+        if (attribute.ignored)
+        {
+            continue;
+        }
+        // Only where somebody chose it for this widget: every number starts
+        // at nought, and saying so of all of them says nothing about any.
+        const std::string carries = attribute.declared ? attribute.held : std::string();
+        mPaletteAttributes->addElement(row(attribute.name, { { "attribute", attribute.name },
+                                                            { "type", attribute.type },
+                                                            { "carries", carries } }));
     }
 }
 
@@ -7181,6 +7218,14 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.values = attribute->values;
             field.type = attribute->type;
             field.ignored = attribute->ignored;
+            // What the element carries when the file says nothing about it,
+            // which is the thing a row about an unwritten field is for. A
+            // field with nothing in it read as a chosen nought, which is a
+            // different statement about the element than the true one.
+            if (!field.authored && attribute->holds)
+            {
+                field.value = attribute->held;
+            }
         }
         else if (declared)
         {

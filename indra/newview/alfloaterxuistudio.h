@@ -411,6 +411,7 @@ private:
     bool siblingOf(const ALXUIEdit& document, const ALXUISelection::path_t& path,
                    bool before, ALXUISelection::path_t& out) const;
     void fillPalette();
+    void fillPaletteAttributes();
     void onInsertFromPalette();
     void onTreeMove(const std::string& action);
     void revealInContainers(LLView* view);
@@ -554,6 +555,7 @@ private:
     LLTextBox*          mAttributeWhat = nullptr;       // what is selected, in its own words
     LLFilterEditor*     mAttributeFilter = nullptr;
     LLScrollListCtrl*   mPalette = nullptr;
+    LLScrollListCtrl*   mPaletteAttributes = nullptr;
     // The element named for reparenting, until somewhere is chosen for it.
     ALXUISelection::path_t mCutPath;
     LLScrollListCtrl*   mLayout = nullptr;
