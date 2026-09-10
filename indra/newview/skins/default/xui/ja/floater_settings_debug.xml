@@ -7,15 +7,5 @@
 	<text name="setting_name_txt">
 		デバッグ設定名
 	</text>
-	<radio_group name="boolean_combo">
-		<radio_item label="有効" name="TRUE"/>
-		<radio_item label="無効" name="FALSE"/>
-	</radio_group>
-	<color_swatch label="色" name="val_color_swatch"/>
-	<spinner label="Ｘ" name="val_spinner_1"/>
-	<spinner label="Ｘ" name="val_spinner_2"/>
-	<spinner label="Ｘ" name="val_spinner_3"/>
-	<spinner label="Ｘ" name="val_spinner_4"/>
-	<button label="デフォルトにリセット" name="default_btn"/>
 	<check_box label="変更された設定のみ表示" name="hide_default"/>
 </floater>

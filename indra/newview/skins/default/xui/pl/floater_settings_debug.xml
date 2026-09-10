@@ -1,9 +1,3 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater name="settings_debug" title="USTAWIENIA DEBUGOWANIA">
-	<radio_group name="boolean_combo">
-		<radio_item label="PRAWDA" name="TRUE" />
-		<radio_item label="FAŁSZ" name="FALSE" />
-	</radio_group>
-	<color_swatch name="val_color_swatch" label="Kolor" />
-	<button label="Domyślnie" name="default_btn" />
 </floater>

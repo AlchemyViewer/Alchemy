@@ -65,6 +65,12 @@ namespace
     // A control narrower than its column sits at the column's left rather
     // than being stretched across it: a number is as wide as a number.
     constexpr S32 NUMBER_WIDTH = 120;
+    // A part of a value that is several numbers is narrower than a number on
+    // its own, since three or four of them share the column -- but never so
+    // narrow that the number in it cannot be read.
+    constexpr S32 NUMBER_MIN_WIDTH = 44;
+    // The line under each of them saying which part it is.
+    constexpr S32 CAPTION_HEIGHT = 12;
     // A row that carries a picture rather than a value is as tall as the
     // picture, and its label sits in the ordinary row at the top of it.
     constexpr S32 PICTURE_HEIGHT = 84;
@@ -96,6 +102,32 @@ namespace
     F32 numberOf(const std::string& text)
     {
         return (F32)atof(text.c_str());
+    }
+
+    // A value that is several numbers, as the numbers it is. A file writes
+    // them with spaces between them and an LLSD one arrives with commas, so
+    // both separate.
+    std::vector<std::string> numbersOf(const std::string& text)
+    {
+        std::vector<std::string> parts;
+        size_t at = 0;
+        while (at < text.size())
+        {
+            while (at < text.size() && (text[at] == ' ' || text[at] == ',' || text[at] == '	'))
+            {
+                ++at;
+            }
+            const size_t start = at;
+            while (at < text.size() && text[at] != ' ' && text[at] != ',' && text[at] != '	')
+            {
+                ++at;
+            }
+            if (at > start)
+            {
+                parts.push_back(text.substr(start, at - start));
+            }
+        }
+        return parts;
     }
 
     // The types worth a swatch rather than a spelling. A colour is written
@@ -426,7 +458,13 @@ std::string ALPropertyGrid::tipFor(const Field& field) const
 
 S32 ALPropertyGrid::rowHeight(const Field& field) const
 {
-    return field.edges.size() == 4 ? llmax(mRowHeight, PICTURE_HEIGHT) : mRowHeight;
+    if (field.edges.size() == 4)
+    {
+        return llmax(mRowHeight, PICTURE_HEIGHT);
+    }
+    // A row whose parts are captioned is a caption taller than one whose
+    // value needs no saying which part it is.
+    return field.components.empty() ? mRowHeight : mRowHeight + CAPTION_HEIGHT;
 }
 
 S32 ALPropertyGrid::sectionHeight(S32 group) const
@@ -567,6 +605,79 @@ void ALPropertyGrid::rebuild()
 
 // The editor a field's type asks for, in the box it is given, wired to say
 // which field it is when it commits. A row holds one of these, or two where
+// A value that is several numbers, edited as several numbers.
+//
+// A vector or a rectangle written into one box is four numbers a reader has
+// to count and a writer has to keep in order. One box each, captioned with
+// what the part is called, is the same value said so that both are obvious.
+//
+// Every box commits the whole value, because the field is one field: what
+// the caller is told is the parts joined the way a file writes them.
+void ALPropertyGrid::makeComponents(const Field& field, const LLRect& box, LLPanel* row)
+{
+    const size_t count = field.components.size();
+    if (count == 0)
+    {
+        return;
+    }
+    static const LLUIColor caption =
+        LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+
+    const std::vector<std::string> parts = numbersOf(field.value);
+    const bool whole = field.kind != ALParamType::REAL;
+    const S32 room = box.getWidth();
+    const S32 each = llmax(NUMBER_MIN_WIDTH, (room - GUTTER * (S32)(count - 1)) / (S32)count);
+
+    // Held so that any one of them can read all of them: a part committed on
+    // its own would say nothing about the other three.
+    auto boxes = std::make_shared<std::vector<LLSpinCtrl*> >();
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        const S32 left = box.mLeft + (S32)i * (each + GUTTER);
+
+        LLSpinCtrl::Params p;
+        p.name = field.name + "." + field.components[i];
+        p.rect = LLRect(left, box.mTop - 1, left + each, box.mBottom + 1 + CAPTION_HEIGHT);
+        p.label_width = 0;
+        p.decimal_digits = whole ? 0 : 3;
+        p.increment = whole ? 1.f : 0.1f;
+        p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
+        p.max_value = 100000.f;
+        p.initial_value = i < parts.size() ? numberOf(parts[i]) : 0.f;
+        LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
+        spin->setUnset(!field.authored);
+        row->addChild(spin);
+        boxes->push_back(spin);
+
+        // What the part is called, under it: X and Y over two boxes is the
+        // difference between a position and two numbers.
+        LLTextBox::Params cp;
+        cp.name = p.name() + "_caption";
+        cp.rect = LLRect(left, box.mBottom + CAPTION_HEIGHT, left + each, box.mBottom);
+        cp.initial_value = field.components[i];
+        cp.font = LLFontGL::getFontSansSerifSmall();
+        cp.font_halign = LLFontGL::HCENTER;
+        cp.text_color = caption;
+        row->addChild(LLUICtrlFactory::create<LLTextBox>(cp));
+    }
+
+    const std::string name = field.name;
+    for (LLSpinCtrl* spin : *boxes)
+    {
+        spin->setCommitCallback([this, name, whole, boxes](LLUICtrl*, const LLSD&)
+        {
+            std::string joined;
+            for (const LLSpinCtrl* one : *boxes)
+            {
+                joined += joined.empty() ? "" : " ";
+                joined += numberText((F32)one->getValue().asReal(), whole);
+            }
+            mFieldCommit(name, joined);
+        });
+    }
+}
+
 // two fields are the same thought: left and top are a position, and reading
 // them on one line is how anybody says it.
 LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPanel* row)
@@ -840,6 +951,12 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     if (field.edges.size() == 4)
     {
         makeEditor(field, LLRect(left, top, left + editor_width, 0), row);
+    }
+    else if (!field.components.empty())
+    {
+        // Several numbers, as the numbers they are. The row was made a
+        // caption taller for them, and the boxes sit above that.
+        makeComponents(field, LLRect(left, top, left + editor_width, bottom - CAPTION_HEIGHT), row);
     }
     else if (partner)
     {

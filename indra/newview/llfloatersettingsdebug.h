@@ -28,9 +28,10 @@
 #define LLFLOATERDEBUGSETTINGS_H
 
 #include "llcontrol.h"
+#include "alpropertygrid.h"
 #include "llfloater.h"
 
-class LLColorSwatchCtrl;
+class ALPropertyGrid;
 class LLScrollListCtrl;
 class LLSpinCtrl;
 class LLTextBox;
@@ -48,8 +49,9 @@ public:
 
     void updateControl(LLControlVariable* control);
 
-    void onCommitSettings();
-    void onClickDefault();
+    // The grid's two answers: a row committed, and a row's way back pressed.
+    void onEditorCommit(const std::string& name, const std::string& text);
+    void onEditorRemove(const std::string& name);
 
     bool matchesSearchFilter(std::string setting_name);
     bool isSettingHidden(LLControlVariable* control);
@@ -65,7 +67,6 @@ private:
     void setSearchFilter(const std::string& filter);
 
     void updateDefaultColumn(LLControlVariable* control);
-    void hideUIControls();
 
     LLScrollListCtrl* mSettingList;
 
@@ -73,19 +74,23 @@ private:
 
 protected:
     class LLTextEditor* mComment;
-    LLSpinCtrl*         mValSpinner1 = nullptr;
-    LLSpinCtrl*         mValSpinner2 = nullptr;
-    LLSpinCtrl*         mValSpinner3 = nullptr;
-    LLSpinCtrl*         mValSpinner4 = nullptr;
-    LLUICtrl*           mBooleanCombo = nullptr;
-    LLUICtrl*           mValText = nullptr;
-    LLUICtrl*           mDefaultButton = nullptr;
+    // The editor a setting gets is the editor its type asks for, which is
+    // what a property grid is. This pane made one of each by hand and showed
+    // the right ones; now it hands the grid a field and the grid decides.
+    ALPropertyGrid*     mEditor = nullptr;
     LLTextBox*          mSettingNameText = nullptr;
-
-    LLColorSwatchCtrl* mColorSwatch = nullptr;
 
     std::string mSearchFilter;
     std::string mOldText;
+
+    // What the grid is holding. Asked every frame, because a setting changed
+    // anywhere else has to show here -- and a row built again every frame is
+    // a row nobody can type into, so nothing is built unless one of these
+    // has moved.
+    std::string mShownName;
+    std::string mShownValue;
+    bool        mShownWritten = false;
+    bool        mShownEditable = true;
 };
 
 #endif //LLFLOATERDEBUGSETTINGS_H

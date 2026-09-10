@@ -106,6 +106,22 @@ public:
         // first of a pair names the other, and the named one gets no row of
         // its own.
         std::string                 pairWith;
+        // A value that is several numbers rather than one: a vector, a
+        // rectangle, a colour written as its parts. One box each, captioned,
+        // on the row the field would otherwise have had -- which is what
+        // makes a rect readable as a rect instead of as four numbers in a
+        // string somebody has to count.
+        //
+        // The captions are the caller's, because what the parts are called
+        // is a fact about the value and not about how many there are: a
+        // vector has an X, a Y and a Z, and a rect has a left, a top, a
+        // right and a bottom.
+        //
+        // The value is the parts joined by a space, which is how a XUI file
+        // writes one; it is read back split on spaces or commas, and it is
+        // committed joined by a space again. One field, one value, whatever
+        // the arity.
+        std::vector<std::string>    components;
         // Four names, in the order left, bottom, right, top: a field whose
         // value is which edges of its parent a thing is tied to, which is a
         // picture rather than four words. The row it gets is as tall as the
@@ -253,6 +269,8 @@ private:
     void rebuild();
     void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
     LLUICtrl* makeEditor(const Field& field, const LLRect& box, LLPanel* row);
+    // A box per part, captioned, all of them committing the whole value.
+    void makeComponents(const Field& field, const LLRect& box, LLPanel* row);
     // The field this one shares its row with, where it names one that is
     // shown, in the same section, and not filtered away.
     const Field* partnerOf(const Field& field) const;

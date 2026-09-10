@@ -458,4 +458,113 @@ namespace tut
                real->getIncrement() > 0.f && real->getIncrement() < 1.f);
         grid->die();
     }
+
+    // A value that is several numbers, edited as several numbers. Four in a
+    // string is four numbers a reader has to count and a writer has to keep
+    // in order; a box each, captioned, is the same value said so that both
+    // are obvious.
+    template<> template<>
+    void alpropertygrid_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("rect", 0));
+        fields.back().kind = ALParamType::INTEGER;
+        fields.back().components = { "L", "T", "R", "B" };
+        fields.back().value = "10 20 30 40";
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
+                           ->getChild<LLPanel>("rect_row", true);
+
+        // One box per part, each holding its own number, each captioned with
+        // what that part is called.
+        const char* parts[] = { "L", "T", "R", "B" };
+        const F32 wanted[] = { 10.f, 20.f, 30.f, 40.f };
+        for (S32 i = 0; i < 4; ++i)
+        {
+            const std::string name = std::string("rect.") + parts[i];
+            LLSpinCtrl* box = row->getChild<LLSpinCtrl>(name, true);
+            ensure("a box for " + name, box != nullptr);
+            ensure_equals("holding its own number", (F32)box->getValue().asReal(), wanted[i]);
+            ensure("and captioned with what it is",
+                   row->findChild<LLView>(name + "_caption", true) != nullptr);
+        }
+
+        // Every box commits the whole value, because the field is one field.
+        std::string said_name;
+        std::string said_value;
+        grid->onFieldCommit([&](const std::string& n, const std::string& v)
+        {
+            said_name = n;
+            said_value = v;
+        });
+        row->getChild<LLSpinCtrl>("rect.R", true)->setValue(99);
+        row->getChild<LLSpinCtrl>("rect.R", true)->onCommit();
+        ensure_equals("the field, not the part", said_name, std::string("rect"));
+        ensure_equals("and the whole of it", said_value, std::string("10 20 99 40"));
+
+        // A row of parts is taller than a row of one value, since each part
+        // carries a line saying which it is.
+        std::vector<ALPropertyGrid::Field> plain;
+        plain.push_back(field("width", 0));
+        plain.back().kind = ALParamType::INTEGER;
+        plain.back().value = "744";
+        ALPropertyGrid* other = build();
+        other->setGroups({ "identity" });
+        other->setFields(plain);
+        const S32 tall = row->getRect().getHeight();
+        const S32 ordinary = other->getChild<LLPanel>("identity_rows", true)
+                                  ->getChild<LLPanel>("width_row", true)->getRect().getHeight();
+        ensure("a captioned row is taller: " + std::to_string(tall) + " vs "
+                   + std::to_string(ordinary), tall > ordinary);
+        other->die();
+        grid->die();
+    }
+
+    // A value arriving with commas between its parts is the same value: an
+    // LLSD one is written that way and a file writes spaces.
+    template<> template<>
+    void alpropertygrid_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("colour", 0));
+        fields.back().kind = ALParamType::REAL;
+        fields.back().components = { "R", "G", "B" };
+        fields.back().value = "0.5, 0.25, 1.0";
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)
+                           ->getChild<LLPanel>("colour_row", true);
+        ensure_equals("split on the commas",
+                      (F32)row->getChild<LLSpinCtrl>("colour.G", true)->getValue().asReal(), 0.25f);
+
+        // Fewer parts than boxes is nought in the rest rather than a hole.
+        std::vector<ALPropertyGrid::Field> short_one;
+        short_one.push_back(field("short", 0));
+        short_one.back().kind = ALParamType::REAL;
+        short_one.back().components = { "X", "Y", "Z" };
+        short_one.back().value = "1 2";
+        grid->setFields(short_one);
+        ensure_equals("the part nobody gave is nought",
+                      (F32)grid->getChild<LLPanel>("identity_rows", true)
+                               ->getChild<LLPanel>("short_row", true)
+                               ->getChild<LLSpinCtrl>("short.Z", true)->getValue().asReal(), 0.f);
+        grid->die();
+    }
 }

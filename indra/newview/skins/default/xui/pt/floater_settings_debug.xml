@@ -5,15 +5,5 @@
 		<scroll_list.columns label="Configuração" name="setting"/>
 	</scroll_list>
 	<text name="setting_name_txt">Nome da configuração de depuração</text>
-	<radio_group name="boolean_combo">
-		<radio_item label="VERDADEIRO" name="TRUE"/>
-		<radio_item label="FALSO" name="FALSE"/>
-	</radio_group>
-	<color_swatch label="Cor" name="val_color_swatch"/>
-	<spinner label="x" name="val_spinner_1"/>
-	<spinner label="x" name="val_spinner_2"/>
-	<spinner label="x" name="val_spinner_3"/>
-	<spinner label="x" name="val_spinner_4"/>
-	<button label="Restaurar padrão" name="default_btn"/>
 	<check_box label="Mostrar apenas configurações alteradas" name="hide_default"/>
 </floater>
