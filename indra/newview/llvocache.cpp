@@ -627,16 +627,18 @@ bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVecto
     facts.mIsChild              = (mParentID > 0);
     facts.mDistThreshold        = dist_threshold;
 
-    // The saved sphere is in region-local space and the octree entry is in agent
-    // space, so each is measured against its own camera origin. Measuring at all
-    // is a pointer chase into the octree, so it is skipped where the sphere test
-    // cannot be reached, and an entry with no place in the world is left
+    // The saved sphere is written when an entry leaves the render pipeline and
+    // describes it in region-local space; an entry that is back in the pipeline
+    // shares its drawable's octree entry, in agent space, and that is where it
+    // actually is. Each is measured against its own camera origin. Measuring at
+    // all is a pointer chase into the octree, so it is skipped where the sphere
+    // test cannot be reached, and an entry with no place in the world is left
     // infinitely far away so the sphere is never what keeps it.
     facts.mDistanceSquared = F32_MAX;
     if(!facts.mIsChild && !facts.mGroupOccluded)
     {
         LLVector4a lookAt;
-        if(mBSphereRadius > 0.f)
+        if(!isState(ACTIVE) && mBSphereRadius > 0.f)
         {
             lookAt.setSub(mBSphereCenter, local_camera_origin);
             facts.mRadius = mBSphereRadius;
