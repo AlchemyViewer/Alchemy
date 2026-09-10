@@ -954,4 +954,28 @@ namespace tut
         ensure("the name it has", !edit.renameAttribute({ "a" }, "width", "width"));
         ensure("no element", !edit.renameAttribute({ "nowhere" }, "width", "height"));
     }
+
+    // An element cannot be moved into itself or beside anything under it.
+    // The removal that starts a move used to take the destination with it,
+    // and the element, lifted and with nowhere to land, was gone from the
+    // file with the step half done; the answer is no, and the file as it was.
+    template<> template<>
+    void alxuiedit_object::test<23>()
+    {
+        const std::string source =
+            "<panel name=\"root\">\n"
+            "    <panel name=\"outer\">\n"
+            "        <text name=\"c\">Here</text>\n"
+            "    </panel>\n"
+            "</panel>\n";
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(source));
+        ensure("not into itself", !edit.moveElement({ "outer" }, { "outer" }));
+        ensure("not into its own child", !edit.moveElement({ "outer" }, { "outer", "c" }));
+        ensure("not beside its own child", !edit.moveBefore({ "outer" }, { "outer", "c" }));
+        ensure("nor after it", !edit.moveAfter({ "outer" }, { "outer", "c" }));
+        ensure_equals("and the file is as it was", edit.text(), source);
+        ensure("with nothing to undo", !edit.canUndo());
+        ensure("and a reason given", !edit.error().empty());
+    }
 }

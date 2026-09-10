@@ -918,11 +918,24 @@ void ALXUIEdit::afterRemoving(const path_t& removed, path_t& other)
     other[depth] = ALXUISelection::step(mine_name, mine_ordinal - 1);
 }
 
+// Whether one path is the other or runs through it, which is the move that
+// cannot be made: the removal that starts it takes the destination with
+// it, and what was lifted has nowhere to land.
+static bool within(const ALXUIEdit::path_t& path, const ALXUIEdit::path_t& under)
+{
+    return path.size() <= under.size() && std::equal(path.begin(), path.end(), under.begin());
+}
+
 bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
 {
     Step step(*this);
     mError.clear();
     note(Did::MovedElement, path);
+    if (path.empty() || within(path, parent))
+    {
+        mError = "an element cannot be moved into itself";
+        return false;
+    }
     std::string xml;
     if (!liftElement(path, xml))
     {
@@ -1002,7 +1015,7 @@ bool ALXUIEdit::moveBeside(const path_t& path, const path_t& sibling, bool befor
     Step step(*this);
     mError.clear();
     note(Did::MovedElement, path);
-    if (path == sibling)
+    if (path.empty() || within(path, sibling))
     {
         mError = "an element cannot be moved beside itself";
         return false;

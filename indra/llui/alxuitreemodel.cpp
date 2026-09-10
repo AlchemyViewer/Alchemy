@@ -171,7 +171,7 @@ ALXUITreeItem* ALXUITreeModel::buildItem(LLView* view, const ALXUISourceMap& sou
     // Children in creation order, which is the reverse of the list; a
     // repeated name among them takes its ordinal in that order.
     const LLView::child_list_t& children = *view->getChildList();
-    std::unordered_map<std::string, S32> seen;
+    boost::unordered_map<std::string, S32> seen;
     S32 child_order = 0;
     for (auto it = children.rbegin(); it != children.rend(); ++it)
     {

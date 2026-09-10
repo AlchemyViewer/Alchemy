@@ -163,6 +163,9 @@ public:
 
     // An arrow key moves the selection by a pixel, ten with shift, and
     // Control+Z puts the last write back the way it was.
+    // What an element occupies now, for the document to measure a move
+    // or a resize from. The view has a parent.
+    static ALXUIEdit::Anchor anchorOf(const LLView* view);
     bool nudge(KEY key, MASK mask);
     bool undoEdit();
     bool redoEdit();
@@ -488,6 +491,11 @@ private:
     // Line every other selected element up with the one the handles are on.
     void alignSelection(const std::string& how);
     const ALXUICatalog::Layer* editTarget() const;
+    // The file's base layer, where structure is written; and the layer a
+    // field is written to, which is the one already positioning the
+    // element where there is one and the base where there is not.
+    const ALXUICatalog::Layer* baseLayer() const;
+    const ALXUICatalog::Layer* writeLayer() const;
     void refreshEditTarget();
 
     // --- the selection -------------------------------------------------------

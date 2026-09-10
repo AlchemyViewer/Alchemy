@@ -2729,8 +2729,8 @@ void ALFloaterXUIStudio::onFindResult()
     mSelection.select(ALXUISelection::fromString(id["path"].asString()));
     if (!selectedView())
     {
-        // Not a built element: open the file at the line instead.
-        openInEditor(id["path"].asString().empty() ? std::string() : std::string(), 0);
+        // Not a built element: the Source inspector shows the file at the
+        // line instead.
         const ALXUICatalog::Entry* entry = mCatalog.find(file);
         if (const ALXUICatalog::Layer* layer = entry ? entry->layer(id["skin"].asString(), language) : nullptr)
         {
@@ -3811,19 +3811,13 @@ void ALFloaterXUIStudio::onInsertFromPalette()
         setStatus(getString("EditNoSelection"));
         return;
     }
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    if (!entry)
-    {
-        return;
-    }
-    const std::vector<const ALXUICatalog::Layer*> layers =
-        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         setStatus(getString("EditNoTarget"));
         return;
     }
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return;
@@ -3839,7 +3833,7 @@ void ALFloaterXUIStudio::onInsertFromPalette()
     LLStringUtil::format_map_t args;
     args["[ATTRS]"] = tag;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditWrote", args));
 }
 
@@ -3978,21 +3972,18 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
         }
     }
 
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    const std::vector<const ALXUICatalog::Layer*> layers = entry
-        ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
-        : std::vector<const ALXUICatalog::Layer*>();
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         return false;
     }
     // Asked of the document as it stands, without opening one: a hover is
     // not an edit.
-    const ALXUIEdit* reading = mDocuments.find(layers.front()->path);
+    const ALXUIEdit* reading = mDocuments.find(layer->path);
     ALXUIEdit disk;
     if (!reading)
     {
-        if (!disk.loadFile(layers.front()->path))
+        if (!disk.loadFile(layer->path))
         {
             return false;
         }
@@ -4013,7 +4004,7 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
         return true;
     }
 
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return false;
@@ -4048,7 +4039,7 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
     mDragTag.clear();
     args["[ATTRS]"] = tag;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditWrote", args));
     return true;
 }
@@ -4066,11 +4057,8 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
     {
         return nullptr;
     }
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    const std::vector<const ALXUICatalog::Layer*> layers = entry
-        ? mCatalog.layersFor(*entry, pv.skin, mLanguage)
-        : std::vector<const ALXUICatalog::Layer*>();
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         return nullptr;
     }
@@ -4124,7 +4112,7 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
     {
         return nullptr;
     }
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return nullptr;
@@ -4185,7 +4173,7 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
     mDragTag.clear();
     args["[ATTRS]"] = tag;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditWrote", args));
     return into;
 }
@@ -6127,14 +6115,13 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
     {
         return;
     }
-    const std::vector<const ALXUICatalog::Layer*> layers =
-        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         setStatus(getString("EditNoTarget"));
         return;
     }
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return;
@@ -6160,7 +6147,7 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
     LLStringUtil::format_map_t args;
     args["[ATTRS]"] = "follows=\"" + text + "\"";
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
     const std::string said = getString("EditWrote", args);
     if (applyLive(mSelection.selection(), "follows", text))
     {
@@ -6244,14 +6231,13 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         return;
     }
 
-    const std::vector<const ALXUICatalog::Layer*> layers =
-        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         setStatus(getString("EditNoTarget"));
         return;
     }
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return;
@@ -6381,7 +6367,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
     LLStringUtil::format_map_t args;
     args["[ATTRS]"] = what;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layers.front()->skin + "/" + layers.front()->language;
+    args["[LAYER]"] = layer->skin + "/" + layer->language;
     documentChanged(getString("EditWrote", args));
 }
 
@@ -8049,15 +8035,7 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
     // Where it is written: the layer that already positions the element when
     // there is one, else the file's own base layer. The same choice a hand
     // edit makes, because a fix is a hand edit the tool typed out.
-    const ALXUICatalog::Layer* layer = editTarget();
-    if (!layer)
-    {
-        const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-        const std::vector<const ALXUICatalog::Layer*> layers = entry
-            ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
-            : std::vector<const ALXUICatalog::Layer*>();
-        layer = layers.empty() ? nullptr : layers.front();
-    }
+    const ALXUICatalog::Layer* layer = writeLayer();
     ALXUIEdit* held = layer ? document(*layer) : nullptr;
     if (!held)
     {
@@ -8071,13 +8049,7 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
     ALXUIEdit::Anchor now;
     if (LLView* view = selectedView(); view && view->getParent())
     {
-        const LLRect& rect = view->getRect();
-        now.left = rect.mLeft;
-        now.top = view->getParent()->getRect().getHeight() - rect.mTop;
-        now.bottom = rect.mBottom;
-        now.width = rect.getWidth();
-        now.height = rect.getHeight();
-        now.topLeft = view->isLayoutTopLeft();
+        now = anchorOf(view);
     }
 
     if (!f.applyFix(*held, now))
@@ -8289,6 +8261,29 @@ LLView* ALFloaterXUIStudio::selectedView() const
 // the element, since that is the one whose numbers are on screen, and the
 // first that has the element at all when none of them positions it, since
 // that is where a position has to be written.
+// The file's base layer as the canvas shows it. Structure is written there:
+// a language overlay says what a value is, not where an element lives.
+const ALXUICatalog::Layer* ALFloaterXUIStudio::baseLayer() const
+{
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry)
+    {
+        return nullptr;
+    }
+    const std::vector<const ALXUICatalog::Layer*> layers =
+        mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
+    return layers.empty() ? nullptr : layers.front();
+}
+
+// The layer a field is written to: the one that already positions the
+// element when there is one, else the file's own base layer, which is
+// where an author working in English means it to go.
+const ALXUICatalog::Layer* ALFloaterXUIStudio::writeLayer() const
+{
+    const ALXUICatalog::Layer* layer = editTarget();
+    return layer ? layer : baseLayer();
+}
+
 const ALXUICatalog::Layer* ALFloaterXUIStudio::editTarget() const
 {
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -8362,14 +8357,7 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
         return false;
     }
 
-    const LLRect& rect = view->getRect();
-    ALXUIEdit::Anchor now;
-    now.left = rect.mLeft;
-    now.top = view->getParent()->getRect().getHeight() - rect.mTop;
-    now.bottom = rect.mBottom;
-    now.width = rect.getWidth();
-    now.height = rect.getHeight();
-    now.topLeft = view->isLayoutTopLeft();
+    const ALXUIEdit::Anchor now = anchorOf(view);
 
     ALXUIEdit* held = document(*layer);
     if (!held)
@@ -8532,15 +8520,7 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
             continue;
         }
 
-        const LLRect& rect = view->getRect();
-        ALXUIEdit::Anchor now;
-        now.left = rect.mLeft;
-        now.top = view->getParent()->getRect().getHeight() - rect.mTop;
-        now.bottom = rect.mBottom;
-        now.width = rect.getWidth();
-        now.height = rect.getHeight();
-        now.topLeft = view->isLayoutTopLeft();
-        if (!held->translate(path, dx, dy, now))
+        if (!held->translate(path, dx, dy, anchorOf(view)))
         {
             setStatus(held->error());
             return;
@@ -8749,15 +8729,13 @@ void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 d
         return;
     }
 
-    // Structure is the base layer's: a language overlay says what a value
-    // is, not where an element lives.
-    const std::vector<const ALXUICatalog::Layer*> layers = mCatalog.layersFor(*entry, pv.skin, mLanguage);
-    if (layers.empty())
+    const ALXUICatalog::Layer* layer = baseLayer();
+    if (!layer)
     {
         setStatus(getString("EditNoTarget"));
         return;
     }
-    ALXUIEdit* held = document(*layers.front());
+    ALXUIEdit* held = document(*layer);
     if (!held)
     {
         return;
@@ -8849,6 +8827,22 @@ void ALFloaterXUIStudio::openNestedFile()
     fillCatalog();
     saveState();
     showPreviews();
+}
+
+// What an element occupies now, as the document measures a move or a
+// resize from: its rect in its parent, from the top where the file counts
+// from the top.
+ALXUIEdit::Anchor ALFloaterXUIStudio::anchorOf(const LLView* view)
+{
+    const LLRect& rect = view->getRect();
+    ALXUIEdit::Anchor now;
+    now.left = rect.mLeft;
+    now.top = view->getParent()->getRect().getHeight() - rect.mTop;
+    now.bottom = rect.mBottom;
+    now.width = rect.getWidth();
+    now.height = rect.getHeight();
+    now.topLeft = view->isLayoutTopLeft();
+    return now;
 }
 
 bool ALFloaterXUIStudio::nudge(KEY key, MASK mask)
@@ -9176,13 +9170,7 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     // Where a field is written: the layer that already writes the geometry
     // when there is one, else the file's own base layer, which is where an
     // author working in English means it to go.
-    const ALXUICatalog::Layer* layer = editTarget();
-    if (!layer)
-    {
-        const std::vector<const ALXUICatalog::Layer*> layers =
-            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
-        layer = layers.empty() ? nullptr : layers.front();
-    }
+    const ALXUICatalog::Layer* layer = writeLayer();
     if (!layer)
     {
         setStatus(getString("EditNoTarget"));
@@ -9235,18 +9223,11 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
 void ALFloaterXUIStudio::renameSelected(const std::string& name)
 {
     const ALXUISelection::path_t was = mSelection.selection();
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    const ALXUICatalog::Layer* layer = editTarget();
-    if (!layer && entry)
-    {
-        const std::vector<const ALXUICatalog::Layer*> layers =
-            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage);
-        layer = layers.empty() ? nullptr : layers.front();
-    }
+    const ALXUICatalog::Layer* layer = writeLayer();
     ALXUIEdit* held = layer ? document(*layer) : nullptr;
     if (!held)
     {
-        setStatus(getString(layer ? "EditNoTarget" : "EditNoTarget"));
+        setStatus(getString("EditNoTarget"));
         return;
     }
 
@@ -9322,15 +9303,7 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
         setStatus(getString("EditNoSelection"));
         return;
     }
-    const ALXUICatalog::Layer* layer = editTarget();
-    if (!layer)
-    {
-        const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-        const std::vector<const ALXUICatalog::Layer*> layers = entry
-            ? mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mLanguage)
-            : std::vector<const ALXUICatalog::Layer*>();
-        layer = layers.empty() ? nullptr : layers.front();
-    }
+    const ALXUICatalog::Layer* layer = writeLayer();
     if (!layer)
     {
         setStatus(getString("EditNoTarget"));
