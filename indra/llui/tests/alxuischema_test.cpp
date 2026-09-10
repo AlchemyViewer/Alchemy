@@ -36,6 +36,7 @@
 #include "../lllineeditor.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
+#include "../llxuiparser.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -437,5 +438,56 @@ namespace tut
             ensure("<" + name + "> carries its sentence", !said.empty());
             ensure_equals("and it is the one that was written", said, ALXUINotes::get().note(name));
         }
+    }
+
+    // What a parameter block writes when nothing has been asked of it. The
+    // rules a file is read under keep what was provided, and nothing is
+    // provided on a block nobody wrote to, so a file written from one of
+    // those is empty. What is wanted here is the other question -- what an
+    // element carries when its file says nothing -- and that is every
+    // parameter that holds a value, which is the rule below.
+    template<> template<>
+    void alxuischema_object::test<16>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLButton::Params defaults;
+        LLXUIParser parser;
+
+        LLXMLNodePtr provided = new LLXMLNode("button", false);
+        parser.writeXUI(provided, defaults);
+        ensure_equals("what was provided is nothing", provided->mAttributes.size(), 0u);
+
+        LLXMLNodePtr held = new LLXMLNode("button", false);
+        parser.writeXUI(held, defaults,
+                        ll_make_predicate(LLInitParam::VALID) && !ll_make_predicate(LLInitParam::EMPTY));
+        ensure("what is held is not", held->mAttributes.size() > 0u);
+
+        // But what C++ declares is not what an element carries: a button is
+        // twenty-three pixels tall because the widget's own template says so,
+        // and the block above has never read one.
+        std::string value;
+        ensure("the block says how tall it is", held->getAttributeString("height", value));
+        ensure_equals("and C++ says nothing about that", value, std::string("0"));
+
+        // The schema reads the block a widget is actually built from, which
+        // is that one with its template over it and its base blocks' under.
+        const ALXUISchema::Tag* button = schema().tag("button");
+        ensure("button", button != nullptr);
+        const ALXUISchema::Attribute* height = find(*button, "height");
+        ensure("height is in the schema", height != nullptr);
+        ensure("and the schema says what it holds", height->holds);
+        ensure_equals("which is the height a button is", height->held, std::string("23"));
+
+        // Not every parameter holds a value to write: a block written as one
+        // thing does not also write its parts, and a parameter nobody can
+        // spell a value for writes none. Holding an empty value is a third
+        // thing again, and the flag is what tells it from holding nothing.
+        ensure("some of them hold nothing",
+               std::any_of(button->attributes.begin(), button->attributes.end(),
+                           [](const ALXUISchema::Attribute& a) { return !a.holds; }));
     }
 }

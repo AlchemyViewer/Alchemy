@@ -99,6 +99,20 @@ class LLWidgetBlockRegistry
     LLSINGLETON_EMPTY_CTOR(LLWidgetBlockRegistry);
 };
 
+// The same block with the widget's own template read into it, and its base
+// blocks' templates under that. A file that writes nothing about an element
+// still gets these: they are what the element carries, where the block above
+// is only what C++ declared. Built the first time it is asked for, since it
+// reads skin files and the registration happens before there are any.
+template <typename WIDGET>
+const LLInitParam::BaseBlock& get_default_param_block();
+
+class LLWidgetDefaultsRegistry
+:   public LLRegistrySingleton<std::string, empty_param_block_func_t, LLWidgetDefaultsRegistry>
+{
+    LLSINGLETON_EMPTY_CTOR(LLWidgetDefaultsRegistry);
+};
+
 // The two things the schema reads about a tag: the block it builds from and
 // the tags valid below it. A widget in a child registry records them where
 // it registers. A root has no such moment -- a floater is never below
@@ -110,6 +124,8 @@ void registerWidgetSchema(const char* tag)
     {
         LLWidgetBlockRegistry::instance().defaultRegistrar()
             .add(tag, &get_empty_param_block<typename T::Params>);
+        LLWidgetDefaultsRegistry::instance().defaultRegistrar()
+            .add(tag, &get_default_param_block<T>);
         LLChildRegistryRegistry::instance().defaultRegistrar()
             .add(tag, &T::child_registry_t::instance());
     }
@@ -389,7 +405,13 @@ private:
     LLHeteroMap mParamDefaultsMap;
 };
 
-template <typename PARAM_BLOCK, int DUMMY>
+template <typename WIDGET>
+const LLInitParam::BaseBlock& get_default_param_block()
+{
+    return LLUICtrlFactory::getDefaultParams<WIDGET>();
+}
+
+template<typename PARAM_BLOCK, int DUMMY>
 LLUICtrlFactory::ParamDefaults<PARAM_BLOCK, DUMMY>::ParamDefaults()
 {
     // look up template file for this param block...

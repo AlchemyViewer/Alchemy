@@ -73,6 +73,19 @@ public:
         // and a tool that shows them beside the ones that do something is
         // telling an author they do something.
         bool                        ignored = false;
+        // What the element carries when the file says nothing about it, in
+        // the spelling a file would use. Empty where the parameter holds no
+        // value to write -- a colour named by nothing, a callback nobody
+        // set -- which is not the same as carrying an empty one, and the
+        // two are told apart by asking whether anything is here at all.
+        std::string                 held;
+        bool                        holds = false;
+        // And whether that is a value somebody chose for this widget rather
+        // than the zero its type starts at. A button is twenty-three pixels
+        // tall because its template says so; it is at left nought because
+        // nought is where an S32 starts, and a file writing `left="0"` is
+        // saying where the thing goes rather than repeating anybody.
+        bool                        declared = false;
     };
 
     struct Element

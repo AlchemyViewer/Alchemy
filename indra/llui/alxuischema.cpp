@@ -311,6 +311,44 @@ void ALXUISchema::build()
                            tag.elements.end());
         std::sort(tag.children.begin(), tag.children.end());
 
+        // What each of them carries when the file says nothing. Written from
+        // the block the widget is actually built from -- its own template and
+        // its base blocks' under that -- under a rule that keeps what holds a
+        // value rather than what somebody provided, since nobody provided
+        // anything here. The names come back in the same spelling the
+        // attributes were flattened into, so they pair by name.
+        const auto carried = [&tag](const empty_param_block_func_t* block)
+        {
+            LLXMLNodePtr written = new LLXMLNode(tag.name.c_str(), false);
+            if (block && *block)
+            {
+                LLXUIParser().writeXUI(written, (**block)(),
+                                       ll_make_predicate(LLInitParam::VALID)
+                                           && !ll_make_predicate(LLInitParam::EMPTY));
+            }
+            return written;
+        };
+
+        // The two of them: what the widget is built from, and what C++ alone
+        // declares. An attribute the first carries is what the element holds
+        // when a file says nothing; one the two disagree about is a value
+        // somebody chose for this widget rather than where its type starts.
+        const LLXMLNodePtr built =
+            carried(LLWidgetDefaultsRegistry::instance().getValue(tag.name));
+        const LLXMLNodePtr bare =
+            carried(LLWidgetBlockRegistry::instance().getValue(tag.name));
+        for (Attribute& attribute : tag.attributes)
+        {
+            if (!built->getAttributeString(attribute.name.c_str(), attribute.held))
+            {
+                continue;
+            }
+            attribute.holds = true;
+            std::string started;
+            attribute.declared = !bare->getAttributeString(attribute.name.c_str(), started)
+                              || started != attribute.held;
+        }
+
         // A name that is both a tag and a parameter is read as the parameter,
         // since the parser only takes a child for a widget once the block has
         // refused it. The element form is the permissive one, so it wins.
