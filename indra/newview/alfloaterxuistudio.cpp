@@ -1960,6 +1960,7 @@ bool ALFloaterXUIStudio::postBuild()
         }
     }
 
+    holdShapePanes();
     loadState();
     scanCatalog();
 
@@ -2124,6 +2125,7 @@ void ALFloaterXUIStudio::onClose(bool app_quitting)
 
 void ALFloaterXUIStudio::draw()
 {
+    rememberShape();
     if (!mLintQueue.empty())
     {
         stepLintAll();
@@ -2853,6 +2855,79 @@ bool ALFloaterXUIStudio::paneCollapsed(std::string_view name) const
 {
     const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
     return panel && panel->isCollapsed();
+}
+
+S32 ALFloaterXUIStudio::paneDim(std::string_view name) const
+{
+    const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
+    return panel ? panel->getTargetDim() : 0;
+}
+
+// The three panes a bar can be dragged on, held rather than searched for:
+// this is asked every frame, and a search by name walks the whole window.
+void ALFloaterXUIStudio::holdShapePanes()
+{
+    static const char* const NAMES[3] = { "navigator_panel", "inspector_panel", "bottom_panel" };
+    for (S32 i = 0; i < 3; ++i)
+    {
+        mShapePanes[i] = findChild<LLLayoutPanel>(NAMES[i], true);
+    }
+}
+
+// Asked for the way a drag on the bar asks, so the stack takes it from
+// its neighbours the way it would have then.
+void ALFloaterXUIStudio::setPaneDim(std::string_view name, S32 dim)
+{
+    LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
+    if (panel && dim > 0)
+    {
+        panel->setTargetDim(dim);
+    }
+}
+
+bool ALFloaterXUIStudio::applyRectControl()
+{
+    // Told to the per-account control the floater reads its rect from, so
+    // that the floater's own bookkeeping -- where it sits relative to the
+    // screen, what it writes back -- runs as it would have. The relative
+    // position the account kept is let go of, since it would otherwise
+    // outrank the rect it was derived from.
+    if (!mRestoredRect.isEmpty() && !mRectControl.empty())
+    {
+        LLControlGroup* group = getControlGroup();
+        group->setRect(mRectControl, mRestoredRect);
+        for (const std::string& name : { mPosXControl, mPosYControl })
+        {
+            if (LLControlVariable* control = group->getControl(name))
+            {
+                control->resetToDefault();
+            }
+        }
+    }
+    return LLFloater::applyRectControl();
+}
+
+void ALFloaterXUIStudio::rememberShape()
+{
+    // Not in the middle of a drag: the shape worth keeping is the one it
+    // ends at.
+    if (gFocusMgr.getMouseCapture())
+    {
+        return;
+    }
+    if (getRect() != mShapeRect)
+    {
+        saveState();
+        return;
+    }
+    for (S32 i = 0; i < 3; ++i)
+    {
+        if (mShapePanes[i] && mShapePanes[i]->getTargetDim() != mShapeDims[i])
+        {
+            saveState();
+            return;
+        }
+    }
 }
 
 // How much bigger than life the canvas draws. The spinner, the wheel and
@@ -9702,6 +9777,24 @@ void ALFloaterXUIStudio::saveState()
     state["fold_navigator"] = paneCollapsed("navigator_panel");
     state["fold_inspectors"] = paneCollapsed("inspector_panel");
     state["fold_bottom"] = paneCollapsed("bottom_panel");
+    // How wide the side panes are and how tall the band is, as the drag
+    // left them; a folded pane remembers the size it unfolds to.
+    state["dim_navigator"] = paneDim("navigator_panel");
+    state["dim_inspectors"] = paneDim("inspector_panel");
+    state["dim_bottom"] = paneDim("bottom_panel");
+    // And the window itself, left, bottom, right, top.
+    {
+        const LLRect r = getRect();
+        state["rect"] = LLSD::emptyArray();
+        state["rect"].append(r.mLeft);
+        state["rect"].append(r.mBottom);
+        state["rect"].append(r.mRight);
+        state["rect"].append(r.mTop);
+        mShapeRect = r;
+        mShapeDims[0] = state["dim_navigator"].asInteger();
+        mShapeDims[1] = state["dim_inspectors"].asInteger();
+        mShapeDims[2] = state["dim_bottom"].asInteger();
+    }
     // Which regions are in a window of their own, and where those windows
     // are: a developer who put the inspectors on the other monitor finds
     // them there next time.
@@ -9787,9 +9880,21 @@ void ALFloaterXUIStudio::loadState()
     {
         mBottom->selectTabByName(state["bottom"].asString());
     }
+    // The sizes before the folds: a fold keeps the size it will unfold to.
+    if (state.has("dim_navigator"))
+    {
+        setPaneDim("navigator_panel", state["dim_navigator"].asInteger());
+        setPaneDim("inspector_panel", state["dim_inspectors"].asInteger());
+        setPaneDim("bottom_panel", state["dim_bottom"].asInteger());
+    }
     setPaneCollapsed("navigator_panel", state["fold_navigator"].asBoolean());
     setPaneCollapsed("inspector_panel", state["fold_inspectors"].asBoolean());
     setPaneCollapsed("bottom_panel", state["fold_bottom"].asBoolean());
+    if (state.has("rect") && state["rect"].size() == 4)
+    {
+        mRestoredRect = LLRect(state["rect"][0].asInteger(), state["rect"][3].asInteger(),
+                               state["rect"][2].asInteger(), state["rect"][1].asInteger());
+    }
     if (state.has("panes_out"))
     {
         const LLSD& out = state["panes_out"];

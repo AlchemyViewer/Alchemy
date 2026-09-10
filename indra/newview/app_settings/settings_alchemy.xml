@@ -236,7 +236,7 @@
         <key>ALXUIStudioState</key>
         <map>
             <key>Comment</key>
-            <string>XUI Studio: the last file, skin, languages, inspector tab and switches, restored when it opens.</string>
+            <string>XUI Studio: the last file, skin, languages, inspector tab and switches, and the window's rect, pane widths and folds, restored when it opens.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

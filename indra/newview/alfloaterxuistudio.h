@@ -68,6 +68,7 @@ class LLFilterEditor;
 class LLFolderView;
 class LLFolderViewFolder;
 class LLFolderViewItem;
+class LLLayoutPanel;
 class LLLineEditor;
 class LLScrollContainer;
 class LLScrollListCtrl;
@@ -98,6 +99,11 @@ public:
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
+    // The window opens where and as big as it was left, out of its own
+    // state rather than the per-account one: this is opened from the
+    // login screen as often as from the world, and there is no account
+    // yet to have remembered anything.
+    bool applyRectControl() override;
 
     // This window has a menu bar of its own, so its shortcuts are asked
     // before the viewer's. Without saying so the viewer's menu answers
@@ -535,6 +541,13 @@ private:
     void setStatus(const std::string& text);
     void saveState();
     void loadState();
+    // The shape a drag leaves behind -- the window's rect, the width of
+    // the two side panes, the height of the band -- noticed once the drag
+    // is over, rather than written on every pixel of it.
+    void rememberShape();
+    void holdShapePanes();
+    S32 paneDim(std::string_view name) const;
+    void setPaneDim(std::string_view name, S32 dim);
     // The menu bar: an action by name, and whether a switch is on.
     void onMenuAction(const LLSD& param);
     bool onMenuCheck(const LLSD& param);
@@ -609,6 +622,13 @@ private:
     // The translation table is written through, so its last write is kept
     // as the file it replaced rather than as a step of the document.
     std::string         mWroteThroughPath;
+    // What the state file said the window's rect was, applied when it
+    // opens; and what was last written, so that a frame can tell whether
+    // anything moved.
+    LLRect              mRestoredRect;
+    LLRect              mShapeRect;
+    S32                 mShapeDims[3] = { 0, 0, 0 };
+    LLLayoutPanel*      mShapePanes[3] = { nullptr, nullptr, nullptr };
     std::string         mWroteThroughText;
     S32                 mLastX = -1;
     S32                 mLastY = -1;
