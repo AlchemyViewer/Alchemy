@@ -51,6 +51,8 @@
     <floater.string name="StepMovedElement">moving [WHERE]</floater.string>
     <floater.string name="StepRemovedElement">taking [WHERE] out</floater.string>
     <floater.string name="EditSaved">Wrote [FILE].</floater.string>
+    <floater.string name="EditSavedAll">Wrote [COUNT] files.</floater.string>
+    <floater.string name="EditSavedSomeAll">Wrote [COUNT] files and stopped: [ERROR]</floater.string>
     <floater.string name="EditSavedAndRepaired">Wrote [FILE] and moved [MOVES] translations to where it now puts them.</floater.string>
     <floater.string name="RenameStrands">[COUNT] translations of this element stop applying; Save and Repair Translations moves them.</floater.string>
     <floater.string name="TranslateImpactNone">No translation stops applying because of this.</floater.string>
@@ -135,6 +137,14 @@
              name="save"
              shortcut="control|S">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
+            </menu_item_call>
+            <menu_item_call
+             label="Save All"
+             layout="topleft"
+             name="save_all"
+             shortcut="control|shift|S">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="save_all" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="dirty" />
             </menu_item_call>
             <menu_item_call

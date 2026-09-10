@@ -183,6 +183,7 @@ public:
 
 
     void saveDocument();
+    void saveAllDocuments();
     void revertDocument();
 
     // What the unsaved edits would strand: a value a language wrote that

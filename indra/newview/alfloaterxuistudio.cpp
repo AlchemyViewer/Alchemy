@@ -3990,6 +3990,30 @@ void ALFloaterXUIStudio::saveDocument()
     documentChanged(getString("EditSaved", args));
 }
 
+// Every file with work in it, written. The set stops at the first that
+// refuses, so what is said is how many went and what stopped it: a developer
+// told "three written" with no word about the fourth has been told nothing to
+// act on.
+void ALFloaterXUIStudio::saveAllDocuments()
+{
+    const S32 unsaved = mDocuments.dirtyCount();
+    if (!unsaved)
+    {
+        setStatus(getString("EditNothingToSave"));
+        return;
+    }
+    const S32 written = mDocuments.saveAll();
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(written);
+    if (written < unsaved)
+    {
+        args["[ERROR]"] = mDocuments.error();
+        setStatus(getString("EditSavedSomeAll", args));
+        return;
+    }
+    documentChanged(getString("EditSavedAll", args));
+}
+
 void ALFloaterXUIStudio::revertDocument()
 {
     if (documentPath().empty() || !document().dirty())
@@ -7916,6 +7940,7 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "open_nested")   { openNestedFile(); }
     else if (action == "capture")       { capturePreview(); }
     else if (action == "save")          { saveDocument(); }
+    else if (action == "save_all")      { saveAllDocuments(); }
     else if (action == "save_repair")   { saveAndRepair(); }
     else if (action == "impact")        { reportTranslationImpact(); }
     else if (action == "revert")        { revertDocument(); }
