@@ -429,7 +429,8 @@ private:
     // be, and the tool already knows how to make the edit. Applying one is
     // an edit like any other: it goes in the history, it can be undone, and
     // the words for it are the tool's rather than the library's.
-    void applyFix(const ALXUILint::Finding& finding);
+    // True where the document was written.
+    bool applyFix(const ALXUILint::Finding& finding);
     void onFixSelected();
     void onFixAll();
     // What pressing it would do, for the button's label and for the row --

@@ -8047,11 +8047,11 @@ std::string ALFloaterXUIStudio::saidFix(const ALXUILint::Finding& f,
 // belongs to the finding, so what is pressed here is what the tests watch
 // write bytes; this chooses the layer it is written into and says what
 // happened, which are the two things a library has no business deciding.
-void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
+bool ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
 {
     if (f.fix.did == ALXUILint::Fix::Do::Nothing)
     {
-        return;
+        return false;
     }
     // A finding from another file names an element of that file, and this
     // tool is looking at this one. Opening it is the way to fix it.
@@ -8060,7 +8060,7 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
         LLStringUtil::format_map_t args;
         args["[FILE]"] = f.file;
         setStatus(getString("FixOtherFile", args));
-        return;
+        return false;
     }
     mSelection.select(f.path);
 
@@ -8072,7 +8072,7 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
     if (!held)
     {
         setStatus(getString("EditNoTarget"));
-        return;
+        return false;
     }
 
     // What the element occupies now, which is what a move or a resize is
@@ -8087,9 +8087,10 @@ void ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
     if (!f.applyFix(*held, now))
     {
         setStatus(held->error().empty() ? getString("FixGone") : held->error());
-        return;
+        return false;
     }
     documentChanged(saidFix(f, *layer));
+    return true;
 }
 
 void ALFloaterXUIStudio::onFixSelected()
@@ -8142,9 +8143,12 @@ void ALFloaterXUIStudio::onFixAll()
 
     const ALXUISelection::path_t was = mSelection.hasSelection() ? mSelection.selection()
                                                                 : ALXUISelection::path_t();
+    // Counted as they land: a fix whose element an earlier one moved away
+    // from under it is not one that was applied.
+    S32 applied = 0;
     for (const ALXUILint::Finding& f : offered)
     {
-        applyFix(f);
+        applied += applyFix(f) ? 1 : 0;
     }
     if (!was.empty())
     {
@@ -8152,7 +8156,7 @@ void ALFloaterXUIStudio::onFixAll()
     }
 
     LLStringUtil::format_map_t args;
-    args["[COUNT]"] = std::to_string((S32)offered.size());
+    args["[COUNT]"] = std::to_string(applied);
     args["[FILE]"] = mFile;
     setStatus(getString("FixApplied", args));
 }

@@ -28,6 +28,7 @@
 
 #include "../alpopover.h"
 #include "../llfloater.h"
+#include "../lllineeditor.h"
 #include "../llscrollcontainer.h"
 #include "../lltabcontainer.h"
 #include "../lluicolortable.h"
@@ -174,6 +175,64 @@ namespace tut
         ensure("return is taken", popover->handleKeyHere(KEY_RETURN, MASK_NONE));
         ensure_equals("and what it held was written once", commits, 1);
         ensure_equals("which was the value it opened on", field->getValue().asString(), std::string("White"));
+        field->die();
+    }
+
+    // What the text comes to: a name out of colors.xml, four numbers, three
+    // with the alpha left to one, and a name nobody declared comes to
+    // nothing -- shown as itself, drawn as nothing.
+    template<> template<>
+    void alcolorfield_object::test<3>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorField* field = make();
+        LLColor4 color;
+
+        field->setValue("White");
+        ensure("a name comes to a colour", field->resolved(color));
+        ensure("the one the table has", color == LLColor4::white);
+
+        field->setValue("0.5, 0.25, 0, 0.75");
+        ensure("four numbers come to a colour", field->resolved(color));
+        ensure("the four", color == LLColor4(0.5f, 0.25f, 0.f, 0.75f));
+
+        field->setValue("1 0 0");
+        ensure("three numbers do too", field->resolved(color));
+        ensure("opaque", color == LLColor4(1.f, 0.f, 0.f, 1.f));
+
+        field->setValue("NoSuchColour");
+        ensure("a name nobody declared comes to nothing", !field->resolved(color));
+        ensure_equals("and is still what the field says", field->getValue().asString(), std::string("NoSuchColour"));
+
+        field->setValue("");
+        ensure("nothing comes to nothing", !field->resolved(color));
+        field->die();
+    }
+
+    // Typing in the line commits the field with what was typed, resolved.
+    template<> template<>
+    void alcolorfield_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorField* field = make();
+        field->setValue("White");
+        std::vector<std::string> said;
+        field->setCommitCallback([&said](LLUICtrl* ctrl, const LLSD&) { said.push_back(ctrl->getValue().asString()); });
+
+        LLLineEditor* line = field->getChild<LLLineEditor>("text");
+        line->setText(std::string("Black"));
+        line->onCommit();
+        ensure_equals("one commit", said.size(), 1u);
+        ensure_equals("of what was typed", said.front(), std::string("Black"));
+        LLColor4 color;
+        ensure("which now comes to a colour", field->resolved(color));
+        ensure("the black one", color == LLColor4::black);
         field->die();
     }
 }

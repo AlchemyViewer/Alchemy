@@ -56,6 +56,11 @@ public:
     void setValue(const LLSD& value) override;
     LLSD getValue() const override;
 
+    // What the text comes to on screen, and whether it comes to anything:
+    // a name colors.xml does not carry is shown as itself and drawn as
+    // nothing, which is the lint's finding made visible.
+    bool resolved(LLColor4& color) const;
+
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
@@ -70,11 +75,6 @@ private:
     void closePopover();
     void chose(const std::string& name);
     void onTextCommit();
-
-    // What the text comes to on screen, and whether it comes to anything:
-    // a name colors.xml does not carry is shown as itself and drawn as
-    // nothing, which is the lint's finding made visible.
-    bool resolved(LLColor4& color) const;
 
     std::string             mText;
     // What the text comes to, worked out when it changes.
