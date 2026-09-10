@@ -163,6 +163,7 @@
     <tag name="quick_open" note="A few letters and a ranked list, for reaching a thing by name rather than by looking for it." />
     <tag name="scope_bar" note="A query written as a sentence: fixed words, dropdowns, and one field for what is looked for." />
     <tag name="specimen_list" note="A list whose rows carry the things themselves rather than words about them." />
+    <tag name="tab_strip" note="The documents a window holds, one tab each over the one it shows, with a dot for unsaved work and a way to close each." />
 
     <tag name="time" note="A time of day, chosen as hours and minutes with a pair of arrows and typed if the file allows it." />
     <tag name="inspector" note="A tooltip that is a panel: what a hover says when it has more to say than one line." />
