@@ -241,6 +241,10 @@ public:
     static F32                  sNearRadius;
     static F32                  sRearFarRadius;
     static F32                  sEvictFarRadius;
+    // The last factor updateDebugSettings derived the radii from: 1 with memory
+    // to spare, 0 at the tightest. Kept so readers can report the policy the
+    // radii came from without recomputing it.
+    static F32                  sMemoryAdjustFactor;
     static F32                  sFrontPixelThreshold;
     static F32                  sRearPixelThreshold;
 };

@@ -653,6 +653,8 @@ LLViewerRegion::LLViewerRegion(const U64 &handle,
     mPaused(false),
     mRegionCacheHitCount(0),
     mRegionCacheMissCount(0),
+    mObjectsEvicted(0),
+    mObjectsBuiltFromCache(0),
     mInterestListMode(IL_MODE_DEFAULT)
 {
     mWidth = region_width_meters;
@@ -1243,11 +1245,14 @@ U32 LLViewerRegion::getNumOfActiveCachedObjects() const
     return static_cast<U32>(mImpl->mActiveSet.size());
 }
 
-void LLViewerRegion::getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes) const
+void LLViewerRegion::getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes,
+                                            U64& evicted, U64& built) const
 {
     cached = static_cast<U32>(mImpl->mCacheMap.size());
     active = static_cast<U32>(mImpl->mActiveSet.size());
     waiting = static_cast<U32>(mImpl->mWaitingSet.size());
+    evicted = mObjectsEvicted;
+    built = mObjectsBuiltFromCache;
 
     // The entry itself plus the packed object data it holds. Node map and set
     // overhead is not counted, so this is a floor.
@@ -1807,6 +1812,8 @@ bool LLViewerRegion::isViewerCameraStatic()
 
 void LLViewerRegion::killInvisibleObjects(F32 max_time)
 {
+    LL_PROFILE_ZONE_SCOPED;
+
 #if 1 // TODO: kill this.  This is ill-conceived, objects that aren't in the camera frustum should not be deleted from memory.
         // because of this, every time you turn around the simulator sends a swarm of full object update messages from cache
     // probe misses and objects have to be reloaded from scratch.  From some reason, disabling this causes holes to
@@ -1900,6 +1907,7 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
     if(!delete_list.empty())
     {
         mInvisibilityCheckHistory |= 1;
+        mObjectsEvicted += delete_list.size();
         for (auto drawable : delete_list)
         {
             gObjectList.killObject(drawable->getVObj());
@@ -1992,6 +2000,7 @@ LLViewerObject* LLViewerRegion::addNewObject(LLVOCacheEntry* entry)
         obj = gObjectList.processObjectUpdateFromCache(entry, this);
         if(obj)
         {
+            mObjectsBuiltFromCache++;
             if(!entry->isState(LLVOCacheEntry::ACTIVE))
             {
                 mImpl->mWaitingSet.insert(entry);

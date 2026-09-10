@@ -763,24 +763,34 @@ void LLWorld::logObjectCacheInfo() const
     U32 total_active = 0;
     U32 total_waiting = 0;
     U64 total_bytes = 0;
+    U64 total_evicted = 0;
+    U64 total_built = 0;
+    U64 total_missed = 0;
 
     for (const LLViewerRegion* regionp : mRegionList)
     {
         U32 cached = 0, active = 0, waiting = 0;
-        U64 bytes = 0;
-        regionp->getObjectCacheFootprint(cached, active, waiting, bytes);
+        U64 bytes = 0, evicted = 0, built = 0;
+        regionp->getObjectCacheFootprint(cached, active, waiting, bytes, evicted, built);
+        const U64 missed = regionp->getRegionCacheMissCount();
 
         LL_INFOS() << "VOCACHE: " << regionp->getName()
                    << " cached " << cached
                    << " active " << active
                    << " waiting " << waiting
                    << fmt::format(" {:.2f} MB", (F64)bytes / (1024.0 * 1024.0))
+                   << " evicted " << evicted
+                   << " built " << built
+                   << " missed " << missed
                    << LL_ENDL;
 
         total_cached += cached;
         total_active += active;
         total_waiting += waiting;
         total_bytes += bytes;
+        total_evicted += evicted;
+        total_built += built;
+        total_missed += missed;
     }
 
     LL_INFOS() << "VOCACHE: " << mRegionList.size() << " regions"
@@ -788,6 +798,20 @@ void LLWorld::logObjectCacheInfo() const
                << " active " << total_active
                << " waiting " << total_waiting
                << fmt::format(" {:.2f} MB", (F64)total_bytes / (1024.0 * 1024.0))
+               << " evicted " << total_evicted
+               << " built " << total_built
+               << " missed " << total_missed
+               << LL_ENDL;
+
+    // The policy those figures were taken under. evicted, built and missed are
+    // cumulative for each region's life, so a rate is the difference between
+    // two of these lines.
+    LL_INFOS() << "VOCACHE: policy"
+               << fmt::format(" factor {:.2f}", LLVOCacheEntry::sMemoryAdjustFactor)
+               << fmt::format(" near {:.1f}m", LLVOCacheEntry::sNearRadius)
+               << fmt::format(" rear {:.1f}m", LLVOCacheEntry::sRearFarRadius)
+               << fmt::format(" evict {:.1f}m", LLVOCacheEntry::sEvictFarRadius)
+               << " frames " << LLVOCacheEntry::sMinFrameRange
                << LL_ENDL;
 }
 

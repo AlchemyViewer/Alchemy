@@ -395,8 +395,8 @@ public:
     LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
     LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
     bool probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss_type);
-    U64 getRegionCacheHitCount() { return mRegionCacheHitCount; }
-    U64 getRegionCacheMissCount() { return mRegionCacheMissCount; }
+    U64 getRegionCacheHitCount() const { return mRegionCacheHitCount; }
+    U64 getRegionCacheMissCount() const { return mRegionCacheMissCount; }
     void requestCacheMisses();
     void addCacheMissFull(const U32 local_id);
     //update object cache if the object receives a full-update or terse update
@@ -418,9 +418,13 @@ public:
 
     U32 getNumOfVisibleGroups() const;
     U32 getNumOfActiveCachedObjects() const;
-    // Entry counts and packed-data footprint of this region's object cache.
+    // Entry counts and packed-data footprint of this region's object cache, plus
+    // the running totals of objects the eviction walk dropped and objects rebuilt
+    // from a cache entry. The totals are cumulative for the region's life; a
+    // reader wanting a rate diffs successive samples.
     // Walks mCacheMap, so call it at logging frequency, not per frame.
-    void getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes) const;
+    void getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes,
+                                 U64& evicted, U64& built) const;
     LLSpatialPartition* getSpatialPartition(U32 type);
     LLVOCachePartition* getVOCachePartition();
 
@@ -629,6 +633,8 @@ public:
     CacheMissItem::cache_miss_list_t   mCacheMissList;
     U64 mRegionCacheHitCount;
     U64 mRegionCacheMissCount;
+    U64 mObjectsEvicted;   //objects dropped by killInvisibleObjects
+    U64 mObjectsBuiltFromCache; //objects created from a cache entry
 
     caps_received_signal_t mCapabilitiesReceivedSignal;
     caps_received_signal_t mSimulatorFeaturesReceivedSignal;

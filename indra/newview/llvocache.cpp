@@ -50,6 +50,7 @@ F32 LLVOCacheEntry::sNearRadius = 1.0f;
 F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
 // Nothing is outside the eviction radius until the settings have been read.
 F32 LLVOCacheEntry::sEvictFarRadius = F32_MAX;
+F32 LLVOCacheEntry::sMemoryAdjustFactor = 1.0f;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
 bool LLVOCachePartition::sNeedsOcclusionCheck = false;
@@ -546,6 +547,7 @@ void LLVOCacheEntry::updateDebugSettings()
                                                  (F32)low_mem_bound_MB, (F32)high_mem_bound_MB,
                                                  (U32)low_mem_bound_MB != low_default,
                                                  (U32)high_mem_bound_MB != high_default); // [0, 1]
+    sMemoryAdjustFactor = adjust_factor;
 
     //min radius: all objects within this radius remain loaded in memory
     static LLCachedControl<F32> min_radius(gSavedSettings,"SceneLoadMinRadius");
