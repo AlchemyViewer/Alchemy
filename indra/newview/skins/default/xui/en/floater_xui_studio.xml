@@ -74,6 +74,10 @@
     <floater.string name="DocumentDirtyMark">•</floater.string>
     <floater.string name="DocumentCloseDirty">[FILE] has work in it; save it or revert it before letting go of it.</floater.string>
     <floater.string name="DocumentClosed">Let go of [FILE].</floater.string>
+    <floater.string name="OverrideField">[ATTR], as each layer has it; writing puts the value in force into the chosen one.</floater.string>
+    <floater.string name="OverrideNoField">No field chosen: click a gutter mark beside a row in Attributes.</floater.string>
+    <floater.string name="OverrideNoLayer">Choose the layer to write it into.</floater.string>
+    <floater.string name="OverrideNoElement">[LAYER] does not have this element, so there is nothing there to override.</floater.string>
     <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
     <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
     <floater.string name="LintStopped">Lint all: stopped.</floater.string>
@@ -1942,38 +1946,129 @@
                  name="source_tab"
                  tool_tip="Source: the element as each layer writes it, one after another"
                  width="478">
-                    <text
-                     follows="left|top|right"
-                     height="16"
-                     layout="topleft"
-                     left="2"
-                     name="source_layers"
-                     top="4"
-                     use_ellipses="true"
-                     width="380" />
-                    <button
-                     follows="top|right"
-                     height="20"
-                     label="Open in editor"
-                     layout="topleft"
-                     left_pad="4"
-                     name="jump_btn"
-                     tool_tip="Open the file in the external editor, at this element's line"
-                     top_delta="-2"
-                     width="90" />
-                    <text_editor
+                    <layout_stack
+                     animate="false"
                      follows="all"
-                     font="Monospace"
-                     height="400"
-                     ignore_tab="false"
+                     height="431"
                      layout="topleft"
                      left="0"
-                     name="source_text"
-                     tool_tip="The element as each layer of the file writes it, in the order they are merged"
-                     read_only="true"
-                     top_pad="4"
-                     width="476"
-                     word_wrap="false" />
+                     name="source_stack"
+                     orientation="vertical"
+                     top="0"
+                     width="478">
+                        <layout_panel
+                         auto_resize="false"
+                         height="24"
+                         layout="topleft"
+                         min_dim="24"
+                         name="source_head"
+                         width="478">
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left="2"
+                             name="source_layers"
+                             top="4"
+                             use_ellipses="true"
+                             width="380" />
+                            <button
+                             follows="top|right"
+                             height="20"
+                             label="Open in editor"
+                             layout="topleft"
+                             left_pad="4"
+                             name="jump_btn"
+                             tool_tip="Open the file in the external editor, at this element's line"
+                             top_delta="-2"
+                             width="90" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="130"
+                         layout="topleft"
+                         min_dim="60"
+                         name="source_layers_panel"
+                         width="478">
+                            <scroll_list
+                             column_padding="0"
+                             draw_heading="true"
+                             follows="all"
+                             height="130"
+                             layout="topleft"
+                             left="0"
+                             name="source_layer_list"
+                             tool_tip="Every layer of this file: what each says about the chosen field, and which one the merge takes"
+                             top="0"
+                             width="478">
+                                <scroll_list.columns
+                                 label=""
+                                 name="force"
+                                 tool_tip="a dot marks the one in force"
+                                 width="16" />
+                                <scroll_list.columns
+                                 label="Layer"
+                                 name="layer"
+                                 width="110" />
+                                <scroll_list.columns
+                                 dynamic_width="true"
+                                 label="Says"
+                                 name="value" />
+                                <scroll_list.columns
+                                 label="Line"
+                                 name="line"
+                                 width="44" />
+                            </scroll_list>
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="false"
+                         height="26"
+                         layout="topleft"
+                         min_dim="26"
+                         name="source_override"
+                         width="478">
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Write here"
+                             layout="topleft"
+                             left="0"
+                             name="write_override"
+                             tool_tip="Write the value in force into the chosen layer, so that layer overrides the rest"
+                             top="2"
+                             width="80" />
+                            <text
+                             follows="left|top|right"
+                             height="16"
+                             layout="topleft"
+                             left_pad="6"
+                             name="override_field"
+                             top_delta="4"
+                             use_ellipses="true"
+                             width="380" />
+                        </layout_panel>
+                        <layout_panel
+                         auto_resize="true"
+                         height="240"
+                         layout="topleft"
+                         min_dim="60"
+                         name="source_text_panel"
+                         width="478">
+                            <text_editor
+                             follows="all"
+                             font="Monospace"
+                             height="240"
+                             ignore_tab="false"
+                             layout="topleft"
+                             left="0"
+                             name="source_text"
+                             tool_tip="The element as each layer of the file writes it, in the order they are merged"
+                             read_only="true"
+                             top="0"
+                             width="476"
+                             word_wrap="false" />
+                        </layout_panel>
+                    </layout_stack>
                 </panel>
                 <panel
                  label="Bindings"

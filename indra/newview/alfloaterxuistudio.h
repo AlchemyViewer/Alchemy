@@ -453,6 +453,13 @@ private:
     // layer's own words about the element already are.
     void onFieldGutter(const std::string& name);
 
+    // Every layer of the file against one field of the selected element:
+    // what each says, which one the merge takes, and the line the element is
+    // on in each. A gutter mark says that the layers disagree; this is where
+    // a person reads how, and writes an override into one of them.
+    void fillSourceLayers();
+    void onWriteOverride();
+
     // --- the shape of the file -----------------------------------------------
     // Order among siblings, reparenting and removal, and the palette of
     // what may go under the selection.
@@ -619,6 +626,13 @@ private:
     LLFolderView*       mTree = nullptr;
     LLPanel*            mBreadcrumb = nullptr;
     LLScrollListCtrl*   mDocumentList = nullptr;
+    LLScrollListCtrl*   mSourceLayerList = nullptr;
+    LLTextBox*          mOverrideField = nullptr;
+    // The field the layer table is about: whichever gutter was last clicked,
+    // or whichever row of the grid is selected.
+    std::string         mGutterField;
+    // And what the merge takes for it, which is what an override starts from.
+    std::string         mOverrideValue;
     LLScrollListCtrl*   mFindings = nullptr;
     LLComboBox*         mFindingScope = nullptr;
     LLComboBox*         mFindingRule = nullptr;
