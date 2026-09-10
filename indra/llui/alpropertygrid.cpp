@@ -318,6 +318,13 @@ void ALPropertyGrid::clearFields()
     rebuild();
 }
 
+// The mark is a child of the row, named for the field it marks: a caller
+// putting a popover beside it needs the view and not the name.
+LLView* ALPropertyGrid::gutterFor(const std::string& name) const
+{
+    return findChild<LLView>(name + "_gutter", true);
+}
+
 void ALPropertyGrid::setAuthoredOnly(bool only)
 {
     if (mAuthoredOnly != only)

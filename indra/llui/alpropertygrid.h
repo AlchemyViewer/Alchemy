@@ -198,6 +198,11 @@ public:
     // The gutter mark beside a row, clicked. What is on the other side of
     // it is the caller's: which layers write this, and the offer to add one
     // -- neither of which this library knows anything about.
+    // The mark beside a row, for a caller that wants to put something beside
+    // it: what a gutter click opens has to know where it was clicked. Null
+    // for a row with no mark, which is most of them.
+    LLView* gutterFor(const std::string& name) const;
+
     typedef boost::signals2::signal<void(const std::string&)> gutter_signal_t;
     boost::signals2::connection onFieldGutter(const gutter_signal_t::slot_type& cb)
     {

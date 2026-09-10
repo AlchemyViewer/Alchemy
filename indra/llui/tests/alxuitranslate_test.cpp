@@ -527,4 +527,47 @@ namespace tut
                       unit->translation, std::string("Zeige Richtung zu:"));
     }
 
+    // The way down to an element, written into an overlay that has none of
+    // it. This is what a translation needs and it is not about translation:
+    // a skin that overrides one number in a file it otherwise says nothing
+    // about needs the same chain, for the same reason -- the merge matches on
+    // names, so a name is all an overlay has to say about the way down.
+    template<> template<>
+    void alxuitranslate_object::test<13>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(english());
+
+        // An overlay with nothing but the root: everything below is written.
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer("<panel name=\"root\"/>\n"));
+
+        std::string error;
+        ensure("the chain is written",
+               ALXUITranslate::ensureChain(overlay, root, { "inner", "deep" }, error));
+        ensure("with nothing to say about it: " + error, error.empty());
+        ensure("and the element is now there", overlay.resolve({ "inner", "deep" }));
+
+        // Each ancestor carries nothing but its name, because that is all the
+        // merge reads and anything else would be an override nobody asked for.
+        const pugi::xml_node inner = overlay.resolve({ "inner" });
+        ensure("the ancestor is there", inner);
+        S32 attributes = 0;
+        for (pugi::xml_attribute one : inner.attributes())
+        {
+            ++attributes;
+        }
+        ensure_equals("carrying only its name", attributes, 1);
+
+        // Which is what an override is written onto.
+        ensure("the override is written",
+               overlay.setAttribute({ "inner", "deep" }, "width", "40"));
+        ensure("and the file says so",
+               overlay.text().find("width=\"40\"") != std::string::npos);
+
+        // An element the base does not have is not one to make a way down to.
+        ensure("no base element, no chain",
+               !ALXUITranslate::ensureChain(overlay, root, { "inner", "nowhere" }, error));
+        ensure("and it says why", !error.empty());
+    }
 }

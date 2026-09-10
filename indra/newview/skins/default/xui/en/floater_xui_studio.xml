@@ -81,6 +81,11 @@
     <floater.string name="OverrideNoField">No field chosen: click a gutter mark beside a row in Attributes.</floater.string>
     <floater.string name="OverrideNoLayer">Choose the layer to write it into.</floater.string>
     <floater.string name="OverrideNoElement">[LAYER] does not have this element, so there is nothing there to override.</floater.string>
+    <floater.string name="OverrideNothingInForce">No layer writes that field, so there is no value to override.</floater.string>
+    <floater.string name="GutterTitle">[ATTR], layer by layer</floater.string>
+    <floater.string name="GutterLayer">Layer</floater.string>
+    <floater.string name="GutterSays">Says</floater.string>
+    <floater.string name="GutterWriteHere">Write here</floater.string>
     <floater.string name="LintStarted">Lint all: [TOTAL] files...</floater.string>
     <floater.string name="LintStepped">Lint all: [DONE] of [TOTAL] files, [FOUND] findings...</floater.string>
     <floater.string name="LintStopped">Lint all: stopped.</floater.string>

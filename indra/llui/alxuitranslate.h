@@ -143,13 +143,22 @@ public:
     // saves.
     static S32 repair(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);
 
+    // The ancestors of a path, written into the overlay if they are not
+    // there, each carrying nothing but its name -- because the merge matches
+    // on names, and a name is all an overlay has to say about the way down to
+    // what it overrides.
+    //
+    // This is about overlays rather than about translations: a language file
+    // is the commonest one, and a skin that overrides a number in a file it
+    // otherwise says nothing about needs the same chain for the same reason.
+    // An ancestor the overlay already has somewhere else is moved rather than
+    // written a second time, since a file that names one element twice is a
+    // file the merge has to guess about.
+    static bool ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const path_t& path, std::string& error);
+
 private:
     void scanBase(pugi::xml_node base, pugi::xml_node overlay);
     void scanOverlay(pugi::xml_node base, pugi::xml_node overlay);
-
-    // The ancestors of a path, written into the overlay if they are not
-    // there, each carrying nothing but its name.
-    static bool ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const path_t& path, std::string& error);
 
     // One sweep of the moves, which repair runs until it changes nothing.
     static S32 movePass(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);

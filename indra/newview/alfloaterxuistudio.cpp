@@ -29,6 +29,7 @@
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
+#include "alpopover.h"
 #include "alpropertygrid.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
@@ -8251,100 +8252,237 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
 void ALFloaterXUIStudio::onFieldGutter(const std::string& name)
 {
     mGutterField = name;
-    if (mInspectors)
-    {
-        mInspectors->selectTabByName("source_tab");
-    }
-    refreshSource(selectedView());
+    openGutterPopover(name);
+    // And the Source inspector, which is the same rows with the file under
+    // them, for the times the popover is not enough.
+    fillSourceLayers();
+}
 
-    const ALPropertyGrid::Field* field = nullptr;
-    for (const ALPropertyGrid::Field& one : mAttributeGrid->fields())
+// The mark beside a row, clicked. The row is marked because more than one
+// layer writes the field; this is where a person reads which, and adds one of
+// their own -- beside the mark rather than in a pane somewhere else, because
+// the question was asked by pointing at that row.
+void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
+{
+    if (LLView* up = mGutterPopover.get())
     {
-        if (one.name == name)
-        {
-            field = &one;
-            break;
-        }
+        up->die();
     }
-    if (!field)
+    mGutterPopover.markDead();
+    mGutterList = nullptr;
+
+    LLView* mark = mAttributeGrid ? mAttributeGrid->gutterFor(field) : nullptr;
+    if (!mark)
     {
         return;
     }
-    std::string where;
-    for (const std::string& line : field->alsoWritten)
-    {
-        where += where.empty() ? line : "   " + line;
-    }
+
+    constexpr S32 WIDTH = 320;
+    constexpr S32 ROWS = 110;
+    constexpr S32 FOOT = 26;
+
+    LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+    pp.name = "gutter_layers";
+    pp.rect = LLRect(0, ROWS + FOOT, WIDTH, 0);
+    LLPanel* content = LLUICtrlFactory::create<LLPanel>(pp);
+
+    LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
+    lp.name = "layers";
+    lp.rect = LLRect(0, ROWS + FOOT, WIDTH, FOOT);
+    lp.follows.flags = FOLLOWS_ALL;
+    lp.draw_heading = true;
+    lp.multi_select = false;
+    lp.column_padding = 0;
+    mGutterList = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
+    content->addChild(mGutterList);
+
+    LLScrollListColumn::Params force;
+    force.name = "force";
+    force.width.pixel_width = 16;
+    mGutterList->addColumn(force);
+    LLScrollListColumn::Params layer;
+    layer.name = "layer";
+    layer.header.label = getString("GutterLayer");
+    layer.width.pixel_width = 110;
+    mGutterList->addColumn(layer);
+    LLScrollListColumn::Params value;
+    value.name = "value";
+    value.header.label = getString("GutterSays");
+    value.width.dynamic_width = true;
+    mGutterList->addColumn(value);
+    LLScrollListColumn::Params line;
+    line.name = "line";
+    line.width.pixel_width = 40;
+    mGutterList->addColumn(line);
+
+    LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+    bp.name = "write_here";
+    bp.label = getString("GutterWriteHere");
+    bp.rect = LLRect(0, FOOT - 2, 100, 2);
+    bp.follows.flags = FOLLOWS_LEFT | FOLLOWS_BOTTOM;
+    LLButton* write = LLUICtrlFactory::create<LLButton>(bp);
+    content->addChild(write);
+
+    mGutterField = field;
+    fillLayerList(mGutterList, field);
+
     LLStringUtil::format_map_t args;
-    args["[ATTR]"] = name;
-    args["[LAYERS]"] = where;
-    setStatus(getString("AttributeAlsoWritten", args));
+    args["[ATTR]"] = field;
+    ALPopover* popover = ALPopover::show(mark, content, getString("GutterTitle", args));
+    if (!popover)
+    {
+        mGutterList = nullptr;
+        return;
+    }
+    mGutterPopover = popover->getHandle();
+
+    // Chosen and gone: the popover is a question about one row, and it has
+    // been answered.
+    write->setClickedCallback([this](LLUICtrl*, const LLSD&)
+    {
+        onWriteOverride();
+        if (LLView* up = mGutterPopover.get())
+        {
+            up->die();
+        }
+        mGutterPopover.markDead();
+        mGutterList = nullptr;
+    });
+    popover->onClosed([this](bool)
+    {
+        mGutterPopover.markDead();
+        mGutterList = nullptr;
+    });
+}
+
+// Every layer of the file against one field of the selected element, in the
+// order the merge applies them.
+//
+// Read off the layers themselves rather than off the attribute grid: only the
+// inspector on top is refreshed, so the grid can still be holding whichever
+// element was selected the last time it was the one showing.
+std::vector<ALFloaterXUIStudio::LayerSays>
+ALFloaterXUIStudio::layersSaying(const std::string& field) const
+{
+    std::vector<LayerSays> said;
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!entry || !mSelection.hasSelection())
+    {
+        return said;
+    }
+    const Preview& pv = mPreviews[PRIMARY];
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+    {
+        LayerSays one;
+        one.layer = layer;
+        const pugi::xml_node node = ALXUICatalog::resolve(layer->root(), mSelection.selection());
+        one.has = (bool)node;
+        one.line = node ? ALXUICatalog::lineOf(*layer, node) : 0;
+        if (node && !field.empty())
+        {
+            const pugi::xml_attribute attribute = node.attribute(field.c_str());
+            one.writes = (bool)attribute;
+            one.value = attribute.value();
+        }
+        said.push_back(one);
+    }
+    return said;
+}
+
+// The merge takes the last that writes it, so the mark goes on the last and
+// not on the first. Past the end where nobody writes it at all.
+// static
+size_t ALFloaterXUIStudio::inForce(const std::vector<LayerSays>& said)
+{
+    size_t at = said.size();
+    for (size_t i = 0; i < said.size(); ++i)
+    {
+        if (said[i].writes)
+        {
+            at = i;
+        }
+    }
+    return at;
+}
+
+void ALFloaterXUIStudio::fillLayerList(LLScrollListCtrl* list, const std::string& field) const
+{
+    if (!list)
+    {
+        return;
+    }
+    const std::string was = list->getFirstSelected()
+        ? list->getFirstSelected()->getValue().asString() : std::string();
+    list->deleteAllItems();
+
+    const std::vector<LayerSays> said = layersSaying(field);
+    const size_t winner = inForce(said);
+    for (size_t i = 0; i < said.size(); ++i)
+    {
+        list->addElement(row(said[i].layer->path, {
+            { "force", i == winner ? getString("DocumentDirtyMark") : std::string() },
+            { "layer", said[i].layer->skin + "/" + said[i].layer->language },
+            { "value", said[i].writes ? said[i].value
+                                      : (said[i].has ? std::string() : getString("LayerMissing")) },
+            { "line", said[i].line > 0 ? std::to_string(said[i].line) : std::string() } }));
+    }
+    if (!was.empty())
+    {
+        list->setSelectedByValue(LLSD(was), true);
+    }
+}
+
+// Which field the layer table is about: whichever gutter was last clicked,
+// while it is still a field of this element; failing that, the first field
+// the layers disagree about, since that is the one the table exists to
+// explain.
+std::string ALFloaterXUIStudio::firstDisputedField() const
+{
+    const std::vector<LayerSays> layers = layersSaying(std::string());
+    for (const LayerSays& one : layers)
+    {
+        if (!one.has)
+        {
+            continue;
+        }
+        const pugi::xml_node node = ALXUICatalog::resolve(one.layer->root(), mSelection.selection());
+        for (pugi::xml_attribute attribute : node.attributes())
+        {
+            S32 writers = 0;
+            for (const LayerSays& other : layers)
+            {
+                const pugi::xml_node theirs =
+                    ALXUICatalog::resolve(other.layer->root(), mSelection.selection());
+                writers += theirs && theirs.attribute(attribute.name());
+            }
+            if (writers > 1)
+            {
+                return attribute.name();
+            }
+        }
+    }
+    return std::string();
 }
 
 // A gutter mark says the layers disagree about a field. This is how: one row
-// per layer of the file, in the order the merge applies them, with what each
-// one says about that field. The last that says anything is the one in force,
-// which is the merge's own rule rather than a second answer to the same
-// question.
-//
-// Read off the layers themselves rather than off the attribute grid: only the
-// inspector on top is refreshed, so the grid may still be holding whichever
-// element was selected the last time it was the one showing.
+// per layer, with what each one says about it and a mark on the one in force.
 void ALFloaterXUIStudio::fillSourceLayers()
 {
     if (!mSourceLayerList)
     {
         return;
     }
-    const std::string was = mSourceLayerList->getFirstSelected()
-        ? mSourceLayerList->getFirstSelected()->getValue().asString() : std::string();
-    mSourceLayerList->deleteAllItems();
-    mOverrideValue.clear();
-
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    const Preview& pv = mPreviews[PRIMARY];
-    std::vector<const ALXUICatalog::Layer*> layers;
-    std::vector<pugi::xml_node> nodes;
-    if (entry && mSelection.hasSelection())
+    if (!mGutterField.empty())
     {
-        for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, pv.skin, pv.language))
+        const std::vector<LayerSays> said = layersSaying(mGutterField);
+        if (inForce(said) >= said.size())
         {
-            layers.push_back(layer);
-            nodes.push_back(ALXUICatalog::resolve(layer->root(), mSelection.selection()));
+            mGutterField.clear();   // no layer writes it: it is not this element's
         }
     }
-
-    const auto writers = [&](const std::string& field)
+    if (mGutterField.empty())
     {
-        S32 count = 0;
-        for (const pugi::xml_node& node : nodes)
-        {
-            count += node && node.attribute(field.c_str());
-        }
-        return count;
-    };
-
-    // Whatever gutter was last clicked, while it is still a field of this
-    // element; failing that, the first field the layers disagree about, since
-    // that is the one this table exists to explain.
-    if (mGutterField.empty() || writers(mGutterField) == 0)
-    {
-        mGutterField.clear();
-        for (const pugi::xml_node& node : nodes)
-        {
-            for (pugi::xml_attribute attribute : node.attributes())
-            {
-                if (writers(attribute.name()) > 1)
-                {
-                    mGutterField = attribute.name();
-                    break;
-                }
-            }
-            if (!mGutterField.empty())
-            {
-                break;
-            }
-        }
+        mGutterField = firstDisputedField();
     }
 
     LLStringUtil::format_map_t args;
@@ -8354,101 +8492,90 @@ void ALFloaterXUIStudio::fillSourceLayers()
         mOverrideField->setText(mGutterField.empty() ? getString("OverrideNoField")
                                                      : getString("OverrideField", args));
     }
-
-    // The merge takes the last that writes it, so the mark goes on the last
-    // and not on the first.
-    size_t in_force = layers.size();
-    for (size_t i = 0; i < nodes.size(); ++i)
-    {
-        if (!mGutterField.empty() && nodes[i] && nodes[i].attribute(mGutterField.c_str()))
-        {
-            in_force = i;
-        }
-    }
-    if (in_force < nodes.size())
-    {
-        mOverrideValue = nodes[in_force].attribute(mGutterField.c_str()).value();
-    }
-
-    for (size_t i = 0; i < layers.size(); ++i)
-    {
-        const pugi::xml_attribute attribute = mGutterField.empty() || !nodes[i]
-            ? pugi::xml_attribute() : nodes[i].attribute(mGutterField.c_str());
-        const S32 line = nodes[i] ? ALXUICatalog::lineOf(*layers[i], nodes[i]) : 0;
-        mSourceLayerList->addElement(row(layers[i]->path, {
-            { "force", i == in_force ? getString("DocumentDirtyMark") : std::string() },
-            { "layer", layers[i]->skin + "/" + layers[i]->language },
-            { "value", attribute ? std::string(attribute.value())
-                                 : (nodes[i] ? std::string() : getString("LayerMissing")) },
-            { "line", line > 0 ? std::to_string(line) : std::string() } }));
-    }
-    if (!was.empty())
-    {
-        mSourceLayerList->setSelectedByValue(LLSD(was), true);
-    }
+    fillLayerList(mSourceLayerList, mGutterField);
 }
 
 // An override is the value in force, written into a layer that did not have
-// the last word about it. Written into a layer that already writes it, it is
-// that layer changing its mind, which is the same operation.
+// the last word about it. Into a layer that already writes it, that is the
+// layer changing its mind, which is the same operation.
 //
-// A layer that does not carry the element at all is not one to write into
-// here: building the chain of ancestors an overlay needs is what a
-// translation write does, and it does it for a field a translator may write.
-// An arbitrary attribute is not that, and one put at the wrong depth makes a
-// layer that applies to nothing.
-void ALFloaterXUIStudio::onWriteOverride()
+// A layer that does not carry the element gets the way down to it first, each
+// ancestor carrying nothing but its name -- which is all the merge matches on,
+// and exactly what a language overlay is written as. The chain and the value
+// are one thing done, so one undo takes both back.
+void ALFloaterXUIStudio::writeOverrideInto(const ALXUICatalog::Layer& layer, const std::string& field)
 {
-    if (mGutterField.empty())
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (field.empty() || !entry || !mSelection.hasSelection())
     {
         setStatus(getString("OverrideNoField"));
         return;
     }
-    const LLScrollListItem* item = mSourceLayerList ? mSourceLayerList->getFirstSelected() : nullptr;
-    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
-    if (!item || !entry || !mSelection.hasSelection())
-    {
-        setStatus(getString("OverrideNoLayer"));
-        return;
-    }
-    const std::string path = item->getValue().asString();
-    const ALXUICatalog::Layer* target = nullptr;
-    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin,
-                                                               mPreviews[PRIMARY].language))
-    {
-        if (layer->path == path)
-        {
-            target = layer;
-        }
-    }
-    if (!target)
-    {
-        setStatus(getString("OverrideNoLayer"));
-        return;
-    }
 
-    ALXUIEdit* held = document(*target);
+    const std::vector<LayerSays> said = layersSaying(field);
+    const size_t winner = inForce(said);
+    if (winner >= said.size())
+    {
+        setStatus(getString("OverrideNothingInForce"));
+        return;
+    }
+    const std::string value = said[winner].value;
+
+    ALXUIEdit* held = document(layer);
     if (!held)
     {
         return;
     }
+
+    ALXUIDocuments::Action together(mDocuments);
     if (!held->resolve(mSelection.selection()))
     {
-        LLStringUtil::format_map_t args;
-        args["[LAYER]"] = target->skin + "/" + target->language;
-        setStatus(getString("OverrideNoElement", args));
-        return;
+        const std::vector<const ALXUICatalog::Layer*> layers =
+            mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin, mPreviews[PRIMARY].language);
+        std::string error;
+        if (layers.empty()
+            || !ALXUITranslate::ensureChain(*held, layers.front()->root(),
+                                            mSelection.selection(), error))
+        {
+            setStatus(error.empty() ? held->error() : error);
+            return;
+        }
     }
-    if (!held->setAttribute(mSelection.selection(), mGutterField, mOverrideValue))
+    if (!held->setAttribute(mSelection.selection(), field, value))
     {
         setStatus(held->error());
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = mGutterField;
+    args["[ATTRS]"] = field;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = target->skin + "/" + target->language;
+    args["[LAYER]"] = layer.skin + "/" + layer.language;
     documentChanged(getString("EditWrote", args));
+}
+
+// The layer chosen in whichever of the two lists asked.
+void ALFloaterXUIStudio::onWriteOverride()
+{
+    LLScrollListCtrl* list = mGutterList && mGutterList->getFirstSelected()
+                           ? mGutterList : mSourceLayerList;
+    const LLScrollListItem* item = list ? list->getFirstSelected() : nullptr;
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        setStatus(getString("OverrideNoLayer"));
+        return;
+    }
+    const std::string path = item->getValue().asString();
+    for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(*entry, mPreviews[PRIMARY].skin,
+                                                              mPreviews[PRIMARY].language))
+    {
+        if (layer->path == path)
+        {
+            writeOverrideInto(*layer, mGutterField);
+            return;
+        }
+    }
+    setStatus(getString("OverrideNoLayer"));
 }
 
 // A layer's skin and language, read off its path: the segments around

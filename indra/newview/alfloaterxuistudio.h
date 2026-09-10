@@ -465,10 +465,32 @@ private:
 
     // Every layer of the file against one field of the selected element:
     // what each says, which one the merge takes, and the line the element is
-    // on in each. A gutter mark says that the layers disagree; this is where
-    // a person reads how, and writes an override into one of them.
+    // on in each. A gutter mark says that the layers disagree; this is what
+    // says how, in the popover the mark opens and in the Source inspector,
+    // which show the same rows because they are the same question.
+    struct LayerSays
+    {
+        const ALXUICatalog::Layer*  layer = nullptr;
+        std::string                 value;
+        bool                        writes = false;     // it says something about the field
+        bool                        has = false;        // it has the element at all
+        S32                         line = 0;
+    };
+    std::vector<LayerSays> layersSaying(const std::string& field) const;
+    // The first field this element's layers disagree about, which is what a
+    // table with nothing chosen should be about.
+    std::string firstDisputedField() const;
+    // Which of them the merge takes, which is the last that says anything.
+    static size_t inForce(const std::vector<LayerSays>& said);
+    void fillLayerList(LLScrollListCtrl* list, const std::string& field) const;
+
     void fillSourceLayers();
     void onWriteOverride();
+
+    // The mark beside a row, clicked: the layers, beside the mark, with the
+    // way to add an override among them.
+    void openGutterPopover(const std::string& field);
+    void writeOverrideInto(const ALXUICatalog::Layer& layer, const std::string& field);
 
     // --- the shape of the file -----------------------------------------------
     // Order among siblings, reparenting and removal, and the palette of
@@ -638,6 +660,9 @@ private:
     ALHistoryList*      mHistory = nullptr;
     LLScrollListCtrl*   mDocumentList = nullptr;
     LLScrollListCtrl*   mSourceLayerList = nullptr;
+    // The list inside the gutter popover, which lives only while it is up.
+    LLHandle<LLView>    mGutterPopover;
+    LLScrollListCtrl*   mGutterList = nullptr;
     LLTextBox*          mOverrideField = nullptr;
     // The field the layer table is about: whichever gutter was last clicked,
     // or whichever row of the grid is selected.
