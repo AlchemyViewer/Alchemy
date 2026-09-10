@@ -89,6 +89,46 @@ public:
     size_t count() const { return mOpen.size(); }
     const std::vector<std::string>& paths() const { return mPaths; }
 
+    // --- one action, however many files ---------------------------------------
+    // A step in a document is a file put back the way it was. That is not
+    // what a person means by undo: repairing the translations of a file
+    // writes a base and every language beside it, and lining up a selection
+    // writes an attribute on each of several elements. Each of those is one
+    // thing done and several steps taken, and undoing it a step at a time
+    // undoes something nobody did.
+    //
+    // So the history lives here, as actions: each names the documents it
+    // touched and how many steps it took in each. An edit that did not say
+    // it was part of something larger is an action of its own, which is what
+    // a single edit looks like to a person anyway.
+    class Action
+    {
+    public:
+        explicit Action(ALXUIDocuments& documents);
+        ~Action();
+        Action(const Action&) = delete;
+        Action& operator=(const Action&) = delete;
+    private:
+        ALXUIDocuments& mDocuments;
+    };
+
+    bool canUndo() const { return !mDone.empty(); }
+    bool canRedo() const { return !mUndone.empty(); }
+    bool undo();
+    bool redo();
+
+    // What the last undo or redo put back, where it was one step of one
+    // document. An action over more than that says only that it was more
+    // than that, since there is no one field for a caller to write.
+    const ALXUIEdit::Change& lastChange() const { return mLastChange; }
+    const ALXUIEdit::path_t& lastPath() const { return mLastPath; }
+    const std::string& lastDocument() const { return mLastDocument; }
+
+    // Steps taken since this last looked, made into actions of their own.
+    // Called where a caller has finished doing something, and quiet while
+    // an Action is open, which is what makes an Action one thing.
+    void settle();
+
     // How many have work in them the disk has not heard about.
     S32 dirtyCount() const;
 
@@ -100,6 +140,24 @@ public:
     const std::string& error() const { return mError; }
 
 private:
+    // One thing done: which documents it took steps in, and how many in
+    // each, in the order they were taken.
+    struct Taken
+    {
+        std::vector<std::pair<std::string, S32> > steps;
+    };
+
+    // How deep each document's own stack was when this last looked.
+    void remember();
+
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<> > mSeen;
+    std::vector<Taken>          mDone;
+    std::vector<Taken>          mUndone;
+    S32                         mOpenActions = 0;
+    ALXUIEdit::Change           mLastChange;
+    ALXUIEdit::path_t           mLastPath;
+    std::string                 mLastDocument;
+
     // Held by pointer because a caller keeps one across the opening of
     // another, and because a document is neither copied nor moved.
     boost::unordered_flat_map<std::string, std::unique_ptr<ALXUIEdit>,

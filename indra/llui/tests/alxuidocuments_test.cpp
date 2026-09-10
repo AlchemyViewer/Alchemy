@@ -170,6 +170,76 @@ namespace tut
         ensure("a file that was never open cannot be closed", !open.close(base));
     }
 
+    // One thing done to two files is one thing to put back. Repairing a
+    // file's translations writes a base and every language beside it, and
+    // undoing that a file at a time undoes something nobody did.
+    template<> template<>
+    void alxuidocuments_object::test<5>()
+    {
+        const std::string base = write("base.xml", panel("a"));
+        const std::string other = write("other.xml", panel("b"));
+
+        ALXUIDocuments open;
+        ensure("opens", open.open(base) != nullptr);
+        ensure("opens", open.open(other) != nullptr);
+        ensure("nothing to put back yet", !open.canUndo());
+
+        {
+            ALXUIDocuments::Action together(open);
+            ensure("writes to one", open.find(base)->setAttribute({ "a" }, "width", "40"));
+            ensure("and to the other", open.find(other)->setAttribute({ "b" }, "width", "50"));
+        }
+
+        ensure("which is one thing", open.canUndo());
+        ensure("put back", open.undo());
+        ensure("both of them", open.find(base)->text().find("width=\"40\"") == std::string::npos);
+        ensure("at once", open.find(other)->text().find("width=\"50\"") == std::string::npos);
+        ensure("and there is nothing else to put back", !open.canUndo());
+
+        ensure("done again", open.redo());
+        ensure("both", open.find(base)->text().find("width=\"40\"") != std::string::npos);
+        ensure("at once", open.find(other)->text().find("width=\"50\"") != std::string::npos);
+
+        // An action over more than one step says only that: there is no one
+        // field for a caller to write onto what it has already built.
+        ensure("undone", open.undo());
+        ensure("it does not claim to be one field",
+               !open.lastChange().oneField);
+    }
+
+    // Several steps in one file, asked for as one thing, come back as one --
+    // and the same steps not asked for as one come back one at a time.
+    template<> template<>
+    void alxuidocuments_object::test<6>()
+    {
+        const std::string base = write("base.xml", panel("a"));
+
+        ALXUIDocuments open;
+        ALXUIEdit* held = open.open(base);
+        ensure("opens", held != nullptr);
+
+        {
+            ALXUIDocuments::Action lining_up(open);
+            ensure("writes", held->setAttribute({ "a" }, "width", "40"));
+            ensure("writes", held->setAttribute({ "a" }, "height", "41"));
+        }
+        ensure("put back", open.undo());
+        ensure("the first went", held->text().find("width=\"40\"") == std::string::npos);
+        ensure("and so did the second", held->text().find("height=\"41\"") == std::string::npos);
+        ensure("as one thing", !open.canUndo());
+
+        // The same two, each on its own.
+        ensure("writes", held->setAttribute({ "a" }, "width", "60"));
+        open.settle();
+        ensure("writes", held->setAttribute({ "a" }, "height", "61"));
+        open.settle();
+        ensure("put back", open.undo());
+        ensure("only the second went", held->text().find("height=\"61\"") == std::string::npos);
+        ensure("the first is still there", held->text().find("width=\"60\"") != std::string::npos);
+        ensure("and there is another to put back", open.canUndo());
+        ensure("which is one field of one element", open.lastChange().oneField);
+    }
+
     // A path that names no file is not a document, and says so rather than
     // becoming an empty one nobody can tell from a real one.
     template<> template<>

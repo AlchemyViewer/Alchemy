@@ -3387,6 +3387,9 @@ ALXUIEdit* ALFloaterXUIStudio::document(const ALXUICatalog::Layer& layer)
 // rebuilt from what is now in memory, next frame.
 void ALFloaterXUIStudio::documentChanged(const std::string& status)
 {
+    // Whatever was just done is done: from here it is one thing that can be
+    // put back, however many files it wrote to.
+    mDocuments.settle();
     mPendingStatus = status;
     setStatus(status);
     mReloadEntryOnly = true;
@@ -3541,8 +3544,11 @@ std::string ALFloaterXUIStudio::describeStep(const ALXUIEdit::Change& change) co
 
 void ALFloaterXUIStudio::replayChange(const std::string& status)
 {
-    const ALXUIEdit::Change& change = document().lastChange();
-    const ALXUISelection::path_t& where = document().lastPath();
+    // The set's answer rather than a document's: an action over more than one
+    // step or more than one file says so by saying nothing, and a preview
+    // built again is the only honest way to show that.
+    const ALXUIEdit::Change& change = mDocuments.lastChange();
+    const ALXUISelection::path_t& where = mDocuments.lastPath();
 
     // A step that wrote a name moved the element, so a step put back or put
     // on again moves it too. What is selected is the same element either way,
@@ -3578,6 +3584,7 @@ void ALFloaterXUIStudio::replayChange(const std::string& status)
 
 void ALFloaterXUIStudio::documentRead(const std::string& status)
 {
+    mDocuments.settle();
     setStatus(status);
     mRereadPending = true;
     mRereadAt.setTimerExpirySec(REREAD_SECONDS);
@@ -3944,6 +3951,11 @@ void ALFloaterXUIStudio::saveAndRepair()
         saveDocument();
         return;
     }
+
+    // A base and every language beside it, written because of one thing the
+    // developer asked for. What that costs the languages is what the repair
+    // is, so putting half of it back is putting back something nobody did.
+    ALXUIDocuments::Action repairing(mDocuments);
 
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
     if (!entry || !document().save())
@@ -5948,16 +5960,19 @@ S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::
         return 0;
     }
 
-    ALXUIEdit overlay;
-    if (!overlay.loadFile(overlay_layer->path))
+    // Through the set rather than a document of its own, so that the repair
+    // is a step of the action that asked for it: a repair nobody can put
+    // back is a repair nobody can try.
+    ALXUIEdit* overlay = mDocuments.open(overlay_layer->path);
+    if (!overlay)
     {
-        error = overlay.error();
+        error = mDocuments.error();
         return 0;
     }
-    const S32 done = ALXUITranslate::repair(overlay, base_layers.front()->root(), error);
-    if (done && !overlay.save())
+    const S32 done = ALXUITranslate::repair(*overlay, base_layers.front()->root(), error);
+    if (done && !overlay->save())
     {
-        error = overlay.error();
+        error = overlay->error();
         return 0;
     }
     return done;
@@ -6697,6 +6712,10 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
         setStatus(getString("EditNoTarget"));
         return;
     }
+    // Lining up a selection writes an attribute on each of several elements,
+    // and it is one thing the developer asked for: undoing it a step at a
+    // time would leave a selection half lined up, which nobody asked for.
+    ALXUIDocuments::Action lining_up(mDocuments);
     ALXUIEdit* held = document(*layer);
     if (!held)
     {
@@ -6769,10 +6788,11 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
 bool ALFloaterXUIStudio::undoEdit()
 {
     // What is about to be put back, asked before it is, since afterwards the
-    // step has moved to the other stack.
+    // step has moved to the other stack. Only where the action is one step of
+    // one document: an action over several says so by saying nothing.
     const ALXUIEdit::Change* about = document().nextUndo();
     const std::string what = about ? describeStep(*about) : LLStringUtil::null;
-    if (!documentPath().empty() && document().undo())
+    if (mDocuments.undo())
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
@@ -6801,13 +6821,13 @@ bool ALFloaterXUIStudio::undoEdit()
 
 bool ALFloaterXUIStudio::redoEdit()
 {
-    if (documentPath().empty() || !document().redo())
+    if (!mDocuments.redo())
     {
         return false;
     }
     LLStringUtil::format_map_t args;
     args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
-    const std::string what = describeStep(document().lastChange());
+    const std::string what = describeStep(mDocuments.lastChange());
     args["[WHAT]"] = what;
     replayChange(getString(what.empty() ? "EditRedone" : "EditRedoneWhat", args));
     return true;

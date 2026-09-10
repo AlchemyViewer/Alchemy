@@ -53,6 +53,7 @@ ALXUIEdit* ALXUIDocuments::open(const std::string& path)
     ALXUIEdit* opened = held.get();
     mOpen.emplace(path, std::move(held));
     mPaths.push_back(path);
+    mSeen.emplace(path, 0u);
     makeActive(path);
     return opened;
 }
@@ -94,6 +95,11 @@ bool ALXUIDocuments::close(std::string_view path)
     const bool was_active = mActivePtr == it->second.get();
     mOpen.erase(it);
     mPaths.erase(std::remove(mPaths.begin(), mPaths.end(), path), mPaths.end());
+    mSeen.erase(std::string(path));
+    // An action naming a document that has gone cannot be put back, and an
+    // action half put back is worse than none: the history goes with it.
+    mDone.clear();
+    mUndone.clear();
     if (was_active)
     {
         // Whatever is left, so that a tool with something open is never
@@ -113,8 +119,138 @@ void ALXUIDocuments::closeAll()
 {
     mOpen.clear();
     mPaths.clear();
+    mSeen.clear();
+    mDone.clear();
+    mUndone.clear();
     mActivePath.clear();
     mActivePtr = nullptr;
+}
+
+ALXUIDocuments::Action::Action(ALXUIDocuments& documents)
+:   mDocuments(documents)
+{
+    // Whatever was done before this is done: what happens from here is the
+    // one thing this Action stands for.
+    mDocuments.settle();
+    ++mDocuments.mOpenActions;
+}
+
+ALXUIDocuments::Action::~Action()
+{
+    if (--mDocuments.mOpenActions == 0)
+    {
+        mDocuments.settle();
+    }
+}
+
+void ALXUIDocuments::remember()
+{
+    mSeen.clear();
+    for (const std::string& path : mPaths)
+    {
+        const ALXUIEdit* held = find(path);
+        mSeen.emplace(path, held ? held->undoDepth() : 0u);
+    }
+}
+
+void ALXUIDocuments::settle()
+{
+    if (mOpenActions > 0)
+    {
+        return;     // still inside something, so it is not finished
+    }
+
+    Taken taken;
+    for (const std::string& path : mPaths)
+    {
+        const ALXUIEdit* held = find(path);
+        if (!held)
+        {
+            continue;
+        }
+        const auto seen = mSeen.find(path);
+        const size_t before = seen == mSeen.end() ? 0u : seen->second;
+        if (held->undoDepth() > before)
+        {
+            taken.steps.emplace_back(path, (S32)(held->undoDepth() - before));
+        }
+    }
+    remember();
+    if (taken.steps.empty())
+    {
+        return;
+    }
+
+    // Everything taken since this last looked is one thing, because looking
+    // is what says a thing has finished: a caller settles after each edit,
+    // and an Action is a caller saying not to settle in the middle of one.
+    mDone.push_back(std::move(taken));
+    mUndone.clear();
+}
+
+bool ALXUIDocuments::undo()
+{
+    settle();
+    if (mDone.empty())
+    {
+        return false;
+    }
+    const Taken taken = mDone.back();
+    mDone.pop_back();
+
+    mLastChange = ALXUIEdit::Change();
+    mLastPath.clear();
+    mLastDocument.clear();
+    // Backwards, since the last step taken is the first put back.
+    for (auto it = taken.steps.rbegin(); it != taken.steps.rend(); ++it)
+    {
+        ALXUIEdit* held = find(it->first);
+        for (S32 i = 0; held && i < it->second; ++i)
+        {
+            held->undo();
+        }
+        if (held && taken.steps.size() == 1 && it->second == 1)
+        {
+            mLastChange = held->lastChange();
+            mLastPath = held->lastPath();
+            mLastDocument = it->first;
+        }
+    }
+    mUndone.push_back(taken);
+    remember();
+    return true;
+}
+
+bool ALXUIDocuments::redo()
+{
+    settle();
+    if (mUndone.empty())
+    {
+        return false;
+    }
+    const Taken taken = mUndone.back();
+    mUndone.pop_back();
+
+    mLastChange = ALXUIEdit::Change();
+    mLastPath.clear();
+    mLastDocument.clear();
+    for (const auto& [path, count] : taken.steps)
+    {
+        ALXUIEdit* held = find(path);
+        for (S32 i = 0; held && i < count; ++i)
+        {
+            held->redo();
+        }
+        if (held && taken.steps.size() == 1 && count == 1)
+        {
+            mLastChange = held->lastChange();
+            mLastPath = held->lastPath();
+            mLastDocument = path;
+        }
+    }
+    mDone.push_back(taken);
+    remember();
+    return true;
 }
 
 S32 ALXUIDocuments::dirtyCount() const
