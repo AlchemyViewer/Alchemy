@@ -1814,10 +1814,6 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
 {
     LL_PROFILE_ZONE_SCOPED;
 
-#if 1 // TODO: kill this.  This is ill-conceived, objects that aren't in the camera frustum should not be deleted from memory.
-        // because of this, every time you turn around the simulator sends a swarm of full object update messages from cache
-    // probe misses and objects have to be reloaded from scratch.  From some reason, disabling this causes holes to
-    // appear in the scene when flying back and forth between regions
     if(!sVOCacheCullingEnabled)
     {
         return;
@@ -1831,10 +1827,22 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
         return;
     }
 
-    // LLVOCacheEntry::isAnyVisible answers true for every entry while the
-    // eviction it once drove is switched off, so the walk below cannot kill
-    // anything; it is kept for the day that is switched back on.
-    return;
+    // Dropping an object the camera cannot see costs the work of rebuilding it
+    // when the camera comes back, so by default it is only done while memory is
+    // actually short. The 2024 note above isAnyVisible describes this evicting
+    // things still in view; the radius that decided that was pinned to two
+    // metres by memory bounds left over from 32-bit builds, and mode 2 is how
+    // that gets measured rather than argued.
+    static LLCachedControl<U32> eviction_mode(gSavedSettings, "AlchemyVOCacheEvictionMode", 1u);
+    if(eviction_mode == 0u)
+    {
+        return;
+    }
+    constexpr F32 PRESSURE_THRESHOLD = 0.5f; //half the radii pulled in
+    if(eviction_mode == 1u && LLVOCacheEntry::sMemoryAdjustFactor > PRESSURE_THRESHOLD)
+    {
+        return;
+    }
 
     LLTimer update_timer;
     LLVector4a camera_origin;
@@ -1914,9 +1922,6 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
         }
         delete_list.clear();
     }
-
-    return;
-#endif
 }
 
 void LLViewerRegion::killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list)

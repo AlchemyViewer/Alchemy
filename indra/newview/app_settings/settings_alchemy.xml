@@ -1434,6 +1434,17 @@
             <key>Value</key>
             <map />
         </map>
+        <key>AlchemyVOCacheEvictionMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether cached objects the camera cannot see are dropped from memory and rebuilt when they are needed again. 0 never, 1 only while memory is short, 2 always.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyVOCacheLogFrequency</key>
         <map>
             <key>Comment</key>
