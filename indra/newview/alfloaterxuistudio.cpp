@@ -30,6 +30,7 @@
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
 #include "alpopover.h"
+#include "alquickopen.h"
 #include "aljumpbar.h"
 #include "alscopebar.h"
 #include "alspecimenlist.h"
@@ -2198,6 +2199,11 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     // Open quickly: the catalog, with whatever was typed there before it
     // selected, so the next thing typed replaces it. A developer looking for
     // a file is looking for it by name.
+    if (key == 'O' && mask == (MASK_CONTROL | MASK_SHIFT))
+    {
+        openQuickly();
+        return true;
+    }
     if (key == 'O' && mask == MASK_CONTROL)
     {
         if (mModes)
@@ -8501,6 +8507,82 @@ void ALFloaterXUIStudio::onFieldGutter(const std::string& name)
     // And the Source inspector, which is the same rows with the file under
     // them, for the times the popover is not enough.
     fillSourceLayers();
+}
+
+// Open quickly: every file in the catalog, ranked against a few letters, with
+// the one meant at the top and return to take it. Over the window rather than
+// in a pane, because it is a gesture and not a place -- it is gone as soon as
+// it has answered.
+void ALFloaterXUIStudio::openQuickly()
+{
+    if (LLView* up = mQuickPopover.get())
+    {
+        up->die();
+    }
+    mQuickPopover.markDead();
+
+    constexpr S32 WIDTH = 460;
+    constexpr S32 HEIGHT = 300;
+
+    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+    qp.name = "quick_open";
+    qp.rect = LLRect(0, HEIGHT, WIDTH, 0);
+    qp.placeholder = getString("QuickOpenPlaceholder");
+    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
+
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (const ALXUICatalog::Entry& entry : mCatalog.entries())
+    {
+        ALQuickOpen::Candidate one;
+        // The file's own name is what a person types, and the folders it is
+        // under are how they tell two of a name apart.
+        const size_t slash = entry.name.find_last_of('/');
+        one.label = slash == std::string::npos ? entry.name : entry.name.substr(slash + 1);
+        one.detail = slash == std::string::npos ? std::string(ALXUICatalog::kindName(entry.kind))
+                                                : entry.name.substr(0, slash);
+        one.value = entry.name;
+        candidates.push_back(std::move(one));
+    }
+    quick->setCandidates(std::move(candidates));
+
+    ALPopover* popover = ALPopover::show(this, quick, getString("QuickOpenTitle"));
+    if (!popover)
+    {
+        return;
+    }
+    mQuickPopover = popover->getHandle();
+    quick->onChose([this](const std::string& file)
+    {
+        if (LLView* up = mQuickPopover.get())
+        {
+            up->die();
+        }
+        mQuickPopover.markDead();
+        goToFile(file);
+    });
+    popover->onClosed([this](bool) { mQuickPopover.markDead(); });
+    quick->takeFocus();
+}
+
+// The file, opened, with the canvas going there whether it is pinned or not:
+// asking for a file by name is asking to be looking at it.
+void ALFloaterXUIStudio::goToFile(const std::string& file)
+{
+    if (file.empty() || file == mFile || !mCatalog.find(file))
+    {
+        return;
+    }
+    mFile = file;
+    mPendingFile.clear();
+    mSelection.clearSelection();
+    if (mModes)
+    {
+        mModes->selectTabByName("files_mode");
+        onMode();
+    }
+    mFileList->setSelectedByValue(mFile, true);
+    saveState();
+    showPreviews();
 }
 
 // The mark beside a row, clicked. The row is marked because more than one

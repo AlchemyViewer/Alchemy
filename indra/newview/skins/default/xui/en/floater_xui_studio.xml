@@ -87,6 +87,8 @@
     <floater.string name="GutterSays">Says</floater.string>
     <floater.string name="GutterWriteHere">Write here</floater.string>
     <floater.string name="BreadcrumbCodeBuilt">code-built</floater.string>
+    <floater.string name="QuickOpenTitle">Open quickly</floater.string>
+    <floater.string name="QuickOpenPlaceholder">a few letters of the file name</floater.string>
     <floater.string name="PaletteTakesText">takes text</floater.string>
     <floater.string name="PaletteTakesChildren">[COUNT] kinds of child</floater.string>
     <floater.string name="FindWord">Find</floater.string>

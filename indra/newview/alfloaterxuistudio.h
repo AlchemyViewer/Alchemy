@@ -498,6 +498,11 @@ private:
     void fillSourceLayers();
     void onWriteOverride();
 
+    // Open quickly: every file in the catalog against a few letters, over
+    // the window, gone as soon as it has answered.
+    void openQuickly();
+    void goToFile(const std::string& file);
+
     // The mark beside a row, clicked: the layers, beside the mark, with the
     // way to add an override among them.
     void openGutterPopover(const std::string& field);
@@ -673,6 +678,7 @@ private:
     LLScrollListCtrl*   mSourceLayerList = nullptr;
     // The list inside the gutter popover, which lives only while it is up.
     LLHandle<LLView>    mGutterPopover;
+    LLHandle<LLView>    mQuickPopover;
     LLScrollListCtrl*   mGutterList = nullptr;
     LLTextBox*          mOverrideField = nullptr;
     // The field the layer table is about: whichever gutter was last clicked,
