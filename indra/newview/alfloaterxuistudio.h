@@ -26,6 +26,7 @@
 
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
+#include "alxuidocuments.h"
 #include "alxuiedit.h"
 #include "alxuilint.h"
 #include "alxuioverlay.h"
@@ -195,7 +196,12 @@ public:
     S32 translationImpact(std::vector<Impact>& out) const;
     void reportTranslationImpact();
     void saveAndRepair();
-    bool documentDirty() const { return mDocument.dirty(); }
+    // The one an operation with no path of its own means: what the
+    // inspectors write to, and what Save and Undo are about.
+    ALXUIEdit& document() { return mDocuments.active(); }
+    const ALXUIEdit& document() const { return mDocuments.active(); }
+    const std::string& documentPath() const { return mDocuments.activePath(); }
+    bool documentDirty() const { return mDocuments.dirtyCount() > 0; }
     bool hoverHighlight() const { return mHoverHighlight; }
 
     // What a drag lands on, and what the preview is measured with.
@@ -487,8 +493,12 @@ private:
     LLFrameTimer        mRereadAt;                  // once the typing stops
     // The layer under edit, held between operations: its undo stack, its
     // dirty flag and the text the preview is built from are all its own.
-    ALXUIEdit           mDocument;
-    std::string         mDocumentPath;
+    // Every file the developer has open, each with its own edits. A tool
+    // holding one at a time has to refuse every move to a second while there
+    // is work in hand -- to a nested file, to the language that translates
+    // this one, to the skin this one varies -- and each of those refusals is
+    // a thing the developer came here to do.
+    ALXUIDocuments      mDocuments;
     // The translation table is written through, so its last write is kept
     // as the file it replaced rather than as a step of the document.
     std::string         mWroteThroughPath;

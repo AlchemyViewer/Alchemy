@@ -120,6 +120,7 @@ target_sources(llui
     alxuicatalog.cpp
     alxuidiagnostics.cpp
     alxuiedit.cpp
+    alxuidocuments.cpp
     alxuilint.cpp
     alxuinotes.cpp
     alxuioverlay.cpp
@@ -266,6 +267,7 @@ target_sources(llui
     alxuicatalog.h
     alxuidiagnostics.h
     alxuiedit.h
+    alxuidocuments.h
     alxuilint.h
     alxuinotes.h
     alxuioverlay.h
@@ -386,6 +388,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(alxuicatalog "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuilint "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiedit "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alxuidocuments "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuitranslate "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuischema "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alxuiselection "" "${test_libs}" "${test_project}")
