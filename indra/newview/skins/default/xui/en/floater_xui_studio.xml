@@ -41,6 +41,15 @@
     <floater.string name="EditRootMove">The preview's own frame is placed here, not by the file: its size is editable, its position is not.</floater.string>
     <floater.string name="EditUndone">Put [FILE] back the way it was.</floater.string>
     <floater.string name="EditRedone">Did that to [FILE] again.</floater.string>
+    <floater.string name="EditUndoneWhat">Took back: [WHAT].</floater.string>
+    <floater.string name="EditRedoneWhat">Did again: [WHAT].</floater.string>
+    <floater.string name="StepWroteField">[WHAT] on [WHERE]</floater.string>
+    <floater.string name="StepTookFieldOut">[WHAT] taken off [WHERE]</floater.string>
+    <floater.string name="StepWroteText">the text of [WHERE]</floater.string>
+    <floater.string name="StepRenamed">naming [WHERE]</floater.string>
+    <floater.string name="StepAddedElement">something put in [WHERE]</floater.string>
+    <floater.string name="StepMovedElement">moving [WHERE]</floater.string>
+    <floater.string name="StepRemovedElement">taking [WHERE] out</floater.string>
     <floater.string name="EditSaved">Wrote [FILE].</floater.string>
     <floater.string name="EditSavedAndRepaired">Wrote [FILE] and moved [MOVES] translations to where it now puts them.</floater.string>
     <floater.string name="RenameStrands">[COUNT] translations of this element stop applying; Save and Repair Translations moves them.</floater.string>

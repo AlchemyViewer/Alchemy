@@ -120,8 +120,24 @@ public:
     // of one element onto what it has already; anything else it has to build
     // again, and a step that changed more than that says so by leaving this
     // empty.
+    // What a step did, said in the terms this file works in rather than in
+    // words: a caller says it in words, because the words a person reads are
+    // the caller's to choose and are not in this library's vocabulary.
+    enum class Did : U8
+    {
+        Something,          // a step from before a step said, or more than one thing
+        WroteField,
+        TookFieldOut,
+        WroteText,
+        Renamed,            // the name, which moves the element
+        AddedElement,
+        MovedElement,
+        RemovedElement
+    };
+
     struct Change
     {
+        Did         did = Did::Something;
         path_t      path;               // where the element was before it
         path_t      after;              // and where the step leaves it
         std::string field;              // the attribute written
@@ -137,6 +153,11 @@ public:
 
     // What the last undo or redo put back.
     const Change& lastChange() const { return mLastChange; }
+
+    // And what the next one would, for a caller that says what a gesture is
+    // about to do before it is asked to do it. Null where there is none.
+    const Change* nextUndo() const { return mUndoWhat.empty() ? nullptr : &mUndoWhat.back(); }
+    const Change* nextRedo() const { return mRedoWhat.empty() ? nullptr : &mRedoWhat.back(); }
 
     // And where the element it was about is to be found now: an undo leaves
     // it where it was before the step, a redo where the step put it. The two
@@ -278,7 +299,7 @@ private:
     // What this operation is doing, said by the operation itself before it
     // changes anything. Only the outermost one says: a move is a removal and
     // an insertion, and what a move did is neither of them.
-    void note(const path_t& path, std::string_view field);
+    void note(Did did, const path_t& path, std::string_view field = std::string_view());
 
     // And where a step that writes a name leaves the element it renames.
     void noteRename(pugi::xml_node node, const std::string& name);

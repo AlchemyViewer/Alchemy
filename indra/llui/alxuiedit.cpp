@@ -327,14 +327,20 @@ ALXUIEdit::Step::Step(ALXUIEdit& doc)
     }
 }
 
-void ALXUIEdit::note(const path_t& path, std::string_view field)
+void ALXUIEdit::note(Did did, const path_t& path, std::string_view field)
 {
     if (mDepth == 1)
     {
+        mPending.did = did;
         mPending.path = path;
         mPending.after = path;
         mPending.field = field;
-        mPending.oneField = true;
+        // What a caller holding something built from this can write onto it
+        // without building it again: one field of one element, and nothing
+        // that changes which elements there are or where they sit.
+        mPending.oneField = did == Did::WroteField
+                         || did == Did::TookFieldOut
+                         || did == Did::Renamed;
     }
 }
 
@@ -680,6 +686,7 @@ bool ALXUIEdit::setText(const path_t& path, const std::string& text)
 {
     Step step(*this);
     mError.clear();
+    note(Did::WroteText, path);
     pugi::xml_node node = resolve(path);
     if (!node)
     {
@@ -719,6 +726,7 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
 {
     Step step(*this);
     mError.clear();
+    note(Did::AddedElement, parent);
     pugi::xml_node node = resolve(parent);
     if (!node)
     {
@@ -764,6 +772,7 @@ bool ALXUIEdit::removeElement(const path_t& path)
 {
     Step step(*this);
     mError.clear();
+    note(Did::RemovedElement, path);
     pugi::xml_node node = resolve(path);
     if (!node)
     {
@@ -913,6 +922,7 @@ bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
 {
     Step step(*this);
     mError.clear();
+    note(Did::MovedElement, path);
     std::string xml;
     if (!liftElement(path, xml))
     {
@@ -939,6 +949,7 @@ bool ALXUIEdit::insertBeside(const path_t& sibling, const std::string& xml, bool
 {
     Step step(*this);
     mError.clear();
+    note(Did::AddedElement, sibling);
     pugi::xml_node node = resolve(sibling);
     if (!node)
     {
@@ -990,6 +1001,7 @@ bool ALXUIEdit::moveBeside(const path_t& path, const path_t& sibling, bool befor
 {
     Step step(*this);
     mError.clear();
+    note(Did::MovedElement, path);
     if (path == sibling)
     {
         mError = "an element cannot be moved beside itself";
@@ -1032,7 +1044,7 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
         return false;
     }
 
-    note(path, name);
+    note(name == "name" ? Did::Renamed : Did::WroteField, path, name);
     if (name == "name")
     {
         noteRename(node, value);
@@ -1076,7 +1088,7 @@ bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
         mError = "the element does not carry " + name;
         return false;
     }
-    note(path, name);
+    note(Did::TookFieldOut, path, name);
     splice(whole, std::string_view());
     return true;
 }

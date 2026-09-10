@@ -868,6 +868,42 @@ namespace tut
                           brought({ "elsewhere", "b" }), std::string("elsewhere/b"));
         }
 
+        // A step says what kind of thing it was, so that a caller can say so
+        // in its own words -- and says it before the step is taken, since
+        // afterwards it has moved to the other stack.
+        {
+            ALXUIEdit doc;
+            ensure("loads", doc.loadBuffer(
+                "<panel name=\"root\">\n"
+                "    <panel name=\"a\" width=\"9\" height=\"8\">Hello</panel>\n"
+                "</panel>\n"));
+
+            ensure("writes", doc.setAttribute({ "a" }, "width", "40"));
+            ensure("takes one out", doc.removeAttribute({ "a" }, "height"));
+            ensure("writes text", doc.setText({ "a" }, "Goodbye"));
+            ensure("adds one", doc.insertElement({ "a" }, "<panel name=\"b\"/>"));
+            ensure("takes one out again", doc.removeElement({ "a", "b" }));
+
+            // The stack, read from the top down as undo would take it.
+            static const ALXUIEdit::Did in_order[] = {
+                ALXUIEdit::Did::RemovedElement,
+                ALXUIEdit::Did::AddedElement,
+                ALXUIEdit::Did::WroteText,
+                ALXUIEdit::Did::TookFieldOut,
+                ALXUIEdit::Did::WroteField,
+            };
+            for (const ALXUIEdit::Did did : in_order)
+            {
+                const ALXUIEdit::Change* next = doc.nextUndo();
+                ensure("there is a step to take back", next != nullptr);
+                ensure("and it says what it was", next->did == did);
+                ensure("taken back", doc.undo());
+                ensure("which is what was taken back", doc.lastChange().did == did);
+            }
+            ensure("and then there is not", doc.nextUndo() == nullptr);
+            ensure("but there is one to do again", doc.nextRedo() != nullptr);
+        }
+
         // A whole element arriving is not one field of one element.
         const std::string before = edit.text();
         ensure("inserts", edit.insertElement({}, "<panel name=\"b\" width=\"4\" height=\"4\"/>"));

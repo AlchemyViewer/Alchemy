@@ -154,6 +154,9 @@ public:
     // wrote one field of one element. Anything else is a build.
     void replayChange(const std::string& status);
 
+    // A step said in words, for a status line and for a list of them.
+    std::string describeStep(const ALXUIEdit::Change& change) const;
+
     // A field put onto what is already built, where a built view can be told
     // about it. Answering false is not a failure: it says this field is not
     // one of those, so the preview has to be made again to show it.

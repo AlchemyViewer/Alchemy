@@ -3521,6 +3521,34 @@ bool ALFloaterXUIStudio::rebuildElement(const ALXUISelection::path_t& path, cons
 // and the preview can be told about it the same way the edit was. Anything
 // else -- an element added, moved or taken out, or a step from before the
 // document said what its steps did -- is a document of a different shape.
+// A step said in words. The document says what it did in its own terms and
+// leaves the words to whoever shows them, which is here: a library that put
+// English in it would be a library nobody could translate.
+std::string ALFloaterXUIStudio::describeStep(const ALXUIEdit::Change& change) const
+{
+    static const std::map<ALXUIEdit::Did, const char*> said = {
+        { ALXUIEdit::Did::WroteField,       "StepWroteField" },
+        { ALXUIEdit::Did::TookFieldOut,     "StepTookFieldOut" },
+        { ALXUIEdit::Did::WroteText,        "StepWroteText" },
+        { ALXUIEdit::Did::Renamed,          "StepRenamed" },
+        { ALXUIEdit::Did::AddedElement,     "StepAddedElement" },
+        { ALXUIEdit::Did::MovedElement,     "StepMovedElement" },
+        { ALXUIEdit::Did::RemovedElement,   "StepRemovedElement" },
+    };
+    const auto it = said.find(change.did);
+    if (it == said.end())
+    {
+        return LLStringUtil::null;
+    }
+    // The element by the last step of its path, which is what it is called:
+    // a person reading this is looking at the outline, where that is the row.
+    const ALXUISelection::path_t& path = change.path;
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = change.field;
+    args["[WHERE]"] = path.empty() ? mFile : path.back();
+    return getString(it->second, args);
+}
+
 void ALFloaterXUIStudio::replayChange(const std::string& status)
 {
     const ALXUIEdit::Change& change = mDocument.lastChange();
@@ -6726,11 +6754,16 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
 // replaced, put back.
 bool ALFloaterXUIStudio::undoEdit()
 {
+    // What is about to be put back, asked before it is, since afterwards the
+    // step has moved to the other stack.
+    const ALXUIEdit::Change* about = mDocument.nextUndo();
+    const std::string what = about ? describeStep(*about) : LLStringUtil::null;
     if (!mDocumentPath.empty() && mDocument.undo())
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
-        replayChange(getString("EditUndone", args));
+        args["[WHAT]"] = what;
+        replayChange(getString(what.empty() ? "EditUndone" : "EditUndoneWhat", args));
         return true;
     }
 
@@ -6760,7 +6793,9 @@ bool ALFloaterXUIStudio::redoEdit()
     }
     LLStringUtil::format_map_t args;
     args["[FILE]"] = mDocumentPath.substr(mDocumentPath.find_last_of("/\\") + 1);
-    replayChange(getString("EditRedone", args));
+    const std::string what = describeStep(mDocument.lastChange());
+    args["[WHAT]"] = what;
+    replayChange(getString(what.empty() ? "EditRedone" : "EditRedoneWhat", args));
     return true;
 }
 
