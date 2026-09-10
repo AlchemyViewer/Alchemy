@@ -48,6 +48,8 @@
 U32 LLVOCacheEntry::sMinFrameRange = 64;
 F32 LLVOCacheEntry::sNearRadius = 1.0f;
 F32 LLVOCacheEntry::sRearFarRadius = 1.0f;
+// Nothing is outside the eviction radius until the settings have been read.
+F32 LLVOCacheEntry::sEvictFarRadius = F32_MAX;
 F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
 bool LLVOCachePartition::sNeedsOcclusionCheck = false;
@@ -484,6 +486,22 @@ F32 LLVOCacheEntry::memoryAdjustFactor(F32 allocated_MB, F32 physical_MB, F32 he
     return llclamp((high_bound_MB - clamped_memory) / adjust_range, 0.f, 1.f);
 }
 
+//static
+F32 LLVOCacheEntry::evictRadius(F32 rear_far_radius, F32 min_radius, F32 draw_radius)
+{
+    // A quarter again beyond the radius that loads an entry, so that turning
+    // around does not cross both radii at once, and never inside
+    // SceneLoadMinRadius, whose own description is that everything within it
+    // stays loaded. The floor is that setting rather than the pressure-scaled
+    // sNearRadius, so memory pressure cannot pull the two radii back together
+    // at the moment it switches eviction on. The sphere is the whole sphere,
+    // not just the part behind the camera, and nothing beyond the draw distance
+    // is drawn, so the draw distance caps it; above four fifths of it the band
+    // narrows to what is left.
+    constexpr F32 EVICT_HYSTERESIS = 1.25f;
+    return llclamp(rear_far_radius * EVICT_HYSTERESIS, llmin(min_radius, draw_radius), draw_radius);
+}
+
 #ifndef LL_TEST
 //static
 void LLVOCacheEntry::updateDebugSettings()
@@ -550,6 +568,7 @@ void LLVOCacheEntry::updateDebugSettings()
     const F32 max_radius = rear_max_radius_frac * draw_radius;
     const F32 clamped_max_radius = llclamp(max_radius, min_radius_plus_one, draw_radius); // [sNearRadius, mDrawDistance]
     sRearFarRadius = min_radius_plus_one + ((clamped_max_radius - min_radius_plus_one) * adjust_factor);
+    sEvictFarRadius = evictRadius(sRearFarRadius, (F32)min_radius, draw_radius);
 
     //the number of frames invisible objects stay in memory
     static LLCachedControl<U32> inv_obj_time(gSavedSettings,"NonvisibleObjectsInMemoryTime");

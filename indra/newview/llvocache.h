@@ -188,6 +188,14 @@ public:
     };
     static bool staysInMemory(const VisibilityFacts& facts);
 
+    // The radius outside which an entry may be evicted, from the radius that
+    // loads one, the SceneLoadMinRadius setting and the draw distance. Wider
+    // than the load radius on purpose: sRearFarRadius does both jobs otherwise,
+    // and loading and unloading at the same distance is what paged objects in
+    // and out when the memory bounds pinned that radius to two metres. Never
+    // narrower than the setting, and never wider than the draw distance.
+    static F32  evictRadius(F32 rear_far_radius, F32 min_radius, F32 draw_radius);
+
     static F32  getSquaredPixelThreshold(bool is_front);
 
 private:
@@ -232,6 +240,7 @@ public:
     static U32                  sMinFrameRange;
     static F32                  sNearRadius;
     static F32                  sRearFarRadius;
+    static F32                  sEvictFarRadius;
     static F32                  sFrontPixelThreshold;
     static F32                  sRearPixelThreshold;
 };

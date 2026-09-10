@@ -794,4 +794,53 @@ namespace tut
             ensure("a window of one keeps it", LLVOCacheEntry::staysInMemory(facts));
         }
     }
+
+    template<> template<>
+    void vocacheTestObject::test<13>()
+    {
+        set_test_name("the radius that evicts an entry is wider than the one that loads it");
+
+        const F32 MIN_RADIUS = 32.f;   // SceneLoadMinRadius
+        const F32 DRAW = 128.f;
+        auto evict = [&](F32 rear_far) { return LLVOCacheEntry::evictRadius(rear_far, MIN_RADIUS, DRAW); };
+
+        // sRearFarRadius runs from about two metres under memory pressure to
+        // three quarters of draw distance with none.
+        const F32 rear_radii[] = { 2.f, 8.f, 32.f, 96.f };
+        F32 previous = -1.f;
+        for (F32 rear_far : rear_radii)
+        {
+            const F32 radius = evict(rear_far);
+            ensure("the eviction radius clears the load radius", radius >= rear_far * 1.25f);
+            ensure("and never reaches inside SceneLoadMinRadius", radius >= llmin(MIN_RADIUS, DRAW));
+            ensure("and does not shrink as the load radius grows", radius >= previous);
+            previous = radius;
+        }
+
+        // a draw distance under the setting is the floor instead
+        ensure("a short draw distance floors the radius, not the setting",
+               LLVOCacheEntry::evictRadius(2.f, MIN_RADIUS, 16.f) == 16.f);
+
+        // The sphere is the whole sphere, not just the part behind the camera,
+        // and nothing beyond the draw distance is drawn, so nothing beyond it is
+        // worth keeping for the turn back. Above four fifths of draw distance the
+        // band between the two radii narrows to what is left.
+        ensure("the draw distance caps the radius",
+               LLVOCacheEntry::evictRadius(120.f, MIN_RADIUS, DRAW) == DRAW);
+
+        // The invariant the two radii exist for: an entry sitting exactly at the
+        // distance the back cull preloads it from is not evictable, however long
+        // it has been out of sight. Turning around cannot cross both at once.
+        for (F32 rear_far : rear_radii)
+        {
+            LLVOCacheEntry::VisibilityFacts facts;
+            facts.mCurrentFrame = 5000;
+            facts.mEntryVisibleFrame = 0;
+            facts.mMinFrameRange = 64;
+            facts.mDistanceSquared = rear_far * rear_far;
+            facts.mDistThreshold = evict(rear_far);
+            ensure("an entry at the load radius is never evicted at the eviction radius",
+                   LLVOCacheEntry::staysInMemory(facts));
+        }
+    }
 }

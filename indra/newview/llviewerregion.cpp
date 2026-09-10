@@ -1830,7 +1830,9 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
     camera_origin.load3(LLViewerCamera::getInstance()->getOrigin().mV);
     LLVector4a local_origin;
     local_origin.load3((LLViewerCamera::getInstance()->getOrigin() - getOriginAgent()).mV);
-    F32 back_threshold = LLVOCacheEntry::sRearFarRadius;
+    // Wider than the radius that loads an entry, so that turning around does not
+    // cross both at once.
+    F32 back_threshold = LLVOCacheEntry::sEvictFarRadius;
 
     size_t max_update = 64;
     if(!mInvisibilityCheckHistory && isViewerCameraStatic())
