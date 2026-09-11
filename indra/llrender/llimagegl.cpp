@@ -1223,11 +1223,11 @@ U32 type_width_from_pixtype(U32 pixtype)
     {
     case GL_UNSIGNED_BYTE:
     case GL_BYTE:
-    case GL_UNSIGNED_INT_8_8_8_8_REV:
         type_width = 1;
         break;
     case GL_UNSIGNED_SHORT:
     case GL_SHORT:
+    case GL_HALF_FLOAT:
         type_width = 2;
         break;
     case GL_UNSIGNED_INT:
