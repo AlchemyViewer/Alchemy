@@ -5,6 +5,7 @@ add_library(llmessage STATIC)
 target_sources(
   llmessage
   PRIVATE
+    alnetimpairment.cpp
     llassetstorage.cpp
     llavatarname.cpp
     llavatarnamecache.cpp
@@ -79,6 +80,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alnetimpairment.h
         llassetstorage.h
         llavatarname.h
         llavatarnamecache.h
@@ -183,6 +185,7 @@ if(AL_BUILD_TESTS)
   al_add_test(io PROJECT llmessage SOURCES tests/llpipeutil.cpp LIBRARIES ${test_libs})
   foreach(
     test
+    alnetimpairment
     llavatarnamecache
     llbuffer
     lldatapacker
