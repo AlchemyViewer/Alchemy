@@ -108,7 +108,6 @@
     <tag name="panel_camera_item" note="One camera preset as a row that can be chosen." />
     <tag name="panel_container" note="A panel holding other panels, one of which is showing." />
     <tag name="panel_inventory_object" note="One inventory object shown as a panel rather than as a row." />
-    <tag name="placeholder" note="A view that holds a space until something is put in it." />
     <tag name="places_inventory_panel" note="Landmarks as an inventory panel." />
     <tag name="profile_drop_target" note="A region that takes a resident dragged onto it." />
     <tag name="profile_image" note="A profile picture, with a way to change it where that is allowed." />

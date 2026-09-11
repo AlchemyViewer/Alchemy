@@ -159,8 +159,7 @@ public:
         Mandatory<LLPanel*>         panel;
 
         Optional<std::string>       label;
-        Optional<bool>              select_tab,
-                                    is_placeholder;
+        Optional<bool>              select_tab;
         Optional<S32>               indent;
         Optional<eInsertionPoint>   insert_at;
         Optional<void*>             user_data;
@@ -169,7 +168,6 @@ public:
         :   panel("panel", NULL),
             label("label"),
             select_tab("select_tab"),
-            is_placeholder("is_placeholder"),
             indent("indent"),
             insert_at("insert_at", END)
         {}
@@ -177,7 +175,6 @@ public:
 
     void        addTabPanel(LLPanel* panel);
     void        addTabPanel(const TabPanelParams& panel);
-    void        addPlaceholder(LLPanel* child, const std::string& label);
     void        removeTabPanel( LLPanel* child );
     void        lockTabs(S32 num_tabs = 0);
     void        unlockTabs();

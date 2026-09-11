@@ -28,6 +28,7 @@
 
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
+#include "../lliconctrl.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 #include "llframetimer.h"
@@ -632,6 +633,45 @@ namespace tut
         tabs->addTabPanel(page("second", std::string()));
         tabs->setValue(1);
         ensure_equals("the value set is the value read", tabs->getValue().asInteger(), 1);
+        tabs->die();
+    }
+
+    // A picture on a tab sits inside the button that selects it, in the
+    // button's own coordinates. It used to be placed by the button's
+    // position in the strip, which put it as far above the button as the
+    // button was above the strip's bottom.
+    template<> template<>
+    void lltabcontainer_object::test<21>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
+        p.name = "tabs";
+        p.rect = LLRect(0, 300, 400, 0);
+        p.use_custom_icon_ctrl = true;
+        p.tab_icon_ctrl_pad = 2;
+        LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
+        LLPanel* pictured = page("pictured", std::string());
+        tabs->addTabPanel(pictured);
+
+        LLIconCtrl::Params ip;
+        ip.name = "picture";
+        LLIconCtrl* icon = LLUICtrlFactory::create<LLIconCtrl>(ip);
+        tabs->setTabImage(pictured, icon);
+
+        LLButton* button = tabButton(tabs, "pictured");
+        ensure("the page has a button", button != nullptr);
+        ensure_equals("the picture is the button's", icon->getParent(), button);
+        const LLRect& in_button = icon->getRect();
+        const LLRect box = button->getLocalRect();
+        ensure("and sits inside it", in_button.mLeft >= box.mLeft && in_button.mRight <= box.mRight
+                                     && in_button.mBottom >= box.mBottom && in_button.mTop <= box.mTop);
+        ensure_equals("padded off the top", in_button.mTop, box.mTop - 2);
+        ensure_equals("and the left", in_button.mLeft, 2);
+        ensure_equals("as tall as the room leaves it", in_button.getHeight(), box.getHeight() - 4);
         tabs->die();
     }
 }

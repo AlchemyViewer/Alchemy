@@ -68,13 +68,12 @@ void LLTabContainer::TabPositions::declareValues()
 class LLTabTuple
 {
 public:
-    LLTabTuple( LLTabContainer* c, LLPanel* p, LLButton* b, LLTextBox* placeholder = NULL)
+    LLTabTuple( LLTabContainer* c, LLPanel* p, LLButton* b)
         :
         mTabContainer(c),
         mTabPanel(p),
         mButton(b),
         mOldState(false),
-        mPlaceholderText(placeholder),
         mPadding(0),
         mVisible(true)
     {}
@@ -83,7 +82,6 @@ public:
     LLPanel*         mTabPanel;
     LLButton*        mButton;
     bool             mOldState;
-    LLTextBox*       mPlaceholderText;
     S32              mPadding;
 
     mutable bool mVisible;
@@ -124,9 +122,12 @@ protected:
 
 public:
 
+    // Where the icon goes, in the button's own coordinates: against the
+    // label's left or right, padded off the edges, or in the middle for a
+    // button that says nothing else.
     void updateLayout()
     {
-        LLRect button_rect = getRect();
+        const LLRect button_rect = getLocalRect();
         LLRect icon_rect = mIcon->getRect();
 
         S32 icon_size = button_rect.getHeight() - 2*mIconCtrlPad;
@@ -139,9 +140,8 @@ public:
             setLeftHPad(icon_size + mIconCtrlPad * 2);
             break;
         case LLFontGL::HCENTER:
-            icon_rect.setLeftTopAndSize(button_rect.mRight - (button_rect.getWidth() + mIconCtrlPad - icon_size)/2, button_rect.mTop - mIconCtrlPad,
+            icon_rect.setLeftTopAndSize((button_rect.getWidth() - icon_size)/2, button_rect.mTop - mIconCtrlPad,
                 icon_size, icon_size);
-            setRightHPad(icon_size + mIconCtrlPad * 2);
             break;
         case LLFontGL::RIGHT:
             icon_rect.setLeftTopAndSize(button_rect.mRight - mIconCtrlPad - icon_size, button_rect.mTop - mIconCtrlPad,
@@ -152,6 +152,15 @@ public:
             break;
         }
         mIcon->setRect(icon_rect);
+    }
+
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override
+    {
+        LLButton::reshape(width, height, called_from_parent);
+        if (mIcon)
+        {
+            updateLayout();
+        }
     }
 
     void setIcon(LLIconCtrl* icon, LLFontGL::HAlign alignment = LLFontGL::LEFT)
@@ -183,16 +192,6 @@ private:
 };
 //============================================================================
 
-struct LLPlaceHolderPanel final : public LLPanel
-{
-    AL_VIEW_TYPE(LLPlaceHolderPanel, LLPanel);
-
-    // create dummy param block to register with "placeholder" nane
-    struct Params : public LLPanel::Params{};
-    LLPlaceHolderPanel(const Params& p) : LLPanel(p)
-    {}
-};
-static LLDefaultChildRegistry::Register<LLPlaceHolderPanel> r1("placeholder");
 static LLDefaultChildRegistry::Register<LLTabContainer> r2("tab_container");
 
 LLTabContainer::TabParams::TabParams()
@@ -386,7 +385,7 @@ bool LLTabContainer::addChild(LLView* view, S32 tab_group)
 
     if (LLPanel* panelp = view->as<LLPanel>())
     {
-        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()).is_placeholder(view->as<LLPlaceHolderPanel>() != nullptr));
+        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()));
         return true;
     }
     else
@@ -955,7 +954,6 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
             : panel.panel()->getLabel();
     bool select = panel.select_tab();
     S32 indent = panel.indent();
-    bool placeholder = panel.is_placeholder;
     eInsertionPoint insertion_point = panel.insert_at();
 
     static LLUICachedControl<S32> tabcntrv_pad ("UITabCntrvPad", 0);
@@ -1054,93 +1052,75 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
         tab_flash_img = mMiddleTabParams.tab_bottom_image_flash;
     }
 
-    LLTextBox* textbox = NULL;
-    LLButton* btn = NULL;
+    LLButton* btn = nullptr;
     LLCustomButtonIconCtrl::Params custom_btn_params;
     {
         custom_btn_params.icon_ctrl_pad(mTabIconCtrlPad);
     }
     LLButton::Params normal_btn_params;
 
-    if (placeholder)
-    {
-        btn_rect.translate(0, -6); // *TODO: make configurable
-        LLTextBox::Params params;
-        params.name(trimmed_label);
-        params.rect(btn_rect);
-        params.initial_value(trimmed_label);
-        params.font(mFont);
-        textbox = LLUICtrlFactory::create<LLTextBox> (params);
+    LLButton::Params& p = (mCustomIconCtrlUsed ? custom_btn_params : normal_btn_params);
 
-        LLButton::Params p;
-        p.name("placeholder");
-        btn = LLUICtrlFactory::create<LLButton>(p);
+    p.rect(btn_rect);
+    p.font(mFont);
+    p.font_halign = mFontHalign;
+    p.label(trimmed_label);
+    p.click_callback.function(boost::bind(&LLTabContainer::onTabBtn, this, _2, child));
+    if (indent)
+    {
+        p.pad_left(indent);
+    }
+    p.pad_bottom( mLabelPadBottom );
+    p.scale_image(true);
+    p.tab_stop(false);
+    p.label_shadow(false);
+    p.follows.flags = FOLLOWS_LEFT;
+
+    if (mIsVertical)
+    {
+      p.name("vtab_"+std::string(child->getName()));
+      p.image_unselected(mMiddleTabParams.tab_left_image_unselected);
+      p.image_selected(mMiddleTabParams.tab_left_image_selected);
+      p.image_flash(mMiddleTabParams.tab_left_image_flash);
+      p.follows.flags = p.follows.flags() | FOLLOWS_TOP;
     }
     else
     {
-        LLButton::Params& p = (mCustomIconCtrlUsed ? custom_btn_params : normal_btn_params);
-
-        p.rect(btn_rect);
-        p.font(mFont);
-        p.font_halign = mFontHalign;
-        p.label(trimmed_label);
-        p.click_callback.function(boost::bind(&LLTabContainer::onTabBtn, this, _2, child));
-        if (indent)
-        {
-            p.pad_left(indent);
-        }
-        p.pad_bottom( mLabelPadBottom );
-        p.scale_image(true);
-        p.tab_stop(false);
-        p.label_shadow(false);
-        p.follows.flags = FOLLOWS_LEFT;
-
-        if (mIsVertical)
-        {
-          p.name("vtab_"+std::string(child->getName()));
-          p.image_unselected(mMiddleTabParams.tab_left_image_unselected);
-          p.image_selected(mMiddleTabParams.tab_left_image_selected);
-          p.image_flash(mMiddleTabParams.tab_left_image_flash);
-          p.follows.flags = p.follows.flags() | FOLLOWS_TOP;
-        }
-        else
-        {
-            p.name("htab_"+std::string(child->getName()));
-            p.visible(false);
-            p.image_unselected(tab_img);
-            p.image_selected(tab_selected_img);
-            p.image_flash(tab_flash_img);
-            p.follows.flags = p.follows.flags() | (getTabPosition() == TOP ? FOLLOWS_TOP : FOLLOWS_BOTTOM);
-            // Try to squeeze in a bit more text
-            p.pad_left( mLabelPadLeft );
-            p.pad_right(2);
-        }
-
-        // inits flash timer
-        p.button_flash_enable = mEnableTabsFlashing;
-        p.flash_color = mTabsFlashingColor;
-
-        // *TODO : It seems wrong not to use p in both cases considering the way p is initialized
-        if (mCustomIconCtrlUsed)
-        {
-            btn = LLUICtrlFactory::create<LLCustomButtonIconCtrl>(custom_btn_params);
-        }
-        else
-        {
-            btn = LLUICtrlFactory::create<LLButton>(p);
-        }
-
-        // A tab that shows an icon and no words says nothing on its own, and
-        // a label clipped to the strip's width says half of something. What
-        // the file wrote about the panel is what the button that selects it
-        // says; a panel that wrote nothing is left as it was.
-        if (btn && !child->getToolTip().empty())
-        {
-            btn->setToolTip(child->getToolTip());
-        }
+        p.name("htab_"+std::string(child->getName()));
+        p.visible(false);
+        p.image_unselected(tab_img);
+        p.image_selected(tab_selected_img);
+        p.image_flash(tab_flash_img);
+        p.follows.flags = p.follows.flags() | (getTabPosition() == TOP ? FOLLOWS_TOP : FOLLOWS_BOTTOM);
+        // Try to squeeze in a bit more text
+        p.pad_left( mLabelPadLeft );
+        p.pad_right(2);
     }
 
-    LLTabTuple* tuple = new LLTabTuple( this, child, btn, textbox );
+    // inits flash timer
+    p.button_flash_enable = mEnableTabsFlashing;
+    p.flash_color = mTabsFlashingColor;
+
+    // p is a reference to whichever block the strip builds from.
+    if (mCustomIconCtrlUsed)
+    {
+        btn = LLUICtrlFactory::create<LLCustomButtonIconCtrl>(custom_btn_params);
+    }
+    else
+    {
+        btn = LLUICtrlFactory::create<LLButton>(p);
+    }
+
+    // A tab that shows an icon and no words says nothing on its own, and
+    // a label clipped to the strip's width says half of something. What
+    // the file wrote about the panel is what the button that selects it
+    // says; a panel that wrote nothing is left as it was.
+    if (!child->getToolTip().empty())
+    {
+        btn->setToolTip(child->getToolTip());
+    }
+
+    LLTabTuple* tuple = new LLTabTuple( this, child, btn );
     insertTuple( tuple, insertion_point );
 
     // if new tab was added as a first or last tab, update button image
@@ -1168,14 +1148,7 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
         }
     }
 
-    if (textbox)
-    {
-        LLUICtrl::addChild(textbox, 0);
-    }
-    if (btn)
-    {
-        LLUICtrl::addChild(btn, 0);
-    }
+    LLUICtrl::addChild(btn, 0);
     LLUICtrl::addChild(child, 1);
 
     sendChildToFront(mPrevArrowBtn);
@@ -1191,51 +1164,8 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
     }
 }
 
-void LLTabContainer::addPlaceholder(LLPanel* child, const std::string& label)
-{
-    addTabPanel(TabPanelParams().panel(child).label(label).is_placeholder(true));
-}
-
 void LLTabContainer::removeTabPanel(LLPanel* child)
 {
-    static LLUICachedControl<S32> tabcntrv_pad ("UITabCntrvPad", 0);
-    if (mIsVertical)
-    {
-        // Fix-up button sizes
-        S32 tab_count = 0;
-        for(tuple_list_t::iterator iter = mTabList.begin(); iter != mTabList.end(); ++iter)
-        {
-            LLTabTuple* tuple = *iter;
-            LLRect rect;
-            rect.setLeftTopAndSize(tabcntrv_pad + LLPANEL_BORDER_WIDTH + 2, // JC - Fudge factor
-                                   (getRect().getHeight() - LLPANEL_BORDER_WIDTH - 1) - ((BTN_HEIGHT + tabcntrv_pad) * (tab_count)),
-                                   mMinTabWidth,
-                                   BTN_HEIGHT);
-            if (tuple->mPlaceholderText)
-            {
-                tuple->mPlaceholderText->setRect(rect);
-            }
-            else
-            {
-                tuple->mButton->setRect(rect);
-            }
-            tab_count++;
-        }
-    }
-    else
-    {
-        // Adjust the total tab width.
-        for(tuple_list_t::iterator iter = mTabList.begin(); iter != mTabList.end(); ++iter)
-        {
-            LLTabTuple* tuple = *iter;
-            if( tuple->mTabPanel == child )
-            {
-                mTotalTabWidth -= tuple->mButton->getRect().getWidth();
-                break;
-            }
-        }
-    }
-
     bool has_focus = gFocusMgr.childHasKeyboardFocus(this);
     LLPanel* current = getCurrentPanel();
 
@@ -1254,6 +1184,7 @@ void LLTabContainer::removeTabPanel(LLPanel* child)
                 update_images(mTabList[mTabList.size()-2], mLastTabParams, getTabPosition());
             }
 
+            mTotalTabWidth -= tuple->mButton->getRect().getWidth();
             removeChild( tuple->mButton );
             delete tuple->mButton;
             tuple->mButton = NULL;
@@ -1682,25 +1613,16 @@ void LLTabContainer::setTabImage(LLPanel* child, const LLUUID& image_id, const L
 void LLTabContainer::setTabImage(LLPanel* child, LLIconCtrl* icon)
 {
     LLTabTuple* tuple = getTabByPanel(child);
-    LLCustomButtonIconCtrl* button;
-    bool hasButton = false;
-
-    if(tuple)
+    LLCustomButtonIconCtrl* button = tuple ? ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton) : nullptr;
+    if (button)
     {
-        button = ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton);
-        if(button)
-        {
-            hasButton = true;
-            button->setIcon(icon);
-            reshapeTuple(tuple);
-        }
+        button->setIcon(icon);
+        reshapeTuple(tuple);
     }
-
-    if (!hasButton && (icon != NULL))
+    else if (icon)
     {
-        // It was assumed that the tab's button would take ownership of the icon pointer.
-        // But since the tab did not have a button, kill the icon to prevent the memory
-        // leak.
+        // The button would have taken the icon; without one to take it,
+        // nothing else will.
         icon->die();
     }
 }

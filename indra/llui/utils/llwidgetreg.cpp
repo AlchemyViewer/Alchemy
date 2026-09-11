@@ -90,7 +90,6 @@ void LLWidgetReg::initClass(bool register_widgets)
         LLDefaultChildRegistry::Register<LLSliderCtrl> slider("slider");
         LLDefaultChildRegistry::Register<LLSpinCtrl> spinner("spinner");
         LLDefaultChildRegistry::Register<LLStatBar> stat_bar("stat_bar");
-        //LLDefaultChildRegistry::Register<LLPlaceHolderPanel> placeholder("placeholder");
         LLDefaultChildRegistry::Register<LLTabContainer> tab_container("tab_container");
         LLDefaultChildRegistry::Register<LLTextBox> text("text");
         LLDefaultChildRegistry::Register<LLTimeCtrl> time("time");

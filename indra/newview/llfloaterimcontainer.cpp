@@ -368,33 +368,19 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
     // Add the floater
     LLMultiFloater::addFloater(floaterp, select_added_floater, insertion_point);
 
+    mSessions[session_id] = floaterp;
+    floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
 
-
-    LLIconCtrl* icon = 0;
-    bool is_in_group = gAgent.isInGroup(session_id, true);
+    // Whose picture the conversation shows: the group's, or the other
+    // party's.
     LLUUID icon_id;
-
-    if (is_in_group)
+    if (gAgent.isInGroup(session_id, true))
     {
-        LLGroupIconCtrl::Params icon_params;
-        icon_params.group_id = session_id;
-        icon = LLUICtrlFactory::instance().create<LLGroupIconCtrl>(icon_params);
         icon_id = session_id;
-
-        mSessions[session_id] = floaterp;
-        floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
     }
-    else
-    {   LLUUID avatar_id = session_id.notNull()?
-            LLIMModel::getInstance()->getOtherParticipantID(session_id) : LLUUID();
-
-        LLAvatarIconCtrl::Params icon_params;
-        icon_params.avatar_id = avatar_id;
-        icon = LLUICtrlFactory::instance().create<LLAvatarIconCtrl>(icon_params);
-        icon_id = avatar_id;
-
-        mSessions[session_id] = floaterp;
-        floaterp->mCloseSignal.connect(boost::bind(&LLFloaterIMContainer::onCloseFloater, this, session_id));
+    else if (session_id.notNull())
+    {
+        icon_id = LLIMModel::getInstance()->getOtherParticipantID(session_id);
     }
 
     LLFloaterIMSessionTab* floater = LLFloaterIMSessionTab::getConversation(session_id);
@@ -406,8 +392,6 @@ void LLFloaterIMContainer::addFloater(LLFloater* floaterp,
     // forced resize of the floater
     LLRect wrapper_rect = this->mTabContainer->getLocalRect();
     floaterp->setRect(wrapper_rect);
-
-    mTabContainer->setTabImage(floaterp, icon);
 }
 
 

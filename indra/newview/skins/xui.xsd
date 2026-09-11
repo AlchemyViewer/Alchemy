@@ -616,12 +616,6 @@
     </xs:annotation>
   </xs:element>
 
-  <xs:element name="placeholder" type="placeholder_t">
-    <xs:annotation>
-      <xs:documentation>A view that holds a space until something is put in it.</xs:documentation>
-    </xs:annotation>
-  </xs:element>
-
   <xs:element name="places_inventory_panel" type="places_inventory_panel_t">
     <xs:annotation>
       <xs:documentation>Landmarks as an inventory panel.</xs:documentation>
@@ -1013,7 +1007,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -1798,7 +1791,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -2449,7 +2441,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -3228,7 +3219,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -3905,7 +3895,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -4584,7 +4573,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -5167,7 +5155,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -5617,7 +5604,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -6275,7 +6261,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -7058,7 +7043,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -7837,7 +7821,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -8666,7 +8649,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -9052,7 +9034,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -9864,7 +9845,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -10131,7 +10111,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -10398,7 +10377,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -10969,7 +10947,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -11264,7 +11241,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -12834,7 +12810,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -13672,7 +13647,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -14393,7 +14367,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -14620,7 +14593,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -14926,7 +14898,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -15107,7 +15078,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -15690,7 +15660,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -16073,7 +16042,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -16256,7 +16224,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -16531,7 +16498,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -16918,7 +16884,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -17582,7 +17547,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -18251,7 +18215,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -19029,7 +18992,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -20207,7 +20169,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -20833,7 +20794,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -21326,7 +21286,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -21592,7 +21551,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -23473,7 +23431,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -23700,7 +23657,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -23966,7 +23922,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -24233,7 +24188,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -24605,7 +24559,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -24789,7 +24742,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -25438,7 +25390,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -25704,7 +25655,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -26130,7 +26080,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -26515,7 +26464,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -26798,7 +26746,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -28370,7 +28317,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -28744,7 +28690,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -29118,7 +29063,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -29896,7 +29840,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -30279,7 +30222,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -30830,7 +30772,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -31607,7 +31548,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -32200,7 +32140,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -32793,7 +32732,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -33386,7 +33324,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -33979,7 +33916,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -34573,7 +34509,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -34956,7 +34891,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -35539,7 +35473,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -36002,7 +35935,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -36553,7 +36485,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -36840,7 +36771,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -37111,7 +37041,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -37377,7 +37306,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -41792,7 +41720,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -42396,7 +42323,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -42779,7 +42705,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -43069,7 +42994,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -43383,7 +43307,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -43705,7 +43628,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -44003,7 +43925,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -44293,7 +44214,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -44786,7 +44706,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -45108,7 +45027,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -45446,7 +45364,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -45832,7 +45749,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -46385,7 +46301,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -46910,7 +46825,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -47543,7 +47457,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -47926,7 +47839,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -48135,7 +48047,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -48518,7 +48429,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -49576,7 +49486,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -50051,7 +49960,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -50344,389 +50252,6 @@
     <xs:attribute name="width" type="xs:integer"/>
   </xs:complexType>
 
-  <xs:complexType name="placeholder_t" mixed="true">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element ref="accordion"/>
-      <xs:element ref="accordion_tab"/>
-      <xs:element ref="asset_filtered_inv_panel"/>
-      <xs:element ref="avatar_icon"/>
-      <xs:element ref="avatar_list"/>
-      <xs:element ref="badge"/>
-      <xs:element ref="block_list"/>
-      <xs:element ref="button"/>
-      <xs:element ref="chat_editor"/>
-      <xs:element ref="chat_history"/>
-      <xs:element ref="check_box"/>
-      <xs:element ref="chiclet_notification"/>
-      <xs:element ref="chiclet_offer"/>
-      <xs:element ref="chiclet_panel"/>
-      <xs:element ref="chiclet_script"/>
-      <xs:element ref="color_field"/>
-      <xs:element ref="color_picker"/>
-      <xs:element ref="color_swatch"/>
-      <xs:element ref="color_wheel"/>
-      <xs:element ref="combo_box"/>
-      <xs:element ref="console"/>
-      <xs:element ref="container_view"/>
-      <xs:element ref="context_menu"/>
-      <xs:element ref="conversation_log_list"/>
-      <xs:element ref="conversation_view_participant"/>
-      <xs:element ref="conversation_view_session"/>
-      <xs:element ref="curve_editor"/>
-      <xs:element ref="debug_view"/>
-      <xs:element ref="dnd_button"/>
-      <xs:element ref="dock_panel"/>
-      <xs:element ref="drop_target"/>
-      <xs:element ref="emoji_complete"/>
-      <xs:element ref="empty_state"/>
-      <xs:element ref="expandable_text"/>
-      <xs:element ref="favorites_bar"/>
-      <xs:element ref="favorites_inventory_panel"/>
-      <xs:element ref="filter_editor"/>
-      <xs:element ref="flags_field"/>
-      <xs:element ref="flat_list_view"/>
-      <xs:element ref="floater_view"/>
-      <xs:element ref="flyout_button"/>
-      <xs:element ref="folder_view_item"/>
-      <xs:element ref="follows_control"/>
-      <xs:element ref="font_field"/>
-      <xs:element ref="fs_virtual_trackpad"/>
-      <xs:element ref="group_drop_target"/>
-      <xs:element ref="group_icon"/>
-      <xs:element ref="group_list"/>
-      <xs:element ref="hex_editor"/>
-      <xs:element ref="hint_popup"/>
-      <xs:element ref="history_list"/>
-      <xs:element ref="icon"/>
-      <xs:element ref="icons_combo_box"/>
-      <xs:element ref="inbox_folder_view_folder"/>
-      <xs:element ref="inbox_folder_view_item"/>
-      <xs:element ref="inbox_inventory_panel"/>
-      <xs:element ref="inventory_gallery_item"/>
-      <xs:element ref="inventory_link_replace_drop_target"/>
-      <xs:element ref="inventory_panel"/>
-      <xs:element ref="joystick_quat"/>
-      <xs:element ref="joystick_rotate"/>
-      <xs:element ref="joystick_slide"/>
-      <xs:element ref="joystick_track"/>
-      <xs:element ref="joystick_turn"/>
-      <xs:element ref="jump_bar"/>
-      <xs:element ref="labeled_back_button"/>
-      <xs:element ref="layout_stack"/>
-      <xs:element ref="line_editor"/>
-      <xs:element ref="list_view"/>
-      <xs:element ref="loading_indicator"/>
-      <xs:element ref="locate"/>
-      <xs:element ref="location_input"/>
-      <xs:element ref="menu"/>
-      <xs:element ref="menu_bar"/>
-      <xs:element ref="menu_button"/>
-      <xs:element ref="menu_holder"/>
-      <xs:element ref="multi_slider"/>
-      <xs:element ref="multi_slider_bar"/>
-      <xs:element ref="name_box"/>
-      <xs:element ref="name_editor"/>
-      <xs:element ref="name_list"/>
-      <xs:element ref="net_map"/>
-      <xs:element ref="notification_list_view"/>
-      <xs:element ref="outfit_gallery_item"/>
-      <xs:element ref="output_monitor"/>
-      <xs:element ref="panel"/>
-      <xs:element ref="panel_camera_item"/>
-      <xs:element ref="panel_container"/>
-      <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
-      <xs:element ref="places_inventory_panel"/>
-      <xs:element ref="profile_drop_target"/>
-      <xs:element ref="profile_image"/>
-      <xs:element ref="progress_bar"/>
-      <xs:element ref="property_grid"/>
-      <xs:element ref="pull_button"/>
-      <xs:element ref="quick_open"/>
-      <xs:element ref="radio_group"/>
-      <xs:element ref="recent_inventory_panel"/>
-      <xs:element ref="scope_bar"/>
-      <xs:element ref="script_editor"/>
-      <xs:element ref="scroll_bar"/>
-      <xs:element ref="scroll_container"/>
-      <xs:element ref="scroll_list"/>
-      <xs:element ref="scrolling_panel_list"/>
-      <xs:element ref="search_combo_box"/>
-      <xs:element ref="search_editor"/>
-      <xs:element ref="settings_drop_target"/>
-      <xs:element ref="simple_text_editor"/>
-      <xs:element ref="single_folder_inventory_panel"/>
-      <xs:element ref="slider"/>
-      <xs:element ref="slider_bar"/>
-      <xs:element ref="snapshot_floater_view"/>
-      <xs:element ref="sound_drop_target"/>
-      <xs:element ref="specimen_list"/>
-      <xs:element ref="spinner"/>
-      <xs:element ref="split_button"/>
-      <xs:element ref="stat_view"/>
-      <xs:element ref="sun_moon_trackball"/>
-      <xs:element ref="tab_container"/>
-      <xs:element ref="tab_strip"/>
-      <xs:element ref="teleport_history_menu_item"/>
-      <xs:element ref="text"/>
-      <xs:element ref="text_chat"/>
-      <xs:element ref="text_editor"/>
-      <xs:element ref="texture_picker"/>
-      <xs:element ref="thumbnail"/>
-      <xs:element ref="toggleable_menu"/>
-      <xs:element ref="tool_tip"/>
-      <xs:element ref="toolbar"/>
-      <xs:element ref="toolbar_view"/>
-      <xs:element ref="tooltip_view"/>
-      <xs:element ref="ui_ctrl"/>
-      <xs:element ref="view"/>
-      <xs:element ref="view_border"/>
-      <xs:element ref="wearable_items_list"/>
-      <xs:element ref="web_browser"/>
-      <xs:element ref="window_shade"/>
-      <xs:element ref="xy_vector"/>
-      <xs:element name="bg_alpha_color" type="al_any"/>
-      <xs:element name="bg_alpha_image" type="al_any"/>
-      <xs:element name="bg_alpha_image_overlay" type="al_any"/>
-      <xs:element name="bg_opaque_color" type="al_any"/>
-      <xs:element name="bg_opaque_image" type="al_any"/>
-      <xs:element name="bg_opaque_image_overlay" type="al_any"/>
-      <xs:element name="commit_callback" type="al_any"/>
-      <xs:element name="follows" type="al_any"/>
-      <xs:element name="font" type="al_any"/>
-      <xs:element name="highlight_dark_color" type="al_any"/>
-      <xs:element name="highlight_light_color" type="al_any"/>
-      <xs:element name="init_callback" type="al_any"/>
-      <xs:element name="initial_value" type="al_any"/>
-      <xs:element name="mouseenter_callback" type="al_any"/>
-      <xs:element name="mouseleave_callback" type="al_any"/>
-      <xs:element name="placeholder.bg_alpha_color" type="al_any"/>
-      <xs:element name="placeholder.bg_alpha_image" type="al_any"/>
-      <xs:element name="placeholder.bg_alpha_image_overlay" type="al_any"/>
-      <xs:element name="placeholder.bg_opaque_color" type="al_any"/>
-      <xs:element name="placeholder.bg_opaque_image" type="al_any"/>
-      <xs:element name="placeholder.bg_opaque_image_overlay" type="al_any"/>
-      <xs:element name="placeholder.commit_callback" type="al_any"/>
-      <xs:element name="placeholder.follows" type="al_any"/>
-      <xs:element name="placeholder.font" type="al_any"/>
-      <xs:element name="placeholder.highlight_dark_color" type="al_any"/>
-      <xs:element name="placeholder.highlight_light_color" type="al_any"/>
-      <xs:element name="placeholder.init_callback" type="al_any"/>
-      <xs:element name="placeholder.initial_value" type="al_any"/>
-      <xs:element name="placeholder.mouseenter_callback" type="al_any"/>
-      <xs:element name="placeholder.mouseleave_callback" type="al_any"/>
-      <xs:element name="placeholder.rect" type="al_any"/>
-      <xs:element name="placeholder.shadow_dark_color" type="al_any"/>
-      <xs:element name="placeholder.shadow_light_color" type="al_any"/>
-      <xs:element name="placeholder.string" type="al_any"/>
-      <xs:element name="placeholder.validate_callback" type="al_any"/>
-      <xs:element name="placeholder.value" type="al_any"/>
-      <xs:element name="placeholder.visible_callback" type="al_any"/>
-      <xs:element name="rect" type="al_any"/>
-      <xs:element name="shadow_dark_color" type="al_any"/>
-      <xs:element name="shadow_light_color" type="al_any"/>
-      <xs:element name="string" type="al_any"/>
-      <xs:element name="validate_callback" type="al_any"/>
-      <xs:element name="value" type="al_any"/>
-      <xs:element name="visible_callback" type="al_any"/>
-    </xs:choice>
-    <xs:attribute name="accepts_badge" type="xs:boolean"/>
-    <xs:attribute name="background_opaque" type="xs:boolean"/>
-    <xs:attribute name="background_visible" type="xs:boolean"/>
-    <xs:attribute name="bevel_style">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="bright"/>
-          <xs:enumeration value="in"/>
-          <xs:enumeration value="none"/>
-          <xs:enumeration value="out"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="bg_alpha_color" type="xs:string"/>
-    <xs:attribute name="bg_alpha_color.alpha" type="al_real"/>
-    <xs:attribute name="bg_alpha_color.blue" type="al_real"/>
-    <xs:attribute name="bg_alpha_color.green" type="al_real"/>
-    <xs:attribute name="bg_alpha_color.red" type="al_real"/>
-    <xs:attribute name="bg_alpha_image" type="xs:string"/>
-    <xs:attribute name="bg_alpha_image.name" type="xs:string"/>
-    <xs:attribute name="bg_alpha_image_overlay" type="xs:string"/>
-    <xs:attribute name="bg_alpha_image_overlay.alpha" type="al_real"/>
-    <xs:attribute name="bg_alpha_image_overlay.blue" type="al_real"/>
-    <xs:attribute name="bg_alpha_image_overlay.green" type="al_real"/>
-    <xs:attribute name="bg_alpha_image_overlay.red" type="al_real"/>
-    <xs:attribute name="bg_opaque_color" type="xs:string"/>
-    <xs:attribute name="bg_opaque_color.alpha" type="al_real"/>
-    <xs:attribute name="bg_opaque_color.blue" type="al_real"/>
-    <xs:attribute name="bg_opaque_color.green" type="al_real"/>
-    <xs:attribute name="bg_opaque_color.red" type="al_real"/>
-    <xs:attribute name="bg_opaque_image" type="xs:string"/>
-    <xs:attribute name="bg_opaque_image.name" type="xs:string"/>
-    <xs:attribute name="bg_opaque_image_overlay" type="xs:string"/>
-    <xs:attribute name="bg_opaque_image_overlay.alpha" type="al_real"/>
-    <xs:attribute name="bg_opaque_image_overlay.blue" type="al_real"/>
-    <xs:attribute name="bg_opaque_image_overlay.green" type="al_real"/>
-    <xs:attribute name="bg_opaque_image_overlay.red" type="al_real"/>
-    <xs:attribute name="bg_visible" type="xs:boolean"/>
-    <xs:attribute name="border" type="xs:boolean"/>
-    <xs:attribute name="border_style">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="line"/>
-          <xs:enumeration value="texture"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="border_thickness" type="xs:integer"/>
-    <xs:attribute name="border_visible" type="xs:boolean"/>
-    <xs:attribute name="bottom" type="xs:integer"/>
-    <xs:attribute name="bottom_delta" type="xs:integer"/>
-    <xs:attribute name="chrome" type="xs:boolean"/>
-    <xs:attribute name="class" type="xs:string"/>
-    <xs:attribute name="commit_callback" type="xs:string"/>
-    <xs:attribute name="commit_callback.control" type="xs:string"/>
-    <xs:attribute name="commit_callback.function" type="xs:string"/>
-    <xs:attribute name="commit_callback.name" type="xs:string"/>
-    <xs:attribute name="commit_callback.parameter" type="xs:string"/>
-    <xs:attribute name="commit_callback.userdata" type="xs:string"/>
-    <xs:attribute name="control_name" type="xs:string"/>
-    <xs:attribute name="default_tab_group" type="xs:integer"/>
-    <xs:attribute name="disabled_control" type="xs:string"/>
-    <xs:attribute name="enabled" type="xs:boolean"/>
-    <xs:attribute name="enabled_control" type="xs:string"/>
-    <xs:attribute name="filename" type="xs:string"/>
-    <xs:attribute name="focus_root" type="xs:boolean"/>
-    <xs:attribute name="follows" type="xs:string"/>
-    <xs:attribute name="follows.flags" type="xs:nonNegativeInteger"/>
-    <xs:attribute name="font" type="xs:string"/>
-    <xs:attribute name="font.name" type="xs:string"/>
-    <xs:attribute name="font.size" type="xs:string"/>
-    <xs:attribute name="font.style" type="xs:string"/>
-    <xs:attribute name="from_xui" type="xs:boolean"/>
-    <xs:attribute name="halign">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="center"/>
-          <xs:enumeration value="left"/>
-          <xs:enumeration value="right"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="height" type="xs:integer"/>
-    <xs:attribute name="help_topic" type="xs:string"/>
-    <xs:attribute name="highlight_dark_color" type="xs:string"/>
-    <xs:attribute name="highlight_dark_color.alpha" type="al_real"/>
-    <xs:attribute name="highlight_dark_color.blue" type="al_real"/>
-    <xs:attribute name="highlight_dark_color.green" type="al_real"/>
-    <xs:attribute name="highlight_dark_color.red" type="al_real"/>
-    <xs:attribute name="highlight_light_color" type="xs:string"/>
-    <xs:attribute name="highlight_light_color.alpha" type="al_real"/>
-    <xs:attribute name="highlight_light_color.blue" type="al_real"/>
-    <xs:attribute name="highlight_light_color.green" type="al_real"/>
-    <xs:attribute name="highlight_light_color.red" type="al_real"/>
-    <xs:attribute name="hover_cursor" type="xs:string"/>
-    <xs:attribute name="init_callback" type="xs:string"/>
-    <xs:attribute name="init_callback.control" type="xs:string"/>
-    <xs:attribute name="init_callback.function" type="xs:string"/>
-    <xs:attribute name="init_callback.name" type="xs:string"/>
-    <xs:attribute name="init_callback.parameter" type="xs:string"/>
-    <xs:attribute name="init_callback.userdata" type="xs:string"/>
-    <xs:attribute name="initial_value" type="xs:string"/>
-    <xs:attribute name="invisibility_control" type="xs:string"/>
-    <xs:attribute name="invisiblity_control" type="xs:string"/>
-    <xs:attribute name="label" type="xs:string"/>
-    <xs:attribute name="layout" type="xs:string"/>
-    <xs:attribute name="left" type="xs:integer"/>
-    <xs:attribute name="left_delta" type="xs:integer"/>
-    <xs:attribute name="left_pad" type="xs:integer"/>
-    <xs:attribute name="length" type="xs:string"/>
-    <xs:attribute name="min_height" type="xs:integer"/>
-    <xs:attribute name="min_width" type="xs:integer"/>
-    <xs:attribute name="mouse_opaque" type="xs:boolean"/>
-    <xs:attribute name="mouseenter_callback" type="xs:string"/>
-    <xs:attribute name="mouseenter_callback.control" type="xs:string"/>
-    <xs:attribute name="mouseenter_callback.function" type="xs:string"/>
-    <xs:attribute name="mouseenter_callback.name" type="xs:string"/>
-    <xs:attribute name="mouseenter_callback.parameter" type="xs:string"/>
-    <xs:attribute name="mouseenter_callback.userdata" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback.control" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback.function" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback.name" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback.parameter" type="xs:string"/>
-    <xs:attribute name="mouseleave_callback.userdata" type="xs:string"/>
-    <xs:attribute name="name" type="xs:string"/>
-    <xs:attribute name="rect" type="xs:string"/>
-    <xs:attribute name="rect.bottom" type="xs:integer"/>
-    <xs:attribute name="rect.height" type="xs:integer"/>
-    <xs:attribute name="rect.left" type="xs:integer"/>
-    <xs:attribute name="rect.right" type="xs:integer"/>
-    <xs:attribute name="rect.top" type="xs:integer"/>
-    <xs:attribute name="rect.width" type="xs:integer"/>
-    <xs:attribute name="requests_front" type="xs:boolean"/>
-    <xs:attribute name="right" type="xs:integer"/>
-    <xs:attribute name="shadow_dark_color" type="xs:string"/>
-    <xs:attribute name="shadow_dark_color.alpha" type="al_real"/>
-    <xs:attribute name="shadow_dark_color.blue" type="al_real"/>
-    <xs:attribute name="shadow_dark_color.green" type="al_real"/>
-    <xs:attribute name="shadow_dark_color.red" type="al_real"/>
-    <xs:attribute name="shadow_light_color" type="xs:string"/>
-    <xs:attribute name="shadow_light_color.alpha" type="al_real"/>
-    <xs:attribute name="shadow_light_color.blue" type="al_real"/>
-    <xs:attribute name="shadow_light_color.green" type="al_real"/>
-    <xs:attribute name="shadow_light_color.red" type="al_real"/>
-    <xs:attribute name="sound_flags" type="xs:integer"/>
-    <xs:attribute name="string.name" type="xs:string"/>
-    <xs:attribute name="string.translate" type="xs:string"/>
-    <xs:attribute name="string.value" type="xs:string"/>
-    <xs:attribute name="style">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="line"/>
-          <xs:enumeration value="texture"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="tab_group" type="xs:integer"/>
-    <xs:attribute name="tab_stop" type="xs:boolean"/>
-    <xs:attribute name="thickness" type="xs:integer"/>
-    <xs:attribute name="title" type="xs:string"/>
-    <xs:attribute name="tool_tip" type="xs:string"/>
-    <xs:attribute name="top" type="xs:integer"/>
-    <xs:attribute name="top_delta" type="xs:integer"/>
-    <xs:attribute name="top_pad" type="xs:integer"/>
-    <xs:attribute name="translate" type="xs:string"/>
-    <xs:attribute name="type" type="xs:string"/>
-    <xs:attribute name="use_bounding_rect" type="xs:boolean"/>
-    <xs:attribute name="validate_callback" type="xs:string"/>
-    <xs:attribute name="validate_callback.control" type="xs:string"/>
-    <xs:attribute name="validate_callback.function" type="xs:string"/>
-    <xs:attribute name="validate_callback.name" type="xs:string"/>
-    <xs:attribute name="validate_callback.parameter" type="xs:string"/>
-    <xs:attribute name="validate_callback.userdata" type="xs:string"/>
-    <xs:attribute name="valign">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="baseline"/>
-          <xs:enumeration value="bottom"/>
-          <xs:enumeration value="center"/>
-          <xs:enumeration value="top"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
-    <xs:attribute name="value" type="xs:string"/>
-    <xs:attribute name="visibility_control" type="xs:string"/>
-    <xs:attribute name="visible" type="xs:boolean"/>
-    <xs:attribute name="visible_callback" type="xs:string"/>
-    <xs:attribute name="visible_callback.control" type="xs:string"/>
-    <xs:attribute name="visible_callback.function" type="xs:string"/>
-    <xs:attribute name="visible_callback.name" type="xs:string"/>
-    <xs:attribute name="visible_callback.parameter" type="xs:string"/>
-    <xs:attribute name="visible_callback.userdata" type="xs:string"/>
-    <xs:attribute name="visiblity_control" type="xs:string"/>
-    <xs:attribute name="width" type="xs:integer"/>
-  </xs:complexType>
-
   <xs:complexType name="places_inventory_panel_t" mixed="true">
     <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element ref="accordion"/>
@@ -50818,7 +50343,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -51597,7 +51121,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -51780,7 +51303,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -52063,7 +51585,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -52351,7 +51872,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -52736,7 +52256,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -53320,7 +52839,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -53705,7 +53223,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -54632,7 +54149,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -55410,7 +54926,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -55795,7 +55310,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -56244,7 +55758,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -57948,7 +57461,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -58469,7 +57981,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -58738,7 +58249,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -60619,7 +60129,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -61797,7 +61306,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -61979,7 +61487,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -62426,7 +61933,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -63204,7 +62710,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -64367,7 +63872,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -64695,7 +64199,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -64961,7 +64464,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -65143,7 +64645,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -65530,7 +65031,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -66455,7 +65955,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -67223,7 +66722,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -67476,7 +66974,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -69889,7 +69386,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -70363,7 +69859,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -70632,7 +70127,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -70968,7 +70462,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -71352,7 +70845,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -71737,7 +71229,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -72184,7 +71675,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -72961,7 +72451,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -73487,7 +72976,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -73901,7 +73389,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -75641,7 +75128,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -75907,7 +75393,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -76089,7 +75574,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -76355,7 +75839,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -76537,7 +76020,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -77140,7 +76622,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -77539,7 +77020,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
@@ -77825,7 +77305,6 @@
       <xs:element ref="panel_camera_item"/>
       <xs:element ref="panel_container"/>
       <xs:element ref="panel_inventory_object"/>
-      <xs:element ref="placeholder"/>
       <xs:element ref="places_inventory_panel"/>
       <xs:element ref="profile_drop_target"/>
       <xs:element ref="profile_image"/>
