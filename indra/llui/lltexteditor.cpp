@@ -549,10 +549,13 @@ void LLTextEditor::replaceTextAll(const std::string& search_text, const std::str
 
 S32 LLTextEditor::getLineColumnFromDocIndex(S32 doc_index, bool include_wordwrap) const
 {
-    const S32 line_start = doc_index - getLineOffsetFromDocIndex(doc_index, include_wordwrap);
-    const S32 span = llmax(doc_index - line_start, 0);
+    const std::string& text = getText();
+    doc_index = llclamp(doc_index, 0, static_cast<S32>(text.size()));
+    const S32 line_start = llclamp(
+        doc_index - getLineOffsetFromDocIndex(doc_index, include_wordwrap), 0, doc_index);
+    const S32 span = doc_index - line_start;
     return (S32)utf8str_codepoint_count(
-        std::string_view(getText()).substr((size_t)line_start, (size_t)span));
+        std::string_view(text).substr((size_t)line_start, (size_t)span));
 }
 
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
