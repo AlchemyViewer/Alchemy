@@ -164,7 +164,8 @@
     <floater.string name="TranslateNothingToRemove">The language writes nothing for this row.</floater.string>
     <floater.string name="TranslateTheText">the text</floater.string>
     <floater.string name="TranslateRepaired">Moved [MOVES] values into place in [FILE]</floater.string>
-    <floater.string name="TranslateRepairedAll">Moved [MOVES] values into place across [FILES] files in [LANG]</floater.string>
+    <floater.string name="TranslateRepairedAll">Moved [COUNT] values into place across [FILES] files in [LANG]</floater.string>
+    <floater.string name="TranslateRemovedOrphans">Took [COUNT] orphaned values out of [FILES] files in [LANG]</floater.string>
     <floater.string name="TranslateNothingToRepair">Nothing in [FILE] is written at a path the base has moved on from.</floater.string>
     <floater.string name="TranslateSameLanguage">Choose a language other than the base to translate into.</floater.string>
     <floater.string name="TranslateRoots">Gave [FILES] files in [LANG] the base's root name; [LEFT] left alone as translations of something else</floater.string>
@@ -564,6 +565,12 @@
              layout="topleft"
              name="repair_all">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="repair_all" />
+            </menu_item_call>
+            <menu_item_call
+             label="Remove Orphans"
+             layout="topleft"
+             name="remove_orphans">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="remove_orphans" />
             </menu_item_call>
         </menu>
     </menu_bar>
@@ -1767,16 +1774,26 @@
                                  tool_tip="Give back the base's root name to the files of this language that carry another, or none: the root is what a whole file is matched on"
                                  top_delta="0"
                                  width="92" />
+                                <button
+                                 follows="left|top"
+                                 height="22"
+                                 label="Remove orphans"
+                                 layout="topleft"
+                                 left_pad="12"
+                                 name="translate_remove_orphans"
+                                 tool_tip="Take out of every file of this language each value written for something the base no longer has: an element of a lost name, an element with no name, an attribute the base's element does not carry. What the base has moved is left for Repair, and what it has at more than one path is left for you."
+                                 top_delta="0"
+                                 width="110" />
                                 <text
                                  follows="left|top|right"
                                  height="16"
                                  layout="topleft"
                                  left_pad="12"
                                  name="translate_counts"
+                                 right="-4"
                                  tool_tip="The rows by what state they are in: translated, missing from the language, written at a path the base has moved on from, translated but with different placeholders, or marked not to be translated"
                                  top_delta="3"
-                                 use_ellipses="true"
-                                 width="284" />
+                                 use_ellipses="true" />
                             </layout_panel>
                             <layout_panel
                              auto_resize="true"

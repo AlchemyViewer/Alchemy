@@ -2054,6 +2054,7 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
     getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
+    getChild<LLButton>("translate_remove_orphans")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRemoveOrphans, this));
 
     // The bar under the canvas: what the canvas is measured and drawn with,
     // where the canvas is. These were on the View menu, which is not where
@@ -2148,9 +2149,9 @@ void ALFloaterXUIStudio::draw()
     {
         stepLintAll();
     }
-    if (!mRepairQueue.empty())
+    if (!mSweep.queue.empty())
     {
-        stepRepairAll();
+        stepSweep();
     }
     if (!mCensusQueue.empty())
     {
@@ -7495,6 +7496,12 @@ void ALFloaterXUIStudio::onTranslationLanguage()
 S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
                                    bool through_set)
 {
+    return writeOverlay(entry, language, error, through_set, &ALXUITranslate::repair);
+}
+
+S32 ALFloaterXUIStudio::writeOverlay(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                                     bool through_set, OverlayOp op)
+{
     std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
     const ALXUICatalog::Layer* overlay_layer = overlayLayer(entry, language);
     if (base_layers.empty() || !overlay_layer || !overlay_layer->root())
@@ -7502,14 +7509,13 @@ S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::
         return 0;
     }
 
-    // Through the set rather than a document of its own, so that the repair
-    // is a step of the action that asked for it: a repair nobody can put
-    // back is a repair nobody can try. Opening a document makes it the one
-    // an operation with no path of its own means, and a repair is not a
-    // change of what is being worked on: the one that was stays. A file
-    // already held goes through its document whatever was asked, since a
-    // disk written under a held document is a disk its next save writes
-    // over.
+    // Through the set rather than a document of its own, so that the change
+    // is a step of the action that asked for it: a change nobody can put
+    // back is a change nobody can try. Opening a document makes it the one
+    // an operation with no path of its own means, and this is not a change
+    // of what is being worked on: the one that was stays. A file already
+    // held goes through its document whatever was asked, since a disk
+    // written under a held document is a disk its next save writes over.
     ALXUIEdit local;
     ALXUIEdit* overlay = mDocuments.find(overlay_layer->path);
     if (!overlay && through_set)
@@ -7535,7 +7541,7 @@ S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::
         }
         overlay = &local;
     }
-    const S32 done = ALXUITranslate::repair(*overlay, base_layers.front()->root(), error);
+    const S32 done = op(*overlay, base_layers.front()->root(), error);
     if (done && !overlay->save())
     {
         error = overlay->error();
@@ -7829,42 +7835,42 @@ void ALFloaterXUIStudio::onExportSchema()
 
 // The same over every file the language has, a few per frame so the
 // viewer keeps drawing.
-void ALFloaterXUIStudio::startRepairAll()
+void ALFloaterXUIStudio::startSweep(OverlayOp op, const char* said, const char* logged)
 {
     const std::string language = mTranslateLanguage->getValue().asString();
     if (language.empty() || language == mLanguage)
     {
         return;
     }
-    mRepairQueue.clear();
-    mRepairFiles = 0;
-    mRepairMoves = 0;
-    mRepairFailed = 0;
+    mSweep = Sweep();
+    mSweep.op = op;
+    mSweep.said = said;
+    mSweep.logged = logged;
     for (const ALXUICatalog::Entry& entry : mCatalog.entries())
     {
         if (overlayLayer(entry, language))
         {
-            mRepairQueue.push_back(entry.name);
+            mSweep.queue.push_back(entry.name);
         }
     }
 }
 
-void ALFloaterXUIStudio::stepRepairAll()
+void ALFloaterXUIStudio::stepSweep()
 {
     const std::string language = mTranslateLanguage->getValue().asString();
     LLTimer timer;
-    while (!mRepairQueue.empty() && timer.getElapsedTimeF32() < 0.015f)
+    while (!mSweep.queue.empty() && timer.getElapsedTimeF32() < 0.015f)
     {
-        const std::string name = mRepairQueue.front();
-        mRepairQueue.pop_front();
+        const std::string name = mSweep.queue.front();
+        mSweep.queue.pop_front();
         if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
         {
             std::string error;
-            const S32 moves = repairFile(*entry, language, error, /*through_set=*/false);
-            if (moves)
+            const S32 changed = writeOverlay(*entry, language, error, /*through_set=*/false, mSweep.op);
+            if (changed)
             {
-                ++mRepairFiles;
-                mRepairMoves += moves;
+                ++mSweep.files;
+                mSweep.count += changed;
                 mCatalog.reload(name);
             }
             else if (!error.empty())
@@ -7872,27 +7878,62 @@ void ALFloaterXUIStudio::stepRepairAll()
                 // A file that would not be read or written is said so in
                 // the log, once: a sweep over seven hundred files that
                 // stopped at the first would never finish.
-                ++mRepairFailed;
-                LL_WARNS("XUIStudio") << "repair " << language << ": " << name << ": " << error << LL_ENDL;
+                ++mSweep.failed;
+                LL_WARNS("XUIStudio") << mSweep.logged << " " << language << ": " << name << ": " << error << LL_ENDL;
             }
         }
     }
 
     LLStringUtil::format_map_t args;
-    args["[MOVES]"] = std::to_string(mRepairMoves);
-    args["[FILES]"] = std::to_string(mRepairFiles);
+    args["[COUNT]"] = std::to_string(mSweep.count);
+    args["[FILES]"] = std::to_string(mSweep.files);
     args["[LANG]"] = language;
-    setStatus(getString("TranslateRepairedAll", args));
-    if (mRepairQueue.empty())
+    setStatus(getString(mSweep.said, args));
+    if (mSweep.queue.empty())
     {
-        LL_INFOS("XUIStudio") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
-                            << mRepairFiles << " files, " << mRepairFailed << " files not written" << LL_ENDL;
+        LL_INFOS("XUIStudio") << mSweep.logged << " " << language << ": " << mSweep.count << " values across "
+                            << mSweep.files << " files, " << mSweep.failed << " files not written" << LL_ENDL;
         // A file that was held went through its document, and that is a
         // step in its history.
         mDocuments.settle();
         fillDocuments();
         fillHistory();
         fillTranslation();
+    }
+}
+
+void ALFloaterXUIStudio::startRepairAll()
+{
+    startSweep(&ALXUITranslate::repair, "TranslateRepairedAll", "repair");
+}
+
+// Asked first: what goes cannot be put back from here, since a pass over
+// every file of a language does not go through the document set.
+void ALFloaterXUIStudio::onRemoveOrphans()
+{
+    const std::string language = mTranslateLanguage->getValue().asString();
+    if (language.empty() || language == mLanguage)
+    {
+        return;
+    }
+    LLSD args;
+    args["LANG"] = language;
+    LLNotificationsUtil::add("XUIStudioRemoveOrphans", args, LLSD(),
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const LLSD& notification, const LLSD& response)
+        {
+            if (ALFloaterXUIStudio* self = handle.get())
+            {
+                self->removeOrphansAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+            }
+            return false;
+        });
+}
+
+void ALFloaterXUIStudio::removeOrphansAnswered(S32 option)
+{
+    if (option == 0)
+    {
+        startSweep(&ALXUITranslate::removeOrphans, "TranslateRemovedOrphans", "remove orphans");
     }
 }
 
@@ -10337,6 +10378,7 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "schema")        { onExportSchema(); }
     else if (action == "repair_roots")  { onRepairRoots(); }
     else if (action == "repair_all")    { startRepairAll(); }
+    else if (action == "remove_orphans") { onRemoveOrphans(); }
     else if (action == "hover")         { mHoverHighlight = !mHoverHighlight; saveState(); }
     else if (action == "real_floater")
     {

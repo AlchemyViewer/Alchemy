@@ -758,4 +758,42 @@ namespace tut
             "<panel name=\"root\">\n"
             "</panel>\n");
     }
+
+    // Everything the language writes for something the base has nowhere,
+    // taken out at once: an element of a lost name, an attribute the base's
+    // element does not carry, an element with no name to match by. What
+    // the base has moved is left for the repair, and what it has at more
+    // than one path is left for a person.
+    template<> template<>
+    void alxuitranslate_object::test<17>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\" title=\"Places\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Nested\"/>\n"
+            "    </panel>\n"
+            "    <button name=\"twice\" label=\"A\"/>\n"
+            "    <button name=\"twice\" label=\"B\"/>\n"
+            "</panel>\n");
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\" title=\"Lugares\">\n"
+            "    <text name=\"deep\" value=\"Anidado\" tool_tip=\"Nada\"/>\n"
+            "    <text name=\"gone\">Fuera</text>\n"
+            "    <text value=\"Sin nombre\"/>\n"
+            "    <button name=\"twice\" label=\"Dos\"/>\n"
+            "</panel>\n"));
+
+        std::string error;
+        const S32 gone = ALXUITranslate::removeOrphans(overlay, root, error);
+        ensure_equals("three orphans went: " + error, gone, 3);
+        ensure_equals("the moved value and the ambiguous one stay", overlay.text(),
+            "<panel name=\"root\" title=\"Lugares\">\n"
+            "    <text name=\"deep\" value=\"Anidado\"/>\n"
+            "    <button name=\"twice\" label=\"Dos\"/>\n"
+            "</panel>\n");
+
+        ensure_equals("and a second sweep finds nothing", ALXUITranslate::removeOrphans(overlay, root, error), 0);
+    }
 }

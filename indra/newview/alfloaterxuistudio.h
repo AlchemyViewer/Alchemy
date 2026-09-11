@@ -474,16 +474,41 @@ private:
     const ALXUICatalog::Layer* overlayLayer(const ALXUICatalog::Entry& entry, const std::string& language) const;
     bool overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
                      std::string& path, bool& created, std::string& error) const;
-    // Through the document set, so the repair is a step to put back; or,
+    // Something done to a language's file for one entry, against the
+    // base: a repair, or the orphans taken out. What it returns is how
+    // many it changed; the caller saves.
+    typedef S32 (*OverlayOp)(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);
+    // Through the document set, so the change is a step to put back; or,
     // for a pass over every file of a language, on the file alone, since
     // holding hundreds of documents open for a batch nobody undoes a file
     // at a time is not what the set is for. A file already held goes
     // through its document either way.
+    S32 writeOverlay(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                     bool through_set, OverlayOp op);
     S32 repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
                    bool through_set = true);
     void onRepairFile();
+
+    // A pass over every file the chosen language has, a few files a frame:
+    // what is done to each, and the words the status says it in. The
+    // repair moves what the base has moved; the other takes out what the
+    // base has nowhere, which the translators asked for as one press per
+    // language rather than one per row.
+    struct Sweep
+    {
+        std::deque<std::string> queue;      // files still to do
+        S32                     files = 0;  // files changed
+        S32                     count = 0;  // values changed
+        S32                     failed = 0; // files that would not be read or written
+        OverlayOp               op = nullptr;
+        std::string             said;       // the status string's name
+        std::string             logged;     // what the log calls the pass
+    };
+    void startSweep(OverlayOp op, const char* said, const char* logged);
+    void stepSweep();
     void startRepairAll();
-    void stepRepairAll();
+    void onRemoveOrphans();
+    void removeOrphansAnswered(S32 option);
 
     // The root name is the one thing a whole file is matched on, so a
     // file that disagrees about it is repaired before anything in it is.
@@ -711,10 +736,7 @@ private:
     LLHandle<LLView>                mListMenu;
     std::vector<LLScrollListCtrl*>  mLists;
 
-    std::deque<std::string>         mRepairQueue;   // files still to repair
-    S32                             mRepairFiles = 0;
-    S32                             mRepairMoves = 0;
-    S32                             mRepairFailed = 0;
+    Sweep                           mSweep;
 
     std::deque<std::string>         mCensusQueue;   // files still to count
     boost::unordered_map<std::string, std::map<std::string, S32>> mCensus;

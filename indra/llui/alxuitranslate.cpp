@@ -957,6 +957,49 @@ bool ALXUITranslate::remove(ALXUIEdit& overlay, const Unit& unit, std::string& e
 }
 
 // static
+bool ALXUITranslate::isOrphan(const Unit& unit)
+{
+    return unit.state == State::NotApplied
+        && (unit.miss == Miss::Absent || unit.miss == Miss::Unnamed || unit.miss == Miss::AttributeAbsent);
+}
+
+// static
+S32 ALXUITranslate::removeOrphans(ALXUIEdit& overlay, pugi::xml_node base, std::string& error)
+{
+    if (!base || !overlay.root())
+    {
+        return 0;
+    }
+    S32 total = 0;
+    // Each pass takes one out and looks again, and a pass that finds none
+    // is the last; a removal that fails ends it as well, since the same
+    // one would be found again.
+    for (;;)
+    {
+        ALXUITranslate scanned;
+        scanned.scan(base, overlay.root());
+        const Unit* orphan = nullptr;
+        for (const Unit& unit : scanned.units())
+        {
+            if (isOrphan(unit))
+            {
+                orphan = &unit;
+                break;
+            }
+        }
+        if (!orphan)
+        {
+            return total;
+        }
+        if (!remove(overlay, *orphan, error))
+        {
+            return total;
+        }
+        ++total;
+    }
+}
+
+// static
 S32 ALXUITranslate::repair(ALXUIEdit& overlay, pugi::xml_node base, std::string& error)
 {
     if (!base || !overlay.root())

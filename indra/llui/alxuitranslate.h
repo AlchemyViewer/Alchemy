@@ -139,6 +139,19 @@ public:
     // which no repair can do for it.
     static bool remove(ALXUIEdit& overlay, const Unit& unit, std::string& error);
 
+    // A value the language writes for something the base has nowhere: an
+    // element of a name the base has lost, an element with no name to be
+    // matched by, or an attribute the base's element does not carry. Not
+    // one the base has moved, which a repair puts right, and not one the
+    // base has at more than one path, which is a person's to place.
+    static bool isOrphan(const Unit& unit);
+
+    // Every orphan taken out of the file, one at a time with the file
+    // read again between, since taking one out moves the paths of what
+    // is beside it. Returns how many went; the caller saves. What a
+    // repair would move is left where it is.
+    static S32 removeOrphans(ALXUIEdit& overlay, pugi::xml_node base, std::string& error);
+
     // What a file would say if the merge read it. A value the base has a
     // place for arrives -- at its path already, or after a move -- and a
     // value naming something the base has nowhere is what the file has

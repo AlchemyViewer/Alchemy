@@ -13544,6 +13544,22 @@ Incoming instant messages from anyone who is not your friend will now be answere
 
   <notification
    icon="alertmodal.tga"
+   name="XUIStudioRemoveOrphans"
+   type="alertmodal">
+Take every orphaned value out of every file of [LANG]?
+
+An orphan is a value the language writes for something the base no longer has: an element whose name is gone, an element with no name, or an attribute the base's element does not carry. The merge applies none of them.
+
+This writes the files and cannot be undone from here.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Remove"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="XUIStudioCloseDocument"
    type="alertmodal">
 [FILE] has edits that are not saved.
