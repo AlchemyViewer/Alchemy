@@ -570,4 +570,30 @@ namespace tut
         ensure("and the notes do not have to be complete",
                ALXUINotes::get().count() > 0);
     }
+
+    // The kind a tag is looked for under, and whether a specimen of it can
+    // be built from a name and a size alone: two questions two windows used
+    // to answer for themselves, each with a list of its own.
+    template<> template<>
+    void alxuischema_object::test<19>()
+    {
+        if (!ui.ok())
+        {
+            skip("the source tree is not where the build said it was");
+        }
+        const ALXUISchema& s = schema();
+        ensure("a button is a control", s.groupOf("button") == ALXUISchema::Group::Controls);
+        ensure("a panel holds things", s.groupOf("panel") == ALXUISchema::Group::Containers);
+        ensure("a layout stack too", s.groupOf("layout_stack") == ALXUISchema::Group::Containers);
+        ensure("a menu item is chrome", s.groupOf("menu_item_call") == ALXUISchema::Group::Chrome);
+        ensure("a scroll list is a list", s.groupOf("scroll_list") == ALXUISchema::Group::Lists);
+        ensure("a line editor is text", s.groupOf("line_editor") == ALXUISchema::Group::Text);
+        ensure("a tag nobody registered is a control", s.groupOf("no_such_tag") == ALXUISchema::Group::Controls);
+        ensure_equals("each kind names the string that says it",
+                      std::string(ALXUISchema::groupKey(ALXUISchema::Group::Chrome)), std::string("GroupChrome"));
+
+        ensure("a button builds from a name and a size", ALXUISchema::buildsAlone("button"));
+        ensure("a panel wants more than that", !ALXUISchema::buildsAlone("panel"));
+        ensure("and a tag nobody registered builds nothing", !ALXUISchema::buildsAlone("no_such_tag"));
+    }
 }

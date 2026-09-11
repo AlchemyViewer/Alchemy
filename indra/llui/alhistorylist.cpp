@@ -93,19 +93,6 @@ ALHistoryList::ALHistoryList(const Params& p)
     mEmpty->say(mEmptyHeadline, mEmptySentence);
 }
 
-void ALHistoryList::reshape(S32 width, S32 height, bool called_from_parent)
-{
-    LLPanel::reshape(width, height, called_from_parent);
-    if (mList)
-    {
-        mList->reshape(width, height);
-    }
-    if (mEmpty)
-    {
-        mEmpty->reshape(width, height);
-    }
-}
-
 void ALHistoryList::setSteps(std::vector<Step> steps, size_t in_force)
 {
     mSteps = std::move(steps);

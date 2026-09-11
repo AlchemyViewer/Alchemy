@@ -119,6 +119,11 @@
     <floater.string name="QuickOpenTitle">Open quickly</floater.string>
     <floater.string name="QuickOpenPlaceholder">a few letters of the file name</floater.string>
     <floater.string name="PaletteTakesText">takes text</floater.string>
+    <floater.string name="GroupContainers">Containers</floater.string>
+    <floater.string name="GroupControls">Controls</floater.string>
+    <floater.string name="GroupLists">Lists</floater.string>
+    <floater.string name="GroupText">Text</floater.string>
+    <floater.string name="GroupChrome">Chrome</floater.string>
     <floater.string name="PaletteTakesChildren">[COUNT] kinds of child</floater.string>
     <floater.string name="FindWord">Find</floater.string>
     <floater.string name="FindIn">in</floater.string>

@@ -32,6 +32,7 @@
 #include "llxuiparser.h"
 
 #include <algorithm>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <cstring>
 #include <optional>
 #include <sstream>
@@ -263,7 +264,79 @@ namespace
     }
 }
 
-//static
+// static
+ALXUISchema::Group ALXUISchema::groupOf(std::string_view tag)
+{
+    static const boost::unordered_flat_set<std::string_view> chrome = {
+        "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check", "menu_item_separator",
+        "menu_item_tear_off", "toolbar", "context_menu", "toggleable_menu", "tool_tip", "badge", "icon",
+        "loading_indicator", "view_border", "divider", "resize_bar", "resize_handle", "drag_handle_top",
+        "drag_handle_left", "progress_bar", "spinner_arrow", "search_editor", "filter_editor",
+        "jump_bar", "scope_bar", "empty_state"
+    };
+    static const boost::unordered_flat_set<std::string_view> lists = {
+        "scroll_list", "combo_box", "flyout_button", "folder_view", "name_list", "list",
+        "search_combo_box", "avatar_list", "inventory_panel", "specimen_list", "flat_list_view"
+    };
+    static const boost::unordered_flat_set<std::string_view> text = {
+        "text", "text_editor", "line_editor", "chat_editor", "textbox", "expandable_text",
+        "name_box", "name_editor", "spell_check", "text_chat", "simple_text_editor"
+    };
+    static const boost::unordered_flat_set<std::string_view> containers = {
+        "panel", "layout_panel", "layout_stack", "tab_container", "accordion", "accordion_tab",
+        "scroll_container", "container_view", "floater", "scrolling_panel_list", "dock_panel"
+    };
+    if (chrome.contains(tag))
+    {
+        return Group::Chrome;
+    }
+    if (lists.contains(tag))
+    {
+        return Group::Lists;
+    }
+    if (text.contains(tag))
+    {
+        return Group::Text;
+    }
+    // Not by whether the tag takes children: a view takes children unless
+    // it says otherwise, so a button takes a button, and that is not what
+    // anybody means by a container.
+    if (containers.contains(tag))
+    {
+        return Group::Containers;
+    }
+    return Group::Controls;
+}
+
+// static
+const char* ALXUISchema::groupKey(Group group)
+{
+    switch (group)
+    {
+    case Group::Containers: return "GroupContainers";
+    case Group::Lists:      return "GroupLists";
+    case Group::Text:       return "GroupText";
+    case Group::Chrome:     return "GroupChrome";
+    case Group::Controls:   break;
+    }
+    return "GroupControls";
+}
+
+// static
+bool ALXUISchema::buildsAlone(const std::string& tag)
+{
+    static const boost::unordered_flat_set<std::string_view> wants_more = {
+        "accordion", "accordion_tab", "chat_editor", "console", "container_view", "context_menu",
+        "flat_list_view", "floater_view", "folder_view_item", "layout_panel", "layout_stack", "locate",
+        "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check", "menu_item_separator",
+        "menu_item_tear_off", "panel", "scroll_container", "scrolling_panel_list",
+        "stat_view", "tab_container", "toggleable_menu", "tool_tip", "toolbar", "tooltip_view",
+        "ui_ctrl", "view", "window_shade"
+    };
+    return !wants_more.contains(tag) && LLDefaultChildRegistry::instance().getValue(tag) != nullptr;
+}
+
+// static
 const ALXUISchema& ALXUISchema::get()
 {
     static const ALXUISchema sSchema = []

@@ -1682,7 +1682,7 @@ namespace
             "layout_panel", "layout_stack", "line_editor", "loading_indicator", "locate", "menu",
             "menu_bar", "menu_button", "menu_item", "menu_item_call", "menu_item_check",
             "menu_item_separator", "menu_item_tear_off", "multi_slider", "multi_slider_bar", "panel",
-            "placeholder", "progress_bar", "radio_group", "scroll_bar", "scroll_container", "scroll_list",
+            "progress_bar", "radio_group", "scroll_bar", "scroll_container", "scroll_list",
             "scrolling_panel_list", "search_editor", "simple_text_editor", "slider", "slider_bar",
             "spinner", "stat_bar", "stat_view", "sun_moon_trackball", "tab_container", "text", "time",
             "toggleable_menu", "tool_tip", "toolbar", "tooltip_view", "ui_ctrl", "view", "view_border",
@@ -1691,9 +1691,6 @@ namespace
         return core.count(tag) != 0;
     }
 
-    // The core tags the gallery shows: the ones that stand on their own
-    // with defaults. The rest need a parent of a kind, children, or
-    // parameters a template does not give.
     // Where the specimen sits in its row, past the label.
     constexpr S32 SPECIMEN_LEFT = 130;
     constexpr S32 SPECIMEN_WIDTH = 150;
@@ -1701,46 +1698,11 @@ namespace
     // Which heading a tag sits under in the Library. Five kinds, read off the
     // name: a guess over a vocabulary, and a wrong one costs a reader one
     // heading of looking rather than anything at all.
-    std::string paletteGroupOf(const std::string& tag)
-    {
-        static const std::set<std::string> containers = {
-            "panel", "layout_panel", "layout_stack", "tab_container", "accordion",
-            "accordion_tab", "scroll_container", "flat_list_view", "container_view",
-            "floater", "scrolling_panel_list", "dock_panel"
-        };
-        static const std::set<std::string> lists = {
-            "scroll_list", "combo_box", "flyout_button", "folder_view", "name_list",
-            "search_combo_box", "avatar_list", "inventory_panel", "specimen_list"
-        };
-        static const std::set<std::string> text = {
-            "text", "text_editor", "line_editor", "chat_editor", "textbox", "expandable_text",
-            "name_box", "name_editor", "spell_check", "text_chat"
-        };
-        static const std::set<std::string> chrome = {
-            "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check",
-            "menu_item_separator", "menu_item_tear_off", "toolbar", "context_menu",
-            "toggleable_menu", "tool_tip", "badge", "icon", "loading_indicator",
-            "view_border", "resize_bar", "resize_handle", "drag_handle_top",
-            "drag_handle_left", "progress_bar", "jump_bar", "scope_bar", "empty_state"
-        };
-        if (containers.count(tag)) { return "Containers"; }
-        if (lists.count(tag))      { return "Lists"; }
-        if (text.count(tag))       { return "Text"; }
-        if (chrome.count(tag))     { return "Chrome"; }
-        return "Controls";
-    }
-
+    // The core tags the gallery shows: the ones that stand on their own
+    // with defaults.
     bool galleryTag(const std::string& tag)
     {
-        static const std::set<std::string> skipped = {
-            "accordion", "accordion_tab", "chat_editor", "console", "container_view", "context_menu",
-            "flat_list_view", "floater_view", "folder_view_item", "layout_panel", "layout_stack", "locate",
-            "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check", "menu_item_separator",
-            "menu_item_tear_off", "panel", "placeholder", "scroll_container", "scrolling_panel_list",
-            "stat_view", "tab_container", "toggleable_menu", "tool_tip", "toolbar", "tooltip_view",
-            "ui_ctrl", "view", "window_shade"
-        };
-        return isCoreWidgetTag(tag) && skipped.count(tag) == 0;
+        return isCoreWidgetTag(tag) && ALXUISchema::buildsAlone(tag);
     }
 }
 
@@ -3768,12 +3730,21 @@ void ALFloaterXUIStudio::fillPalette()
         ALXUIShellBuild shell;
         ALXUIDiagnostics sink;
 
-        for (const std::string& child : declared->children)
+        // Under the kinds the schema sorts tags into, in the schema's order
+        // of them: a list read down finds a tag by what kind of thing it is
+        // before it finds it by name.
+        std::vector<std::string> children(declared->children);
+        std::stable_sort(children.begin(), children.end(),
+                         [](const std::string& a, const std::string& b)
+                         {
+                             return ALXUISchema::groupOf(a) < ALXUISchema::groupOf(b);
+                         });
+        for (const std::string& child : children)
         {
             ALSpecimenList::Specimen specimen;
             specimen.label = child;
             specimen.value = child;
-            specimen.group = paletteGroupOf(child);
+            specimen.group = getString(ALXUISchema::groupKey(ALXUISchema::groupOf(child)));
 
             // What it is for, in the sentence the notes have for it, and
             // then what it takes.
@@ -3797,7 +3768,7 @@ void ALFloaterXUIStudio::fillPalette()
             }
             specimen.toolTip = takes;
 
-            if (galleryTag(child) && LLDefaultChildRegistry::instance().getValue(child))
+            if (galleryTag(child))
             {
                 const std::string xml = "<" + child + " name=\"" + child + "\" label=\"" + child
                     + "\" layout=\"topleft\" left=\"0\" top=\"0\" width=\"" + std::to_string(SPECIMEN_WIDTH)
@@ -8454,16 +8425,10 @@ LLView* ALFloaterXUIStudio::selectedView() const
     return ALXUISelection::resolve(pv.root, mSelection.selection());
 }
 
-// The element the selection names, in the most specific layer that has
-// it, which is the one whose values the built view shows.
 // ---------------------------------------------------------------------------
 // Edits
 // ---------------------------------------------------------------------------
 
-// The layer a move is written into: the most specific one that positions
-// the element, since that is the one whose numbers are on screen, and the
-// first that has the element at all when none of them positions it, since
-// that is where a position has to be written.
 // The file's base layer as the canvas shows it. Structure is written there:
 // a language overlay says what a value is, not where an element lives.
 const ALXUICatalog::Layer* ALFloaterXUIStudio::baseLayer() const
@@ -8487,6 +8452,10 @@ const ALXUICatalog::Layer* ALFloaterXUIStudio::writeLayer() const
     return layer ? layer : baseLayer();
 }
 
+// The layer a move is written into: the most specific one that positions
+// the element, since that is the one whose numbers are on screen, and the
+// first that has the element at all when none of them positions it, since
+// that is where a position has to be written.
 const ALXUICatalog::Layer* ALFloaterXUIStudio::editTarget() const
 {
     const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
@@ -9058,6 +9027,8 @@ bool ALFloaterXUIStudio::nudge(KEY key, MASK mask)
     return applyEdges(dx, dy, dx, dy);
 }
 
+// The element the selection names, in the most specific layer that has
+// it, which is the one whose values the built view shows.
 pugi::xml_node ALFloaterXUIStudio::authoredElement(const ALXUICatalog::Layer*& layer) const
 {
     layer = nullptr;

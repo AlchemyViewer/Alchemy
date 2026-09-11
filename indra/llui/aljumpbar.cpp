@@ -32,8 +32,6 @@
 #include "lltextbox.h"
 #include "lluictrlfactory.h"
 
-#include "llcallbacklist.h"
-
 static LLDefaultChildRegistry::Register<ALJumpBar> r("jump_bar");
 
 namespace
@@ -53,25 +51,23 @@ ALJumpBar::Params::Params()
 
 ALJumpBar::ALJumpBar(const Params& p)
 :   LLPanel(p),
-    mTrailerText(p.trailer)
+    mTrailerText(p.trailer),
+    mRebuild([this]() { build(); })
 {
 }
 
-ALJumpBar::~ALJumpBar()
-{
-    gIdleCallbacks.deleteFunction(buildIdle, this);
-}
+ALJumpBar::~ALJumpBar() = default;
 
 void ALJumpBar::setPath(std::vector<Crumb> crumbs)
 {
     mCrumbs = std::move(crumbs);
-    build();
+    mRebuild.request();
 }
 
 void ALJumpBar::setTrailer(const std::string& text)
 {
     mTrailerText = text;
-    build();
+    mRebuild.request();
 }
 
 S32 ALJumpBar::widthOf(const Crumb& crumb) const
@@ -107,29 +103,6 @@ size_t ALJumpBar::folded() const
 }
 
 void ALJumpBar::build()
-{
-    if (mFiring > 0)
-    {
-        if (!mBuildWaiting)
-        {
-            mBuildWaiting = true;
-            gIdleCallbacks.addFunction(buildIdle, this);
-        }
-        return;
-    }
-    buildNow();
-}
-
-// static
-void ALJumpBar::buildIdle(void* self)
-{
-    ALJumpBar* bar = static_cast<ALJumpBar*>(self);
-    gIdleCallbacks.deleteFunction(buildIdle, self);
-    bar->mBuildWaiting = false;
-    bar->buildNow();
-}
-
-void ALJumpBar::buildNow()
 {
     for (LLView* part : mParts)
     {
@@ -240,9 +213,7 @@ void ALJumpBar::buildNow()
 // The value is copied first: what is chosen may be the path being replaced.
 void ALJumpBar::chose(size_t at, std::string value)
 {
-    ++mFiring;
-    mChose(at, value);
-    --mFiring;
+    mRebuild.around([&]() { mChose(at, value); });
 }
 
 void ALJumpBar::reshape(S32 width, S32 height, bool called_from_parent)
@@ -253,6 +224,6 @@ void ALJumpBar::reshape(S32 width, S32 height, bool called_from_parent)
     {
         // How many crumbs fit is a question about the width, so it is asked
         // again when the width changes and not otherwise.
-        build();
+        mRebuild.request();
     }
 }

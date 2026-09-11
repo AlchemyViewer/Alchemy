@@ -771,8 +771,6 @@ private:
     // The field the layer table is about: whichever gutter was last clicked,
     // or whichever row of the grid is selected.
     std::string         mGutterField;
-    // And what the merge takes for it, which is what an override starts from.
-    std::string         mOverrideValue;
     LLScrollListCtrl*   mFindings = nullptr;
     LLComboBox*         mFindingScope = nullptr;
     LLComboBox*         mFindingRule = nullptr;

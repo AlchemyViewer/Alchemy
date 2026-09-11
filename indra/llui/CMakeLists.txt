@@ -110,6 +110,7 @@ target_sources(llui
     llxuiparser.cpp
     alcanvasview.cpp
     alcolorfield.cpp
+    aldeferredrebuild.cpp
     aldockpanel.cpp
     alemptystate.cpp
     alflagsfield.cpp
@@ -265,6 +266,7 @@ target_sources(llui
     llxuiparser.h
     alcanvasview.h
     alcolorfield.h
+    aldeferredrebuild.h
     aldockpanel.h
     alemptystate.h
     alflagsfield.h

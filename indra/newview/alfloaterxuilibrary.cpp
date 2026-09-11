@@ -43,25 +43,6 @@
 #include <algorithm>
 #include <set>
 
-namespace
-{
-    // The tags that build from a name and a size alone. The rest want a
-    // parent of a kind, children, or parameters no default carries, and a
-    // specimen of one is a picture of a failure.
-    bool buildableAlone(const std::string& tag)
-    {
-        static const std::set<std::string> skipped = {
-            "accordion", "accordion_tab", "chat_editor", "console", "container_view", "context_menu",
-            "flat_list_view", "floater_view", "folder_view_item", "layout_panel", "layout_stack", "locate",
-            "menu", "menu_bar", "menu_item", "menu_item_call", "menu_item_check", "menu_item_separator",
-            "menu_item_tear_off", "panel", "placeholder", "scroll_container", "scrolling_panel_list",
-            "stat_view", "tab_container", "toggleable_menu", "tool_tip", "toolbar", "tooltip_view",
-            "ui_ctrl", "view", "window_shade"
-        };
-        return skipped.count(tag) == 0 && LLDefaultChildRegistry::instance().getValue(tag) != nullptr;
-    }
-}
-
 const ALXUICatalog* ALFloaterXUILibrary::catalogOf()
 {
     const ALFloaterXUIStudio* studio =
@@ -101,43 +82,6 @@ void ALFloaterXUILibrary::onFilter()
     fillTags();
 }
 
-// The five a developer looks in, decided from what the tag does rather than
-// from what it is called: the schema says whether it takes text, whether it
-// takes children, and how many attributes it answers to.
-std::string ALFloaterXUILibrary::groupOf(const std::string& tag)
-{
-    static const std::set<std::string> chrome = {
-        "icon", "loading_indicator", "progress_bar", "badge", "view_border", "divider",
-        "menu_item_separator", "spinner_arrow", "search_editor", "filter_editor"
-    };
-    static const std::set<std::string> lists = {
-        "scroll_list", "combo_box", "name_list", "flat_list_view", "folder_view",
-        "list", "scroll_container", "tab_container"
-    };
-    static const std::set<std::string> text = {
-        "text", "text_editor", "line_editor", "expandable_text", "textbox",
-        "name_box", "text_chat", "chat_editor", "spinner"
-    };
-    if (chrome.count(tag))
-    {
-        return "GroupChrome";
-    }
-    if (lists.count(tag))
-    {
-        return "GroupLists";
-    }
-    if (text.count(tag))
-    {
-        return "GroupText";
-    }
-    const ALXUISchema::Tag* declared = ALXUISchema::get().tag(tag);
-    if (declared && !declared->children.empty())
-    {
-        return "GroupContainers";
-    }
-    return "GroupControls";
-}
-
 void ALFloaterXUILibrary::fillTags()
 {
     const std::string chosen = mTags->getSelectedValue().asString();
@@ -148,26 +92,29 @@ void ALFloaterXUILibrary::fillTags()
 
     // Grouped, and each group in one place: the list is read down, so a tag
     // is found by the kind of thing it is before it is found by its name.
-    std::vector<std::pair<std::string, std::string>> rows;   // group, tag
-    for (const ALXUISchema::Tag& declared : ALXUISchema::get().tags())
+    const ALXUISchema& schema = ALXUISchema::get();
+    std::vector<std::pair<ALXUISchema::Group, std::string>> rows;   // group, tag
+    for (const ALXUISchema::Tag& declared : schema.tags())
     {
         if (!filter.empty() && declared.name.find(filter) == std::string::npos)
         {
             continue;
         }
-        rows.emplace_back(groupOf(declared.name), declared.name);
+        rows.emplace_back(ALXUISchema::groupOf(declared.name), declared.name);
     }
     std::sort(rows.begin(), rows.end());
 
-    std::string group;
+    bool first = true;
+    ALXUISchema::Group group = ALXUISchema::Group::Containers;
     for (const auto& [in_group, tag] : rows)
     {
-        if (in_group != group)
+        if (first || in_group != group)
         {
+            first = false;
             group = in_group;
             LLSD heading;
             heading["columns"][0]["column"] = "tag";
-            heading["columns"][0]["value"] = getString(group);
+            heading["columns"][0]["value"] = getString(ALXUISchema::groupKey(group));
             heading["columns"][0]["font"]["style"] = "BOLD";
             LLScrollListItem* item = mTags->addElement(heading);
             item->setEnabled(false);
@@ -360,7 +307,7 @@ std::string ALFloaterXUILibrary::describe(const std::string& tag) const
 void ALFloaterXUILibrary::showSpecimen(const std::string& tag)
 {
     mSpecimen->deleteAllChildren();
-    if (tag.empty() || !buildableAlone(tag))
+    if (tag.empty() || !ALXUISchema::buildsAlone(tag))
     {
         return;
     }

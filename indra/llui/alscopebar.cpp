@@ -33,8 +33,6 @@
 #include "lluictrl.h"
 #include "lluictrlfactory.h"
 
-#include "llcallbacklist.h"
-
 static LLDefaultChildRegistry::Register<ALScopeBar> r("scope_bar");
 
 namespace
@@ -57,14 +55,17 @@ ALScopeBar::Params::Params()
 ALScopeBar::ALScopeBar(const Params& p)
 :   LLPanel(p),
     mControlHeight(p.control_height),
-    mGap(p.gap)
+    mGap(p.gap),
+    mRebuild([this]()
+    {
+        mSegments = std::move(mNext);
+        mNext.clear();
+        build();
+    })
 {
 }
 
-ALScopeBar::~ALScopeBar()
-{
-    gIdleCallbacks.deleteFunction(buildIdle, this);
-}
+ALScopeBar::~ALScopeBar() = default;
 
 void ALScopeBar::setSentence(std::vector<Segment> segments)
 {
@@ -84,29 +85,8 @@ void ALScopeBar::setSentence(std::vector<Segment> segments)
     }
     // The parts answer for the sentence they were built from until they
     // are built again, so a sentence that has to wait waits whole.
-    if (mFiring > 0)
-    {
-        mWaiting = std::move(segments);
-        if (!mBuildWaiting)
-        {
-            mBuildWaiting = true;
-            gIdleCallbacks.addFunction(buildIdle, this);
-        }
-        return;
-    }
-    mSegments = std::move(segments);
-    build();
-}
-
-// static
-void ALScopeBar::buildIdle(void* self)
-{
-    ALScopeBar* bar = static_cast<ALScopeBar*>(self);
-    gIdleCallbacks.deleteFunction(buildIdle, self);
-    bar->mBuildWaiting = false;
-    bar->mSegments = std::move(bar->mWaiting);
-    bar->mWaiting.clear();
-    bar->build();
+    mNext = std::move(segments);
+    mRebuild.request();
 }
 
 void ALScopeBar::build()
@@ -145,16 +125,12 @@ void ALScopeBar::build()
             {
                 choice->add(label, LLSD(value));
             }
-            if (!segment.value.empty() && choice->setSelectedByValue(LLSD(segment.value), true))
-            {
-                // it had one already
-            }
-            else
+            if (segment.value.empty() || !choice->setSelectedByValue(LLSD(segment.value), true))
             {
                 choice->selectFirstItem();
                 segment.value = choice->getValue().asString();
             }
-            choice->setCommitCallback([this](LLUICtrl*, const LLSD&) { fire(mChanged); });
+            choice->setCommitCallback([this](LLUICtrl*, const LLSD&) { mRebuild.around([this] { mChanged(); }); });
             addChild(choice);
             mParts.push_back(choice);
             break;
@@ -171,8 +147,8 @@ void ALScopeBar::build()
             p.label = segment.text;
             LLLineEditor* field = LLUICtrlFactory::create<LLLineEditor>(p);
             field->setText(segment.value);
-            field->setCommitCallback([this](LLUICtrl*, const LLSD&) { fire(mRun); });
-            field->setKeystrokeCallback([this](LLLineEditor*, void*) { fire(mChanged); }, nullptr);
+            field->setCommitCallback([this](LLUICtrl*, const LLSD&) { mRebuild.around([this] { mRun(); }); });
+            field->setKeystrokeCallback([this](LLLineEditor*, void*) { mRebuild.around([this] { mChanged(); }); }, nullptr);
             addChild(field);
             mParts.push_back(field);
             break;

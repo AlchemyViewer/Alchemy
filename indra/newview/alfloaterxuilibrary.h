@@ -76,7 +76,6 @@ private:
     // in, decided from what the tag does rather than from what it is called.
     // Answered as a key, which is what the list is ordered by; the heading
     // over each is the floater's string of that name.
-    static std::string groupOf(const std::string& tag);
 
     // The catalog the studio has already read, where the studio is open.
     // The library is its companion and does not scan the skin itself.

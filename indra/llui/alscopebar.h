@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldeferredrebuild.h"
 #include "llpanel.h"
 
 #include <string>
@@ -128,25 +129,16 @@ private:
     // -- is built again once the part has finished, since building deletes
     // the part that is still on the stack.
     void build();
-    static void buildIdle(void* self);
-    // Around each signal: while it is up, a build waits.
-    template<typename SIGNAL> void fire(SIGNAL& signal)
-    {
-        ++mFiring;
-        signal();
-        --mFiring;
-    }
     void layout();
     S32 widthOf(const Segment& segment) const;
 
     std::vector<Segment>    mSegments;
-    std::vector<Segment>    mWaiting;       // the next sentence, while a part is mid-callback
+    std::vector<Segment>    mNext;          // the sentence to build from
     std::vector<LLView*>    mParts;         // one per segment, in order
     LLView*                 mAdornment = nullptr;
     S32                     mControlHeight;
     S32                     mGap;
-    S32                     mFiring = 0;
-    bool                    mBuildWaiting = false;
     changed_signal_t        mChanged;
     run_signal_t            mRun;
+    ALDeferredRebuild       mRebuild;
 };

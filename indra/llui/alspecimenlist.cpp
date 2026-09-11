@@ -287,7 +287,7 @@ void ALSpecimenList::layout()
     // What is shown, in the order it is shown, before anything is placed:
     // the content panel has to be as tall as the whole of it, and a row is
     // placed from the content's top.
-    struct Placed { LLView* view = nullptr; S32 height = 0; };
+    struct Placed { LLView* view = nullptr; S32 height = 0; bool heading = false; };
     std::vector<Placed> order;
     mShown = 0;
 
@@ -308,10 +308,10 @@ void ALSpecimenList::layout()
             }
             if (heading && !any)
             {
-                order.push_back({ heading, HEADING_HEIGHT });
+                order.push_back({ heading, HEADING_HEIGHT, true });
             }
             any = true;
-            order.push_back({ mRows[i], mRowHeight });
+            order.push_back({ mRows[i], mRowHeight, false });
             ++mShown;
         }
         if (heading)
@@ -338,7 +338,7 @@ void ALSpecimenList::layout()
     S32 top = tall;
     for (const Placed& one : order)
     {
-        const S32 left = one.height == HEADING_HEIGHT ? INSET : 0;
+        const S32 left = one.heading ? INSET : 0;
         one.view->setShape(LLRect(left, top, width, top - one.height));
         top -= one.height;
     }
@@ -350,13 +350,5 @@ void ALSpecimenList::layout()
 void ALSpecimenList::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLPanel::reshape(width, height, called_from_parent);
-    if (mScroller)
-    {
-        mScroller->reshape(width, height);
-    }
-    if (mEmpty)
-    {
-        mEmpty->reshape(width, height);
-    }
     layout();
 }

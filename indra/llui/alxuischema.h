@@ -153,6 +153,18 @@ public:
     // every widget there is. False for a tag the schema does not know.
     bool                        acceptsChild(std::string_view tag, std::string_view child) const;
 
+    // Whether a specimen of the tag can be built from a name and a size
+    // alone. The rest want a parent of a kind, children, or parameters no
+    // default carries, and a specimen of one is a picture of a failure.
+    static bool                 buildsAlone(const std::string& tag);
+
+    // The five kinds a developer looks for a tag under, in the order they
+    // are listed. The key is the name of the string a window says the kind
+    // in.
+    enum class Group : U8 { Containers, Controls, Lists, Text, Chrome };
+    static Group                groupOf(std::string_view tag);
+    static const char*          groupKey(Group group);
+
     // The whole model as one XSD document.
     std::string                 asXSD() const;
 
