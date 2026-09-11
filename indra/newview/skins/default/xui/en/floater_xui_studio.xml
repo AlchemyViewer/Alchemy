@@ -98,7 +98,6 @@
     <floater.string name="OverrideField">[ATTR], as each layer has it; writing puts the value in force into the chosen one.</floater.string>
     <floater.string name="OverrideNoField">No field chosen: click a gutter mark beside a row in Attributes.</floater.string>
     <floater.string name="OverrideNoLayer">Choose the layer to write it into.</floater.string>
-    <floater.string name="OverrideNoElement">[LAYER] does not have this element, so there is nothing there to override.</floater.string>
     <floater.string name="OverrideNothingInForce">No layer writes that field, so there is no value to override.</floater.string>
     <floater.string name="GutterTitle">[ATTR], layer by layer</floater.string>
     <floater.string name="GutterLayer">Layer</floater.string>
@@ -155,7 +154,6 @@
     <floater.string name="TranslateImpact">[COUNT] translations stop applying if this is written as it stands: [LANGS]. Save and Repair Translations moves them.</floater.string>
     <floater.string name="EditReverted">Read [FILE] again; what was done to it is gone.</floater.string>
     <floater.string name="EditNothingToSave">Nothing has been changed.</floater.string>
-    <floater.string name="EditUnsaved">[FILE] has changes that are not written. Save or revert first.</floater.string>
     <floater.string name="EditChangedOnDisk">[FILE] changed on disk, and there are changes here that are not written. Save to keep these, or revert to take those.</floater.string>
     <floater.string name="TranslateCounts">[TRANSLATED] translated, [RESCUED] applied after a move, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
     <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
@@ -193,7 +191,6 @@
     <floater.string name="AttributeShowEvery">Show every field</floater.string>
     <floater.string name="AttributeNoMatch">No field of that name</floater.string>
     <floater.string name="AttributeNoMatchHow">The filter matches the names a file writes, dots and all. Clear it to see the rest.</floater.string>
-    <floater.string name="AttributeAlsoWritten">[ATTR] is written over in   [LAYERS]</floater.string>
     <floater.string name="PaneNavigator">XUI Studio: Navigator</floater.string>
     <floater.string name="PaneBottom">XUI Studio: Findings and Tables</floater.string>
     <floater.string name="PaneInspectors">XUI Studio: Inspectors</floater.string>
