@@ -28,7 +28,6 @@
 #define LL_TABCONTAINER_H
 
 #include "llpanel.h"
-#include "lltextbox.h"
 #include "llframetimer.h"
 #include "lliconctrl.h"
 #include "llbutton.h"
@@ -143,13 +142,10 @@ public:
     /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
     /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
     /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                        EDragAndDropType type, void* cargo_data,
                                        EAcceptance* accept, std::string& tooltip);
-    /*virtual*/ LLView* getChildView(std::string_view name, bool recurse = true) const;
-    /*virtual*/ LLView* findChildView(std::string_view name, bool recurse = true) const;
     /*virtual*/ void initFromParams(const LLPanel::Params& p);
     /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
     /*virtual*/ bool postBuild();
@@ -214,7 +210,6 @@ public:
     // button that selects it. An empty label takes it away again, so a tab
     // with nothing to say looks like one that never had anything.
     void        setTabBadge(LLPanel* child, const std::string& label);
-    void        setTitle( const std::string& title );
     const std::string getPanelTitle(S32 index);
 
     void        setTopBorderHeight(S32 height);
@@ -234,6 +229,11 @@ public:
 
     void        startDragAndDropDelayTimer() { mDragAndDropDelayTimer.start(); }
 
+    // How far the strip is scrolled, and how far it can be, in tabs that
+    // show; a hidden tab is not a place to scroll to.
+    S32 getScrollPos() const            { return mScrollPos; }
+    S32 getMaxScrollPos() const         { return mMaxScrollPos; }
+
     void onTabBtn( const LLSD& data, LLPanel* panel );
     void onNextBtn(const LLSD& data);
     void onNextBtnHeld(const LLSD& data);
@@ -252,10 +252,10 @@ private:
     LLTabTuple* getTabByPanel(LLPanel* child);
     void insertTuple(LLTabTuple * tuple, eInsertionPoint insertion_point);
 
-    S32 getScrollPos() const            { return mScrollPos; }
     void setScrollPos(S32 pos)          { mScrollPos = pos; }
-    S32 getMaxScrollPos() const         { return mMaxScrollPos; }
     void setMaxScrollPos(S32 pos)       { mMaxScrollPos = pos; }
+    S32 visibleTabWidth() const;
+    void scrollTabIntoView(const LLTabTuple* tuple);
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 
@@ -288,8 +288,6 @@ private:
     S32                             mScrollPos;
     S32                             mScrollPosPixels;
     S32                             mMaxScrollPos;
-
-    LLTextBox*                      mTitleBox;
 
     S32                             mTopBorderHeight;
     TabPosition                     mTabPosition;

@@ -51,6 +51,7 @@
 #include "llfloaterreporter.h"
 #include "llimview.h"
 #include "llnotificationsutil.h"
+#include "lltextbox.h"
 #include "lltoolbarview.h"
 #include "lltransientfloatermgr.h"
 #include "llviewercontrol.h"

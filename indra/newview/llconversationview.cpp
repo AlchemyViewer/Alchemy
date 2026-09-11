@@ -40,6 +40,7 @@
 #include "llfloaterreg.h"
 #include "llgroupiconctrl.h"
 #include "lluictrlfactory.h"
+#include "lltextbox.h"
 #include "lltoolbarview.h"
 
 //

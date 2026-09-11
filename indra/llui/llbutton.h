@@ -226,6 +226,8 @@ public:
     LLFontGL::HAlign getHAlign() const                      { return mHAlign; }
     void            setLeftHPad( S32 pad )                  { mLeftHPad = pad; }
     void            setRightHPad( S32 pad )                 { mRightHPad = pad; }
+    S32             getLeftHPad() const                     { return mLeftHPad; }
+    S32             getRightHPad() const                    { return mRightHPad; }
 
     void            setImageOverlayTopPad( S32 pad )            { mImageOverlayTopPad = pad; }
     S32             getImageOverlayTopPad() const               { return mImageOverlayTopPad; }

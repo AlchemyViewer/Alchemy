@@ -35,6 +35,7 @@
 #include "llkeyframemotion.h"
 #include "llfilepicker.h"
 #include "lllineeditor.h"
+#include "lltextbox.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 #include "lluictrlfactory.h"

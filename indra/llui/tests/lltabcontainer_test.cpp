@@ -674,4 +674,119 @@ namespace tut
         ensure_equals("as tall as the room leaves it", in_button.getHeight(), box.getHeight() - 4);
         tabs->die();
     }
+
+    // Where the strip is scrolled to, and how far it can go, count the
+    // tabs that show. A hidden tab is not a place to scroll to and takes
+    // no room; it used to be counted into how many fit from the right and
+    // into where a selected tab sits, so the strip scrolled to the wrong
+    // place whenever a hidden tab lay before the one selected.
+    template<> template<>
+    void lltabcontainer_object::test<22>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build();
+        for (const char* name : { "a", "b", "c", "d", "e" })
+        {
+            tabs->addTabPanel(page(name, std::string()));
+        }
+        LLPanel* wide = page("f", std::string());
+        tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(wide)
+                          .label("A label long enough to be widened to the strip's maximum"));
+        tabs->addTabPanel(page("g", std::string()));
+        LLPanel* last = page("h", std::string());
+        tabs->addTabPanel(last);
+        ensure_equals("the wide tab is as wide as a tab may be",
+                      tabButton(tabs, "f")->getRect().getWidth(), tabs->getMaxTabWidth());
+
+        tabs->setTabVisibility(wide, false);
+        ensure_equals("seven tabs of sixty in four hundred: one more than fit", tabs->getMaxScrollPos(), 1);
+
+        tabs->selectTabPanel(last);
+        ensure_equals("scrolled one tab to show the last", tabs->getScrollPos(), 1);
+        tabs->die();
+    }
+
+    // Arrow keys on a tab button switch tabs on their own. With a modifier
+    // held they are somebody else's key, and the strip says so.
+    template<> template<>
+    void lltabcontainer_object::test<23>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build();
+        LLPanel* first = page("first", std::string());
+        LLPanel* second = page("second", std::string());
+        tabs->addTabPanel(first);
+        tabs->addTabPanel(second);
+        tabs->selectTabPanel(first);
+        tabButton(tabs, "first")->setFocus(true);
+
+        ensure("control-right is not the strip's", !tabs->handleKeyHere(KEY_RIGHT, MASK_CONTROL));
+        ensure_equals("and moved nothing", tabs->getCurrentPanel(), first);
+        ensure("right on its own is", tabs->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        ensure_equals("and moved to the next", tabs->getCurrentPanel(), second);
+        gFocusMgr.setKeyboardFocus(nullptr);
+        tabs->die();
+    }
+
+    // An indent asked for on a tab is added to the padding its label has
+    // along the top; it used to be written and then written over.
+    template<> template<>
+    void lltabcontainer_object::test<24>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build();
+        LLPanel* plain = page("plain", std::string());
+        LLPanel* indented = page("indented", std::string());
+        tabs->addTabPanel(plain);
+        tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(indented).indent(10));
+        const S32 pad = tabButton(tabs, "plain")->getLeftHPad();
+        ensure_equals("the indent is added to the label's padding",
+                      tabButton(tabs, "indented")->getLeftHPad(), pad + 10);
+        tabs->die();
+    }
+
+    // The container hides when its last tab is hidden and shows when one
+    // comes back, and between those its visibility is its owner's: hiding
+    // one tab among others does not show a container its owner has hidden.
+    template<> template<>
+    void lltabcontainer_object::test<25>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer* tabs = build();
+        LLPanel* first = page("first", std::string());
+        LLPanel* second = page("second", std::string());
+        tabs->addTabPanel(first);
+        tabs->addTabPanel(second);
+        tabs->selectTabPanel(first);
+
+        tabs->setVisible(false);
+        tabs->setTabVisibility(second, false);
+        ensure("hiding a tab among others leaves the container as its owner left it", !tabs->getVisible());
+        tabs->setTabVisibility(second, true);
+        ensure("and so does showing one while another showed", !tabs->getVisible());
+
+        tabs->setVisible(true);
+        tabs->setTabVisibility(first, false);
+        tabs->setTabVisibility(second, false);
+        ensure("nothing left to show hides it", !tabs->getVisible());
+        tabs->setTabVisibility(first, true);
+        ensure("something to show again shows it", tabs->getVisible());
+        tabs->die();
+    }
 }

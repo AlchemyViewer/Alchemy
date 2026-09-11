@@ -49,6 +49,7 @@
 #include "llpreview.h"
 #include "llsidepanelinventory.h"
 #include "llstartup.h"
+#include "lltextbox.h"
 #include "lltrans.h"
 #include "llviewerassettype.h"
 #include "llviewerattachmenu.h"
