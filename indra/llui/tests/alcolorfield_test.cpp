@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alcolorfield.h"
+#include "../alcolorpicker.h"
 
 #include "../alpopover.h"
 #include "../llfloater.h"
@@ -233,6 +234,37 @@ namespace tut
         LLColor4 color;
         ensure("which now comes to a colour", field->resolved(color));
         ensure("the black one", color == LLColor4::black);
+        field->die();
+    }
+
+    // The picker on the other tab starts from what the field has, looked
+    // up where the field has a name, and follows a name chosen from the
+    // grid. It used to read the name as numbers and start from black.
+    template<> template<>
+    void alcolorfield_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorField* field = make();
+        field->setValue("White");
+        field->handleMouseDown(4, 10, MASK_NONE);
+
+        ALColorPicker* picker = gFloaterView->findChild<ALColorPicker>("picker", true);
+        ensure("the popover has its picker", picker != nullptr);
+        ensure("which starts from the field's colour", picker->color() == LLColor4::white);
+
+        LLView* grid = swatchesUnder(gFloaterView);
+        ensure("and the grid", grid != nullptr);
+        // The first swatch, which is the first name in the table.
+        grid->handleMouseDown(5 + 14, grid->getRect().getHeight() - 5 - 14, MASK_NONE);
+        LLFloater* popover = grid->getParentByType<LLFloater>();
+        ensure("the grid is in the popover", popover != nullptr);
+        const std::string chosen = popover->getTitle();
+        ensure("a name was chosen", LLUIColorTable::instance().colorExists(chosen));
+        ensure("and the picker followed it",
+               picker->color() == LLUIColorTable::instance().getColor(chosen).get());
         field->die();
     }
 }

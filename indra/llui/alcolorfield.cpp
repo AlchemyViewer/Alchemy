@@ -28,6 +28,7 @@
 
 #include "alcolorpicker.h"
 #include "alpopover.h"
+#include "alstringmatch.h"
 
 #include "llfiltereditor.h"
 #include "llfloater.h"
@@ -131,19 +132,10 @@ namespace
 
         void filter(const std::string& text)
         {
-            mFilter = text;
-            LLStringUtil::toLower(mFilter);
             mShown.clear();
             for (const Entry& entry : mAll)
             {
-                if (mFilter.empty())
-                {
-                    mShown.push_back(&entry);
-                    continue;
-                }
-                std::string name(entry.name);
-                LLStringUtil::toLower(name);
-                if (name.find(mFilter) != std::string::npos)
+                if (ALStringMatch::containsNoCase(entry.name, text))
                 {
                     mShown.push_back(&entry);
                 }
@@ -246,7 +238,6 @@ namespace
         std::vector<Entry>          mAll;
         std::vector<const Entry*>   mShown;
         std::string                 mChosen;
-        std::string                 mFilter;
         chose_t                     mChose;
         S32                         mHover = -1;
     };
@@ -309,7 +300,11 @@ namespace
             gp.rect = LLRect(0, body.getHeight(), scroll->getContentWindowRect().getWidth(), 0);
             gp.background_visible = false;
             gp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
-            mGrid = new ALColorSwatchGrid(gp, [this](const std::string& name) { chose(name); });
+            mGrid = new ALColorSwatchGrid(gp, [this](const std::string& name)
+            {
+                chose(name);
+                showInPicker(name);
+            });
             mGrid->setChosen(mValue);
             scroll->addChild(mGrid);
             // A tab container picks its first tab when it is built, and this
@@ -330,7 +325,7 @@ namespace
             pp.rect = LLRect(4, body.getHeight() - 4, body.getWidth() - 4, 4);
             pp.follows.flags = FOLLOWS_ALL;
             mPicker = LLUICtrlFactory::create<ALColorPicker>(pp);
-            mPicker->setValue(mValue);
+            showInPicker(mValue);
             mPicker->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
             {
                 chose(ctrl->getValue().asString());
@@ -383,6 +378,18 @@ namespace
         void refreshPreview()
         {
             setTitle(mValue);
+        }
+
+        // The picker starts from what the field has, and follows a name
+        // chosen from the grid: a name is what a file writes, and the
+        // picker reads numbers, so the name is looked up for it.
+        void showInPicker(const std::string& value)
+        {
+            LLColor4 color;
+            if (resolve(value, color))
+            {
+                mPicker->setColor(color);
+            }
         }
 
         std::string         mValue;

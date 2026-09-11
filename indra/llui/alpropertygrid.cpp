@@ -26,6 +26,8 @@
 
 #include "alpropertygrid.h"
 
+#include "alstringmatch.h"
+
 #include "llui.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
@@ -176,16 +178,6 @@ namespace
         return text;
     }
 
-    bool carries(std::string_view haystack, std::string_view needle)
-    {
-        if (needle.empty())
-        {
-            return true;
-        }
-        const auto at = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(),
-                                    [](char a, char b) { return LLStringOps::toLower(a) == LLStringOps::toLower(b); });
-        return at != haystack.end();
-    }
 }
 
 // The strip beside a label that says this value is written somewhere else
@@ -460,7 +452,7 @@ bool ALPropertyGrid::shows(const Field& field) const
     {
         return false;
     }
-    return carries(field.name, mFilter);
+    return ALStringMatch::containsNoCase(field.name, mFilter);
 }
 
 // What the row is, then where what is in force came from, then -- where

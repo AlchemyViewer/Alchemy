@@ -27,6 +27,7 @@
 #include "alspecimenlist.h"
 
 #include "alemptystate.h"
+#include "alstringmatch.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llscrollcontainer.h"
@@ -45,16 +46,6 @@ namespace
     constexpr S32 HEADING_HEIGHT = 20;
     constexpr S32 INSET = 6;
     constexpr S32 GAP = 8;
-
-    bool holds(std::string_view haystack, std::string_view needle)
-    {
-        const auto same = [](char a, char b)
-        {
-            return LLStringOps::toLower(a) == LLStringOps::toLower(b);
-        };
-        return std::search(haystack.begin(), haystack.end(),
-                           needle.begin(), needle.end(), same) != haystack.end();
-    }
 }
 
 // One row: a label, and the thing itself beside it.
@@ -252,7 +243,8 @@ void ALSpecimenList::setSpecimens(std::vector<Specimen> specimens)
 
 bool ALSpecimenList::passes(const Specimen& specimen) const
 {
-    return mFilter.empty() || holds(specimen.label, mFilter) || holds(specimen.group, mFilter);
+    return ALStringMatch::containsNoCase(specimen.label, mFilter)
+        || ALStringMatch::containsNoCase(specimen.group, mFilter);
 }
 
 void ALSpecimenList::filter(const std::string& text)

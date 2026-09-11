@@ -26,6 +26,7 @@
 
 #include "alxuifindings.h"
 
+#include "alstringmatch.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -127,22 +128,6 @@ std::vector<std::pair<std::string, S32> > ALXUIFindings::byRule() const
     return rules;
 }
 
-namespace
-{
-    // Without regard to case, since nobody typing a filter is thinking about
-    // it, and without copying either string: this runs over every finding
-    // held, four times each, on every keystroke.
-    bool holds(std::string_view haystack, std::string_view needle)
-    {
-        const auto same = [](char a, char b)
-        {
-            return LLStringOps::toLower(a) == LLStringOps::toLower(b);
-        };
-        return std::search(haystack.begin(), haystack.end(),
-                           needle.begin(), needle.end(), same) != haystack.end();
-    }
-}
-
 ALXUIFindings::Selected ALXUIFindings::select(const Query& query) const
 {
     Selected selected;
@@ -174,10 +159,10 @@ ALXUIFindings::Selected ALXUIFindings::select(const Query& query) const
                 continue;
             }
             if (!query.text.empty()
-                && !holds(finding.message, query.text)
-                && !holds(finding.what, query.text)
-                && !holds(file, query.text)
-                && !holds(ALXUISelection::toString(finding.path), query.text))
+                && !ALStringMatch::containsNoCase(finding.message, query.text)
+                && !ALStringMatch::containsNoCase(finding.what, query.text)
+                && !ALStringMatch::containsNoCase(file, query.text)
+                && !ALStringMatch::containsNoCase(ALXUISelection::toString(finding.path), query.text))
             {
                 continue;
             }

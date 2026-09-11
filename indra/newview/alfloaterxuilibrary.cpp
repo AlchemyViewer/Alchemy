@@ -27,6 +27,7 @@
 #include "alfloaterxuilibrary.h"
 
 #include "alfloaterxuistudio.h"
+#include "alstringmatch.h"
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
 #include "alxuinotes.h"
@@ -86,8 +87,7 @@ void ALFloaterXUILibrary::fillTags()
 {
     const std::string chosen = mTags->getSelectedValue().asString();
     // Every tag is lower case; what is typed to find one need not be.
-    std::string filter = mFilter ? mFilter->getText() : std::string();
-    LLStringUtil::toLower(filter);
+    const std::string filter = mFilter ? mFilter->getText() : std::string();
     mTags->deleteAllItems();
 
     // Grouped, and each group in one place: the list is read down, so a tag
@@ -96,7 +96,7 @@ void ALFloaterXUILibrary::fillTags()
     std::vector<std::pair<ALXUISchema::Group, std::string>> rows;   // group, tag
     for (const ALXUISchema::Tag& declared : schema.tags())
     {
-        if (!filter.empty() && declared.name.find(filter) == std::string::npos)
+        if (!ALStringMatch::containsNoCase(declared.name, filter))
         {
             continue;
         }

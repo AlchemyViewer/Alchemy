@@ -276,6 +276,7 @@ target_sources(llui
     alquickopen.h
     alscopebar.h
     alspecimenlist.h
+    alstringmatch.h
     altabstrip.h
     alfollowscontrol.h
     alfontfield.h

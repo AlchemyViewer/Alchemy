@@ -35,6 +35,7 @@
 #include "aljumpbar.h"
 #include "alscopebar.h"
 #include "alspecimenlist.h"
+#include "alstringmatch.h"
 #include "altabstrip.h"
 #include "alpropertygrid.h"
 #include "alxuinotes.h"
@@ -3519,21 +3520,15 @@ void ALFloaterXUIStudio::fillNotifications()
     const std::string selected = mNotification;
     mNotifications->deleteAllItems();
 
-    std::string filter = mNotificationFilter ? mNotificationFilter->getText() : std::string();
-    LLStringUtil::toLower(filter);
+    const std::string filter = mNotificationFilter ? mNotificationFilter->getText() : std::string();
 
     for (auto it = LLNotifications::instance().templatesBegin();
          it != LLNotifications::instance().templatesEnd(); ++it)
     {
         const LLNotificationTemplatePtr& tmpl = it->second;
-        if (!filter.empty())
+        if (!ALStringMatch::containsNoCase(tmpl->mName, filter))
         {
-            std::string name = tmpl->mName;
-            LLStringUtil::toLower(name);
-            if (name.find(filter) == std::string::npos)
-            {
-                continue;
-            }
+            continue;
         }
         std::string message = tmpl->mMessage;
         LLStringUtil::replaceChar(message, '\n', ' ');
@@ -6692,8 +6687,9 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
     {
         // Looked at and nothing more to say, which is not the same answer as
         // never looked at: the store keeps the difference.
+        const S32 counted = (S32)found.size();
         mFindingStore.replace(entry.name, std::move(found));
-        return 0;
+        return counted;
     }
 
     ALXUIPreviewHost* host = nullptr;
@@ -6734,7 +6730,6 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
         entries = sink.entries();
     }
 
-    S32 counted = 0;
     if (root)
     {
         ALXUISourceMap map;
@@ -6755,10 +6750,11 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
             input.authored = layers.front()->root();
         }
         lint.run(input);
-
-        counted = (S32)lint.findings().size();
         found.insert(found.end(), lint.findings().begin(), lint.findings().end());
     }
+    // Everything said about the file, the catalog's part included: the
+    // count stepping across the status is the count the store ends with.
+    const S32 counted = (S32)found.size();
     mFindingStore.replace(entry.name, std::move(found));
     if (host)
     {
@@ -7843,6 +7839,7 @@ void ALFloaterXUIStudio::startRepairAll()
     mRepairQueue.clear();
     mRepairFiles = 0;
     mRepairMoves = 0;
+    mRepairFailed = 0;
     for (const ALXUICatalog::Entry& entry : mCatalog.entries())
     {
         if (overlayLayer(entry, language))
@@ -7870,6 +7867,14 @@ void ALFloaterXUIStudio::stepRepairAll()
                 mRepairMoves += moves;
                 mCatalog.reload(name);
             }
+            else if (!error.empty())
+            {
+                // A file that would not be read or written is said so in
+                // the log, once: a sweep over seven hundred files that
+                // stopped at the first would never finish.
+                ++mRepairFailed;
+                LL_WARNS("XUIStudio") << "repair " << language << ": " << name << ": " << error << LL_ENDL;
+            }
         }
     }
 
@@ -7881,7 +7886,7 @@ void ALFloaterXUIStudio::stepRepairAll()
     if (mRepairQueue.empty())
     {
         LL_INFOS("XUIStudio") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
-                            << mRepairFiles << " files" << LL_ENDL;
+                            << mRepairFiles << " files, " << mRepairFailed << " files not written" << LL_ENDL;
         // A file that was held went through its document, and that is a
         // step in its history.
         mDocuments.settle();

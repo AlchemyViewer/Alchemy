@@ -714,6 +714,7 @@ private:
     std::deque<std::string>         mRepairQueue;   // files still to repair
     S32                             mRepairFiles = 0;
     S32                             mRepairMoves = 0;
+    S32                             mRepairFailed = 0;
 
     std::deque<std::string>         mCensusQueue;   // files still to count
     boost::unordered_map<std::string, std::map<std::string, S32>> mCensus;

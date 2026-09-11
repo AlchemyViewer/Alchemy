@@ -28,6 +28,7 @@
 
 #include "llcheckboxctrl.h"
 #include "alpopover.h"
+#include "alstringmatch.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
 #include "llfloater.h"
@@ -109,14 +110,10 @@ namespace
 
         void filter(const std::string& text)
         {
-            std::string wanted(text);
-            LLStringUtil::toLower(wanted);
             mShown.clear();
             for (size_t i = 0; i < mAll.size(); ++i)
             {
-                std::string lower(mAll[i]);
-                LLStringUtil::toLower(lower);
-                if (wanted.empty() || lower.find(wanted) != std::string::npos)
+                if (ALStringMatch::containsNoCase(mAll[i], text))
                 {
                     mShown.push_back(i);
                 }
