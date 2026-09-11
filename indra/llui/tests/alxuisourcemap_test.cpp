@@ -65,6 +65,7 @@ namespace tut
             "    </panel>\n"
             "  </panel>\n"
             "  <panel name=\"other\" width=\"10\" height=\"10\"/>\n"                     // 10
+            "  <panel name=\"line\" width=\"10\" height=\"10\"><panel name=\"same\" width=\"1\" height=\"1\"/></panel>\n"  // 11
             "</floater>\n";
 
         struct TestFloater : public LLFloater
@@ -159,17 +160,19 @@ namespace tut
         ALXUISourceMap map;
         map.build(floater, root);
 
-        // The file names six widgets: the floater, outer, two inners, the
-        // leaf, and other. The floater made more views than that.
-        ensure_equals("six views come from the file", map.size(), 6u);
-        ensure("the floater built views of its own", countViews(floater) > 6);
+        // The file names eight widgets: the floater, outer, two inners, the
+        // leaf, other, and a pair on one line. The floater made more views
+        // than that.
+        ensure_equals("eight views come from the file", map.size(), 8u);
+        ensure("the floater built views of its own", countViews(floater) > 8);
 
         LLView* outer = childNamed(floater, "outer");
         LLView* inner1 = childNamed(outer, "inner", 0);
         LLView* inner2 = childNamed(outer, "inner", 1);
         LLView* leaf = childNamed(inner2, "leaf");
         LLView* other = childNamed(floater, "other");
-        ensure("the tree is as the file says", outer && inner1 && inner2 && leaf && other);
+        LLView* same = childNamed(childNamed(floater, "line"), "same");
+        ensure("the tree is as the file says", outer && inner1 && inner2 && leaf && other && same);
 
         ensure_equals("the floater's line", map.find(floater)->line, 1);
         ensure_equals("the floater's tag", map.find(floater)->tag, std::string("floater"));
@@ -183,7 +186,7 @@ namespace tut
         ensure("which came from no element", !map.isFromXML(dragHandle(floater)));
         for (const LLView* child : *floater->getChildList())
         {
-            if (child != outer && child != other)
+            if (child != outer && child != other && child != childNamed(floater, "line"))
             {
                 ensure(std::string("no element for ") + child->getName(), !map.isFromXML(child));
             }
@@ -192,6 +195,7 @@ namespace tut
         ensure_equals("a line maps to the view starting on it", map.viewAtLine(5), inner2);
         ensure_equals("a line inside an element maps to the element before it", map.viewAtLine(6), inner2);
         ensure_equals("a line before the first element maps to nothing", map.viewAtLine(0), (const LLView*)nullptr);
+        ensure_equals("two elements opening on one line: the inner one is the nearer", map.viewAtLine(11), same);
 
         map.clear();
         ensure_equals("cleared", map.size(), 0u);

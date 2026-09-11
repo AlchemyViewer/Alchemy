@@ -250,4 +250,57 @@ namespace tut
                !ALXUICatalog::resolve(en->root(), ALXUISelection::fromString("body/ok#2")));
         ensure_equals("and back again", ALXUISelection::toString(ALXUICatalog::namePath(second)), std::string("body/ok#1"));
     }
+
+    // A file element with no name is known by its value in the file's
+    // vocabulary, as the merge knows a combo box's items, and by "unnamed"
+    // in a view's, which is what the widget built from it is called. Both
+    // reach it: a path taken from a view finds the element the merge would.
+    template<> template<>
+    void alxuicatalog_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLUICtrlFactory::getDefaultParams<LLPanel>();
+
+        const std::string xml =
+            "<panel name=\"p\">\n"
+            "  <combo_box name=\"c\">\n"
+            "    <item value=\"v1\" label=\"One\"/>\n"
+            "    <item value=\"v2\" label=\"Two\"/>\n"
+            "    <item label=\"Three\"/>\n"
+            "  </combo_box>\n"
+            "  <panel value=\"x\" width=\"1\"/>\n"
+            "  <panel value=\"y\" width=\"2\"/>\n"
+            "</panel>\n";
+        pugi::xml_document doc;
+        ensure("parses", doc.load_string(xml.c_str()));
+        const pugi::xml_node root = doc.document_element();
+        const pugi::xml_node two = root.child("combo_box").child("item").next_sibling("item");
+        const pugi::xml_node three = two.next_sibling("item");
+        const pugi::xml_node y = root.last_child();
+
+        ensure_equals("an item is known by its value", ALXUISelection::toString(ALXUICatalog::namePath(two, true)),
+                      std::string("c/v2"));
+        // One with neither is unnamed, and counted among every sibling with
+        // no name, since that is what a step of "unnamed" counts.
+        ensure_equals("and one with neither is unnamed", ALXUISelection::toString(ALXUICatalog::namePath(three, true)),
+                      std::string("c/unnamed#2"));
+        ensure("the value resolves", ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v2"), true) == two);
+        ensure("and unnamed, counted among the ones with no name, reaches the third",
+               ALXUICatalog::resolve(root, ALXUISelection::fromString("c/unnamed#2"), true) == three);
+        ensure("a value the file lacks resolves to nothing",
+               !ALXUICatalog::resolve(root, ALXUISelection::fromString("c/v3"), true));
+
+        // A widget with a value and no name: the view is "unnamed", and a
+        // path taken from the view reaches the file's element all the same.
+        ensure_equals("a widget's path says unnamed", ALXUISelection::toString(ALXUICatalog::namePath(y)),
+                      std::string("unnamed#1"));
+        ensure_equals("the file's says its value", ALXUISelection::toString(ALXUICatalog::namePath(y, true)),
+                      std::string("y"));
+        ensure("the view's path reaches it in the file's vocabulary",
+               ALXUICatalog::resolve(root, ALXUISelection::fromString("unnamed#1"), true) == y);
+        ensure("and so does the file's", ALXUICatalog::resolve(root, ALXUISelection::fromString("y"), true) == y);
+    }
 }

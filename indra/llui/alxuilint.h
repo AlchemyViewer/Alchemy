@@ -229,6 +229,7 @@ private:
     void checkLayoutDimensions(const Input& input, LLView* view, const ALXUISelection::path_t& path,
                                const LLXMLNode* node);
     void checkCallbacks(const Input& input, const ALXUISelection::path_t& path, S32 line);
+    void checkParameterNames(const Input& input, const ALXUISelection::path_t& path, S32 line);
 
     std::vector<Finding>                        mFindings;
     boost::unordered_map<std::string, S32>      mCountByPath;   // the element and everything below it

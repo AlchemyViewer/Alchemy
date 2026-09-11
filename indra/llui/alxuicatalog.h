@@ -155,20 +155,30 @@ public:
 
     // The names from the root's child down to an element, which is the
     // key the merge matches by and the key the selection is held under.
-    // An element without a name is "unnamed"; a repeated name among the
-    // siblings carries its ordinal as "name#2".
+    // An element without a name is "unnamed", which is what the view built
+    // from it is called; a repeated name among the siblings carries its
+    // ordinal as "name#2".
     //
     // A path that addresses a view counts widget siblings, since only
     // those became views. A path that addresses an element of a file
     // counts every named sibling, because that is what the merge matches
     // on: the parameter elements -- <floater.string>, <scroll_list.columns>
     // -- carry names and are matched by them, and a path that walks past
-    // them cannot name what they hold.
+    // them cannot name what they hold. In that vocabulary an element with
+    // no name is known by its value where it has one, as the merge knows
+    // a combo box's items; a step of "unnamed" still finds it, so a path
+    // taken from the view it built reaches it as well.
     static std::vector<std::string> namePath(pugi::xml_node node, bool any_tag = false);
 
     // The element at a name path under a root: at each step, the child
     // with that name, or nothing.
     static pugi::xml_node resolve(pugi::xml_node root, const std::vector<std::string>& path, bool any_tag = false);
+
+    // The key a file element is matched by in the any_tag vocabulary: its
+    // name, else its value, else "unnamed". The merge's own rule.
+    static std::string_view keyOf(pugi::xml_node node, bool any_tag = true);
+    // Whether a sibling answers to a step's name in that vocabulary.
+    static bool answersTo(pugi::xml_node node, std::string_view name, bool any_tag);
 
     // The line an element starts on in the layer that holds it.
     static S32 lineOf(const Layer& layer, pugi::xml_node node);

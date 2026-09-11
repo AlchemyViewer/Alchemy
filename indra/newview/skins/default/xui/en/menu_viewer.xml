@@ -4505,13 +4505,6 @@ function="World.EnvPreset"
               parameter="xui_studio" />
             </menu_item_call>
             <menu_item_call
-             label="Floater in Panel Probe"
-             name="Floater in Panel Probe">
-             <menu_item_call.on_click
-              function="Floater.Toggle"
-              parameter="in_panel_probe" />
-            </menu_item_call>
-            <menu_item_call
              label="XUI Baseline Census"
              name="XUI Baseline Census">
                 <menu_item_call.on_click

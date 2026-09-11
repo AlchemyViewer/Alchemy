@@ -35,10 +35,13 @@
 #include "llmenugl.h"
 #include "llscrollcontainer.h"
 #include "llstatview.h"
+#include "llstl.h"
 #include "lluictrlfactory.h"
 
 #include <algorithm>
 #include <filesystem>
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 namespace
 {
@@ -375,15 +378,54 @@ std::vector<const ALXUICatalog::Layer*> ALXUICatalog::layersFor(const Entry& ent
 }
 
 // static
+// Remembered per tag: the registries are filled by static registrars
+// before anything asks, and a path asks this of every sibling of every
+// step.
 bool ALXUICatalog::isWidgetTag(std::string_view tag)
 {
+    static boost::unordered_flat_map<std::string, bool, ll::string_hash, std::equal_to<> > known;
+    if (const auto held = known.find(tag); held != known.end())
+    {
+        return held->second;
+    }
     const std::string key(tag);
-    return LLDefaultChildRegistry::instance().getValue(key)
+    const bool widget = LLDefaultChildRegistry::instance().getValue(key)
         || MenuRegistry::instance().getValue(key)
         || LLLayoutStack::LayoutStackRegistry::instance().getValue(key)
         || ScrollContainerRegistry::instance().getValue(key)
         || ContainerViewRegistry::instance().getValue(key)
         || StatViewRegistry::instance().getValue(key);
+    known.emplace(key, widget);
+    return widget;
+}
+
+// static
+std::string_view ALXUICatalog::keyOf(pugi::xml_node node, bool any_tag)
+{
+    if (const pugi::xml_attribute name = node.attribute("name"))
+    {
+        return name.value();
+    }
+    if (any_tag)
+    {
+        if (const pugi::xml_attribute value = node.attribute("value"); value && *value.value())
+        {
+            return value.value();
+        }
+    }
+    return "unnamed";
+}
+
+// static
+bool ALXUICatalog::answersTo(pugi::xml_node node, std::string_view name, bool any_tag)
+{
+    if (keyOf(node, any_tag) == name)
+    {
+        return true;
+    }
+    // A step taken from a view says "unnamed" of an element the merge
+    // knows by its value: the view was never told the value.
+    return any_tag && name == "unnamed" && !node.attribute("name");
 }
 
 // static
@@ -443,12 +485,12 @@ std::vector<std::string> ALXUICatalog::namePath(pugi::xml_node node, bool any_ta
     std::vector<std::string> path;
     for (pugi::xml_node cur = node; cur && cur.parent() && cur.parent().type() == pugi::node_element; cur = cur.parent())
     {
-        const char* name = cur.attribute("name").as_string("unnamed");
+        const std::string_view name = keyOf(cur, any_tag);
         S32 ordinal = 0;
         for (pugi::xml_node sib = cur.previous_sibling(); sib; sib = sib.previous_sibling())
         {
             if (sib.type() == pugi::node_element && (any_tag || isWidgetTag(sib.name()))
-                && std::string_view(sib.attribute("name").as_string("unnamed")) == name)
+                && answersTo(sib, name, any_tag))
             {
                 ++ordinal;
             }
@@ -476,7 +518,7 @@ pugi::xml_node ALXUICatalog::resolve(pugi::xml_node root, const std::vector<std:
             {
                 continue;
             }
-            if (std::string_view(child.attribute("name").as_string("unnamed")) == name)
+            if (answersTo(child, name, any_tag))
             {
                 if (seen++ == wanted)
                 {

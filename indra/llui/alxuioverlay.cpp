@@ -165,9 +165,12 @@ void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
     mOrigins[base].push_back(Origin{ layer, overlay->getLineNumber(), std::string() });
 }
 
+// Only where the layer's element says nothing at all -- no text, no
+// children, nothing but the name it was matched by: an element written for
+// an attribute of its own says what it came to say.
 void ALXUIOverlay::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
-    if (overlay->getFirstChild().isNull())
+    if (overlay->getFirstChild().isNull() && overlay->mAttributes.size() <= 1)
     {
         drop(layer, overlay, std::string(), "LintDropTextEmpty");
     }

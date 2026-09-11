@@ -82,7 +82,6 @@
     <floater.string name="DropAfter">[WHAT] after [WHERE]</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
-    <floater.string name="MenuUndoWrite">Undo writing [FILE]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
     <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
     <floater.string name="FindingsAll">[SHOWN] of [HELD] findings over [FILES] files checked</floater.string>

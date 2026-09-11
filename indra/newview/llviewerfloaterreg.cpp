@@ -184,7 +184,6 @@
 #include "llfloatertos.h"
 #include "llfloatertoybox.h"
 #include "llfloatertranslationsettings.h"
-#include "alfloaterinpanelprobe.h"
 #include "alfloaterxuistudio.h"
 #include "alfloaterxuilibrary.h"
 #include "llfloaterwebcontent.h"
@@ -569,7 +568,6 @@ void LLViewerFloaterReg::registerFloaters()
 
     LLFloaterReg::add("xui_studio", "floater_xui_studio.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUIStudio>);
     LLFloaterReg::add("xui_library", "floater_xui_library.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterXUILibrary>);
-    LLFloaterReg::add("in_panel_probe", "floater_in_panel_probe.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterInPanelProbe>);
     LLFloaterReg::add("upload_anim_bvh", "floater_animation_bvh_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterBvhPreview>, "upload");
     LLFloaterReg::add("upload_anim_anim", "floater_animation_anim_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterAnimPreview>, "upload");
     LLFloaterReg::add("upload_image", "floater_image_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterImagePreview>, "upload");

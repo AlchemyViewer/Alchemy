@@ -660,4 +660,50 @@ namespace tut
         ensure("and it is translated outright afterwards: " + describe(units),
                one && one->state == ALXUITranslate::State::Translated);
     }
+
+    // A combo box's items have no name, and the merge matches them by
+    // value: a language that translates the second item alone translates
+    // the second, not whichever item it lists first. And an item written
+    // for a base that lacks it is made with the value that names it.
+    template<> template<>
+    void alxuitranslate_object::test<15>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(
+            "<panel name=\"root\">\n"
+            "    <combo_box name=\"c\">\n"
+            "        <item value=\"v1\" label=\"One\"/>\n"
+            "        <item value=\"v2\" label=\"Two\"/>\n"
+            "    </combo_box>\n"
+            "</panel>\n");
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <combo_box name=\"c\">\n"
+            "        <item value=\"v2\" label=\"Zwei\"/>\n"
+            "    </combo_box>\n"
+            "</panel>\n"));
+
+        ALXUITranslate units;
+        units.scan(root, overlay.root());
+        const ALXUITranslate::Unit* one = find(units, "c/v1", "label");
+        const ALXUITranslate::Unit* two = find(units, "c/v2", "label");
+        ensure("both items are units, by value: " + describe(units), one && two);
+        ensure_equals("the first is missing", (int)one->state, (int)ALXUITranslate::State::Missing);
+        ensure_equals("the second is translated", (int)two->state, (int)ALXUITranslate::State::Translated);
+        ensure_equals("with the language's word", two->translation, std::string("Zwei"));
+
+        std::string error;
+        ensure("writes the first: " + error, ALXUITranslate::write(overlay, root, *one, "Eins", error));
+        ensure_equals("as an item named by its value", overlay.text(),
+            "<panel name=\"root\">\n"
+            "    <combo_box name=\"c\">\n"
+            "        <item value=\"v2\" label=\"Zwei\"/>\n"
+            "        <item value=\"v1\" label=\"Eins\"/>\n"
+            "    </combo_box>\n"
+            "</panel>\n");
+        units.scan(root, overlay.root());
+        one = find(units, "c/v1", "label");
+        ensure("and it is translated now", one && one->state == ALXUITranslate::State::Translated);
+    }
 }

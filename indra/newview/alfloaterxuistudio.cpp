@@ -5048,13 +5048,6 @@ void ALFloaterXUIStudio::refreshUndoLabels(const std::vector<ALXUIDocuments::Ent
             args["[WHAT]"] = describeAction(history[in_force - 1]);
             undo->setLabel(getString("MenuUndoWhat", args));
         }
-        else if (!mWroteThroughPath.empty())
-        {
-            // The translation table writes through rather than holding, and
-            // its one way back is the file it replaced.
-            args["[FILE]"] = mWroteThroughPath.substr(mWroteThroughPath.find_last_of("/\\") + 1);
-            undo->setLabel(getString("MenuUndoWrite", args));
-        }
         else
         {
             undo->setLabel(getString("MenuUndo"));
@@ -7340,54 +7333,35 @@ void ALFloaterXUIStudio::onTranslationWrite()
         return;
     }
 
-    // The table is written through: a cell answered is a cell written,
-    // and what reads it back is the catalog rather than a document held
-    // open. So this one keeps the file it replaced, and undo puts that
-    // back, where an edit to the document under preview is undone in
-    // memory and never reached the disk at all.
-    //
-    // Unless the language's file is one of the documents held: then the
-    // write goes through that document and is saved from it, since a
-    // disk written under a held document is a disk the document's next
-    // save writes over, and the preview reads the document meanwhile.
-    if (ALXUIEdit* held = mDocuments.find(path))
+    // Through the document set, as every other edit and as a repair: the
+    // write is a step in the language file's history, and the file is
+    // saved at once, since a cell answered is a cell written and what
+    // reads the table back is the catalog. Opening the language's file
+    // does not make it the one being worked on, so what was active stays.
+    const std::string was_active = mDocuments.activePath();
+    ALXUIEdit* held = mDocuments.open(path);
+    if (!held)
     {
-        if (!ALXUITranslate::write(*held, base_layers.front()->root(), unit, mTranslateValue->getText(), error))
-        {
-            setStatus(error);
-            return;
-        }
-        if (!held->save())
-        {
-            setStatus(held->error());
-            return;
-        }
-        mDocuments.settle();
-        fillDocuments();
-        fillHistory();
+        setStatus(mDocuments.error());
+        return;
     }
-    else
+    if (!was_active.empty())
     {
-        ALXUIEdit overlay;
-        if (!overlay.loadFile(path))
-        {
-            setStatus(overlay.error());
-            return;
-        }
-        const std::string before = overlay.text();
-        if (!ALXUITranslate::write(overlay, base_layers.front()->root(), unit, mTranslateValue->getText(), error))
-        {
-            setStatus(error);
-            return;
-        }
-        if (!overlay.save())
-        {
-            setStatus(overlay.error());
-            return;
-        }
-        mWroteThroughPath = path;
-        mWroteThroughText = before;
+        mDocuments.makeActive(was_active);
     }
+    if (!ALXUITranslate::write(*held, base_layers.front()->root(), unit, mTranslateValue->getText(), error))
+    {
+        setStatus(error);
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
     LLStringUtil::format_map_t args;
     args["[FIELD]"] = unit.field.empty() ? getString("TranslateTheText") : unit.field;
     args["[FILE]"] = language + "/" + mFile;
@@ -7406,8 +7380,6 @@ void ALFloaterXUIStudio::onTranslationWrite()
         mCatalog.reload(mFile);
     }
     fillTranslation();
-    // A write is a thing to undo, and the menu says so.
-    refreshUndoLabels(mDocuments.history());
     // The second preview is this language, so it shows what was written.
     if (mShowSecondary && mLanguage2 == language)
     {
@@ -7436,7 +7408,8 @@ void ALFloaterXUIStudio::onTranslationLanguage()
 // Every value this file writes at a path the base has moved on from,
 // moved to where the base has it. Nothing else is touched: the value is
 // the language's own, written back where it will be read.
-S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error)
+S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                                   bool through_set)
 {
     std::vector<const ALXUICatalog::Layer*> base_layers = mCatalog.layersFor(entry, mSkin, mLanguage);
     const ALXUICatalog::Layer* overlay_layer = overlayLayer(entry, language);
@@ -7449,17 +7422,34 @@ S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::
     // is a step of the action that asked for it: a repair nobody can put
     // back is a repair nobody can try. Opening a document makes it the one
     // an operation with no path of its own means, and a repair is not a
-    // change of what is being worked on: the one that was stays.
-    const std::string was_active = mDocuments.activePath();
-    ALXUIEdit* overlay = mDocuments.open(overlay_layer->path);
-    if (!overlay)
+    // change of what is being worked on: the one that was stays. A file
+    // already held goes through its document whatever was asked, since a
+    // disk written under a held document is a disk its next save writes
+    // over.
+    ALXUIEdit local;
+    ALXUIEdit* overlay = mDocuments.find(overlay_layer->path);
+    if (!overlay && through_set)
     {
-        error = mDocuments.error();
-        return 0;
+        const std::string was_active = mDocuments.activePath();
+        overlay = mDocuments.open(overlay_layer->path);
+        if (!overlay)
+        {
+            error = mDocuments.error();
+            return 0;
+        }
+        if (!was_active.empty())
+        {
+            mDocuments.makeActive(was_active);
+        }
     }
-    if (!was_active.empty())
+    else if (!overlay)
     {
-        mDocuments.makeActive(was_active);
+        if (!local.loadFile(overlay_layer->path))
+        {
+            error = local.error();
+            return 0;
+        }
+        overlay = &local;
     }
     const S32 done = ALXUITranslate::repair(*overlay, base_layers.front()->root(), error);
     if (done && !overlay->save())
@@ -7785,7 +7775,7 @@ void ALFloaterXUIStudio::stepRepairAll()
         if (const ALXUICatalog::Entry* entry = mCatalog.find(name))
         {
             std::string error;
-            const S32 moves = repairFile(*entry, language, error);
+            const S32 moves = repairFile(*entry, language, error, /*through_set=*/false);
             if (moves)
             {
                 ++mRepairFiles;
@@ -7804,6 +7794,11 @@ void ALFloaterXUIStudio::stepRepairAll()
     {
         LL_INFOS("XUIStudio") << "repair " << language << ": " << mRepairMoves << " values moved into place across "
                             << mRepairFiles << " files" << LL_ENDL;
+        // A file that was held went through its document, and that is a
+        // step in its history.
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
         fillTranslation();
     }
 }
@@ -8303,17 +8298,20 @@ void ALFloaterXUIStudio::refreshBreadcrumb()
             const ALXUISelection::path_t up(path.begin(), path.begin() + i - 1);
             if (const LLView* parent = ALXUISelection::resolve(pv.root, up))
             {
+                // Every sibling counts towards an ordinal, as a path counts
+                // them; only the ones the file wrote are offered.
                 boost::unordered_map<std::string, S32> seen;
                 for (auto it = parent->getChildList()->rbegin();
                      it != parent->getChildList()->rend(); ++it)
                 {
+                    const std::string& name = (*it)->getName();
+                    const S32 ordinal = seen[name]++;
                     if (!pv.sourceMap.isFromXML(*it))
                     {
                         continue;
                     }
-                    const std::string& name = (*it)->getName();
                     ALXUISelection::path_t beside(up);
-                    beside.push_back(ALXUISelection::step(name, seen[name]++));
+                    beside.push_back(ALXUISelection::step(name, ordinal));
                     crumb.alternatives.emplace_back(name, ALXUISelection::toString(beside));
                 }
                 if (crumb.alternatives.size() < 2)
@@ -8653,11 +8651,11 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
     documentChanged(getString("EditAligned", args));
 }
 
-// One step of the document's own stack, which is one operation as it was
-// asked for however many splices it took, and nothing on disk to put back
-// because nothing went there. The translation table is written through
-// rather than held, so its last write is undone the other way: the file it
-// replaced, put back.
+// One action of the set, which is one thing done as it was asked for
+// however many steps and files it took, and nothing on disk to put back
+// because nothing went there. A translation written and a repair are
+// saved as they are made, so undoing one leaves its file dirty against
+// the disk, with Save the way to write the undo out.
 bool ALFloaterXUIStudio::undoEdit()
 {
     // What is about to be put back, asked before it is, since afterwards the
@@ -8682,23 +8680,7 @@ bool ALFloaterXUIStudio::undoEdit()
         replayChange(getString(what.empty() ? "EditUndone" : "EditUndoneWhat", args));
         return true;
     }
-
-    if (mWroteThroughPath.empty())
-    {
-        return false;
-    }
-    std::string error;
-    if (!ALXUIEdit::writeFile(mWroteThroughPath, mWroteThroughText, error))
-    {
-        setStatus(error);
-        return false;
-    }
-    LLStringUtil::format_map_t args;
-    args["[FILE]"] = mWroteThroughPath.substr(mWroteThroughPath.find_last_of("/\\") + 1);
-    mWroteThroughPath.clear();
-    mWroteThroughText.clear();
-    documentChanged(getString("EditUndone", args));
-    return true;
+    return false;
 }
 
 bool ALFloaterXUIStudio::redoEdit()
@@ -10034,7 +10016,9 @@ void ALFloaterXUIStudio::elementIn(const ALXUICatalog::Layer& layer, const ALXUI
         line = held->lineOf(node);
         return;
     }
-    node = ALXUICatalog::resolve(layer.root(), path);
+    // In the vocabulary the held document uses, so a layer answers the
+    // same whether or not it is one of the documents open.
+    node = ALXUICatalog::resolve(layer.root(), path, /*any_tag=*/true);
     line = node ? ALXUICatalog::lineOf(layer, node) : 0;
 }
 
@@ -10366,7 +10350,7 @@ bool ALFloaterXUIStudio::onMenuEnable(const LLSD& param)
     if (what == "dirty")    { return documentDirty(); }
     // The set's history rather than the active document's: the last thing
     // done may have been to another file, and the label beside this says so.
-    if (what == "undo")     { return mDocuments.canUndo() || !mWroteThroughPath.empty(); }
+    if (what == "undo")     { return mDocuments.canUndo(); }
     if (what == "redo")     { return mDocuments.canRedo(); }
     if (what == "nested")   { return !nestedFile(selectedView()).empty(); }
     return true;

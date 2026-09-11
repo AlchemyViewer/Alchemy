@@ -203,4 +203,31 @@ namespace tut
         ensure_equals("on its line", unnamed->line, 4);
         ensure_equals("and the layer's file is known by its index", overlay.layerPath(1), std::string("de/base.xml"));
     }
+
+    // An element with no text where the base has some is an empty text
+    // only when it says nothing else: one written for an attribute of its
+    // own said what it came to say, and one that is a bare name did not.
+    template<> template<>
+    void alxuioverlay_object::test<7>()
+    {
+        const std::string base_xml =
+            "<panel name=\"p\">\n"
+            "  <text name=\"a\" font=\"Sans\">Base a</text>\n"
+            "  <text name=\"b\">Base b</text>\n"
+            "</panel>\n";
+        const std::string overlay_xml =
+            "<panel name=\"p\">\n"
+            "  <text name=\"a\" font=\"Serif\"/>\n"
+            "  <text name=\"b\"/>\n"
+            "</panel>\n";
+        LLXMLNodePtr base;
+        LLXMLNodePtr layer;
+        ensure("parses", LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base)
+                      && LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
+        ALXUIOverlay overlay;
+        ALXmlLayerMerge::merge(base, layer, 1, &overlay);
+        ensure_equals("one drop", overlay.drops().size(), 1u);
+        ensure_equals("the bare name", overlay.drops().front().key, std::string("LintDropTextEmpty"));
+        ensure_equals("on its line", overlay.drops().front().line, 3);
+    }
 }

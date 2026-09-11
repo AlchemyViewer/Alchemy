@@ -188,7 +188,6 @@ set(viewer_SOURCE_FILES
     alscopedata.cpp
     alxuibaseline.cpp
     alfloaterwebprofile.cpp
-    alfloaterinpanelprobe.cpp
     alfloaterxuilibrary.cpp
     alfloaterxuistudio.cpp
     algradehistory.cpp
@@ -974,7 +973,6 @@ set(viewer_HEADER_FILES
     altexturetable.h
     alxuibaseline.h
     alfloaterwebprofile.h
-    alfloaterinpanelprobe.h
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
     algradehistory.h

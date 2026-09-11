@@ -147,6 +147,23 @@ namespace
         return trimmed(text);
     }
 
+    // The key the merge matches an element by: its name, else its value,
+    // which is how a combo box's items are told apart. Empty where it has
+    // neither, and then nothing matches it.
+    std::string matchKey(pugi::xml_node node)
+    {
+        const char* name = node.attribute("name").as_string();
+        return *name ? name : node.attribute("value").as_string();
+    }
+
+    // What an element written to stand for another carries, so the merge
+    // matches the two: the name where the base has one, the value where it
+    // has only that.
+    std::string keyAttribute(pugi::xml_node node)
+    {
+        return node.attribute("name") ? "name" : "value";
+    }
+
     // A path with an ordinal in it -- "name#2" -- names one of several
     // siblings the base calls the same thing. A translation cannot be
     // written to one of those from here: the ancestors this writes carry
@@ -202,9 +219,9 @@ namespace
                     continue;
                 }
                 stack.push_back(child);
-                if (const char* name = child.attribute("name").as_string(); *name)
+                if (const std::string key = matchKey(child); !key.empty())
                 {
-                    index[name].push_back(child);
+                    index[key].push_back(child);
                 }
             }
         }
@@ -264,7 +281,7 @@ namespace
                     continue;
                 }
                 stack.push_back(child);
-                if (std::string_view(child.attribute("name").as_string()) != name)
+                if (matchKey(child) != name)
                 {
                     continue;
                 }
@@ -358,25 +375,14 @@ static pugi::xml_node mergeTarget(pugi::xml_node base, pugi::xml_node overlay_ro
     {
         return pugi::xml_node();
     }
-    // The name a child is matched by: its name, or its value where it has
-    // no name, which is how a combo box's items are told apart.
-    const char* key = overlay.attribute("name").as_string();
-    if (!*key)
-    {
-        key = overlay.attribute("value").as_string();
-    }
-    if (!*key)
+    const std::string key = matchKey(overlay);
+    if (key.empty())
     {
         return pugi::xml_node();
     }
-    const auto keyOf = [](pugi::xml_node node) -> std::string_view
-    {
-        const char* name = node.attribute("name").as_string();
-        return *name ? name : node.attribute("value").as_string();
-    };
     for (pugi::xml_node child : parent.children())
     {
-        if (child.type() == pugi::node_element && keyOf(child) == key)
+        if (child.type() == pugi::node_element && matchKey(child) == key)
         {
             return child;
         }
@@ -394,7 +400,7 @@ static pugi::xml_node mergeTarget(pugi::xml_node base, pugi::xml_node overlay_ro
                 continue;
             }
             stack.push_back(child);
-            if (keyOf(child) == key)
+            if (matchKey(child) == key)
             {
                 if (only)
                 {
@@ -564,7 +570,7 @@ void ALXUITranslate::scanBase(pugi::xml_node base, pugi::xml_node overlay)
 
         const bool is_root = node == base;
         const path_t path = is_root ? path_t() : ALXUICatalog::namePath(node, /*any_tag=*/true);
-        const std::string name = node.attribute("name").as_string();
+        const std::string name = matchKey(node);
         // Whether translating this element is forbidden is a walk up its
         // ancestors, asked once here rather than once per field of it.
         const bool forbid = forbidden(node);
@@ -695,7 +701,7 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
             continue;
         }
 
-        const std::string name = node.attribute("name").as_string();
+        const std::string name = matchKey(node);
         const path_t path = ALXUICatalog::namePath(node, /*any_tag=*/true);
         pugi::xml_node theirs = ALXUICatalog::resolve(base, path, /*any_tag=*/true);
         Miss missed = Miss::None;
@@ -792,7 +798,7 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
 
     // The element in the overlay, wherever the language has put it, moved
     // under the ancestors the base gives it when that is not where it is.
-    const std::string name = element.attribute("name").as_string();
+    const std::string name = matchKey(element);
     const path_t parent(unit.path.begin(), unit.path.end() - (unit.path.empty() ? 0 : 1));
     if (!unit.path.empty() && !overlay.resolve(unit.path))
     {
@@ -853,9 +859,10 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
         }
         else
         {
-            // Nothing there: the element carrying nothing but its name,
-            // under ancestors carrying nothing but theirs.
-            const std::string xml = "<" + std::string(element.name()) + " name=\"" + name + "\"/>";
+            // Nothing there: the element carrying nothing but what it is
+            // matched by, under ancestors carrying nothing but theirs.
+            const std::string xml = "<" + std::string(element.name()) + " " + keyAttribute(element)
+                                  + "=\"" + name + "\"/>";
             if (!overlay.insertElement(parent, xml))
             {
                 error = overlay.error();
@@ -1038,7 +1045,7 @@ bool ALXUITranslate::ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const 
             return false;
         }
         const path_t parent(so_far.begin(), so_far.end() - 1);
-        const std::string name = node.attribute("name").as_string();
+        const std::string name = matchKey(node);
 
         // The language may already have this ancestor, one level up or
         // three: it is moved, with everything under it, rather than made
@@ -1071,7 +1078,8 @@ bool ALXUITranslate::ensureChain(ALXUIEdit& overlay, pugi::xml_node base, const 
         }
         else
         {
-            const std::string xml = "<" + std::string(node.name()) + " name=\"" + name + "\"/>";
+            const std::string xml = "<" + std::string(node.name()) + " " + keyAttribute(node)
+                                  + "=\"" + name + "\"/>";
             if (!overlay.insertElement(parent, xml))
             {
                 error = overlay.error();

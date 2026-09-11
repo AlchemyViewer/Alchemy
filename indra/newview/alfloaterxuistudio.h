@@ -467,7 +467,13 @@ private:
     const ALXUICatalog::Layer* overlayLayer(const ALXUICatalog::Entry& entry, const std::string& language) const;
     bool overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,
                      std::string& path, bool& created, std::string& error) const;
-    S32 repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error);
+    // Through the document set, so the repair is a step to put back; or,
+    // for a pass over every file of a language, on the file alone, since
+    // holding hundreds of documents open for a batch nobody undoes a file
+    // at a time is not what the set is for. A file already held goes
+    // through its document either way.
+    S32 repairFile(const ALXUICatalog::Entry& entry, const std::string& language, std::string& error,
+                   bool through_set = true);
     void onRepairFile();
     void startRepairAll();
     void stepRepairAll();
@@ -661,9 +667,6 @@ private:
     // this one, to the skin this one varies -- and each of those refusals is
     // a thing the developer came here to do.
     ALXUIDocuments      mDocuments;
-    // The translation table is written through, so its last write is kept
-    // as the file it replaced rather than as a step of the document.
-    std::string         mWroteThroughPath;
     // What the state file said the window's rect was, applied when it
     // opens; and what was last written, so that a frame can tell whether
     // anything moved.
@@ -671,7 +674,6 @@ private:
     LLRect              mShapeRect;
     S32                 mShapeDims[3] = { 0, 0, 0 };
     LLLayoutPanel*      mShapePanes[3] = { nullptr, nullptr, nullptr };
-    std::string         mWroteThroughText;
     S32                 mLastX = -1;
     S32                 mLastY = -1;
 

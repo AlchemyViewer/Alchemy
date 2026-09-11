@@ -959,4 +959,31 @@ namespace tut
         ALXUILint::Rule back;
         ensure("that comes back", ALXUILint::ruleNamed("overlay rescue", back) && back == ALXUILint::Rule::OverlayRescue);
     }
+
+    // A parameter element and a widget under one parent sharing a name: the
+    // merge matches by name whatever the tag, and a path of names cannot
+    // tell them apart. Two widgets of a name are the collision rule's, and
+    // two parameter elements are the merge's own duplicate.
+    template<> template<>
+    void alxuilint_object::test<21>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Run run;
+        ensure("builds", run.build(
+            "  <string name=\"shared\">Hello</string>\n"
+            "  <panel name=\"shared\" left=\"0\" top=\"0\" width=\"20\" height=\"20\"/>\n"
+            "  <string name=\"alone\">Alone</string>\n"
+            "  <panel name=\"other\" left=\"40\" top=\"0\" width=\"20\" height=\"20\"/>"));
+        ensure_equals("one collision: " + run.describe(), run.count(ALXUILint::Rule::NameCollision), 1);
+        const ALXUILint::Finding* f = run.first(ALXUILint::Rule::NameCollision);
+        ensure_equals("said as the parameter sentence", f->key, std::string("LintNameCollisionParameter"));
+        ensure_equals("naming the name", f->what, std::string("shared"));
+        ensure_equals("the parameter element", f->args.at("[TAG]")(), std::string("string"));
+        ensure_equals("and the widget", f->args.at("[OTHER]")(), std::string("panel"));
+        ensure_equals("under the parent", f->args.at("[PARENT]")(), std::string("root"));
+        ensure("on the parent's path, since a path cannot name the pair", f->path.empty());
+    }
 }

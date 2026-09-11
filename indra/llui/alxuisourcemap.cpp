@@ -55,7 +55,9 @@ void ALXUISourceMap::record(const LLView* view, const LLXMLNodePtr& node)
     origin.line = node->getLineNumber();
     origin.tag = node->getName()->mString;
     LLStringUtil::toLower(origin.tag);
-    mByLine.emplace(origin.line, view);
+    // A parent and its child opening on one line: the child is recorded
+    // after, and is the nearer answer to a line.
+    mByLine[origin.line] = view;
 }
 
 void ALXUISourceMap::pairChildren(const LLView* parent, const LLXMLNode* node)

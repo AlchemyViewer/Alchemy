@@ -129,9 +129,11 @@ void ALXmlMergeLog::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode*
                          << namePath(overlay) << " " << reason << LL_ENDL;
 }
 
+// Only where the layer's element says nothing at all: one written for an
+// attribute of its own said what it came to say.
 void ALXmlMergeLog::textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay)
 {
-    if (overlay->getFirstChild().isNull())
+    if (overlay->getFirstChild().isNull() && overlay->mAttributes.size() <= 1)
     {
         LL_DEBUGS("XUIMerge") << where(layer, overlay) << " " << namePath(base)
                               << " has no text here; the base's text is kept" << LL_ENDL;

@@ -56,6 +56,7 @@
     <string name="LintOutOfBounds">sits outside [PARENT], which is [WIDTH] by [HEIGHT]</string>
     <string name="LintTruncation">the text needs [NEEDED] pixels and has [ROOM]</string>
     <string name="LintNameCollision">a second child of [PARENT] named this; getChild answers the first</string>
+    <string name="LintNameCollisionParameter">&lt;[TAG]&gt; and &lt;[OTHER]&gt; under [PARENT] are both named "[NAME]"; the layer merge matches by name and cannot tell them apart, and neither can a path</string>
     <string name="LintOverlap">overlaps [OTHER]</string>
     <string name="LintOverlapHidden">overlaps the hidden [OTHER]</string>
     <string name="LintUnknownAttribute">&lt;[TAG]&gt; has no parameter named "[NAME]"</string>

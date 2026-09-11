@@ -253,6 +253,7 @@ const std::vector<const char*>& ALXUILint::keys()
         "LintOutOfBounds",
         "LintTruncation",
         "LintNameCollision",
+        "LintNameCollisionParameter",
         "LintOverlap",
         "LintOverlapHidden",
         "LintUnknownAttribute",
@@ -546,6 +547,7 @@ void ALXUILint::walkViews(const Input& input, LLView* view, const ALXUISelection
         checkAttributes(input, view, path, origin->node.get());
         checkLayoutDimensions(input, view, path, origin->node.get());
         checkCallbacks(input, path, origin->line);
+        checkParameterNames(input, path, origin->line);
     }
 
     // Children in creation order, which is the order the file lists them.
@@ -957,6 +959,59 @@ void ALXUILint::checkCallbacks(const Input& input, const ALXUISelection::path_t&
             path, input.file, line, tag,
             input.callbacksAreDecisive ? "LintCallbackUnknown" : "LintCallbackNotGlobal",
             { { "[FUNCTION]", function } });
+    }
+}
+
+// A parameter element and a widget under one parent sharing a name. The
+// parser tells them apart by their tags; the layer merge matches children
+// by name whatever the tag, so a translation of either lands on whichever
+// comes first, and a path made of names cannot say which of the two it
+// means. Read off the file as written, since the parser has consumed the
+// parameter elements by the time the tree is walked.
+void ALXUILint::checkParameterNames(const Input& input, const ALXUISelection::path_t& path, S32 line)
+{
+    if (!input.authored)
+    {
+        return;
+    }
+    const pugi::xml_node element = path.empty() ? input.authored
+                                                : ALXUICatalog::resolve(input.authored, path);
+    if (!element)
+    {
+        return;
+    }
+    // The first child of each key, and whether it was a widget.
+    boost::unordered_map<std::string, std::pair<pugi::xml_node, bool> > first;
+    for (pugi::xml_node child = element.first_child(); child; child = child.next_sibling())
+    {
+        if (child.type() != pugi::node_element)
+        {
+            continue;
+        }
+        const std::string key(ALXUICatalog::keyOf(child, /*any_tag=*/true));
+        if (key == "unnamed")
+        {
+            continue;
+        }
+        const bool widget = ALXUICatalog::isWidgetTag(child.name());
+        const auto held = first.find(key);
+        if (held == first.end())
+        {
+            first.emplace(key, std::make_pair(child, widget));
+            continue;
+        }
+        if (held->second.second == widget)
+        {
+            continue;   // two widgets is the collision rule's, two parameters the merge's
+        }
+        add(Rule::NameCollision, Severity::Warning, path, input.file, line, key,
+            "LintNameCollisionParameter",
+            { { "[NAME]", key },
+              { "[TAG]", held->second.first.name() },
+              { "[OTHER]", child.name() },
+              { "[PARENT]", std::string(ALXUICatalog::keyOf(element, /*any_tag=*/true)) } });
+        // Said once per name.
+        held->second.second = widget;
     }
 }
 
