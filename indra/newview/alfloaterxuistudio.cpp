@@ -2256,7 +2256,6 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         if (mModes)
         {
             mModes->selectTabByName("files_mode");
-            onMode();
         }
         mCatalogFilter->setFocus(true);
         return true;
@@ -2274,7 +2273,6 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
             if (mModes)
             {
                 mModes->selectTabByName("outline_mode");
-                onMode();
             }
             if (mTree)
             {
@@ -2296,31 +2294,52 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         return true;
     }
     // A developer who works in one region reaches it without the mouse, and
-    // the number is its place in the strip rather than a name to learn.
-    // Control for the navigator's modes, and control with shift for the
-    // inspectors, which are the two strips a developer moves between.
-    const auto pick = [](LLTabContainer* tabs, S32 which)
+    // the number is its place in the strip rather than a name to learn:
+    // the nth of the tabs that show, since a hidden tab is not on the strip
+    // to be counted. Control for the navigator's modes, and control with
+    // shift for the inspectors, which are the two strips a developer moves
+    // between. A pane that is folded is unfolded, since a tab was asked
+    // for in it.
+    const auto pick = [this](LLTabContainer* tabs, S32 which, const char* pane)
     {
-        if (tabs && which < tabs->getTabCount())
+        if (!tabs)
         {
-            tabs->selectTab(which);
-            return true;
+            return false;
+        }
+        for (S32 i = 0; i < tabs->getTabCount(); ++i)
+        {
+            if (!tabs->getTabVisibility(tabs->getPanelByIndex(i)))
+            {
+                continue;
+            }
+            if (which-- == 0)
+            {
+                if (!tabs->selectTab(i))
+                {
+                    return false;
+                }
+                if (paneCollapsed(pane))
+                {
+                    togglePane(pane);
+                }
+                return true;
+            }
         }
         return false;
     };
+    // Selecting a tab commits the strip, which is what fills the mode or
+    // the inspector chosen; nothing is asked of them twice.
     if (key >= '1' && key <= '9')
     {
-        if (mask == MASK_CONTROL && pick(mModes, key - '1'))
+        if (mask == MASK_CONTROL && pick(mModes, key - '1', "navigator_panel"))
         {
-            onMode();
             return true;
         }
-        if (mask == (MASK_CONTROL | MASK_SHIFT) && pick(mInspectors, key - '1'))
+        if (mask == (MASK_CONTROL | MASK_SHIFT) && pick(mInspectors, key - '1', "inspector_panel"))
         {
-            refreshInspectors();
             return true;
         }
-        if (mask == (MASK_CONTROL | MASK_ALT) && pick(mBottom, key - '1'))
+        if (mask == (MASK_CONTROL | MASK_ALT) && pick(mBottom, key - '1', "bottom_panel"))
         {
             return true;
         }
@@ -9616,7 +9635,6 @@ void ALFloaterXUIStudio::goToFile(const std::string& file)
     if (mModes)
     {
         mModes->selectTabByName("files_mode");
-        onMode();
     }
     mFileList->setSelectedByValue(mFile, true);
     saveState();
