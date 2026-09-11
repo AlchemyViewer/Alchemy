@@ -7,7 +7,6 @@
 		<menu_item_call label="[APP_NAME]を終了" name="Quit"/>
 	</menu>
 	<menu label="ヘルプ" name="Help">
-		<menu_item_call label="ハウツー…" name="How To"/>
 		<menu_item_call label="Second Lifeナレッジベース" name="Knowledge Base"/>
 		<menu_item_call label="Second Life Wiki" name="Wiki"/>
 		<menu_item_call label="Second Lifeコミュニティフォーラム" name="Community Forums"/>

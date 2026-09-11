@@ -12,7 +12,6 @@
 	<panel.string name="paste_options">
 		ペースト時のオプション
 	</panel.string>
-	<menu_button name="clipboard_color_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<text name="color label">
 		色
 	</text>
@@ -46,7 +45,6 @@
 		<radio_item label="メタリック／粗さ" name="Metallic/roughness"/>
 		<radio_item label="放射（エミッシブ）" name="Emissive"/>
 	</radio_group>
-	<menu_button name="clipboard_texture_params_btn" tool_tip="ペースト時のオプションを選択します。"/>
 	<texture_picker label="ＰＢＲマテリアル" name="pbr_control" tool_tip="クリックでＰＢＲマテリアルを選択します。"/>
 	<button name="pbr_from_inventory" label="インベントリから選択"/>
 	<text name="material_permissions_loading_label">

@@ -9,13 +9,6 @@
 	<floater.string name="UploadInfo">
 		・[UPLOADER]によって[DATE]にアップロードされました。
 	</floater.string>
-	<layout_stack name="preview_stack">
-		<layout_panel name="texture_panel">
-			<text name="aspect_ratio">
-				アスペクト比のプレビュー：
-			</text>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="aspect_combo_lp">
 			<combo_box name="combo_aspect_ratio" tool_tip="固定した縦横比のプレビュー"/>

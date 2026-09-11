@@ -3,9 +3,6 @@
 	<panel.string name="aspect_ratio_text">
 		[NUM]：[DEN]
 	</panel.string>
-	<text name="Cache:">
-		キャッシュ：
-	</text>
 	<spinner label="キャッシュサイズ（896～32768㎆）" name="cachesizespinner"/>
 	<text name="text_box5">
 		㎆
@@ -22,11 +19,6 @@
 	<text name="HUD Size:" width="120">
 		ＨＵＤのスケール：
 	</text>
-	<check_box label="スクリプトのエラーを表示：" name="show_script_errors"/>
-	<radio_group name="show_location">
-		<radio_item label="近くのチャット" name="0"/>
-		<radio_item label="別ウィンドウ" name="1"/>
-	</radio_group>
 	<check_box label="複数のビューアを許可" name="allow_multiple_viewer_check"/>
 	<check_box label="ログイン時にグリッド選択を表示" name="show_grid_selection_check"/>
 	<check_box label="高度な操作メニューを表示" name="show_advanced_menu_check"/>

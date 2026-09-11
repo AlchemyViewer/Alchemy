@@ -4,6 +4,5 @@
 		<panel label="一般" name="chat_prefs_general"/>
 		<panel label="コマンド" name="chat_prefs_cmd"/>
 		<panel label="拒否するメッセージ" name="chat_prefs_moderation"/>
-		<panel label="自動返答" name="chat_pref_autoreponse"/>
 	</tab_container>
 </panel>

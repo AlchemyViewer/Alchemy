@@ -12,9 +12,6 @@
 						<combo_box.item label="最後にいた場所" name="MyLastLocation"/>
 						<combo_box.item label="ホーム" name="MyHome"/>
 					</combo_box>
-					<text name="sign_up_text">
-						サインアップ
-					</text>
 					<check_box label="パスワードを記録" name="remember_name" tool_tip="すでに記憶されているユーザーは、「私」>「初期設定」>「詳細設定」>「記憶されているユーザー名」から忘れることができます。"/>
 					<check_box label="パスワード再発行" name="remember_password"/>
 					<layout_stack name="login_stack">

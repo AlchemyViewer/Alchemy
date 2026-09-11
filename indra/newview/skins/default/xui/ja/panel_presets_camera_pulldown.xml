@@ -3,5 +3,4 @@
 	<text name="Camera Presets">
 		カメラのプリセット
 	</text>
-	<button name="open_prefs_btn" label="カメラフローターを開く" tool_tip="カメラのフローターを開きます。"/>
 </panel>

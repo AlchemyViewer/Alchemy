@@ -46,9 +46,6 @@ that are returned from one component and may appear in many places
 	<string name="BuildConfig">
 		ビルド構成：[BUILD_CONFIG]
 	</string>
-	<string name="BuildDate">
-		ビルド日時：[BUILD_DATE] [BUILD_TIME]
-	</string>
 	<string name="AboutPosition">
 		あなたは、現在[REGION]の[POSITION_LOCAL_0,number,1]，[POSITION_LOCAL_1,number,1]，[POSITION_LOCAL_2,number,1]にいます。
 位置は、&lt;nolink&gt;[HOSTNAME]&lt;/nolink&gt;です。
@@ -1356,9 +1353,6 @@ Second Lifeのサポートまでお問い合わせください。
 	</string>
 	<string name="Validator_ShouldBeASCII">
 		無効な文字[NR]です：「[CH]」（アスキー文字のみを使用してください）
-	</string>
-	<string name="Validator_ShouldBeNewLineOrASCII">
-		無効な文字[NR]です：「[CH]」（アスキー文字または改行のみを使用してください）
 	</string>
 
 	<!-- Wearable Types -->
@@ -4775,9 +4769,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 	<string name="not_online_inventory">
 		ユーザーがオンラインでありません－インベントリに保存されました。
 	</string>
-	<string name="AutoresponsePrefix">
-		（自動応答）
-	</string>
 	<!-- voice calls -->
 	<string name="answered_call">
 		相手がコールを受けました。
@@ -5121,9 +5112,6 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		一般的ジェスチャー
 	</string>
 	<!-- Additional inventory entries -->
-	<string name="RlvRoot">
-		#RLV
-	</string>
 	<!-- gestures -->
 	<string name="Male - Excuse me">
 		男性－すみません
@@ -6305,7 +6293,6 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	<string name="NotifyIncomingMessage">[NAME]さんからのメッセージが届いています…</string>
 	<string name="AvatarTyping">入力中</string>
 	<string name="UnknownAvatar">不明なアバター</string>
-	<string name="NotAvailableOnPlatform">このプラットフォームでは使用できません。</string>
 	<string name="NowPlaying">再生中：</string>
 	<string name="SimulatorFeaturesTitle">シミュレーターの機能</string>
 	<!--Minimap-->
