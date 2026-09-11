@@ -168,15 +168,39 @@ const LLUUID ANIM_AGENT_PHYSICS_MOTION = LLUUID("7360e029-3cb8-ebc4-863e-212df44
 //-----------------------------------------------------------------------------
 // Constants
 //-----------------------------------------------------------------------------
-const F32 DELTA_TIME_MIN = 0.01f;   // we clamp measured delta_time to this
-const F32 DELTA_TIME_MAX = 0.2f;    // range to insure stability of computations.
+const F32 DELTA_TIME_MAX = 0.2f;    // we clamp measured delta_time to this, for stability.
 
-const F32 PELVIS_LAG_FLYING     = 0.22f;// pelvis follow half life while flying
+// Exponential time constants for how the pelvis follows the direction the avatar is facing. The
+// comments here used to say "half life", which is what they were when this was fed to
+// LLSmoothInterpolation; the u = dt/tau rewrite that replaced it silently reinterpreted them as
+// time constants without changing the numbers. These preserve the behaviour that actually
+// shipped, so they are labelled for how they are used, not for what they once meant.
+const F32 PELVIS_LAG_FLYING     = 0.22f;// pelvis follow time constant while flying
 const F32 PELVIS_LAG_WALKING    = 0.4f; // ...while walking
 const F32 PELVIS_LAG_MOUSELOOK = 0.15f;
+
+// How quickly mSpeedAccum chases the avatar's actual speed. Chosen to reproduce the 0.95/0.05
+// per-frame blend this replaced, at the 60 fps that blend was evidently written for.
+const F32 SPEED_ACCUM_HALF_LIFE = 0.2257f;
 const F32 MOUSELOOK_PELVIS_FOLLOW_FACTOR = 0.5f;
 const F32 TORSO_NOISE_AMOUNT = 1.0f;    // Amount of deviation from up-axis, in degrees
 const F32 TORSO_NOISE_SPEED = 0.2f; // Time scale factor on torso noise.
+
+// How far to close an exponential follow across dt, for a given half life.
+//
+// This is the curve LLSmoothInterpolation applies, but driven by the caller's own elapsed time
+// instead of the frame's, which matters here: updateCharacter is skipped for an impostored avatar
+// for up to 64 frames at a time, and when it does run it has to close the whole interval it
+// missed rather than one frame of it. Using the shared per-frame interpolant would leave a
+// throttled avatar's pelvis turning dozens of times slower than a nearby one's.
+static F32 follow_fraction(F32 dt, F32 half_life)
+{
+    if (half_life <= 0.f)
+    {
+        return 1.f;
+    }
+    return llclamp(1.f - powf(2.f, -dt / half_life), 0.f, 1.f);
+}
 
 const F32 BREATHE_ROT_MOTION_STRENGTH = 0.05f;
 
@@ -4962,7 +4986,6 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
 
             // Set the root rotation, but do so incrementally so that it
             // lags in time by some fixed amount.
-            //F32 u = LLSmoothInterpolation::getInterpolant(PELVIS_LAG);
             F32 pelvis_lag_time = 0.f;
             if (self_in_mouselook)
             {
@@ -4979,7 +5002,11 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
                 pelvis_lag_time = PELVIS_LAG_WALKING;
             }
 
-    F32 u = llclamp((delta_time / pelvis_lag_time), 0.0f, 1.0f);
+            // dt/tau is the linear approximation of this curve, and only holds while dt is small
+            // against the time constant. It is not: the step it produced grew without bound as
+            // frame time did, so the pelvis chased the facing direction at a rate that depended
+            // on the frame rate rather than on the wall clock.
+            F32 u = follow_fraction(delta_time, pelvis_lag_time * F_LN2);
 
             mRoot->setWorldRotationIfMoved( slerp(u, mRoot->getWorldRotation(), wQv) );
 }
@@ -5059,10 +5086,14 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         //--------------------------------------------------------------------
         F32 delta_time = animation_time - mTimeLast;
 
-        delta_time = llclamp( delta_time, DELTA_TIME_MIN, DELTA_TIME_MAX );
+        // Only a ceiling. There used to be a 10 ms floor here as well, which meant that above
+        // 100 fps every step was inflated to the floor: at 300 fps the pelvis closed a turn
+        // roughly twelve times faster than at 60, because it took three times as many steps and
+        // each one was three times larger than the frame had earned.
+        delta_time = llmin( delta_time, DELTA_TIME_MAX );
         mTimeLast = animation_time;
 
-        mSpeedAccum = (mSpeedAccum * 0.95f) + (speed * 0.05f);
+        mSpeedAccum = lerp(mSpeedAccum, speed, follow_fraction(delta_time, SPEED_ACCUM_HALF_LIFE));
 
         //--------------------------------------------------------------------
         // compute the position of the avatar's root
