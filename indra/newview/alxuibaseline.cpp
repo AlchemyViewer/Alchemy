@@ -118,20 +118,10 @@ namespace
     void countTruncation(const LLView* view, const std::set<std::string>& xml_names,
                          S32& count, S32& code_built, std::vector<std::string>& names)
     {
-        bool truncated = false;
-        if (const LLTextBox* text = view->as<LLTextBox>())
-        {
-            const LLFontGL* font = text->getFont();
-            truncated = font && !text->getWordWrap() && !text->getText().empty()
-                && ALXUILint::widestLine(font, text->getText()) > text->getRect().getWidth() - 2 * text->getHPad();
-        }
-        else if (const LLButton* button = view->as<LLButton>())
-        {
-            const LLFontGL* font = button->getFont();
-            const std::string& label = button->getLabelUnselected();
-            constexpr S32 pad = 4;
-            truncated = font && !label.empty() && font->getWidth(label) > button->getRect().getWidth() - 2 * pad;
-        }
+        std::string text;
+        S32 needed = 0;
+        S32 room = 0;
+        const bool truncated = ALXUILint::measuresText(view, text, needed, room) && needed > room;
         if (truncated)
         {
             if (xml_names.count(view->getName()))

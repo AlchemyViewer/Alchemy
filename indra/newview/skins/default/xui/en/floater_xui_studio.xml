@@ -15,6 +15,7 @@
     <floater.string name="ExternalEditorNotSet">No editor: set the ExternalEditor setting or the LL_XUI_EDITOR environment variable, with %s for the file and %L for the line.</floater.string>
     <floater.string name="NoFile">Select a file.</floater.string>
     <floater.string name="CaptureNoSnapshot">The window would not give a snapshot.</floater.string>
+    <floater.string name="CaptureNoPreview">Nothing is being previewed.</floater.string>
     <floater.string name="CaptureOffScreen">The preview is off screen.</floater.string>
     <floater.string name="CaptureWriteFailed">Could not write [PATH]</floater.string>
     <floater.string name="CaptureWritten">Captured [WIDTH] by [HEIGHT] to [PATH]</floater.string>

@@ -143,7 +143,7 @@ public:
     // Whether an element of this tag may become a child at that path.
     bool accepts(const ALXUISelection::path_t& parent, std::string_view tag) const;
     // What the tag being carried is: the moved element's, or the new one's.
-    std::string carriedTag(const ALXUIEdit& held) const;
+    std::string carriedTag() const;
     // Where the document's last step left the element it moved or made,
     // which the document read off the file once the step was taken.
     static ALXUISelection::path_t landing(const ALXUIEdit& held);

@@ -28,6 +28,7 @@
 
 #include "alfloaterxuistudio.h"
 #include "alxuicatalog.h"
+#include "alxuidiagnostics.h"
 #include "alxuinotes.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
@@ -366,8 +367,10 @@ void ALFloaterXUILibrary::showSpecimen(const std::string& tag)
 
     // Built the way the file would write it, with nothing but a name, a
     // label and a size. Diagnostics are swallowed: a tag that will not build
-    // from its defaults is a blank space here, not a report.
+    // from its defaults is a blank space here, not a report -- and not a
+    // warning in the log for every tag that takes no label.
     ALXUIShellBuild shell;
+    ALXUIDiagnostics sink;
     const LLRect room = mSpecimen->getLocalRect();
     const std::string xml = "<" + tag + " name=\"specimen\" label=\"" + tag
         + "\" layout=\"topleft\" left=\"8\" top=\"8\" width=\""

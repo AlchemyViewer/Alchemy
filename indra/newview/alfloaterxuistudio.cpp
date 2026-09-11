@@ -3353,6 +3353,19 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
         canvas->fitContent(width, height);
     };
 
+    // Where what is built goes: at the corner the first time, and where the
+    // last one was left every time after. An edit rebuilds what is on the
+    // canvas, and a preview that went back to the corner on every field
+    // written would be one nobody could work on and move. The same for a
+    // floater, a panel and a widget, since all three can be moved.
+    const auto placed = [this, canvas](S32& left, S32& down)
+    {
+        if (mKeepPlace)
+        {
+            canvas->keptPlace(left, down);
+        }
+    };
+
     LLView* root = nullptr;
     factory.pushFileName(file);
     switch (entry.kind)
@@ -3374,16 +3387,9 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
             floater->setVisible(true);
             const LLRect r = floater->getRect();
             fit(r.getWidth() + 2 * CANVAS_MARGIN, r.getHeight() + 2 * CANVAS_MARGIN);
-            // At the corner the first time, and where the last one was left
-            // every time after: an edit rebuilds what is on the canvas, and
-            // a preview that went back to the corner on every field written
-            // would be a window nobody could work on and move.
             S32 left = CANVAS_MARGIN;
             S32 down = CANVAS_MARGIN;
-            if (mKeepPlace)
-            {
-                canvas->keptPlace(left, down);
-            }
+            placed(left, down);
             floater->setOrigin(left, canvas->surfaceHeight() - r.getHeight() - down);
             root = floater;
         }
@@ -3401,19 +3407,21 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
         LLPanel* panel = LLUICtrlFactory::create<LLPanel>(pp);
         if (panel->initPanelXML(node, canvas, LLUICtrlFactory::getDefaultParams<LLPanel>()))
         {
-            panel->setOrigin(2, 2);
+            panel->setOrigin(CANVAS_MARGIN, CANVAS_MARGIN);
             panel->setUseBoundingRect(true);
             panel->updateBoundingRect();
             LLRect box = panel->getRect();
             box.unionWith(panel->getBoundingRect());
-            fit(box.getWidth() + 4, box.getHeight() + 4);
+            fit(box.getWidth() + 2 * CANVAS_MARGIN, box.getHeight() + 2 * CANVAS_MARGIN);
             // A child positioned past its parent's edge is drawn past it,
             // so the surface starts where the drawing does and not where
-            // the panel says it does.
-            panel->setOrigin(2 + llmax(0, panel->getRect().mLeft - box.mLeft),
-                             canvas->surfaceHeight() - box.getHeight() - 2
-                                 + llmax(0, panel->getRect().mBottom - box.mBottom));
-            panel->reshape(box.getWidth(), box.getHeight());
+            // the panel says it does: the panel's own corner sits in from
+            // the surface's by the margin and by what is drawn past it.
+            const LLRect& own = panel->getRect();
+            S32 left = CANVAS_MARGIN + llmax(0, own.mLeft - box.mLeft);
+            S32 down = CANVAS_MARGIN + llmax(0, box.mTop - own.mTop);
+            placed(left, down);
+            panel->setOrigin(left, canvas->surfaceHeight() - down - own.getHeight());
             root = panel;
         }
         else
@@ -3466,7 +3474,10 @@ LLView* ALFloaterXUIStudio::buildFromNode(const ALXUICatalog::Entry& entry, ALXU
         {
             const LLRect r = view->getRect();
             fit(r.getWidth() + 16, r.getHeight() + 16);
-            view->setOrigin(8, canvas->surfaceHeight() - r.getHeight() - 8);
+            S32 left = 8;
+            S32 down = 8;
+            placed(left, down);
+            view->setOrigin(left, canvas->surfaceHeight() - r.getHeight() - down);
             root = view;
         }
         break;
@@ -3933,14 +3944,19 @@ bool ALFloaterXUIStudio::carrying(EDragAndDropType type, const void* cargo) cons
         && (!mDragPath.empty() || !mDragTag.empty());
 }
 
-std::string ALFloaterXUIStudio::carriedTag(const ALXUIEdit& held) const
+// What the tag being carried is: the new one's, or the moved element's as
+// the file wrote it, which the map that paired the view with its element
+// remembers. Asked on every frame of a drag, so nothing is read for it.
+std::string ALFloaterXUIStudio::carriedTag() const
 {
     if (!mDragTag.empty())
     {
         return mDragTag;
     }
-    const pugi::xml_node node = held.resolve(mDragPath);
-    return node ? node.name() : std::string();
+    const Preview& pv = mPreviews[PRIMARY];
+    const LLView* moving = pv.root ? ALXUISelection::resolve(pv.root, mDragPath) : nullptr;
+    const ALXUISourceMap::Origin* origin = moving ? pv.sourceMap.find(moving) : nullptr;
+    return origin ? origin->tag : std::string();
 }
 
 // The tag a container answers to is the class that was built, since that
@@ -4009,19 +4025,7 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
     {
         return false;
     }
-    // Asked of the document as it stands, without opening one: a hover is
-    // not an edit.
-    const ALXUIEdit* reading = mDocuments.find(layer->path);
-    ALXUIEdit disk;
-    if (!reading)
-    {
-        if (!disk.loadFile(layer->path))
-        {
-            return false;
-        }
-        reading = &disk;
-    }
-    const std::string tag = carriedTag(*reading);
+    const std::string tag = carriedTag();
     if (tag.empty() || !accepts(parent, tag))
     {
         return false;
@@ -4447,10 +4451,20 @@ bool ALFloaterXUIStudio::rebuildElement(const ALXUISelection::path_t& path, cons
     parent->removeChild(old);
     delete old;
 
-    LLUICtrlFactory& factory = LLUICtrlFactory::instance();
-    factory.pushFileName(mFile);
-    LLView* fresh = factory.createFromXML(node, parent, mFile, *registry);
-    factory.popFileName();
+    // Built the way the whole preview was: in the preview's skin and
+    // language, as a shell, with the parser's complaints kept out of the
+    // log. An element built any other way is a class with the viewer's
+    // side effects, or a widget with this viewer's images in it.
+    LLView* fresh = nullptr;
+    {
+        ALXUISkinScope scope(pv.skin, pv.language);
+        ALXUIShellBuild shell;
+        ALXUIDiagnostics sink;
+        LLUICtrlFactory& factory = LLUICtrlFactory::instance();
+        factory.pushFileName(mFile);
+        fresh = factory.createFromXML(node, parent, mFile, *registry);
+        factory.popFileName();
+    }
     if (!fresh)
     {
         // The parent is now short an element, so the preview no longer says
@@ -6450,13 +6464,32 @@ bool ALFloaterXUIStudio::siblingOf(const ALXUIEdit& document, const ALXUISelecti
 // since what is over it is what would be captured.
 void ALFloaterXUIStudio::capturePreview()
 {
-    LLFloater* host = mPreviews[PRIMARY].host.get();
-    if (!host)
+    // What is captured: the preview's own window where it has one, else
+    // the preview as it is drawn on the canvas in this window -- through
+    // the zoom, and only what of it can be seen, since a snapshot is of
+    // the screen.
+    const Preview& pv = mPreviews[PRIMARY];
+    LLFloater* host = pv.host.get();
+    LLRect screen;
+    if (host)
     {
-        setStatus(getString("NoFile"));
+        host->setFrontmost(false);
+        screen = host->calcScreenRect();
+    }
+    else if (ALXUICanvas* canvas = pv.root ? mCanvases[PRIMARY] : nullptr; canvas && canvas->getVisible())
+    {
+        const F32 zoom = canvas->zoom();
+        const LLRect content = canvas->localRectOf(pv.root);
+        LLRect drawn(ll_round((F32)content.mLeft * zoom), ll_round((F32)content.mTop * zoom),
+                     ll_round((F32)content.mRight * zoom), ll_round((F32)content.mBottom * zoom));
+        drawn.intersectWith(canvas->viewportRect());
+        canvas->localRectToScreen(drawn, &screen);
+    }
+    else
+    {
+        setStatus(getString("CaptureNoPreview"));
         return;
     }
-    host->setFrontmost(false);
 
     const S32 window_width = gViewerWindow->getWindowWidthRaw();
     const S32 window_height = gViewerWindow->getWindowHeightRaw();
@@ -6468,9 +6501,8 @@ void ALFloaterXUIStudio::capturePreview()
         return;
     }
 
-    // The floater's rect in the window, in the snapshot's own scale: a
-    // snapshot may come back at a different size than the window.
-    const LLRect screen = host->calcScreenRect();
+    // The rect in the window, in the snapshot's own scale: a snapshot may
+    // come back at a different size than the window.
     const F32 scale_x = (F32)shot->getWidth() / (F32)llmax(1, gViewerWindow->getWindowWidthScaled());
     const F32 scale_y = (F32)shot->getHeight() / (F32)llmax(1, gViewerWindow->getWindowHeightScaled());
     const S32 left = llclamp((S32)(screen.mLeft * scale_x), 0, shot->getWidth());
@@ -10213,25 +10245,14 @@ void ALFloaterXUIStudio::refreshState(LLView* view)
         add("StateFocus", yes(ctrl->hasFocus()));
         add("StateValue", ctrl->getValue().asString());
     }
+    // Measured the way the lint measures it, so the two never disagree.
     std::string text;
-    bool truncated = false;
-    if (const LLTextBox* box = view->as<LLTextBox>())
-    {
-        text = box->getText();
-        const LLFontGL* font = box->getFont();
-        truncated = font && !box->getWordWrap() && !text.empty()
-            && ALXUILint::widestLine(font, text) > box->getRect().getWidth() - 2 * box->getHPad();
-    }
-    else if (const LLButton* button = view->as<LLButton>())
-    {
-        text = button->getLabelUnselected();
-        const LLFontGL* font = button->getFont();
-        truncated = font && !text.empty() && font->getWidth(text) > button->getRect().getWidth() - 8;
-    }
-    if (!text.empty())
+    S32 needed = 0;
+    S32 room = 0;
+    if (ALXUILint::measuresText(view, text, needed, room))
     {
         add("StateText", text);
-        add("StateTruncated", yes(truncated));
+        add("StateTruncated", yes(needed > room));
     }
     add("StateTooltip", view->getToolTip());
     add("StateName", view->getName());

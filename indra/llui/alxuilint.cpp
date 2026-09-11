@@ -373,6 +373,34 @@ S32 ALXUILint::widestLine(const LLFontGL* font, const std::string& text)
 }
 
 // static
+bool ALXUILint::measuresText(const LLView* view, std::string& text, S32& needed, S32& room)
+{
+    const LLFontGL* font = nullptr;
+    text.clear();
+    if (const LLTextBox* box = view->as<LLTextBox>())
+    {
+        if (!box->getWordWrap())
+        {
+            font = box->getFont();
+            text = box->getText();
+            room = box->getRect().getWidth() - 2 * box->getHPad();
+        }
+    }
+    else if (const LLButton* button = view->as<LLButton>())
+    {
+        font = button->getFont();
+        text = button->getLabelUnselected();
+        room = button->getRect().getWidth() - 8;
+    }
+    if (!font || text.empty())
+    {
+        return false;
+    }
+    needed = widestLine(font, text);
+    return true;
+}
+
+// static
 bool ALXUILint::callbackRegistered(const std::string& name)
 {
     return LLUICtrl::CommitCallbackRegistry::instance().getValue(name) != nullptr
@@ -609,36 +637,17 @@ void ALXUILint::checkGeometry(const Input& input, LLView* view, const ALXUISelec
 
     // A label wider than the box it is in, which is the check "Show
     // Rectangles" asked the eye to make.
-    const LLFontGL* font = nullptr;
     std::string text;
+    S32 width = 0;
     S32 room = 0;
-    if (const LLTextBox* box = view->as<LLTextBox>())
+    if (view->getVisible() && measuresText(view, text, width, room) && width > room)
     {
-        if (!box->getWordWrap())
+        Finding& f = add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
+            "LintTruncation", { { "[NEEDED]", std::to_string(width) }, { "[ROOM]", std::to_string(room) } });
+        if (!placedBySomethingElse(view, input.root))
         {
-            font = box->getFont();
-            text = box->getText();
-            room = box->getRect().getWidth() - 2 * box->getHPad();
-        }
-    }
-    else if (const LLButton* button = view->as<LLButton>())
-    {
-        font = button->getFont();
-        text = button->getLabelUnselected();
-        room = button->getRect().getWidth() - 8;
-    }
-    if (font && !text.empty() && view->getVisible())
-    {
-        const S32 width = widestLine(font, text);
-        if (width > room)
-        {
-            Finding& f = add(Rule::Truncation, Severity::Warning, path, input.file, line, view->getName(),
-                "LintTruncation", { { "[NEEDED]", std::to_string(width) }, { "[ROOM]", std::to_string(room) } });
-            if (!placedBySomethingElse(view, input.root))
-            {
-                f.fix.did = Fix::Do::WidenBy;
-                f.fix.dx = width - room;
-            }
+            f.fix.did = Fix::Do::WidenBy;
+            f.fix.dx = width - room;
         }
     }
 }

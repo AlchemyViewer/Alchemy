@@ -213,6 +213,11 @@ public:
     // The widest line of a text that may run to several, in a font: what
     // a box has to be for the text not to be cut.
     static S32 widestLine(const LLFontGL* font, const std::string& text);
+    // The text a widget draws in a box of its own -- a text box that does
+    // not wrap, or a button's label -- with what it needs and what it has.
+    // False, and nothing measured, for every other widget and for one with
+    // no text.
+    static bool measuresText(const LLView* view, std::string& text, S32& needed, S32& room);
     bool fontDeclared(const std::string& name);
 
 private:
