@@ -43,6 +43,7 @@ namespace tut
     {
         std::vector<std::string> events;
         S32 matched = 0;
+        S32 rescued = 0;
         S32 unmatched = 0;
         S32 applied = 0;
         S32 dropped = 0;
@@ -55,6 +56,7 @@ namespace tut
         S32 parsed = 0;
         S32 skipped = 0;
         S32 skippedLine = 0;
+        std::string skippedReason;
 
         static std::string nameOf(LLXMLNode* node)
         {
@@ -77,16 +79,20 @@ namespace tut
         {
             ++skipped;
             skippedLine = line;
+            skippedReason = reason;
             events.push_back("skipped " + std::to_string(layer));
         }
         void rootMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++roots; add("root", layer, base); }
         void rootNameDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++renamed; add("renamed", layer, overlay); }
         void rootTagDiffers(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++retagged; add("retagged", layer, overlay); }
         void childMatched(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++matched; add("match", layer, base); }
+        void childRescued(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++rescued; add("rescued", layer, base); }
         void childUnmatched(S32 layer, LLXMLNode* parent, LLXMLNode* overlay, Miss why) override
         {
             ++unmatched;
-            add(why == Miss::Unnamed ? "unnamed" : "nosibling", layer, overlay);
+            add(why == Miss::Unnamed ? "unnamed"
+                : why == Miss::Duplicate ? "duplicate"
+                : why == Miss::Ambiguous ? "ambiguous" : "nosibling", layer, overlay);
         }
         void textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++text; add("text", layer, base); }
         void textKept(S32 layer, LLXMLNode* base, LLXMLNode* overlay) override { ++kept; add("kept", layer, base); }
@@ -371,6 +377,95 @@ namespace tut
             LLXMLNodePtr again;
             ensure("loads", ALXmlLayerMerge::load({ base, overlay }, again));
             ensure("and hears nothing once it is gone", silent.roots == 0);
+        }
+    }
+
+    // A child written where the base used to have the element is applied
+    // where the base has it now, when exactly one element of the name
+    // sits below; two below is a guess and none is a name the base no
+    // longer has. And a copy left at the old path never takes the element
+    // from a copy written at the new one, whichever the file lists first:
+    // what is written where the base has it is matched before anything
+    // is looked for below.
+    template<> template<>
+    void alxmllayermerge_object::test<5>()
+    {
+        static constexpr const char* MOVED =
+            "<floater name=\"f\">\n"
+            "  <panel name=\"stack\">\n"
+            "    <text name=\"note\">Base note</text>\n"
+            "    <panel name=\"deeper\"><button name=\"twice\" label=\"1\"/></panel>\n"
+            "  </panel>\n"
+            "  <panel name=\"other\"><button name=\"twice\" label=\"2\"/></panel>\n"
+            "</floater>\n";
+
+        {
+            LLXMLNodePtr base = parse(MOVED);
+            LLXMLNodePtr overlay = parse(
+                "<floater name=\"f\">\n"
+                "  <text name=\"note\">Notiz</text>\n"
+                "  <button name=\"twice\" label=\"Zwei\"/>\n"
+                "  <button name=\"gone\" label=\"Weg\"/>\n"
+                "</floater>\n");
+            RecordingObserver rec;
+            ALXmlLayerMerge::merge(base, overlay, 1, &rec);
+            ensure_equals("the one element of the name below is where it went",
+                          attr(base, "stack/note", "text()"), std::string("Notiz"));
+            ensure("and it was reported as a rescue", rec.has("rescued 1 text[note]"));
+            ensure_equals("two of the name below is a guess not made",
+                          attr(base, "stack/deeper/twice", "label"), std::string("1"));
+            ensure_equals("either of them", attr(base, "other/twice", "label"), std::string("2"));
+            ensure("and said so", rec.has("ambiguous 1 button[twice]"));
+            ensure("a name the base has nowhere", rec.has("nosibling 1 button[gone]"));
+            ensure_equals("one rescue", rec.rescued, 1);
+            ensure_equals("two misses", rec.unmatched, 2);
+        }
+
+        // The stray copy first in the file, then the right one.
+        for (const bool stray_first : { true, false })
+        {
+            const std::string right = "  <panel name=\"stack\"><text name=\"note\">Richtig</text></panel>\n";
+            const std::string stray = "  <text name=\"note\">Alt</text>\n";
+            const std::string xml = "<floater name=\"f\">\n" + (stray_first ? stray + right : right + stray) + "</floater>\n";
+            LLXMLNodePtr base = parse(MOVED);
+            LLXMLNodePtr overlay = parse(xml.c_str());
+            RecordingObserver rec;
+            ALXmlLayerMerge::merge(base, overlay, 1, &rec);
+            ensure_equals(std::string("the copy written where the base has it wins, stray ")
+                          + (stray_first ? "first" : "second"),
+                          attr(base, "stack/note", "text()"), std::string("Richtig"));
+            ensure("and the stray applies to nothing", rec.has("nosibling 1 text[note]"));
+            ensure_equals("with no rescue made", rec.rescued, 0);
+        }
+    }
+
+    // A layer given as text is merged from the text and not from the disk
+    // under the same name, and a text that does not parse is skipped with
+    // the text's own error and line, not the disk's.
+    template<> template<>
+    void alxmllayermerge_object::test<6>()
+    {
+        const std::string base = write("base.xml", BASE);
+        const std::string overlay = write("overlay.xml", OVERLAY);
+        const std::string held = "<floater name=\"f\" title=\"Gehalten\"/>\n";
+        {
+            RecordingObserver rec;
+            LLXMLNodePtr root;
+            ensure("loads", ALXmlLayerMerge::loadSources({ { base, nullptr }, { overlay, &held } }, root, &rec));
+            ensure_equals("the title is the held text's, not the file's", attr(root, "", "title"), std::string("Gehalten"));
+            ensure_equals("and the file's children were not read", rec.matched, 0);
+        }
+        {
+            const std::string broken = "<floater name=\"f\">\n  <panel>\n";
+            RecordingObserver rec;
+            LLXMLNodePtr root;
+            ensure("loads past a held text that does not parse",
+                   ALXmlLayerMerge::loadSources({ { base, nullptr }, { overlay, &broken } }, root, &rec));
+            ensure_equals("which is skipped", rec.skipped, 1);
+            ensure("with the text's line, past the first: " + std::to_string(rec.skippedLine), rec.skippedLine >= 2);
+            ensure("and a reason: " + rec.skippedReason, !rec.skippedReason.empty()
+                   && rec.skippedReason.find("No error") == std::string::npos);
+            ensure_equals("and the file under that name did not apply either", attr(root, "", "title"), std::string("Title"));
         }
     }
 }

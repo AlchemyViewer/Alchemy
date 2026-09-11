@@ -2702,18 +2702,26 @@ void ALFloaterXUIStudio::onFindResult()
     const LLSD id = item->getValue();
     const std::string file = id["file"].asString();
     const std::string language = id["language"].asString();
-    if (language != "en" && language != mLanguage)
+    // A result is a place, not a browse: the canvas goes there whether it
+    // is pinned or not, and holds that file afterwards. A hit in another
+    // language's file is a place in that language, and the preview is
+    // built under it -- whether or not the file is the one already shown.
+    const bool other_file = file != mFile;
+    const bool other_language = language != "en" && language != mLanguage;
+    if (other_file)
     {
-        mLanguage = language;
-        mLanguageCombo->setValue(mLanguage);
-    }
-    if (file != mFile)
-    {
-        // A result is a place, not a browse: the canvas goes there whether
-        // it is pinned or not, and holds that file afterwards.
         mFile = file;
         mPendingFile.clear();
         mFileList->setSelectedByValue(mFile, true);
+    }
+    if (other_language)
+    {
+        mLanguageCombo->setValue(language);
+        onSkinOrLanguage();
+    }
+    else if (other_file)
+    {
+        saveState();
         showPreviews();
     }
     mSelection.select(ALXUISelection::fromString(id["path"].asString()));
@@ -7439,12 +7447,19 @@ S32 ALFloaterXUIStudio::repairFile(const ALXUICatalog::Entry& entry, const std::
 
     // Through the set rather than a document of its own, so that the repair
     // is a step of the action that asked for it: a repair nobody can put
-    // back is a repair nobody can try.
+    // back is a repair nobody can try. Opening a document makes it the one
+    // an operation with no path of its own means, and a repair is not a
+    // change of what is being worked on: the one that was stays.
+    const std::string was_active = mDocuments.activePath();
     ALXUIEdit* overlay = mDocuments.open(overlay_layer->path);
     if (!overlay)
     {
         error = mDocuments.error();
         return 0;
+    }
+    if (!was_active.empty())
+    {
+        mDocuments.makeActive(was_active);
     }
     const S32 done = ALXUITranslate::repair(*overlay, base_layers.front()->root(), error);
     if (done && !overlay->save())
@@ -7472,6 +7487,10 @@ void ALFloaterXUIStudio::onRepairFile()
                     : (error.empty() ? getString("TranslateNothingToRepair", args) : error));
     if (moves)
     {
+        // The repair went through a held document, and is a thing to undo.
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
         mCatalog.reload(mFile);
         fillTranslation();
     }
@@ -7520,9 +7539,14 @@ void ALFloaterXUIStudio::onRepairRoots()
             continue;
         }
 
-        ALXUIEdit edit;
-        std::string error;
-        if (!edit.loadFile(overlay->path) || !edit.setAttribute({}, "name", base_root) || !edit.save())
+        // Through the document where the file is one of those held, as the
+        // translation table writes: a disk written under a held document is
+        // a disk the document's next save writes over.
+        ALXUIEdit* held = mDocuments.find(overlay->path);
+        ALXUIEdit local;
+        ALXUIEdit& edit = held ? *held : local;
+        if ((!held && !edit.loadFile(overlay->path))
+            || !edit.setAttribute({}, "name", base_root) || !edit.save())
         {
             setStatus(edit.error());
             return;
@@ -7539,6 +7563,9 @@ void ALFloaterXUIStudio::onRepairRoots()
     setStatus(getString("TranslateRoots", args));
     if (named)
     {
+        mDocuments.settle();
+        fillDocuments();
+        fillHistory();
         scanCatalog();
         fillTranslation();
     }

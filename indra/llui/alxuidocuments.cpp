@@ -98,8 +98,26 @@ bool ALXUIDocuments::close(std::string_view path)
     mSeen.erase(std::string(path));
     // An action naming a document that has gone cannot be put back, and an
     // action half put back is worse than none: the history goes with it.
-    mDone.clear();
-    mUndone.clear();
+    // One that no action names takes nothing with it.
+    const auto names = [path](const std::vector<Taken>& actions)
+    {
+        for (const Taken& taken : actions)
+        {
+            for (const auto& [document, count] : taken.steps)
+            {
+                if (document == path)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    if (names(mDone) || names(mUndone))
+    {
+        mDone.clear();
+        mUndone.clear();
+    }
     if (was_active)
     {
         // Whatever is left, so that a tool with something open is never

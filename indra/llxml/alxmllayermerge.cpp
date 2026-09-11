@@ -75,24 +75,47 @@ namespace
     }
 
     // Why a layer did not parse, for whoever is listening; the parse that
-    // failed only logged it.
-    void reportSkipped(ALXmlMergeObserver* observer, S32 layer, const std::string& path)
+    // failed only logged it. Parsed again from where the layer came from,
+    // since a text the caller holds is not what is on the disk under the
+    // same name.
+    void reportSkipped(ALXmlMergeObserver* observer, S32 layer, const ALXmlLayerMerge::Source& source)
     {
         if (!observer)
         {
             return;
         }
         ALXmlDocument doc;
-        doc.loadFile(path);
-        observer->layerSkipped(layer, path, doc.errorDescription(), doc.errorLine());
+        if (source.text)
+        {
+            doc.loadBuffer(source.text->data(), source.text->size());
+        }
+        else
+        {
+            doc.loadFile(source.path);
+        }
+        observer->layerSkipped(layer, source.path, doc.errorDescription(), doc.errorLine());
     }
+
+    // One layer's pass over the base: the elements it has applied to, and
+    // the children it could not match where they were written, held back
+    // until every child written where the base has it has been matched.
+    struct Pass
+    {
+        struct Deferred
+        {
+            LLXMLNodePtr base;
+            LLXMLNodePtr overlay;
+        };
+        claimed_t               claimed;
+        std::vector<Deferred>   later;
+    };
 }
 
 namespace
 {
 
 void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer,
-               claimed_t& claimed)
+               Pass& pass)
 {
     if (base.isNull() || overlay.isNull())
     {
@@ -183,7 +206,7 @@ void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeO
             if (matchKey(child) == overlay_key)
             {
                 any_of_that_name = true;
-                if (!claimed.count(child.get()))
+                if (!pass.claimed.count(child.get()))
                 {
                     match = child;
                     break;
@@ -193,12 +216,12 @@ void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeO
 
         if (match.notNull())
         {
-            claimed.insert(match.get());
+            pass.claimed.insert(match.get());
             if (observer)
             {
                 observer->childMatched(layer, match, overlay_child);
             }
-            mergeInto(match, overlay_child, layer, observer, claimed);
+            mergeInto(match, overlay_child, layer, observer, pass);
             continue;
         }
 
@@ -216,18 +239,34 @@ void mergeInto(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeO
         // No child of the base element carries the name. The base may
         // have moved the element deeper, into a layout panel or an
         // accordion it grew after the layer was written; the layer's
-        // author cannot know that, and the name is what binds them. One
-        // element below is where it went; several is a guess.
+        // author cannot know that, and the name is what binds them. Where
+        // it went is looked for once the rest of the layer has matched,
+        // so that a copy left at the old path never takes the element
+        // from the copy written at the new one.
+        pass.later.push_back({ base, overlay_child });
+    }
+}
+
+// The children held back: one element of the name below where each was
+// written is where the base moved it; several is a guess. A rescued
+// subtree is merged like any other, and what it cannot match where it
+// was written joins the end of the same line.
+void rescueDeferred(S32 layer, ALXmlMergeObserver* observer, Pass& pass)
+{
+    for (size_t i = 0; i < pass.later.size(); ++i)
+    {
+        LLXMLNodePtr base = pass.later[i].base;
+        LLXMLNodePtr overlay_child = pass.later[i].overlay;
         std::vector<LLXMLNodePtr> below;
-        findBelow(base.get(), overlay_key, claimed, below);
+        findBelow(base.get(), matchKey(overlay_child), pass.claimed, below);
         if (below.size() == 1)
         {
-            claimed.insert(below.front().get());
+            pass.claimed.insert(below.front().get());
             if (observer)
             {
                 observer->childRescued(layer, below.front(), overlay_child);
             }
-            mergeInto(below.front(), overlay_child, layer, observer, claimed);
+            mergeInto(below.front(), overlay_child, layer, observer, pass);
         }
         else if (observer)
         {
@@ -257,8 +296,9 @@ ALXmlMergeObserver* ALXmlLayerMerge::defaultObserver()
 
 void ALXmlLayerMerge::merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer, ALXmlMergeObserver* observer)
 {
-    claimed_t claimed;
-    mergeInto(base, overlay, layer, observer, claimed);
+    Pass pass;
+    mergeInto(base, overlay, layer, observer, pass);
+    rescueDeferred(layer, observer, pass);
 }
 
 bool ALXmlLayerMerge::load(const std::vector<std::string>& paths, LLXMLNodePtr& root, ALXmlMergeObserver* observer)
@@ -304,8 +344,8 @@ bool ALXmlLayerMerge::loadSources(const std::vector<Source>& paths, LLXMLNodePtr
 
     if (!parseSource(paths.front(), root))
     {
-        LL_WARNS() << "Problem reading UI description file: " << base_path << " " << errno << LL_ENDL;
-        reportSkipped(observer, 0, base_path);
+        LL_WARNS() << "Problem reading UI description file: " << base_path << LL_ENDL;
+        reportSkipped(observer, 0, paths.front());
         return false;
     }
     if (observer)
@@ -331,7 +371,7 @@ bool ALXmlLayerMerge::loadSources(const std::vector<Source>& paths, LLXMLNodePtr
         if (!parseSource(paths[i], overlay))
         {
             LL_WARNS() << "Problem reading localized UI description file: " << layer_path << ", skipping it" << LL_ENDL;
-            reportSkipped(observer, layer, layer_path);
+            reportSkipped(observer, layer, paths[i]);
             continue;
         }
         if (observer)

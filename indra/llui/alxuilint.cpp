@@ -151,6 +151,7 @@ const char* ALXUILint::ruleName(Rule rule)
     case Rule::ParseError:              return "parse";
     case Rule::BuildFailed:             return "build failed";
     case Rule::OverlayDrop:             return "overlay drop";
+    case Rule::OverlayRescue:           return "overlay rescue";
     case Rule::Overlap:                 return "overlap";
     case Rule::Alternatives:            return "alternatives";
     case Rule::OutOfBounds:             return "out of bounds";
@@ -194,6 +195,7 @@ const char* ALXUILint::ruleKey(Rule rule)
     case Rule::ParseError:              return "LintRuleParseError";
     case Rule::BuildFailed:             return "LintRuleBuildFailed";
     case Rule::OverlayDrop:             return "LintRuleOverlayDrop";
+    case Rule::OverlayRescue:           return "LintRuleOverlayRescue";
     case Rule::Overlap:                 return "LintRuleOverlap";
     case Rule::Alternatives:            return "LintRuleAlternatives";
     case Rule::OutOfBounds:             return "LintRuleOutOfBounds";
@@ -246,6 +248,7 @@ const std::vector<const char*>& ALXUILint::keys()
         "LintDropNotBelow",
         "LintDropTextEmpty",
         "LintDropAttribute",
+        "LintRescued",
         "LintEmptyRect",
         "LintOutOfBounds",
         "LintTruncation",
@@ -521,6 +524,14 @@ void ALXUILint::fromOverlay(const Input& input)
     {
         add(Rule::OverlayDrop, Severity::Warning, ALXUISelection::fromString(d.path),
             input.overlay->layerPath(d.layer), d.line, d.what, d.key.c_str(), d.args);
+    }
+    // Applied, and worth a look: a value found where the base moved the
+    // element is found only until the base grows another of the name.
+    for (const ALXUIOverlay::Rescue& r : input.overlay->rescues())
+    {
+        add(Rule::OverlayRescue, Severity::Note, ALXUISelection::fromString(r.to),
+            input.overlay->layerPath(r.layer), r.line, r.from, "LintRescued",
+            { { "[FROM]", r.from }, { "[TO]", r.to } });
     }
 }
 

@@ -25,6 +25,8 @@
 #include "linden_common.h"
 
 #include "../alxuilint.h"
+#include "../alxuioverlay.h"
+#include "alxmllayermerge.h"
 
 #include "../alxuicatalog.h"
 #include "../alxuisourcemap.h"
@@ -898,5 +900,63 @@ namespace tut
         ensure_equals("on the second of the name", ALXUISelection::toString(overlap->path),
                       ALXUISelection::step("a", 1));
         ensure_equals("with the other named", overlap->args.at("[OTHER]")(), std::string("b"));
+    }
+
+    // What the merge dropped is a warning on the element it was looked for
+    // under, and what it rescued is a note on the element it landed on:
+    // applied, and holding only until the base grows another of the name.
+    template<> template<>
+    void alxuilint_object::test<20>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const std::string base_xml =
+            "<floater name=\"f\">\n"
+            "  <panel name=\"stack\"><text name=\"note\">Base note</text></panel>\n"
+            "</floater>\n";
+        const std::string overlay_xml =
+            "<floater name=\"f\" extra=\"x\">\n"
+            "  <text name=\"note\">Notiz</text>\n"
+            "</floater>\n";
+        LLXMLNodePtr base;
+        LLXMLNodePtr layer;
+        ensure("parses", LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base)
+                      && LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
+        ALXUIOverlay overlay;
+        overlay.layerParsed(0, "floater_x.xml");
+        overlay.layerParsed(1, "de/floater_x.xml");
+        ALXmlLayerMerge::merge(base, layer, 1, &overlay);
+
+        ALXUILint lint;
+        ALXUILint::Input input;
+        input.overlay = &overlay;
+        input.file = "floater_x.xml";
+        lint.run(input);
+
+        const ALXUILint::Finding* drop = nullptr;
+        const ALXUILint::Finding* rescue = nullptr;
+        for (const ALXUILint::Finding& f : lint.findings())
+        {
+            if (f.rule == ALXUILint::Rule::OverlayDrop)   { drop = &f; }
+            if (f.rule == ALXUILint::Rule::OverlayRescue) { rescue = &f; }
+        }
+        ensure("the attribute the base lacks is a drop", drop != nullptr);
+        ensure("which is a warning", drop->severity == ALXUILint::Severity::Warning);
+        ensure_equals("in the layer's file", drop->file, std::string("de/floater_x.xml"));
+        ensure_equals("naming the attribute", drop->what, std::string("extra"));
+        ensure_equals("in the sentence's words", drop->message, ALXUILint::wording("LintDropAttribute", drop->args));
+
+        ensure("the value applied where the base moved it is a rescue", rescue != nullptr);
+        ensure("which is a note", rescue->severity == ALXUILint::Severity::Note);
+        ensure_equals("on the element it landed on", ALXUISelection::toString(rescue->path), std::string("stack/note"));
+        ensure_equals("saying where it was written", rescue->args.at("[FROM]")(), std::string("note"));
+        ensure_equals("and where it went", rescue->args.at("[TO]")(), std::string("stack/note"));
+        ensure_equals("in the layer's file", rescue->file, std::string("de/floater_x.xml"));
+        ensure_equals("on the line it was written", rescue->line, 2);
+        ensure("under a rule with a name", std::string(ALXUILint::ruleName(rescue->rule)) == "overlay rescue");
+        ALXUILint::Rule back;
+        ensure("that comes back", ALXUILint::ruleNamed("overlay rescue", back) && back == ALXUILint::Rule::OverlayRescue);
     }
 }

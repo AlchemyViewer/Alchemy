@@ -149,8 +149,15 @@ void ALXUIOverlay::childUnmatched(S32 layer, LLXMLNode* base_parent, LLXMLNode* 
     case Miss::Ambiguous:   key = "LintDropAmbiguous"; break;
     case Miss::NotBelow:    break;
     }
+    // The root has no path of its own, and the sentence needs a name for
+    // it all the same.
+    std::string parent = namePath(base_parent);
+    if (parent.empty() && (!base_parent->getAttributeString("name", parent) || parent.empty()))
+    {
+        parent = std::string("<") + base_parent->getName()->mString + ">";
+    }
     drop(layer, overlay, std::string("<") + overlay->getName()->mString + ">", key,
-         { { "[PARENT]", namePath(base_parent) } });
+         { { "[PARENT]", parent } });
 }
 
 void ALXUIOverlay::textApplied(S32 layer, LLXMLNode* base, LLXMLNode* overlay)

@@ -56,6 +56,7 @@ public:
         ParseError,             // the parser refused something
         BuildFailed,            // the factory could not build an element
         OverlayDrop,            // a layer applied to nothing
+        OverlayRescue,          // a layer applied where the base moved the element, not where it was written
         Overlap,                // two siblings shown together intersect
         Alternatives,           // two siblings intersect, not shown together
         OutOfBounds,            // a child sits outside its parent

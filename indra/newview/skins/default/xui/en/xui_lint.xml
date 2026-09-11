@@ -17,6 +17,7 @@
     <string name="LintRuleParseError">parse</string>
     <string name="LintRuleBuildFailed">build failed</string>
     <string name="LintRuleOverlayDrop">overlay drop</string>
+    <string name="LintRuleOverlayRescue">overlay rescue</string>
     <string name="LintRuleOverlap">overlap</string>
     <string name="LintRuleAlternatives">alternatives</string>
     <string name="LintRuleOutOfBounds">out of bounds</string>
@@ -50,6 +51,7 @@
     <string name="LintDropNotBelow">nothing of this name below [PARENT]</string>
     <string name="LintDropTextEmpty">the text is empty in this layer; the base's text is kept</string>
     <string name="LintDropAttribute">the base element has no such attribute</string>
+    <string name="LintRescued">written at [FROM] and applied at [TO], where the base moved it; that holds until the base grows another element of the name, and Repair Translations moves it</string>
     <string name="LintEmptyRect">shown with a rect of [WIDTH] by [HEIGHT]</string>
     <string name="LintOutOfBounds">sits outside [PARENT], which is [WIDTH] by [HEIGHT]</string>
     <string name="LintTruncation">the text needs [NEEDED] pixels and has [ROOM]</string>

@@ -26,6 +26,7 @@
 
 #include "../alxuioverlay.h"
 
+#include "alxmllayermerge.h"
 #include "llxmlnode.h"
 
 #include "../test/lltut.h"
@@ -137,5 +138,69 @@ namespace tut
         overlay.attributeApplied(1, base.get(), skin.get());
         overlay.clear();
         ensure("nothing is remembered", overlay.writersOf(base.get()).empty());
+    }
+
+    // Through a merge: every decision that applied nothing arrives as a
+    // drop naming its sentence and the names in it, and a value applied
+    // where the base moved the element arrives as a rescue saying from
+    // where to where.
+    template<> template<>
+    void alxuioverlay_object::test<6>()
+    {
+        const std::string base_xml =
+            "<floater name=\"f\" title=\"Title\">\n"
+            "  <panel name=\"stack\">\n"
+            "    <text name=\"note\">Base note</text>\n"
+            "    <button name=\"ok\" label=\"OK\"/>\n"
+            "  </panel>\n"
+            "</floater>\n";
+        const std::string overlay_xml =
+            "<floater name=\"f\" title=\"Titel\" extra=\"x\">\n"
+            "  <text name=\"note\">Notiz</text>\n"
+            "  <text name=\"gone\">Weg</text>\n"
+            "  <text>Ohne Namen</text>\n"
+            "</floater>\n";
+        LLXMLNodePtr base;
+        LLXMLNodePtr layer;
+        ensure("the base parses", LLXMLNode::parseBuffer(base_xml.data(), base_xml.size(), base));
+        ensure("the layer parses", LLXMLNode::parseBuffer(overlay_xml.data(), overlay_xml.size(), layer));
+
+        ALXUIOverlay overlay;
+        overlay.layerParsed(0, "base.xml");
+        overlay.layerParsed(1, "de/base.xml");
+        ALXmlLayerMerge::merge(base, layer, 1, &overlay);
+
+        ensure_equals("one rescue", overlay.rescues().size(), 1u);
+        const ALXUIOverlay::Rescue& r = overlay.rescues().front();
+        ensure_equals("from where the layer wrote it", r.from, std::string("note"));
+        ensure_equals("to where the base has it", r.to, std::string("stack/note"));
+        ensure_equals("in the layer", r.layer, 1);
+        ensure_equals("on the line it was written", r.line, 2);
+
+        ensure_equals("three drops: the attribute, the name nowhere, the unnamed", overlay.drops().size(), 3u);
+        const auto dropped = [&overlay](const char* key) -> const ALXUIOverlay::Drop*
+        {
+            for (const ALXUIOverlay::Drop& d : overlay.drops())
+            {
+                if (d.key == key)
+                {
+                    return &d;
+                }
+            }
+            return nullptr;
+        };
+        const ALXUIOverlay::Drop* attribute = dropped("LintDropAttribute");
+        ensure("the attribute the base lacks", attribute != nullptr);
+        ensure_equals("named", attribute->what, std::string("extra"));
+        ensure_equals("at the root", attribute->path, std::string());
+        const ALXUIOverlay::Drop* nowhere = dropped("LintDropNotBelow");
+        ensure("the name the base has nowhere", nowhere != nullptr);
+        ensure_equals("names the element", nowhere->what, std::string("<text>"));
+        ensure_equals("and the parent it was looked for under", nowhere->args.at("[PARENT]")(), std::string("f"));
+        ensure_equals("on its line", nowhere->line, 3);
+        const ALXUIOverlay::Drop* unnamed = dropped("LintDropUnnamed");
+        ensure("the one with no name", unnamed != nullptr);
+        ensure_equals("on its line", unnamed->line, 4);
+        ensure_equals("and the layer's file is known by its index", overlay.layerPath(1), std::string("de/base.xml"));
     }
 }

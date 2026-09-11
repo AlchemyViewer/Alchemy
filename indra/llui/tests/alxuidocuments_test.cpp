@@ -346,4 +346,32 @@ namespace tut
         ensure("which the merge is still given", open.textFor(path) != nullptr);
         ensure("and the document says why", !held->error().empty());
     }
+
+    // Closing a document takes the history with it only where an action
+    // named it: one opened to be read and closed again is not a reason to
+    // lose what was done to the others.
+    template<> template<>
+    void alxuidocuments_object::test<10>()
+    {
+        const std::string base = write("base.xml", panel("a"));
+        const std::string other = write("other.xml", panel("b"));
+        ALXUIDocuments open;
+        ALXUIEdit* first = open.open(base);
+        ensure("opens", first != nullptr);
+        ensure("writes", first->setAttribute({ "a" }, "width", "40"));
+        open.settle();
+        ensure_equals("one action", open.history().size(), 1u);
+
+        ensure("opens another", open.open(other) != nullptr);
+        ensure("closes it untouched", open.close(other));
+        ensure_equals("and the action is still there", open.history().size(), 1u);
+        ensure("to be put back", open.canUndo());
+
+        ensure("opens it again", open.open(other) != nullptr);
+        ensure("writes to it", open.find(other)->setAttribute({ "b" }, "width", "50"));
+        open.settle();
+        ensure_equals("two actions", open.history().size(), 2u);
+        ensure("closes it with work in the history", open.close(other));
+        ensure("and the history is gone, since half of it named a file that is", open.history().empty());
+    }
 }
