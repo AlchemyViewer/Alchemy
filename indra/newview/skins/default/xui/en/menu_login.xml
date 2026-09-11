@@ -156,12 +156,6 @@
              function="Floater.Toggle"
              parameter="xui_studio" />
         </menu_item_call>
-        <menu_item_call
-         label="XUI Baseline Census"
-         name="XUI Baseline Census">
-            <menu_item_call.on_click
-             function="Advanced.XUIBaseline" />
-        </menu_item_call>
       <menu_item_separator />
       <menu
        create_jump_keys="true"
