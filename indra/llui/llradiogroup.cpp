@@ -72,6 +72,7 @@ static LLWidgetNameRegistry::StaticRegistrar register_radio_item(typeid(LLRadioG
 
 LLRadioGroup::Params::Params()
 :   allow_deselect("allow_deselect"),
+    draw_border("draw_border", false),
     items("item")
 {
     addSynonym(items, "radio_item");
@@ -85,7 +86,17 @@ LLRadioGroup::LLRadioGroup(const LLRadioGroup::Params& p)
     mFont(p.font.isProvided() ? p.font() : LLFontGL::getFontSansSerifSmall()),
     mSelectedIndex(-1),
     mAllowDeselect(p.allow_deselect)
-{}
+{
+    if (p.draw_border)
+    {
+        LLViewBorder::Params bp;
+        bp.name = "radio group border";
+        bp.rect = getLocalRect();
+        bp.bevel_style = LLViewBorder::BEVEL_NONE;
+        bp.follows.flags = FOLLOWS_ALL;
+        addChild(LLUICtrlFactory::create<LLViewBorder>(bp));
+    }
+}
 
 void LLRadioGroup::initFromParams(const Params& p)
 {

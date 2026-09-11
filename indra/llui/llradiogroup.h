@@ -51,6 +51,9 @@ public:
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool>                      allow_deselect;
+        // A line around the group, drawn by a border the group holds and
+        // which follows every edge of it.
+        Optional<bool>                      draw_border;
         Multiple<ItemParams, AtLeast<1> >   items;
         Params();
     };

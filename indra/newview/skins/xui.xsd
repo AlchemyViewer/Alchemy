@@ -53311,6 +53311,7 @@
     <xs:attribute name="control_name" type="xs:string"/>
     <xs:attribute name="default_tab_group" type="xs:integer"/>
     <xs:attribute name="disabled_control" type="xs:string"/>
+    <xs:attribute name="draw_border" type="xs:boolean"/>
     <xs:attribute name="enabled" type="xs:boolean"/>
     <xs:attribute name="enabled_control" type="xs:string"/>
     <xs:attribute name="focus_root" type="xs:boolean"/>

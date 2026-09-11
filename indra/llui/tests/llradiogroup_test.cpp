@@ -26,6 +26,8 @@
 
 #include "../llradiogroup.h"
 
+#include "../llviewborder.h"
+
 #include "../llui.h"
 #include "../lluictrlfactory.h"
 #include "llcontrol.h"
@@ -149,5 +151,37 @@ namespace tut
         ensure("the item named false writes no", !config().getBOOL("RadioGroupTestNamed"));
         ensure("as a no", setting->getValue().isBoolean());
         group->die();
+    }
+
+    // A group asked to draw a border holds one that fills it and follows
+    // it as it is reshaped; one that is not asked holds none.
+    template<> template<>
+    void llradiogroup_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLRadioGroup* plain = choice("a", "b");
+        ensure("no border unless asked", plain->findChild<LLViewBorder>("radio group border", false) == nullptr);
+        plain->die();
+
+        LLRadioGroup::Params p(LLUICtrlFactory::getDefaultParams<LLRadioGroup>());
+        p.name = "bordered";
+        p.rect = LLRect(0, 40, 200, 0);
+        p.draw_border = true;
+        LLRadioGroup::ItemParams item;
+        item.name = "only";
+        item.rect = LLRect(0, 40, 200, 22);
+        p.items.add(item);
+        LLRadioGroup* bordered = LLUICtrlFactory::create<LLRadioGroup>(p);
+
+        LLViewBorder* border = bordered->findChild<LLViewBorder>("radio group border", false);
+        ensure("asked for, a border is held", border != nullptr);
+        ensure_equals("around the whole group", border->getRect(), bordered->getLocalRect());
+        bordered->reshape(300, 60);
+        ensure_equals("and around it still once it has grown", border->getRect(), bordered->getLocalRect());
+        bordered->die();
     }
 }
