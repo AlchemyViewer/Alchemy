@@ -6300,6 +6300,36 @@ void LLAppViewer::idleNetwork()
 
     gObjectList.mNumNewObjects = 0;
 
+#if AL_NET_IMPAIRMENT
+    // Deliberate damage to the inbound stream, applied here rather than once at login so the
+    // level can be changed while watching what it does. Absent from the build that ships.
+    {
+        static LLCachedControl<F32> sim_loss(gSavedSettings, "ALSimulatePacketLoss", 0.f);
+        static LLCachedControl<F32> sim_burst(gSavedSettings, "ALSimulatePacketLossBurst", 1.f);
+        static LLCachedControl<F32> sim_reorder(gSavedSettings, "ALSimulatePacketReorder", 0.f);
+        static LLCachedControl<S32> sim_reorder_delay(gSavedSettings, "ALSimulatePacketReorderDelay", 3);
+
+        gMessageSystem->setNetImpairment(sim_loss, sim_burst, sim_reorder, sim_reorder_delay);
+
+        // Say so periodically while it is on. Without this, "nothing went wrong" during a test is
+        // ambiguous between the recovery working and the impairment never having been applied.
+        const ALNetImpairment& impairment = gMessageSystem->getNetImpairment();
+        if (impairment.isActive())
+        {
+            static LLFrameTimer report_timer;
+            if (report_timer.getElapsedTimeF32() > 10.f)
+            {
+                report_timer.reset();
+                LL_INFOS("NetImpairment") << "simulating " << sim_loss() << "% loss in bursts of "
+                                          << sim_burst() << ", " << sim_reorder() << "% reordered by "
+                                          << sim_reorder_delay() << " packets; dropped so far "
+                                          << impairment.getDroppedCount() << ", reordered "
+                                          << impairment.getReorderedCount() << LL_ENDL;
+            }
+        }
+    }
+#endif
+
     static LLCachedControl<bool> speed_test(gSavedSettings, "SpeedTest", false);
     if (!speed_test())
     {

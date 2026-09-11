@@ -266,6 +266,50 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALSimulatePacketLoss</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid, absent from release builds: average percentage of inbound UDP packets to discard before the viewer sees them. Exercises the recovery paths -- prediction phase-out, region-crossing expiry -- that a healthy connection never reaches. 0 disables.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>ALSimulatePacketLossBurst</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid: mean length in packets of a simulated loss burst. Real loss arrives in runs rather than spread evenly, and the distinction matters -- the same average loss concentrated into longer outages is what actually strands a moving object. 1 leaves losses unclustered. Does not change the average loss rate.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>ALSimulatePacketReorder</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid, absent from release builds: percentage of surviving inbound packets to deliver late, so they arrive out of sequence. Exercises the per-object out-of-order guard. 0 disables.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>ALSimulatePacketReorderDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>Testing aid: how many later packets a delayed packet is released behind. Larger values put an update further out of sequence when it finally arrives.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>3</integer>
+        </map>
         <key>ALXUIStudioState</key>
         <map>
             <key>Comment</key>

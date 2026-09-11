@@ -946,9 +946,53 @@ void LLMessageSystem::setDropPercentage(F32 percent_to_drop)
     mDropPercentage = percent_to_drop;
 }
 
+#if AL_NET_IMPAIRMENT
+void LLMessageSystem::setNetImpairment(F32 loss_percent, F32 burst_packets, F32 reorder_percent, S32 reorder_delay)
+{
+    const bool was_active = mNetImpairment.isActive();
+
+    mNetImpairment.setLossPercent(loss_percent);
+    mNetImpairment.setBurstLength(burst_packets);
+    mNetImpairment.setReorderPercent(reorder_percent);
+    mNetImpairment.setReorderDelay(reorder_delay);
+
+    if (was_active && !mNetImpairment.isActive())
+    {
+        // Switched off with packets still held back. Deliver them rather than losing traffic the
+        // caller did not ask to lose.
+        std::vector<LLPacketBuffer> released;
+        mNetImpairment.flush(released);
+        for (const LLPacketBuffer& late : released)
+        {
+            if (isHighPriorityMessage(late))
+            {
+                mHighPriorityInbound.pushPacket(late);
+            }
+            else
+            {
+                mLowPriorityInbound.pushPacket(late);
+            }
+        }
+    }
+}
+#endif
+
 S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked)
 {
     packet_id_already_checked = false;
+
+#if AL_NET_IMPAIRMENT
+    // Steady-state traffic arrives here, one direct socket read per call. The drain that feeds the
+    // queues -- and so bufferInboundPacket, where the impairment sits -- only runs when a frame's
+    // message budget overflows, so hooked there alone the impairment never saw ordinary traffic
+    // and reported nothing dropped. While it is on, take everything waiting through that intake
+    // first, so every packet passes the impairment, and a dropped one is simply skipped: returning
+    // zero here instead would read as "no more packets" and end this frame's reads.
+    if (mNetImpairment.isActive() && getNumBufferedPackets() == 0)
+    {
+        drainUdpSocket();
+    }
+#endif
 
     if (getNumBufferedPackets() > 0)
     {
@@ -1073,7 +1117,19 @@ S32 LLMessageSystem::bufferInboundPacket()
         }
     }
 
-    if (packet_size >= (S32)LL_MINIMUM_VALID_PACKET_SIZE && !computeDrop())
+    // A read that returned nothing is not a packet: neither the explicit drop counter nor the
+    // impairment's burst state advances on it, or the empty read that ends every drain would step
+    // them once a frame. For a packet, both are evaluated rather than short-circuited, so each
+    // sees every one and stays in step with the stream.
+    const bool have_packet = packet_size >= (S32)LL_MINIMUM_VALID_PACKET_SIZE;
+    const bool drop_requested = have_packet && computeDrop();
+#if AL_NET_IMPAIRMENT
+    const bool drop_impaired = have_packet && mNetImpairment.shouldDrop();
+#else
+    const bool drop_impaired = false;
+#endif
+
+    if (have_packet && !drop_requested && !drop_impaired)
     {
         const char* data = pkt.getData();
         LLCircuitData* cdp = mCircuitInfo.findCircuit(pkt.getHost());
@@ -1122,14 +1178,36 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         }
 
-        if (isHighPriorityMessage(pkt))
+        auto enqueue = [this](const LLPacketBuffer& buffered)
         {
-            mHighPriorityInbound.pushPacket(pkt);
-        }
-        else
+            if (isHighPriorityMessage(buffered))
+            {
+                mHighPriorityInbound.pushPacket(buffered);
+            }
+            else
+            {
+                mLowPriorityInbound.pushPacket(buffered);
+            }
+        };
+
+#if AL_NET_IMPAIRMENT
+        std::vector<LLPacketBuffer> released;
+        mNetImpairment.advance(released);
+
+        if (!mNetImpairment.hold(pkt))
         {
-            mLowPriorityInbound.pushPacket(pkt);
+            enqueue(pkt);
         }
+
+        // Anything released rejoins *behind* the packet that just arrived, which is what puts it
+        // out of order: its sequence number is now older than one already delivered.
+        for (const LLPacketBuffer& late : released)
+        {
+            enqueue(late);
+        }
+#else
+        enqueue(pkt);
+#endif
     }
 
     return socket_read_size;
