@@ -277,4 +277,28 @@ namespace tut
                       pane->getParentByType<ALPanelFloater>()->getRect().getWidth(), moved.getWidth());
         w.floater->die();
     }
+
+    // Back after the window changed size while the pane was out: the pane
+    // fills the room it comes back to as it is now, not as it was, since
+    // it follows every later resize from wherever it was put.
+    template<> template<>
+    void aldockpanel_object::test<10>()
+    {
+        Window w = build();
+        ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+
+        pane->popOut();
+        w.stack->updateLayout();
+        w.floater->reshape(600, 500);
+        w.stack->reshape(600, 500);
+        w.stack->updateLayout();
+        pane->dock();
+        w.stack->updateLayout();
+
+        ensure_equals("in the parent it came from", pane->getParent(), (LLView*)w.side);
+        ensure_equals("and as tall as it is now: " + std::to_string(pane->getRect().getHeight())
+                          + " in " + std::to_string(w.side->getRect().getHeight()),
+                      pane->getRect(), w.side->getLocalRect());
+        w.floater->die();
+    }
 }

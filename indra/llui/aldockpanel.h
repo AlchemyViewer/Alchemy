@@ -122,7 +122,6 @@ private:
     std::string         mTitle;
     LLHandle<LLView>    mHome;          // the parent it was declared in
     LLHandle<LLFloater> mFloater;       // the window it is in, while it is out
-    LLRect              mHomeRect;
     LLRect              mFloatingRect;
     U32                 mHomeFollows = FOLLOWS_ALL;
 };

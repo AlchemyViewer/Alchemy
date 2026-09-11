@@ -131,7 +131,6 @@ void ALDockPanel::popOut()
     LLFloater* was_in = getParentByType<LLFloater>();
 
     mHome = home->getHandle();
-    mHomeRect = getRect();
     mHomeFollows = getFollows();
 
     // The window is the pane AND a title bar: a window made the size of the
@@ -204,9 +203,12 @@ void ALDockPanel::dock()
             mFloatingRect = floater->getRect();
             floater->removeChild(this);
         }
+        // The whole of home as it is now, not as it was: the window may
+        // have been resized while the pane was out, and a pane put back at
+        // its old size follows every later resize from the wrong one.
         home->addChild(this);
         setFollows(mHomeFollows);
-        setShape(mHomeRect);
+        setShape(home->getLocalRect());
         setVisible(true);
 
         // The room it gave up, given back at the size it wanted before.
