@@ -82,6 +82,9 @@ public:
     LLButton*        mButton;
     bool             mOldState;
     S32              mPadding;
+    // The width the tab wants for what is on it: what it scrolls at, and
+    // what it takes its share of a strip filled across from.
+    S32              mNaturalWidth = 0;
 
     mutable bool mVisible;
 };
@@ -225,7 +228,8 @@ LLTabContainer::Params::Params()
     tabs_flashing_color("tabs_flashing_color"),
     tab_icon_ctrl_pad("tab_icon_ctrl_pad", 0),
     use_ellipses("use_ellipses"),
-    use_tab_offset("use_tab_offset", false)
+    use_tab_offset("use_tab_offset", false),
+    fill_width("fill_width", false)
 {}
 
 LLTabContainer::LLTabContainer(const LLTabContainer::Params& p)
@@ -264,7 +268,8 @@ LLTabContainer::LLTabContainer(const LLTabContainer::Params& p)
     mEnableTabsFlashing(p.enable_tabs_flashing),
     mTabsFlashingColor(p.tabs_flashing_color),
     mUseTabEllipses(p.use_ellipses),
-    mUseTabOffset(p.use_tab_offset)
+    mUseTabOffset(p.use_tab_offset),
+    mFillWidth(p.fill_width)
 {
     static LLUICachedControl<S32> tabcntr_vert_tab_min_width ("UITabCntrVertTabMinWidth", 0);
 
@@ -924,8 +929,6 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
 
     child->setVisible( false );  // Will be made visible when selected
 
-    mTotalTabWidth += button_width;
-
     // Tab button
     LLRect btn_rect;  // Note: btn_rect.mLeft is just a dummy.  Will be updated in draw().
     LLUIImage* tab_img = NULL;
@@ -1024,6 +1027,7 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
     }
 
     LLTabTuple* tuple = new LLTabTuple( this, child, btn );
+    setNaturalWidth(tuple, button_width);
     insertTuple( tuple, insertion_point );
 
     // if new tab was added as a first or last tab, update button image
@@ -1087,7 +1091,7 @@ void LLTabContainer::removeTabPanel(LLPanel* child)
                 update_images(mTabList[mTabList.size()-2], mLastTabParams, getTabPosition());
             }
 
-            mTotalTabWidth -= tuple->mButton->getRect().getWidth();
+            mTotalTabWidth -= tuple->mNaturalWidth;
             removeChild( tuple->mButton );
             delete tuple->mButton;
             tuple->mButton = NULL;
@@ -1449,14 +1453,14 @@ void LLTabContainer::scrollTabIntoView(const LLTabTuple* selected)
         else
         {
             const S32 available_width_with_arrows = stripRoom(true);
-            S32 running_tab_width = shown[i]->mButton->getRect().getWidth();
+            S32 running_tab_width = shown[i]->mNaturalWidth;
             S32 j = i - 1;
             S32 min_scroll_pos = i;
             if (running_tab_width < available_width_with_arrows)
             {
                 while (j >= 0)
                 {
-                    running_tab_width += shown[j]->mButton->getRect().getWidth();
+                    running_tab_width += shown[j]->mNaturalWidth;
                     if (running_tab_width > available_width_with_arrows)
                     {
                         break;
@@ -1595,15 +1599,9 @@ void LLTabContainer::reshapeTuple(LLTabTuple* tuple)
             const F32 scale = llmin(1.f, (F32)tuple->mButton->getRect().getHeight() / (F32)llmax(1, overlay->getHeight()));
             image_overlay_width = ll_round((F32)overlay->getWidth() * scale);
         }
-        // remove current width from total tab strip width
-        mTotalTabWidth -= tuple->mButton->getRect().getWidth();
-
         tuple->mPadding = image_overlay_width;
-
-        tuple->mButton->reshape(llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + tuple->mPadding, mMinTabWidth, mMaxTabWidth),
-                                tuple->mButton->getRect().getHeight());
-        // add back in button width to total tab strip width
-        mTotalTabWidth += tuple->mButton->getRect().getWidth();
+        setNaturalWidth(tuple, llclamp(mFont->getWidth(tuple->mButton->getLabelSelected()) + tab_padding + tuple->mPadding,
+                                       mMinTabWidth, mMaxTabWidth));
 
         // tabs have changed size, might need to scroll to see current tab
         updateMaxScrollPos();
@@ -1933,6 +1931,7 @@ void LLTabContainer::insertTuple(LLTabTuple * tuple, eInsertionPoint insertion_p
 void LLTabContainer::updateMaxScrollPos()
 {
     static LLUICachedControl<S32> tabcntrv_pad ("UITabCntrvPad", 0);
+    fillStrip();
     bool no_scroll = true;
     if (mIsVertical)
     {
@@ -1967,7 +1966,7 @@ void LLTabContainer::updateMaxScrollPos()
                 {
                     continue;
                 }
-                running_tab_width += (*tab_it)->mButton->getRect().getWidth();
+                running_tab_width += (*tab_it)->mNaturalWidth;
                 if (running_tab_width > available_width_with_arrows)
                 {
                     break;
@@ -2046,7 +2045,7 @@ S32 LLTabContainer::stripRoom(bool with_arrows) const
     return pageRight() - mRightTabBtnOffset - pageLeft() - (with_arrows ? 4 * tabcntr_arrow_btn_size : 0);
 }
 
-// The strip's width as it shows: the tabs that are not hidden.
+// The strip's width as it shows: what the tabs that are not hidden want.
 S32 LLTabContainer::visibleTabWidth() const
 {
     S32 width = 0;
@@ -2054,10 +2053,52 @@ S32 LLTabContainer::visibleTabWidth() const
     {
         if (tuple->mVisible)
         {
-            width += tuple->mButton->getRect().getWidth();
+            width += tuple->mNaturalWidth;
         }
     }
     return width;
+}
+
+void LLTabContainer::setNaturalWidth(LLTabTuple* tuple, S32 width)
+{
+    mTotalTabWidth += width - tuple->mNaturalWidth;
+    tuple->mNaturalWidth = width;
+    tuple->mButton->reshape(width, tuple->mButton->getRect().getHeight());
+}
+
+// A strip that fills its width: when the tabs that show fit, what is left
+// over is shared out among them, a pixel more to the first few where it
+// does not divide; when they do not fit, each is its own width and the
+// strip scrolls.
+void LLTabContainer::fillStrip()
+{
+    if (mIsVertical || !mFillWidth)
+    {
+        return;
+    }
+    const S32 room = stripRoom(false);
+    const S32 wanted = visibleTabWidth();
+    S32 shown = 0;
+    for (const LLTabTuple* tuple : mTabList)
+    {
+        shown += tuple->mVisible ? 1 : 0;
+    }
+    const bool fits = shown > 0 && wanted <= room;
+    const S32 each = fits ? (room - wanted) / shown : 0;
+    S32 remainder = fits ? (room - wanted) % shown : 0;
+    for (LLTabTuple* tuple : mTabList)
+    {
+        S32 width = tuple->mNaturalWidth;
+        if (fits && tuple->mVisible)
+        {
+            width += each + (remainder > 0 ? 1 : 0);
+            remainder = llmax(0, remainder - 1);
+        }
+        if (tuple->mButton->getRect().getWidth() != width)
+        {
+            tuple->mButton->reshape(width, tuple->mButton->getRect().getHeight());
+        }
+    }
 }
 
 void LLTabContainer::setTabVisibility( LLPanel const *aPanel, bool aVisible )

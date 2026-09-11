@@ -119,6 +119,12 @@ public:
 
         Optional<bool> use_tab_offset;
 
+        // The tabs share the strip's width when they fit in it, each
+        // taking its own width and an equal part of what is left, so the
+        // strip runs the whole way across its pages. Tabs that do not fit
+        // keep their own widths and scroll.
+        Optional<bool> fill_width;
+
         Params();
     };
 
@@ -259,6 +265,8 @@ private:
     S32 pageLeft() const;
     S32 pageRight() const;
     S32 stripRoom(bool with_arrows) const;
+    void setNaturalWidth(LLTabTuple* tuple, S32 width);
+    void fillStrip();
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 
@@ -334,6 +342,7 @@ private:
     LLFrameTimer                    mMouseDownTimer;
 
     bool mUseTabOffset;
+    bool mFillWidth;
 };
 
 #endif  // LL_TABCONTAINER_H

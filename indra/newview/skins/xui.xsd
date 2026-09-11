@@ -49655,6 +49655,7 @@
     <xs:attribute name="enabled" type="xs:boolean"/>
     <xs:attribute name="enabled_control" type="xs:string"/>
     <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="fill_width" type="xs:boolean"/>
     <xs:attribute name="first_tab.tab_bottom_image_flash" type="xs:string"/>
     <xs:attribute name="first_tab.tab_bottom_image_flash.name" type="xs:string"/>
     <xs:attribute name="first_tab.tab_bottom_image_selected" type="xs:string"/>
@@ -69554,6 +69555,7 @@
     <xs:attribute name="enabled" type="xs:boolean"/>
     <xs:attribute name="enabled_control" type="xs:string"/>
     <xs:attribute name="filename" type="xs:string"/>
+    <xs:attribute name="fill_width" type="xs:boolean"/>
     <xs:attribute name="first_tab.tab_bottom_image_flash" type="xs:string"/>
     <xs:attribute name="first_tab.tab_bottom_image_flash.name" type="xs:string"/>
     <xs:attribute name="first_tab.tab_bottom_image_selected" type="xs:string"/>

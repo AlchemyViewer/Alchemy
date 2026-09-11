@@ -818,4 +818,61 @@ namespace tut
             tabs->die();
         }
     }
+
+    // A strip asked to fill its width shares what is left over among the
+    // tabs that show, so it runs the whole way across its pages; a strip
+    // whose tabs do not fit leaves each its own width and scrolls.
+    template<> template<>
+    void lltabcontainer_object::test<27>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
+        p.name = "tabs";
+        p.rect = LLRect(0, 300, 400, 0);
+        p.fill_width = true;
+        LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
+        LLPanel* a = page("a", std::string());
+        tabs->addTabPanel(a);
+        tabs->addTabPanel(page("b", std::string()));
+        tabs->addTabPanel(page("c", std::string()));
+        tabs->addTabPanel(page("d", std::string()));
+
+        // Four tabs of sixty in the three hundred and ninety-eight between
+        // the page's sides: each gets its sixty and a fourth of the rest.
+        const S32 room = 398;
+        S32 total = 0;
+        for (const char* name : { "a", "b", "c", "d" })
+        {
+            const S32 width = tabButton(tabs, name)->getRect().getWidth();
+            ensure("each tab is wider than it wants", width > 60);
+            total += width;
+        }
+        ensure_equals("and together they are the strip", total, room);
+        ensure_equals("the odd pixels go to the first", tabButton(tabs, "a")->getRect().getWidth(),
+                      tabButton(tabs, "d")->getRect().getWidth() + 1);
+
+        // A hidden tab takes no share.
+        tabs->setTabVisibility(a, false);
+        total = 0;
+        for (const char* name : { "b", "c", "d" })
+        {
+            total += tabButton(tabs, name)->getRect().getWidth();
+        }
+        ensure_equals("three share it", total, room);
+        ensure_equals("the hidden one is its own width", tabButton(tabs, "a")->getRect().getWidth(), 60);
+        tabs->setTabVisibility(a, true);
+
+        // More than fit: their own widths, and a scroll.
+        for (const char* name : { "e", "f", "g" })
+        {
+            tabs->addTabPanel(page(name, std::string()));
+        }
+        ensure_equals("seven of sixty do not fit, so each is sixty", tabButton(tabs, "a")->getRect().getWidth(), 60);
+        ensure("and the strip scrolls", tabs->getMaxScrollPos() > 0);
+        tabs->die();
+    }
 }
