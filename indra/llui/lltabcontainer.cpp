@@ -1676,10 +1676,11 @@ void LLTabContainer::reshapeTuple(LLTabTuple* tuple)
             LLIconCtrl* icon_ctrl = button ? button->getIconCtrl() : NULL;
             image_overlay_width = icon_ctrl ? icon_ctrl->getRect().getWidth() : 0;
         }
-        else
+        else if (LLUIImage* overlay = tuple->mButton->getImageOverlay())
         {
-            image_overlay_width = tuple->mButton->getImageOverlay().notNull() ?
-                    tuple->mButton->getImageOverlay()->getImage()->getWidth(0) : 0;
+            // As the button draws it: scaled down to fit the button's height.
+            const F32 scale = llmin(1.f, (F32)tuple->mButton->getRect().getHeight() / (F32)llmax(1, overlay->getHeight()));
+            image_overlay_width = ll_round((F32)overlay->getWidth() * scale);
         }
         // remove current width from total tab strip width
         mTotalTabWidth -= tuple->mButton->getRect().getWidth();

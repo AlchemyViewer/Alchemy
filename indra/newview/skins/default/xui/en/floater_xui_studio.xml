@@ -637,38 +637,40 @@
      top_delta="0"
      width="60" />
 
+    <!-- The three regions' toggles, at the right end of the bar: they are
+         about the window's shape, not about what is being previewed. -->
     <button
-     follows="left|top"
+     follows="right|top"
      height="22"
      is_toggle="true"
      label="Navigator"
      layout="topleft"
-     left_pad="24"
      name="fold_navigator"
+     right="-144"
      tool_tip="The pane of files, the outline, search and the library, down the left (Control+0)"
-     top_delta="0"
+     top="41"
      width="72" />
     <button
-     follows="left|top"
+     follows="right|top"
      height="22"
      is_toggle="true"
      label="Tables"
      layout="topleft"
-     left_pad="2"
      name="fold_bottom"
+     right="-86"
      tool_tip="The band under the canvas: findings, translation, notices and channels (Control+Shift+B)"
-     top_delta="0"
+     top="41"
      width="56" />
     <button
-     follows="left|top"
+     follows="right|top"
      height="22"
      is_toggle="true"
      label="Inspectors"
      layout="topleft"
-     left_pad="2"
      name="fold_inspectors"
+     right="-8"
      tool_tip="The inspectors of the selected element, down the right (Control+Alt+0)"
-     top_delta="0"
+     top="41"
      width="76" />
 
     <layout_stack
@@ -697,7 +699,7 @@
          min_dim="0"
          name="navigator_panel"
          user_resize="true"
-         width="380"
+         width="400"
          background_visible="true"
          background_opaque="true"
          bg_opaque_color="DkGray2"
@@ -709,15 +711,13 @@
              left="0"
              name="navigator_tabs"
              tab_height="26"
-             tab_max_width="34"
-             tab_min_width="34"
              tab_position="top"
              top="0"
-             width="380">
+             width="400">
                 <panel
                  follows="all"
                  height="444"
-                 label=""
+                 label="Files"
                  layout="topleft"
                  name="files_mode"
                  tool_tip="Files: every XUI file in the skin, with the ones the chosen skin and language have of their own"
@@ -794,7 +794,7 @@
                 <panel
                  follows="all"
                  height="444"
-                 label=""
+                 label="Outline"
                  layout="topleft"
                  name="outline_mode"
                  tool_tip="Outline: the tree of the previewed file, with its filter and the buttons that reorder it"
@@ -931,7 +931,7 @@
                 <panel
                  follows="all"
                  height="444"
-                 label=""
+                 label="Find"
                  layout="topleft"
                  name="find_mode"
                  tool_tip="Find: a search across every file and every layer"
@@ -1005,7 +1005,7 @@
                 <panel
                  follows="all"
                  height="444"
-                 label=""
+                 label="Documents"
                  layout="topleft"
                  name="documents_mode"
                  tool_tip="Documents: every file this tool has open, and which of them have work the disk has not heard about"
@@ -1111,7 +1111,7 @@
                 <panel
                  follows="all"
                  height="444"
-                 label=""
+                 label="Library"
                  layout="topleft"
                  name="palette_mode"
                  tool_tip="Library: the tags the selected element may contain"
@@ -2079,7 +2079,7 @@
          min_dim="0"
          name="inspector_panel"
          user_resize="true"
-         width="480"
+         width="500"
          background_visible="true"
          background_opaque="true"
          bg_opaque_color="DkGray2"
@@ -2093,7 +2093,7 @@
              tab_min_width="60"
              tab_position="top"
              top="0"
-             width="480">
+             width="500">
                 <panel
                  label="Attributes"
                  layout="topleft"

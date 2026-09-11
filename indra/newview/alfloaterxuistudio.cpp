@@ -1881,22 +1881,38 @@ bool ALFloaterXUIStudio::postBuild()
     // unreadable in a column and want the width of the middle of the window.
     mModes = getChild<LLTabContainer>("navigator_tabs");
     mBottom = getChild<LLTabContainer>("bottom_tabs");
-    // A navigator mode is a picture in a strip. The file says what each one
-    // is, in the tooltip its page carries; which picture stands for it is
-    // named here, because a tab's icon is not something a XUI file can ask
-    // for. The band's tabs have room for their names and keep them.
+    // A navigator mode and an inspector are a picture and a name in a
+    // strip. The file gives each its name and, in the tooltip its page
+    // carries, says what it is; which picture stands for it is named here,
+    // because a tab's icon is not something a XUI file can ask for. The
+    // band's tabs are names alone.
     static constexpr std::pair<const char*, const char*> MODE_ICONS[] = {
-        { "files_mode",   "Command_Scripts_Icon" },
+        { "files_mode",     "Command_Scripts_Icon" },
         { "documents_mode", "Command_LocalAssets_Icon" },
-        { "outline_mode", "Command_Inventory_Icon" },
-        { "find_mode",    "Command_Search_Icon" },
-        { "palette_mode", "Command_Build_Icon" },
+        { "outline_mode",   "Command_Inventory_Icon" },
+        { "find_mode",      "Command_Search_Icon" },
+        { "palette_mode",   "Command_Build_Icon" },
     };
     for (const auto& [page, icon] : MODE_ICONS)
     {
         if (LLPanel* panel = mModes->getPanelByName(page))
         {
-            mModes->setTabImage(panel, icon, LLColor4::white, LLFontGL::HCENTER);
+            mModes->setTabImage(panel, icon);
+        }
+    }
+    static constexpr std::pair<const char*, const char*> INSPECTOR_ICONS[] = {
+        { "attributes_tab", "Command_Preferences_Icon" },
+        { "layout_tab",     "Command_Move_Icon" },
+        { "source_tab",     "Command_Scripts_Icon" },
+        { "bindings_tab",   "Command_Gestures_Icon" },
+        { "state_tab",      "Command_View_Icon" },
+        { "findings_tab",   "Command_Report_Abuse_Icon" },
+    };
+    for (const auto& [page, icon] : INSPECTOR_ICONS)
+    {
+        if (LLPanel* panel = mInspectors->getPanelByName(page))
+        {
+            mInspectors->setTabImage(panel, icon);
         }
     }
     mNotifications = getChild<LLScrollListCtrl>("notifications");
