@@ -348,7 +348,6 @@ void LLTabContainer::draw()
 {
     static LLUICachedControl<S32> tabcntrv_pad ("UITabCntrvPad", 0);
     static LLUICachedControl<S32> tabcntrv_arrow_btn_size ("UITabCntrvArrowBtnSize", 0);
-    static LLUICachedControl<S32> tabcntr_tab_h_pad ("UITabCntrTabHPad", 0);
     static LLUICachedControl<S32> tabcntr_arrow_btn_size ("UITabCntrArrowBtnSize", 0);
     static LLUICachedControl<S32> tabcntr_tab_partial_width ("UITabCntrTabPartialWidth", 0);
     S32 target_pixel_scroll = 0;
@@ -361,7 +360,7 @@ void LLTabContainer::draw()
         }
         else
         {
-            S32 available_width_with_arrows = getRect().getWidth() - mRightTabBtnOffset - 2 * (LLPANEL_BORDER_WIDTH + tabcntr_arrow_btn_size  + tabcntr_arrow_btn_size + 1);
+            const S32 available_width_with_arrows = stripRoom(true);
             for(tuple_list_t::iterator iter = mTabList.begin(); iter != mTabList.end(); ++iter)
             {
                 if (cur_scroll_pos == 0)
@@ -402,8 +401,8 @@ void LLTabContainer::draw()
     }
     else
     {
-        // Set the leftmost position of the tab buttons.
-        left = LLPANEL_BORDER_WIDTH + (has_scroll_arrows ? (tabcntr_arrow_btn_size * 2) : tabcntr_tab_h_pad);
+        // The strip starts where the pages do, after the arrows when it has them.
+        left = pageLeft() + (has_scroll_arrows ? (tabcntr_arrow_btn_size * 2) : 0);
         left -= getScrollPosPixels();
     }
 
@@ -417,11 +416,19 @@ void LLTabContainer::draw()
         }
     }
 
+    // While the strip scrolls, a tab carried under an arrow stops at the
+    // pages' sides rather than running past the container; a strip that
+    // fits has nothing to cut, and the pages are never cut.
+    if (has_scroll_arrows)
     {
         LLRect clip_rect = getLocalRect();
-        clip_rect.mLeft+=(LLPANEL_BORDER_WIDTH + 2);
-        clip_rect.mRight-=(LLPANEL_BORDER_WIDTH + 2);
+        clip_rect.mLeft = pageLeft();
+        clip_rect.mRight = pageRight();
         LLLocalClipRect clip(clip_rect);
+        LLPanel::draw();
+    }
+    else
+    {
         LLPanel::draw();
     }
 
@@ -908,9 +915,7 @@ void LLTabContainer::addTabPanel(const TabPanelParams& panel)
     }
     else
     {
-        S32 left_offset = mUseTabOffset ? LLPANEL_BORDER_WIDTH * 3 : LLPANEL_BORDER_WIDTH;
-        S32 right_offset = mUseTabOffset ? LLPANEL_BORDER_WIDTH * 2 : LLPANEL_BORDER_WIDTH;
-        tab_panel_rect = LLRect(left_offset, tab_panel_top, getRect().getWidth() - right_offset, tab_panel_bottom);
+        tab_panel_rect = LLRect(pageLeft(), tab_panel_top, pageRight(), tab_panel_bottom);
     }
     child->setFollowsAll();
     child->translate( tab_panel_rect.mLeft - child->getRect().mLeft, tab_panel_rect.mBottom - child->getRect().mBottom);
@@ -1404,7 +1409,6 @@ bool LLTabContainer::setTab(S32 which)
 // not a place to scroll to.
 void LLTabContainer::scrollTabIntoView(const LLTabTuple* selected)
 {
-    static LLUICachedControl<S32> tabcntr_arrow_btn_size ("UITabCntrArrowBtnSize", 0);
     std::vector<const LLTabTuple*> shown;
     S32 i = -1;
     for (const LLTabTuple* tuple : mTabList)
@@ -1444,7 +1448,7 @@ void LLTabContainer::scrollTabIntoView(const LLTabTuple* selected)
         }
         else
         {
-            const S32 available_width_with_arrows = getRect().getWidth() - mRightTabBtnOffset - 2 * (LLPANEL_BORDER_WIDTH + tabcntr_arrow_btn_size  + tabcntr_arrow_btn_size + 1);
+            const S32 available_width_with_arrows = stripRoom(true);
             S32 running_tab_width = shown[i]->mButton->getRect().getWidth();
             S32 j = i - 1;
             S32 min_scroll_pos = i;
@@ -1774,24 +1778,23 @@ void LLTabContainer::initButtons()
         // Left and right scroll arrows (for when there are too many tabs to show all at once).
         S32 btn_top = (getTabPosition() == TOP ) ? getRect().getHeight() - getTopBorderHeight() : tabcntr_arrow_btn_size + 1;
 
-        LLRect left_arrow_btn_rect;
-        left_arrow_btn_rect.setLeftTopAndSize( LLPANEL_BORDER_WIDTH+1+tabcntr_arrow_btn_size, btn_top + arrow_fudge, tabcntr_arrow_btn_size, mTabHeight );
-
+        // The arrows stand at the pages' sides: the two that scroll inward
+        // of the two that jump.
         LLRect jump_left_arrow_btn_rect;
-        jump_left_arrow_btn_rect.setLeftTopAndSize( LLPANEL_BORDER_WIDTH+1, btn_top + arrow_fudge, tabcntr_arrow_btn_size, mTabHeight );
+        jump_left_arrow_btn_rect.setLeftTopAndSize( pageLeft(), btn_top + arrow_fudge, tabcntr_arrow_btn_size, mTabHeight );
 
-        S32 right_pad = tabcntr_arrow_btn_size + LLPANEL_BORDER_WIDTH + 1;
-
-        LLRect right_arrow_btn_rect;
-        right_arrow_btn_rect.setLeftTopAndSize( getRect().getWidth() - mRightTabBtnOffset - right_pad - tabcntr_arrow_btn_size,
-                                                btn_top + arrow_fudge,
-                                                tabcntr_arrow_btn_size, mTabHeight );
-
+        LLRect left_arrow_btn_rect;
+        left_arrow_btn_rect.setLeftTopAndSize( pageLeft() + tabcntr_arrow_btn_size, btn_top + arrow_fudge, tabcntr_arrow_btn_size, mTabHeight );
 
         LLRect jump_right_arrow_btn_rect;
-        jump_right_arrow_btn_rect.setLeftTopAndSize( getRect().getWidth() - mRightTabBtnOffset - right_pad,
+        jump_right_arrow_btn_rect.setLeftTopAndSize( pageRight() - mRightTabBtnOffset - tabcntr_arrow_btn_size,
                                                      btn_top + arrow_fudge,
                                                      tabcntr_arrow_btn_size, mTabHeight );
+
+        LLRect right_arrow_btn_rect;
+        right_arrow_btn_rect.setLeftTopAndSize( pageRight() - mRightTabBtnOffset - 2 * tabcntr_arrow_btn_size,
+                                                btn_top + arrow_fudge,
+                                                tabcntr_arrow_btn_size, mTabHeight );
 
         LLButton::Params p;
         p.name(std::string("Jump Left Arrow"));
@@ -1946,15 +1949,13 @@ void LLTabContainer::updateMaxScrollPos()
     }
     else
     {
-        static LLUICachedControl<S32> tabcntr_tab_h_pad ("UITabCntrTabHPad", 0);
-        static LLUICachedControl<S32> tabcntr_arrow_btn_size ("UITabCntrArrowBtnSize", 0);
         static LLUICachedControl<S32> tabcntr_tab_partial_width ("UITabCntrTabPartialWidth", 0);
         const S32 tab_space = visibleTabWidth();
-        const S32 available_space = getRect().getWidth() - mRightTabBtnOffset - 2 * (LLPANEL_BORDER_WIDTH + tabcntr_tab_h_pad);
+        const S32 available_space = stripRoom(false);
 
         if( tab_space > available_space )
         {
-            S32 available_width_with_arrows = getRect().getWidth() - mRightTabBtnOffset - 2 * (LLPANEL_BORDER_WIDTH + tabcntr_arrow_btn_size  + tabcntr_arrow_btn_size + 1);
+            S32 available_width_with_arrows = stripRoom(true);
             // subtract off reserved portion on left
             available_width_with_arrows -= tabcntr_tab_partial_width;
 
@@ -2022,6 +2023,27 @@ bool LLTabContainer::commitTabAt(S32 x, S32 y)
 S32 LLTabContainer::getTotalTabWidth() const
 {
     return mTotalTabWidth;
+}
+
+// The sides of the pages of a strip laid across the top or bottom, which
+// are the sides of the strip as well: the first tab and the outer arrows
+// sit flush with them.
+S32 LLTabContainer::pageLeft() const
+{
+    return mUseTabOffset ? LLPANEL_BORDER_WIDTH * 3 : LLPANEL_BORDER_WIDTH;
+}
+
+S32 LLTabContainer::pageRight() const
+{
+    return getRect().getWidth() - (mUseTabOffset ? LLPANEL_BORDER_WIDTH * 2 : LLPANEL_BORDER_WIDTH);
+}
+
+// The room the tabs have between the pages' sides, short of what is kept
+// clear at the right, and short of the four arrows when the strip scrolls.
+S32 LLTabContainer::stripRoom(bool with_arrows) const
+{
+    static LLUICachedControl<S32> tabcntr_arrow_btn_size ("UITabCntrArrowBtnSize", 0);
+    return pageRight() - mRightTabBtnOffset - pageLeft() - (with_arrows ? 4 * tabcntr_arrow_btn_size : 0);
 }
 
 // The strip's width as it shows: the tabs that are not hidden.

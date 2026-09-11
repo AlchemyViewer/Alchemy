@@ -256,6 +256,9 @@ private:
     void setMaxScrollPos(S32 pos)       { mMaxScrollPos = pos; }
     S32 visibleTabWidth() const;
     void scrollTabIntoView(const LLTabTuple* tuple);
+    S32 pageLeft() const;
+    S32 pageRight() const;
+    S32 stripRoom(bool with_arrows) const;
     S32 getScrollPosPixels() const      { return mScrollPosPixels; }
     void setScrollPosPixels(S32 pixels) { mScrollPosPixels = pixels; }
 

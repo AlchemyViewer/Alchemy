@@ -789,4 +789,33 @@ namespace tut
         ensure("something to show again shows it", tabs->getVisible());
         tabs->die();
     }
+
+    // The strip sits flush with the pages: its outer arrows stand where a
+    // page's sides are, so nothing is a pixel or two short of the content
+    // under it, whichever way the pages are inset.
+    template<> template<>
+    void lltabcontainer_object::test<26>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        for (bool offset : { false, true })
+        {
+            LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
+            p.name = "tabs";
+            p.rect = LLRect(0, 300, 400, 0);
+            p.use_tab_offset = offset;
+            LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
+            LLPanel* only = page("only", std::string());
+            tabs->addTabPanel(only);
+            LLButton* jump_left = tabs->findChild<LLButton>("Jump Left Arrow", true);
+            LLButton* jump_right = tabs->findChild<LLButton>("Jump Right Arrow", true);
+            ensure("the strip has its jump arrows", jump_left && jump_right);
+            ensure_equals("the strip starts where the page does", jump_left->getRect().mLeft, only->getRect().mLeft);
+            ensure_equals("and ends where it does", jump_right->getRect().mRight, only->getRect().mRight);
+            tabs->die();
+        }
+    }
 }
