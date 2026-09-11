@@ -535,8 +535,16 @@ namespace
                                                    channel->mSmoothedDoppler));
         const float log_next   = log_curr + (log_target - log_curr) * kSmoothAlpha;
         channel->mSmoothedDoppler = std::exp(log_next);
-        FAudioSourceVoice_SetFrequencyRatio(voice, channel->mSmoothedDoppler,
-                                            FAUDIO_COMMIT_NOW);
+        // Defer SetFrequencyRatio via an operation set rather than FAUDIO_COMMIT_NOW.
+        // Writing freqRatio immediately from the main thread races with the SDL
+        // audio thread reading it in FAudio_INTERNAL_MixSource during the window
+        // where sourceLock is released to fire OnVoiceProcessingPassStart.
+        // A unique per-call counter avoids colliding with any other pending set.
+        static uint32_t s_opset_counter = 0;
+        if (++s_opset_counter == FAUDIO_COMMIT_NOW) ++s_opset_counter;
+        const uint32_t opset = s_opset_counter;
+        FAudioSourceVoice_SetFrequencyRatio(voice, channel->mSmoothedDoppler, opset);
+        FAudio_CommitOperationSet(engine->getFAudio(), opset);
     }
 }
 

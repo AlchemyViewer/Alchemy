@@ -1698,7 +1698,14 @@ bool LLAudioChannelFAudio::updateBuffer()
     auto* buf = static_cast<LLAudioBufferFAudio*>(mCurrentSourcep->getCurrentBuffer());
     if (!buf) return false;
 
-    if (buffer_changed || !mVoice)
+    if (buffer_changed)
+    {
+        if (mVoice && !mVoiceUsesFilter)
+            destroyVoice();
+        else
+            retireVoice();
+    }
+    if (!mVoice)
     {
         // A genuine buffer swap makes any stashed resume offset stale —
         // it was a frame count for the old buffer's length, not this
