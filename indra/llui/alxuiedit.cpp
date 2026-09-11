@@ -399,8 +399,33 @@ ALXUIEdit::Step::~Step()
         {
             mDoc.mUndoWhat.back() = mDoc.mPending;
         }
+        // A step that is done is a step past which nothing is redone.
+        mDoc.mRedoHeld.clear();
+        mDoc.mRedoWhatHeld.clear();
         mDoc.mStepOpen = false;
     }
+}
+
+void ALXUIEdit::abandonStep()
+{
+    if (mDepth != 1 || !mStepOpen)
+    {
+        return;
+    }
+    mText = std::move(mUndo.back());
+    mUndo.pop_back();
+    mUndoWhat.pop_back();
+    mRedo = std::move(mRedoHeld);
+    mRedoWhat = std::move(mRedoWhatHeld);
+    mRedoHeld.clear();
+    mRedoWhatHeld.clear();
+    --mTaken;
+    mStepOpen = false;
+    mDirty = mText != mSaved;
+    // The text put back parsed before; what is kept is why the step failed.
+    const std::string why = mError;
+    parse();
+    mError = why;
 }
 
 void ALXUIEdit::landed(size_t name_offset)
@@ -442,6 +467,8 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
     {
         mUndo.push_back(mText);
         mUndoWhat.push_back(mPending);
+        mRedoHeld = std::move(mRedo);
+        mRedoWhatHeld = std::move(mRedoWhat);
         mRedo.clear();
         mRedoWhat.clear();
         mStepOpen = true;
@@ -1016,7 +1043,12 @@ bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
 
     path_t landing(parent);
     afterRemoving(path, landing);
-    return removeElement(path) && insertElement(landing, xml);
+    if (!removeElement(path) || !insertElement(landing, xml))
+    {
+        abandonStep();
+        return false;
+    }
+    return true;
 }
 
 bool ALXUIEdit::duplicateElement(const path_t& path)
@@ -1120,7 +1152,12 @@ bool ALXUIEdit::moveBeside(const path_t& path, const path_t& sibling, bool befor
     // first: a name it shares with what is going answers to one fewer.
     path_t landing(sibling);
     afterRemoving(path, landing);
-    return removeElement(path) && insertBeside(landing, xml, before);
+    if (!removeElement(path) || !insertBeside(landing, xml, before))
+    {
+        abandonStep();
+        return false;
+    }
+    return true;
 }
 
 bool ALXUIEdit::valueText(pugi::xml_node node, std::string_view name, std::string& out) const
@@ -1248,6 +1285,7 @@ bool ALXUIEdit::writeAll(const path_t& path, const std::vector<std::pair<std::st
     {
         if (!setAttribute(path, attribute, std::to_string(value)))
         {
+            abandonStep();
             return false;
         }
         mWritten.push_back(attribute);

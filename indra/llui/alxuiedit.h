@@ -282,6 +282,13 @@ private:
     };
     friend struct Step;
 
+    // A step that failed part way is taken back whole: what it did before
+    // it failed is not a thing anybody asked for, and a file left half
+    // moved with an error beside it is worse than one left alone. The
+    // text goes back to what it was, the step leaves no record, and what
+    // could have been redone before it still can be.
+    void abandonStep();
+
     // The element's own text, with the indentation of where it sits taken
     // off, so it can be written in at another depth.
     bool liftElement(const path_t& path, std::string& xml) const;
@@ -343,6 +350,10 @@ private:
     std::vector<std::string>        mRedo;
     std::vector<Change>             mUndoWhat;      // beside each step
     std::vector<Change>             mRedoWhat;
+    // What could be redone before the step in hand: gone once the step
+    // is done, back if the step is abandoned.
+    std::vector<std::string>        mRedoHeld;
+    std::vector<Change>             mRedoWhatHeld;
     Change                          mPending;       // of the operation in hand
     Change                          mLastChange;    // of the last one put back
     path_t                          mLastPath;      // where that leaves it

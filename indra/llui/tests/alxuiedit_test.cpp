@@ -1136,4 +1136,36 @@ namespace tut
         ensure("the field reads", edit.fieldText({ "a" }, "label", value));
         ensure_equals("as the parser reads it", value, std::string("Save & Close"));
     }
+
+    // A move that fails part way -- the element taken out, nowhere to put
+    // it -- leaves the file as it was, no step behind it, and whatever
+    // could be redone before it still there. It used to leave the file
+    // without the element and a step to undo that nobody took.
+    template<> template<>
+    void alxuiedit_object::test<28>()
+    {
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <button name=\"a\"/>\n"
+            "    <panel name=\"b\"/>\n"
+            "</panel>\n"));
+        // Something to redo, which a failed step must not take away.
+        ensure("writes", edit.setAttribute({ "a" }, "width", "40"));
+        ensure("undo", edit.undo());
+        ensure("can redo", edit.canRedo());
+        const std::string before = edit.text();
+        const size_t taken = edit.stepsTaken();
+
+        ensure("a move into nowhere fails", !edit.moveElement({ "a" }, { "no_such" }));
+        ensure("and says so", !edit.error().empty());
+        ensure_equals("the file is as it was", edit.text(), before);
+        ensure("no step was taken", !edit.canUndo());
+        ensure_equals("and none is counted", edit.stepsTaken(), taken);
+        ensure("and what could be redone still can", edit.canRedo());
+
+        ensure("a move beside nowhere fails", !edit.moveBefore({ "a" }, { "no_such" }));
+        ensure_equals("and leaves the file as it was", edit.text(), before);
+        ensure("with nothing to undo", !edit.canUndo());
+    }
 }
