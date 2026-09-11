@@ -159,9 +159,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 // Used for sorting
     struct sort
@@ -430,9 +430,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 private:
     LLTextureView* mTextureView;
@@ -540,9 +540,9 @@ public:
         mTextureView(p.texture_view)
     {}
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
 private:
     LLTextureView* mTextureView;

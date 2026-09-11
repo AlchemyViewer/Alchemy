@@ -54,7 +54,7 @@ public:
     LLFloaterExperienceProfile(const LLSD& data);
     virtual ~LLFloaterExperienceProfile();
 
-    /* virtual */ bool matchesKey(const LLSD& key);
+    /* virtual */ bool matchesKey(const LLSD& key) override;
 
     LLUUID getExperienceId() const { return mExperienceId; }
     void setPreferences( const LLSD& content );
@@ -62,9 +62,9 @@ public:
 
     void refreshExperience(const LLSD& experience);
     void onSaveComplete( const LLSD& content );
-    virtual bool canClose();
+    virtual bool canClose() override;
 
-    virtual void onClose(bool app_quitting);
+    virtual void onClose(bool app_quitting) override;
 protected:
     void onClickEdit();
     void onClickPermission(const char* permission);
@@ -89,7 +89,7 @@ protected:
     static void experienceCallback(LLHandle<LLFloaterExperienceProfile> handle, const LLSD& experience);
     static bool experiencePermission(LLHandle<LLFloaterExperienceProfile> handle, const LLSD& permission);
 
-    bool postBuild();
+    bool postBuild() override;
     bool setMaturityString(U8 maturity, LLTextBox* child, LLComboBox* combo);
     bool handleSaveChangesDialog(const LLSD& notification, const LLSD& response, PostSaveAction action);
     void doSave( int success_action );

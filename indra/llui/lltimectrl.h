@@ -94,8 +94,8 @@ private:
         NONE
     };
 
-    virtual void    onFocusLost();
-    virtual bool    handleKeyHere(KEY key, MASK mask);
+    virtual void    onFocusLost() override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
 
     void    onUpBtn();
     void    onDownBtn();

@@ -85,12 +85,12 @@ public:
 
     void apply();
     void cancel(const std::vector<std::string> settings_to_skip = {});
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
-    /*virtual*/ void changed();
-    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) {};
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
+    /*virtual*/ void changed() override;
+    /*virtual*/ void changed(const LLUUID& session_id, U32 mask) override {};
 
     // static data update, called from message handler
     static void updateUserInfo(const std::string& visibility);
@@ -107,7 +107,7 @@ public:
     // update Show Favorites checkbox
     static void updateShowFavoritesCheckbox(bool val);
 
-    void processProperties( void* pData, EAvatarProcessorType type );
+    void processProperties( void* pData, EAvatarProcessorType type ) override;
     void saveAvatarProperties( void );
     static void saveAvatarPropertiesCoro(const std::string url, bool allow_publish);
     void selectPrivacyPanel();
@@ -180,7 +180,7 @@ public:
     void setPersonalInfo(const std::string& visibility);
     void refreshEnabledState();
     void onCommitWindowedMode();
-    void refresh(); // Refresh enable/disable
+    void refresh() override; // Refresh enable/disable
     // if the quality radio buttons are changed
     void onChangeQuality(const LLSD& data);
 
@@ -303,7 +303,7 @@ public:
     AL_VIEW_TYPE(LLPanelPreference, LLPanel);
 
     LLPanelPreference();
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     virtual ~LLPanelPreference();
 
@@ -351,12 +351,12 @@ class LLPanelPreferenceGraphics final : public LLPanelPreference
 public:
     AL_VIEW_TYPE(LLPanelPreferenceGraphics, LLPanelPreference);
 
-    bool postBuild();
-    void draw();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    bool postBuild() override;
+    void draw() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
-    void setHardwareDefaults();
+    void setHardwareDefaults() override;
     void setPresetText();
 
 protected:
@@ -405,11 +405,11 @@ public:
     LLPanelPreferenceControls();
     virtual ~LLPanelPreferenceControls();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void apply();
-    void cancel(const std::vector<std::string> settings_to_skip = {});
-    void saveSettings();
+    void apply() override;
+    void cancel(const std::vector<std::string> settings_to_skip = {}) override;
+    void saveSettings() override;
     void resetDirtyChilds();
 
     void onListCommit();
@@ -425,9 +425,9 @@ public:
     void updateAndApply();
 
     // from interface
-    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes);
-    /*virtual*/ void onDefaultKeyBind(bool all_modes);
-    /*virtual*/ void onCancelKeyBind();
+    /*virtual*/ bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) override;
+    /*virtual*/ void onDefaultKeyBind(bool all_modes) override;
+    /*virtual*/ void onCancelKeyBind() override;
 
 private:
     // reloads settings, discards current changes, updates table
@@ -478,13 +478,13 @@ public:
     void cancel();
 
 protected:
-    bool postBuild();
-    void onOpen(const LLSD& key);
-    void onClose(bool app_quitting);
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void onClose(bool app_quitting) override;
     void saveSettings();
     void onBtnOk();
     void onBtnCancel();
-    void onClickCloseBtn(bool app_quitting = false);
+    void onClickCloseBtn(bool app_quitting = false) override;
 
     void onChangeSocksSettings();
 

@@ -82,7 +82,7 @@ public:
 
     static LLPanelInventoryListItemBase* create(LLViewerInventoryItem* item);
 
-    virtual void draw();
+    virtual void draw() override;
 
     /**
      * Let item know it need to be refreshed in next draw()
@@ -119,22 +119,22 @@ public:
     /**
      * Inheritors need to call base implementation of postBuild()
      */
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Handles item selection
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
     /**
      * Handles filter request
      */
-    /*virtual*/ S32  notify(const LLSD& info);
+    /*virtual*/ S32  notify(const LLSD& info) override;
 
     /* Highlights item */
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
     /* Removes item highlight */
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     /** Get the name of a corresponding inventory item */
     const std::string& getItemName() const;
@@ -197,7 +197,7 @@ protected:
     /**
      * Show tool tip if item name text size > panel size
      */
-    virtual bool handleToolTip( S32 x, S32 y, MASK mask);
+    virtual bool handleToolTip( S32 x, S32 y, MASK mask) override;
 
     const LLUUID mInventoryItemUUID;
     bool mHovered;

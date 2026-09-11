@@ -47,11 +47,11 @@ class LLPanelContents final : public LLPanel
 public:
     AL_VIEW_TYPE(LLPanelContents, LLPanel);
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
     LLPanelContents();
     virtual ~LLPanelContents();
 
-    void            refresh();
+    void            refresh() override;
     void            clearContents();
 
 

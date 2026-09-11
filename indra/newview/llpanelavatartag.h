@@ -59,12 +59,12 @@ public:
 
     const LLUUID&   getAvatarId() const { return mAvatarId; }
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
 
     virtual boost::signals2::connection setLeftButtonClickCallback(
                                                                    const commit_callback_t& cb);
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     void onClick();
 private:

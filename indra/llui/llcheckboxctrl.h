@@ -89,23 +89,23 @@ protected:
 public:
     // LLView interface
 
-    virtual void        setEnabled( bool b );
+    virtual void        setEnabled( bool b ) override;
 
-    virtual void        reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void        reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     // LLUICtrl interface
-    virtual void        setValue(const LLSD& value );
-    virtual LLSD        getValue() const;
+    virtual void        setValue(const LLSD& value ) override;
+    virtual LLSD        getValue() const override;
             bool        get() const { return (bool)getValue().asBoolean(); }
             void        set(bool value) { setValue(value); }
 
-    virtual void        setTentative(bool b);
-    virtual bool        getTentative() const;
+    virtual void        setTentative(bool b) override;
+    virtual bool        getTentative() const override;
 
-    virtual bool        setLabelArg( const std::string& key, const LLStringExplicit& text );
+    virtual bool        setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
 
-    virtual void        clear();
-    virtual void        onCommit();
+    virtual void        clear() override;
+    virtual void        onCommit() override;
 
     // LLCheckBoxCtrl interface
     virtual bool        toggle() { return mButton->toggleState(); }      // returns new state
@@ -119,12 +119,12 @@ public:
     std::string         getLabel() const;
 
     void                setFont( const LLFontGL* font ) { mFont = font; }
-    const LLFontGL*     getFont() const { return mFont; }
+    const LLFontGL*     getFont() const override { return mFont; }
 
-    virtual void        setControlName(const std::string& control_name, LLView* context);
+    virtual void        setControlName(const std::string& control_name, LLView* context) override;
 
-    virtual bool        isDirty()   const;      // Returns true if the user has modified this control.
-    virtual void        resetDirty();           // Clear dirty state
+    virtual bool        isDirty()   const override;      // Returns true if the user has modified this control.
+    virtual void        resetDirty() override;           // Clear dirty state
 
     LLTextBox* getTextBox() // Provide direct access to label textbox control
     {
@@ -132,12 +132,12 @@ public:
     }
 
 protected:
-    virtual std::string _getSearchText() const
+    virtual std::string _getSearchText() const override
     {
         return getLabel() + getToolTip();
     }
 
-    virtual void onSetHighlight() const // When highlight, really do highlight the label
+    virtual void onSetHighlight() const override // When highlight, really do highlight the label
     {
         if( mLabel )
             mLabel->ll::ui::SearchableControl::setHighlighted( ll::ui::SearchableControl::getHighlighted() );

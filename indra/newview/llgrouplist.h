@@ -61,9 +61,9 @@ public:
 
     void enableForAgent(bool show_icons);
 
-    virtual void draw(); // from LLView
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask); // from LLView
-    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask); // from LLView
+    virtual void draw() override; // from LLView
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override; // from LLView
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override; // from LLView
 
     void setNameFilter(const std::string& filter);
     void toggleIcons();
@@ -78,7 +78,7 @@ private:
     void setDirty(bool val = true)      { mDirty = val; }
     void refresh();
     void addNewItem(const LLUUID& id, const std::string& name, const LLUUID& icon_id, EAddPosition pos = ADD_BOTTOM, bool visible_in_profile = true);
-    bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata); // called on agent group list changes
+    bool handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD& userdata) override; // called on agent group list changes
 
     bool onContextMenuItemClick(const LLSD& userdata);
     bool onContextMenuItemEnable(const LLSD& userdata);
@@ -107,10 +107,10 @@ public:
 
     LLGroupListItem(bool for_agent, bool show_icons);
     ~LLGroupListItem();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void setValue(const LLSD& value);
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void setValue(const LLSD& value) override;
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     const LLUUID& getGroupID() const            { return mGroupID; }
     const std::string& getGroupName() const     { return mGroupName; }
@@ -120,7 +120,7 @@ public:
     void setGroupIconID(const LLUUID& group_icon_id);
     void setGroupIconVisible(bool visible);
 
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     void setVisibleInProfile(bool visible);
 private:

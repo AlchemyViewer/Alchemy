@@ -70,22 +70,22 @@ public:
 
     bool    canAddText  ();
 
-    void    onMouseLeave    (S32 x, S32 y, MASK mask);
-    void    onMouseEnter    (S32 x, S32 y, MASK mask);
-    bool    handleMouseDown (S32 x, S32 y, MASK mask);
-    bool    handleMouseUp   (S32 x, S32 y, MASK mask);
+    void    onMouseLeave    (S32 x, S32 y, MASK mask) override;
+    void    onMouseEnter    (S32 x, S32 y, MASK mask) override;
+    bool    handleMouseDown (S32 x, S32 y, MASK mask) override;
+    bool    handleMouseUp   (S32 x, S32 y, MASK mask) override;
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    void    reshape     (S32 width, S32 height, bool called_from_parent = true);
+    void    reshape     (S32 width, S32 height, bool called_from_parent = true) override;
 
     void    setHeaderVisibility(EShowItemHeader e);
-    bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
+    bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     virtual void init(LLSD& data);
     virtual void addMessage(LLSD& data);
 
-    virtual void draw();
+    virtual void draw() override;
 
     //*TODO REMOVE, why a dup of getFromID?
     const LLUUID&   messageID() const { return mFromID;}

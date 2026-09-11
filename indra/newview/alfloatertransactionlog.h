@@ -43,7 +43,7 @@ class ALFloaterTransactionLog final : public LLFloater
     AL_VIEW_TYPE(ALFloaterTransactionLog, LLFloater);
 
     ALFloaterTransactionLog(const LLSD& key);
-    bool postBuild();
+    bool postBuild() override;
     void addTransaction(const LLDate& date, const LLUUID& sender, S32 amount, bool incoming);
 
   private:

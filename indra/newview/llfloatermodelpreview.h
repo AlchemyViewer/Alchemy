@@ -70,20 +70,20 @@ public:
     LLFloaterModelPreview(const LLSD& key);
     virtual ~LLFloaterModelPreview();
 
-    virtual bool postBuild();
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual bool postBuild() override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     void initModelPreview();
     void setUploadDestination(const LLUUID& dest_folder) { mDestinationFolderId = dest_folder; }
     static void showModelPreview(const LLUUID& dest_folder = LLUUID::null);
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleMouseUp(S32 x, S32 y, MASK mask);
-    bool handleHover(S32 x, S32 y, MASK mask);
-    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     static void onMouseCaptureLostModelPreview(LLMouseHandler*);
     static void setUploadAmount(S32 amount) { sUploadAmount = amount; }
@@ -102,7 +102,7 @@ public:
 
     static void onUpload(void* data);
 
-    void refresh();
+    void refresh() override;
 
     void            loadModel(S32 lod);
     void            loadModel(S32 lod, const std::string& file_name, bool force_disable_slm = false);
@@ -121,18 +121,18 @@ public:
     bool isModelLoading();
 
     // shows warning message if agent has no permissions to upload model
-    /*virtual*/ void onPermissionsReceived(const LLSD& result);
+    /*virtual*/ void onPermissionsReceived(const LLSD& result) override;
 
     // called when error occurs during permissions request
-    /*virtual*/ void setPermissonsErrorStatus(S32 status, const std::string& reason);
+    /*virtual*/ void setPermissonsErrorStatus(S32 status, const std::string& reason) override;
 
-    /*virtual*/ void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url);
+    /*virtual*/ void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) override;
                 void handleModelPhysicsFeeReceived();
-    /*virtual*/ void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result);
+    /*virtual*/ void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) override;
 
-    /*virtual*/ void onModelUploadSuccess();
+    /*virtual*/ void onModelUploadSuccess() override;
 
-    /*virtual*/ void onModelUploadFailure();
+    /*virtual*/ void onModelUploadFailure() override;
 
     bool isModelUploadAllowed();
 
@@ -167,7 +167,7 @@ protected:
     static void onPhysicsBrowse(LLUICtrl* ctrl, void* userdata);
     static void onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata);
 
-    void            draw();
+    void            draw() override;
 
     void initDecompControls();
 

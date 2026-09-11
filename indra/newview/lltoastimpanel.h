@@ -54,8 +54,8 @@ public:
 
     LLToastIMPanel(LLToastIMPanel::Params &p);
     virtual ~LLToastIMPanel();
-    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask) override;
 private:
     void showInspector();
 

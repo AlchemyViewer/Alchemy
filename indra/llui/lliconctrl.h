@@ -73,18 +73,18 @@ public:
     virtual ~LLIconCtrl();
 
     // llview overrides
-    virtual void    draw();
+    virtual void    draw() override;
 
     // llview overrides
-    virtual bool handleHover(S32 x, S32 y, MASK mask);
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
 
     // lluictrl overrides
-    void onVisibilityChange(bool new_visibility);
-    virtual void    setValue(const LLSD& value );
+    void onVisibilityChange(bool new_visibility) override;
+    virtual void    setValue(const LLSD& value ) override;
 
     std::string getImageName() const;
 
-    void            setColor(const LLUIColor& color) { mColor = color; }
+    void            setColor(const LLUIColor& color) override { mColor = color; }
     void            setImage(LLPointer<LLUIImage> image) { mImagep = image; }
     const LLPointer<LLUIImage> getImage() { return mImagep; }
 

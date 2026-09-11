@@ -198,7 +198,7 @@ public:
     static void initClass();
     static void cleanupClass();
 
-    bool postBuild();
+    bool postBuild() override;
 
     virtual void openItem( void );
 
@@ -274,7 +274,7 @@ public:
 
     // This method returns the actual name of the thing being
     // viewed. This method will ask the viewed object itself.
-    const std::string& getName( void ) const;
+    const std::string& getName( void ) const override;
 
     // Override to provide lazy tooltip generation without memory overhead
     // Inventory can consist of millions of items, yet most stay invisible,
@@ -332,25 +332,25 @@ public:
     bool isSingleFolderMode() const { return mSingleFolderMode; }
 
     // LLView functionality
-    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleHover( S32 x, S32 y, MASK mask );
-    virtual bool handleMouseUp( S32 x, S32 y, MASK mask );
-    virtual bool handleDoubleClick( S32 x, S32 y, MASK mask );
+    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleHover( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleDoubleClick( S32 x, S32 y, MASK mask ) override;
 
-    virtual void onMouseLeave(S32 x, S32 y, MASK mask);
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     //virtual LLView* findChildView(const std::string& name, bool recurse) const { return LLView::findChildView(name, recurse); }
 
     // Releases cached text geometry when hidden so off-screen items hold no font buffers.
-    virtual void setVisible(bool visible);
+    virtual void setVisible(bool visible) override;
 
     // Sizes itself and stops when out of sight; setVisible settles the width
     // afterwards. See the definition for why nothing reads what is skipped.
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     //  virtual void handleDropped();
-    virtual void draw();
+    virtual void draw() override;
 
     // The disclosure triangle, and which icon the row shows. Only a folder has
     // either: a plain item's arrow is gated on hasVisibleChildren() and
@@ -369,7 +369,7 @@ public:
                                     EDragAndDropType cargo_type,
                                     void* cargo_data,
                                     EAcceptance* accept,
-                                    std::string& tooltip_msg);
+                                    std::string& tooltip_msg) override;
 
 private:
     static std::map<U8, LLFontGL*> sFonts; // map of styles to fonts
@@ -502,11 +502,11 @@ public:
     LLFolderViewItem* getPreviousFromChild( LLFolderViewItem*, bool include_children = true  );
 
     // addToFolder() returns true if it succeeds. false otherwise
-    virtual void addToFolder(LLFolderViewFolder* folder);
+    virtual void addToFolder(LLFolderViewFolder* folder) override;
 
     // Finds width and height of this object and it's children.  Also
     // makes sure that this view and it's children are the right size.
-    virtual S32 arrange( S32* width, S32* height );
+    virtual S32 arrange( S32* width, S32* height ) override;
 
     bool needsArrange();
 
@@ -516,22 +516,22 @@ public:
     // selection information if necessary.
     // Returns true if this object (or a child) ends up being selected.
     // If 'openitem' is true then folders are opened up along the way to the selection.
-    virtual bool setSelection(LLFolderViewItem* selection, bool openitem, bool take_keyboard_focus = true);
+    virtual bool setSelection(LLFolderViewItem* selection, bool openitem, bool take_keyboard_focus = true) override;
 
     // This method is used to change the selection of an item.
     // Recursively traverse all children; if 'selection' is 'this' then change
     // the select status if necessary.
     // Returns true if the selection state of this folder, or of a child, was changed.
-    virtual bool changeSelection(LLFolderViewItem* selection, bool selected);
+    virtual bool changeSelection(LLFolderViewItem* selection, bool selected) override;
 
     // this method is used to group select items
     void extendSelectionTo(LLFolderViewItem* selection);
 
     // Returns true is this object and all of its children can be removed.
-    virtual bool isRemovable();
+    virtual bool isRemovable() override;
 
     // Returns true is this object and all of its children can be moved
-    virtual bool isMovable();
+    virtual bool isMovable() override;
 
     bool isFavorite() const { return mIsFavorite; }
     bool hasFavorites() const { return mHasFavorites; }
@@ -546,15 +546,15 @@ private:
 public:
 
     // destroys this folder, and all children
-    virtual void destroyView();
+    virtual void destroyView() override;
     void destroyRoot();
 
     // whether known children are fully loaded (arrange sets to true)
-    virtual bool isFolderComplete() { return mIsFolderComplete; }
+    virtual bool isFolderComplete() override { return mIsFolderComplete; }
 
     // whether known children are fully built
-    virtual bool areChildrenInited() { return mAreChildrenInited; }
-    virtual void setChildrenInited(bool inited) { mAreChildrenInited = inited; }
+    virtual bool areChildrenInited() override { return mAreChildrenInited; }
+    virtual void setChildrenInited(bool inited) override { mAreChildrenInited = inited; }
 
     // extractItem() removes the specified item from the folder, but
     // doesn't delete it.
@@ -567,7 +567,7 @@ public:
     virtual void toggleOpen();
 
     // Force a folder open or closed
-    virtual void setOpen(bool openitem = true);
+    virtual void setOpen(bool openitem = true) override;
 
     // Called when a child is refreshed.
     virtual void requestArrange();
@@ -579,8 +579,8 @@ public:
     virtual void setOpenArrangeRecursively(bool openitem, ERecurseType recurse = RECURSE_NO);
 
     // Get the current state of the folder.
-    virtual bool isOpen() const { return mIsOpen; }
-    virtual bool showsChildren() const { return isOpen() || mCurHeight != mTargetHeight; }
+    virtual bool isOpen() const override { return mIsOpen; }
+    virtual bool showsChildren() const override { return isOpen() || mCurHeight != mTargetHeight; }
 
     // special case if an object is dropped on the child.
     bool handleDragAndDropFromChild(MASK mask,
@@ -596,26 +596,26 @@ public:
     // apply this functor to the folder's descendants.
     void applyFunctorRecursively(LLFolderViewFunctor& functor);
 
-    virtual void openItem( void );
+    virtual void openItem( void ) override;
 
     // LLView functionality
-    virtual bool handleHover(S32 x, S32 y, MASK mask);
-    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleDoubleClick( S32 x, S32 y, MASK mask );
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleDoubleClick( S32 x, S32 y, MASK mask ) override;
     virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask,
                                     bool drop,
                                     EDragAndDropType cargo_type,
                                     void* cargo_data,
                                     EAcceptance* accept,
-                                    std::string& tooltip_msg);
+                                    std::string& tooltip_msg) override;
     bool handleDragAndDropToThisFolder(MASK mask,
                                         bool drop,
                                        EDragAndDropType cargo_type,
                                        void* cargo_data,
                                        EAcceptance* accept,
                                        std::string& tooltip_msg);
-    virtual void draw();
+    virtual void draw() override;
 
     // The disclosure triangle and the open icon: only a folder has either.
     void drawOpenFolderArrow() override;
@@ -636,8 +636,8 @@ public:
     // internal functions for tracking folders and items separately
     // use addToFolder() virtual method to ensure folders are always added to mFolders
     // and not mItems
-    void addItem(LLFolderViewItem* item);
-    void addFolder( LLFolderViewFolder* folder);
+    void addItem(LLFolderViewItem* item) override;
+    void addFolder( LLFolderViewFolder* folder) override;
 
     //WARNING: do not call directly...use the appropriate LLFolderViewModel-derived class instead
     template<typename SORT_FUNC> void sortFolders(const SORT_FUNC& func) { mFolders.sort(func); }

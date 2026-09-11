@@ -205,7 +205,7 @@ public:
     ~LLViewerMediaImpl();
 
     // Override inherited version from LLViewerMediaEventEmitter
-    virtual void emitEvent(LLPluginClassMedia* self, LLViewerMediaObserver::EMediaEvent event);
+    virtual void emitEvent(LLPluginClassMedia* self, LLViewerMediaObserver::EMediaEvent event) override;
 
     void createMediaSource();
     void destroyMediaSource();
@@ -326,52 +326,52 @@ public:
     static bool handleSkinCurrentChanged(const LLSD& newvalue);
 
     // need these to handle mouseup...
-    /*virtual*/ void    onMouseCaptureLost();
-    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ void    onMouseCaptureLost() override;
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
 
     // Grr... the only thing I want as an LLMouseHandler are the onMouseCaptureLost and handleMouseUp calls.
     // Sadly, these are all pure virtual, so I have to supply implementations here:
-    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) { return false; };
-    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) { return false; };
-    /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleMiddleMouseUp(S32 x, S32 y, MASK mask) {return false; };
-    /*virtual*/ const std::string& getName() const;
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override { return false; };
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override { return false; };
+    /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override { return false; };
+    /*virtual*/ bool    handleMiddleMouseUp(S32 x, S32 y, MASK mask) override {return false; };
+    /*virtual*/ const std::string& getName() const override;
 
-    /*virtual*/ void    screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const {};
-    /*virtual*/ void    localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const {};
-    /*virtual*/ bool hasMouseCapture() { return gFocusMgr.getMouseCapture() == this; };
+    /*virtual*/ void    screenPointToLocal(S32 screen_x, S32 screen_y, S32* local_x, S32* local_y) const override {};
+    /*virtual*/ void    localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* screen_y) const override {};
+    /*virtual*/ bool hasMouseCapture() override { return gFocusMgr.getMouseCapture() == this; };
 
     // Inherited from LLPluginClassMediaOwner
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent);
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent) override;
 
     // LLEditMenuHandler overrides
     LLView* asView() override { return nullptr; }
-    /*virtual*/ void    undo();
-    /*virtual*/ bool    canUndo() const;
+    /*virtual*/ void    undo() override;
+    /*virtual*/ bool    canUndo() const override;
 
-    /*virtual*/ void    redo();
-    /*virtual*/ bool    canRedo() const;
+    /*virtual*/ void    redo() override;
+    /*virtual*/ bool    canRedo() const override;
 
-    /*virtual*/ void    cut();
-    /*virtual*/ bool    canCut() const;
+    /*virtual*/ void    cut() override;
+    /*virtual*/ bool    canCut() const override;
 
-    /*virtual*/ void    copy();
-    /*virtual*/ bool    canCopy() const;
+    /*virtual*/ void    copy() override;
+    /*virtual*/ bool    canCopy() const override;
 
-    /*virtual*/ void    paste();
-    /*virtual*/ bool    canPaste() const;
+    /*virtual*/ void    paste() override;
+    /*virtual*/ bool    canPaste() const override;
 
-    /*virtual*/ void    doDelete();
-    /*virtual*/ bool    canDoDelete() const;
+    /*virtual*/ void    doDelete() override;
+    /*virtual*/ bool    canDoDelete() const override;
 
-    /*virtual*/ void    selectAll();
-    /*virtual*/ bool    canSelectAll() const;
+    /*virtual*/ void    selectAll() override;
+    /*virtual*/ bool    canSelectAll() const override;
 
     void addObject(LLVOVolume* obj) ;
     void removeObject(LLVOVolume* obj) ;

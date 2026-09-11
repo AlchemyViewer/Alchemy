@@ -51,9 +51,9 @@ public:
 
     LLMultiPreview();
 
-    /*virtual*/void onOpen(const LLSD& key);
-    /*virtual*/void tabOpen(LLFloater* opened_floater, bool from_click);
-    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false);
+    /*virtual*/void onOpen(const LLSD& key) override;
+    /*virtual*/void tabOpen(LLFloater* opened_floater, bool from_click) override;
+    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false) override;
 
 };
 
@@ -75,7 +75,7 @@ public:
     LLPreview(const LLSD& key );
     virtual ~LLPreview();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     virtual void setObjectID(const LLUUID& object_id);
     void setItem( LLInventoryItem* item );
@@ -86,10 +86,10 @@ public:
     static void hide(const LLUUID& item_uuid, bool no_saving = false );
     static void dirty(const LLUUID& item_uuid);
 
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool handleHover(S32 x, S32 y, MASK mask);
-    virtual void onOpen(const LLSD& key);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
+    virtual void onOpen(const LLSD& key) override;
 
     virtual void setAuxItem( const LLInventoryItem* item );
 
@@ -97,7 +97,7 @@ public:
 
     static void         onKeepBtn(void* data);
     static void         onDiscardBtn(void* data);
-    /*virtual*/ void    handleReshape(const LLRect& new_rect, bool by_user = false);
+    /*virtual*/ void    handleReshape(const LLRect& new_rect, bool by_user = false) override;
 
     void userResized() { mUserResized = true; };
 
@@ -108,7 +108,7 @@ public:
     void setNotecardInfo(const LLUUID& notecard_inv_id, const LLUUID& object_id);
 
     // llview
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
     virtual void refreshFromItem();
 
     // We can't modify Item or description in preview if either in-world Object
@@ -131,13 +131,13 @@ protected:
 // [/SL:KB]
 
 protected:
-    virtual void onCommit();
+    virtual void onCommit() override;
 
     static void onText(LLUICtrl*, void* userdata);
     static void onRadio(LLUICtrl*, void* userdata);
 
     // for LLInventoryObserver
-    virtual void changed(U32 mask);
+    virtual void changed(U32 mask) override;
     bool mDirty;
     bool mSaveDialogShown;
 

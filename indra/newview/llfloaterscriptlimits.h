@@ -48,10 +48,10 @@ class LLFloaterScriptLimits final : public LLFloater
 public:
     AL_VIEW_TYPE(LLFloaterScriptLimits, LLFloater);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     // from LLPanel
-    virtual void refresh();
+    virtual void refresh() override;
 
 private:
 
@@ -74,7 +74,7 @@ public:
 
     LLPanelScriptLimitsInfo();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
     virtual void updateChild(LLUICtrl* child_ctrl);
 
 protected:
@@ -107,7 +107,7 @@ public:
     ~LLPanelScriptLimitsRegionMemory();
 
     // LLPanel
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setRegionDetails(LLSD content);
     void setRegionSummary(LLSD content);
@@ -151,9 +151,9 @@ private:
 protected:
 
 // LLRemoteParcelInfoObserver interface:
-/*virtual*/ void processParcelInfo(const LLParcelData& parcel_data);
-/*virtual*/ void setParcelID(const LLUUID& parcel_id);
-/*virtual*/ void setErrorStatus(S32 status, const std::string& reason);
+/*virtual*/ void processParcelInfo(const LLParcelData& parcel_data) override;
+/*virtual*/ void setParcelID(const LLUUID& parcel_id) override;
+/*virtual*/ void setErrorStatus(S32 status, const std::string& reason) override;
 
     static void onClickRefresh(void* userdata);
     static void onClickHighlight(void* userdata);

@@ -68,13 +68,13 @@ public:
     void noTarget();
     void target(const std::string& name, S32 price);
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void updateUI();
     void collapsePanels(bool collapse);
 
-    virtual void draw();
-    virtual bool canClose();
+    virtual void draw() override;
+    virtual bool canClose() override;
 
     void onClickBuy();
     void onClickCancel();

@@ -95,17 +95,17 @@ public:
         void setTakeFocusOnClick( bool take_focus );
 
         // handle mouse related methods
-        virtual bool handleHover( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseUp( S32 x, S32 y, MASK mask );
-        virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-        virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-        virtual bool handleRightMouseUp(S32 x, S32 y, MASK mask);
-        virtual bool handleMiddleMouseDown(S32 x, S32 y, MASK mask);
-        virtual bool handleMiddleMouseUp(S32 x, S32 y, MASK mask);
-        virtual bool handleDoubleClick( S32 x, S32 y, MASK mask );
-        virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
-        virtual bool handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta );
-        virtual bool handleToolTip(S32 x, S32 y, MASK mask);
+        virtual bool handleHover( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+        virtual bool handleRightMouseUp(S32 x, S32 y, MASK mask) override;
+        virtual bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+        virtual bool handleMiddleMouseUp(S32 x, S32 y, MASK mask) override;
+        virtual bool handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+        virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+        virtual bool handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+        virtual bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
         // navigation
         void navigateTo( std::string url_in, std::string mime_type = "", bool clean_browser = false);
@@ -165,20 +165,20 @@ public:
         void setAllowFileDownload(bool allow) { mAllowFileDownload = allow; }
 
         // over-rides
-        virtual bool handleKeyHere( KEY key, MASK mask);
-        virtual bool handleKeyUpHere(KEY key, MASK mask);
-        virtual void onVisibilityChange ( bool new_visibility );
-        virtual bool handleUnicodeCharHere(llwchar uni_char);
-        virtual void reshape( S32 width, S32 height, bool called_from_parent = true);
-        virtual void draw();
-        virtual bool postBuild();
+        virtual bool handleKeyHere( KEY key, MASK mask) override;
+        virtual bool handleKeyUpHere(KEY key, MASK mask) override;
+        virtual void onVisibilityChange ( bool new_visibility ) override;
+        virtual bool handleUnicodeCharHere(llwchar uni_char) override;
+        virtual void reshape( S32 width, S32 height, bool called_from_parent = true) override;
+        virtual void draw() override;
+        virtual bool postBuild() override;
 
         // focus overrides
-        void onFocusLost();
-        void onFocusReceived();
+        void onFocusLost() override;
+        void onFocusReceived() override;
 
         // Incoming media event dispatcher
-        virtual void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+        virtual void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 
         // right click debugging item
         void onOpenWebInspector();
@@ -191,10 +191,10 @@ public:
         LLUUID getTextureID() {return mMediaTextureID;}
 
         // The Browser windows want keyup and keydown events. Overridden from LLFocusableElement to return true.
-        virtual bool    wantsKeyUpKeyDown() const;
-        virtual bool    wantsReturnKey() const;
+        virtual bool    wantsKeyUpKeyDown() const override;
+        virtual bool    wantsReturnKey() const override;
 
-        virtual bool    acceptsTextInput() const { return true; }
+        virtual bool    acceptsTextInput() const override { return true; }
 
         std::string getMediaMimeType();
         std::string getMediaLoadingStatus();

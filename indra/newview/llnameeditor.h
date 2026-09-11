@@ -67,8 +67,8 @@ public:
 
 
     // Take/return agent UUIDs
-    virtual void    setValue( const LLSD& value );
-    virtual LLSD    getValue() const;
+    virtual void    setValue( const LLSD& value ) override;
+    virtual LLSD    getValue() const override;
 
 private:
     static std::set<LLNameEditor*> sInstances;

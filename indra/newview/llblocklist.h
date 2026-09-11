@@ -56,13 +56,13 @@ public:
     LLBlockList(const Params& p);
     virtual ~LLBlockList();
 
-    virtual bool        handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool        handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     LLToggleableMenu*   getContextMenu() const { return mContextMenu.get(); }
     LLBlockedListItem*  getBlockedItem() const;
 
-    virtual void onChange();
-    virtual void onChangeDetailed(const LLMute& );
-    virtual void draw();
+    virtual void onChange() override;
+    virtual void onChangeDetailed(const LLMute& ) override;
+    virtual void draw() override;
 
     void setNameFilter(const std::string& filter);
     void sortByName();

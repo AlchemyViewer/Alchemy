@@ -78,17 +78,17 @@ public:
                                   S32 precision, F32 min_value, F32 max_value);
 
     virtual void    forceSetValue(const LLSD& value ) ;
-    virtual void    setValue(const LLSD& value );
+    virtual void    setValue(const LLSD& value ) override;
             F32     get() const { return getValueF32(); }
             void    set(F32 value) { setValue(value); mInitialValue = value; }
 
     bool            isMouseHeldDown() const;
 
-    virtual void    setEnabled( bool b );
-    virtual void    setFocus( bool b );
-    virtual void    clear();
-    virtual bool    isDirty() const { return( getValueF32() != mInitialValue ); }
-    virtual void    resetDirty() { mInitialValue = getValueF32(); }
+    virtual void    setEnabled( bool b ) override;
+    virtual void    setFocus( bool b ) override;
+    virtual void    clear() override;
+    virtual bool    isDirty() const override { return( getValueF32() != mInitialValue ); }
+    virtual void    resetDirty() override { mInitialValue = getValueF32(); }
 
     virtual void    setPrecision(S32 precision);
 
@@ -105,15 +105,15 @@ public:
     void            setDisabledLabelColor(const LLUIColor& c)    { mTextDisabledColor = c; updateLabelColor();}
     void            setAllowEdit(bool allow_edit);
 
-    virtual void    onTabInto();
+    virtual void    onTabInto() override;
 
-    virtual void    setTentative(bool b);           // marks value as tentative
-    virtual void    onCommit();                     // mark not tentative, then commit
+    virtual void    setTentative(bool b) override;           // marks value as tentative
+    virtual void    onCommit() override;                     // mark not tentative, then commit
 
     void            forceEditorCommit();            // for commit on external button
 
-    virtual bool    handleScrollWheel(S32 x,S32 y,LLScrollDelta delta);
-    virtual bool    handleKeyHere(KEY key, MASK mask);
+    virtual bool    handleScrollWheel(S32 x,S32 y,LLScrollDelta delta) override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
 
     // Dragging the label changes the value, and a spinner with no label puts
     // the same gesture on its buttons, vertically. Shift is fine, control is
@@ -127,10 +127,10 @@ public:
     boost::signals2::connection setMouseDownCallback(const commit_signal_t::slot_type& cb);
     boost::signals2::connection setMouseUpCallback(const commit_signal_t::slot_type& cb);
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual void    onMouseCaptureLost();
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual void    onMouseCaptureLost() override;
 
     void            onEditorCommit(const LLSD& data);
     static void     onEditorGainFocus(LLFocusableElement* caller, void *userdata);

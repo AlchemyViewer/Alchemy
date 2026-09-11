@@ -149,7 +149,7 @@ public:
                      bool enabled = true, const std::string& suffix = LLStringUtil::null, const std::string& prefix = LLStringUtil::null);
     LLScrollListItem* addNameItem(NameItem& item, EAddPosition pos = ADD_BOTTOM);
 
-    /*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
+    /*virtual*/ LLScrollListItem* addElement(const LLSD& element, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
     LLScrollListItem* addNameItemRow(const NameItem& value, EAddPosition pos = ADD_BOTTOM, const std::string& suffix = LLStringUtil::null,
                                                                                             const std::string& prefix = LLStringUtil::null);
 
@@ -171,18 +171,18 @@ public:
     /*virtual*/ bool    handleDragAndDrop(S32 x, S32 y, MASK mask,
                                       bool drop, EDragAndDropType cargo_type, void *cargo_data,
                                       EAcceptance *accept,
-                                      std::string& tooltip_msg);
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
+                                      std::string& tooltip_msg) override;
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
     void setAllowCallingCardDrop(bool b) { mAllowCallingCardDrop = b; }
 
     void sortByName(bool ascending);
 
-    /*virtual*/ void updateColumns(bool force_update);
+    /*virtual*/ void updateColumns(bool force_update) override;
 
-    /*virtual*/ void mouseOverHighlightNthItem( S32 index );
+    /*virtual*/ void mouseOverHighlightNthItem( S32 index ) override;
 
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     bool isSpecialType() { return (mNameListType == SPECIAL); }
 

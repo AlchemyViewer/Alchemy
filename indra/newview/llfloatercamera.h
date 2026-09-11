@@ -75,8 +75,8 @@ public:
     /*switch to one of the camera presets (front, rear, side)*/
     static void switchToPreset(const std::string& name);
 
-    virtual void onOpen(const LLSD& key);
-    virtual void onClose(bool app_quitting);
+    virtual void onOpen(const LLSD& key) override;
+    virtual void onClose(bool app_quitting) override;
 
     static void onSavePreset();
     void onCustomPresetSelected();
@@ -95,9 +95,9 @@ private:
     /* return instance if it exists - created by LLFloaterReg */
     static LLFloaterCamera* findInstance();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    F32 getCurrentTransparency();
+    F32 getCurrentTransparency() override;
 
     void onViewButtonClick(const LLSD& user_data);
 
@@ -169,9 +169,9 @@ public:
         Optional<CommitCallbackParam> mousedown_callback;
         Params();
     };
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     /** setting on/off background icon to indicate selected state */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
     // sends commit signal
     void onAnyMouseClick();
 protected:

@@ -88,8 +88,8 @@ public:
 
     LLFloaterPay(const LLSD& key);
     virtual ~LLFloaterPay();
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     void setCallback(money_callback callback) { mCallback = callback; }
 

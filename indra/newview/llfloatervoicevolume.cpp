@@ -61,13 +61,13 @@ public:
     LLFloaterVoiceVolume(const LLSD& avatar_id);
     virtual ~LLFloaterVoiceVolume();
 
-    /*virtual*/ bool postBuild(void);
+    /*virtual*/ bool postBuild(void) override;
 
     // Because floater is single instance, need to re-parse data on each spawn
     // (for example, inspector about same avatar but in different position)
-    /*virtual*/ void onOpen(const LLSD& avatar_id);
+    /*virtual*/ void onOpen(const LLSD& avatar_id) override;
 
-    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() { return LLTransientFloaterMgr::GLOBAL; }
+    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() override { return LLTransientFloaterMgr::GLOBAL; }
 
 private:
     // Set the volume slider to this user's current client-side volume setting,

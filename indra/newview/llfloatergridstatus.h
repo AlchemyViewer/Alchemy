@@ -45,8 +45,8 @@ public:
 
     LLFloaterGridStatus(const Params& key);
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false);
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false) override;
 
     static bool checkGridStatusRSS();
     static void getGridStatusRSSCoro();
@@ -59,7 +59,7 @@ public:
 
 
 private:
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     void applyPreferredRect();
 

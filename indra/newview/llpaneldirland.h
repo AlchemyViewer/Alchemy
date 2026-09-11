@@ -40,9 +40,9 @@ public:
     LLPanelDirLand();
     /*virtual*/ ~LLPanelDirLand();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void performQuery();
+    void performQuery() override;
 
 protected:
     void onClickSort();

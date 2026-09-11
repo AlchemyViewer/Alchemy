@@ -53,22 +53,22 @@ public:
     virtual ~LLPreviewGesture();
 
     // LLView
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                      EDragAndDropType cargo_type,
                                      void* cargo_data,
                                      EAcceptance* accept,
-                                     std::string& tooltip_msg);
+                                     std::string& tooltip_msg) override;
 
     // LLPanel
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     // LLFloater
-    /*virtual*/ bool canClose();
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ bool canClose() override;
+    /*virtual*/ void onClose(bool app_quitting) override;
     /*virtual*/ void onUpdateSucceeded();
-    /*virtual*/ void refresh();
+    /*virtual*/ void refresh() override;
 
 protected:
     // Populate various comboboxes
@@ -79,7 +79,7 @@ protected:
 
     void initDefaultGesture();
 
-    void loadAsset();
+    void loadAsset() override;
 
     static void onLoadComplete(const LLUUID& asset_uuid,
                                LLAssetType::EType type,

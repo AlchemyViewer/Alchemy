@@ -70,11 +70,11 @@ public:
     LLAvatarList(const Params&);
     virtual ~LLAvatarList();
 
-    virtual void draw(); // from LLView
+    virtual void draw() override; // from LLView
 
-    virtual void clear();
+    virtual void clear() override;
 
-    virtual void setVisible(bool visible);
+    virtual void setVisible(bool visible) override;
 
     void setNameFilter(const std::string& filter);
     void setDirty(bool val = true, bool force_refresh = false);
@@ -93,10 +93,10 @@ public:
     bool getIconsVisible() const { return mShowIcons; }
     const std::string getIconParamName() const{return mIconParamName;}
     std::string getAvatarName(LLAvatarName av_name);
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
 
     // Return true if filter has at least one match.
     bool filterHasMatches();
@@ -113,7 +113,7 @@ public:
 
     boost::signals2::connection setItemClickedCallback(const mouse_signal_t::slot_type& cb);
 
-    virtual S32 notifyParent(const LLSD& info);
+    virtual S32 notifyParent(const LLSD& info) override;
 
     void handleDisplayNamesOptionChanged();
 

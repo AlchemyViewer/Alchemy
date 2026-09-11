@@ -49,8 +49,8 @@ public:
 
     // virtual
     void initFromParams(const LLInventoryPanel::Params&);
-    LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop);
-    LLFolderViewItem * createFolderViewItem(LLInvFVBridge * bridge);
+    LLFolderViewFolder* createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop) override;
+    LLFolderViewItem * createFolderViewItem(LLInvFVBridge * bridge) override;
 
     void onRemoveItemFreshness(const LLUUID& item_id);
 };
@@ -72,12 +72,12 @@ public:
 
     LLInboxFolderViewFolder(const Params& p);
 
-    void addItem(LLFolderViewItem* item);
-    void draw();
+    void addItem(LLFolderViewItem* item) override;
+    void draw() override;
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
-    void selectItem();
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    void selectItem() override;
 
     void computeFreshness();
     void deFreshify();
@@ -106,12 +106,12 @@ public:
 
     LLInboxFolderViewItem(const Params& p);
 
-    void addToFolder(LLFolderViewFolder* folder);
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    void addToFolder(LLFolderViewFolder* folder) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
-    void draw();
+    void draw() override;
 
-    void selectItem();
+    void selectItem() override;
 
     void computeFreshness();
     void deFreshify();

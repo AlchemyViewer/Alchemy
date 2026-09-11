@@ -241,12 +241,12 @@ public:
     void initFromParams(const LLFloater::Params& p);
     bool initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename);
 
-    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false);
-    /*virtual*/ bool canSnapTo(const LLView* other_view);
-    /*virtual*/ void setSnappedTo(const LLView* snap_view);
-    /*virtual*/ void setFocus( bool b );
-    /*virtual*/ void setIsChrome(bool is_chrome);
-    /*virtual*/ void setRect(const LLRect &rect);
+    /*virtual*/ void handleReshape(const LLRect& new_rect, bool by_user = false) override;
+    /*virtual*/ bool canSnapTo(const LLView* other_view) override;
+    /*virtual*/ void setSnappedTo(const LLView* snap_view) override;
+    /*virtual*/ void setFocus( bool b ) override;
+    /*virtual*/ void setIsChrome(bool is_chrome) override;
+    /*virtual*/ void setRect(const LLRect &rect) override;
                 void setIsSingleInstance(bool is_single_instance);
                 bool getIsSingleInstance() const { return mSingleInstance; }
 
@@ -260,7 +260,7 @@ public:
     // Close the floater or its host. Use when hidding or toggling a floater instance.
     virtual void    closeHostedFloater();
 
-    /*virtual*/ void translate(S32 x, S32 y);
+    /*virtual*/ void translate(S32 x, S32 y) override;
 
     // Release keyboard and mouse focus
     void            releaseFocus();
@@ -326,27 +326,27 @@ public:
     S32             getMinHeight() const{ return mMinHeight; }
     S32             getHeaderHeight() const { return mHeaderHeight; }
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
-    virtual bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
-    virtual void    draw();
+    virtual void    draw() override;
     virtual void    drawShadow(LLPanel* panel);
 
-    virtual void    onOpen(const LLSD& key) {}
+    virtual void    onOpen(const LLSD& key) override {}
     virtual void    onClose(bool app_quitting) {}
 
     // This cannot be "const" until all derived floater canClose()
     // methods are const as well.  JC
     virtual bool    canClose() { return true; }
 
-    /*virtual*/ void setVisible(bool visible); // do not override
-    /*virtual*/ void onVisibilityChange ( bool new_visibility ); // do not override
+    /*virtual*/ void setVisible(bool visible) override; // do not override
+    /*virtual*/ void onVisibilityChange ( bool new_visibility ) override; // do not override
 
     bool            canFocusStealFrontmost() const { return mFocusStealsFrontmost; }
     void            setFocusStealsFrontmost(bool wants_frontmost) { mFocusStealsFrontmost = wants_frontmost; }
@@ -627,9 +627,9 @@ public:
     // Every child is a floater; anything else is refused.
     bool addChild(LLView* child, S32 tab_group = 0) override;
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void draw();
-    /*virtual*/ LLRect getSnapRect() const;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ LLRect getSnapRect() const override;
     /*virtual*/ void refresh();
 
     LLRect          findNeighboringPosition( LLFloater* reference_floater, LLFloater* neighbor );

@@ -55,16 +55,16 @@ public:
     LLWorldMapView();
     virtual ~LLWorldMapView();
 
-    virtual bool    postBuild();
+    virtual bool    postBuild() override;
 
-    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true );
-    virtual void    setVisible(bool visible);
+    virtual void    reshape(S32 width, S32 height, bool called_from_parent = true ) override;
+    virtual void    setVisible(bool visible) override;
 
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick( S32 x, S32 y, MASK mask );
-    virtual bool    handleHover( S32 x, S32 y, MASK mask );
-    virtual bool    handleToolTip( S32 x, S32 y, MASK mask);
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+    virtual bool    handleHover( S32 x, S32 y, MASK mask ) override;
+    virtual bool    handleToolTip( S32 x, S32 y, MASK mask) override;
 
     bool            checkItemHit(S32 x, S32 y, LLItemInfo& item, LLUUID* id, bool track);
     void            handleClick(S32 x, S32 y, MASK mask, S32* hit_type, LLUUID* id);
@@ -89,7 +89,7 @@ public:
     LLVector3       globalPosToView(const LLVector3d& global_pos);
     LLVector3d      viewPosToGlobal(S32 x,S32 y);
 
-    virtual void    draw();
+    virtual void    draw() override;
     void            drawGenericItems(const LLSimInfo::item_info_list_t& items, LLUIImagePtr image);
     void            drawGenericItem(const LLItemInfo& item, LLUIImagePtr image);
     void            drawImage(const LLVector3d& global_pos, LLUIImagePtr image, const LLColor4& color = LLColor4::white);

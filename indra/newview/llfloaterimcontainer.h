@@ -58,20 +58,20 @@ public:
     LLFloaterIMContainer(const LLSD& seed, const Params& params = getDefaultParams());
     virtual ~LLFloaterIMContainer();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void draw();
-    /*virtual*/ void setMinimized(bool b);
-    /*virtual*/ void setVisible(bool visible);
-    /*virtual*/ void setVisibleAndFrontmost(bool take_focus=true, const LLSD& key = LLSD());
-    /*virtual*/ void updateResizeLimits();
-    /*virtual*/ void handleReshape(const LLRect& rect, bool by_user);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ void setMinimized(bool b) override;
+    /*virtual*/ void setVisible(bool visible) override;
+    /*virtual*/ void setVisibleAndFrontmost(bool take_focus=true, const LLSD& key = LLSD()) override;
+    /*virtual*/ void updateResizeLimits() override;
+    /*virtual*/ void handleReshape(const LLRect& rect, bool by_user) override;
 
     void onCloseFloater(LLUUID& id);
 
     /*virtual*/ void addFloater(LLFloater* floaterp,
                                 bool select_added_floater,
-                                LLTabContainer::eInsertionPoint insertion_point = LLTabContainer::END);
+                                LLTabContainer::eInsertionPoint insertion_point = LLTabContainer::END) override;
     void returnFloaterToHost();
     void showConversation(const LLUUID& session_id);
     void selectConversation(const LLUUID& session_id);
@@ -82,7 +82,7 @@ public:
     bool selectNextorPreviousConversation(bool select_next, bool focus_selected = true);
     void expandConversation();
 
-    /*virtual*/ void tabClose();
+    /*virtual*/ void tabClose() override;
     void showStub(bool visible);
 
     static LLFloaterIMContainer* findInstance();
@@ -98,11 +98,11 @@ public:
     static void idle(void* user_data);
 
     // LLIMSessionObserver observe triggers
-    /*virtual*/ void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, bool has_offline_msg);
-    /*virtual*/ void sessionActivated(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id);
-    /*virtual*/ void sessionVoiceOrIMStarted(const LLUUID& session_id);
-    /*virtual*/ void sessionRemoved(const LLUUID& session_id);
-    /*virtual*/ void sessionIDUpdated(const LLUUID& old_session_id, const LLUUID& new_session_id);
+    /*virtual*/ void sessionAdded(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id, bool has_offline_msg) override;
+    /*virtual*/ void sessionActivated(const LLUUID& session_id, const std::string& name, const LLUUID& other_participant_id) override;
+    /*virtual*/ void sessionVoiceOrIMStarted(const LLUUID& session_id) override;
+    /*virtual*/ void sessionRemoved(const LLUUID& session_id) override;
+    /*virtual*/ void sessionIDUpdated(const LLUUID& old_session_id, const LLUUID& new_session_id) override;
 
     LLConversationViewModel& getRootViewModel() { return mConversationViewModel; }
     LLUUID getSelectedSession() { return mSelectedSession; }
@@ -117,11 +117,11 @@ public:
     void doToParticipants(const std::string& item, uuid_vec_t& selectedIDS);
 
     void assignResizeLimits();
-    virtual bool handleKeyHere(KEY key, MASK mask );
-    /*virtual*/ void closeFloater(bool app_quitting = false);
+    virtual bool handleKeyHere(KEY key, MASK mask ) override;
+    /*virtual*/ void closeFloater(bool app_quitting = false) override;
     void closeAllConversations(bool app_quitting);
     void closeSelectedConversations(const uuid_vec_t& ids);
-    /*virtual*/ bool isFrontmost();
+    /*virtual*/ bool isFrontmost() override;
 
 
 private:
@@ -129,7 +129,7 @@ private:
     avatarID_panel_map_t mSessions;
     boost::signals2::connection mNewMessageConnection;
 
-    /*virtual*/ void computeResizeLimits(S32& new_min_width, S32& new_min_height) {}
+    /*virtual*/ void computeResizeLimits(S32& new_min_width, S32& new_min_height) override {}
 
     void onNewMessageReceived(const LLSD& data);
 
@@ -138,8 +138,8 @@ private:
     void processParticipantsStyleUpdate();
     void onSpeakButtonPressed();
     void onSpeakButtonReleased();
-    /*virtual*/ void onClickCloseBtn(bool app_quitting = false);
-    /*virtual*/ void closeHostedFloater();
+    /*virtual*/ void onClickCloseBtn(bool app_quitting = false) override;
+    /*virtual*/ void closeHostedFloater() override;
 
     void collapseConversationsPane(bool collapse, bool save_is_allowed=true);
 

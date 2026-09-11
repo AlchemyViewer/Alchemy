@@ -3033,7 +3033,7 @@ public:
         mAccountIndependentSettings.push_back("AutoDisengageMic");
     }
 
-    /*virtual*/ void saveSettings()
+    /*virtual*/ void saveSettings() override
     {
         LLPanelPreference::saveSettings();
 

@@ -56,7 +56,7 @@ protected:
         };
 
         // adds or removes "More" link as needed
-        /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+        /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
         void setText(ALStringViewExplicit text, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
         void setTextBase(const std::string& text) { LLTextBase::setText(text); }
 
@@ -125,38 +125,38 @@ public:
     /**
      * Returns text
      */
-    virtual const std::string& getText() const { return mText; }
+    virtual const std::string& getText() const override { return mText; }
 
     /**
      * Sets text
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
     /**
      * Returns text
      */
-    /*virtual*/ LLSD getValue() const { return mText; }
+    /*virtual*/ LLSD getValue() const override { return mText; }
 
     /**
      * Collapses text box on focus_lost event
      */
-    /*virtual*/ void onFocusLost();
+    /*virtual*/ void onFocusLost() override;
 
     /**
      * Collapses text box on top_lost event
      */
-    /*virtual*/ void onTopLost();
+    /*virtual*/ void onTopLost() override;
 
     /**
      * *HACK: Update the inner textbox shape.
      */
     void updateTextShape();
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     /**
      * Draws text box, collapses text box if its expanded and its parent's position changed
      */
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
     virtual ~LLExpandableTextBox();
 

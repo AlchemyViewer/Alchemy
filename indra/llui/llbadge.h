@@ -135,7 +135,7 @@ public:
 
     bool                addToView(LLView * view);
 
-    virtual void        draw();
+    virtual void        draw() override;
 
     const std::string&  getLabel() const { return mLabel.getString(); }
     void                setLabel( const LLStringExplicit& label);

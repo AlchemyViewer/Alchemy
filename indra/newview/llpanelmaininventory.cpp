@@ -81,8 +81,8 @@ class LLFloaterInventoryFinder final : public LLFloater
 public:
     AL_VIEW_TYPE(LLFloaterInventoryFinder, LLFloater);
     LLFloaterInventoryFinder(LLPanelMainInventory* inventory_view);
-    void draw();
-    bool postBuild();
+    void draw() override;
+    bool postBuild() override;
     void changeFilter(LLInventoryFilter* filter);
     void updateElementsFromFilter();
     bool getCheckShowEmpty();

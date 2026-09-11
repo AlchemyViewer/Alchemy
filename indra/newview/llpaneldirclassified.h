@@ -44,10 +44,10 @@ public:
     LLPanelDirClassified();
     /*virtual*/ ~LLPanelDirClassified();
 
-    bool postBuild();
+    bool postBuild() override;
 
     // Request the classifieds from the database
-    void performQuery();
+    void performQuery() override;
 
 protected:
     // onClickNext and onClickPrev are special case searches

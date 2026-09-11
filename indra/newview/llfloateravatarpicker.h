@@ -57,7 +57,7 @@ public:
     LLFloaterAvatarPicker(const LLSD& key);
     virtual ~LLFloaterAvatarPicker();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     void setOkBtnEnableCb(validate_callback_t cb);
 
@@ -67,7 +67,7 @@ public:
     bool handleDragAndDrop(S32 x, S32 y, MASK mask,
                            bool drop, EDragAndDropType cargo_type,
                            void *cargo_data, EAcceptance *accept,
-                           std::string& tooltip_msg);
+                           std::string& tooltip_msg) override;
 
     void openFriendsTab();
     bool isExcludeAgentFromSearchResults() {return mExcludeAgentFromSearchResults;}
@@ -95,8 +95,8 @@ private:
     LLScrollListCtrl* getActiveList();
 
     void drawFrustum();
-    virtual void draw();
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual void draw() override;
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     LLUUID              mQueryID;
     int                 mNumResultsReturned;

@@ -69,7 +69,7 @@ public:
     LLCOFWearables();
     virtual ~LLCOFWearables();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     LLUUID getSelectedUUID();
     bool getSelectedUUIDs(uuid_vec_t& selected_ids);
@@ -78,8 +78,8 @@ public:
     void getSelectedItems(std::vector<LLPanel*>& selected_items) const;
 
     /* Repopulate the COF wearables list if the COF category has been changed since the last refresh */
-    void refresh();
-    void clear();
+    void refresh() override;
+    void clear() override;
 
     LLAssetType::EType getExpandedAccordionAssetType();
     LLAssetType::EType getSelectedAccordionAssetType();

@@ -66,9 +66,9 @@ public:
                                              LLDate date, const std::string &hl);
     virtual ~LLTeleportHistoryFlatItem();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    /*virtual*/ S32 notify(const LLSD& info);
+    /*virtual*/ S32 notify(const LLSD& info) override;
 
     S32 getIndex() { return mIndex; }
     void setIndex(S32 index) { mIndex = index; }
@@ -80,11 +80,11 @@ public:
     void updateTimestamp();
     std::string getTimestamp();
 
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     static void showPlaceInfoPanel(S32 index);
 

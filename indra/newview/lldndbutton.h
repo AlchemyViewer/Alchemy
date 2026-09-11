@@ -72,7 +72,7 @@ public:
         EDragAndDropType cargo_type,
         void* cargo_data,
         EAcceptance* accept,
-        std::string& tooltip_msg);
+        std::string& tooltip_msg) override;
 
 private:
     drag_drop_handler_t mDragDropHandler;

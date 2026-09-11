@@ -70,17 +70,17 @@ public:
      * Returns width, required to display amount of notifications in text form.
      * Width is the only valid value.
      */
-    /*virtual*/ LLRect getRequiredRect();
+    /*virtual*/ LLRect getRequiredRect() override;
 
     /**
      * Sets number of notifications using LLSD
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
     /**
      * Returns number of notifications wrapped in LLSD
      */
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ LLSD getValue() const override;
 
 protected:
 
@@ -141,7 +141,7 @@ public:
     /**
      * Sets icon, if value is LLUUID::null - default icon will be set.
      */
-    virtual void setValue(const LLSD& value );
+    virtual void setValue(const LLSD& value ) override;
 
 protected:
 
@@ -203,12 +203,12 @@ public:
     /**
      * Sets IM Session id using LLSD
      */
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ LLSD getValue() const override;
 
     /**
      * Returns IM Session id using LLSD
      */
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
 protected:
 
@@ -218,7 +218,7 @@ protected:
     /**
      * Notifies subscribers about click on chiclet.
      */
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     /**
      * Notifies subscribers about chiclet size changed event.
@@ -263,7 +263,7 @@ public:
     /**
      * It is used for default setting up of chicklet:click handler, etc.
      */
-    bool postBuild();
+    bool postBuild() override;
 
     /**
      * Sets IM session name. This name will be displayed in chiclet tooltip.
@@ -309,7 +309,7 @@ public:
     /**
      * Displays popup menu.
      */
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     void hidePopupMenu();
 
@@ -386,12 +386,12 @@ public:
         Params();
     };
 
-    /*virtual*/ void setSessionId(const LLUUID& session_id);
+    /*virtual*/ void setSessionId(const LLUUID& session_id) override;
 
     /**
      * Toggle script floater
      */
-    /*virtual*/ void onMouseDown();
+    /*virtual*/ void onMouseDown() override;
 
 protected:
 
@@ -401,7 +401,7 @@ protected:
     /**
      * Creates chiclet popup menu.
      */
-    virtual void createPopupMenu();
+    virtual void createPopupMenu() override;
 
     /**
      * Processes clicks on chiclet popup menu.
@@ -432,12 +432,12 @@ public:
         Params();
     };
 
-    /*virtual*/ void setSessionId(const LLUUID& session_id);
+    /*virtual*/ void setSessionId(const LLUUID& session_id) override;
 
     /**
      * Toggle script floater
      */
-    /*virtual*/ void onMouseDown();
+    /*virtual*/ void onMouseDown() override;
 
 protected:
     LLInvOfferChiclet(const Params&);
@@ -446,7 +446,7 @@ protected:
     /**
      * Creates chiclet popup menu.
      */
-    virtual void createPopupMenu();
+    virtual void createPopupMenu() override;
 
     /**
      * Processes clicks on chiclet popup menu.
@@ -516,7 +516,7 @@ protected:
     /**
      * Displays menu.
      */
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     virtual void createMenu() = 0;
 
@@ -583,7 +583,7 @@ protected:
     /**
      * Creates menu.
      */
-    /*virtual*/ void createMenu();
+    /*virtual*/ void createMenu() override;
 
     /*virtual*/ void setCounter(S32 counter);
     S32 mUreadSystemNotifications;
@@ -675,7 +675,7 @@ public:
     boost::signals2::connection setChicletClickedCallback(
         const commit_callback_t& cb);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Handler for the Voice Client's signal. Finds a corresponding chiclet and toggles its SpeakerControl
@@ -685,13 +685,13 @@ public:
     /**
      * Reshapes controls and rearranges chiclets if needed.
      */
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true );
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true ) override;
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
     S32 getMinWidth() const { return mMinWidth; }
 
-    /*virtual*/ S32 notifyParent(const LLSD& info);
+    /*virtual*/ S32 notifyParent(const LLSD& info) override;
 
     /**
      * Toggle chiclet by session id ON and toggle OFF all other chiclets.
@@ -790,7 +790,7 @@ protected:
     /**
      * Callback for mouse wheel scrolled, calls scrollRight() or scrollLeft()
      */
-    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
     /**
      * Notifies subscribers about click on chiclet.

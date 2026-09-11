@@ -38,8 +38,8 @@ class LLFloaterLagMeter final : public LLFloater
 public:
     AL_VIEW_TYPE(LLFloaterLagMeter, LLFloater);
 
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
 private:
 
     LLFloaterLagMeter(const LLSD& key);

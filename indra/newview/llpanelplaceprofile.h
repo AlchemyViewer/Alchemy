@@ -42,15 +42,15 @@ public:
     LLPanelPlaceProfile();
     /*virtual*/ ~LLPanelPlaceProfile();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void resetLocation();
+    /*virtual*/ void resetLocation() override;
 
-    /*virtual*/ void setInfoType(EInfoType type);
+    /*virtual*/ void setInfoType(EInfoType type) override;
 
-    /*virtual*/ void processParcelInfo(const LLParcelData& parcel_data);
+    /*virtual*/ void processParcelInfo(const LLParcelData& parcel_data) override;
 
-    /*virtual*/ void onVisibilityChange(bool new_visibility);
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
 
     // Displays information about the currently selected parcel
     // without sending a request to the server.

@@ -78,15 +78,15 @@ public:
     static void geometryChanged(const std::string &uuid, S32 x, S32 y, S32 width, S32 height);
     void geometryChanged(S32 x, S32 y, S32 width, S32 height);
 
-    /* virtual */ bool postBuild();
-    /* virtual */ void onOpen(const LLSD& key);
-    /* virtual */ bool matchesKey(const LLSD& key);
-    /* virtual */ void onClose(bool app_quitting);
-    /* virtual */ void draw();
+    /* virtual */ bool postBuild() override;
+    /* virtual */ void onOpen(const LLSD& key) override;
+    /* virtual */ bool matchesKey(const LLSD& key) override;
+    /* virtual */ void onClose(bool app_quitting) override;
+    /* virtual */ void draw() override;
 
 protected:
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
 
     void onClickBack();
     void onClickForward();

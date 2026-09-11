@@ -54,11 +54,11 @@ public:
     LLPanelObject();
     virtual ~LLPanelObject();
 
-    virtual bool    postBuild();
-    virtual void    draw();
-    virtual void    clearCtrls();
+    virtual bool    postBuild() override;
+    virtual void    draw() override;
+    virtual void    clearCtrls() override;
 
-    void            refresh();
+    void            refresh() override;
 
     static bool     precommitValidate(const LLSD& data);
 

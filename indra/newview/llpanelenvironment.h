@@ -251,7 +251,7 @@ public:
         EDragAndDropType cargo_type,
         void* cargo_data,
         EAcceptance* accept,
-        std::string& tooltip_msg);
+        std::string& tooltip_msg) override;
     void setPanel(LLPanelEnvironmentInfo* panel, std::string track) { mEnvironmentInfoPanel = panel;  mTrack = track; };
     void setDndEnabled(bool dnd_enabled) { mDndEnabled = dnd_enabled; };
 

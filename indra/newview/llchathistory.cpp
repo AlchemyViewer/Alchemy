@@ -176,7 +176,7 @@ public:
         }
     }
 
-    bool handleMouseUp(S32 x, S32 y, MASK mask)
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
         return LLPanel::handleMouseUp(x,y,mask);
     }
@@ -663,7 +663,7 @@ public:
         return false;
     }
 
-    bool postBuild()
+    bool postBuild() override
     {
         setDoubleClickCallback(boost::bind(&LLChatHistoryHeader::showInspector, this));
 
@@ -705,7 +705,7 @@ public:
         return  child->pointInView(local_x, local_y);
     }
 
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask)
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override
     {
         if(pointInChild("avatar_icon",x,y) || pointInChild("user_name",x,y))
         {
@@ -928,7 +928,7 @@ public:
         }
     }
 
-    /*virtual*/ void draw()
+    /*virtual*/ void draw() override
     {
         LLTextBox* user_name = mUserNameTextBox; //getChild<LLTextBox>("user_name");
         LLTextBox* time_box = mTimeBoxTextBox; //getChild<LLTextBox>("time_box");

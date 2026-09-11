@@ -83,21 +83,21 @@ public:
      *  If descendant class overrides postBuild() in order to perform specific
      *  construction then it must still invoke its superclass' implementation.
      */
-    /* virtula */bool postBuild();
-    /* virtual */void setDocked(bool docked, bool pop_on_undock = true);
-    /* virtual */void draw();
+    /* virtula */bool postBuild() override;
+    /* virtual */void setDocked(bool docked, bool pop_on_undock = true) override;
+    /* virtual */void draw() override;
 
     /**
      *  If descendant class overrides setVisible() then it must still invoke its
      *  superclass' implementation.
      */
-    /*virtual*/ void setVisible(bool visible);
+    /*virtual*/ void setVisible(bool visible) override;
 
     /**
      *  If descendant class overrides setMinimized() then it must still invoke its
      *  superclass' implementation.
      */
-    /*virtual*/ void setMinimized(bool minimize);
+    /*virtual*/ void setMinimized(bool minimize) override;
 
     LLView * getDockWidget();
 

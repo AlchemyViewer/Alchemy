@@ -103,18 +103,18 @@ class LLPanelFace final : public LLPanel
 public:
     AL_VIEW_TYPE(LLPanelFace, LLPanel);
 
-    virtual bool    postBuild();
+    virtual bool    postBuild() override;
     LLPanelFace();
     virtual ~LLPanelFace();
 
-    void            refresh();
+    void            refresh() override;
     void            refreshMedia();
     void            unloadMedia();
 
     static void onMaterialOverrideReceived(const LLUUID& object_id, S32 side);
 
-    /*virtual*/ void onVisibilityChange(bool new_visibility);
-    /*virtual*/ void draw();
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
+    /*virtual*/ void draw() override;
 
     LLMaterialPtr createDefaultMaterial(LLMaterialPtr current_material)
     {

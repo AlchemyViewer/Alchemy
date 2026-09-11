@@ -57,9 +57,9 @@ class LLFloaterPathfindingConsole final
 public:
     AL_VIEW_TYPE(LLFloaterPathfindingConsole, LLFloater);
 
-    virtual bool postBuild();
-    virtual void onOpen(const LLSD& pKey);
-    virtual void onClose(bool pIsAppQuitting);
+    virtual bool postBuild() override;
+    virtual void onOpen(const LLSD& pKey) override;
+    virtual void onClose(bool pIsAppQuitting) override;
 
     static LLHandle<LLFloaterPathfindingConsole> getInstanceHandle();
 

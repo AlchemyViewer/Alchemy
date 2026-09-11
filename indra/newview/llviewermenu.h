@@ -137,12 +137,12 @@ public:
 
     LLViewerMenuHolderGL(const Params& p);
 
-    virtual bool hideMenus();
+    virtual bool hideMenus() override;
 
     void setParcelSelection(LLSafeHandle<LLParcelSelection> selection);
     void setObjectSelection(LLSafeHandle<LLObjectSelection> selection);
 
-    virtual const LLRect getMenuRect() const;
+    virtual const LLRect getMenuRect() const override;
 
 protected:
     LLSafeHandle<LLParcelSelection> mParcelSelection;

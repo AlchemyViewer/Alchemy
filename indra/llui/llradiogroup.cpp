@@ -53,10 +53,10 @@ public:
 
     typedef LLRadioGroup::ItemParams Params;
     /*virtual*/ ~LLRadioCtrl();
-    /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ void setValue(const LLSD& value) override;
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     const LLSD& getPayload() const { return mPayload; }
 

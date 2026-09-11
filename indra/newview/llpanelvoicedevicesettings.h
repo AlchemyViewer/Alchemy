@@ -38,15 +38,15 @@ public:
     LLPanelVoiceDeviceSettings();
     ~LLPanelVoiceDeviceSettings();
 
-    /*virtual*/ void draw();
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool postBuild() override;
     void apply();
     void cancel();
-    void refresh();
+    void refresh() override;
     void initialize();
     void cleanup();
 
-    /*virtual*/ void onVisibilityChange ( bool new_visibility );
+    /*virtual*/ void onVisibilityChange ( bool new_visibility ) override;
 
     void setUseTuningMode(bool use) { mUseTuningMode = use; };
 

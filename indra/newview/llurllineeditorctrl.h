@@ -40,8 +40,8 @@ public:
     AL_VIEW_TYPE(LLURLLineEditor, LLLineEditor);
 
     // LLLineEditor overrides to do necessary escaping
-    /*virtual*/     void copy();
-    /*virtual*/     void cut();
+    /*virtual*/     void copy() override;
+    /*virtual*/     void cut() override;
 
 protected:
     LLURLLineEditor(const Params&);

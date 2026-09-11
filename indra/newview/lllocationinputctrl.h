@@ -93,22 +93,22 @@ public:
     };
 
     // LLView interface
-    /*virtual*/ void        setEnabled(bool enabled);
-    /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool        handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ void        onFocusReceived();
-    /*virtual*/ void        onFocusLost();
-    /*virtual*/ void        draw();
-    /*virtual*/ void        reshape(S32 width, S32 height, bool called_from_parent = true);
+    /*virtual*/ void        setEnabled(bool enabled) override;
+    /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool        handleKeyHere(KEY key, MASK mask) override;
+    /*virtual*/ void        onFocusReceived() override;
+    /*virtual*/ void        onFocusLost() override;
+    /*virtual*/ void        draw() override;
+    /*virtual*/ void        reshape(S32 width, S32 height, bool called_from_parent = true) override;
     //========================================================================
 
     // LLUICtrl interface
-    /*virtual*/ void        setFocus(bool b);
+    /*virtual*/ void        setFocus(bool b) override;
     //========================================================================
 
     // LLComboBox interface
-    void                    hideList();
-    void                    onTextEntry(LLLineEditor* line_editor);
+    void                    hideList() override;
+    void                    onTextEntry(LLLineEditor* line_editor) override;
     //========================================================================
 
     LLLineEditor*           getTextEntry() const { return mTextEntry; }

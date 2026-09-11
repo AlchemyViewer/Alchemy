@@ -55,7 +55,7 @@ public:
     * @param key - params to be passed to panel, use key[PARAM_SUB_PANEL_NAME]
     * to specify panel name to be opened.
     */
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     /**
      * Opens given subpanel.
@@ -71,7 +71,7 @@ public:
     * Overrides LLTabContainer::handleKeyHere to disable panel switch on
     * Alt + Left/Right button press.
     */
-    bool handleKeyHere(KEY key, MASK mask);
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     /**
     * Name of parameter that stores panel name to open.

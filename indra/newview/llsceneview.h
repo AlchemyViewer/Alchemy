@@ -37,11 +37,11 @@ public:
 
     LLSceneView(const LLRect& rect);
 
-    virtual void draw();
+    virtual void draw() override;
 
 protected:
-    virtual void onClose(bool app_qutting = false);
-    virtual void onClickCloseBtn(bool app_qutting = false);
+    virtual void onClose(bool app_qutting = false) override;
+    virtual void onClickCloseBtn(bool app_qutting = false) override;
 
 
 };

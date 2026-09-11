@@ -47,25 +47,25 @@ protected:
 public:
     virtual ~LLViewerTextEditor();
 
-    virtual void makePristine();
+    virtual void makePristine() override;
 
-    /*virtual*/ void onVisibilityChange( bool new_visibility );
+    /*virtual*/ void onVisibilityChange( bool new_visibility ) override;
 
     // mousehandler overrides
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask );
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask ) override;
 
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask,
                                         bool drop, EDragAndDropType cargo_type,
-                                        void *cargo_data, EAcceptance *accept, std::string& tooltip_msg);
+                                        void *cargo_data, EAcceptance *accept, std::string& tooltip_msg) override;
 
     const class LLInventoryItem* getDragItem() const { return mDragItem; }
-    virtual bool    importBuffer(const char* buffer, S32 length);
+    virtual bool    importBuffer(const char* buffer, S32 length) override;
     virtual bool    importStream(std::istream& str);
-    virtual bool    exportBuffer(std::string& buffer);
-    virtual void    onValueChange(S32 start, S32 end);
+    virtual bool    exportBuffer(std::string& buffer) override;
+    virtual void    onValueChange(S32 start, S32 end) override;
 
     void setNotecardInfo(const LLUUID& notecard_item_id, const LLUUID& object_id, const LLUUID& preview_id)
     {
@@ -95,7 +95,7 @@ public:
 private:
     // Embedded object operations
     void findEmbeddedItemSegments(S32 start, S32 end);
-    virtual llwchar pasteEmbeddedItem(llwchar ext_char);
+    virtual llwchar pasteEmbeddedItem(llwchar ext_char) override;
 
     bool            openEmbeddedItemAtPos( S32 pos );
     bool            openEmbeddedItem(LLPointer<LLInventoryItem> item, llwchar wc);

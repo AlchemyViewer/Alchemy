@@ -199,10 +199,10 @@ S32 ALFollowsControl::partAt(S32 x, S32 y) const
     }
     // Outside the element and inside the parent: the nearest edge is the
     // one the point is beyond.
-    if (x < child.mLeft)   { return STRUT + LEFT; }
-    if (x > child.mRight)  { return STRUT + RIGHT; }
-    if (y < child.mBottom) { return STRUT + BOTTOM; }
-    return STRUT + TOP;
+    if (x < child.mLeft)   { return LEFT; }
+    if (x > child.mRight)  { return RIGHT; }
+    if (y < child.mBottom) { return BOTTOM; }
+    return TOP;
 }
 
 std::string ALFollowsControl::partName(S32 part) const

@@ -140,21 +140,21 @@ public:
 
 
     // from LLView
-    /*virtual*/ void setValue(const LLSD& value);
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ void setValue(const LLSD& value) override;
+    /*virtual*/ LLSD getValue() const override;
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                        EDragAndDropType type, void* cargo_data,
-                                       EAcceptance* accept, std::string& tooltip);
+                                       EAcceptance* accept, std::string& tooltip) override;
     /*virtual*/ void initFromParams(const LLPanel::Params& p);
-    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0) override;
+    /*virtual*/ bool postBuild() override;
 
     struct TabPanelParams : public LLInitParam::Block<TabPanelParams>
     {

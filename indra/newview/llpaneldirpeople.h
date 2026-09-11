@@ -39,9 +39,9 @@ public:
     LLPanelDirPeople();
     virtual ~LLPanelDirPeople();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void performQuery();
+    /*virtual*/ void performQuery() override;
 
     static void onClickSearch(void *userdata);
     static void onKeystrokeName(LLLineEditor* line, void* data);

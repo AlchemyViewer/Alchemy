@@ -58,8 +58,8 @@ public:
     LLFloaterGesture(const LLSD& key);
     virtual ~LLFloaterGesture();
 
-    virtual bool postBuild();
-    virtual void done ();
+    virtual bool postBuild() override;
+    virtual void done () override;
     void refreshAll();
     /**
      * @brief Add new scrolllistitem into gesture_list.
