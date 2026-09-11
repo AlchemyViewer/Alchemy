@@ -5497,8 +5497,16 @@ void LLAppViewer::idle()
     // Cap out-of-control frame times
     // Too low because in menus, swapping, debugger, etc.
     // Too high because idle called with no objects in view, etc.
+    //
+    // The ceiling used to be 200, which floored every step at 5 ms. Everything downstream turns a
+    // per-second rate into a per-frame step with these -- keyboard turning multiplies by
+    // gFrameDTClamped, the camera orbit/pan/zoom keys divide by gFPSClamped -- so on any display
+    // faster than 200 Hz each step was bigger than the frame had earned: at 500 fps the avatar
+    // turned at 225 degrees a second instead of 90. A genuinely short frame is not an error to be
+    // clamped. The only hazard up here is a near-zero dt, and a ceiling far above any real refresh
+    // rate still guards that.
     const F32 MIN_FRAME_RATE = 1.f;
-    const F32 MAX_FRAME_RATE = 200.f;
+    const F32 MAX_FRAME_RATE = 10000.f;
 
     F32 frame_rate_clamped = 1.f / dt_raw;
     frame_rate_clamped = llclamp(frame_rate_clamped, MIN_FRAME_RATE, MAX_FRAME_RATE);
