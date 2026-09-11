@@ -753,6 +753,16 @@ void ALXUITranslate::scanOverlay(pugi::xml_node base, pugi::xml_node overlay)
                 add(attribute.name(), std::string(), attribute.value(), Miss::AttributeAbsent);
             }
         }
+        // And the text, where the element the base lacks carries any: a
+        // translation of something that is not there any more, which is
+        // what most of what a language file has outlived is.
+        if (!theirs)
+        {
+            if (const std::string text = textOf(node); !text.empty())
+            {
+                add(std::string(), std::string(), text, missed);
+            }
+        }
     }
 }
 
@@ -890,6 +900,59 @@ bool ALXUITranslate::write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& 
         error = overlay.error();
         return false;
     }
+    return true;
+}
+
+// static
+bool ALXUITranslate::remove(ALXUIEdit& overlay, const Unit& unit, std::string& error)
+{
+    // Where the language wrote it: at the base's path, or wherever the
+    // scan found it instead.
+    const path_t at = unit.where.empty() ? unit.path : ALXUISelection::fromString(unit.where);
+    if (at.empty())
+    {
+        error = "the root is not a thing to take out";
+        return false;
+    }
+    const pugi::xml_node element = overlay.resolve(at);
+    if (!element)
+    {
+        error = "the language has no element at that path";
+        return false;
+    }
+
+    bool done = false;
+    if (!unit.field.empty())
+    {
+        if (!element.attribute(unit.field.c_str()))
+        {
+            error = "the element does not carry " + unit.field;
+            return false;
+        }
+        done = overlay.removeAttribute(at, unit.field);
+    }
+    else
+    {
+        // The text, or the element where the text was all it said: an
+        // element with nothing on it but what it is matched by is a shell.
+        bool bare = true;
+        const std::string key = keyAttribute(element);
+        for (pugi::xml_attribute attribute : element.attributes())
+        {
+            bare = bare && key == attribute.name();
+        }
+        for (pugi::xml_node child : element.children())
+        {
+            bare = bare && child.type() != pugi::node_element;
+        }
+        done = bare ? overlay.removeElement(at) : overlay.setText(at, std::string());
+    }
+    if (!done)
+    {
+        error = overlay.error();
+        return false;
+    }
+    prune(overlay);
     return true;
 }
 

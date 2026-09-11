@@ -149,6 +149,8 @@
     <floater.string name="TranslateCounts">[TRANSLATED] translated, [RESCUED] applied after a move, [MISSING] missing, [NOTAPPLIED] applying to nothing, [PLACEHOLDERS] stale, [FORBIDDEN] forbidden</floater.string>
     <floater.string name="TranslateNoFile">Select a file and a language.</floater.string>
     <floater.string name="TranslateWrote">Wrote [FIELD] into [FILE]</floater.string>
+    <floater.string name="TranslateRemoved">Took [FIELD] out of [FILE]</floater.string>
+    <floater.string name="TranslateNothingToRemove">The language writes nothing for this row.</floater.string>
     <floater.string name="TranslateTheText">the text</floater.string>
     <floater.string name="TranslateRepaired">Moved [MOVES] values into place in [FILE]</floater.string>
     <floater.string name="TranslateRepairedAll">Moved [MOVES] values into place across [FILES] files in [LANG]</floater.string>
@@ -1831,6 +1833,16 @@
                                  name="translate_write"
                                  tool_tip="Write it where the merge will find it, under the ancestors the base gives it"
                                  top="2"
+                                 width="80" />
+                                <button
+                                 follows="right|top"
+                                 height="22"
+                                 label="Remove"
+                                 layout="topleft"
+                                 left="658"
+                                 name="translate_remove"
+                                 tool_tip="Take the language's value for this row out of its file: the attribute, or the element where its text was all it carried. The way a value that names nothing the base has leaves the file."
+                                 top="26"
                                  width="80" />
                             </layout_panel>
                         </layout_stack>

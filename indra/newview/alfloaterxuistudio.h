@@ -184,6 +184,9 @@ public:
     // from it: the disk hears nothing until a save.
     std::vector<ALXmlLayerMerge::Source> sourcesFor(const std::string& file) const;
     ALXUIEdit* document(const ALXUICatalog::Layer& layer);
+    // The document an edit goes into, and the layer it is: the base layer,
+    // or the one that positions the element. Null with the status set.
+    ALXUIEdit* editDocument(const ALXUICatalog::Layer*& layer, bool positioned);
     void documentChanged(const std::string& status);
 
     // What an edit costs the rest of the tool when the preview did not have
@@ -203,6 +206,9 @@ public:
     // about it. Answering false is not a failure: it says this field is not
     // one of those, so the preview has to be made again to show it.
     bool applyLive(const ALXUISelection::path_t& path, const std::string& name, const std::string& value);
+    // The status after a write, in the floater's words: what, to which
+    // file, in which layer.
+    std::string saidWrite(const char* key, const std::string& attrs, const ALXUICatalog::Layer& layer) const;
 
     // The rect the factory would have given the element, worked out again
     // from the element as it now reads -- and the same for every element the
@@ -437,8 +443,8 @@ private:
     void onFixAll();
     // What pressing it would do, for the button's label and for the row --
     // and what it did, once it has.
-    std::string describeFix(const ALXUILint::Finding& finding) const;
-    std::string saidFix(const ALXUILint::Finding& finding, const ALXUICatalog::Layer& layer) const;
+    // What a fix offers (no layer), or what it did, in which file and layer.
+    std::string fixWords(const ALXUILint::Finding& finding, const ALXUICatalog::Layer* layer) const;
     // The finding a row of the findings list is about, or null.
     const ALXUILint::Finding* findingForRow(const LLScrollListItem* item) const;
     void refreshFixButtons();
@@ -463,6 +469,7 @@ private:
     void fillTranslation();
     void onTranslationSelected();
     void onTranslationWrite();
+    void onTranslationRemove();
     void onTranslationLanguage();
     const ALXUICatalog::Layer* overlayLayer(const ALXUICatalog::Entry& entry, const std::string& language) const;
     bool overlayPath(const ALXUICatalog::Entry& entry, const std::string& language,

@@ -57,30 +57,7 @@ const std::vector<ALXUIOverlay::Origin>& ALXUIOverlay::writersOf(const LLXMLNode
 // static
 std::string ALXUIOverlay::namePath(const LLXMLNode* node)
 {
-    std::vector<std::string> names;
-    for (const LLXMLNode* cur = node; cur && cur->mParent; cur = cur->mParent)
-    {
-        std::string name;
-        if (!cur->getAttributeString("name", name) || name.empty())
-        {
-            if (!cur->getAttributeString("value", name) || name.empty())
-            {
-                name = std::string("<") + cur->getName()->mString + ">";
-            }
-        }
-        names.push_back(name);
-    }
-    std::reverse(names.begin(), names.end());
-    std::string path;
-    for (const std::string& name : names)
-    {
-        if (!path.empty())
-        {
-            path += '/';
-        }
-        path += name;
-    }
-    return path;
+    return ALXmlLayerMerge::namePath(node);
 }
 
 void ALXUIOverlay::drop(S32 layer, const LLXMLNode* overlay_node, std::string what, const char* key,

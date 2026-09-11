@@ -53,6 +53,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
 
 namespace
 {
@@ -143,44 +144,64 @@ namespace
     }
 }
 
+namespace
+{
+    // Each rule's name, which the findings store keys by, and the line in
+    // xui_lint.xml that says it in the language in force. One row per rule,
+    // in the order of the enumeration, so a rule added there is added here
+    // and nowhere else.
+    struct RuleWords
+    {
+        ALXUILint::Rule rule;
+        const char*     name;
+        const char*     key;
+    };
+    constexpr RuleWords RULES[] = {
+        { ALXUILint::Rule::ParseError,            "parse",                "LintRuleParseError" },
+        { ALXUILint::Rule::BuildFailed,           "build failed",         "LintRuleBuildFailed" },
+        { ALXUILint::Rule::OverlayDrop,           "overlay drop",         "LintRuleOverlayDrop" },
+        { ALXUILint::Rule::OverlayRescue,         "overlay rescue",       "LintRuleOverlayRescue" },
+        { ALXUILint::Rule::Overlap,               "overlap",              "LintRuleOverlap" },
+        { ALXUILint::Rule::Alternatives,          "alternatives",         "LintRuleAlternatives" },
+        { ALXUILint::Rule::OutOfBounds,           "out of bounds",        "LintRuleOutOfBounds" },
+        { ALXUILint::Rule::NameCollision,         "name collision",       "LintRuleNameCollision" },
+        { ALXUILint::Rule::LayoutDimension,       "layout dimension",     "LintRuleLayoutDimension" },
+        { ALXUILint::Rule::EmptyRect,             "empty rect",           "LintRuleEmptyRect" },
+        { ALXUILint::Rule::Truncation,            "truncation",           "LintRuleTruncation" },
+        { ALXUILint::Rule::TemplateRootMismatch,  "template root",        "LintRuleTemplateRootMismatch" },
+        { ALXUILint::Rule::UnknownAttribute,      "unknown attribute",    "LintRuleUnknownAttribute" },
+        { ALXUILint::Rule::WroteTheDefault,       "wrote the default",    "LintRuleWroteTheDefault" },
+        { ALXUILint::Rule::DeprecatedAttribute,   "deprecated attribute", "LintRuleDeprecatedAttribute" },
+        { ALXUILint::Rule::DanglingImage,         "dangling image",       "LintRuleDanglingImage" },
+        { ALXUILint::Rule::DanglingColor,         "dangling colour",      "LintRuleDanglingColor" },
+        { ALXUILint::Rule::DanglingFont,          "dangling font",        "LintRuleDanglingFont" },
+        { ALXUILint::Rule::CallbackNotRegistered, "callback",             "LintRuleCallbackNotRegistered" },
+        { ALXUILint::Rule::ControlMissing,        "control",              "LintRuleControlMissing" },
+        { ALXUILint::Rule::FileMissing,           "file",                 "LintRuleFileMissing" },
+    };
+    static_assert(std::size(RULES) == (size_t)ALXUILint::Rule::FileMissing + 1, "a rule without its words");
+
+    const RuleWords& wordsOf(ALXUILint::Rule rule)
+    {
+        const size_t at = (size_t)rule;
+        return RULES[at < std::size(RULES) && RULES[at].rule == rule ? at : 0];
+    }
+}
+
 // static
 const char* ALXUILint::ruleName(Rule rule)
 {
-    switch (rule)
-    {
-    case Rule::ParseError:              return "parse";
-    case Rule::BuildFailed:             return "build failed";
-    case Rule::OverlayDrop:             return "overlay drop";
-    case Rule::OverlayRescue:           return "overlay rescue";
-    case Rule::Overlap:                 return "overlap";
-    case Rule::Alternatives:            return "alternatives";
-    case Rule::OutOfBounds:             return "out of bounds";
-    case Rule::NameCollision:           return "name collision";
-    case Rule::LayoutDimension:         return "layout dimension";
-    case Rule::EmptyRect:               return "empty rect";
-    case Rule::Truncation:              return "truncation";
-    case Rule::TemplateRootMismatch:    return "template root";
-    case Rule::UnknownAttribute:        return "unknown attribute";
-    case Rule::WroteTheDefault:         return "wrote the default";
-    case Rule::DeprecatedAttribute:     return "deprecated attribute";
-    case Rule::DanglingImage:           return "dangling image";
-    case Rule::DanglingColor:           return "dangling colour";
-    case Rule::DanglingFont:            return "dangling font";
-    case Rule::CallbackNotRegistered:   return "callback";
-    case Rule::ControlMissing:          return "control";
-    case Rule::FileMissing:             return "file";
-    }
-    return "?";
+    return wordsOf(rule).name;
 }
 
 // static
 bool ALXUILint::ruleNamed(std::string_view name, Rule& rule)
 {
-    for (U8 i = 0; i <= (U8)Rule::FileMissing; ++i)
+    for (const RuleWords& words : RULES)
     {
-        if (name == ruleName((Rule)i))
+        if (name == words.name)
         {
-            rule = (Rule)i;
+            rule = words.rule;
             return true;
         }
     }
@@ -190,31 +211,7 @@ bool ALXUILint::ruleNamed(std::string_view name, Rule& rule)
 // static
 const char* ALXUILint::ruleKey(Rule rule)
 {
-    switch (rule)
-    {
-    case Rule::ParseError:              return "LintRuleParseError";
-    case Rule::BuildFailed:             return "LintRuleBuildFailed";
-    case Rule::OverlayDrop:             return "LintRuleOverlayDrop";
-    case Rule::OverlayRescue:           return "LintRuleOverlayRescue";
-    case Rule::Overlap:                 return "LintRuleOverlap";
-    case Rule::Alternatives:            return "LintRuleAlternatives";
-    case Rule::OutOfBounds:             return "LintRuleOutOfBounds";
-    case Rule::NameCollision:           return "LintRuleNameCollision";
-    case Rule::LayoutDimension:         return "LintRuleLayoutDimension";
-    case Rule::EmptyRect:               return "LintRuleEmptyRect";
-    case Rule::Truncation:              return "LintRuleTruncation";
-    case Rule::TemplateRootMismatch:    return "LintRuleTemplateRootMismatch";
-    case Rule::UnknownAttribute:        return "LintRuleUnknownAttribute";
-    case Rule::WroteTheDefault:         return "LintRuleWroteTheDefault";
-    case Rule::DeprecatedAttribute:     return "LintRuleDeprecatedAttribute";
-    case Rule::DanglingImage:           return "LintRuleDanglingImage";
-    case Rule::DanglingColor:           return "LintRuleDanglingColor";
-    case Rule::DanglingFont:            return "LintRuleDanglingFont";
-    case Rule::CallbackNotRegistered:   return "LintRuleCallbackNotRegistered";
-    case Rule::ControlMissing:          return "LintRuleControlMissing";
-    case Rule::FileMissing:             return "LintRuleFileMissing";
-    }
-    return "LintRuleParseError";
+    return wordsOf(rule).key;
 }
 
 // static

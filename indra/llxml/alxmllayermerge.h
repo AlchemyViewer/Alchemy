@@ -120,4 +120,9 @@ namespace ALXmlLayerMerge
     // which is the key and is never written; an attribute the base lacks
     // is dropped; a child that matches nothing is dropped.
     void merge(LLXMLNodePtr& base, LLXMLNodePtr& overlay, S32 layer = 1, ALXmlMergeObserver* observer = nullptr);
+
+    // The names from the root's child down to an element, joined with '/',
+    // each as the merge matches it: the name, else the value, else the tag
+    // in angle brackets. Empty for the root itself.
+    std::string namePath(const LLXMLNode* node);
 }

@@ -310,6 +310,7 @@ private:
     bool insertionPoint(pugi::xml_node node, size_t& offset, std::string& separator) const;
 
     bool addDelta(pugi::xml_node node, std::string_view name, S32 delta, std::vector<std::pair<std::string, S32>>& writes);
+    bool writeAll(const path_t& path, const std::vector<std::pair<std::string, S32>>& writes);
 
     std::string                     mPath;
     std::string                     mText;

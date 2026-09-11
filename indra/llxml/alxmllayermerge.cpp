@@ -284,6 +284,26 @@ namespace
     ALXmlMergeObserver* sDefaultObserver = nullptr;
 }
 
+std::string ALXmlLayerMerge::namePath(const LLXMLNode* node)
+{
+    std::vector<std::string> names;
+    for (const LLXMLNode* cur = node; cur && cur->mParent; cur = cur->mParent)
+    {
+        std::string name = matchKey(cur);
+        if (name.empty())
+        {
+            name = std::string("<") + cur->getName()->mString + ">";
+        }
+        names.push_back(std::move(name));
+    }
+    std::string path;
+    for (auto it = names.rbegin(); it != names.rend(); ++it)
+    {
+        path += (path.empty() ? "" : "/") + *it;
+    }
+    return path;
+}
+
 void ALXmlLayerMerge::setDefaultObserver(ALXmlMergeObserver* observer)
 {
     sDefaultObserver = observer;

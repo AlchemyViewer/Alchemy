@@ -443,9 +443,8 @@ void ALPropertyGrid::setFilter(const std::string& text)
 // row it is on, and the grid is what has them.
 std::string ALPropertyGrid::valueOf(const std::string& name) const
 {
-    const auto it = std::find_if(mFields.begin(), mFields.end(),
-                                 [&name](const Field& field) { return field.name == name; });
-    return it == mFields.end() ? std::string() : it->value;
+    const Field* field = fieldNamed(name);
+    return field ? field->value : std::string();
 }
 
 bool ALPropertyGrid::shows(const Field& field) const
@@ -871,28 +870,33 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
     }
 
     // Every editor answers the same way: the row says which field it is,
-    // and what a file would write is made from the value here.
+    // and what a file would write is made from the value here. Except a
+    // font, which answers by its parts above, since it is three fields and
+    // a commit of the whole would write the name a second time.
     const bool whole = field.kind != ALParamType::REAL;
     const ALParamType::EValue kind = field.kind;
-    editor->setCommitCallback([this, name, kind, whole](LLUICtrl* ctrl, const LLSD&)
+    if (!editor->as<ALFontField>())
     {
-        std::string text;
-        switch (kind)
+        editor->setCommitCallback([this, name, kind, whole](LLUICtrl* ctrl, const LLSD&)
         {
-        case ALParamType::BOOLEAN:
-            text = ctrl->getValue().asBoolean() ? "true" : "false";
-            break;
-        case ALParamType::INTEGER:
-        case ALParamType::UNSIGNED:
-        case ALParamType::REAL:
-            text = numberText((F32)ctrl->getValue().asReal(), whole);
-            break;
-        default:
-            text = ctrl->getValue().asString();
-            break;
-        }
-        mFieldCommit(name, text);
-    });
+            std::string text;
+            switch (kind)
+            {
+            case ALParamType::BOOLEAN:
+                text = ctrl->getValue().asBoolean() ? "true" : "false";
+                break;
+            case ALParamType::INTEGER:
+            case ALParamType::UNSIGNED:
+            case ALParamType::REAL:
+                text = numberText((F32)ctrl->getValue().asReal(), whole);
+                break;
+            default:
+                text = ctrl->getValue().asString();
+                break;
+            }
+            mFieldCommit(name, text);
+        });
+    }
     // The row's own words, on the editor as well: a pointer resting on a
     // control is asking what a pointer resting on its label is asking, and
     // on a paired row the two halves are two different questions.
@@ -1028,8 +1032,9 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     // The way back, on the rows that have one. A field this file writes can
     // be taken out again, and what was in force before is in force after --
     // which the document has always been able to do and this pane has never
-    // had a way to ask for.
-    addRemove(row, field);
+    // had a way to ask for. A paired row has one button for its two fields,
+    // and it takes out whichever of them the file writes.
+    addRemove(row, field, partner);
 
     // The gutter: a value some other skin or language disagrees about, said
     // once beside the row rather than as a column repeating the same word
@@ -1058,7 +1063,7 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
 // the file comes to write is the same row with the button shown, rather
 // than a new row under whoever was typing into the old one. A field that
 // is written and thrown away has nothing worth taking out.
-void ALPropertyGrid::addRemove(LLPanel* row, const Field& field)
+void ALPropertyGrid::addRemove(LLPanel* row, const Field& field, const Field* partner)
 {
     const S32 width = row->getRect().getWidth();
     const S32 top = row->getRect().getHeight();
@@ -1068,24 +1073,51 @@ void ALPropertyGrid::addRemove(LLPanel* row, const Field& field)
     p.rect = LLRect(width - MARGIN - mRemoveWidth, top - 2, width - MARGIN, top - mRowHeight);
     p.tool_tip = say(mTips.remove, field);
     p.follows.flags = FOLLOWS_RIGHT | FOLLOWS_TOP;
-    p.visible = field.authored && !field.ignored;
+    p.visible = (field.authored && !field.ignored) || (partner && partner->authored && !partner->ignored);
     LLButton* remove = LLUICtrlFactory::create<LLButton>(p);
     const std::string removed = field.name;
-    remove->setCommitCallback([this, removed](LLUICtrl*, const LLSD&) { mFieldRemove(removed); });
+    const std::string other = partner ? partner->name : std::string();
+    remove->setCommitCallback([this, removed, other](LLUICtrl*, const LLSD&)
+    {
+        // Read as the fields stand when pressed, since either half may have
+        // been written or taken out since the row was made.
+        for (const std::string& name : { removed, other })
+        {
+            if (const Field* f = fieldNamed(name); f && f->authored && !f->ignored)
+            {
+                mFieldRemove(name);
+            }
+        }
+    });
     row->addChild(remove);
+}
+
+const ALPropertyGrid::Field* ALPropertyGrid::fieldNamed(const std::string& name) const
+{
+    const auto it = std::find_if(mFields.begin(), mFields.end(),
+                                 [&name](const Field& field) { return field.name == name; });
+    return it == mFields.end() ? nullptr : &*it;
+}
+
+LLPanel* ALPropertyGrid::rowOf(const std::string& name) const
+{
+    if (LLPanel* own = findChild<LLPanel>(name + "_row", true))
+    {
+        return own;
+    }
+    for (const Field& field : mFields)
+    {
+        if (field.pairWith == name)
+        {
+            return findChild<LLPanel>(field.name + "_row", true);
+        }
+    }
+    return nullptr;
 }
 
 void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const std::string& source)
 {
-    Field* field = nullptr;
-    for (Field& each : mFields)
-    {
-        if (each.name == name)
-        {
-            field = &each;
-            break;
-        }
-    }
+    Field* field = const_cast<Field*>(fieldNamed(name));
     if (!field || (field->authored == authored && field->source == source))
     {
         return;
@@ -1102,19 +1134,27 @@ void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const s
     }
 
     // The row is this field's own, or the one it shares with the field it
-    // partners -- where the label and the way back are the other field's,
-    // and only the editor is this one's to tell.
+    // partners -- where the label is the other field's, the way back is
+    // both of theirs, and only the editor is this one's to tell.
     const std::string tip = tipFor(*field);
-    if (LLPanel* row = findChild<LLPanel>(name + "_row", true))
+    if (LLPanel* row = rowOf(name))
     {
         if (LLTextBox* label = row->findChild<LLTextBox>(name + "_label"))
         {
             label->setColor(inkFor(*field));
             label->setToolTip(tip);
         }
-        if (LLView* remove = row->findChild<LLView>(name + "_remove"))
+        for (LLView* child : *row->getChildList())
         {
-            remove->setVisible(authored && !field->ignored);
+            const std::string& child_name = child->getName();
+            if (!child_name.ends_with("_remove"))
+            {
+                continue;
+            }
+            const Field* first = fieldNamed(child_name.substr(0, child_name.size() - 7));
+            const Field* partner = first ? partnerOf(*first) : nullptr;
+            const auto stands = [](const Field* f) { return f && f->authored && !f->ignored; };
+            child->setVisible(stands(first) || stands(partner));
         }
     }
     if (LLView* editor = findChild<LLView>(name, true))

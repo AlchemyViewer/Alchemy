@@ -80,6 +80,19 @@ namespace
     {
         return name == "left" || name == "right" || name == "top" || name == "bottom";
     }
+
+    // Every line after the first indented one step further, so a block of
+    // several lines lands whole at the depth it is written into.
+    std::string indented(const std::string& xml, const std::string& indent)
+    {
+        std::string block = xml;
+        for (size_t line = block.find('\n'); line != std::string::npos;
+             line = block.find('\n', line + 1 + indent.size()))
+        {
+            block.insert(line + 1, indent);
+        }
+        return block;
+    }
 }
 
 ALXUIEdit::ALXUIEdit()
@@ -797,12 +810,7 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
     // Every line of it lands at the same depth, so an element that
     // arrives with children of its own keeps their shape and takes the
     // indentation of where it is going.
-    std::string block = xml;
-    for (size_t line = block.find('\n'); line != std::string::npos;
-         line = block.find('\n', line + 1 + indent.size()))
-    {
-        block.insert(line + 1, indent);
-    }
+    const std::string block = indented(xml, indent);
 
     // Where the element's own '<' lands, so the step can say where it is.
     const size_t lead = llmin(block.size(), block.find_first_not_of(" \t\r\n"));
@@ -1039,12 +1047,7 @@ bool ALXUIEdit::insertBeside(const path_t& sibling, const std::string& xml, bool
     const std::string eol = mText.find("\r\n") == std::string::npos ? "\n" : "\r\n";
 
     // The whole of it lands at the sibling's depth, children and all.
-    std::string block = xml;
-    for (size_t line = block.find('\n'); line != std::string::npos;
-         line = block.find('\n', line + 1 + indent.size()))
-    {
-        block.insert(line + 1, indent);
-    }
+    const std::string block = indented(xml, indent);
 
     const size_t lead = llmin(block.size(), block.find_first_not_of(" \t\r\n"));
     if (before)
@@ -1212,6 +1215,21 @@ bool ALXUIEdit::renameAttribute(const path_t& path, const std::string& from, con
     return true;
 }
 
+// The numbers a move, a resize or a re-author worked out, written one
+// attribute each and remembered for the panel that says what was written.
+bool ALXUIEdit::writeAll(const path_t& path, const std::vector<std::pair<std::string, S32>>& writes)
+{
+    for (const auto& [attribute, value] : writes)
+    {
+        if (!setAttribute(path, attribute, std::to_string(value)))
+        {
+            return false;
+        }
+        mWritten.push_back(attribute);
+    }
+    return true;
+}
+
 bool ALXUIEdit::isGeometryAttribute(std::string_view name)
 {
     return name == "left" || name == "right" || name == "top" || name == "bottom"
@@ -1320,15 +1338,7 @@ bool ALXUIEdit::translate(const path_t& path, S32 dx, S32 dy, const Anchor& now)
         }
     }
 
-    for (const auto& [attribute, value] : writes)
-    {
-        if (!setAttribute(path, attribute, std::to_string(value)))
-        {
-            return false;
-        }
-        mWritten.push_back(attribute);
-    }
-    return true;
+    return writeAll(path, writes);
 }
 
 // A resize holds the edge the element is positioned from and moves the
@@ -1378,15 +1388,7 @@ bool ALXUIEdit::resize(const path_t& path, S32 dw, S32 dh, const Anchor& now)
         }
     }
 
-    for (const auto& [attribute, value] : writes)
-    {
-        if (!setAttribute(path, attribute, std::to_string(value)))
-        {
-            return false;
-        }
-        mWritten.push_back(attribute);
-    }
-    return true;
+    return writeAll(path, writes);
 }
 
 bool ALXUIEdit::reauthor(const path_t& path, const Anchor& want, EAuthor what)
@@ -1413,13 +1415,9 @@ bool ALXUIEdit::reauthor(const path_t& path, const Anchor& want, EAuthor what)
     writes.emplace_back("width", want.width);
     writes.emplace_back("height", want.height);
 
-    for (const auto& [attribute, value] : writes)
+    if (!writeAll(path, writes))
     {
-        if (!setAttribute(path, attribute, std::to_string(value)))
-        {
-            return false;
-        }
-        mWritten.push_back(attribute);
+        return false;
     }
 
     // And everything else that positions it comes off. The node is stale

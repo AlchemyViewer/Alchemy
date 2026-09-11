@@ -706,4 +706,56 @@ namespace tut
         one = find(units, "c/v1", "label");
         ensure("and it is translated now", one && one->state == ALXUITranslate::State::Translated);
     }
+
+    // A value that names nothing the base has is taken out of the file:
+    // the attribute, or the element where its text was all it carried, and
+    // the shells left above it go too.
+    template<> template<>
+    void alxuitranslate_object::test<16>()
+    {
+        Doc base;
+        pugi::xml_node root = base.load(english());
+        ALXUIEdit overlay;
+        ensure("loads", overlay.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Anidado\" tool_tip=\"Nada\"/>\n"
+            "        <text name=\"gone\">Fuera</text>\n"
+            "    </panel>\n"
+            "</panel>\n"));
+
+        ALXUITranslate units;
+        units.scan(root, overlay.root());
+        const ALXUITranslate::Unit* tip = find(units, "inner/deep", "tool_tip");
+        ensure("the attribute the base lacks is a unit: " + describe(units), tip);
+        ensure_equals("applying to nothing", (int)tip->miss, (int)ALXUITranslate::Miss::AttributeAbsent);
+        std::string error;
+        ensure("taken out: " + error, ALXUITranslate::remove(overlay, *tip, error));
+        ensure_equals("the attribute alone", overlay.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Anidado\"/>\n"
+            "        <text name=\"gone\">Fuera</text>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        units.scan(root, overlay.root());
+        const ALXUITranslate::Unit* gone = find(units, "inner/gone", "");
+        ensure("the element the base lacks is a unit: " + describe(units), gone);
+        ensure("taken out: " + error, ALXUITranslate::remove(overlay, *gone, error));
+        ensure_equals("the whole element, since its text was all it said", overlay.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"inner\">\n"
+            "        <text name=\"deep\" value=\"Anidado\"/>\n"
+            "    </panel>\n"
+            "</panel>\n");
+
+        units.scan(root, overlay.root());
+        const ALXUITranslate::Unit* deep = find(units, "inner/deep", "value");
+        ensure("the translated value is a unit", deep);
+        ensure("taken out as well: " + error, ALXUITranslate::remove(overlay, *deep, error));
+        ensure_equals("and the shell above it goes with it", overlay.text(),
+            "<panel name=\"root\">\n"
+            "</panel>\n");
+    }
 }

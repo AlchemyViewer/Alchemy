@@ -169,6 +169,8 @@ namespace tut
         {
             said.push_back({ part, value });
         });
+        S32 commits = 0;
+        field->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
 
         // Pressing the specimen opens it.
         field->handleMouseDown(4, 10, MASK_NONE);
@@ -183,6 +185,7 @@ namespace tut
         bold->onCommit();
         ensure("escape is taken", popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
         ensure("nothing was written", said.empty());
+        ensure_equals("and nothing committed", commits, 0);
         ensure_equals("the style is what it was", field->style(), std::string("NORMAL"));
 
         // Returned: what was picked is written, one part per attribute that
@@ -204,6 +207,7 @@ namespace tut
         ensure_equals("as a file writes it", said[1].value, std::string("BOLD"));
         ensure_equals("the name did not change and was not written",
                       field->getValue().asString(), std::string("SansSerif"));
+        ensure_equals("and the field committed once for the answer", commits, 1);
         field->die();
     }
 }

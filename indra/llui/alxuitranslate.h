@@ -131,6 +131,14 @@ public:
     static bool write(ALXUIEdit& overlay, pugi::xml_node base, const Unit& unit,
                       const std::string& text, std::string& error, bool create_when_absent = true);
 
+    // Take the language's value for a unit out of its file: the attribute,
+    // or the text -- and the whole element where the text was all it
+    // carried, since an element left with nothing but its name says nothing
+    // to the merge. The shells a removal leaves go with it. This is how a
+    // value that names something the base no longer has leaves the file,
+    // which no repair can do for it.
+    static bool remove(ALXUIEdit& overlay, const Unit& unit, std::string& error);
+
     // What a file would say if the merge read it. A value the base has a
     // place for arrives -- at its path already, or after a move -- and a
     // value naming something the base has nowhere is what the file has

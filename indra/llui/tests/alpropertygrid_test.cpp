@@ -27,6 +27,7 @@
 #include "../alpropertygrid.h"
 
 #include "../llbutton.h"
+#include "../lllineeditor.h"
 #include "../alcolorfield.h"
 #include "../llaccordionctrltab.h"
 
@@ -883,6 +884,80 @@ namespace tut
                                      ->getChild<LLTextBox>("width_label", true)->getToolTip();
         ensure("and a name in good standing says nothing of the kind: " + fine,
                fine.find("should") == std::string::npos);
+        grid->die();
+    }
+
+    // A paired row has one way back for its two fields: it is shown when
+    // either is written, it takes out whichever of them the file writes,
+    // and the field that has no row of its own still reaches it.
+    template<> template<>
+    void alpropertygrid_object::test<19>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "size" });
+        std::vector<std::string> removed;
+        grid->onFieldRemove([&removed](const std::string& name) { removed.push_back(name); });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("width", 0));
+        fields.back().pairWith = "height";
+        fields.back().authored = false;
+        fields.back().source.clear();
+        fields.push_back(field("height", 0));
+        grid->setFields(fields);
+
+        LLPanel* row = grid->getChild<LLPanel>("size_rows", true)->getChild<LLPanel>("width_row", true);
+        LLView* back = row->getChild<LLView>("width_remove", true);
+        ensure("the way back is there for the half that is written", back->getVisible());
+        back->as<LLButton>()->onCommit();
+        ensure_equals("and takes out that half alone", removed.size(), 1u);
+        ensure_equals("which is the second", removed.front(), std::string("height"));
+
+        // The second half told it is unwritten reaches the row it shares.
+        grid->setAuthored("height", false, std::string());
+        ensure("and nothing is left to take out", !back->getVisible());
+        grid->setAuthored("width", true, "base");
+        ensure("until the first is written", back->getVisible());
+        removed.clear();
+        back->as<LLButton>()->onCommit();
+        ensure_equals("and then it takes out the first", removed.size(), 1u);
+        ensure_equals("alone", removed.front(), std::string("width"));
+        grid->die();
+    }
+
+    // A font row is three fields, and answers by its parts: a name typed
+    // into it is written once, not once as a part and again as the whole.
+    template<> template<>
+    void alpropertygrid_object::test<20>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "typeface" });
+        std::vector<std::pair<std::string, std::string> > written;
+        grid->onFieldCommit([&written](const std::string& name, const std::string& value)
+        {
+            written.emplace_back(name, value);
+        });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("font", 0));
+        fields.back().type = "const LLFontGL *";
+        fields.back().value = "SansSerif";
+        grid->setFields(fields);
+
+        LLLineEditor* line = grid->getChild<LLLineEditor>("text", true);
+        line->setText(std::string("Monospace"));
+        line->onCommit();
+        ensure_equals("one write: " + std::to_string(written.size()), written.size(), 1u);
+        ensure_equals("of the name", written.front().first, std::string("font"));
+        ensure_equals("as typed", written.front().second, std::string("Monospace"));
         grid->die();
     }
 }

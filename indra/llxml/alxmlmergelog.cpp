@@ -28,28 +28,10 @@
 
 namespace
 {
-    // The names from the root's child down to an element, which is the
-    // path the merge matched it by.
+    // The path the merge matched an element by, with a word for the root.
     std::string namePath(const LLXMLNode* node)
     {
-        std::vector<std::string> names;
-        for (const LLXMLNode* cur = node; cur && cur->mParent; cur = cur->mParent)
-        {
-            std::string name;
-            if (!cur->getAttributeString("name", name) || name.empty())
-            {
-                if (!cur->getAttributeString("value", name) || name.empty())
-                {
-                    name = std::string("<") + cur->getName()->mString + ">";
-                }
-            }
-            names.push_back(name);
-        }
-        std::string path;
-        for (auto it = names.rbegin(); it != names.rend(); ++it)
-        {
-            path += (path.empty() ? "" : "/") + *it;
-        }
+        const std::string path = ALXmlLayerMerge::namePath(node);
         return path.empty() ? std::string("the root") : path;
     }
 }

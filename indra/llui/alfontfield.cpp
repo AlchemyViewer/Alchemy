@@ -449,6 +449,10 @@ void ALFontField::apply(const std::string& name, const std::string& size, const 
     if (mName != was_name)  { mPartCommit(LLStringUtil::null, mName); }
     if (mSize != was_size)  { mPartCommit("size", mSize); }
     if (mStyle != was_style) { mPartCommit("style", mStyle); }
+    if (mName != was_name || mSize != was_size || mStyle != was_style)
+    {
+        onCommit();
+    }
 }
 
 void ALFontField::openPopover()

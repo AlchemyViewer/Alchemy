@@ -132,6 +132,18 @@ private:
     bool        mSwitched;
 };
 
+// The words two dozen status lines share: a file by its name alone, and a
+// layer by the skin and language it is.
+static std::string fileNameOf(const std::string& path)
+{
+    return path.substr(path.find_last_of("/\\") + 1);
+}
+
+static std::string layerName(const ALXUICatalog::Layer& layer)
+{
+    return layer.skin + "/" + layer.language;
+}
+
 // One file of the primary preview, watched for a change on disk. The
 // first check counts as reading it; only a change after that reloads.
 class ALXUILiveFile final : public LLLiveFile
@@ -2049,6 +2061,7 @@ bool ALFloaterXUIStudio::postBuild()
     // the About box's credits do -- so return in the box puts a line in it
     // rather than writing what is there.
     getChild<LLButton>("translate_write")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationWrite, this));
+    getChild<LLButton>("translate_remove")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTranslationRemove, this));
     getChild<LLButton>("translate_repair_file")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairFile, this));
     getChild<LLButton>("translate_repair_all")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::startRepairAll, this));
     getChild<LLButton>("translate_repair_roots")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onRepairRoots, this));
@@ -2675,7 +2688,7 @@ void ALFloaterXUIStudio::onFind()
         mFindResults->addElement(row(id, {
             { "file", hit.entry->name },
             { "line", std::to_string(hit.line) },
-            { "layer", hit.layer->skin + "/" + hit.layer->language },
+            { "layer", layerName(*hit.layer) },
             { "snippet", hit.snippet } }));
     }
 
@@ -3828,13 +3841,8 @@ void ALFloaterXUIStudio::onInsertFromPalette()
         setStatus(getString("EditNoSelection"));
         return;
     }
-    const ALXUICatalog::Layer* layer = baseLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
     if (!held)
     {
         return;
@@ -3847,11 +3855,7 @@ void ALFloaterXUIStudio::onInsertFromPalette()
         return;
     }
 
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = tag;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditWrote", args));
+    documentChanged(saidWrite("EditWrote", tag, *layer));
 }
 
 // A name of its own, since a name is identity to the merge, to getChild and
@@ -4053,10 +4057,7 @@ bool ALFloaterXUIStudio::treeDrop(const ALXUISelection::path_t& target, ALXUITre
     }
     mDragPath.clear();
     mDragTag.clear();
-    args["[ATTRS]"] = tag;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditWrote", args));
+    documentChanged(saidWrite("EditWrote", tag, *layer));
     return true;
 }
 
@@ -4190,10 +4191,7 @@ LLView* ALFloaterXUIStudio::canvasDrop(S32 which, LLView* under, S32 x, S32 y, b
     }
     mDragPath.clear();
     mDragTag.clear();
-    args["[ATTRS]"] = tag;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditWrote", args));
+    documentChanged(saidWrite("EditWrote", tag, *layer));
     return into;
 }
 
@@ -4320,6 +4318,33 @@ ALXUIEdit* ALFloaterXUIStudio::document(const ALXUICatalog::Layer& layer)
         setStatus(mDocuments.error());
     }
     return held;
+}
+
+// The document an edit goes into, opened: the file's own base layer, or --
+// for an edit that positions the element -- the layer that already does,
+// whose numbers are the ones on screen. Null, with the status saying so,
+// where the file has no layer to write.
+ALXUIEdit* ALFloaterXUIStudio::editDocument(const ALXUICatalog::Layer*& layer, bool positioned)
+{
+    layer = positioned ? writeLayer() : baseLayer();
+    if (!layer)
+    {
+        setStatus(getString("EditNoTarget"));
+        return nullptr;
+    }
+    return document(*layer);
+}
+
+// The status after a write: what was written, to which file, in which
+// layer, in the floater's words.
+std::string ALFloaterXUIStudio::saidWrite(const char* key, const std::string& attrs,
+                                          const ALXUICatalog::Layer& layer) const
+{
+    LLStringUtil::format_map_t args;
+    args["[ATTRS]"] = attrs;
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(layer);
+    return getString(key, args);
 }
 
 // What an operation does once it has changed the document: the preview is
@@ -4929,7 +4954,7 @@ void ALFloaterXUIStudio::saveAndRepair()
     repairing.close();
 
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(documentPath());
     args["[MOVES]"] = std::to_string(moved);
     documentChanged(getString("EditSavedAndRepaired", args));
 }
@@ -4949,7 +4974,7 @@ void ALFloaterXUIStudio::saveDocument()
     // The watchers prime themselves on what they find when the rebuild
     // makes them, so a write of the tool's own is not an outside change.
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(documentPath());
     documentChanged(getString("EditSaved", args));
 }
 
@@ -5135,7 +5160,7 @@ bool ALFloaterXUIStudio::describeDocument(const std::string& path, std::string& 
             if (one.path == path)
             {
                 file = entry.name;
-                layer = one.skin + "/" + one.language;
+                layer = layerName(one);
                 return true;
             }
         }
@@ -5143,7 +5168,7 @@ bool ALFloaterXUIStudio::describeDocument(const std::string& path, std::string& 
     // A file the catalog does not have -- one written since it was read, or
     // one from outside the skins -- is still a document, and its own name is
     // the best thing to call it.
-    file = path.substr(path.find_last_of("/\\") + 1);
+    file = fileNameOf(path);
     layer.clear();
     return false;
 }
@@ -5213,7 +5238,7 @@ void ALFloaterXUIStudio::onDocumentSave()
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(path);
     documentChanged(getString("EditSaved", args));
 }
 
@@ -5232,7 +5257,7 @@ void ALFloaterXUIStudio::onDocumentRevert()
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(path);
     documentChanged(getString("EditReverted", args));
 }
 
@@ -5260,7 +5285,7 @@ void ALFloaterXUIStudio::closeDocument(const std::string& path)
         return;
     }
     LLSD args;
-    args["FILE"] = path.substr(path.find_last_of("/\\") + 1);
+    args["FILE"] = fileNameOf(path);
     LLSD payload;
     payload["path"] = path;
     LLNotificationsUtil::add("XUIStudioCloseDocument", args, payload,
@@ -5311,7 +5336,7 @@ void ALFloaterXUIStudio::letGoOf(const std::string& path)
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = path.substr(path.find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(path);
     if (dirty)
     {
         // The file as the disk has it is not what the canvas was built
@@ -5337,7 +5362,7 @@ void ALFloaterXUIStudio::revertDocument()
         return;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(documentPath());
     documentChanged(getString("EditReverted", args));
 }
 
@@ -5631,7 +5656,7 @@ void ALFloaterXUIStudio::fileChanged()
             }
         }
         LLStringUtil::format_map_t args;
-        args["[FILE]"] = dirty.substr(dirty.find_last_of("/\\") + 1);
+        args["[FILE]"] = fileNameOf(dirty);
         setStatus(getString("EditChangedOnDisk", args));
         return;
     }
@@ -6152,13 +6177,8 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
     {
         return;
     }
-    const ALXUICatalog::Layer* layer = baseLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
     if (!held)
     {
         return;
@@ -6181,11 +6201,7 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
         setStatus(held->error());
         return;
     }
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = "follows=\"" + text + "\"";
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    const std::string said = getString("EditWrote", args);
+    const std::string said = saidWrite("EditWrote", "follows=\"" + text + "\"", *layer);
     if (applyLive(mSelection.selection(), "follows", text))
     {
         documentRead(said);
@@ -6268,13 +6284,8 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         return;
     }
 
-    const ALXUICatalog::Layer* layer = baseLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
     if (!held)
     {
         return;
@@ -6401,11 +6412,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
     }
 
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = what;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditWrote", args));
+    documentChanged(saidWrite("EditWrote", what, *layer));
 }
 
 // Where an element came to rest, as the document says: the path it had
@@ -7388,6 +7395,70 @@ void ALFloaterXUIStudio::onTranslationWrite()
     }
 }
 
+// The language's value for a row, taken out of its file: the way a value
+// that names nothing the base has leaves the file, which no repair can do
+// for it. Through the document set and saved at once, as a write is.
+void ALFloaterXUIStudio::onTranslationRemove()
+{
+    LLScrollListItem* item = mTranslateList->getFirstSelected();
+    const ALXUICatalog::Entry* entry = mCatalog.find(mFile);
+    if (!item || !entry)
+    {
+        return;
+    }
+    const S32 index = item->getValue().asInteger();
+    if (index < 0 || index >= (S32)mTranslate.units().size())
+    {
+        return;
+    }
+    const ALXUITranslate::Unit unit = mTranslate.units()[index];
+    const std::string language = mTranslateLanguage->getValue().asString();
+    const ALXUICatalog::Layer* layer = overlayLayer(*entry, language);
+    if (unit.state == ALXUITranslate::State::Missing || !layer)
+    {
+        setStatus(getString("TranslateNothingToRemove"));
+        return;
+    }
+
+    const std::string was_active = mDocuments.activePath();
+    ALXUIEdit* held = mDocuments.open(layer->path);
+    if (!held)
+    {
+        setStatus(mDocuments.error());
+        return;
+    }
+    if (!was_active.empty())
+    {
+        mDocuments.makeActive(was_active);
+    }
+    std::string error;
+    if (!ALXUITranslate::remove(*held, unit, error))
+    {
+        setStatus(error);
+        return;
+    }
+    if (!held->save())
+    {
+        setStatus(held->error());
+        return;
+    }
+    mDocuments.settle();
+    fillDocuments();
+    fillHistory();
+    LLStringUtil::format_map_t args;
+    args["[FIELD]"] = unit.field.empty() ? getString("TranslateTheText") : unit.field;
+    args["[FILE]"] = language + "/" + mFile;
+    mPendingStatus = getString("TranslateRemoved", args);
+    setStatus(mPendingStatus);
+    mCatalog.reload(mFile);
+    fillTranslation();
+    if (mShowSecondary && mLanguage2 == language)
+    {
+        mReloadEntryOnly = true;
+        mReloadPending = true;
+    }
+}
+
 // The language this table is about is the one the second preview shows,
 // so choosing it here turns that preview on.
 void ALFloaterXUIStudio::onTranslationLanguage()
@@ -7915,7 +7986,7 @@ void ALFloaterXUIStudio::fillFindings()
             { "line", f.line > 0 ? std::to_string(f.line) : std::string() },
             { "where", where },
             { "message", sayFinding(f) },
-            { "fix", describeFix(f) } }));
+            { "fix", fixWords(f, nullptr) } }));
     }
 
     if (mFindingCount)
@@ -8052,51 +8123,34 @@ std::string ALFloaterXUIStudio::sayRule(const std::string& rule_name) const
 // What pressing it would do, said in this tool's words. The library says
 // which operation, because that is what a document works in; what a person
 // reads about it is chosen here, where the strings file is.
-std::string ALFloaterXUIStudio::describeFix(const ALXUILint::Finding& f) const
+// What a fix offers, and what the tool says once it has done it. The words
+// are chosen here for the same reason the operation is named in the
+// library: a document says what it did in its own terms, and English is not
+// one of them. Given a layer the sentence is the one for what was done, in
+// which file and layer; given none it is the offer.
+std::string ALFloaterXUIStudio::fixWords(const ALXUILint::Finding& f, const ALXUICatalog::Layer* layer) const
 {
     LLStringUtil::format_map_t args;
     args["[ATTR]"] = f.what;
     args["[NAME]"] = f.fix.spelling;
     args["[DX]"] = std::to_string(f.fix.dx);
     args["[DY]"] = std::to_string(f.fix.dy);
+    if (layer)
+    {
+        args["[WHERE]"] = f.path.empty() ? mFile : f.path.back();
+        args["[FILE]"] = mFile;
+        args["[LAYER]"] = layerName(*layer);
+    }
+    const char* key = nullptr;
     switch (f.fix.did)
     {
-    case ALXUILint::Fix::Do::TakeAttributeOut: return getString("FixTakeOut", args);
-    case ALXUILint::Fix::Do::SpellAttribute:   return getString("FixSpell", args);
-    case ALXUILint::Fix::Do::MoveInside:       return getString("FixMoveInside", args);
-    case ALXUILint::Fix::Do::WidenBy:          return getString("FixWidenBy", args);
+    case ALXUILint::Fix::Do::TakeAttributeOut: key = layer ? "FixDidTakeOut" : "FixTakeOut"; break;
+    case ALXUILint::Fix::Do::SpellAttribute:   key = layer ? "FixDidSpell" : "FixSpell"; break;
+    case ALXUILint::Fix::Do::MoveInside:       key = layer ? "FixDidMove" : "FixMoveInside"; break;
+    case ALXUILint::Fix::Do::WidenBy:          key = layer ? "FixDidWiden" : "FixWidenBy"; break;
     case ALXUILint::Fix::Do::Nothing:          break;
     }
-    return std::string();
-}
-
-// One finding, put right. The element it is about is selected first: an edit
-// nobody watched happen is one they have to go and find, and the fix writes
-// through the same path a hand edit does -- the same layer, the same live
-// apply, the same history.
-// What the tool says it did, once it has. The words are chosen here for the
-// same reason the operation is named in the library: a document says what it
-// did in its own terms, and English is not one of them.
-std::string ALFloaterXUIStudio::saidFix(const ALXUILint::Finding& f,
-                                        const ALXUICatalog::Layer& layer) const
-{
-    LLStringUtil::format_map_t args;
-    args["[ATTR]"] = f.what;
-    args["[NAME]"] = f.fix.spelling;
-    args["[DX]"] = std::to_string(f.fix.dx);
-    args["[DY]"] = std::to_string(f.fix.dy);
-    args["[WHERE]"] = f.path.empty() ? mFile : f.path.back();
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer.skin + "/" + layer.language;
-    switch (f.fix.did)
-    {
-    case ALXUILint::Fix::Do::TakeAttributeOut: return getString("FixDidTakeOut", args);
-    case ALXUILint::Fix::Do::SpellAttribute:   return getString("FixDidSpell", args);
-    case ALXUILint::Fix::Do::MoveInside:       return getString("FixDidMove", args);
-    case ALXUILint::Fix::Do::WidenBy:          return getString("FixDidWiden", args);
-    case ALXUILint::Fix::Do::Nothing:          break;
-    }
-    return std::string();
+    return key ? getString(key, args) : std::string();
 }
 
 // One finding, put right. The element it is about is selected first: an edit
@@ -8124,11 +8178,10 @@ bool ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
     // Where it is written: the layer that already positions the element when
     // there is one, else the file's own base layer. The same choice a hand
     // edit makes, because a fix is a hand edit the tool typed out.
-    const ALXUICatalog::Layer* layer = writeLayer();
-    ALXUIEdit* held = layer ? document(*layer) : nullptr;
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
     if (!held)
     {
-        setStatus(getString("EditNoTarget"));
         return false;
     }
 
@@ -8146,7 +8199,7 @@ bool ALFloaterXUIStudio::applyFix(const ALXUILint::Finding& f)
         setStatus(held->error().empty() ? getString("FixGone") : held->error());
         return false;
     }
-    documentChanged(saidFix(f, *layer));
+    documentChanged(fixWords(f, layer));
     return true;
 }
 
@@ -8333,7 +8386,7 @@ void ALFloaterXUIStudio::refreshBreadcrumb()
     // about where this element is written rather than about the way to it.
     const ALXUICatalog::Layer* layer = nullptr;
     authoredElement(layer);
-    mBreadcrumb->setTrailer(layer ? layer->skin + "/" + layer->language
+    mBreadcrumb->setTrailer(layer ? layerName(*layer)
                                   : getString("BreadcrumbCodeBuilt"));
 }
 
@@ -8439,7 +8492,7 @@ void ALFloaterXUIStudio::refreshEditTarget()
     }
     LLStringUtil::format_map_t args;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    args["[LAYER]"] = layerName(*layer);
     mEditTarget->setText(getString("EditTarget", args));
 }
 
@@ -8546,7 +8599,7 @@ bool ALFloaterXUIStudio::applyEdges(S32 dl, S32 db, S32 dr, S32 dt)
     LLStringUtil::format_map_t args;
     args["[ATTRS]"] = names;
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    args["[LAYER]"] = layerName(*layer);
     args["[SIBLING]"] = absorbs;
     const char* said = "EditWrote";
     if (root_move)
@@ -8647,7 +8700,7 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
     LLStringUtil::format_map_t args;
     args["[COUNT]"] = std::to_string(moved);
     args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
+    args["[LAYER]"] = layerName(*layer);
     documentChanged(getString("EditAligned", args));
 }
 
@@ -8675,7 +8728,7 @@ bool ALFloaterXUIStudio::undoEdit()
     if (mDocuments.undo())
     {
         LLStringUtil::format_map_t args;
-        args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+        args["[FILE]"] = fileNameOf(documentPath());
         args["[WHAT]"] = what;
         replayChange(getString(what.empty() ? "EditUndone" : "EditUndoneWhat", args));
         return true;
@@ -8690,7 +8743,7 @@ bool ALFloaterXUIStudio::redoEdit()
         return false;
     }
     LLStringUtil::format_map_t args;
-    args["[FILE]"] = documentPath().substr(documentPath().find_last_of("/\\") + 1);
+    args["[FILE]"] = fileNameOf(documentPath());
     const std::string what = describeStep(mDocuments.lastChange());
     args["[WHAT]"] = what;
     replayChange(getString(what.empty() ? "EditRedone" : "EditRedoneWhat", args));
@@ -8824,13 +8877,8 @@ void ALFloaterXUIStudio::canvasReparent(S32 which, LLView* parent, S32 dx, S32 d
         return;
     }
 
-    const ALXUICatalog::Layer* layer = baseLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/false);
     if (!held)
     {
         return;
@@ -9269,14 +9317,8 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     // Where a field is written: the layer that already writes the geometry
     // when there is one, else the file's own base layer, which is where an
     // author working in English means it to go.
-    const ALXUICatalog::Layer* layer = writeLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
     if (!held)
     {
         return;
@@ -9303,11 +9345,7 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
         return;
     }
 
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = name;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    const std::string said = getString("EditWrote", args);
+    const std::string said = saidWrite("EditWrote", name, *layer);
     // A field the preview can be told about is told, and nothing is made
     // again: the window keeps its place, the outline keeps its rows, and
     // the keyboard stays in the box the number was typed into. The row is
@@ -9316,7 +9354,7 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
     if (applyLive(mSelection.selection(), name, value)
         || rebuildElement(mSelection.selection(), name))
     {
-        mAttributeGrid->setAuthored(name, true, layer->skin + "/" + layer->language);
+        mAttributeGrid->setAuthored(name, true, layerName(*layer));
         documentRead(said);
         return;
     }
@@ -9335,11 +9373,10 @@ void ALFloaterXUIStudio::onFieldCommit(const std::string& name, const std::strin
 void ALFloaterXUIStudio::renameSelected(const std::string& name)
 {
     const ALXUISelection::path_t was = mSelection.selection();
-    const ALXUICatalog::Layer* layer = writeLayer();
-    ALXUIEdit* held = layer ? document(*layer) : nullptr;
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
     if (!held)
     {
-        setStatus(getString("EditNoTarget"));
         return;
     }
 
@@ -9365,11 +9402,7 @@ void ALFloaterXUIStudio::renameSelected(const std::string& name)
     mRenamedFrom = was;
     mRenamedTo = moved;
 
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = "name";
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    std::string said = getString("EditWrote", args);
+    std::string said = saidWrite("EditWrote", "name", *layer);
     if (stranded > 0)
     {
         LLStringUtil::format_map_t cost;
@@ -9415,13 +9448,8 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
         setStatus(getString("EditNoSelection"));
         return;
     }
-    const ALXUICatalog::Layer* layer = writeLayer();
-    if (!layer)
-    {
-        setStatus(getString("EditNoTarget"));
-        return;
-    }
-    ALXUIEdit* held = document(*layer);
+    const ALXUICatalog::Layer* layer = nullptr;
+    ALXUIEdit* held = editDocument(layer, /*positioned=*/true);
     if (!held)
     {
         return;
@@ -9439,11 +9467,7 @@ void ALFloaterXUIStudio::onFieldRemove(const std::string& name)
         setStatus(held->error());
         return;
     }
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = name;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer->skin + "/" + layer->language;
-    documentChanged(getString("EditTookOut", args));
+    documentChanged(saidWrite("EditTookOut", name, *layer));
 }
 
 // The mark beside a row, clicked. The row is marked because more than one
@@ -9707,7 +9731,7 @@ void ALFloaterXUIStudio::fillLayerList(LLScrollListCtrl* list, const std::string
     {
         list->addElement(row(said[i].layer->path, {
             { "force", i == winner ? getString("DocumentDirtyMark") : std::string() },
-            { "layer", said[i].layer->skin + "/" + said[i].layer->language },
+            { "layer", layerName(*said[i].layer) },
             { "value", said[i].writes ? said[i].value
                                       : (said[i].has ? std::string() : getString("LayerMissing")) },
             { "line", said[i].line > 0 ? std::to_string(said[i].line) : std::string() } }));
@@ -9833,11 +9857,7 @@ void ALFloaterXUIStudio::writeOverrideInto(const ALXUICatalog::Layer& layer, con
         return;
     }
     together.close();
-    LLStringUtil::format_map_t args;
-    args["[ATTRS]"] = field;
-    args["[FILE]"] = mFile;
-    args["[LAYER]"] = layer.skin + "/" + layer.language;
-    documentChanged(getString("EditWrote", args));
+    documentChanged(saidWrite("EditWrote", field, layer));
 }
 
 // The layer chosen in whichever of the two lists asked.
@@ -10054,7 +10074,7 @@ void ALFloaterXUIStudio::refreshSource(LLView* view)
         {
             layers_text += "   ";
         }
-        layers_text += layer->skin + "/" + layer->language + ": " + (node ? std::to_string(line) : getString("LayerMissing"));
+        layers_text += layerName(*layer) + ": " + (node ? std::to_string(line) : getString("LayerMissing"));
         if (!node)
         {
             continue;

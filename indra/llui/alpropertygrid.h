@@ -297,7 +297,11 @@ private:
     void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
     // The way back, at the right end of the row; shown on the rows the
     // file writes.
-    void addRemove(LLPanel* row, const Field& field);
+    void addRemove(LLPanel* row, const Field& field, const Field* partner);
+    // The row a field is on: its own, or the one it shares with the field
+    // that names it as a partner.
+    LLPanel* rowOf(const std::string& name) const;
+    const Field* fieldNamed(const std::string& name) const;
     LLUICtrl* makeEditor(const Field& field, const LLRect& box, LLPanel* row);
     // A box per part, captioned, all of them committing the whole value.
     void makeComponents(const Field& field, const LLRect& box, LLPanel* row);
