@@ -31,6 +31,8 @@
     <floater.string name="CanvasTabDirtyTip">[FILE] in [LAYER], with edits not yet saved</floater.string>
     <floater.string name="CanvasTabPreviewTip">[FILE] in [SKIN]/[LANG], being looked at and not held: the next file chosen takes its place</floater.string>
     <floater.string name="CanvasTabWaiting">waiting</floater.string>
+    <floater.string name="CanvasDropInto">into [NAME]</floater.string>
+    <floater.string name="CanvasRoomFrom">from [NAME]</floater.string>
     <floater.string name="CanvasTabWaitingTip">[FILE] is chosen and waits for the pin to come off; pressing here takes the pin off</floater.string>
     <floater.string name="CanvasHeld">The canvas is held on [FILE]; [PENDING] is built when the pin comes off.</floater.string>
     <floater.string name="CanvasPinnedHere">The canvas is held on [FILE], which is the file the catalog is on.</floater.string>
@@ -54,6 +56,9 @@
     <floater.string name="StepWroteText">the text of [WHERE]</floater.string>
     <floater.string name="StepRenamed">naming [WHERE]</floater.string>
     <floater.string name="StepAddedElement">something put in [WHERE]</floater.string>
+    <floater.string name="EditRemoved">Took [WHERE] out of [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditMoved">Moved [WHERE] in [FILE] in [LAYER]</floater.string>
+    <floater.string name="EditDuplicated">Copied [WHERE] in [FILE] in [LAYER]</floater.string>
     <floater.string name="StepMovedElement">moving [WHERE]</floater.string>
     <floater.string name="StepRemovedElement">taking [WHERE] out</floater.string>
     <floater.string name="EditSaved">Wrote [FILE].</floater.string>
@@ -309,6 +314,14 @@
          tear_off="false"
          width="200">
             <menu_item_call
+             label="Open Quickly..."
+             layout="topleft"
+             name="quick_open"
+             shortcut="control|shift|O">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="quick_open" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
              label="Save"
              layout="topleft"
              name="save"
@@ -374,7 +387,7 @@
              label="Open the File This Element Names"
              layout="topleft"
              name="open_nested"
-             shortcut="control|shift|O">
+             shortcut="control|shift|N">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="open_nested" />
                 <menu_item_call.on_enable function="XUIStudio.MenuEnable" parameter="nested" />
             </menu_item_call>
@@ -397,7 +410,7 @@
              label="Show Preview"
              layout="topleft"
              name="show"
-             shortcut="control|shift|S">
+             shortcut="control|shift|P">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="show" />
             </menu_item_call>
             <menu_item_call

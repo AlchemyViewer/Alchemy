@@ -83,6 +83,13 @@
          parameter="paste" />
     </menu_item_call>
     <menu_item_call
+     label="Duplicate"
+     name="duplicate">
+        <menu_item_call.on_click
+         function="XUIStudio.Tree"
+         parameter="duplicate" />
+    </menu_item_call>
+    <menu_item_call
      label="Delete"
      name="delete">
         <menu_item_call.on_click

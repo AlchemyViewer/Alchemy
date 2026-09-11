@@ -1074,4 +1074,45 @@ namespace tut
         ensure("read again", doc.loadBuffer(heavy));
         ensure_equals("which starts the count over", doc.stepsTaken(), 0u);
     }
+
+    // A copy of an element lands after it, children and all, at the depth
+    // it was at, keeping every byte of it; the step says where the copy is.
+    template<> template<>
+    void alxuiedit_object::test<26>()
+    {
+        ALXUIEdit doc;
+        ensure("loads", doc.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <panel name=\"row\" width=\"9\">\n"
+            "        <text name=\"t\">Hi &amp; bye</text>\n"
+            "    </panel>\n"
+            "    <panel name=\"after\"/>\n"
+            "</panel>\n"));
+        ensure("copies", doc.duplicateElement({ "row" }));
+        ensure_equals("after the original, as it was written", doc.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"row\" width=\"9\">\n"
+            "        <text name=\"t\">Hi &amp; bye</text>\n"
+            "    </panel>\n"
+            "    <panel name=\"row\" width=\"9\">\n"
+            "        <text name=\"t\">Hi &amp; bye</text>\n"
+            "    </panel>\n"
+            "    <panel name=\"after\"/>\n"
+            "</panel>\n");
+        const ALXUIEdit::Change* step = doc.nextUndo();
+        ensure("one step", step != nullptr);
+        ensure("which added an element", step->did == ALXUIEdit::Did::AddedElement);
+        ensure_equals("and says where the copy is", ALXUISelection::toString(step->after),
+                      ALXUISelection::step("row", 1));
+        ensure("the root is not copied", !doc.duplicateElement({}));
+        ensure("nor nothing", !doc.duplicateElement({ "nowhere" }));
+        ensure("undo", doc.undo());
+        ensure_equals("puts it back", doc.text(),
+            "<panel name=\"root\">\n"
+            "    <panel name=\"row\" width=\"9\">\n"
+            "        <text name=\"t\">Hi &amp; bye</text>\n"
+            "    </panel>\n"
+            "    <panel name=\"after\"/>\n"
+            "</panel>\n");
+    }
 }

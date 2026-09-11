@@ -29,6 +29,7 @@
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
+#include "alflagsfield.h"
 #include "alpopover.h"
 #include "alquickopen.h"
 #include "aljumpbar.h"
@@ -90,6 +91,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 #include <set>
 
 // ===========================================================================
@@ -538,7 +540,7 @@ public:
                     {
                         if (LLView* into = mDrop.get())
                         {
-                            drawLabelledBox(into, ink().dropTarget.get(), "into " + into->getName());
+                            drawLabelledBox(into, ink().dropTarget.get(), named("CanvasDropInto", into));
                         }
                     }
                     if (dragging())
@@ -551,13 +553,13 @@ public:
                         gl_rect_2d(dragged, ink().dragged.get(), false);
                         if (LLView* into = mDrop.get())
                         {
-                            drawLabelledBox(into, ink().dropTarget.get(), "into " + into->getName());
+                            drawLabelledBox(into, ink().dropTarget.get(), named("CanvasDropInto", into));
                         }
                         else if (axis >= 0)
                         {
                             if (LLView* absorbs = absorbingSibling(view))
                             {
-                                drawLabelledBox(absorbs, ink().absorbing.get(), "from " + absorbs->getName());
+                                drawLabelledBox(absorbs, ink().absorbing.get(), named("CanvasRoomFrom", absorbs));
                             }
                         }
                     }
@@ -900,6 +902,15 @@ private:
         return true;
     }
 
+    // A sentence of the floater's about one element, for the labels drawn
+    // over the canvas.
+    std::string named(const char* key, const LLView* view) const
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = view->getName();
+        return mTool->getString(key, args);
+    }
+
     // The eight squares, as rects in this floater's space.
     static void gripRects(const LLRect& r, LLRect (&out)[8])
     {
@@ -914,14 +925,14 @@ private:
         }
     }
 
-    // The middle of the part of the element that is inside the window,
-    // since an element that hangs over the edge is drawn there but the
-    // mouse never reaches past it, and that element is the one most in
-    // need of being dragged back.
+    // The middle of the part of the element that can be seen, since an
+    // element that hangs over the edge, or is scrolled half off, is drawn
+    // there but the mouse never reaches past it -- and that element is the
+    // one most in need of being dragged back.
     LLRect moveGripRect(const LLRect& r) const
     {
         LLRect visible(r);
-        visible.intersectWith(getLocalRect());
+        visible.intersectWith(viewportRect());
         if (visible.isEmpty())
         {
             visible = r;
@@ -1230,24 +1241,13 @@ private:
         }
     }
 
-    // Two strips beyond the top and the left edges, counting from the
-    // previewed root's top left corner, which is where the file counts from.
-    // Outside it, so a rule never sits over the thing being measured: a view
-    // draws through its parent's translation and nothing clips it to its own
-    // rect, so the strips are simply at negative coordinates.
-    //
-    // Ticks are the grid, which is whatever the grid is; the numbers are
-    // every fifty, which is round whether or not fifty is a multiple of the
-    // grid. The selection's edges are marked on both.
-    // What of the canvas can be seen, in the canvas's own coordinates. A
-    // canvas is as big as what is on it and the container scrolls it, so the
-    // surface's own top-left is often somewhere off screen.
-    // The rules belong to the canvas, along the edges of what can be seen.
-    // They were drawn against the preview's own rect, which put them outside
-    // it, moved them whenever it moved, and took them off the surface
-    // entirely when it was dragged. What still comes from the preview is
-    // where zero is: the numbers are the ones the file is written in, so
-    // moving a preview renumbers the rules rather than carrying them off.
+    // Two strips along the top and the left edges of what can be seen,
+    // numbered from the previewed root's top left corner, which is where the
+    // file counts from: the rules belong to the canvas and stay put, and
+    // moving a preview renumbers them rather than carrying them off. Ticks
+    // are the grid, whatever the grid is; the numbers are every fifty, which
+    // is round whether or not fifty is a multiple of the grid. The
+    // selection's edges are marked on both.
     void drawRulers()
     {
         static constexpr S32 RULER = 14;
@@ -1504,25 +1504,35 @@ namespace
             && ALXUICatalog::isWidgetTag(firstToken(e.path));
     }
 
+    // The follows flags as a file writes them and back, through the one
+    // reader and writer of a set of named bits. The names sit at bits nought
+    // to three here and the flags do not, so the two are mapped.
+    const std::vector<std::string>& followsNames()
+    {
+        static const std::vector<std::string> names = { "left", "right", "top", "bottom" };
+        return names;
+    }
+    constexpr U32 FOLLOWS_BY_BIT[] = { FOLLOWS_LEFT, FOLLOWS_RIGHT, FOLLOWS_TOP, FOLLOWS_BOTTOM };
+
     std::string followsText(U32 follows)
     {
-        std::string text;
-        auto add = [&](U32 flag, const char* name)
+        U32 bits = 0;
+        for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
         {
-            if (follows & flag)
-            {
-                if (!text.empty())
-                {
-                    text += '|';
-                }
-                text += name;
-            }
-        };
-        add(FOLLOWS_LEFT, "left");
-        add(FOLLOWS_TOP, "top");
-        add(FOLLOWS_RIGHT, "right");
-        add(FOLLOWS_BOTTOM, "bottom");
-        return text.empty() ? std::string("none") : text;
+            bits |= (follows & FOLLOWS_BY_BIT[i]) ? (1u << i) : 0u;
+        }
+        return ALFlagsField::write(bits, followsNames(), "all", "none");
+    }
+
+    U32 followsFlags(std::string_view text)
+    {
+        const U32 bits = ALFlagsField::read(text, followsNames(), "all");
+        U32 follows = FOLLOWS_NONE;
+        for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
+        {
+            follows |= (bits & (1u << i)) ? FOLLOWS_BY_BIT[i] : 0u;
+        }
+        return follows;
     }
 
     bool isBuilt(ALXUICatalog::Kind kind)
@@ -2261,14 +2271,6 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         mTreeFilter->setFocus(true);
         return true;
     }
-    // Open quickly: the catalog, with whatever was typed there before it
-    // selected, so the next thing typed replaces it. A developer looking for
-    // a file is looking for it by name.
-    if (key == 'O' && mask == (MASK_CONTROL | MASK_SHIFT))
-    {
-        openQuickly();
-        return true;
-    }
     if (key == 'O' && mask == MASK_CONTROL)
     {
         if (mModes)
@@ -2353,6 +2355,7 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         case KEY_DOWN:  onTreeMove("move_down"); return true;
         case KEY_RIGHT: onTreeMove("move_in");   return true;
         case KEY_LEFT:  onTreeMove("move_out");  return true;
+        case 'D':       onTreeMove("duplicate"); return true;
         default: break;
         }
     }
@@ -2380,6 +2383,14 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     }
     if (ours && nudge(key, mask))
     {
+        return true;
+    }
+    // And Delete takes the element out, from the same places the arrows
+    // move it and from the outline, which has no delete of its own.
+    const bool in_tree = mTree && gFocusMgr.childHasKeyboardFocus(mTree);
+    if (key == KEY_DELETE && mask == MASK_NONE && (ours || in_tree) && mSelection.hasSelection())
+    {
+        onTreeMove("delete");
         return true;
     }
     return LLFloater::handleKeyHere(key, mask);
@@ -4626,24 +4637,7 @@ bool ALFloaterXUIStudio::applyLive(const ALXUISelection::path_t& path,
     }
     else if (name == "follows")
     {
-        U32 flags = FOLLOWS_NONE;
-        for (size_t at = 0; at <= value.size();)
-        {
-            const size_t bar = value.find('|', at);
-            const std::string_view one(value.data() + at,
-                                       (bar == std::string::npos ? value.size() : bar) - at);
-            if (one == "left")        { flags |= FOLLOWS_LEFT; }
-            else if (one == "right")  { flags |= FOLLOWS_RIGHT; }
-            else if (one == "top")    { flags |= FOLLOWS_TOP; }
-            else if (one == "bottom") { flags |= FOLLOWS_BOTTOM; }
-            else if (one == "all")    { flags |= FOLLOWS_ALL; }
-            if (bar == std::string::npos)
-            {
-                break;
-            }
-            at = bar + 1;
-        }
-        view->setFollows(flags);
+        view->setFollows(followsFlags(value));
         done = true;
     }
     else if (ALXUIEdit::isGeometryAttribute(name))
@@ -6148,7 +6142,7 @@ void ALFloaterXUIStudio::onTreeAction(const LLSD& param)
     }
     else if (action == "move_up" || action == "move_down" || action == "move_in"
           || action == "move_out" || action == "cut" || action == "paste"
-          || action == "delete")
+          || action == "delete" || action == "duplicate")
     {
         restructure(action, item->getPath());
     }
@@ -6184,18 +6178,7 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
         return;
     }
 
-    const U32 now = view->getFollows() ^ flags[edge];
-    std::string text;
-    const auto add = [&text](const char* name) { text += text.empty() ? name : (std::string("|") + name); };
-    if (now & FOLLOWS_LEFT)   { add("left"); }
-    if (now & FOLLOWS_TOP)    { add("top"); }
-    if (now & FOLLOWS_RIGHT)  { add("right"); }
-    if (now & FOLLOWS_BOTTOM) { add("bottom"); }
-    if (text.empty())
-    {
-        text = "none";
-    }
-
+    const std::string text = followsText(view->getFollows() ^ flags[edge]);
     if (!held->setAttribute(mSelection.selection(), "follows", text))
     {
         setStatus(held->error());
@@ -6300,7 +6283,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
     if (action == "delete")
     {
         ok = held->removeElement(path);
-        what = "removed";
+        what = "EditRemoved";
         if (ok)
         {
             afterwards.assign(path.begin(), path.end() - 1);
@@ -6314,6 +6297,17 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
             {
                 ALXUIEdit::afterRemoving(path, mCutPath);
             }
+        }
+    }
+    else if (action == "duplicate")
+    {
+        // A copy after the original, which is where the selection goes: a
+        // copy is made to be changed, and the change is the next thing.
+        ok = held->duplicateElement(path);
+        what = "EditDuplicated";
+        if (ok)
+        {
+            afterwards = landing(*held);
         }
     }
     else if (action == "paste")
@@ -6335,7 +6329,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
         ok = held->moveElement(mCutPath, path);
         mCutPath.clear();
-        what = "moved";
+        what = "EditMoved";
         if (ok)
         {
             afterwards = landing(*held);
@@ -6352,7 +6346,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
             return;
         }
         ok = held->moveElement(path, sibling);
-        what = "moved";
+        what = "EditMoved";
         if (ok)
         {
             afterwards = landing(*held);
@@ -6369,7 +6363,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
         ALXUISelection::path_t parent(path.begin(), path.end() - 1);
         ok = held->moveAfter(path, parent);
-        what = "moved";
+        what = "EditMoved";
         if (ok)
         {
             afterwards = landing(*held);
@@ -6388,7 +6382,7 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
         ok = action == "move_up" ? held->moveBefore(path, sibling)
                                  : held->moveAfter(path, sibling);
-        what = "moved";
+        what = "EditMoved";
         if (ok)
         {
             afterwards = landing(*held);
@@ -6412,7 +6406,11 @@ void ALFloaterXUIStudio::restructure(const std::string& action, const ALXUISelec
         }
     }
 
-    documentChanged(saidWrite("EditWrote", what, *layer));
+    LLStringUtil::format_map_t args;
+    args["[WHERE]"] = path.back();
+    args["[FILE]"] = mFile;
+    args["[LAYER]"] = layerName(*layer);
+    documentChanged(getString(what, args));
 }
 
 // Where an element came to rest, as the document says: the path it had
@@ -10310,6 +10308,7 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "reload")        { reloadAll(); }
     else if (action == "edit")          { onJumpToSource(); }
     else if (action == "open_nested")   { openNestedFile(); }
+    else if (action == "quick_open")    { openQuickly(); }
     else if (action == "capture")       { capturePreview(); }
     else if (action == "save")          { saveDocument(); }
     else if (action == "save_all")      { saveAllDocuments(); }

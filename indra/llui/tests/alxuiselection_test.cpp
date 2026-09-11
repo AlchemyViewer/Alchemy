@@ -210,4 +210,36 @@ namespace tut
         ensure_equals("cleared, there is nothing", selection.selectedCount(), 0);
         ensure("not even the one", !selection.isSelected(three));
     }
+
+    // A name can carry a '#' of its own -- the menu item "Forbid Give to
+    // #RLV" does -- so only digits after the last one are an ordinal, and a
+    // step is otherwise all name. Written and read back, a step means what
+    // it meant.
+    template<> template<>
+    void alxuiselection_object::test<4>()
+    {
+        std::string_view name;
+        S32 ordinal = -1;
+        ensure("a hash with letters after it is no ordinal",
+               !ALXUISelection::splitOrdinal("Forbid Give to #RLV", name, ordinal));
+        ensure_equals("and the name is the whole of it", std::string(name), std::string("Forbid Give to #RLV"));
+        ensure_equals("with no ordinal", ordinal, 0);
+
+        const std::string second = ALXUISelection::step("Forbid Give to #RLV", 1);
+        ensure_equals("the second of that name", second, std::string("Forbid Give to #RLV#1"));
+        ensure("reads back", ALXUISelection::splitOrdinal(second, name, ordinal));
+        ensure_equals("as the name", std::string(name), std::string("Forbid Give to #RLV"));
+        ensure_equals("and the ordinal", ordinal, 1);
+
+        ensure("a hash at the end is no ordinal either", !ALXUISelection::splitOrdinal("odd#", name, ordinal));
+        ensure_equals("and the name keeps it", std::string(name), std::string("odd#"));
+        ensure("nor is one with nothing after it in a longer step",
+               ALXUISelection::splitOrdinal("odd##2", name, ordinal));
+        ensure_equals("where the name keeps its own", std::string(name), std::string("odd#"));
+        ensure_equals("and the ordinal is the last", ordinal, 2);
+
+        const ALXUISelection::path_t path = ALXUISelection::fromString("a/b#2/c");
+        ensure_equals("a path splits on the slashes alone", path.size(), 3u);
+        ensure_equals("and joins back", ALXUISelection::toString(path), std::string("a/b#2/c"));
+    }
 }

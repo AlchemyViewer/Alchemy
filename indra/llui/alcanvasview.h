@@ -146,7 +146,7 @@ public:
     // What of the surface can be seen, in the surface's own drawn
     // coordinates. A surface is as big as what is on it and the container
     // scrolls it, so its top left is often somewhere off screen.
-    LLRect viewportRect();
+    LLRect viewportRect() const;
 
     // Where a view inside this one is, in the surface's coordinates.
     LLRect localRectOf(const LLView* view) const;

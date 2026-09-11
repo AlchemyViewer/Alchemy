@@ -272,7 +272,7 @@ void ALCanvasView::draw()
     drawChrome();
 }
 
-LLRect ALCanvasView::viewportRect()
+LLRect ALCanvasView::viewportRect() const
 {
     if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
     {

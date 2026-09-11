@@ -113,6 +113,11 @@ public:
     // a layout stack are, so where among the children is the edit.
     bool insertBefore(const path_t& sibling, const std::string& xml);
     bool insertAfter(const path_t& sibling, const std::string& xml);
+
+    // A copy of the element, everything under it included, after it: the
+    // way a row of something is made from the row before it. It keeps the
+    // name, which the lint then says twice, and the author renames.
+    bool duplicateElement(const path_t& path);
     bool moveBefore(const path_t& path, const path_t& sibling);
     bool moveAfter(const path_t& path, const path_t& sibling);
 

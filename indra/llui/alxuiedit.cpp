@@ -1013,6 +1013,25 @@ bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
     return removeElement(path) && insertElement(landing, xml);
 }
 
+bool ALXUIEdit::duplicateElement(const path_t& path)
+{
+    Step step(*this);
+    mError.clear();
+    note(Did::AddedElement, path);
+    if (path.empty())
+    {
+        mError = "the root is not a thing to copy";
+        return false;
+    }
+    std::string xml;
+    if (!liftElement(path, xml))
+    {
+        mError = "could not read the element";
+        return false;
+    }
+    return insertBeside(path, xml, false);
+}
+
 bool ALXUIEdit::insertBefore(const path_t& sibling, const std::string& xml)
 {
     return insertBeside(sibling, xml, true);
