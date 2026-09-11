@@ -136,6 +136,7 @@ public:
 
     // from LLView
     /*virtual*/ void setValue(const LLSD& value);
+    /*virtual*/ LLSD getValue() const;
 
     /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void draw();
@@ -269,9 +270,11 @@ private:
 
     void updateMaxScrollPos();
     void commitHoveredButton(S32 x, S32 y);
+    bool commitTabAt(S32 x, S32 y);
+    void selectNeighbour(S32 step);
 
     // updates tab button images given the tuple, tab position and the corresponding params
-    void update_images(LLTabTuple* tuple, TabParams params, LLTabContainer::TabPosition pos);
+    void update_images(LLTabTuple* tuple, const TabParams& params, LLTabContainer::TabPosition pos);
     void reshapeTuple(LLTabTuple* tuple);
 
     // Variables

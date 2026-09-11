@@ -281,6 +281,7 @@ public:
     void            setImageDisabled(LLPointer<LLUIImage> image);
     void            setImageDisabledSelected(LLPointer<LLUIImage> image);
     void            setImageFlash(LLPointer<LLUIImage> image);
+    LLPointer<LLUIImage> getImageFlash() const { return mImageFlash; }
     void            setImagePressed(LLPointer<LLUIImage> image);
 
     void            setCommitOnReturn(bool commit) { mCommitOnReturn = commit; }
