@@ -641,19 +641,39 @@ F32 LLDrawable::updateXform(bool undamped)
 
     if (damped && isVisible())
     {
+        // Rotation's contribution, as a non-negative quantity. The FIXME this replaces -- "this can
+        // be negative, it is possible for some rots to 'cancel out' pos or size changes" -- was
+        // real: neither LLXform::setRotation nor slerp renormalises, so a dot slightly over 1 made
+        // the term negative and cancelled genuine position error. A drawable whose total came out
+        // negative could then never satisfy the exact `dist_squared == 0.f` test for being done,
+        // and sat on the move list indefinitely. q and -q are the same rotation, so the magnitude
+        // is the meaningful part.
+        auto rotation_error = [](const LLQuaternion& a, const LLQuaternion& b) -> F32
+        {
+            return (1.f - llclamp(llabs(dot(a, b)), 0.f, 1.f)) * 10.f;
+        };
+
         F32 lerp_amt = llclamp(LLSmoothInterpolation::getInterpolant(OBJECT_DAMPING_TIME_CONSTANT), 0.f, 1.f);
         LLVector3 new_pos = lerp(old_pos, target_pos, lerp_amt);
         dist_squared = dist_vec_squared(new_pos, target_pos);
 
         LLQuaternion new_rot = nlerp(lerp_amt, old_rot, target_rot);
-        // FIXME: This can be negative! It is be possible for some rots to 'cancel out' pos or size changes.
-        dist_squared += (1.f - dot(new_rot, target_rot)) * 10.f;
+        dist_squared += rotation_error(new_rot, target_rot);
 
         LLVector3 new_scale = lerp(old_scale, target_scale, lerp_amt);
         dist_squared += dist_vec_squared(new_scale, target_scale);
 
-        if ((dist_squared >= MIN_INTERPOLATE_DISTANCE_SQUARED * camdist2) &&
-            (dist_squared <= MAX_INTERPOLATE_DISTANCE_SQUARED))
+        // Whether to keep smoothing is decided on how far there is left to travel *before* this
+        // step, not on what remains after it. The size of a step is set by the frame time, so
+        // testing the leftover meant the same motion fell under the threshold and snapped at low
+        // frame rates while it stayed above and glided at high ones -- the lerp is frame-rate
+        // independent, but the rule deciding when to stop lerping was not.
+        F32 remaining_squared = dist_vec_squared(old_pos, target_pos);
+        remaining_squared += rotation_error(old_rot, target_rot);
+        remaining_squared += dist_vec_squared(old_scale, target_scale);
+
+        if ((remaining_squared >= MIN_INTERPOLATE_DISTANCE_SQUARED * camdist2) &&
+            (remaining_squared <= MAX_INTERPOLATE_DISTANCE_SQUARED))
         {
             // interpolate
             target_pos = new_pos;
