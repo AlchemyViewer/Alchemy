@@ -69,7 +69,7 @@ public:
     AL_VIEW_TYPE(LLFolderViewScrollContainer, LLScrollContainer);
 
     /*virtual*/ ~LLFolderViewScrollContainer() {};
-    /*virtual*/ const LLRect getScrolledViewRect() const;
+    /*virtual*/ const LLRect getScrolledViewRect() const override;
 
 protected:
     LLFolderViewScrollContainer(const LLScrollContainer::Params& p);
@@ -114,10 +114,10 @@ public:
     LLFolderView(const Params&);
     virtual ~LLFolderView( void );
 
-    virtual bool canFocusChildren() const;
+    virtual bool canFocusChildren() const override;
 
-    virtual const LLFolderView* getRoot() const { return this; }
-    virtual LLFolderView*   getRoot() { return this; }
+    virtual const LLFolderView* getRoot() const override { return this; }
+    virtual LLFolderView*   getRoot() override { return this; }
 
     LLFolderViewModelInterface* getFolderViewModel() { return mViewModel; }
     const LLFolderViewModelInterface* getFolderViewModel() const { return mViewModel; }
@@ -139,12 +139,12 @@ public:
     void closeAllFolders();
     void openTopLevelFolders();
 
-    virtual void addFolder( LLFolderViewFolder* folder);
+    virtual void addFolder( LLFolderViewFolder* folder) override;
 
     // Find width and height of this object and its children. Also
     // makes sure that this view and its children are the right size.
-    virtual S32 arrange( S32* width, S32* height );
-    virtual S32 getItemHeight() const;
+    virtual S32 arrange( S32* width, S32* height ) override;
+    virtual S32 getItemHeight() const override;
 
     void arrangeAll() { mArrangeGeneration++; }
     S32 getArrangeGeneration() const { return mArrangeGeneration; }
@@ -162,13 +162,13 @@ public:
 
     // Record the selected item and pass it down the hierarchy.
     virtual bool setSelection(LLFolderViewItem* selection, bool openitem,
-        bool take_keyboard_focus = true);
+        bool take_keyboard_focus = true) override;
 
     // This method is used to toggle the selection of an item. Walks
     // children, and keeps track of selected objects.
-    virtual bool changeSelection(LLFolderViewItem* selection, bool selected);
+    virtual bool changeSelection(LLFolderViewItem* selection, bool selected) override;
 
-    virtual std::set<LLFolderViewItem*> getSelectionList() const;
+    virtual std::set<LLFolderViewItem*> getSelectionList() const override;
 
     // Make sure if ancestor is selected, descendants are not
     void sanitizeSelection();
@@ -187,17 +187,17 @@ public:
     void autoOpenItem(LLFolderViewFolder* item);
     void closeAutoOpenedFolders();
     bool autoOpenTest(LLFolderViewFolder* item);
-    bool isOpen() const { return true; } // root folder always open
+    bool isOpen() const override { return true; } // root folder always open
 
     // Copy & paste
-    virtual bool    canCopy() const;
-    virtual void    copy();
+    virtual bool    canCopy() const override;
+    virtual void    copy() override;
 
-    virtual bool    canCut() const;
-    virtual void    cut();
+    virtual bool    canCut() const override;
+    virtual void    cut() override;
 
-    virtual bool    canPaste() const;
-    virtual void    paste();
+    virtual bool    canPaste() const override;
+    virtual void    paste() override;
 
     LLFolderViewItem* getNextUnselectedItem();
 
@@ -206,21 +206,21 @@ public:
 
     // LLView functionality
     ///*virtual*/ bool handleKey( KEY key, MASK mask, bool called_from_parent );
-    /*virtual*/ bool handleKeyHere( KEY key, MASK mask );
-    /*virtual*/ bool handleUnicodeCharHere(llwchar uni_char);
-    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleDoubleClick( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleRightMouseDown( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleKeyHere( KEY key, MASK mask ) override;
+    /*virtual*/ bool handleUnicodeCharHere(llwchar uni_char) override;
+    /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleDoubleClick( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask ) override;
     /*virtual*/ bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) { setShowSelectionContext(false); }
-    virtual void draw();
-    virtual void deleteAllChildren();
+                                   std::string& tooltip_msg) override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override { setShowSelectionContext(false); }
+    virtual void draw() override;
+    virtual void deleteAllChildren() override;
 
     void stopAutoScollining() {mNeedsScroll = false;}
     void scrollToShowSelection();
@@ -257,7 +257,7 @@ public:
     // DEBUG only
     void dumpSelectionInformation();
 
-    virtual S32 notify(const LLSD& info) ;
+    virtual S32 notify(const LLSD& info) override ;
 
     void setShowEmptyMessage(bool show_msg) { mShowEmptyMessage = show_msg; }
 

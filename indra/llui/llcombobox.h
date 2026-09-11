@@ -96,7 +96,7 @@ public:
 
     virtual ~LLComboBox();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -104,36 +104,36 @@ protected:
     void    initFromParams(const Params&);
     void    prearrangeList(std::string filter = "");
 
-    virtual std::string _getSearchText() const;
-    virtual void onSetHighlight() const;
+    virtual std::string _getSearchText() const override;
+    virtual void onSetHighlight() const override;
 
     void imageLoaded();
 
 public:
     // LLView interface
-    virtual void    onFocusLost();
+    virtual void    onFocusLost() override;
 
-    virtual bool    handleToolTip(S32 x, S32 y, MASK mask);
-    virtual bool    handleKeyHere(KEY key, MASK mask);
-    virtual bool    handleUnicodeCharHere(llwchar uni_char);
-    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleToolTip(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
+    virtual bool    handleUnicodeCharHere(llwchar uni_char) override;
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
     // LLUICtrl interface
-    virtual void    clear();                    // select nothing
-    virtual void    onCommit();
-    virtual bool    acceptsTextInput() const        { return mAllowTextEntry; }
-    virtual bool    isDirty() const;            // Returns true if the user has modified this control.
-    virtual void    resetDirty();               // Clear dirty state
+    virtual void    clear() override;                    // select nothing
+    virtual void    onCommit() override;
+    virtual bool    acceptsTextInput() const override        { return mAllowTextEntry; }
+    virtual bool    isDirty() const override;            // Returns true if the user has modified this control.
+    virtual void    resetDirty() override;               // Clear dirty state
 
-    virtual void    setFocus(bool b);
+    virtual void    setFocus(bool b) override;
 
     // Selects item by underlying LLSD value, using LLSD::asString() matching.
     // For simple items, this is just the name of the label.
-    virtual void    setValue(const LLSD& value );
+    virtual void    setValue(const LLSD& value ) override;
 
     // Gets underlying LLSD value for currently selected items.  For simple
     // items, this is just the label.
-    virtual LLSD    getValue() const;
+    virtual LLSD    getValue() const override;
 
     void            setTextEntry(const LLStringExplicit& text);
     void            setKeystrokeOnEsc(bool enable);
@@ -192,34 +192,34 @@ public:
     void            createLineEditor(const Params&);
 
     //========================================================================
-    LLCtrlSelectionInterface* getSelectionInterface()   { return (LLCtrlSelectionInterface*)this; };
-    LLCtrlListInterface* getListInterface()             { return (LLCtrlListInterface*)this; };
+    LLCtrlSelectionInterface* getSelectionInterface() override   { return (LLCtrlSelectionInterface*)this; };
+    LLCtrlListInterface* getListInterface() override             { return (LLCtrlListInterface*)this; };
 
     // LLCtrlListInterface functions
     // See llscrolllistctrl.h
-    virtual S32     getItemCount() const;
+    virtual S32     getItemCount() const override;
     // Overwrites the default column (See LLScrollListCtrl for format)
-    virtual void    addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM);
-    virtual void    clearColumns();
-    virtual void    setColumnLabel(const std::string& column, const std::string& label);
-    virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL);
-    virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD());
-    virtual void    clearRows();
-    virtual void    sortByColumn(const std::string& name, bool ascending);
+    virtual void    addColumn(const LLSD& column, EAddPosition pos = ADD_BOTTOM) override;
+    virtual void    clearColumns() override;
+    virtual void    setColumnLabel(const std::string& column, const std::string& label) override;
+    virtual LLScrollListItem* addElement(const LLSD& value, EAddPosition pos = ADD_BOTTOM, void* userdata = NULL) override;
+    virtual LLScrollListItem* addSimpleElement(const std::string& value, EAddPosition pos = ADD_BOTTOM, const LLSD& id = LLSD()) override;
+    virtual void    clearRows() override;
+    virtual void    sortByColumn(const std::string& name, bool ascending) override;
 
     // LLCtrlSelectionInterface functions
-    virtual bool    getCanSelect() const                { return true; }
-    virtual bool    selectFirstItem()                   { return setCurrentByIndex(0); }
-    virtual bool    selectNthItem( S32 index )          { return setCurrentByIndex(index); }
-    virtual bool    selectItemRange( S32 first, S32 last );
-    virtual S32     getFirstSelectedIndex() const       { return getCurrentIndex(); }
-    virtual bool    setCurrentByID( const LLUUID& id );
-    virtual LLUUID  getCurrentID() const;               // LLUUID::null if no items in menu
-    virtual bool    setSelectedByValue(const LLSD& value, bool selected);
-    virtual LLSD    getSelectedValue();
-    virtual bool    isSelected(const LLSD& value) const;
-    virtual bool    operateOnSelection(EOperation op);
-    virtual bool    operateOnAll(EOperation op);
+    virtual bool    getCanSelect() const override                { return true; }
+    virtual bool    selectFirstItem() override                   { return setCurrentByIndex(0); }
+    virtual bool    selectNthItem( S32 index ) override          { return setCurrentByIndex(index); }
+    virtual bool    selectItemRange( S32 first, S32 last ) override;
+    virtual S32     getFirstSelectedIndex() const override       { return getCurrentIndex(); }
+    virtual bool    setCurrentByID( const LLUUID& id ) override;
+    virtual LLUUID  getCurrentID() const override;               // LLUUID::null if no items in menu
+    virtual bool    setSelectedByValue(const LLSD& value, bool selected) override;
+    virtual LLSD    getSelectedValue() override;
+    virtual bool    isSelected(const LLSD& value) const override;
+    virtual bool    operateOnSelection(EOperation op) override;
+    virtual bool    operateOnAll(EOperation op) override;
 
     //========================================================================
 
@@ -240,7 +240,7 @@ public:
 
     // Populates the provided LLSD with combo box-specific information(list of items, item count, current selection label)
     // also includes base LLUICtrl information via parent class
-    void addInfo(LLSD & info);
+    void addInfo(LLSD & info) override;
 
     void            onButtonMouseDown();
     void            onListMouseUp();
@@ -293,7 +293,7 @@ public:
         Params();
     };
 
-    /*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const;
+    /*virtual*/ const std::string getSelectedItemLabel(S32 column = 0) const override;
 
 private:
     enum EColumnIndex

@@ -71,7 +71,7 @@ public:
     */
     bool getForceRefresh() { return mForceRefresh; }
 
-    virtual bool selectItemByValue(const LLSD& value, bool select = true);
+    virtual bool selectItemByValue(const LLSD& value, bool select = true) override;
 
     void updateSelection();
 

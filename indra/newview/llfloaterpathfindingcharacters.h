@@ -44,7 +44,7 @@ class LLFloaterPathfindingCharacters final : public LLFloaterPathfindingObjects
 public:
     AL_VIEW_TYPE(LLFloaterPathfindingCharacters, LLFloaterPathfindingObjects);
 
-    virtual void                                    onClose(bool pIsAppQuitting);
+    virtual void                                    onClose(bool pIsAppQuitting) override;
 
     bool                                            isShowPhysicsCapsule() const;
     void                                            setShowPhysicsCapsule(bool pIsShowPhysicsCapsule);
@@ -60,20 +60,20 @@ protected:
     LLFloaterPathfindingCharacters(const LLSD& pSeed);
     virtual ~LLFloaterPathfindingCharacters();
 
-    virtual bool                       postBuild();
+    virtual bool                       postBuild() override;
 
-    virtual void                       requestGetObjects();
+    virtual void                       requestGetObjects() override;
 
-    virtual void                       buildObjectsScrollList(const LLPathfindingObjectListPtr pObjectListPtr);
+    virtual void                       buildObjectsScrollList(const LLPathfindingObjectListPtr pObjectListPtr) override;
 
-    virtual void                       updateControlsOnScrollListChange();
+    virtual void                       updateControlsOnScrollListChange() override;
 
-    virtual S32                        getNameColumnIndex() const;
-    virtual S32                        getOwnerNameColumnIndex() const;
-    virtual std::string                getOwnerName(const LLPathfindingObject *pObject) const;
-    virtual const LLColor4             &getBeaconColor() const;
+    virtual S32                        getNameColumnIndex() const override;
+    virtual S32                        getOwnerNameColumnIndex() const override;
+    virtual std::string                getOwnerName(const LLPathfindingObject *pObject) const override;
+    virtual const LLColor4             &getBeaconColor() const override;
 
-    virtual LLPathfindingObjectListPtr getEmptyObjectList() const;
+    virtual LLPathfindingObjectListPtr getEmptyObjectList() const override;
 
 private:
     void onShowPhysicsCapsuleClicked();

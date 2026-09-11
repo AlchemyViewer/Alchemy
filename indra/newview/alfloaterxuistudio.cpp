@@ -1490,20 +1490,6 @@ namespace
 
     constexpr S32 MAX_FIND_ROWS = 500;
 
-    std::string firstToken(const std::string& path)
-    {
-        const size_t dot = path.find('.');
-        return dot == std::string::npos ? path : path.substr(0, dot);
-    }
-
-    // A child widget's attributes fail against the parent's block by
-    // design and are parsed again by the child; those are not findings.
-    bool isNoise(const ALXUIDiagnostics::Entry& e)
-    {
-        return e.kind == ALXUIDiagnostics::Kind::UnknownAttribute && e.depth > 0
-            && ALXUICatalog::isWidgetTag(firstToken(e.path));
-    }
-
     // The follows flags as a file writes them and back, through the one
     // reader and writer of a set of named bits. The names sit at bits nought
     // to three here and the flags do not, so the two are mapped.

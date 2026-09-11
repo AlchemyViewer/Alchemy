@@ -59,8 +59,8 @@ public:
     LLPanelPlaces();
     virtual ~LLPanelPlaces();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     // Called on parcel selection change to update place information.
     void changedParcelSelection();
@@ -81,7 +81,7 @@ public:
 
     bool tabsCreated() { return mTabsCreated;}
 
-    /*virtual*/ S32 notifyParent(const LLSD& info);
+    /*virtual*/ S32 notifyParent(const LLSD& info) override;
 
     void hideBackBtn();
 
@@ -107,7 +107,7 @@ private:
 
     void togglePlaceInfoPanel(bool visible);
 
-    /*virtual*/ void onVisibilityChange(bool new_visibility);
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
 
     void updateVerbs();
 

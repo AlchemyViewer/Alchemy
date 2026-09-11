@@ -75,17 +75,17 @@ public:
     LLOutfitGallery(const LLOutfitGallery::Params& params = getDefaultParams());
     virtual ~LLOutfitGallery();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& info);
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& info) override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
     void moveUp();
     void moveDown();
     void moveLeft();
     void moveRight();
 
-    /*virtual*/ void onFocusLost();
-    /*virtual*/ void onFocusReceived();
+    /*virtual*/ void onFocusLost() override;
+    /*virtual*/ void onFocusReceived() override;
 
     static void onRemoveOutfit(const LLUUID& outfit_cat_id);
     static void onOutfitsRemovalConfirmation(const LLSD& notification, const LLSD& response, const LLUUID& outfit_cat_id);
@@ -94,35 +94,35 @@ public:
     void wearSelectedOutfit();
 
 
-    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string);
+    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string) override;
 
-    /*virtual*/ void getCurrentCategories(uuid_vec_t& vcur);
-    /*virtual*/ void updateAddedCategory(LLUUID cat_id);
-    /*virtual*/ void updateRemovedCategory(LLUUID cat_id);
-    /*virtual*/ void updateChangedCategoryName(LLViewerInventoryCategory *cat, std::string name);
-    /*virtual*/ bool updateOneOutfit(); // bulk processing, scheduled by observer when updates are needed
+    /*virtual*/ void getCurrentCategories(uuid_vec_t& vcur) override;
+    /*virtual*/ void updateAddedCategory(LLUUID cat_id) override;
+    /*virtual*/ void updateRemovedCategory(LLUUID cat_id) override;
+    /*virtual*/ void updateChangedCategoryName(LLViewerInventoryCategory *cat, std::string name) override;
+    /*virtual*/ bool updateOneOutfit() override; // bulk processing, scheduled by observer when updates are needed
 
-    /*virtual*/ bool hasItemSelected();
-    /*virtual*/ bool canWearSelected();
+    /*virtual*/ bool hasItemSelected() override;
+    /*virtual*/ bool canWearSelected() override;
 
-    /*virtual*/ bool getHasExpandableFolders() { return false; }
+    /*virtual*/ bool getHasExpandableFolders() override { return false; }
 
-    /*virtual*/ void onChangeSortOrder(const LLSD& userdata) {};
+    /*virtual*/ void onChangeSortOrder(const LLSD& userdata) override {};
     void updateMessageVisibility();
     bool hasDefaultImage(const LLUUID& outfit_cat_id);
 
     void refreshOutfit(const LLUUID& category_id);
-    virtual LLToggleableMenu* getSortMenu();
+    virtual LLToggleableMenu* getSortMenu() override;
 
 protected:
-    /*virtual*/ void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id);
-    /*virtual*/ void onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid);
-    /*virtual*/ void onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id);
-    /*virtual*/ void onChangeOutfitSelection(LLWearableItemsList* list, const LLUUID& category_id);
+    /*virtual*/ void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id) override;
+    /*virtual*/ void onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid) override;
+    /*virtual*/ void onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id) override;
+    /*virtual*/ void onChangeOutfitSelection(LLWearableItemsList* list, const LLUUID& category_id) override;
 
-    /*virtual*/ void onCollapseAllFolders() {}
-    /*virtual*/ void onExpandAllFolders() {}
-    /*virtual*/ LLOutfitListGearMenuBase* createGearMenu();
+    /*virtual*/ void onCollapseAllFolders() override {}
+    /*virtual*/ void onExpandAllFolders() override {}
+    /*virtual*/ LLOutfitListGearMenuBase* createGearMenu() override;
 
 private:
     LLUUID getPhotoAssetId(const LLUUID& outfit_id);
@@ -239,14 +239,14 @@ public:
     LLOutfitGalleryItem(const Params& p);
     virtual ~LLOutfitGalleryItem();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ void onFocusLost();
-    /*virtual*/ void onFocusReceived();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
+    /*virtual*/ void onFocusLost() override;
+    /*virtual*/ void onFocusReceived() override;
 
     bool openOutfitsContent();
 

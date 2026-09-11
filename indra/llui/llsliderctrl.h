@@ -85,28 +85,28 @@ protected:
 public:
     virtual ~LLSliderCtrl();
 
-    /*virtual*/ F32 getValueF32() const { return mSlider->getValueF32(); }
+    /*virtual*/ F32 getValueF32() const override { return mSlider->getValueF32(); }
     void            setValue(F32 v, bool from_event = false);
 
-    /*virtual*/ void    setValue(const LLSD& value) { setValue((F32)value.asReal(), true); }
-    /*virtual*/ LLSD    getValue() const            { return LLSD(getValueF32()); }
-    /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text );
+    /*virtual*/ void    setValue(const LLSD& value) override { setValue((F32)value.asReal(), true); }
+    /*virtual*/ LLSD    getValue() const override            { return LLSD(getValueF32()); }
+    /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
 
     bool            isMouseHeldDown() const { return mSlider->hasMouseCapture(); }
 
     virtual void    setPrecision(S32 precision);
 
-    /*virtual*/ void    setEnabled( bool b );
-    /*virtual*/ void    clear();
+    /*virtual*/ void    setEnabled( bool b ) override;
+    /*virtual*/ void    clear() override;
 
-    /*virtual*/ void    setMinValue(const LLSD& min_value)  { setMinValue((F32)min_value.asReal()); }
-    /*virtual*/ void    setMaxValue(const LLSD& max_value)  { setMaxValue((F32)max_value.asReal()); }
-    /*virtual*/ void    setMinValue(F32 min_value)  { mSlider->setMinValue(min_value); updateText(); }
-    /*virtual*/ void    setMaxValue(F32 max_value)  { mSlider->setMaxValue(max_value); updateText(); }
-    /*virtual*/ void    setIncrement(F32 increment) { mSlider->setIncrement(increment);}
+    /*virtual*/ void    setMinValue(const LLSD& min_value) override  { setMinValue((F32)min_value.asReal()); }
+    /*virtual*/ void    setMaxValue(const LLSD& max_value) override  { setMaxValue((F32)max_value.asReal()); }
+    /*virtual*/ void    setMinValue(F32 min_value) override  { mSlider->setMinValue(min_value); updateText(); }
+    /*virtual*/ void    setMaxValue(F32 max_value) override  { mSlider->setMaxValue(max_value); updateText(); }
+    /*virtual*/ void    setIncrement(F32 increment) override { mSlider->setIncrement(increment);}
 
-    F32             getMinValue() const { return mSlider->getMinValue(); }
-    F32             getMaxValue() const { return mSlider->getMaxValue(); }
+    F32             getMinValue() const override { return mSlider->getMinValue(); }
+    F32             getMaxValue() const override { return mSlider->getMaxValue(); }
 
     void            setLabel(const LLStringExplicit& label)     { if (mLabelBox) mLabelBox->setText(label); }
     void            setLabelColor(const LLUIColor& c)            { mTextEnabledColor = c; }
@@ -116,19 +116,19 @@ public:
     boost::signals2::connection setSliderMouseUpCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setSliderEditorCommitCallback( const commit_signal_t::slot_type& cb );
 
-    /*virtual*/ void    onTabInto();
+    /*virtual*/ void    onTabInto() override;
 
-    /*virtual*/ void    setTentative(bool b);           // marks value as tentative
-    /*virtual*/ void    onCommit();                     // mark not tentative, then commit
+    /*virtual*/ void    setTentative(bool b) override;           // marks value as tentative
+    /*virtual*/ void    onCommit() override;                     // mark not tentative, then commit
 
-    /*virtual*/ void    setControlName(const std::string& control_name, LLView* context)
+    /*virtual*/ void    setControlName(const std::string& control_name, LLView* context) override
     {
         LLUICtrl::setControlName(control_name, context);
         mSlider->setControlName(control_name, context);
     }
 
-    /*virtual*/ void    setRect(const LLRect& rect);
-    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true);
+    /*virtual*/ void    setRect(const LLRect& rect) override;
+    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     static void     onSliderCommit(LLUICtrl* caller, const LLSD& userdata);
 
@@ -136,14 +136,14 @@ public:
     static void     onEditorGainFocus(LLFocusableElement* caller, void *userdata);
 
 protected:
-    virtual std::string _getSearchText() const
+    virtual std::string _getSearchText() const override
     {
         std::string strLabel;
         if( mLabelBox )
             strLabel = mLabelBox->getLabel();
         return strLabel + getToolTip();
     }
-    virtual void onSetHighlight() const  // When highlight, really do highlight the label
+    virtual void onSetHighlight() const override  // When highlight, really do highlight the label
     {
         if( mLabelBox )
             mLabelBox->ll::ui::SearchableControl::setHighlighted( ll::ui::SearchableControl::getHighlighted() );

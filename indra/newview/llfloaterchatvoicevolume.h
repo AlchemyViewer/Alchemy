@@ -37,9 +37,9 @@ public:
     LLFloaterChatVoiceVolume(const LLSD& key);
     virtual ~LLFloaterChatVoiceVolume();
 
-    virtual void onOpen(const LLSD& key);
+    virtual void onOpen(const LLSD& key) override;
 
-    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() { return LLTransientFloaterMgr::GLOBAL; }
+    /*virtual*/ LLTransientFloaterMgr::ETransientGroup getGroup() override { return LLTransientFloaterMgr::GLOBAL; }
 };
 
 #endif /* LLFLOATERCHATVOICEVOLUME_H_ */

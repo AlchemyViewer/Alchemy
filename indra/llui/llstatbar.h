@@ -64,16 +64,16 @@ public:
     };
     LLStatBar(const Params&);
 
-    virtual void draw();
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool handleHover(S32 x, S32 y, MASK mask);
+    virtual void draw() override;
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override;
 
     void setStat(const std::string& stat_name);
 
     void setRange(F32 bar_min, F32 bar_max);
     void getRange(F32& bar_min, F32& bar_max) const { bar_min = mTargetMinBar; bar_max = mTargetMaxBar; }
 
-    /*virtual*/ LLRect getRequiredRect();   // Return the height of this object, given the set options.
+    /*virtual*/ LLRect getRequiredRect() override;   // Return the height of this object, given the set options.
 
     // The spacing that lands the most tick marks on round numbers across
     // [min, max]. Zero when the range is empty.

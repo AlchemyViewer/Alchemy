@@ -152,13 +152,13 @@ public:
     // checkbox lives inside the header, not in the tab's own child list.
     LLCheckBoxCtrl* getHeaderCheckBox() const { return mHeaderCheckBox; }
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    S32 notifyParent(const LLSD& info);
-    S32 notify(const LLSD& info);
-    bool notifyChildren(const LLSD& info);
+    S32 notifyParent(const LLSD& info) override;
+    S32 notify(const LLSD& info) override;
+    bool notifyChildren(const LLSD& info) override;
 
-    virtual void draw();
+    virtual void draw() override;
 
     void storeOpenCloseState();
     void restoreOpenCloseState();
@@ -171,25 +171,25 @@ protected:
 public:
 
     // Call reshape after changing size
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     /**
      * Raises notifyParent event with "child_visibility_change" = new_visibility
      */
-    void onVisibilityChange(bool new_visibility);
-    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl);
+    void onVisibilityChange(bool new_visibility) override;
+    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl) override;
 
     // Changes expand/collapse state and triggers expand/collapse callbacks
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
 
-    virtual bool handleToolTip(S32 x, S32 y, MASK mask);
-    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
-    virtual bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+    virtual bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
-    virtual bool addChild(LLView* child, S32 tab_group = 0 );
+    virtual bool addChild(LLView* child, S32 tab_group = 0 ) override;
 
     bool isExpanded() const { return mDisplayChildren; }
 

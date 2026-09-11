@@ -20,9 +20,9 @@ public:
     AL_VIEW_TYPE(ALFloaterExploreSounds, LLFloater);
 
     ALFloaterExploreSounds(const LLSD& key);
-    bool postBuild();
+    bool postBuild() override;
 
-    bool tick();
+    bool tick() override;
 
     LLSoundHistoryItem getItem(const LLUUID& itemID);
 

@@ -138,14 +138,14 @@ public:
         mChatBarReshapeConnection.disconnect();
     }
 
-    void redrawToasts()
+    void redrawToasts() override
     {
         arrangeToasts();
     }
 
     // hide all toasts from screen, but not remove them from a channel
     // removes all toasts from a channel
-    virtual void        removeToastsFromChannel()
+    virtual void        removeToastsFromChannel() override
     {
         for(toast_vec_t::iterator it = m_active_toasts.begin(); it != m_active_toasts.end(); ++it)
         {
@@ -154,7 +154,7 @@ public:
         m_active_toasts.clear();
     };
 
-    virtual void deleteAllChildren()
+    virtual void deleteAllChildren() override
     {
         LL_DEBUGS("NearbyChat") << "Clearing toast pool" << LL_ENDL;
         m_toast_pool.clear();
@@ -224,7 +224,7 @@ public:
     {
     }
 
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
 private:
     LLFloaterIMNearbyChatScreenChannel* mNearbyChatScreenChannelp;

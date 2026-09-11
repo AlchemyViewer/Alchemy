@@ -126,8 +126,8 @@ public:
     LLPanelOutfitEdit();
     /*virtual*/ ~LLPanelOutfitEdit();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
     void moveWearable(bool closer_to_body);
 
@@ -187,7 +187,7 @@ public:
                                       EDragAndDropType cargo_type,
                                       void* cargo_data,
                                       EAcceptance* accept,
-                                      std::string& tooltip_msg);
+                                      std::string& tooltip_msg) override;
 
 private:
     void onAddMoreButtonClicked();

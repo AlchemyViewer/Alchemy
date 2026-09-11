@@ -92,34 +92,34 @@ public:
     LLAccordionCtrl();
     virtual ~LLAccordionCtrl();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    virtual bool handleRightMouseDown   ( S32 x, S32 y, MASK mask);
-    virtual bool handleScrollWheel      ( S32 x, S32 y, LLScrollDelta delta );
-    virtual bool handleScrollHWheel     ( S32 x, S32 y, LLScrollDelta delta );
-    virtual bool handleKeyHere          (KEY key, MASK mask);
+    virtual bool handleRightMouseDown   ( S32 x, S32 y, MASK mask) override;
+    virtual bool handleScrollWheel      ( S32 x, S32 y, LLScrollDelta delta ) override;
+    virtual bool handleScrollHWheel     ( S32 x, S32 y, LLScrollDelta delta ) override;
+    virtual bool handleKeyHere          (KEY key, MASK mask) override;
     virtual bool handleDragAndDrop      (S32 x, S32 y, MASK mask, bool drop,
                                          EDragAndDropType cargo_type,
                                          void* cargo_data,
                                          EAcceptance* accept,
-                                         std::string& tooltip_msg);
+                                         std::string& tooltip_msg) override;
     //
 
     // Call reshape after changing splitter's size
-    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     void addCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab);
     void removeCollapsibleCtrl(LLAccordionCtrlTab* accordion_tab);
     void arrange();
 
 
-    void    draw();
+    void    draw() override;
 
     void    onScrollPosChangeCallback(S32, LLScrollbar*);
-    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl);
+    virtual void onUpdateScrollToChild(const LLUICtrl * cntrl) override;
 
-    void    onOpen      (const LLSD& key);
-    S32     notifyParent(const LLSD& info);
+    void    onOpen      (const LLSD& key) override;
+    S32     notifyParent(const LLSD& info) override;
 
     void    reset       ();
     void    expandDefaultTab();

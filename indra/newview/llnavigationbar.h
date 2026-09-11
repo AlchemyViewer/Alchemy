@@ -62,11 +62,11 @@ public:
         }
     };
 
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     boost::signals2::connection setClickDraggingCallback(const commit_signal_t::slot_type& cb);
 

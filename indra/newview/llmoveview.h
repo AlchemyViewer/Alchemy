@@ -51,8 +51,8 @@ private:
     ~LLFloaterMove();
 public:
 
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ void    setVisible(bool visible);
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ void    setVisible(bool visible) override;
     static F32  getYawRate(F32 time);
     static void setFlyingMode(bool fly);
     void setFlyingModeImpl(bool fly);
@@ -60,7 +60,7 @@ public:
     void setAlwaysRunModeImpl(bool run);
     static void setSittingMode(bool bSitting);
     static void enableInstance();
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
 //  static void sUpdateFlyingStatus();
 // [RLVa:KB] - Checked: 2011-05-27 (RLVa-1.4.0a) | Added: RLVa-1.4.0a
@@ -149,13 +149,13 @@ public:
     static LLPanelStandStopFlying* getInstance();
     static void setStandStopFlyingMode(EStandStopFlyingMode mode);
     static void clearStandStopFlyingMode(EStandStopFlyingMode mode);
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void setVisible(bool visible);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void setVisible(bool visible) override;
 
     // *HACK: due to hard enough to have this control aligned with "Move" button while resizing
     // let update its position in each frame
-    /*virtual*/ void draw(){updatePosition(); LLPanel::draw();}
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
+    /*virtual*/ void draw() override{updatePosition(); LLPanel::draw();}
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
 
 protected:

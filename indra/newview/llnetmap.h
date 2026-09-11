@@ -72,18 +72,18 @@ public:
     static const F32 MAP_SCALE_VERY_CLOSE;
     static const F32 MAP_SCALE_MAX;
 
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool    handleToolTip( S32 x, S32 y, MASK mask);
-    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true);
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool    handleHover( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool    handleToolTip( S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void    reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-    /*virtual*/ bool    postBuild();
-    /*virtual*/ bool    handleRightMouseDown( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool    postBuild() override;
+    /*virtual*/ bool    handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
     /*virtual*/ bool    handleClick(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleDoubleClick( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool    handleDoubleClick( S32 x, S32 y, MASK mask ) override;
 
     void            refreshParcelOverlay() { mUpdateParcelImage = true; }
 

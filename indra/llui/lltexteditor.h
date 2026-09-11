@@ -100,53 +100,53 @@ public:
     void handleMentionCommit(std::string name_url);
 
     // mousehandler overrides
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask );
-    virtual bool    handleMiddleMouseDown(S32 x,S32 y,MASK mask);
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask ) override;
+    virtual bool    handleMiddleMouseDown(S32 x,S32 y,MASK mask) override;
 
-    virtual bool    handleKeyHere(KEY key, MASK mask );
-    virtual bool    handleUnicodeCharHere(llwchar uni_char);
+    virtual bool    handleKeyHere(KEY key, MASK mask ) override;
+    virtual bool    handleUnicodeCharHere(llwchar uni_char) override;
 
-    virtual void    onMouseCaptureLost();
+    virtual void    onMouseCaptureLost() override;
 
     // view overrides
-    virtual void    draw();
-    virtual void    onFocusReceived();
-    virtual void    onFocusLost();
-    virtual void    onCommit();
-    virtual void    setEnabled(bool enabled);
+    virtual void    draw() override;
+    virtual void    onFocusReceived() override;
+    virtual void    onFocusLost() override;
+    virtual void    onCommit() override;
+    virtual void    setEnabled(bool enabled) override;
 
     // uictrl overrides
-    virtual void    clear();
-    virtual void    setFocus( bool b );
-    virtual bool    isDirty() const;
+    virtual void    clear() override;
+    virtual void    setFocus( bool b ) override;
+    virtual bool    isDirty() const override;
 
     // LLEditMenuHandler interface
-    virtual void    undo();
-    virtual bool    canUndo() const;
-    virtual void    redo();
-    virtual bool    canRedo() const;
+    virtual void    undo() override;
+    virtual bool    canUndo() const override;
+    virtual void    redo() override;
+    virtual bool    canRedo() const override;
 
-    virtual void    cut();
-    virtual bool    canCut() const;
-    virtual void    copy();
-    virtual bool    canCopy() const;
-    virtual void    paste();
-    virtual bool    canPaste() const;
+    virtual void    cut() override;
+    virtual bool    canCut() const override;
+    virtual void    copy() override;
+    virtual bool    canCopy() const override;
+    virtual void    paste() override;
+    virtual bool    canPaste() const override;
 
     virtual void    updatePrimary();
     virtual void    copyPrimary();
     virtual void    pastePrimary();
     virtual bool    canPastePrimary() const;
 
-    virtual void    doDelete();
-    virtual bool    canDoDelete() const;
-    virtual void    selectAll();
-    virtual bool    canSelectAll()  const;
-    virtual void    deselect();
+    virtual void    doDelete() override;
+    virtual bool    canDoDelete() const override;
+    virtual void    selectAll() override;
+    virtual bool    canSelectAll()  const override;
+    virtual void    deselect() override;
 
     void            selectByCursorPosition(S32 prev_cursor_pos, S32 next_cursor_pos);
     void            setSelectAllOnFocusReceived(bool b);
@@ -175,7 +175,7 @@ public:
     autoreplace_callback_t mAutoreplaceCallback;
     void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
 
-    /*virtual*/ void    onSpellCheckPerformed();
+    /*virtual*/ void    onSpellCheckPerformed() override;
 
     //
     // Text manipulation
@@ -185,7 +185,7 @@ public:
     void            insertText(const std::string &text);
     void            insertText(std::string &text);
 
-    void            appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo);
+    void            appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo) override;
     // Non-undoable
     void            setText(ALStringViewExplicit utf8str, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
 
@@ -284,15 +284,15 @@ protected:
     bool            hasPreeditString() const;
 
     // Overrides LLPreeditor
-    virtual void    resetPreedit();
+    virtual void    resetPreedit() override;
     virtual void    updatePreedit(std::string_view preedit_string,
-                        const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position);
-    virtual void    markAsPreedit(S32 position, S32 length);
-    virtual void    getPreeditRange(S32 *position, S32 *length) const;
-    virtual void    getSelectionRange(S32 *position, S32 *length) const;
-    virtual bool    getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect *bounds, LLRect *control) const;
-    virtual S32     getPreeditFontSize() const;
-    virtual const std::string& getPreeditStringUtf8() const { return getText(); }
+                        const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position) override;
+    virtual void    markAsPreedit(S32 position, S32 length) override;
+    virtual void    getPreeditRange(S32 *position, S32 *length) const override;
+    virtual void    getSelectionRange(S32 *position, S32 *length) const override;
+    virtual bool    getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect *bounds, LLRect *control) const override;
+    virtual S32     getPreeditFontSize() const override;
+    virtual const std::string& getPreeditStringUtf8() const override { return getText(); }
 
     virtual bool    useFontBuffers() const { return getReadOnly(); }
     //

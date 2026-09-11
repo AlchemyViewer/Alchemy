@@ -161,7 +161,7 @@ class LLFavoriteLandmarkButton final : public LLButton
 public:
     AL_VIEW_TYPE(LLFavoriteLandmarkButton, LLButton);
 
-    bool handleToolTip(S32 x, S32 y, MASK mask)
+    bool handleToolTip(S32 x, S32 y, MASK mask) override
     {
         std::string region_name = mLandmarkInfoGetter.getName();
 
@@ -180,7 +180,7 @@ public:
         return true;
     }
 
-    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask)
+    /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) override
     {
         LLFavoritesBarCtrl* fb = getParentAs<LLFavoritesBarCtrl>();
 
@@ -195,7 +195,7 @@ public:
     void setLandmarkID(const LLUUID& id){ mLandmarkInfoGetter.setLandmarkID(id); }
     const LLUUID& getLandmarkID() const { return mLandmarkInfoGetter.getLandmarkID(); }
 
-    void onMouseEnter(S32 x, S32 y, MASK mask)
+    void onMouseEnter(S32 x, S32 y, MASK mask) override
     {
         if (LLToolDragAndDrop::getInstance()->hasMouseCapture())
         {
@@ -226,7 +226,7 @@ class LLFavoriteLandmarkMenuItem final : public LLMenuItemCallGL
 {
 public:
     AL_VIEW_TYPE(LLFavoriteLandmarkMenuItem, LLMenuItemCallGL);
-    bool handleToolTip(S32 x, S32 y, MASK mask)
+    bool handleToolTip(S32 x, S32 y, MASK mask) override
     {
         std::string region_name = mLandmarkInfoGetter.getName();
         if (!region_name.empty())
@@ -242,21 +242,21 @@ public:
     const LLUUID& getLandmarkID() const { return mLandmarkInfoGetter.getLandmarkID(); }
     void setLandmarkID(const LLUUID& id) { mLandmarkInfoGetter.setLandmarkID(id); }
 
-    virtual bool handleMouseDown(S32 x, S32 y, MASK mask)
+    virtual bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
         if (mouse_signal_t* signal = mouseDownSignal())
             (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseDown(x, y, mask);
     }
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask)
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
         if (mouse_signal_t* signal = mouseUpSignal())
             (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseUp(x, y, mask);
     }
 
-    virtual bool handleHover(S32 x, S32 y, MASK mask)
+    virtual bool handleHover(S32 x, S32 y, MASK mask) override
     {
         if (fb)
         {

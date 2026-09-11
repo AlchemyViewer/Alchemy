@@ -94,14 +94,14 @@ protected:
 public:
 
     // LLView overrides
-    /*virtual*/ void onVisibilityChange(bool new_visibility);
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleRightMouseUp(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onVisibilityChange(bool new_visibility) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleRightMouseUp(S32 x, S32 y, MASK mask) override;
 
     // LLUICtrl overrides
-    /*virtual*/ void setValue(const LLSD& value);
-    /*virtual*/ LLSD getValue() const;
+    /*virtual*/ void setValue(const LLSD& value) override;
+    /*virtual*/ LLSD getValue() const override;
 
     virtual bool hasAccelerator(const KEY &key, const MASK &mask) const;
     virtual bool handleAcceleratorKey(KEY key, MASK mask);
@@ -117,7 +117,7 @@ public:
 
     // set the font used by this item.
     void setFont(const LLFontGL* font) { mFont = font; }
-    const LLFontGL* getFont() const { return mFont; }
+    const LLFontGL* getFont() const override { return mFont; }
 
     // returns the height in pixels for the current font.
     virtual U32 getNominalHeight( void ) const;
@@ -133,7 +133,7 @@ public:
     // change the label
     void setLabel( const LLStringExplicit& label ) { mLabel = label; }
     std::string getLabel( void ) const { return mLabel.getString(); }
-    virtual bool setLabelArg( const std::string& key, const LLStringExplicit& text );
+    virtual bool setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
 
     // Get the parent menu for this item
     virtual class LLMenuGL* getMenu() const;
@@ -157,7 +157,7 @@ public:
     // for branching menu items, bring sub menus up to root level of menu hierarchy
     virtual void updateBranchParent( LLView* parentp ){};
 
-    virtual void onCommit( void );
+    virtual void onCommit( void ) override;
 
     virtual void setHighlight( bool highlight );
     virtual bool getHighlight() const { return mHighlight; }
@@ -171,15 +171,15 @@ public:
     virtual void setEnabledSubMenus(bool enable){};
 
     // LLView Functionality
-    virtual bool handleKeyHere( KEY key, MASK mask );
-    virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleMouseUp( S32 x, S32 y, MASK mask );
-    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
+    virtual bool handleKeyHere( KEY key, MASK mask ) override;
+    virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleMouseUp( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
 
-    virtual void    onMouseEnter(S32 x, S32 y, MASK mask);
-    virtual void    onMouseLeave(S32 x, S32 y, MASK mask);
+    virtual void    onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void    onMouseLeave(S32 x, S32 y, MASK mask) override;
 
-    virtual void draw( void );
+    virtual void draw( void ) override;
 
     bool getHover() const { return mGotHover; }
 
@@ -222,7 +222,7 @@ protected:
     // the current accelerator key and mask to the provided string.
     void appendAcceleratorString( std::string& st ) const;
 
-    virtual std::string _getSearchText() const
+    virtual std::string _getSearchText() const override
     {
         return mLabel.getString();
     }
@@ -297,14 +297,14 @@ public:
     LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
 
-    /*virtual*/ void draw( void );
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
+    /*virtual*/ void draw( void ) override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
 
-    virtual void buildDrawLabel();
+    virtual void buildDrawLabel() override;
 
-    /*virtual*/ U32 getNominalHeight( void ) const;
+    /*virtual*/ U32 getNominalHeight( void ) const override;
 
 private:
     enable_signal_t mVisibleSignal;
@@ -343,12 +343,12 @@ public:
     void initFromParams(const Params& p);
 
     // called to rebuild the draw label
-    virtual void buildDrawLabel( void );
+    virtual void buildDrawLabel( void ) override;
 
-    virtual void onCommit( void );
+    virtual void onCommit( void ) override;
 
-    virtual bool handleAcceleratorKey(KEY key, MASK mask);
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual bool handleAcceleratorKey(KEY key, MASK mask) override;
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
     //virtual void draw();
 
@@ -398,13 +398,13 @@ public:
 
     void initFromParams(const Params& p);
 
-    virtual void onCommit( void );
+    virtual void onCommit( void ) override;
 
-    virtual void setValue(const LLSD& value);
-    virtual LLSD getValue() const;
+    virtual void setValue(const LLSD& value) override;
+    virtual LLSD getValue() const override;
 
     // called to rebuild the draw label
-    virtual void buildDrawLabel( void );
+    virtual void buildDrawLabel( void ) override;
 
     boost::signals2::connection setCheckCallback( const enable_signal_t::slot_type& cb )
     {
@@ -504,16 +504,16 @@ public:
 
 
     // LLView Functionality
-    /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
-    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
-    /*virtual*/ void draw( void );
+    /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char ) override;
+    /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask ) override;
+    /*virtual*/ bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
+    /*virtual*/ void draw( void ) override;
     /*virtual*/ void drawBackground(LLMenuItemGL* itemp, F32 alpha);
-    /*virtual*/ void setVisible(bool visible);
-    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0);
-    /*virtual*/ void deleteAllChildren();
-    /*virtual*/ void removeChild( LLView* ctrl);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ void setVisible(bool visible) override;
+    /*virtual*/ bool addChild(LLView* view, S32 tab_group = 0) override;
+    /*virtual*/ void deleteAllChildren() override;
+    /*virtual*/ void removeChild( LLView* ctrl) override;
+    /*virtual*/ bool postBuild() override;
 
     virtual bool hasAccelerator(const KEY &key, const MASK &mask) const;
     virtual bool handleAcceleratorKey(KEY key, MASK mask);
@@ -624,7 +624,7 @@ public:
     // add a context menu branch
     bool appendContextSubMenu(LLMenuGL *menu);
 
-    const LLFontGL *getFont() const { return mFont; }
+    const LLFontGL *getFont() const override { return mFont; }
 
   protected:
     void createSpilloverBranch();
@@ -712,47 +712,47 @@ protected:
 public:
     virtual ~LLMenuItemBranchGL();
 
-    virtual bool handleMouseUp(S32 x, S32 y, MASK mask);
+    virtual bool handleMouseUp(S32 x, S32 y, MASK mask) override;
 
-    virtual bool hasAccelerator(const KEY &key, const MASK &mask) const;
-    virtual bool handleAcceleratorKey(KEY key, MASK mask);
+    virtual bool hasAccelerator(const KEY &key, const MASK &mask) const override;
+    virtual bool handleAcceleratorKey(KEY key, MASK mask) override;
 
     // check if we've used these accelerators already
-    virtual bool addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *listp);
+    virtual bool addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *listp) override;
 
     // called to rebuild the draw label
-    virtual void buildDrawLabel( void );
+    virtual void buildDrawLabel( void ) override;
 
-    virtual void onCommit( void );
+    virtual void onCommit( void ) override;
 
-    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
-    virtual bool handleUnicodeChar(llwchar uni_char, bool called_from_parent);
+    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
+    virtual bool handleUnicodeChar(llwchar uni_char, bool called_from_parent) override;
 
     // set the hover status (called by it's menu) and if the object is
     // active. This is used for behavior transfer.
-    virtual void setHighlight( bool highlight );
+    virtual void setHighlight( bool highlight ) override;
 
-    virtual bool handleKeyHere(KEY key, MASK mask);
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
 
-    virtual bool isActive() const;
+    virtual bool isActive() const override;
 
-    virtual bool isOpen() const;
+    virtual bool isOpen() const override;
 
     LLMenuGL* getBranch() const { return (LLMenuGL*)mBranchHandle.get(); }
 
-    virtual void updateBranchParent( LLView* parentp );
+    virtual void updateBranchParent( LLView* parentp ) override;
 
     // LLView Functionality
-    virtual void onVisibilityChange( bool curVisibilityIn );
+    virtual void onVisibilityChange( bool curVisibilityIn ) override;
 
-    virtual void draw();
+    virtual void draw() override;
 
-    virtual void setEnabledSubMenus(bool enabled) { if (getBranch()) getBranch()->setEnabledSubMenus(enabled); }
+    virtual void setEnabledSubMenus(bool enabled) override { if (getBranch()) getBranch()->setEnabledSubMenus(enabled); }
 
     virtual void openMenu();
 
-    virtual LLView* getChildView(std::string_view name, bool recurse = true) const;
-    virtual LLView* findChildView(std::string_view name, bool recurse = true) const;
+    virtual LLView* getChildView(std::string_view name, bool recurse = true) const override;
+    virtual LLView* findChildView(std::string_view name, bool recurse = true) const override;
 
 private:
     LLHandle<LLView> mBranchHandle;
@@ -788,18 +788,18 @@ public:
 
     // LLView Functionality
     // can't set visibility directly, must call show or hide
-    virtual void    setVisible          (bool visible);
+    virtual void    setVisible          (bool visible) override;
 
     virtual void    show                (S32 x, S32 y, LLView* spawning_view = NULL);
     virtual void    hide                ();
 
-    virtual bool    handleHover         ( S32 x, S32 y, MASK mask );
-    virtual bool    handleRightMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool    handleRightMouseUp  ( S32 x, S32 y, MASK mask );
+    virtual bool    handleHover         ( S32 x, S32 y, MASK mask ) override;
+    virtual bool    handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool    handleRightMouseUp  ( S32 x, S32 y, MASK mask ) override;
 
-    virtual bool    addChild            (LLView* view, S32 tab_group = 0);
-    /*virtual*/ void deleteAllChildren();
-    /*virtual*/ void removeChild(LLView* ctrl);
+    virtual bool    addChild            (LLView* view, S32 tab_group = 0) override;
+    /*virtual*/ void deleteAllChildren() override;
+    /*virtual*/ void removeChild(LLView* ctrl) override;
 
             LLHandle<LLContextMenu> getHandle() { return getDerivedHandle<LLContextMenu>(); }
 
@@ -832,13 +832,13 @@ public:
     virtual ~LLContextMenuBranch();
 
     // called to rebuild the draw label
-    virtual void    buildDrawLabel( void );
+    virtual void    buildDrawLabel( void ) override;
 
     // onCommit() - do the primary funcationality of the menu item.
-    virtual void    onCommit( void );
+    virtual void    onCommit( void ) override;
 
     LLContextMenu*  getBranch() { return mBranch.get(); }
-    void            setHighlight( bool highlight );
+    void            setHighlight( bool highlight ) override;
 
 protected:
     void    showSubMenu();
@@ -864,20 +864,20 @@ public:
     virtual ~LLMenuBarGL();
 
 
-    /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask);
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ bool handleJumpKey(KEY key);
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask) override;
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
+    /*virtual*/ bool handleJumpKey(KEY key) override;
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
-    /*virtual*/ void draw();
-    /*virtual*/ bool jumpKeysActive();
+    /*virtual*/ void draw() override;
+    /*virtual*/ bool jumpKeysActive() override;
 
     // add a vertical separator to this menu
-    virtual bool addSeparator();
+    virtual bool addSeparator() override;
 
     // LLView Functionality
-    virtual bool handleHover( S32 x, S32 y, MASK mask );
+    virtual bool handleHover( S32 x, S32 y, MASK mask ) override;
 
     // Returns x position of rightmost child, usually Help menu
     S32 getRightmostMenuEdge();
@@ -886,10 +886,10 @@ public:
 
 private:
     // add a menu - this will create a drop down menu.
-    virtual bool appendMenu( LLMenuGL* menu );
+    virtual bool appendMenu( LLMenuGL* menu ) override;
     // rearrange the child rects so they fit the shape of the menu
     // bar.
-    virtual void arrange( void );
+    virtual void arrange( void ) override;
 
     void checkMenuTrigger();
 
@@ -913,18 +913,18 @@ public:
     virtual ~LLMenuHolderGL() {}
 
     virtual bool hideMenus();
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     void setCanHide(bool can_hide) { mCanHide = can_hide; }
 
     // LLView functionality
-    virtual void draw();
-    virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
-    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask );
+    virtual void draw() override;
+    virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
+    virtual bool handleRightMouseDown( S32 x, S32 y, MASK mask ) override;
 
     // Close context menus on right mouse up not handled by menus.
-    /*virtual*/ bool handleRightMouseUp( S32 x, S32 y, MASK mask );
+    /*virtual*/ bool handleRightMouseUp( S32 x, S32 y, MASK mask ) override;
 
-    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
+    virtual bool handleKey(KEY key, MASK mask, bool called_from_parent) override;
     virtual const LLRect getMenuRect() const { return getLocalRect(); }
     LLMenuGL* getVisibleMenu() const;
     virtual bool hasVisibleMenu() const {return getVisibleMenu() != NULL;}
@@ -956,12 +956,12 @@ public:
     static LLTearOffMenu* create(LLMenuGL* menup);
     virtual ~LLTearOffMenu();
 
-    virtual void draw(void);
-    virtual void onFocusReceived();
-    virtual void onFocusLost();
-    virtual bool handleUnicodeChar(llwchar uni_char, bool called_from_parent);
-    virtual bool handleKeyHere(KEY key, MASK mask);
-    virtual void translate(S32 x, S32 y);
+    virtual void draw(void) override;
+    virtual void onFocusReceived() override;
+    virtual void onFocusLost() override;
+    virtual bool handleUnicodeChar(llwchar uni_char, bool called_from_parent) override;
+    virtual bool handleKeyHere(KEY key, MASK mask) override;
+    virtual void translate(S32 x, S32 y) override;
 
     void updateSize();
 
@@ -992,9 +992,9 @@ public:
 
     LLMenuItemTearOffGL( const Params& );
 
-    virtual void onCommit(void);
-    virtual void draw(void);
-    virtual U32 getNominalHeight() const;
+    virtual void onCommit(void) override;
+    virtual void draw(void) override;
+    virtual U32 getNominalHeight() const override;
 
     LLFloater* getParentFloater();
 };

@@ -57,17 +57,17 @@ public:
     LLPanelWearing();
     virtual ~LLPanelWearing();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
-    /*virtual*/ void onOpen(const LLSD& info);
+    /*virtual*/ void onOpen(const LLSD& info) override;
 
-    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string);
+    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string) override;
 
-    /*virtual*/ bool isActionEnabled(const LLSD& userdata);
+    /*virtual*/ bool isActionEnabled(const LLSD& userdata) override;
 
-    /*virtual*/ void getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const;
+    /*virtual*/ void getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const override;
 
     /*virtual*/ void copyToClipboard();
 
@@ -86,10 +86,10 @@ public:
     void onEditAttachment();
     void onRemoveAttachment();
 
-    void updateMenuItemsVisibility() {};
-    LLToggleableMenu* getGearMenu();
-    LLToggleableMenu* getSortMenu();
-    bool getTrashMenuVisible() { return false; }
+    void updateMenuItemsVisibility() override {};
+    LLToggleableMenu* getGearMenu() override;
+    LLToggleableMenu* getSortMenu() override;
+    bool getTrashMenuVisible() override { return false; }
 
 private:
     void onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y);

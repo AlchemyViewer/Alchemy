@@ -46,10 +46,10 @@ public:
     LLInspectToast(const LLSD& notification_idl);
     virtual ~LLInspectToast();
 
-    /*virtual*/ void onOpen(const LLSD& notification_id);
-    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
-    /*virtual*/ void deleteAllChildren();
-    /*virtual*/ void removeChild(LLView* child);
+    /*virtual*/ void onOpen(const LLSD& notification_id) override;
+    /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ void deleteAllChildren() override;
+    /*virtual*/ void removeChild(LLView* child) override;
 private:
     void onToastDestroy(LLToast * toast);
 

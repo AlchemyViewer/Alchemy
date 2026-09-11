@@ -49,24 +49,24 @@ public:
     virtual ~LLPanelGroupGeneral();
 
     // LLPanelGroupTab
-    virtual void activate();
-    virtual bool needsApply(std::string& mesg);
-    virtual bool apply(std::string& mesg);
-    virtual void cancel();
+    virtual void activate() override;
+    virtual bool needsApply(std::string& mesg) override;
+    virtual bool apply(std::string& mesg) override;
+    virtual void cancel() override;
 
-    virtual void update(LLGroupChange gc);
+    virtual void update(LLGroupChange gc) override;
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    virtual void draw();
+    virtual void draw() override;
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
-    virtual void setupCtrls (LLPanel* parent);
+    virtual void setupCtrls (LLPanel* parent) override;
 private:
     void    reset();
 
-    void    resetDirty();
+    void    resetDirty() override;
 
     static void onFocusEdit(LLFocusableElement* ctrl, void* data);
     static void onCommitAny(LLUICtrl* ctrl, void* data);

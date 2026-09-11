@@ -56,10 +56,10 @@ public:
 
 protected:
 
-    /*virtual*/ bool    postBuild();
-    void refresh();
-    void draw();
-    virtual void onOpen(const LLSD& key);
+    /*virtual*/ bool    postBuild() override;
+    void refresh() override;
+    void draw() override;
+    virtual void onOpen(const LLSD& key) override;
 
     void moveToInventory(bool wear, bool replace = false);
 

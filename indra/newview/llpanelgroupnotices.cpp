@@ -97,7 +97,7 @@ public:
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
     void setPanel (LLPanelGroupNotices* panel) {mGroupNoticesPanel = panel;};
     void setGroup (LLUUID group) {mGroupID = group;};
 

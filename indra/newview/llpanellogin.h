@@ -50,9 +50,9 @@ public:
                 void *callback_data);
     ~LLPanelLogin();
 
-    void draw();
+    void draw() override;
 
-    virtual void setFocus( bool b );
+    virtual void setFocus( bool b ) override;
 
     static void show(const LLRect &rect,
         void (*callback)(S32 option, void* user_data),
@@ -79,7 +79,7 @@ public:
     static void setAlwaysRefresh(bool refresh);
 
     // inherited from LLViewerMediaObserver
-    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event);
+    /*virtual*/ void handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event) override;
     static void updateServer();  // update the combo box, change the login page to the new server, clear the combo
 
     /// to be called from LLStartUp::setStartSLURL

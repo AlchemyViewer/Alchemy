@@ -37,8 +37,8 @@ public:
 private:
     friend class LLFloaterReg;
 
-    virtual bool postBuild();
-    virtual void onOpen(const LLSD& key);
+    virtual bool postBuild() override;
+    virtual void onOpen(const LLSD& key) override;
 
     void populateList();
     void onSelectionChange();
@@ -58,11 +58,11 @@ public:
     LLCameraPresetFlatItem(const std::string &preset_name, bool is_default);
     virtual ~LLCameraPresetFlatItem();
 
-    void setValue(const LLSD& value);
+    void setValue(const LLSD& value) override;
 
-    virtual bool postBuild();
-    virtual void onMouseEnter(S32 x, S32 y, MASK mask);
-    virtual void onMouseLeave(S32 x, S32 y, MASK mask);
+    virtual bool postBuild() override;
+    virtual void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    virtual void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     std::string getPresetName() { return mPresetName; }
 

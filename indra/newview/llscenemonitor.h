@@ -114,13 +114,13 @@ public:
 
     LLSceneMonitorView(const LLRect& rect);
     ~LLSceneMonitorView();
-    virtual void draw();
+    virtual void draw() override;
 
-    virtual void onVisibilityChange(bool visible);
+    virtual void onVisibilityChange(bool visible) override;
 
 protected:
-    virtual void onClose(bool app_quitting=false);
-    virtual void onClickCloseBtn(bool app_quitting=false);
+    virtual void onClose(bool app_quitting=false) override;
+    virtual void onClickCloseBtn(bool app_quitting=false) override;
     void onTeleportFinished();
     boost::signals2::connection sTeleportFinishConnection;
 };

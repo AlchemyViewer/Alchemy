@@ -122,15 +122,15 @@ public:
     /*virtual*/ ~LLPanel();
 
     // LLView interface
-    /*virtual*/ bool    isPanel() const;
+    /*virtual*/ bool    isPanel() const override;
     LLView*             badgeHolderView() override { return this; }
     LLBadgeHolder*      asBadgeHolder() override { return this; }
-    /*virtual*/ void    draw();
-    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
-    /*virtual*/ void    onVisibilityChange ( bool new_visibility );
+    /*virtual*/ void    draw() override;
+    /*virtual*/ bool    handleKeyHere( KEY key, MASK mask ) override;
+    /*virtual*/ void    onVisibilityChange ( bool new_visibility ) override;
 
     // From LLFocusableElement
-    /*virtual*/ void    setFocus( bool b );
+    /*virtual*/ void    setFocus( bool b ) override;
 
     // New virtuals
     virtual     void    refresh();  // called in setFocus()

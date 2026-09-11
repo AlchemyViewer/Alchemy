@@ -88,6 +88,7 @@ public:
     void setSentence(std::vector<Segment> segments);
 
     std::string valueOf(std::string_view name) const;
+    using LLUICtrl::setValue;
     void setValue(std::string_view name, const std::string& value);
     // The whole of it, for a caller passing it on rather than reading parts.
     LLSD query() const;

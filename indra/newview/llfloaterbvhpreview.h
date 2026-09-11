@@ -75,15 +75,15 @@ public:
     LLFloaterBvhPreview(const LLSD& args);
     virtual ~LLFloaterBvhPreview();
 
-    bool postBuild();
+    bool postBuild() override;
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleMouseUp(S32 x, S32 y, MASK mask);
-    bool handleHover(S32 x, S32 y, MASK mask);
-    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    void onMouseCaptureLost();
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    void onMouseCaptureLost() override;
 
-    void refresh();
+    void refresh() override;
 
     void onBtnPlay();
     void onBtnPause();
@@ -114,7 +114,7 @@ private:
 
 
 protected:
-    void            draw();
+    void            draw() override;
     void            resetMotion();
 
     LLPointer< LLPreviewAnimation > mAnimPreview;

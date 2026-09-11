@@ -58,9 +58,9 @@ public:
     LLConversationLogList(const Params& p);
     virtual ~LLConversationLogList();
 
-    virtual void draw();
+    virtual void draw() override;
 
-    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
 
     LLToggleableMenu*   getContextMenu() const { return mContextMenu.get(); }
 
@@ -74,14 +74,14 @@ public:
     /**
      * Changes from LLConversationLogObserver
      */
-    virtual void changed();
-    virtual void changed(const LLUUID& session_id, U32 mask);
+    virtual void changed() override;
+    virtual void changed(const LLUUID& session_id, U32 mask) override;
 
     /**
      * Changes from LLMuteListObserver
      */
-    virtual void onChange();
-    virtual void onChangeDetailed(const LLMute& mute);
+    virtual void onChange() override;
+    virtual void onChangeDetailed(const LLMute& mute) override;
 
 private:
 

@@ -45,15 +45,15 @@ public:
     LLFloaterSimpleSnapshot(const LLSD& key);
     ~LLFloaterSimpleSnapshot();
 
-    bool postBuild();
-    void onOpen(const LLSD& key);
-    void draw();
+    bool postBuild() override;
+    void onOpen(const LLSD& key) override;
+    void draw() override;
 
     static void update();
 
     static LLFloaterSimpleSnapshot* getInstance(const LLSD &key);
     static LLFloaterSimpleSnapshot* findInstance(const LLSD &key);
-    void saveTexture();
+    void saveTexture() override;
 
     const LLRect& getThumbnailPlaceholderRect() { return mThumbnailPlaceholder->getRect(); }
 

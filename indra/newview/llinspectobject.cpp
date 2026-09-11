@@ -76,18 +76,18 @@ public:
     LLInspectObject(const LLSD& object_id);
     virtual ~LLInspectObject();
 
-    /*virtual*/ bool postBuild(void);
+    /*virtual*/ bool postBuild(void) override;
 
     // Because floater is single instance, need to re-parse data on each spawn
     // (for example, inspector about same avatar but in different position)
-    /*virtual*/ void onOpen(const LLSD& avatar_id);
+    /*virtual*/ void onOpen(const LLSD& avatar_id) override;
 
     // Release the selection and do other cleanup
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     // override the inspector mouse leave so timer is only paused if
     // gear menu is not open
-    /* virtual */ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /* virtual */ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
 private:
     // Refresh displayed data with information from selection manager

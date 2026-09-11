@@ -77,8 +77,8 @@ public:
 
     LLPanelCameraZoom() { onCreate(); }
 
-    /* virtual */ bool  postBuild();
-    /* virtual */ void  draw();
+    /* virtual */ bool  postBuild() override;
+    /* virtual */ void  draw() override;
 
 protected:
     LLPanelCameraZoom(const Params& p) { onCreate(); }

@@ -64,23 +64,23 @@ public:
     virtual ~LLSlider();
     void            setValue( F32 value, bool from_event = false );
     // overrides for LLF32UICtrl methods
-    virtual void    setValue(const LLSD& value )    { setValue((F32)value.asReal(), true); }
+    virtual void    setValue(const LLSD& value ) override    { setValue((F32)value.asReal(), true); }
 
-    virtual void    setMinValue(const LLSD& min_value) { setMinValue((F32)min_value.asReal()); }
-    virtual void    setMaxValue(const LLSD& max_value) { setMaxValue((F32)max_value.asReal()); }
-    virtual void    setMinValue(F32 min_value) { LLF32UICtrl::setMinValue(min_value); updateThumbRect(); }
-    virtual void    setMaxValue(F32 max_value) { LLF32UICtrl::setMaxValue(max_value); updateThumbRect(); }
+    virtual void    setMinValue(const LLSD& min_value) override { setMinValue((F32)min_value.asReal()); }
+    virtual void    setMaxValue(const LLSD& max_value) override { setMaxValue((F32)max_value.asReal()); }
+    virtual void    setMinValue(F32 min_value) override { LLF32UICtrl::setMinValue(min_value); updateThumbRect(); }
+    virtual void    setMaxValue(F32 max_value) override { LLF32UICtrl::setMaxValue(max_value); updateThumbRect(); }
 
     boost::signals2::connection setMouseDownCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setMouseUpCallback( const commit_signal_t::slot_type& cb );
 
-    virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
-    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
-    virtual bool    handleKeyHere(KEY key, MASK mask);
-    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
-    virtual void    draw();
+    virtual bool    handleHover(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
+    virtual bool    handleKeyHere(KEY key, MASK mask) override;
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    virtual void    draw() override;
 
 private:
     void            setValueAndCommit(F32 value);

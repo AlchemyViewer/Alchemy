@@ -55,12 +55,12 @@ public:
     /**
     * Shows buttons when mouse is over
     */
-    /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask) override;
 
     /**
     * Hides buttons when mouse is out
     */
-    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask);
+    /*virtual*/ void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
 protected:
 
@@ -87,8 +87,8 @@ public:
         Params();
     };
 
-    bool postBuild();
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
+    bool postBuild() override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
 
     static LLPanelWearableOutfitItem* create(LLViewerInventoryItem* item,
                                              bool worn_indication_enabled,
@@ -99,7 +99,7 @@ public:
      */
     /*virtual*/ void updateItem(const std::string& name,
                                 bool favorite,
-                                EItemState item_state = IS_DEFAULT);
+                                EItemState item_state = IS_DEFAULT) override;
 
     void onAddWearable();
     void onRemoveWearable();
@@ -133,7 +133,7 @@ public:
 
     virtual ~LLPanelDeletableWearableListItem() {};
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Make button visible during mouse over event.
@@ -157,7 +157,7 @@ public:
     /** Set item title. Joint name is added to the title in parenthesis */
     /*virtual*/ void updateItem(const std::string& name,
                                 bool favorite,
-                                EItemState item_state = IS_DEFAULT);
+                                EItemState item_state = IS_DEFAULT) override;
 
 protected:
     LLPanelAttachmentListItem(LLViewerInventoryItem* item, const Params& params) : LLPanelDeletableWearableListItem(item, params) {};
@@ -190,7 +190,7 @@ public:
 
     virtual ~LLPanelClothingListItem();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
      * Make button visible during mouse over event.
@@ -227,7 +227,7 @@ public:
 
     virtual ~LLPanelBodyPartsListItem();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     /**
     * Make button visible during mouse over event.
@@ -258,7 +258,7 @@ public:
     };
     static LLPanelDummyClothingListItem* create(LLWearableType::EType w_type);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     LLWearableType::EType getWearableType() const;
 
 protected:

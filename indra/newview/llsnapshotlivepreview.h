@@ -60,8 +60,8 @@ public:
 
     void setContainer(LLView* container) { mViewContainer = container; }
 
-    /*virtual*/ void draw();
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent);
+    /*virtual*/ void draw() override;
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent) override;
 
     void setSize(S32 w, S32 h);
     void setWidth(S32 w) { mWidth[mCurImageIndex] = w; }

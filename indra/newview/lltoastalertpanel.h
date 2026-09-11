@@ -58,10 +58,10 @@ public:
     // User's responsibility to call show() after creating these.
     LLToastAlertPanel( LLNotificationPtr notep, bool is_modal );
 
-    virtual bool    handleKeyHere(KEY key, MASK mask );
+    virtual bool    handleKeyHere(KEY key, MASK mask ) override;
 
-    virtual void    draw();
-    virtual void    setVisible( bool visible );
+    virtual void    draw() override;
+    virtual void    setVisible( bool visible ) override;
 
     void            setCaution(bool val = true) { mCaution = val; }
     // If mUnique==true only one copy of this message should exist

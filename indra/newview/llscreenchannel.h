@@ -77,9 +77,9 @@ public:
 
     LLScreenChannelBase(const Params&);
 
-    bool postBuild();
+    bool postBuild() override;
 
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     // Channel's outfit-functions
     // update channel's size and position in the World View
@@ -176,20 +176,20 @@ public:
 
     // Channel's outfit-functions
     // update channel's size and position in the World View
-    void        updatePositionAndSize(LLRect new_rect);
+    void        updatePositionAndSize(LLRect new_rect) override;
     // initialization of channel's shape and position
-    void        init(S32 channel_left, S32 channel_right);
+    void        init(S32 channel_left, S32 channel_right) override;
 
     // Operating with toasts
     // add a toast to a channel
     void        addToast(const LLToast::Params& p);
     // kill or modify a toast by its ID
-    void        killToastByNotificationID(LLUUID id);
-    void        removeToastByNotificationID(LLUUID id);
+    void        killToastByNotificationID(LLUUID id) override;
+    void        removeToastByNotificationID(LLUUID id) override;
     void        killMatchedToasts(const Matcher& matcher);
     void        modifyToastByNotificationID(LLUUID id, LLPanel* panel);
     // hide all toasts from screen, but not remove them from a channel
-    void        hideToastsFromScreen();
+    void        hideToastsFromScreen() override;
     // hide toast by notification id
     void        hideToast(const LLUUID& notification_id);
 
@@ -199,9 +199,9 @@ public:
     void closeHiddenToasts(const Matcher& matcher);
 
     // removes all toasts from a channel
-    void        removeToastsFromChannel();
+    void        removeToastsFromChannel() override;
     // show all toasts in a channel
-    void        redrawToasts();
+    void        redrawToasts() override;
     //
     void        loadStoredToastsToChannel();
     // finds a toast among stored by its Notification ID and throws it on a screen to a channel

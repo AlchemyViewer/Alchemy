@@ -86,7 +86,7 @@ class LLChatHistory final : public LLUICtrl
         LLChatHistory(const Params&);
         friend class LLUICtrlFactory;
 
-        /*virtual*/ void draw();
+        /*virtual*/ void draw() override;
         /**
          * Redefinition of LLTextEditor::updateTextRect() to considerate text
          * left/right padding params.
@@ -108,7 +108,7 @@ class LLChatHistory final : public LLUICtrl
         LLView* getHeader(const LLChat& chat,const LLStyle::Params& style_params, const LLSD& args);
     public:
         ~LLChatHistory();
-        LLSD getValue() const;
+        LLSD getValue() const override;
         void initFromParams(const Params&);
 
         /**
@@ -123,7 +123,7 @@ class LLChatHistory final : public LLUICtrl
          * @param input_append_params - font style.
          */
         void appendMessage(const LLChat& chat, const LLSD &args = LLSD(), const LLStyle::Params& input_append_params = LLStyle::Params());
-        /*virtual*/ void clear();
+        /*virtual*/ void clear() override;
 
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-08-27 (Catznip-3.3)
     public:

@@ -43,11 +43,11 @@ public:
      * LLView overrides
      */
 public:
-    /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
-    /*virtual*/ bool hasAccelerators() const;
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& sdKey);
-    /*virtual*/ void onClose(bool fQuiting);
+    /*virtual*/ bool handleKeyHere(KEY key, MASK mask) override;
+    /*virtual*/ bool hasAccelerators() const override;
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& sdKey) override;
+    /*virtual*/ void onClose(bool fQuiting) override;
     void             setCanReplace(bool can_replace);
 
     /*

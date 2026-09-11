@@ -50,6 +50,7 @@ public:
     };
 
     // The colour as four floats, which is what the rest of the UI speaks.
+    using LLUICtrl::setColor;
     void setColor(const LLColor4& color);
     const LLColor4& color() const { return mColor; }
 

@@ -111,7 +111,7 @@ public:
 
     LLHintPopup(const Params&);
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
     void onClickClose()
     {
@@ -121,7 +121,7 @@ public:
             LLNotifications::instance().cancel(mNotification);
         }
     }
-    void draw();
+    void draw() override;
     void hide() { if(!mHidden) {mHidden = true; mFadeTimer.reset();} }
 
 private:

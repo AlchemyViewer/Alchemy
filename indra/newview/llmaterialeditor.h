@@ -57,7 +57,7 @@ public:
     LLFloaterComboOptions();
 
     virtual ~LLFloaterComboOptions();
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
 
     static LLFloaterComboOptions* showUI(
         combo_callback callback,

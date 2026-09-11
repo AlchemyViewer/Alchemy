@@ -83,8 +83,8 @@ public:
     LLOutfitListBase();
     virtual ~LLOutfitListBase();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void onOpen(const LLSD& info);
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void onOpen(const LLSD& info) override;
 
     void refreshList(const LLUUID& category_id);
     void computeDifference(const LLInventoryModel::cat_array_t& vcats, uuid_vec_t& vadded, uuid_vec_t& vremoved);
@@ -117,7 +117,7 @@ public:
     void outfitRightClickCallBack(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id);
 
     void onAction(const LLSD& userdata);
-    virtual bool isActionEnabled(const LLSD& userdata);
+    virtual bool isActionEnabled(const LLSD& userdata) override;
     virtual void performAction(std::string action);
     virtual bool hasItemSelected() = 0;
     virtual bool canWearSelected() = 0;
@@ -136,9 +136,9 @@ public:
 
     virtual void onChangeSortOrder(const LLSD& userdata) = 0;
 
-    virtual void updateMenuItemsVisibility();
-    virtual LLToggleableMenu* getGearMenu();
-    virtual bool getTrashMenuVisible() { return true; };
+    virtual void updateMenuItemsVisibility() override;
+    virtual LLToggleableMenu* getGearMenu() override;
+    virtual bool getTrashMenuVisible() override { return true; };
 
 protected:
     void observerCallback(const LLUUID& category_id);
@@ -277,8 +277,8 @@ public:
         Params() : cat_id("cat_id") {}
     };
 
-    virtual void draw();
-    virtual bool handleToolTip(S32 x, S32 y, MASK mask);
+    virtual void draw() override;
+    virtual bool handleToolTip(S32 x, S32 y, MASK mask) override;
 
     void setFavorite(bool is_favorite);
     bool getFavorite() const { return mIsFavorite; }
@@ -322,26 +322,26 @@ public:
     LLOutfitsList();
     virtual ~LLOutfitsList();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
     void initComparator();
 
-    /*virtual*/ void onOpen(const LLSD& info);
+    /*virtual*/ void onOpen(const LLSD& info) override;
 
 
     //virtual void refreshList(const LLUUID& category_id);
 
-    /*virtual*/ void updateAddedCategory(LLUUID cat_id);
-    /*virtual*/ void updateRemovedCategory(LLUUID cat_id);
+    /*virtual*/ void updateAddedCategory(LLUUID cat_id) override;
+    /*virtual*/ void updateRemovedCategory(LLUUID cat_id) override;
 
     // highlits currently worn outfit tab text and unhighlights previously worn
-    /*virtual*/ void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id);
+    /*virtual*/ void onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id) override;
 
     //void performAction(std::string action);
 
 
-    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string);
+    /*virtual*/ void onFilterSubStringChanged(const std::string& new_string, const std::string& old_string) override;
 
-    /*virtual*/ void getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const;
+    /*virtual*/ void getSelectedItemsUUIDs(uuid_vec_t& selected_uuids) const override;
 
     // Collects selected items from all selected lists and wears them(if possible- adds, else replaces)
     void wearSelectedItems();
@@ -349,25 +349,25 @@ public:
     /**
      * Returns true if there is a selection inside currently selected outfit
      */
-    /*virtual*/ bool hasItemSelected();
+    /*virtual*/ bool hasItemSelected() override;
 
     /**
     Collapses all outfit accordions.
     */
-    /*virtual*/ void onCollapseAllFolders();
+    /*virtual*/ void onCollapseAllFolders() override;
     /**
     Expands all outfit accordions.
     */
-    void onExpandAllFolders();
+    void onExpandAllFolders() override;
 
-    /*virtual*/ bool getHasExpandableFolders() { return true; }
+    /*virtual*/ bool getHasExpandableFolders() override { return true; }
 
-    /*virtual*/ void onChangeSortOrder(const LLSD& userdata);
-    virtual LLToggleableMenu* getSortMenu();
-    void updateMenuItemsVisibility();
+    /*virtual*/ void onChangeSortOrder(const LLSD& userdata) override;
+    virtual LLToggleableMenu* getSortMenu() override;
+    void updateMenuItemsVisibility() override;
 
 protected:
-    LLOutfitListGearMenuBase* createGearMenu();
+    LLOutfitListGearMenuBase* createGearMenu() override;
 
 private:
 
@@ -376,21 +376,21 @@ private:
      */
     //void computeDifference(const LLInventoryModel::cat_array_t& vcats, uuid_vec_t& vadded, uuid_vec_t& vremoved);
 
-    void getCurrentCategories(uuid_vec_t& vcur);
+    void getCurrentCategories(uuid_vec_t& vcur) override;
 
     /**
      * Updates tab displaying outfit identified by category_id.
      */
-    /*virtual*/ void updateChangedCategoryName(LLViewerInventoryCategory *cat, std::string name);
+    /*virtual*/ void updateChangedCategoryName(LLViewerInventoryCategory *cat, std::string name) override;
 
-    /*virtual*/ void sortOutfits();
+    /*virtual*/ void sortOutfits() override;
 
-    /*virtual*/ void onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid);
+    /*virtual*/ void onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid) override;
 
     /**
      * Resets previous selection and stores newly selected list and outfit id.
      */
-    /*virtual*/ void onChangeOutfitSelection(LLWearableItemsList* list, const LLUUID& category_id);
+    /*virtual*/ void onChangeOutfitSelection(LLWearableItemsList* list, const LLUUID& category_id) override;
 
     /**
      *Resets items selection inside outfit
@@ -400,7 +400,7 @@ private:
     /**
      * Removes the outfit from selection.
      */
-    /*virtual*/ void deselectOutfit(const LLUUID& category_id);
+    /*virtual*/ void deselectOutfit(const LLUUID& category_id) override;
 
     /**
      * Try restoring selection for a temporary hidden tab.
@@ -425,14 +425,14 @@ private:
     /**
      * Returns true if all selected items can be worn.
      */
-    bool canWearSelected();
+    bool canWearSelected() override;
 
     void onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y);
     void onCOFChanged();
 
     void onListSelectionChange(LLUICtrl* ctrl);
 
-    /*virtual*/ void onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id);
+    /*virtual*/ void onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id) override;
 
     static void onOutfitRename(const LLSD& notification, const LLSD& response);
 

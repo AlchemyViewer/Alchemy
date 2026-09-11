@@ -48,9 +48,9 @@ public:
     virtual void submit() = 0;
 
 public:
-    virtual void clear();
+    virtual void clear() override;
     virtual void update();
-    virtual void draw();
+    virtual void draw() override;
 
 protected:
     virtual void updateGroupName();

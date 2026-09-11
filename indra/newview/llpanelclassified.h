@@ -48,11 +48,11 @@ public:
     LLPanelClassifiedInfo();
     virtual ~LLPanelClassifiedInfo();
 
-    /*virtual*/ void onOpen(const LLSD& key);
+    /*virtual*/ void onOpen(const LLSD& key) override;
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type);
+    /*virtual*/ void processProperties(void* data, EAvatarProcessorType type) override;
 
     void setAvatarId(const LLUUID& avatar_id);
 
@@ -113,9 +113,9 @@ public:
             const LLVector3d& global_pos,
             const std::string& sim_name);
 
-    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
+    /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
 protected:
 

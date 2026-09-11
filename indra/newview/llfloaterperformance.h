@@ -42,8 +42,8 @@ public:
     LLFloaterPerformance(const LLSD& key);
     virtual ~LLFloaterPerformance();
 
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void draw() override;
 
     void showSelectedPanel(LLPanel* selected_panel);
     void showMainPanel();

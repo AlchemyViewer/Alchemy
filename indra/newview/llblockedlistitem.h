@@ -50,15 +50,15 @@ public:
     AL_VIEW_TYPE(LLBlockedListItem, LLPanel);
 
     LLBlockedListItem(const LLMute* item);
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
-    virtual void setValue(const LLSD& value);
+    virtual void setValue(const LLSD& value) override;
 
     void                    highlightName(const std::string& highlited_text);
-    const std::string&      getName() const { return mItemName; }
+    const std::string&      getName() const override { return mItemName; }
     const LLMute::EType&    getType() const { return mMuteType; }
     const LLUUID&           getUUID() const { return mItemID;   }
 

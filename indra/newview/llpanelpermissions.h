@@ -50,10 +50,10 @@ public:
     LLPanelPermissions();
     virtual ~LLPanelPermissions();
 
-    /*virtual*/ bool    postBuild();
+    /*virtual*/ bool    postBuild() override;
     void updateOwnerName(const LLUUID& owner_id, const LLAvatarName& owner_name, const LLStyle::Params& style_params);
     void updateCreatorName(const LLUUID& creator_id, const LLAvatarName& creator_name, const LLStyle::Params& style_params);
-    void refresh();                         // refresh all labels as needed
+    void refresh() override;                         // refresh all labels as needed
 
 protected:
     // statics

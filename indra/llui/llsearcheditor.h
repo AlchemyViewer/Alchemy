@@ -74,19 +74,19 @@ protected:
 public:
     virtual ~LLSearchEditor();
 
-    /*virtual*/ void    draw();
+    /*virtual*/ void    draw() override;
 
     void setText(ALStringViewExplicit new_text) { mSearchEditor->setText(new_text); }
-    const std::string& getText() const      { return mSearchEditor->getText(); }
+    const std::string& getText() const override      { return mSearchEditor->getText(); }
 
     // LLUICtrl interface
-    virtual void    setValue(const LLSD& value );
-    virtual LLSD    getValue() const;
-    virtual bool    setTextArg( const std::string& key, const LLStringExplicit& text );
-    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text );
+    virtual void    setValue(const LLSD& value ) override;
+    virtual LLSD    getValue() const override;
+    virtual bool    setTextArg( const std::string& key, const LLStringExplicit& text ) override;
+    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
     virtual void    setLabel( const LLStringExplicit &new_label );
-    virtual void    clear();
-    virtual void    setFocus( bool b );
+    virtual void    clear() override;
+    virtual void    setFocus( bool b ) override;
 
     void            setKeystrokeCallback( commit_callback_t cb ) { mKeystrokeCallback = cb; }
     void            setTextChangedCallback( commit_callback_t cb ) { mTextChangedCallback = cb; }

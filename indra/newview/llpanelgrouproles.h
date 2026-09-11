@@ -55,8 +55,8 @@ public:
     friend class LLPanelGroupRolesSubTab;
     friend class LLPanelGroupActionsSubTab;
 
-    virtual bool postBuild();
-    virtual bool isVisibleByAgent(LLAgent* agentp);
+    virtual bool postBuild() override;
+    virtual bool isVisibleByAgent(LLAgent* agentp) override;
 
 
     bool handleSubTabSwitch(const LLSD& data);
@@ -72,15 +72,15 @@ public:
     bool onModalClose(const LLSD& notification, const LLSD& response);
 
     // Most of these messages are just passed on to the current sub-tab.
-    virtual void activate();
-    virtual void deactivate();
-    virtual bool needsApply(std::string& mesg);
-    virtual bool hasModal();
-    virtual bool apply(std::string& mesg);
-    virtual void cancel();
-    virtual void update(LLGroupChange gc);
+    virtual void activate() override;
+    virtual void deactivate() override;
+    virtual bool needsApply(std::string& mesg) override;
+    virtual bool hasModal() override;
+    virtual bool apply(std::string& mesg) override;
+    virtual void cancel() override;
+    virtual void update(LLGroupChange gc) override;
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
 protected:
     LLPanelGroupTab*        mCurrentTab;
@@ -101,15 +101,15 @@ public:
     LLPanelGroupSubTab();
     virtual ~LLPanelGroupSubTab();
 
-    virtual bool postBuild();
+    virtual bool postBuild() override;
 
     // This allows sub-tabs to collect child widgets from a higher level in the view hierarchy.
     virtual bool postBuildSubTab(LLView* root);
 
     virtual void setSearchFilter( const std::string& filter );
 
-    virtual void activate();
-    virtual void deactivate();
+    virtual void activate() override;
+    virtual void deactivate() override;
 
     // Helper functions
     bool matchesActionSearchFilter(std::string action);
@@ -117,7 +117,7 @@ public:
 
     void setFooterEnabled(bool enable);
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 protected:
     void buildActionsList(LLScrollListCtrl* ctrl,
                                  U64 allowed_by_some,
@@ -163,7 +163,7 @@ public:
     LLPanelGroupMembersSubTab();
     virtual ~LLPanelGroupMembersSubTab();
 
-    virtual bool postBuildSubTab(LLView* root);
+    virtual bool postBuildSubTab(LLView* root) override;
 
     static void onMemberSelect(LLUICtrl*, void*);
     void handleMemberSelect();
@@ -194,17 +194,17 @@ public:
     void applyMemberChanges();
     bool addOwnerCB(const LLSD& notification, const LLSD& response);
 
-    virtual void activate();
-    virtual void deactivate();
-    virtual void cancel();
-    virtual bool needsApply(std::string& mesg);
-    virtual bool apply(std::string& mesg);
-    virtual void update(LLGroupChange gc);
+    virtual void activate() override;
+    virtual void deactivate() override;
+    virtual void cancel() override;
+    virtual bool needsApply(std::string& mesg) override;
+    virtual bool apply(std::string& mesg) override;
+    virtual void update(LLGroupChange gc) override;
     void updateMembers();
 
-    virtual void draw();
+    virtual void draw() override;
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
     void addMemberToList(LLGroupMemberData* data);
     void onNameCache(const LLUUID& update_id, LLGroupMemberData* member, const LLAvatarName& av_name, const LLUUID& av_id);
@@ -252,15 +252,15 @@ public:
     LLPanelGroupRolesSubTab();
     virtual ~LLPanelGroupRolesSubTab();
 
-    virtual bool postBuildSubTab(LLView* root);
+    virtual bool postBuildSubTab(LLView* root) override;
 
-    virtual void activate();
-    virtual void deactivate();
-    virtual bool needsApply(std::string& mesg);
-    virtual bool apply(std::string& mesg);
-    virtual void cancel();
+    virtual void activate() override;
+    virtual void deactivate() override;
+    virtual bool needsApply(std::string& mesg) override;
+    virtual bool apply(std::string& mesg) override;
+    virtual void cancel() override;
     bool matchesSearchFilter(std::string rolename, std::string roletitle);
-    virtual void update(LLGroupChange gc);
+    virtual void update(LLGroupChange gc) override;
 
     static void onRoleSelect(LLUICtrl*, void*);
     void handleRoleSelect();
@@ -291,7 +291,7 @@ public:
 
     void saveRoleChanges(bool select_saved_role);
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
     bool    mFirstOpen;
 
@@ -328,19 +328,19 @@ public:
     LLPanelGroupActionsSubTab();
     virtual ~LLPanelGroupActionsSubTab();
 
-    virtual bool postBuildSubTab(LLView* root);
+    virtual bool postBuildSubTab(LLView* root) override;
 
 
-    virtual void activate();
-    virtual void deactivate();
-    virtual bool needsApply(std::string& mesg);
-    virtual bool apply(std::string& mesg);
-    virtual void update(LLGroupChange gc);
-    virtual void onFilterChanged();
+    virtual void activate() override;
+    virtual void deactivate() override;
+    virtual bool needsApply(std::string& mesg) override;
+    virtual bool apply(std::string& mesg) override;
+    virtual void update(LLGroupChange gc) override;
+    virtual void onFilterChanged() override;
 
     void handleActionSelect();
 
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 protected:
     LLScrollListCtrl*   mActionList;
     LLScrollListCtrl*   mActionRoles;
@@ -358,11 +358,11 @@ public:
     LLPanelGroupBanListSubTab();
     virtual ~LLPanelGroupBanListSubTab() {}
 
-    virtual bool postBuildSubTab(LLView* root);
+    virtual bool postBuildSubTab(LLView* root) override;
 
-    virtual void activate();
-    virtual void update(LLGroupChange gc);
-    virtual void draw();
+    virtual void activate() override;
+    virtual void update(LLGroupChange gc) override;
+    virtual void draw() override;
 
     static void onBanEntrySelect(LLUICtrl* ctrl, void* user_data);
     void handleBanEntrySelect();
@@ -383,7 +383,7 @@ protected:
     void populateBanList();
 
 public:
-    virtual void setGroupID(const LLUUID& id);
+    virtual void setGroupID(const LLUUID& id) override;
 
 protected:
     LLNameListCtrl* mBanList;

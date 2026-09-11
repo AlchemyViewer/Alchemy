@@ -64,11 +64,11 @@ public:
     LLToolBarButton(const Params& p);
     ~LLToolBarButton();
 
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleHover(S32 x, S32 y, MASK mask);
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
 
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
-    void setEnabled(bool enabled);
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    void setEnabled(bool enabled) override;
     // Takes the command with the id, so the two cannot come apart. Commands are
     // registered once from commands.xml and never removed, so what is kept here
     // outlives the button; the alternative was looking the id up in the manager
@@ -79,11 +79,11 @@ public:
     void setStartDragCallback(tool_startdrag_callback_t cb)   { mStartDragItemCallback  = cb; }
     void setHandleDragCallback(tool_handledrag_callback_t cb) { mHandleDragItemCallback = cb; }
 
-    void onMouseEnter(S32 x, S32 y, MASK mask);
-    void onMouseLeave(S32 x, S32 y, MASK mask);
-    void onMouseCaptureLost();
+    void onMouseEnter(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    void onMouseCaptureLost() override;
 
-    void onCommit();
+    void onCommit() override;
 
     std::string getToolTip() const override;
 
@@ -253,15 +253,15 @@ public:
     };
 
     // virtuals
-    bool postBuild();
-    void draw();
-    void reshape(S32 width, S32 height, bool called_from_parent = true);
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask);
+    bool postBuild() override;
+    void draw() override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
+                                   std::string& tooltip_msg) override;
 
     static const int RANK_NONE = -1;
     bool addCommand(const LLCommandId& commandId, int rank = RANK_NONE);

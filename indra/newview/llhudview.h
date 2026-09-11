@@ -41,10 +41,10 @@ public:
     LLHUDView(const LLRect& rect);
     virtual ~LLHUDView();
 
-    virtual void draw();
+    virtual void draw() override;
 
 protected:
-    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
+    /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 };
 
 extern LLHUDView *gHUDView;

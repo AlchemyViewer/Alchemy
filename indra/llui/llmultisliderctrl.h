@@ -87,9 +87,9 @@ public:
     F32             getSliderValue(const std::string& name) const   { return mMultiSlider->getSliderValue(name); }
     void            setSliderValue(const std::string& name, F32 v, bool from_event = false);
 
-    virtual void    setValue(const LLSD& value );
-    virtual LLSD    getValue() const        { return mMultiSlider->getValue(); }
-    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text );
+    virtual void    setValue(const LLSD& value ) override;
+    virtual LLSD    getValue() const override        { return mMultiSlider->getValue(); }
+    virtual bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
 
     const std::string& getCurSlider() const                 { return mMultiSlider->getCurSlider(); }
     F32             getCurSliderValue() const               { return mCurValue; }
@@ -97,17 +97,17 @@ public:
     void            resetCurSlider();
     void            setCurSliderValue(F32 val, bool from_event = false) { setSliderValue(mMultiSlider->getCurSlider(), val, from_event); }
 
-    virtual void    setMinValue(const LLSD& min_value)  { setMinValue((F32)min_value.asReal()); }
-    virtual void    setMaxValue(const LLSD& max_value)  { setMaxValue((F32)max_value.asReal());  }
+    virtual void    setMinValue(const LLSD& min_value) override  { setMinValue((F32)min_value.asReal()); }
+    virtual void    setMaxValue(const LLSD& max_value) override  { setMaxValue((F32)max_value.asReal());  }
 
     bool            isMouseHeldDown();
 
-    virtual void    setEnabled( bool b );
-    virtual void    clear();
+    virtual void    setEnabled( bool b ) override;
+    virtual void    clear() override;
     virtual void    setPrecision(S32 precision);
-    void            setMinValue(F32 min_value) {mMultiSlider->setMinValue(min_value);}
-    void            setMaxValue(F32 max_value) {mMultiSlider->setMaxValue(max_value);}
-    void            setIncrement(F32 increment) {mMultiSlider->setIncrement(increment);}
+    void            setMinValue(F32 min_value) override {mMultiSlider->setMinValue(min_value);}
+    void            setMaxValue(F32 max_value) override {mMultiSlider->setMaxValue(max_value);}
+    void            setIncrement(F32 increment) override {mMultiSlider->setIncrement(increment);}
 
     F32             getNearestIncrement(F32 value) const { return mMultiSlider->getNearestIncrement(value); }
     F32             getSliderValueFromPos(S32 x, S32 y) const { return mMultiSlider->getSliderValueFromPos(x, y); }
@@ -123,8 +123,8 @@ public:
     void            deleteSlider(const std::string& name);
     void            deleteCurSlider()           { deleteSlider(mMultiSlider->getCurSlider()); }
 
-    F32             getMinValue() const { return mMultiSlider->getMinValue(); }
-    F32             getMaxValue() const { return mMultiSlider->getMaxValue(); }
+    F32             getMinValue() const override { return mMultiSlider->getMinValue(); }
+    F32             getMaxValue() const override { return mMultiSlider->getMaxValue(); }
 
     S32             getMaxNumSliders() const { return mMultiSlider->getMaxNumSliders(); }
     S32             getCurNumSliders() const { return mMultiSlider->getCurNumSliders(); }
@@ -138,12 +138,12 @@ public:
     boost::signals2::connection setSliderMouseDownCallback( const commit_signal_t::slot_type& cb );
     boost::signals2::connection setSliderMouseUpCallback( const commit_signal_t::slot_type& cb );
 
-    virtual void    onTabInto();
+    virtual void    onTabInto() override;
 
-    virtual void    setTentative(bool b);           // marks value as tentative
-    virtual void    onCommit();                     // mark not tentative, then commit
+    virtual void    setTentative(bool b) override;           // marks value as tentative
+    virtual void    onCommit() override;                     // mark not tentative, then commit
 
-    virtual void        setControlName(const std::string& control_name, LLView* context);
+    virtual void        setControlName(const std::string& control_name, LLView* context) override;
 
     static void     onSliderCommit(LLUICtrl* caller, const LLSD& userdata);
 

@@ -41,8 +41,8 @@ public:
 
     LLPanelLandMedia(LLSafeHandle<LLParcelSelection>& parcelp);
     /*virtual*/ ~LLPanelLandMedia();
-    /*virtual*/ bool postBuild();
-    void refresh();
+    /*virtual*/ bool postBuild() override;
+    void refresh() override;
     void setMediaType(const std::string& media_type);
     void setMediaURL(const std::string& media_type);
     std::string getMediaURL();

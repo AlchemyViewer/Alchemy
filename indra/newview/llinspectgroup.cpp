@@ -61,17 +61,17 @@ public:
 
     // Because floater is single instance, need to re-parse data on each spawn
     // (for example, inspector about same group but in different position)
-    /*virtual*/ void onOpen(const LLSD& group_id);
+    /*virtual*/ void onOpen(const LLSD& group_id) override;
 
     void setGroupID(const LLUUID& group_id);
 
     // When closing they should close their gear menu
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     // Update view based on information from group manager
     void processGroupData();
 
-    virtual void changed(LLGroupChange gc);
+    virtual void changed(LLGroupChange gc) override;
 
     // Make network requests for all the data to display in this view.
     // Used on construction and if avatar id changes.

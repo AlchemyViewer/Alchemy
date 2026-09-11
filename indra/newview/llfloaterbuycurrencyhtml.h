@@ -39,11 +39,11 @@ class LLFloaterBuyCurrencyHTML final :
 
         LLFloaterBuyCurrencyHTML( const LLSD& key );
 
-        /*virtual*/ bool postBuild();
-        /*virtual*/ void onClose( bool app_quitting );
+        /*virtual*/ bool postBuild() override;
+        /*virtual*/ void onClose( bool app_quitting ) override;
 
         // inherited from LLViewerMediaObserver
-        /*virtual*/ void handleMediaEvent( LLPluginClassMedia* self, EMediaEvent event );
+        /*virtual*/ void handleMediaEvent( LLPluginClassMedia* self, EMediaEvent event ) override;
 
         // allow our controlling parent to tell us paramters
         void setParams( bool specific_sum_requested, const std::string& message, S32 sum );

@@ -81,19 +81,19 @@ public:
     static LLFloaterWorldMap* getInstance();
 
     static void *createWorldMapView(void* data);
-    bool postBuild();
+    bool postBuild() override;
 
-    /*virtual*/ void onOpen(const LLSD& key);
-    /*virtual*/ void onClose(bool app_quitting);
+    /*virtual*/ void onOpen(const LLSD& key) override;
+    /*virtual*/ void onClose(bool app_quitting) override;
 
     static void reloadIcons(void*);
 
-    /*virtual*/ void reshape( S32 width, S32 height, bool called_from_parent = true );
-    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
-    /*virtual*/ void draw();
+    /*virtual*/ void reshape( S32 width, S32 height, bool called_from_parent = true ) override;
+    /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    /*virtual*/ void draw() override;
 
-    /*virtual*/ void onFocusLost();
+    /*virtual*/ void onFocusLost() override;
 
     // methods for dealing with inventory. The observe() method is
     // called during program startup. inventoryUpdated() will be
@@ -270,9 +270,9 @@ public:
     static LLPanelHideBeacon* getInstance();
 
     LLPanelHideBeacon();
-    /*virtual*/ bool postBuild();
-    /*virtual*/ void setVisible(bool visible);
-    /*virtual*/ void draw();
+    /*virtual*/ bool postBuild() override;
+    /*virtual*/ void setVisible(bool visible) override;
+    /*virtual*/ void draw() override;
 
 private:
     static LLPanelHideBeacon* getPanelHideBeacon();

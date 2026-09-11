@@ -60,10 +60,10 @@ public:
     LLStatusBar(const LLRect& rect );
     /*virtual*/ ~LLStatusBar();
 
-    /*virtual*/ void draw();
+    /*virtual*/ void draw() override;
 
-    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    /*virtual*/ bool postBuild() override;
 
     // MANIPULATORS
     void        setBalance(S32 balance);
@@ -77,7 +77,7 @@ public:
     void setLandCredit(S32 credit);
     void setLandCommitted(S32 committed);
 
-    void        refresh();
+    void        refresh() override;
     void setVisibleForMouselook(bool visible);
         // some elements should hide in mouselook
 

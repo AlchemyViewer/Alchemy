@@ -41,9 +41,9 @@ public:
 
     static LLPanelExperienceLog* create();
 
-    /*virtual*/ bool postBuild();
+    /*virtual*/ bool postBuild() override;
 
-    void refresh();
+    void refresh() override;
 protected:
     void logSizeChanged();
     void notifyChanged();

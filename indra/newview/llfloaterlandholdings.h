@@ -43,11 +43,11 @@ public:
     LLFloaterLandHoldings(const LLSD& key);
     virtual ~LLFloaterLandHoldings();
 
-    virtual bool postBuild();
-    virtual void onOpen(const LLSD& key);
-    virtual void draw();
+    virtual bool postBuild() override;
+    virtual void onOpen(const LLSD& key) override;
+    virtual void draw() override;
 
-    void refresh();
+    void refresh() override;
 
     void buttonCore(S32 which);
 

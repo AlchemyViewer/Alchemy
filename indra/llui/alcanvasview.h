@@ -73,7 +73,7 @@ public:
     LLView* root() const { return mRoot; }
 
     // Everything on the surface goes, and the surface forgets what it held.
-    void clear();
+    void clear() override;
 
     // Where the root sits, and how far past itself it draws, read again.
     // Call it after moving the root: where a root sits on a surface is
@@ -105,7 +105,7 @@ public:
     // asks, every time it draws -- otherwise the next change of size puts
     // the root back where the surface last put it, and a window cannot be
     // dragged by the handle it is meant to be dragged by.
-    void refresh();
+    void refresh() override;
 
     // A surface in a window of its own is as big as what it shows. A surface
     // that is a region of a window is as big as the region, and what it

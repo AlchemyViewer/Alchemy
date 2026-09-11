@@ -304,22 +304,22 @@ public:
     LLInventoryGalleryItem(const Params& p);
     virtual ~LLInventoryGalleryItem();
 
-    bool postBuild();
-    void draw();
-    bool handleMouseDown(S32 x, S32 y, MASK mask);
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask);
-    bool handleDoubleClick(S32 x, S32 y, MASK mask);
-    bool handleMouseUp(S32 x, S32 y, MASK mask);
-    bool handleHover(S32 x, S32 y, MASK mask);
+    bool postBuild() override;
+    void draw() override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,
                                    EAcceptance* accept,
-                                   std::string& tooltip_msg);
-    bool handleKeyHere(KEY key, MASK mask);
+                                   std::string& tooltip_msg) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
 
-    void onFocusLost();
-    void onFocusReceived();
+    void onFocusLost() override;
+    void onFocusReceived() override;
 
     LLFontGL* getTextFont();
 

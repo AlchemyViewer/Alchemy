@@ -44,8 +44,8 @@ class LLFloaterSettingsDebug final
 public:
     AL_VIEW_TYPE(LLFloaterSettingsDebug, LLFloater);
 
-    virtual bool postBuild();
-    virtual void draw();
+    virtual bool postBuild() override;
+    virtual void draw() override;
 
     void updateControl(LLControlVariable* control);
 
