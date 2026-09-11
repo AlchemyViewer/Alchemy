@@ -72,6 +72,11 @@ public:
     void setIndexEnabled(S32 index, bool enabled);
     // return the index value of the selected item
     S32 getSelectedIndex() const { return mSelectedIndex; }
+    // The item a yes or no picks out: the one whose value reads as it, and
+    // failing any that reads as either, the second for yes and the first
+    // for no. This is what lets a choice of two answer for a boolean
+    // setting. -1 when no item is that.
+    S32 getIndexForBool(bool which) const;
     // set the index value programatically
     bool setSelectedIndex(S32 index, bool from_event = false);
     // foxus child by index if it can get focus
@@ -80,6 +85,10 @@ public:
     // Accept and retrieve strings of the radio group control names
     virtual void    setValue(const LLSD& value );
     virtual LLSD    getValue() const;
+    // What the selection writes to the setting it is bound to: the item's
+    // value, or, for a setting that is a boolean, the yes or no the item
+    // stands for.
+    LLSD            getControlValue();
 
     // Update the control as needed.  Userdata must be a pointer to the button.
     void onClickButton(LLUICtrl* clicked_radio);

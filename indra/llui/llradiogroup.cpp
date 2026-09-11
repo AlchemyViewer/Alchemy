@@ -58,7 +58,7 @@ public:
     /*virtual*/ bool postBuild();
     /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
 
-    LLSD getPayload() { return mPayload; }
+    const LLSD& getPayload() const { return mPayload; }
 
     // Ensure label is in an attribute, not the contents
 
@@ -220,10 +220,68 @@ bool LLRadioGroup::setSelectedIndex(S32 index, bool from_event)
 
     if (!from_event)
     {
-        setControlValue(getValue());
+        setControlValue(getControlValue());
     }
 
     return true;
+}
+
+// Whether an item's value says yes or no: by being one, by being a number,
+// or by being a word for one.
+static bool reads_as_bool(const LLSD& value, bool& said)
+{
+    switch (value.type())
+    {
+    case LLSD::TypeBoolean:
+        said = value.asBoolean();
+        return true;
+    case LLSD::TypeInteger:
+        said = value.asInteger() != 0;
+        return true;
+    case LLSD::TypeString:
+        return LLStringUtil::convertToBOOL(value.asStringRef(), said);
+    default:
+        return false;
+    }
+}
+
+S32 LLRadioGroup::getIndexForBool(bool which) const
+{
+    bool any_said = false;
+    S32 idx = 0;
+    for (const LLRadioCtrl* radio : mRadioButtons)
+    {
+        bool said = false;
+        if (reads_as_bool(radio->getPayload(), said))
+        {
+            any_said = true;
+            if (said == which)
+            {
+                return idx;
+            }
+        }
+        ++idx;
+    }
+    if (!any_said && mRadioButtons.size() == 2)
+    {
+        return which ? 1 : 0;
+    }
+    return -1;
+}
+
+LLSD LLRadioGroup::getControlValue()
+{
+    LLControlVariable* control = getControlVariable();
+    if (control && control->type() == TYPE_BOOLEAN && mSelectedIndex >= 0)
+    {
+        bool said = false;
+        if (reads_as_bool(mRadioButtons[mSelectedIndex]->getPayload(), said))
+        {
+            return said;
+        }
+        return mSelectedIndex > 0;
+    }
+    return getValue();
 }
 
 void LLRadioGroup::focusSelectedRadioBtn()
@@ -356,8 +414,13 @@ void LLRadioGroup::setValue( const LLSD& value )
     }
     if (idx != -1)
     {
-        // string not found, try integer
-        if (value.isInteger())
+        // string not found: a yes or no picks the item that stands for
+        // it, a number picks by position
+        if (value.isBoolean())
+        {
+            setSelectedIndex(getIndexForBool(value.asBoolean()), true);
+        }
+        else if (value.isInteger())
         {
             setSelectedIndex((S32) value.asInteger(), true);
         }
