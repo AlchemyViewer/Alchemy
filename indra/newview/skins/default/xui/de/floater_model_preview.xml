@@ -77,19 +77,6 @@
 			<text name="name_label">
 				Modellname:
 			</text>
-			<text name="model_category_label">
-				Dieses Modell repräsentiert...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Eine auswählen..." name="Choose one"/>
-				<combo_item label="Avatarform" name="Avatar shape"/>
-				<combo_item label="Avatar-Anhang" name="Avatar attachment"/>
-				<combo_item label="Mobile Objekte (Fahrzeug, Tier)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Baukomponenten" name="Building Component"/>
-				<combo_item label="Groß, unbeweglich usw." name="Large, non moving etc"/>
-				<combo_item label="Kleiner, unbeweglich usw." name="Smaller, non-moving etc"/>
-				<combo_item label="Keine der oben genannten" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Detailstufe" name="lod_panel" title="Detailstufe">
@@ -99,7 +86,6 @@
 				<text initial_value="Hoch" name="high_label" value="Hoch"/>
 				<combo_box name="lod_source_high">
 					<item label="Aus Datei laden" name="Load from file" value="Aus Datei laden"/>
-					<item label="Generieren" name="Generate" value="Generieren"/>
 				</combo_box>
 				<button label="Durchsuchen..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="Mittel" name="medium_label" value="Mittel"/>
 				<combo_box name="lod_source_medium">
 					<item label="Aus Datei laden" name="Load from file" value="Aus Datei laden"/>
-					<item label="Generieren" name="Generate" value="Generieren"/>
 					<item label="Detailstufe oben verwenden" name="Use LoD above" value="Detailstufe oben verwenden"/>
 				</combo_box>
 				<button label="Durchsuchen..." name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="Niedrig" name="low_label" value="Niedrig"/>
 				<combo_box name="lod_source_low">
 					<item label="Aus Datei laden" name="Load from file" value="Aus Datei laden"/>
-					<item label="Generieren" name="Generate" value="Generieren"/>
 					<item label="Detailstufe oben verwenden" name="Use LoD above" value="Detailstufe oben verwenden"/>
 				</combo_box>
 				<button label="Durchsuchen..." name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="Niedrigste" name="lowest_label" value="Niedrigste"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Aus Datei laden" name="Load from file" value="Aus Datei laden"/>
-					<item label="Generieren" name="Generate" value="Generieren"/>
 					<item label="Detailstufe oben verwenden" name="Use LoD above" value="Detailstufe oben verwenden"/>
 				</combo_box>
 				<button label="Durchsuchen..." name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Texturen einschließen" name="upload_textures"/>
-				<text name="include_label">
-					Nur für Avatarmodelle:
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

@@ -15,9 +15,6 @@ Sie suchen nach Leuten? Verwenden Sie die [secondlife:///app/worldmap Karte].
 		Sie haben nicht das Richtige gefunden? Versuchen Sie es mit der [secondlife:///app/search/people/[SEARCH_TERM] Suche].
 	</string>
 	<string name="no_filtered_groups_msg" value="Sie haben nicht das Richtige gefunden? Versuchen Sie es mit der [secondlife:///app/search/groups/[SEARCH_TERM] Suche]."/>
-	<string name="no_groups_msg" value="Suchen Sie nach Gruppen? Versuchen Sie es mit der [secondlife:///app/search/groups Suche]."/>
-	<string name="MiniMapToolTipMsg" value="[REGION](Doppelklicken, um Karte zu öffnen; Umschalttaste gedrückt halten und ziehen, um zu schwenken)"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION](Doppelklicken, um zu teleportieren; Umschalttaste gedrückt halten und ziehen, um zu schwenken)"/>
 	<string name="GroupCountWithInfo" value="Du gehörst zu [COUNT] Gruppen, und kannst [REMAINING] weiteren beitreten. [secondlife:/// Erhöhe dein Limit]"/>
 	<tab_container name="tabs">
 		<panel label="IN DER NÄHE" name="nearby_panel">
@@ -40,7 +37,6 @@ Sie suchen nach Leuten? Verwenden Sie die [secondlife:///app/worldmap Karte].
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="Online"/>
 				<accordion_tab name="tab_all" title="Alle"/>
-				<accordion_tab name="tab_suggested_friends" title="Potenzielle Freunde"/>
 			</accordion>
 		</panel>
 		<panel label="GRUPPEN" name="groups_panel">
@@ -63,9 +59,6 @@ Sie suchen nach Leuten? Verwenden Sie die [secondlife:///app/worldmap Karte].
 				<button name="add_friend_btn" tool_tip="Einem Einwohner die Freundschaft anbieten"/>
 				<dnd_button name="recent_del_btn" tool_tip="Ausgewählte Person als Freund entfernen"/>
 			</panel>
-		</panel>
-		<panel label="IGNORIERT" name="blocked_panel">
-			<panel label="Ignorierte Einwohner und Objekte" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

@@ -86,7 +86,7 @@ um mehrere Mitglieder auszuwählen.</panel.string>
 		<text name="static2">Beschreibung</text>
 		<text name="static4">Mitglieder in Rolle</text>
 		<check_box label="Mitglieder anzeigen" name="role_visible_in_list" tool_tip="Festlegen, ob Mitglieder in dieser Rolle auf der Registerkarte  'Allgemein ' für Personen außerhalb der Gruppe sichtbar sind."/>
-		<text name="static5" tool_tip="Eine Liste der Fähigkeiten der aktuell ausgewählten Rolle.">Zulässige Fähigkeiten</text>
+		<text name="static5">Zulässige Fähigkeiten</text>
 		<scroll_list name="role_allowed_actions" tool_tip="Um detaillierte Informationen zu den Fähigkeiten anzuzeigen, siehe Registerkarte Fähigkeiten.">
 			<scroll_list.columns label="" name="checkbox"/>
 			<scroll_list.columns label="" name="action"/>

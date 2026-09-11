@@ -34,14 +34,14 @@
 			<text name="ContentRatingText">Adult</text>
 			<text name="Owner:">Eigentümer:</text>
 			<text name="Group:">Gruppe:</text>
-			<button label="Festlegen" label_selected="Einstellen..." name="Set..." width="90"/>
+			<button label="Festlegen" name="Set..." width="90"/>
 			<check_box label="Übertragung an Gruppe zulassen" name="check deed" tool_tip="Ein Gruppen-Officer kann dieses Land der Gruppe übertragen. Das Land wird dann über die Landzuteilung der Gruppe verwaltet."/>
-			<button label="Übertragung" label_selected="Übertragen..." name="Deed..." tool_tip="Sie können Land nur übertragen, wenn Sie in der ausgewählten Gruppe Officer sind."/>
+			<button label="Übertragung" name="Deed..." tool_tip="Sie können Land nur übertragen, wenn Sie in der ausgewählten Gruppe Officer sind."/>
 			<check_box label="Eigentümer leistet Beitrag durch Übertragung" name="check contrib" tool_tip="Wenn das Land an die Gruppe übertragen wird, trägt der frühere Eigentümer ausreichend Landnutzungsrechte bei, um es zu halten."/>
 			<text name="For Sale:">Zum Verkauf:</text>
 			<text name="Not for sale.">Nicht zu verkaufen</text>
 			<text name="For Sale: Price L$[PRICE].">Preis: [PRICE] L$ ([PRICE_PER_SQM]L$/m²)</text>
-			<button label="Land verkaufen" label_selected="Land verkaufen..." name="Sell Land..."/>
+			<button label="Land verkaufen" name="Sell Land..."/>
 			<text name="For sale to">Zum Verkauf an: [BUYER]</text>
 			<text name="Sell with landowners objects in parcel.">Objekte sind im Verkauf eingeschlossen</text>
 			<text name="Selling with no objects in parcel.">Objekte sind im Verkauf nicht eingeschlossen</text>
@@ -52,13 +52,13 @@
 			<text name="PriceText">4.048 m²</text>
 			<text name="Traffic:">Traffic:</text>
 			<text name="DwellText">Laden...</text>
-			<button label="Land kaufen" label_selected="Land kaufen..." name="Buy Land..."/>
-			<button label="Linden-Verkauf" label_selected="Linden-Verkauf..." name="Linden Sale..." tool_tip="Land muss Eigentum und auf Inhalt gesetzt sein und nicht zur Auktion stehen."/>
+			<button label="Land kaufen" name="Buy Land..."/>
+			<button label="Linden-Verkauf" name="Linden Sale..." tool_tip="Land muss Eigentum und auf Inhalt gesetzt sein und nicht zur Auktion stehen."/>
 			<button label="Skriptinfo" name="Scripts..."/>
-			<button label="Für Gruppe kaufen" label_selected="Für Gruppe kaufen..." name="Buy For Group..."/>
-			<button label="Pass kaufen" label_selected="Pass kaufen..." name="Buy Pass..." tool_tip="Ein Pass gibt Ihnen zeitbegrenzten Zugang zu diesem Land."/>
-			<button label="Land aufgeben" label_selected="Land aufgeben..." name="Abandon Land..."/>
-			<button label="Land in Besitz nehmen" label_selected="Land in Besitz nehmen..." name="Reclaim Land..."/>
+			<button label="Für Gruppe kaufen" name="Buy For Group..."/>
+			<button label="Pass kaufen" name="Buy Pass..." tool_tip="Ein Pass gibt Ihnen zeitbegrenzten Zugang zu diesem Land."/>
+			<button label="Land aufgeben" name="Abandon Land..."/>
+			<button label="Land in Besitz nehmen" name="Reclaim Land..."/>
 		</panel>
 		<panel label="VERTRAG" name="land_covenant_panel">
 			<panel.string name="can_resell">Gekauftes Land in dieser Region kann wiederverkauft werden.</panel.string>
@@ -96,21 +96,21 @@ werden.</text>
 			<text name="Owned by parcel owner:" width="200">Im Eigentum des Parzellenbesitzers:</text>
 			<text left_delta="204" name="owner_objects_text">[COUNT]</text>
 			<button label="Anzeigen" label_selected="Anzeigen" name="ShowOwner"/>
-			<button label="Zurückgeben" label_selected="Zurückgeben..." name="ReturnOwner..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
+			<button label="Zurückgeben" name="ReturnOwner..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
 			<text name="Set to group:">Der Gruppe zugeordnet:</text>
 			<text name="group_objects_text">[COUNT]</text>
 			<button label="Anzeigen" label_selected="Anzeigen" name="ShowGroup"/>
-			<button label="Zurückgeben" label_selected="Zurückgeben..." name="ReturnGroup..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
+			<button label="Zurückgeben" name="ReturnGroup..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
 			<text name="Owned by others:">Im Eigentum anderer:</text>
 			<text name="other_objects_text">[COUNT]</text>
 			<button label="Anzeigen" label_selected="Anzeigen" name="ShowOther"/>
-			<button label="Zurückgeben" label_selected="Zurückgeben..." name="ReturnOther..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
+			<button label="Zurückgeben" name="ReturnOther..." tool_tip="Objekte an ihre Eigentümer zurückgeben."/>
 			<text name="Selected / sat upon:">Ausgewählt/gesessen auf:</text>
 			<text name="selected_objects_text">[COUNT]</text>
 			<text name="Autoreturn">Objekte anderer Einwohner automatisch zurückgeben (Minuten, 0 für aus):</text>
 			<text name="Object Owners:">Objekteigentümer:</text>
-			<button label="Liste aktualisieren" label_selected="Liste aktualisieren" name="Refresh List" tool_tip="Objektliste aktualisieren"/>
-			<button label="Objekte zurückgeben" label_selected="Objekte zurückgeben..." name="Return objects..."/>
+			<button name="Refresh List" tool_tip="Objektliste aktualisieren"/>
+			<button label="Objekte zurückgeben" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="Typ" name="type"/>
 				<name_list.columns label="Name" name="name"/>
@@ -162,9 +162,9 @@ Nur große Parzellen können in der Suche aufgeführt werden.</panel.string>
 			</combo_box>
 			<check_box label="Moderater Inhalt" name="MatureCheck" tool_tip=""/>
 			<text name="Snapshot:">Foto:</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Klicken Sie hier, um ein Bild auszuwählen"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Klicken Sie hier, um ein Bild auszuwählen"/>
 			<text name="allow_see_label">Avatare in anderen Parzellen können Avatare in dieser Parzelle sehen und mit ihnen chatten.</text>
-			<check_box label="Avatare sehen" name="SeeAvatarsCheck" tool_tip="Gestattet sowohl Avataren auf anderen Parzellen, Avatare auf dieser Parzelle zu sehen und mit ihnen zu chatten, als auch Ihnen, diese Avatare auf anderen Parzellen zu sehen und mit ihnen zu chatten."/>
+			<check_box name="SeeAvatarsCheck" tool_tip="Gestattet sowohl Avataren auf anderen Parzellen, Avatare auf dieser Parzelle zu sehen und mit ihnen zu chatten, als auch Ihnen, diese Avatare auf anderen Parzellen zu sehen und mit ihnen zu chatten."/>
 			<text name="landing_point">Landepunkt: [LANDING]</text>
 			<button label="Festlegen" label_selected="Festlegen" name="Set" tool_tip="Legt Ihren Standort als Landepunkt fest, an dem Besucher ankommen. Legt die Position Ihres Avatars innerhalb dieser Parzelle fest." width="70"/>
 			<button label="Löschen" label_selected="Löschen" name="Clear" tool_tip="Landepunkt löschen" width="70"/>
@@ -183,7 +183,7 @@ Nur große Parzellen können in der Suche aufgeführt werden.</panel.string>
 			<text name="Description:">Inhalt:</text>
 			<line_editor name="url_description" tool_tip="Text, der neben der Abspielen/Laden-Schaltfläche angezeigt wird"/>
 			<text name="Media texture:">Textur ersetzen:</text>
-			<texture_picker label="" name="media texture" tool_tip="Klicken Sie hier, um ein Bild auszuwählen"/>
+			<texture_picker name="media texture" tool_tip="Klicken Sie hier, um ein Bild auszuwählen"/>
 			<text name="replace_texture_help">Objekte, die diese Textur verwenden, werden den Film oder die Webseite anzeigen, nachdem Sie auf den Pfeil (Wiedergabe) klicken.  Wählen Sie das kleine Bild aus, um eine andere Textur auszuwählen.</text>
 			<check_box label="Automatisch skalieren" name="media_auto_scale" tool_tip="Aktivieren Sie diese Option, um den Inhalt für diese Parzelle automatisch zu skalieren. Dies ist eventuell langsamer und die Qualität ist schlechter, aber Sie müssen keine weitere Texturskalierung oder -anpassung vornehmen."/>
 			<text name="media_size" tool_tip="Darstellungsgröße von Webmedien, für Standard bei 0 belassen.">Größe:</text>

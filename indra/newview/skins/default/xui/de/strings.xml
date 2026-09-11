@@ -15,9 +15,6 @@
 	<string name="SUPPORT_SITE">
 		Second Life Support-Portal
 	</string>
-	<string name="StartupDetectingHardware">
-		Hardware wird erfasst...
-	</string>
 	<string name="StartupLoading">
 		[APP_NAME] wird geladen...
 	</string>
@@ -350,60 +347,6 @@ Warten Sie kurz und versuchen Sie dann noch einmal, sich anzumelden.
 	</string>
 	<string name="TestingDisconnect">
 		Verbindungsabbruch wird getestet
-	</string>
-	<string name="SocialFacebookConnecting">
-		Mit Facebook verbinden...
-	</string>
-	<string name="SocialFacebookPosting">
-		Posten...
-	</string>
-	<string name="SocialFacebookDisconnecting">
-		Facebook-Verbindung trennen...
-	</string>
-	<string name="SocialFacebookErrorConnecting">
-		Problem beim Verbinden mit Facebook
-	</string>
-	<string name="SocialFacebookErrorPosting">
-		Problem beim Posten auf Facebook
-	</string>
-	<string name="SocialFacebookErrorDisconnecting">
-		Problem beim Trennen der Facebook-Verbindung
-	</string>
-	<string name="SocialFlickrConnecting">
-		Verbinden mit Flickr...
-	</string>
-	<string name="SocialFlickrPosting">
-		Posten...
-	</string>
-	<string name="SocialFlickrDisconnecting">
-		Flickr-Verbindung wird getrennt...
-	</string>
-	<string name="SocialFlickrErrorConnecting">
-		Problem beim Verbinden mit Flickr
-	</string>
-	<string name="SocialFlickrErrorPosting">
-		Problem beim Posten auf Flickr
-	</string>
-	<string name="SocialFlickrErrorDisconnecting">
-		Problem beim Trennen der Flickr-Verbindung
-	</string>
-	<string name="SocialTwitterConnecting">
-		Verbinden mit Twitter...
-	</string>
-	<string name="SocialTwitterPosting">
-		Posten...
-	</string>
-	<string name="SocialTwitterDisconnecting">
-		Twitter-Verbindung wird getrennt...
-	</string>
-	<string name="SocialTwitterErrorConnecting">
-		Problem beim Verbinden mit Twitter
-	</string>
-	<string name="SocialTwitterErrorPosting">
-		Problem beim Posten auf Twitter
-	</string>
-	<string name="SocialTwitterErrorDisconnecting">
-		Problem beim Trennen der Twitter-Verbindung
 	</string>
 	<string name="BlackAndWhite">
 		Schwarzweiß
@@ -1161,7 +1104,6 @@ besuchen Sie bitte http://secondlife.com/support
 	<string name="AgentNameSubst">
 		(Sie)
 	</string>
-	<string name="JoinAnExperience"/>
 	<string name="SilentlyManageEstateAccess">
 		Beim Verwalten von Grundbesitzzugangslisten Warnhinweise unterdrücken
 	</string>
@@ -1534,14 +1476,12 @@ besuchen Sie bitte http://secondlife.com/support
 	<string name="InventoryOutboxNotMerchantTitle">
 		Jeder kann Artikel im Marktplatz verkaufen.
 	</string>
-	<string name="InventoryOutboxNotMerchantTooltip"/>
 	<string name="InventoryOutboxNotMerchant">
 		Wenn Sie als Händler aktiv werden möchten, müssen Sie einen [[MARKETPLACE_CREATE_STORE_URL] Laden im Marktplatz erstellen].
 	</string>
 	<string name="InventoryOutboxNoItemsTitle">
 		Ihre Outbox ist leer.
 	</string>
-	<string name="InventoryOutboxNoItemsTooltip"/>
 	<string name="InventoryOutboxNoItems">
 		Ziehen Sie Ordner in dien Bereich und klicken Sie auf „In Marktplatz übertragen“, um sie im [[MARKETPLACE_DASHBOARD_URL] Marktplatz] zum Verkauf anzubieten.
 	</string>
@@ -2663,9 +2603,6 @@ Falls diese Meldung weiterhin angezeigt wird, wenden Sie sich unter http://suppo
 	<string name="GroupMoneyDebits">
 		Soll
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc] [mth,datetime,utc] [day,datetime,utc], [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		Erworbene Artikel
 	</string>
@@ -2674,9 +2611,6 @@ Falls diese Meldung weiterhin angezeigt wird, wenden Sie sich unter http://suppo
 	</string>
 	<string name="UploadingCosts">
 		Das Hochladen von [NAME] kostet [AMOUNT] L$
-	</string>
-	<string name="BuyingCosts">
-		Die Kosten betragen: [AMOUNT] L$
 	</string>
 	<string name="UnknownFileExtension">
 		Unbekanntes Dateiformat .%s
@@ -2959,16 +2893,6 @@ Ausführung erfolgt in Fenster.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Beschreibung für Pixelformat nicht verfügbar
-	</string>
-	<string name="MBTrueColorWindow">
-		Um [APP_NAME] auszuführen, ist True Color (32-bit) erforderlich.
-Klicken Sie öffnen Sie auf Ihrem Computer die Einstellungen für die Anzeige und stellen Sie den Bildschirm auf 32-bit Farbe ein.
-	</string>
-	<string name="MBAlpha">
-		[APP_NAME] kann nicht ausgeführt werden, da kein 8-Bit-Alpha-Kanal verfügbar ist.  Dies geschieht normalerweise bei Problemen mit dem Treiber der Video-Karte.
-Bitte vergewissern Sie sich, dass Sie die aktuellsten Treiber für Ihre Videokarte installiert haben.
-Vergewissern Sie sich außerdem, dass Ihr Bildschirm auf True Color (32-Bit) eingestellt ist (Systemsteuerung &gt; Anzeige &gt; Einstellungen).
-Falls diese Meldung weiterhin angezeigt wird, wenden Sie sich bitte an [SUPPORT_SITE].
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Pixel-Format kann nicht eingestellt werden.
@@ -4584,15 +4508,6 @@ Erfahren Sie mehr unter https://second.life/scripted-agents.
 	<string name="share_alert">
 		Objekte aus dem Inventar hier her ziehen
 	</string>
-	<string name="facebook_post_success">
-		Sie haben auf Facebook gepostet.
-	</string>
-	<string name="flickr_post_success">
-		Sie haben auf Flickr gepostet.
-	</string>
-	<string name="twitter_post_success">
-		Sie haben auf Twitter gepostet.
-	</string>
 	<string name="no_session_message">
 		(IM-Session nicht vorhanden)
 	</string>
@@ -5033,9 +4948,6 @@ Missbrauchsbericht
 	<string name="dance8">
 		Tanzen8
 	</string>
-	<string name="AvatarBirthDateFormat">
-		[mthnum,datetime,slt]/[day,datetime,slt]/[year,datetime,slt]
-	</string>
 	<string name="DefaultMimeType">
 		Keine/Keiner
 	</string>
@@ -5121,7 +5033,7 @@ Bitte überprüfen Sie http://status.secondlifegrid.net, um herauszufinden, ob e
 	<string name="Notices">
 		Mitteilungen
 	</string>
-	<string name="Chat" value=" Chat:">
+	<string name="Chat">
 		Chat
 	</string>
 	<string name="BaseMembership">
@@ -5525,12 +5437,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	<string name="Command_Environments_Label">
 		Meine Umgebungen
 	</string>
-	<string name="Command_Facebook_Label">
-		Facebook
-	</string>
-	<string name="Command_Flickr_Label">
-		Flickr
-	</string>
 	<string name="Command_Gestures_Label">
 		Gesten
 	</string>
@@ -5554,9 +5460,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	</string>
 	<string name="Command_Move_Label">
 		Gehen / Rennen / Fliegen
-	</string>
-	<string name="Command_Outbox_Label">
-		Händler-Outbox
 	</string>
 	<string name="Command_People_Label">
 		Leute
@@ -5584,9 +5487,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	</string>
 	<string name="Command_Speak_Label">
 		Sprechen
-	</string>
-	<string name="Command_Twitter_Label">
-		Twitter
 	</string>
 	<string name="Command_View_Label">
 		Kamerasteuerungen
@@ -5621,12 +5521,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	<string name="Command_Environments_Tooltip">
 		Meine Umgebungen
 	</string>
-	<string name="Command_Facebook_Tooltip">
-		Auf Facebook posten
-	</string>
-	<string name="Command_Flickr_Tooltip">
-		Auf Flickr hochladen
-	</string>
 	<string name="Command_Gestures_Tooltip">
 		Gesten für Ihren Avatar
 	</string>
@@ -5650,9 +5544,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	</string>
 	<string name="Command_Move_Tooltip">
 		Ihren Avatar bewegen
-	</string>
-	<string name="Command_Outbox_Tooltip">
-		Artikel zum Verkauf in den Marktplatz übertragen
 	</string>
 	<string name="Command_People_Tooltip">
 		Freunde, Gruppen und Leute in der Nähe
@@ -5680,9 +5571,6 @@ Setzen Sie den Editorpfad in Anführungszeichen
 	</string>
 	<string name="Command_Speak_Tooltip">
 		Über Ihr Mikrofon mit Leuten in der Nähe sprechen
-	</string>
-	<string name="Command_Twitter_Tooltip">
-		Twitter
 	</string>
 	<string name="Command_View_Tooltip">
 		Kamerawinkel ändern

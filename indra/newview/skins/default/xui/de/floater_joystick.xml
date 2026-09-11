@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="JOYSTICK-KONFIGURATION">
-	<check_box label="Joystick aktivieren:" name="enable_joystick" width="80"/>
+	<check_box name="enable_joystick" width="80"/>
 	<text left="140" name="joystick_type" width="360"/>
 	<spinner label="X-Achse" name="JoystickAxis1"/>
 	<spinner label="Y-Achse" name="JoystickAxis2"/>
@@ -74,7 +74,4 @@
 		<stat_bar label="Achse 4" name="axis4"/>
 		<stat_bar label="Achse 5" name="axis5"/>
 	</stat_view>
-	<string name="NoDevice">
-		Kein Gerät erkannt
-	</string>
 </floater>

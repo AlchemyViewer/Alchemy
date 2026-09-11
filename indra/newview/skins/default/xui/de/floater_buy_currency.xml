@@ -3,17 +3,8 @@
 	<floater.string name="buy_currency">
 		[LINDENS] L$ für ca. [LOCALAMOUNT] kaufen
 	</floater.string>
-	<text name="buying_label">
-		Zum Preis von
-	</text>
-	<text name="buy_action">
-		[ACTION]
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php Zahlungsart] | [http://www.secondlife.com/my/account/currency.php Währung]
-	</text>
-	<text name="purchase_warning_notenough">
-		Sie kaufen nicht genügend L$. Bitte erhöhen Sie den Betrag.
 	</text>
   <floater.string name="info_cannot_buy">
 		Kaufabbruch

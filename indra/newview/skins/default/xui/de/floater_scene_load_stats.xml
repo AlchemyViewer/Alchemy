@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Scene Load Statistics" title="STATISTIKEN ZUM LADEN VON SZENEN">
-	<button label="Anhalten" name="playpause"/>
 	<scroll_container name="statistics_scroll">
 		<container_view name="statistics_view">
 			<stat_view label="Standard" name="basic">

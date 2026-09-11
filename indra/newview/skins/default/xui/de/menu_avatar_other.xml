@@ -8,8 +8,6 @@
 	<menu_item_call label="In Gruppe einladen" name="Invite..."/>
 	<menu_item_call label="Hineinzoomen" name="Zoom In"/>
 	<menu_item_call label="Bezahlen" name="Pay..."/>
-	<context_menu label="Avatar darstellen" name="Render Avatar">
-	</context_menu>
 	<context_menu name="Avatar Manage">
 		<menu_item_call label="Hinauswerfen" name="Eject..."/>
 		<menu_item_call label="Einfrieren" name="Freeze..."/>

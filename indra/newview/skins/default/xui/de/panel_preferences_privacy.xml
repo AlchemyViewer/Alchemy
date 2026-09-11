@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Kommunikation" name="Privacy panel">
-	<check_box label="Nur Freunde und Gruppen können mich anrufen oder mir eine IM schicken" name="voice_call_friends_only_check"/>
-	<check_box label="Meine Lieblingslandmarken bei Anmeldung anzeigen (im Dropdown-Menü  „Hier anfangen“)" name="favorites_on_login_check" top_pad="15"/>
-	<text name="Logs:">
-		Chatprotokolle:
-	</text>
-	<check_box label="Protokolle von Gesprächen in der Nähe auf meinem Computer speichern" name="log_nearby_chat"/>
-	<check_box label="IM Protokolle auf meinem Computer speichern" name="log_instant_messages"/>
-	<check_box label="Zeitstempel zu jeder Zeile im Chatprotokoll hinzufügen" name="show_timestamps_check_im"/>
-	<check_box label="Datumsstempel zu Protokolldateinamen hinzufügen" name="logfile_name_datestamp"/>
-	<text name="log_path_desc">
-		Protokolle speichern in:
-	</text>
-	<button label="Durchsuchen" label_selected="Durchsuchen" name="log_path_button"/>
+	<check_box name="favorites_on_login_check" top_pad="15"/>
 	<tab_container name="privacy_tab_container">
 		<panel name="privacy_preferences_general">
 			<text name="block_list_label">

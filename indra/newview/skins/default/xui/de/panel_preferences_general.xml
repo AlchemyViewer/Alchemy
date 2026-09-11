@@ -23,7 +23,6 @@
 	<text name="maturity_desired_prompt" width="350">
 		Ich möchte auf Inhalt mit folgender Einstufung zugreifen:
 	</text>
-	<text name="maturity_desired_textbox"/>
 	<combo_box name="maturity_desired_combobox">
 		<combo_box.item label="Generell, Moderat, Adult" name="Desired_Adult"/>
 		<combo_box.item label="Generell und Moderat" name="Desired_Mature"/>
@@ -43,7 +42,6 @@
 	</radio_group>
 	<check_box label="Mein Name" name="show_my_name_checkbox1"/>
 	<check_box label="Benutzernamen" name="show_slids" tool_tip="Benutzernamen wie berndschmidt123 anzeigen"/>
-	<check_box label="Gruppentitel" name="show_all_title_checkbox1" tool_tip="Gruppentitel wie „Vorstand“ oder „Mitglied“"/>
 	<check_box label="Freunde hervorheben" name="show_friends" tool_tip="Avatarnamen Ihrer Freunde hervorheben"/>
 	<check_box label="Anzeigenamen anzeigen" name="display_names_check" tool_tip="Aktivieren Sie diese Option, um Anzeigenamen in Chat, IM, Avatarnamen usw. zu verwenden."/>
 	<text name="inworld_typing_rg_label">

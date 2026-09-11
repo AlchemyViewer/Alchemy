@@ -30,23 +30,6 @@
 					<stat_bar label="Rohsp" name="rawmemstat"/>
 					<stat_bar label="Zugeteilter Sp" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="Speichernutzung" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="UI" name="LLView"/>
-					<stat_bar label="Schriftarten" name="LLFontFreetype"/>
-					<stat_bar label="Inventar" name="LLInventoryObject"/>
-					<stat_bar label="Viewer-Objekte" name="LLViewerObject"/>
-					<stat_bar label="Octree-Gruppendaten" name="LLViewerOctreeGroup"/>
-					<stat_bar label="Octree-Daten" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Viewer-Objekt-Cache" name="LLVOCacheEntry"/>
-					<stat_bar label="Zeichnungsobjekte" name="LLDrawable"/>
-					<stat_bar label="Gesichtsdaten" name="LLFace"/>
-					<stat_bar label="Zeichnungsinfos" name="LLDrawInfo"/>
-					<stat_bar label="Texturdaten" name="LLTexture"/>
-					<stat_bar label="Bilddaten" name="LLImage"/>
-					<stat_bar label="GL-Bilddaten" name="LLImageGL"/>
-					<stat_bar label="Vertex-Buffer" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="Netzwerk" name="network">
 					<stat_bar label="Paketeingang" name="packetsinstat"/>
 					<stat_bar label="Paketausgang" name="packetsoutstat"/>

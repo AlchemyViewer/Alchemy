@@ -30,18 +30,6 @@
 	<panel.string name="origin_inworld">
 		(Inworld)
 	</panel.string>
-	<text name="title" value="Objektprofil"/>
-	<text name="origin" value="(Inventar)"/>
-	<scroll_container name="item_profile_scroll">
-		<panel label="" name="item_profile">
-			<text name="LabelItemNameTitle">
-				Name:
-			</text>
-		</panel>
-	</scroll_container>
-	<panel name="button_panel">
-		<button label="Abbrechen" name="cancel_btn"/>
-	</panel>
 	<layout_stack name="main_stack">
 		<layout_panel name="layout_item_permissions_sale">
 			<spinner label="Preis: L$" name="Edit Cost" tool_tip="Objektkosten."/>
