@@ -23,6 +23,7 @@
     <floater.string name="EditorOpened">Opened [PATH]:[LINE]</floater.string>
     <floater.string name="NotBuilt">This kind of file is catalogued and searched, not built.</floater.string>
     <floater.string name="ViewerWidget">[TAG] is a viewer widget: a shell build does not run its constructor. Catalogued and searched.</floater.string>
+    <floater.string name="TemplateAlone">A [TAG] cannot be built from its template alone: it wants a model, a parent or children the template does not give it.</floater.string>
     <floater.string name="Built">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]</floater.string>
     <floater.string name="BuiltReal">[VIEWS] views in [MS] ms, [DIAG] findings, [SKIN]/[LANG]; the registered floater, so no handles</floater.string>
     <floater.string name="BuildFailed">Could not build [FILE]: see the findings.</floater.string>

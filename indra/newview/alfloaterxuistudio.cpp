@@ -5474,17 +5474,24 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
     }
     const bool viewer_widget = !widget_tag.empty() && !isCoreWidgetTag(widget_tag);
+    // A template is built from nothing but its tag, and a tag that wants a
+    // model, a parent or children it is not given asserts in its own
+    // building rather than showing anything.
+    const bool template_alone = entry->kind == ALXUICatalog::Kind::Template && !viewer_widget
+                             && !ALXUISchema::buildsAlone(widget_tag);
 
     // notifications.xml is a file of templates rather than a view tree; it
     // is built once one of them has been chosen on the Notifications tab.
     const bool notification = entry->kind == ALXUICatalog::Kind::Notifications && !mNotification.empty();
-    if ((!isBuilt(entry->kind) && !notification) || viewer_widget)
+    if ((!isBuilt(entry->kind) && !notification) || viewer_widget || template_alone)
     {
         if (which == PRIMARY)
         {
             LLStringUtil::format_map_t args;
             args["[TAG]"] = widget_tag;
-            setStatus(viewer_widget ? getString("ViewerWidget", args) : getString("NotBuilt"));
+            setStatus(viewer_widget ? getString("ViewerWidget", args)
+                    : template_alone ? getString("TemplateAlone", args)
+                                     : getString("NotBuilt"));
             runLint();
             fillFindings();
             refreshBreadcrumb();
@@ -6679,17 +6686,24 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
         found = already->second;
     }
 
+    // A widget file is built from what it holds; a template is built from
+    // nothing but its tag, a name and a size, which only a tag that builds
+    // alone survives: a folder view item made with no model to show
+    // asserts in its own postBuild.
     std::string widget_tag;
+    bool buildable = isBuilt(entry.kind);
     if (entry.kind == ALXUICatalog::Kind::Widget)
     {
         widget_tag = entry.rootTag;
+        buildable = buildable && isCoreWidgetTag(widget_tag);
     }
     else if (entry.kind == ALXUICatalog::Kind::Template)
     {
         widget_tag = entry.name.substr(entry.name.rfind('/') + 1);
         widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
+        buildable = buildable && isCoreWidgetTag(widget_tag) && ALXUISchema::buildsAlone(widget_tag);
     }
-    if (!isBuilt(entry.kind) || (!widget_tag.empty() && !isCoreWidgetTag(widget_tag)))
+    if (!buildable)
     {
         // Looked at and nothing more to say, which is not the same answer as
         // never looked at: the store keeps the difference.
