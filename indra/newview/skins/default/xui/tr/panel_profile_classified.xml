@@ -112,8 +112,6 @@
 							<icons_combo_box.item label="Genel İçerik" name="pg_ci" value="PG"/>
 						</icons_combo_box>
 						<check_box label="Her hafta otomatik yenile" name="auto_renew_edit"/>
-						<text name="price_for_listing_edit_label" value="İlan fiyatı:"/>
-						<spinner label="L$" name="price_for_listing_edit" tool_tip="İlan fiyatı." value="50"/>
 					</panel>
 				</panel>
 			</scroll_container>

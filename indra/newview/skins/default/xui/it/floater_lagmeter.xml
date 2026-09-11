@@ -126,7 +126,7 @@
 	<floater.string name="bigger_label">
 		&lt;&lt;
 	</floater.string>
-	<button label="" label_selected="" name="client_lagmeter" tool_tip="Stato del lag del client"/>
+	<button name="client_lagmeter" tool_tip="Stato del lag del client"/>
 	<text name="client">
 		Client
 	</text>
@@ -134,7 +134,7 @@
 		Normale
 	</text>
 	<text left="30" name="client_lag_cause" right="-10"/>
-	<button label="" label_selected="" name="network_lagmeter" tool_tip="Stato del lag della rete"/>
+	<button name="network_lagmeter" tool_tip="Stato del lag della rete"/>
 	<text name="network">
 		Rete
 	</text>
@@ -142,7 +142,7 @@
 		Normale
 	</text>
 	<text left="30" name="network_lag_cause" right="-10"/>
-	<button label="" label_selected="" name="server_lagmeter" tool_tip="Stato del lag del server"/>
+	<button name="server_lagmeter" tool_tip="Stato del lag del server"/>
 	<text name="server">
 		Server
 	</text>

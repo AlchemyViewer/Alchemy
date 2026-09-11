@@ -24,5 +24,4 @@
 		00:00 (тихоокеанское время)
 	</text>
 	<button name="media_toggle_btn" tool_tip="Запуск/остановка всех медиа (музыка, видео, веб-страницы)"/>
-	<button name="volume_btn" tool_tip="Регулятор громкости"/>
 </panel>

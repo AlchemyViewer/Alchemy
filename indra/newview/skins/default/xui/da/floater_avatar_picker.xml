@@ -12,7 +12,7 @@
 	<floater.string name="searching">
 		Søger...
 	</floater.string>
-	<string label="Vælg" label_selected="Vælg" name="Select">
+	<string name="Select">
 		Vælg
 	</string>
 	<string name="Close">
@@ -42,7 +42,6 @@
 			<text name="meters">
 				meter
 			</text>
-			<button label="Gentegn liste" label_selected="Gentegn liste" name="Refresh"/>
 			<scroll_list name="NearMe">
 				<columns label="Navn" name="name"/>
 				<columns label="Brugernavn" name="username"/>

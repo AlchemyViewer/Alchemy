@@ -15,9 +15,6 @@
 	<text name="Current color:">
 		Geçerli renk:
 	</text>
-	<text name="(Drag below to save.)">
-		(Kaydetmek için aşağıya sürükleyin)
-	</text>
 	<tab_container name="color_type_container">
 		<panel name="RGB">
 			<text name="b_val_text">

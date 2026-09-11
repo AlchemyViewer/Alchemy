@@ -2,20 +2,12 @@
 <menu_bar name="Main Menu">
 	<menu label="Io" name="Me">
 		<menu_item_call label="Profilo..." name="Profile"/>
-		<menu_item_call label="Scegli un avatar..." name="Avatar Picker"/>
 		<menu_item_check label="Inventario..." name="Inventory"/>
 		<menu_item_call label="Nuova finestra inventario" name="NewInventoryWindow"/>
 		<menu_item_call label="Luoghi..." name="Places"/>
 		<menu_item_call label="Preferiti..." name="Picks"/>
 		<menu_item_call label="Esperienze..." name="Experiences"/>
 		<menu_item_call label="Controlli fotocamera..." name="Camera Controls"/>
-		<menu label="Spostamento" name="Movement">
-			<menu_item_call label="Siedi" name="Sit Down Here"/>
-			<menu_item_call label="Alzati" name="Stand up"/>
-			<menu_item_check label="Vola" name="Fly"/>
-		</menu>
-		<menu label="Stato" name="Status">
-		</menu>
 		<menu_item_call label="Acquista L$..." name="Buy and Sell L$"/>
 		<menu_item_call label="Annunci Marketplace..." name="MarketplaceListings"/>
 		<menu_item_call label="Dashboard dell'account..." name="Manage My Account">
@@ -35,9 +27,6 @@
 		<menu_item_check label="Parla" name="Speak"/>
 		<menu_item_check label="Registro conversazioni..." name="Conversation Log..."/>
 		<menu_item_check label="Avvisi chat..." name="Chat Alerts"/>
-		<menu_item_call label="Facebook..." name="Facebook"/>
-		<menu_item_call label="Twitter..." name="Twitter"/>
-		<menu_item_call label="Flickr..." name="Flickr"/>
 		<menu_item_check label="Gesture..." name="Gestures"/>
 		<menu_item_check label="Amici" name="My Friends"/>
 		<menu_item_check label="Gruppi" name="My Groups"/>
@@ -61,7 +50,6 @@
 		<menu_item_call label="Terreni posseduti..." name="My Land"/>
 		<menu_item_call label="Acquista questo terreno" name="Buy Land"/>
 		<menu label="Mostra" name="LandShow">
-			<menu_item_check label="Linee di divieto" name="Ban Lines"/>
 			<menu_item_check label="Marcatori" name="beacons"/>
 			<menu_item_check label="Linee di confine" name="Property Lines"/>
 			<menu_item_check label="Proprietari di terreno" name="Land Owners"/>
@@ -155,13 +143,10 @@
 		<menu_item_call label="Ripeti" name="Redo"/>
 	</menu>
 	<menu label="Aiuto" name="Help">
-		<menu_item_call label="Istruzioni..." name="How To"/>
-		<menu_item_call label="Guida introduttiva" name="Quickstart"/>
 		<menu_item_call label="Base di conoscenza" name="Knowledge Base"/>
 		<menu_item_call label="Wiki" name="Wiki"/>
 		<menu_item_call label="Forum della comunità" name="Community Forums"/>
 		<menu_item_call label="Portale assistenza" name="Support portal"/>
-		<menu_item_call label="[SECOND_LIFE] Notizie" name="Second Life News"/>
 		<menu_item_call label="[SECOND_LIFE] Blog" name="Second Life Blogs"/>
 		<menu_item_call label="Segnala abuso" name="Report Abuse"/>
 		<menu_item_call label="Segnala bug" name="Report Bug"/>
@@ -196,7 +181,6 @@
 			<menu_item_check label="Toppa superficie" name="Rendering Type Surface Patch"/>
 			<menu_item_check label="Cielo" name="Rendering Type Sky"/>
 			<menu_item_check label="Acqua" name="Rendering Type Water"/>
-			<menu_item_check label="Suolo" name="Rendering Type Ground"/>
 			<menu_item_check label="Volume" name="Rendering Type Volume"/>
 			<menu_item_check label="Erba" name="Rendering Type Grass"/>
 			<menu_item_check label="Nuvole" name="Rendering Type Clouds"/>
@@ -218,7 +202,6 @@
 		<menu_item_check label="Fluidità mouse" name="Mouse Smoothing"/>
 		<menu_item_call label="Rilascia tasti" name="Release Keys"/>
 		<menu label="Scorciatoie" name="Shortcuts">
-			<menu_item_check label="Mostra menu Avanzato - tasti di scelta rapida esistenti" name="Show Advanced Menu - legacy shortcut"/>
 			<menu_item_call label="Chiudi finestra" name="Close Window"/>
 			<menu_item_call label="Chiudi tutte le finestre" name="Close All Windows"/>
 			<menu_item_call label="Foto su disco" name="Snapshot to Disk"/>
@@ -235,10 +218,8 @@
 			<menu_item_check label="Console texture" name="Texture Console"/>
 			<menu_item_check label="Console di Debug" name="Debug Console"/>
 			<menu_item_check label="Console di debug regione" name="Region Debug Console"/>
-			<menu_item_check label="Memoria" name="Memory"/>
 			<menu_item_check label="Statistiche scena" name="Scene Statistics"/>
 			<menu_item_check label="Monitoraggio caricamento scena" name="Scene Loading Monitor"/>
-			<menu_item_call label="Console di debug recupero texture" name="Texture Fetch Debug Console"/>
 			<menu_item_call label="Informazioni regione sulla console di debug" name="Region Info to Debug Console"/>
 			<menu_item_check label="Fotocamera" name="Camera"/>
 			<menu_item_check label="Vento" name="Wind"/>
@@ -271,7 +252,6 @@
 		<menu label="Prove di rendering" name="Render Tests">
 			<menu_item_check label="Spostamento fotocamera" name="Camera Offset"/>
 			<menu_item_check label="Veloc. di visualizzazione casuale" name="Randomize Framerate"/>
-			<menu_item_check label="Test frame" name="Frame Test"/>
 			<menu_item_call label="Profilo frame" name="Frame Profile"/>
 			<menu_item_call label="Benchmark" name="Benchmark"/>
 			<menu_item_check name="Periodic Slow Frame" label="Slow Frame periodico"/>
@@ -282,7 +262,6 @@
 			<menu_item_check label="Aggiorna tipo" name="Update Type"/>
 			<menu_item_check label="Info livello dettaglio" name="LOD Info"/>
 			<menu_item_check label="Conteggio triangolo" name="Triangle Count"/>
-			<menu_item_check label="Crea coda" name="Build Queue"/>
 			<menu_item_check label="Particelle" name="Particles"/>
 			<menu_item_check label="Giunti" name="Joints"/>
 			<menu_item_check label="Vettori vento" name="Wind Vectors"/>
@@ -310,19 +289,14 @@
 			<menu_item_check label="Assi" name="Axes"/>
 			<menu_item_call label="Info materiale selezionato" name="Selected Material Info"/>
 			<menu_item_check label="Wireframe" name="Wireframe"/>
-			<menu_item_check label="Modello illuminazione avanzato" name="Advanced Lighting Model"/>
 			<menu_item_check label="Ombra dal sole, dalla luna e dai proiettori" name="Shadows from Sun/Moon/Projectors"/>
 			<menu_item_check label="SSAO e ombre fluide" name="SSAO and Shadow Smoothing"/>
 			<menu_item_check label="Maschera alfa automatica (differita)" name="Automatic Alpha Masks (deferred)"/>
 			<menu_item_check label="Maschera alfa automatica (non differita)" name="Automatic Alpha Masks (non-deferred)"/>
 			<menu_item_check label="Texture delle animazioni" name="Animation Textures"/>
 			<menu_item_check label="Disabilita texture" name="Disable Textures"/>
-			<menu_item_check label="Disattiva Ambiente" name="Disable Ambient"/>
-			<menu_item_check label="Disattiva luce del sole" name="Disable Sunlight"/>
-			<menu_item_check label="Disattiva Luci locali" name="Disable Local Lights"/>
 			<menu_item_check label="Rendering delle luci unite" name="Render Attached Lights"/>
 			<menu_item_check label="Rendering particelle unite" name="Render Attached Particles"/>
-			<menu_item_check label="Gli oggetti brillano quando sono sotto il cursore" name="Hover Glow Objects"/>
 			<menu_item_call label="Pulisci cache immediatamente" name="Cache Clear"/>
 			<menu_item_check name="Rull Res Textures" label="Texture a tutta risoluzione"/>
 			<menu_item_check name="Debug Pipeline" label="Accesso al debug"/>
@@ -402,8 +376,6 @@
 			<menu_item_check name="Show Point At" label="Mostra il punto a"/>
 			<menu_item_check name="Show Look At" label="Mostra Osserva"/>
 		</menu>
-		<menu_item_check label="Texture HTTP" name="HTTP Textures"/>
-		<menu_item_call label="Attiva Visual Leak Detector" name="Enable Visual Leak Detector"/>
 		<menu_item_check label="Finestra Console al prossimo lancio" name="Console Window"/>
 		<menu label="Imposta livello di registrazione" name="Set Logging Level">
 			<menu_item_check label="Debug" name="Debug"/>
@@ -416,11 +388,7 @@
 		<menu_item_call label="Lascia stato Admin" name="Leave Admin Options"/>
 		<menu_item_check label="Mostra menu Admin" name="View Admin Options"/>
 		<menu_item_call name="Dump Scripted Camera" label="Elimina camera con script"/>
-		<menu_item_call name="Playback event recording" label="Riproduzione della registrazione di eventi"/>
 		<menu_item_check name="Output Debug Minidump" label="Uscita Debug Minidump"/>
-		<menu_item_call name="Dump Timers" label="Cestina i timer"/>
-		<menu_item_call name="Stop event recording" label="Interrompi la registrazione degli eventi"/>
-		<menu_item_call name="Start event recording" label="Avvia la registrazione degli eventi"/>
 		<menu_item_call name="Compress Images" label="Comprimi le immagini"/>
 		<menu name="Recorder" label="Registratore">
 			<menu_item_call name="Stop Record" label="Ferma la registrazione"/>

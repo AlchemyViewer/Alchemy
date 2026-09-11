@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <panel label="Zaawansowane" name="advanced">
-	<text name="Cache:">
-		Pamięć podręczna:
-	</text>
 	<spinner label="Rozmiar (256 - 9984 MB)" name="cachesizespinner" />
 	<button label="Wyczyść" label_selected="Wyczyść" name="clear_cache" />
 	<text name="Cache location">
@@ -13,11 +10,6 @@
 	<text name="UI Size:">
 		Rozmiar interfejsu:
 	</text>
-	<check_box label="Pokaż błędy skryptów w:" name="show_script_errors" />
-	<radio_group name="show_location">
-		<radio_item label="Czacie lokalnym" name="0" />
-		<radio_item label="Osobnym oknie" name="1" />
-	</radio_group>
 	<check_box label="Zezwól na wiele Przeglądarek" name="allow_multiple_viewer_check" />
 	<check_box label="Zezwól na logowanie do innych siatek" name="show_grid_selection_check" />
 	<check_box label="Pokaż menu Zaawansowane" name="show_advanced_menu_check" />

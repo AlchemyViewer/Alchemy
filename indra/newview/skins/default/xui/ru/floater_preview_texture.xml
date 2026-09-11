@@ -6,13 +6,6 @@
 	<floater.string name="Copy">
 		Копировать в инвентарь
 	</floater.string>
-	<layout_stack name="preview_stack">
-		<layout_panel name="texture_panel">
-			<text name="aspect_ratio">
-				Предварительный просмотр соотношения сторон
-			</text>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="aspect_combo_lp">
 			<combo_box name="combo_aspect_ratio" tool_tip="Просмотр изображения с фиксированным соотношением сторон"/>

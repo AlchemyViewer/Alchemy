@@ -77,19 +77,6 @@
 			<text name="name_label">
 				Имя модели:
 			</text>
-			<text name="model_category_label">
-				Эта модель представляет...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Выберите вариант..." name="Choose one"/>
-				<combo_item label="Форма аватара" name="Avatar shape"/>
-				<combo_item label="Присоединение аватара" name="Avatar attachment"/>
-				<combo_item label="Подвижный объект (машина, животное)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Строительный компонент" name="Building Component"/>
-				<combo_item label="Большая, неподвижная и т.д." name="Large, non moving etc"/>
-				<combo_item label="Малая, неподвижная и т.д." name="Smaller, non-moving etc"/>
-				<combo_item label="Ни один из них" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Уровень детализации" name="lod_panel" title="Уровень детализации">
@@ -99,7 +86,6 @@
 				<text initial_value="Высокий" name="high_label" value="Высокий"/>
 				<combo_box name="lod_source_high">
 					<item label="Загрузка из файла" name="Load from file" value="Загрузка из файла"/>
-					<item label="Создать" name="Generate" value="Создать"/>
 				</combo_box>
 				<button label="Обзор..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="Средний" name="medium_label" value="Средний"/>
 				<combo_box name="lod_source_medium">
 					<item label="Загрузка из файла" name="Load from file" value="Загрузка из файла"/>
-					<item label="Создать" name="Generate" value="Создать"/>
 					<item label="Использовать УД выше" name="Use LoD above" value="Использовать УД выше"/>
 				</combo_box>
 				<button label="Обзор..." name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="Низкий" name="low_label" value="Низкий"/>
 				<combo_box name="lod_source_low">
 					<item label="Загрузка из файла" name="Load from file" value="Загрузка из файла"/>
-					<item label="Создать" name="Generate" value="Создать"/>
 					<item label="Использовать УД выше" name="Use LoD above" value="Использовать УД выше"/>
 				</combo_box>
 				<button label="Обзор..." name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="Самый низкий" name="lowest_label" value="Самый низкий"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Загрузка из файла" name="Load from file" value="Загрузка из файла"/>
-					<item label="Создать" name="Generate" value="Создать"/>
 					<item label="Использовать УД выше" name="Use LoD above" value="Использовать УД выше"/>
 				</combo_box>
 				<button label="Обзор..." name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Включить текстуры" name="upload_textures"/>
-				<text name="include_label">
-					Только для моделей аватаров:
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

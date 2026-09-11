@@ -15,9 +15,6 @@
 	<text name="Current color:">
 		目前顏色：
 	</text>
-	<text name="(Drag below to save.)">
-		（拖曳到下方即可儲存）
-	</text>
 	<tab_container name="color_type_container">
 		<panel name="RGB">
 			<text name="b_val_text">

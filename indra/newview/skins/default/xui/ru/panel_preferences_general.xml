@@ -42,7 +42,6 @@
 	</radio_group>
 	<check_box label="Мое имя" name="show_my_name_checkbox1"/>
 	<check_box label="Имена пользователей" name="show_slids" tool_tip="Показывать имя пользователя, например, bobsmith123"/>
-	<check_box label="Титулы групп" name="show_all_title_checkbox1" tool_tip="Показывать титулы групп, например, Officer или Member"/>
 	<check_box label="Подсветка друзей" name="show_friends" tool_tip="Подсвечивать теги имен ваших друзей"/>
 	<check_box label="Экранные имена" name="display_names_check" tool_tip="Показывать экранные имена в чате, IM, тегах имен и пр."/>
 	<text name="inworld_typing_rg_label">

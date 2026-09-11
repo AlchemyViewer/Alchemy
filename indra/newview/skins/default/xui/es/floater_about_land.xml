@@ -275,7 +275,7 @@ Vaya al menú Mundo &gt; Acerca del terreno o seleccione otra parcela para ver s
 			<text name="Object Owners:">
 				Propietarios de los objetos:
 			</text>
-			<button label="Actualizar la lista" label_selected="Actualizar la lista" name="Refresh List" tool_tip="Refresh Object List"/>
+			<button name="Refresh List" tool_tip="Refresh Object List"/>
 			<button label="Devolver los objetos" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="Tipo" name="type"/>
@@ -360,11 +360,11 @@ Sólo las parcelas más grandes pueden listarse en la búsqueda.
 			<text name="Snapshot:">
 				Foto:
 			</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Pulse para elegir una imagen"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Pulse para elegir una imagen"/>
 			<text name="allow_see_label" top="170">
 				Los avatares de otras parcelas pueden ver a los avatares de esta parcela y chatear con ellos
 			</text>
-			<check_box label="Ver los avatares" name="SeeAvatarsCheck" tool_tip="Permite que los avatares de otras parcelas vean a los avatares de ésta y chateen con ellos, y también que tú puedas verles y chatear con ellos." top="170"/>
+			<check_box name="SeeAvatarsCheck" tool_tip="Permite que los avatares de otras parcelas vean a los avatares de ésta y chateen con ellos, y también que tú puedas verles y chatear con ellos." top="170"/>
 			<text name="landing_point">
 				Punto de llegada: [LANDING]
 			</text>
@@ -397,7 +397,7 @@ Sólo las parcelas más grandes pueden listarse en la búsqueda.
 				Cambiar
 la textura:
 			</text>
-			<texture_picker label="" left="97" name="media texture" tool_tip="Pulse para elegir una imagen"/>
+			<texture_picker left="97" name="media texture" tool_tip="Pulse para elegir una imagen"/>
 			<text name="replace_texture_help" width="285">
 				Cuando pulses la flecha &apos;play&apos;, los objetos que usen esta textura mostrarán la película o la página web.  Selecciona la miniatura para elegir una textura distinta.
 			</text>

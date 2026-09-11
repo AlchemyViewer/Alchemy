@@ -6,16 +6,6 @@
 		<menu_item_call label="Køb L$" name="Buy and Sell L$"/>
 		<menu_item_call label="Profil" name="Profile"/>
 		<menu_item_check label="Beholdning" name="Inventory"/>
-		<menu_item_check label="Min beholdning" name="ShowSidetrayInventory"/>
-		<menu_item_check label="Min stemme" name="ShowVoice"/>
-		<menu label="Bevægelser" name="Movement">
-			<menu_item_call label="Sid ned" name="Sit Down Here"/>
-			<menu_item_check label="Flyv" name="Fly"/>
-		</menu>
-		<menu label="Min status" name="Status">
-			<menu_item_call label="Væk" name="Set Away"/>
-			<menu_item_call label="Optaget" name="Set Busy"/>
-		</menu>
 		<menu_item_call label="Afslut [APP_NAME]" name="Quit"/>
 		<menu_item_check label="Vis HUD vedhæftninger" name="Show HUD Attachments"/>
 		<menu_item_check label="Kontroller" name="Camera Controls"/>
@@ -40,8 +30,6 @@
 		<menu_item_call label="Køb dette land" name="Buy Land"/>
 		<menu_item_call label="Mit land" name="My Land"/>
 		<menu label="Vis" name="LandShow">
-			<menu_item_check label="Bevægelses kontrol" name="Movement Controls"/>
-			<menu_item_check label="&apos;Ingen adgang&apos; markering" name="Ban Lines"/>
 			<menu_item_check label="Pejlelys" name="beacons"/>
 			<menu_item_check label="Parcel skel" name="Property Lines"/>
 			<menu_item_check label="Grundejere" name="Land Owners"/>
@@ -51,10 +39,6 @@
 		</menu>
 		<menu_item_call label="Teleport hjem" name="Teleport Home"/>
 		<menu_item_call label="Sæt dette sted som &apos;Hjem&apos;" name="Set Home to Here"/>
-		<menu label="Sol" name="Sun">
-			<menu_item_call label="Estate tid" name="Revert to Region Default"/>
-			<menu_item_call label="Redigering af omgivelser" name="Environment Editor"/>
-		</menu>
 		<menu name="Environment">
 			<menu_item_call label="Midnat" name="Midnight"/>
 			<menu_item_call label="Solnedgang" name="Sunset"/>
@@ -79,19 +63,12 @@
 		<menu_item_call label="Sammenkæd" name="Link"/>
 		<menu_item_call label="Adskil" name="Unlink"/>
 		<menu_item_check label="Redigér sammekædede objekter" name="Edit Linked Parts"/>
-		<menu label="Vis lænkede dele" name="Select Linked Parts">
-			<menu_item_call label="Vælg næste del" name="Select Next Part"/>
-			<menu_item_call label="Vælg forrige del" name="Select Previous Part"/>
-			<menu_item_call label="Inkludér næste del" name="Include Next Part"/>
-			<menu_item_call label="Inkludér forrige del" name="Include Previous Part"/>
-		</menu>
 		<menu_item_call label="Fokusér på valgte" name="Focus on Selection"/>
 		<menu_item_call label="Zoom til valgte" name="Zoom to Selection"/>
 		<menu label="Objekt" name="Object">
 			<menu_item_call label="Køb" name="Menu Object Buy"/>
 			<menu_item_call label="Tag" name="Menu Object Take"/>
 			<menu_item_call label="Tag kopi" name="Take Copy"/>
-			<menu_item_call label="Opdatér ændringer til beholdning" name="Save Object Back to My Inventory"/>
 			<menu_item_call label="Opdater ændringer i indhold til objekt" name="Save Object Back to Object Contents"/>
 			<menu_item_call label="Returnér objekt" name="Return Object back to Owner"/>
 		</menu>
@@ -122,16 +99,12 @@
 			<menu_item_call label="Lyd (L$[COST])..." name="Upload Sound"/>
 			<menu_item_call label="Animation (L$[COST])..." name="Upload Animation"/>
 			<menu_item_call label="Model..." name="Upload Model"/>
-			<menu_item_call label="Model Wizard..." name="Upload Model Wizard"/>
 			<menu_item_call label="Mange (L$[COST] pr. fil)..." name="Bulk Upload"/>
-			<menu_item_call label="Sæt standardværdier for upload rettigheder" name="perm prefs"/>
 		</menu>
 		<menu_item_call label="Fortyd" name="Undo"/>
 		<menu_item_call label="Gendan" name="Redo"/>
 	</menu>
 	<menu label="Hjælp" name="Help">
-		<menu_item_call label="[SECOND_LIFE] Help" name="Second Life Help"/>
-		<menu_item_check label="Aktiver tips" name="Enable Hints"/>
 		<menu_item_call label="Rapporter misbrug" name="Report Abuse"/>
 		<menu_item_call label="Rapportér fejl" name="Report Bug"/>
 		<menu_item_call label="Stød, skub &amp; slag" name="Bumps, Pushes &amp;amp; Hits"/>
@@ -148,7 +121,6 @@
 		<menu label="Værktøjer til ydelse" name="Performance Tools">
 			<menu_item_call label="Lag meter" name="Lag Meter"/>
 			<menu_item_check label="Statistik bjælke" name="Statistics Bar"/>
-			<menu_item_check label="Vis avatarers gengivelsesbelastning" name="Avatar Rendering Cost"/>
 		</menu>
 		<menu label="Fremhævninger og  and sigtbarhed" name="Highlighting and Visibility">
 			<menu_item_check label="Pejlelys blink effekt" name="Cheesy Beacon"/>
@@ -164,7 +136,6 @@
 			<menu_item_check label="Surface Patch" name="Rendering Type Surface Patch"/>
 			<menu_item_check label="Himmel" name="Rendering Type Sky"/>
 			<menu_item_check label="Vand" name="Rendering Type Water"/>
-			<menu_item_check label="Jord" name="Rendering Type Ground"/>
 			<menu_item_check label="Volume" name="Rendering Type Volume"/>
 			<menu_item_check label="Græs" name="Rendering Type Grass"/>
 			<menu_item_check label="Skyer" name="Rendering Type Clouds"/>
@@ -184,7 +155,6 @@
 		<menu_item_call label="Tøm gruppe cache" name="ClearGroupCache"/>
 		<menu_item_check label="Muse udjævning" name="Mouse Smoothing"/>
 		<menu label="Shortcuts" name="Shortcuts">
-			<menu_item_check label="Vis avanceret menu (gammel genvej)" name="Show Advanced Menu - legacy shortcut"/>
 			<menu_item_call label="Luk vindue" name="Close Window"/>
 			<menu_item_call label="Luk alle vinduer" name="Close All Windows"/>
 			<menu_item_call label="Foto til disk" name="Snapshot to Disk"/>
@@ -201,9 +171,6 @@
 		<menu label="Konsoller" name="Consoles">
 			<menu_item_check label="Tekstur konsol" name="Texture Console"/>
 			<menu_item_check label="Debug konsol" name="Debug Console"/>
-			<menu_item_check label="Tekstur størrelse konsol" name="Texture Size"/>
-			<menu_item_check label="Konsol med tekstur kategorier" name="Texture Category"/>
-			<menu_item_check label="Hukommelse" name="Memory"/>
 			<menu_item_check label="Scene Statistics" name="Scene Statistics"/>
 			<menu_item_call label="Vis Regionsinfo i debug-konsol" name="Region Info to Debug Console"/>
 			<menu_item_check label="Kamera" name="Camera"/>
@@ -233,31 +200,25 @@
 		<menu label="Gengivelses tests" name="Render Tests">
 			<menu_item_check label="Kamera offset" name="Camera Offset"/>
 			<menu_item_check label="Tilfældige framerates" name="Randomize Framerate"/>
-			<menu_item_check label="Frame test" name="Frame Test"/>
 		</menu>
 		<menu label="Render Metadata" name="Render Metadata">
 			<menu_item_check label="Normals" name="Normals"/>
 			<menu_item_check label="Physics Shapes" name="Physics Shapes"/>
 			<menu_item_check label="Opdatér type" name="Update Type"/>
 			<menu_item_check label="LOD Info" name="LOD Info"/>
-			<menu_item_check label="Build Queue" name="Build Queue"/>
 			<menu_item_check label="Sculpt" name="Sculpt"/>
 		</menu>
 		<menu label="Gengivelse" name="Rendering">
 			<menu_item_check label="Akser" name="Axes"/>
 			<menu_item_check label="Wireframe" name="Wireframe"/>
-			<menu_item_check label="Lys og skygger" name="Advanced Lighting Model"/>
 			<menu_item_check label="Skygger fra sol/måne/andre lyskilder" name="Shadows from Sun/Moon/Projectors"/>
 			<menu_item_check label="SSAO og skygge udjævning" name="SSAO and Shadow Smoothing"/>
-			<menu_item_check label="Globalt lys (eksperimentiel)" name="Global Illumination"/>
 			<menu_item_check label="Automatisk alpha-masker (udskudte)" name="Automatic Alpha Masks (deferred)"/>
 			<menu_item_check label="Automatiske alpha-masker (ikke udskudt)" name="Automatic Alpha Masks (non-deferred)"/>
 			<menu_item_check label="Animationsteksturer" name="Animation Textures"/>
 			<menu_item_check label="Slå teksturer fra" name="Disable Textures"/>
-			<menu_item_check label="Tekstur atlas (eksperimentiel)" name="Texture Atlas"/>
 			<menu_item_check label="Gengiv vedhæftede lys" name="Render Attached Lights"/>
 			<menu_item_check label="Gengiv vedhæftede partikler" name="Render Attached Particles"/>
-			<menu_item_check label="Hover Glow Objects" name="Hover Glow Objects"/>
 		</menu>
 		<menu label="Netværk" name="Network">
 			<menu_item_check label="Pause avatar" name="AgentPause"/>
@@ -269,10 +230,7 @@
 			<menu_item_call label="Dump Region Object Cache" name="Dump Region Object Cache"/>
 		</menu>
 		<menu label="UI (brugerflade)" name="UI">
-			<menu_item_call label="Media browser test" name="Web Browser Test"/>
-			<menu_item_call label="Browser med webindhold" name="Web Content Browser"/>
 			<menu_item_call label="Print info om valgt objekt" name="Print Selected Object Info"/>
-			<menu_item_call label="Hukommelse statistik" name="Memory Stats"/>
 			<menu_item_check label="Debug klik" name="Debug Clicks"/>
 			<menu_item_check label="Debug muse-hændelser" name="Debug Mouse Events"/>
 		</menu>
@@ -305,8 +263,6 @@
 				<menu_item_check label="Slow motion animationer" name="Slow Motion Animations"/>
 			</menu>
 		</menu>
-		<menu_item_check label="HTTP teksturer" name="HTTP Textures"/>
-		<menu_item_check label="HTTP Inventory" name="HTTP Inventory"/>
 		<menu_item_check label="Benyt consol vindue ved næste opstart" name="Console Window"/>
 		<menu_item_call label="Anmod om administrator status" name="Request Admin Options"/>
 		<menu_item_call label="Forlad administrationsstatus" name="Leave Admin Options"/>

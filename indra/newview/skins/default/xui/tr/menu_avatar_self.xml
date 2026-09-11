@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Self Pie">
-	<menu_item_call label="Otur" name="Sit Down Here"/>
-	<menu_item_call label="Kalk" name="Stand Up"/>
 	<context_menu label="Çıkar" name="Take Off &gt;">
 		<context_menu label="Giysiler" name="Clothes &gt;">
 			<menu_item_call label="Gömlek" name="Shirt"/>
@@ -24,7 +22,6 @@
 	</context_menu>
 	<menu_item_call label="Görünümüm" name="Chenge Outfit"/>
 	<menu_item_call label="Dış Görünümümü Düzenle" name="Edit Outfit"/>
-	<menu_item_call label="Şeklimi Düzenle" name="Edit My Shape"/>
 	<menu_item_call label="Konum Yüksekliği" name="Hover Height"/>
 	<menu_item_call label="İskeleti Sıfırla" name="Reset Skeleton"/>
 	<menu_item_call label="İskeleti ve Animasyonları Sıfırla" name="Reset Skeleton And Animations"/>

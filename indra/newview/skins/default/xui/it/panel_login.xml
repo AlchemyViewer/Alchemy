@@ -12,8 +12,6 @@
 						<combo_box.item label="La mia ultima ubicazione" name="MyLastLocation"/>
 						<combo_box.item label="Casa mia" name="MyHome"/>
 					</combo_box>
-					<check_box label="Ricordami" name="remember_check"/>
-					<text name="sign_up_text">Registrati</text>
 					<layout_stack name="login_stack">
 						<layout_panel name="login_panel">
 							<text name="forgot_password_text">Password dimenticata</text>

@@ -3,17 +3,8 @@
 	<floater.string name="buy_currency">
 		購買 L$ [LINDENS]，所需花費約為 [LOCALAMOUNT]
 	</floater.string>
-	<text name="buying_label">
-		以此價格
-	</text>
-	<text name="buy_action">
-		[ACTION]
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php 付費方式] | [http://www.secondlife.com/my/account/currency.php 幣種]
-	</text>
-	<text name="purchase_warning_notenough">
-		你購買的林登幣不足， 請增加數額。
 	</text>
 	<floater.string name="info_cannot_buy">
 		無法購買

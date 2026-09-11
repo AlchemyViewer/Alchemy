@@ -9,6 +9,6 @@
 		<scroll_list.columns label="Bygget af" name="creator_name"/>
 		<scroll_list.columns label="Lavet den " name="creation_date"/>
 	</scroll_list>
-	<button label="Se profil for ejer..." label_selected="" name="button owner" tool_tip="Se profilen for ejeren af det markerede objekt på listen"/>
-	<button label="Se profil for bygger..." label_selected="" name="button creator" tool_tip="Se profilen for den beboer der har bygget det markerede objekt på listen"/>
+	<button label="Se profil for ejer..." name="button owner" tool_tip="Se profilen for ejeren af det markerede objekt på listen"/>
+	<button label="Se profil for bygger..." name="button creator" tool_tip="Se profilen for den beboer der har bygget det markerede objekt på listen"/>
 </floater>

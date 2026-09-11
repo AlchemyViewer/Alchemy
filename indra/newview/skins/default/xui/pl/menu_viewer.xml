@@ -8,14 +8,13 @@
 		<menu_item_call label="Landmarki..." name="Places" />
 		<menu_item_call label="Miejsca..." name="Picks" />
 		<menu_item_call label="Ustawienia kamery..." name="Camera Controls" />
-		<menu label="Ustawienia ruchu" name="Movement">
+		<menu name="Movement">
 			<menu_item_call label="Usiądź" name="Sit Down Here" />
 			<menu_item_check label="Zacznij latać" name="Fly" />
 			<menu_item_call label="Przestań latać" name="Stop flying" />
 			<menu_item_call label="Chodzenie / Bieganie / Latanie..." name="Walk / run / fly" />
 		</menu>
 		<menu_item_call label="Kup L$..." name="Buy and Sell L$" />
-		<menu_item_call label="Skrzynka nadawcza kupca..." name="MerchantOutbox" />
 		<menu_item_call label="Zarządzaj kontem..." name="Manage My Account" />
 		<menu_item_call label="Ustawienia..." name="Preferences" />
 		<menu_item_call label="Przyciski na paskach..." name="Toolbars" />
@@ -53,33 +52,12 @@
 		<menu_item_call label="Moje działki..." name="My Land" />
 		<menu_item_call label="Kup działkę" name="Buy Land" />
 		<menu label="Pokaż więcej" name="LandShow">
-			<menu_item_check label="Linie zakazu" name="Ban Lines" />
 			<menu_item_check label="Emitery" name="beacons" shortcut="" />
 			<menu_item_check label="Granice działek" name="Property Lines" />
 			<menu_item_check label="Właściciele działek" name="Land Owners" />
 			<menu_item_check label="Współrzędne" name="Coordinates" />
 			<menu_item_check label="Zezwolenia działek" name="Parcel Properties" />
 			<menu_item_check label="Menu Zaawansowane" name="Show Advanced Menu" />
-		</menu>
-		<menu_item_check label="Pokaż pasek nawigacyjny" name="ShowNavbarNavigationPanel" />
-		<menu_item_check label="Pokaż pasek ulubionych" name="ShowNavbarFavoritesPanel" />
-		<menu label="Słońce" name="Sun">
-			<menu_item_check label="Używaj czasu Regionu" name="Use Region Settings" />
-		</menu>
-		<menu label="Edytor środowiska" name="Environment Editor">
-			<menu_item_call label="Ustawienia środowiska..." name="Environment Settings" />
-			<menu name="Water Presets" label="Ustawienia wody">
-				<menu_item_call label="Nowe Ustawienie..." name="new_water_preset" />
-				<menu_item_call label="Edytuj Ustawienie..." name="edit_water_preset" />
-			</menu>
-			<menu name="Sky Presets" label="Ustawienia nieba">
-				<menu_item_call label="Nowe Ustawienie..." name="new_sky_preset" />
-				<menu_item_call label="Edytuj Ustawienie..." name="edit_sky_preset" />
-			</menu>
-			<menu name="Day Presets" label="Ustawienia pory dnia">
-				<menu_item_call label="Nowe Ustawienie..." name="new_day_preset" />
-				<menu_item_call label="Edytuj Ustawienie..." name="edit_day_preset" />
-			</menu>
 		</menu>
 		<menu name="Environment">
 			<menu_item_check label="Północ" name="Midnight" />
@@ -105,12 +83,6 @@
 		<menu_item_call label="Scal" name="Link" />
 		<menu_item_call label="Rozłącz" name="Unlink" />
 		<menu_item_check label="Edytuj połączone części" name="Edit Linked Parts" />
-		<menu label="Wybierz połączone części" name="Select Linked Parts">
-			<menu_item_call label="Wybierz następną część" name="Select Next Part" />
-			<menu_item_call label="Zaznacz poprzednią część" name="Select Previous Part" />
-			<menu_item_call label="Uwzględnij następną część" name="Include Next Part" />
-			<menu_item_call label="Uwzględnij poprzednią część" name="Include Previous Part" />
-		</menu>
 		<menu_item_call label="Zbiory części (linków)..." name="pathfinding_linkset_menu_item" />
 		<menu_item_call label="Wycentruj na selekcji" name="Focus on Selection" />
 		<menu_item_call label="Przybliż do selekcji" name="Zoom to Selection" />
@@ -161,14 +133,10 @@
 		<menu_item_call label="Ponów" name="Redo" />	  
 	</menu>
 	<menu label="Pomoc" name="Help">
-		<menu_item_call label="Podstawowe zagadnienia..." name="How To" />
-		<menu_item_call label="Szybki start" name="Quickstart" />
-		<menu_item_call label="Samouczek" name="Tutorial" />
 		<menu_item_call label="Baza wiedzy" name="Knowledge Base" />
 		<menu_item_call label="Wiki informacyjna" name="Wiki" />
 		<menu_item_call label="Forum społecznościowe" name="Community Forums" />
 		<menu_item_call label="Portal wsparcia" name="Support portal" />
-		<menu_item_call label="Newsy [SECOND_LIFE]" name="Second Life News" />
 		<menu_item_call label="Blogi [SECOND_LIFE]" name="Second Life Blogs" />
 		<menu_item_call label="Zgłoś nadużycie" name="Report Abuse" />
 		<menu_item_call label="Zgłoś błędy klienta" name="Report Bug" />
@@ -187,7 +155,6 @@
 			<menu_item_call label="Miernik lagów" name="Lag Meter" />
 			<menu_item_check label="Statystyki ogólne" name="Statistics Bar" />
 			<menu_item_call label="Statystyki obciążenia sceny" name="Scene Load Statistics" />
-			<menu_item_check label="Pokaż wartość renderowania awatara" name="Avatar Rendering Cost" />
 		</menu>
 		<menu label="Podświetlanie i widoczność" name="Highlighting and Visibility">
 			<menu_item_check label="Efekt emiterów" name="Cheesy Beacon" />
@@ -203,7 +170,6 @@
 			<menu_item_check label="Płaszczyzna powierzchni" name="Rendering Type Surface Patch" />
 			<menu_item_check label="Niebo" name="Rendering Type Sky" />
 			<menu_item_check label="Woda" name="Rendering Type Water" />
-			<menu_item_check label="Ziemia" name="Rendering Type Ground" />
 			<menu_item_check label="Objętość" name="Rendering Type Volume" />
 			<menu_item_check label="Trawa" name="Rendering Type Grass" />
 			<menu_item_check label="Chmury" name="Rendering Type Clouds" />
@@ -224,7 +190,6 @@
 		<menu_item_check label="Wygładzanie ruchu myszki" name="Mouse Smoothing" />
 		<menu_item_call label="Cofnij dodatkom zezwolenia kontroli przycisków" name="Release Keys" />
 		<menu label="Skróty" name="Shortcuts">
-			<menu_item_check label="Pokazuj menu Zaawansowane" name="Show Advanced Menu - legacy shortcut" />
 			<menu_item_call label="Zamknij okno" name="Close Window" />
 			<menu_item_call label="Zamknij wszystkie okna" name="Close All Windows" />
 			<menu_item_call label="Zapisz zdjęcie na dysk twardy" name="Snapshot to Disk" />
@@ -246,10 +211,8 @@
 			<menu_item_check label="Konsola tekstur" name="Texture Console" />		
 			<menu_item_check label="Konsola debugowania" name="Debug Console" />
 			<menu_item_check label="Konsola debugowania regionu" name="Region Debug Console" />
-			<menu_item_check label="Pamięć" name="Memory" />
 			<menu_item_check label="Statystyki sceny" name="Scene Statistics" />
 			<menu_item_check label="Monitor obciążenia sceny" name="Scene Loading Monitor" />
-			<menu_item_call label="Konsola debugowania dla ładowania tekstur" name="Texture Fetch Debug Console" />
 			<menu_item_call label="Info o regionie do konsoli debugowania" name="Region Info to Debug Console" />
 			<menu_item_call label="Info o grupie do konsoli debugowania" name="Group Info to Debug Console" />
 			<menu_item_call label="Info o możliwościach do konsoli debugowania" name="Capabilities Info to Debug Console" />
@@ -267,7 +230,6 @@
 			<menu_item_check label="Pokaż macierze" name="Show Matrices" />
 			<menu_item_check label="Pokaż kolor pod kursorem" name="Show Color Under Cursor" />
 			<menu_item_check label="Pokaż pamięć" name="Show Memory" />
-			<menu_item_check label="Pokaż informacje o pamięci prywatnej" name="Show Private Mem Info" />
 			<menu_item_check label="Pokaż aktualizacje obiektów" name="Show Updates" />
 		</menu>
 		<menu label="Wymuś błąd" name="Force Errors">
@@ -284,7 +246,6 @@
 			<menu_item_check label="Kamera poza zasiegiem" name="Camera Offset" />
 			<menu_item_check label="Losowa ilość klatek" name="Randomize Framerate" />
 			<menu_item_check label="Okresowe spowolnienie" name="Periodic Slow Frame" />
-			<menu_item_check label="Test klatek obrazu" name="Frame Test" />
 			<menu_item_call label="Profil klatek obrazu" name="Frame Profile" />
 			<menu_item_call label="Testowanie (benchmark)" name="Benchmark" />
 		</menu>
@@ -302,15 +263,12 @@
 			<menu_item_check label="Obszary tekstur" name="Texture Area" />
 			<menu_item_check label="Obszary powierzchni" name="Face Area" />
 			<menu_item_check label="Poziomy detali" name="LOD Info" />
-			<menu_item_check label="Kolejka budowania" name="Build Queue" />
 			<menu_item_check label="Światła" name="Lights" />
 			<menu_item_check label="Cząsteczki" name="Particles" />
 			<menu_item_check label="Szkielet kolizji" name="Collision Skeleton" />
 			<menu_item_check label="Stawy" name="Joints" />
 			<menu_item_check label="Promienie" name="Raycast" />
 			<menu_item_check label="Wektory wiatru" name="Wind Vectors" />
-			<menu_item_check label="Złożoność renderowania" name="rendercomplexity" />
-			<menu_item_check label="Bajty dodatków" name="attachment bytes" />
 			<menu_item_check label="Skulpty" name="Sculpt" />
 			<menu label="Gęstość tekstur" name="Texture Density">
 				<menu_item_check label="Żadna" name="None" />
@@ -326,7 +284,6 @@
 			<menu_item_call label="Informacje o zaznaczonym materiale" name="Selected Material Info" />
 			<menu_item_check label="Tryb obrazu szkieletowego" name="Wireframe" />
 			<menu_item_check label="Okluzja obiektu do obiektu" name="Object-Object Occlusion" />
-			<menu_item_check label="Zaawansowane oświetlenie" name="Advanced Lighting Model" />
 			<menu_item_check label="   Cienie Słońca, Księżyca i innych źródeł" name="Shadows from Sun/Moon/Projectors" />
 			<menu_item_check label="   SSAO i wygładzanie cieni" name="SSAO and Shadow Smoothing" />
 			<menu_item_check label="Debugowanie GL" name="Debug GL" />
@@ -338,7 +295,6 @@
 			<menu_item_check label="Maksymalna rozdzielczość tekstur (niebezpieczne)" name="Rull Res Textures" />
 			<menu_item_check label="Renderowania przyłączonego światła" name="Render Attached Lights" />
 			<menu_item_check label="Renderowanie przyłączonych cząsteczek" name="Render Attached Particles" />
-			<menu_item_check label="Wyświetlaj obiekty odblaskowe" name="Hover Glow Objects" />
 			<menu_item_call label="Wyczyść natychmiast pamięć podręczną" name="Cache Clear" />
 		</menu>
 		<menu label="Sieć" name="Network">
@@ -351,9 +307,6 @@
 		</menu>
 		<menu_item_call label="Zrzut oskryptowanej kamery" name="Dump Scripted Camera" />
 		<menu label="Nagrywanie" name="Recorder">
-			<menu_item_call label="Rozpocznij nagrywanie zdarzeń" name="Start event recording" />
-			<menu_item_call label="Zatrzymaj nagrywanie zdarzeń" name="Stop event recording" />
-			<menu_item_call label="Odtwarzanie nagranych zdarzeń" name="Playback event recording" />
 			<menu_item_call label="Rozpocznij odtwarzanie" name="Start Playback" />
 			<menu_item_call label="Zatrzymaj odtwarzanie" name="Stop Playback" />
 			<menu_item_check label="Odtwarzanie w pętli" name="Loop Playback" />
@@ -366,13 +319,9 @@
 			<menu_item_call label="Zrzut buforu pamięci obiektów regionu" name="Dump Region Object Cache" />
 		</menu>
 		<menu label="Interfejs" name="UI">
-			<menu_item_check label="Nowy pasek dolny" name="New Bottom Bar" />
-			<menu_item_call label="Test przeglądarki mediów" name="Web Browser Test" />
-			<menu_item_call label="Przeglądarka treści internetowych" name="Web Content Browser" />
 			<menu_item_call label="Test połączenia z Facebookiem" name="FB Connect Test" />
 			<menu_item_call label="Zrzut SelectMgr" name="Dump SelectMgr" />
 			<menu_item_call label="Zrzut Szafy" name="Dump Inventory" />
-			<menu_item_call label="Zrzut liczników" name="Dump Timers" />
 			<menu_item_call label="Zrzut punktu skupienia" name="Dump Focus Holder" />
 			<menu_item_call label="Listuj informacje o zaznaczonym obiekcie" name="Print Selected Object Info" />
 			<menu_item_call label="Listuj informacje o Agencie" name="Print Agent Info" />
@@ -420,14 +369,11 @@
 			<menu_item_check label="Debuguj VIs postaci" name="Debug Character Vis" />
 			<menu_item_check label="Pokaż szkielet kolizji" name="Show Collision Skeleton" />
 			<menu_item_check label="Wyświetl cel Agenta" name="Display Agent Target" />
-			<menu_item_check label="Debugowanie rotacji" name="Debug Rotation" />
 			<menu_item_call label="Zrzut przyłączonych dodatków" name="Dump Attachments" />
 			<menu_item_call label="Debugowanie tekstur awatara" name="Debug Avatar Textures" shortcut="" />
 			<menu_item_call label="Zrzut lokalnych tekstur" name="Dump Local Textures" />
 		</menu>
-		<menu_item_check label="Tekstury przez HTTP" name="HTTP Textures" />
 		<menu_item_call label="Kompresuj obrazki" name="Compress Images" />
-		<menu_item_call label="Włącz wizualny detektor wycieków pamięci" name="Enable Visual Leak Detector" />
 		<menu_item_check label="Mały zrzut wyjścia debugowania" name="Output Debug Minidump" />
 		<menu_item_check label="Aktywacja okna konsoli podczas następnego uruchomienia" name="Console Window" />
 		<menu label="Ustaw poziom logowania" name="Set Logging Level">

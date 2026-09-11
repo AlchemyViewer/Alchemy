@@ -17,14 +17,14 @@
 	<string name="Filter.Bodyparts" value="Corpo"/>
 	<string name="replace_body_part" value="Clique para substituir sua forma atual"/>
 	<text name="title" value="Editar look"/>
-	<panel label="bottom_panel" name="header_panel">
-		<panel label="bottom_panel" name="outfit_name_and_status">
+	<panel name="header_panel">
+		<panel name="outfit_name_and_status">
 			<text name="status" value="Editando..."/>
 			<text name="curr_outfit_name" value="[Look atual]"/>
 		</panel>
 	</panel>
 	<layout_stack name="im_panels">
-		<layout_panel label="Painel de controle de MIs" name="outfit_wearables_panel">
+		<layout_panel name="outfit_wearables_panel">
 			<layout_stack name="filter_panels">
 				<layout_panel name="add_button_and_combobox">
 					<button label="Adicionar mais..." name="show_add_wearables_btn" tool_tip="Abrir/Fechar"/>

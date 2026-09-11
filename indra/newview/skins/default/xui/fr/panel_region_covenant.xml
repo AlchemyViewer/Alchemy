@@ -21,7 +21,6 @@
 	<text name="covenant_timestamp_text" width="350">
 		Dernière modification le mercredi 31 décembre 1969 16:00:00
 	</text>
-	<button label="?" name="covenant_help"/>
 	<text_editor bottom="-263" height="178" name="covenant_editor">
 		Il n&apos;y a aucun règlement pour ce domaine.
 	</text_editor>

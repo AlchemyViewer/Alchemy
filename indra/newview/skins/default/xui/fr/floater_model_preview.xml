@@ -77,19 +77,6 @@
 			<text name="name_label">
 				Nom du modèle :
 			</text>
-			<text name="model_category_label">
-				Ce modèle représente...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Choisir une option..." name="Choose one"/>
-				<combo_item label="Silhouette de l&apos;avatar" name="Avatar shape"/>
-				<combo_item label="Éléments attachés aux avatars" name="Avatar attachment"/>
-				<combo_item label="Objet mobile (véhicule, animal)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Éléments pour la construction" name="Building Component"/>
-				<combo_item label="Important, immobile etc." name="Large, non moving etc"/>
-				<combo_item label="Plus petit, immobile etc." name="Smaller, non-moving etc"/>
-				<combo_item label="Aucun" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Niveau de détail" name="lod_panel" title="Niveau de détail">
@@ -99,7 +86,6 @@
 				<text initial_value="Élevé" name="high_label" value="Élevé"/>
 				<combo_box name="lod_source_high">
 					<item label="Depuis un fichier" name="Load from file" value="Depuis un fichier"/>
-					<item label="Génération" name="Generate" value="Génération"/>
 				</combo_box>
 				<button label="Parcourir..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="Moyen" name="medium_label" value="Moyen"/>
 				<combo_box name="lod_source_medium">
 					<item label="Depuis un fichier" name="Load from file" value="Depuis un fichier"/>
-					<item label="Génération" name="Generate" value="Génération"/>
 					<item label="Niveau de détail du dessus" name="Use LoD above" value="Niveau de détail du dessus"/>
 				</combo_box>
 				<button label="Parcourir..." name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="Faible" name="low_label" value="Faible"/>
 				<combo_box name="lod_source_low">
 					<item label="Depuis un fichier" name="Load from file" value="Depuis un fichier"/>
-					<item label="Génération" name="Generate" value="Génération"/>
 					<item label="Niveau de détail du dessus" name="Use LoD above" value="Niveau de détail du dessus"/>
 				</combo_box>
 				<button label="Parcourir..." name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="Le plus faible" name="lowest_label" value="Le plus faible"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Depuis un fichier" name="Load from file" value="Depuis un fichier"/>
-					<item label="Génération" name="Generate" value="Génération"/>
 					<item label="Niveau de détail du dessus" name="Use LoD above" value="Niveau de détail du dessus"/>
 				</combo_box>
 				<button label="Parcourir..." name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Inclure les textures" name="upload_textures"/>
-				<text name="include_label">
-					Modèles d&apos;avatar uniquement :
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

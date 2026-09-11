@@ -34,15 +34,6 @@
 	<text name="HardwareText">
 		Hardware
 	</text>
-	<slider label="Memoria para texturas (MB):" name="GraphicsCardTextureMemory" tool_tip="Cantidad de memoria asignada a las texturas. Por defecto es la memoria de la tarjeta de vídeo. Reducir esta cantidad puede mejorar el rendimiento, pero también hacer que las texturas se vean borrosas."/>
-	<slider label="Intensidad de la niebla:" name="fog"/>
-	<slider label="Gamma:" name="gamma"/>
-	<text name="(brightness, lower is brighter)">
-		(0 = brillo por defecto, más bajo = más brillo)
-	</text>
-	<check_box label="Filtrado anisotrópico (enlentece el dibujo)" name="ani"/>
-	<check_box initial_value="true" label="Habilitar objetos de búfer de vértices OpenGL" name="vbo" tool_tip="Su activación en un hardware moderno aumenta el rendimiento. No obstante, la ejecución poco eficiente de los VBO en los equipos antiguos puede hacer que se bloquee la aplicación."/>
-	<check_box initial_value="true" label="Activar la compresión de texturas (requiere reiniciar)" name="texture compression" tool_tip="Comprime las texturas en la memoria de vídeo, lo cual permite cargar texturas de una resolución más alta, pero con una cierta pérdida de calidad del color."/>
 	<check_box initial_value="true" label="Activar soporte para visores HiDPI (requiere reiniciar)" name="use HiDPI" tool_tip="Activar OpenGl para Dibujos de alta resolución."/>
 	<text name="antialiasing label">
 		Antialiasing:
@@ -76,28 +67,11 @@
 		Shaders
 	</text>
 	<check_box initial_value="true" label="Agua transparente" name="TransparentWater"/>
-	<check_box initial_value="true" label="Efecto de relieve y brillo" name="BumpShiny"/>
-	<check_box initial_value="true" label="Puntos de luz locales" name="LocalLights"/>
-	<slider label="Nivel de detalle del terreno:" name="TerrainDetail"/>
-	<text name="TerrainDetailText">
-		Bajo
-	</text>
-	<check_box initial_value="true" label="Renderizado de avatares por hardware" name="AvatarVertexProgram"/>
-	<check_box initial_value="true" label="Ropas del avatar" name="AvatarCloth"/>
-	<text name="ReflectionsText">
-		Reflejos en el agua:
-	</text>
 	<combo_box name="Reflections">
 		<combo_box.item label="Mínimo" name="0"/>
 		<combo_box.item label="Terreno y árboles" name="1"/>
 		<combo_box.item label="Todos los objetos estáticos" name="2"/>
 	</combo_box>
-	<check_box initial_value="true" label="Shaders de la atmósfera" name="WindLightUseAtmosShaders"/>
-	<slider label="Cielo:" name="SkyMeshDetail"/>
-	<text name="SkyMeshDetailText">
-		Bajo
-	</text>
-	<check_box initial_value="true" label="Modelo de iluminación avanzado" name="UseLightShaders"/>
 	<check_box initial_value="true" label="Oclusión ambiental" name="UseSSAO"/>
 	<check_box initial_value="true" label="Profundidad de campo" name="UseDoF"/>
 	<text name="RenderShadowDetailText">

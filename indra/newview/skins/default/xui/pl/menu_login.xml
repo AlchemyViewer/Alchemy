@@ -25,7 +25,6 @@
 		<menu_item_call label="Ustaw rozmiar okna..." name="Set Window Size..." />
 		<menu_item_call label="Pokaż warunki użytkowania" name="TOS" />
 		<menu_item_call label="Pokaż wiadomość krytyczną" name="Critical" />
-		<menu_item_call label="Test debugowania okienka sieciowego" name="Web Content Floater Debug Test" />
 		<menu label="Ustaw poziom logowania" name="Set Logging Level">
 			<menu_item_check name="Debug" label="Debugowanie" />
 			<menu_item_check name="Info" label="Informacje" />

@@ -10,14 +10,10 @@
 		Lysstyrke:
 	</text>
 	<check_box label="Benyt nu" name="apply_immediate"/>
-	<button label="" label_selected="" name="color_pipette"/>
 	<button label="Annullér" label_selected="Annullér" name="cancel_btn"/>
 	<button label="OK" label_selected="OK" name="select_btn"/>
 	<text name="Current color:">
 		Nuværende Farve:
-	</text>
-	<text name="(Drag below to save.)">
-		(Træk ned for at gemme)
 	</text>
 	<tab_container name="color_type_container">
 		<panel name="RGB">

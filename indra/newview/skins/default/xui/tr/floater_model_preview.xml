@@ -77,19 +77,6 @@
 			<text name="name_label">
 				Model adı:
 			</text>
-			<text name="model_category_label">
-				Bu modelin temsil ettiği...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Birini Seçin..." name="Choose one"/>
-				<combo_item label="Avatar şekli" name="Avatar shape"/>
-				<combo_item label="Avatar aksesuarı" name="Avatar attachment"/>
-				<combo_item label="Hareket eden nesne (araç, hayvan)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Bina Bileşeni" name="Building Component"/>
-				<combo_item label="Büyük, hareketsiz, vs." name="Large, non moving etc"/>
-				<combo_item label="Daha küçük, hareketsiz, vs." name="Smaller, non-moving etc"/>
-				<combo_item label="Bunlardan herhangi biri değil" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Ayrıntı Seviyesi" name="lod_panel" title="Ayrıntı Seviyesi">
@@ -99,7 +86,6 @@
 				<text initial_value="Yüksek" name="high_label" value="Yüksek"/>
 				<combo_box name="lod_source_high">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="Orta" name="medium_label" value="Orta"/>
 				<combo_box name="lod_source_medium">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="Düşük" name="low_label" value="Düşük"/>
 				<combo_box name="lod_source_low">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="En Düşük" name="lowest_label" value="En Düşük"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Dosyadan yükle" name="Load from file" value="Dosyadan yükle"/>
-					<item label="Oluştur" name="Generate" value="Oluştur"/>
 					<item label="Yukarıdaki ayrıntı seviyesini kullan" name="Use LoD above" value="Yukarıdaki ayrıntı seviyesini kullan"/>
 				</combo_box>
 				<button label="Gözat..." name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Dokuları dahil et" name="upload_textures"/>
-				<text name="include_label">
-					Sadece avatar modelleri için:
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

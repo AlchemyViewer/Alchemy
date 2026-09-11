@@ -8,9 +8,6 @@
 	<menu_item_call label="Przybliż" name="Zoom In" />
 	<menu_item_call label="Zapłać" name="Pay..." />
 	<menu_item_call label="Profil obiektu" name="Object Inspect" />
-	<menu_item_check name="Renderuj normalnie" label="Normal Rendering" />
-	<menu_item_check name="Zawsze upraszczaj" label="Always use impostor" />
-	<menu_item_check name="Nigdy nie upraszczaj" label="Never use impostor" />
 	<context_menu name="Avatar Attachment Manage">
 		<menu_item_call label="Wyrzuć" name="Eject..." />
 		<menu_item_call label="Unieruchom" name="Freeze..." />

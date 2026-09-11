@@ -22,7 +22,6 @@
 		[COUNT] г
 	</string>
 	<text name="avatar_name" value="(загрузка)"/>
-	<text name="last_interaction" value="0 с"/>
 	<icon name="permission_edit_theirs_icon" tool_tip="Вы можете изменять объекты этого друга"/>
 	<icon name="permission_edit_mine_icon" tool_tip="Этот друг может изменять, удалять или брать ваши объекты"/>
 	<icon name="permission_map_icon" tool_tip="Этот друг может видеть вас на карте"/>

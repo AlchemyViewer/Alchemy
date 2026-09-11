@@ -9,6 +9,6 @@
 		<scroll_list.columns label="Creador" name="creator_name"/>
 		<scroll_list.columns label="Fecha de creación" name="creation_date"/>
 	</scroll_list>
-	<button label="Ver el perfil del propietario..." label_selected="" name="button owner" tool_tip="Ver el perfil del propietario del objeto realzado" width="185"/>
-	<button label="Ver el perfil del creador..." label_selected="" left="205" name="button creator" tool_tip="Ver el perfil del creador original del objeto realzado" width="165"/>
+	<button label="Ver el perfil del propietario..." name="button owner" tool_tip="Ver el perfil del propietario del objeto realzado" width="185"/>
+	<button label="Ver el perfil del creador..." left="205" name="button creator" tool_tip="Ver el perfil del creador original del objeto realzado" width="165"/>
 </floater>

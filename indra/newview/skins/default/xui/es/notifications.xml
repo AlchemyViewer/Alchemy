@@ -1458,7 +1458,6 @@ excediendo el límite de [LIMIT].
 	<notification label="Mensaje a todo el estado" name="MessageEstate">
 		Escribe un anuncio breve que se enviará a todo el que esté en tu estado.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1704,7 +1703,6 @@ Se cambiarán miles de regiones, y se provocará un colapso en el espacio del se
 	<notification label="Mensaje a toda la región" name="MessageRegion">
 		Escribe un anuncio breve que se enviará a todo el que esté en esta región.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1781,7 +1779,6 @@ Serán copiados a tu inventario.
 ¿Estás seguro de querer hacer esta compra?
 Por favor, vuelva a escribir tu contraseña y pulsa OK.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -2378,12 +2375,10 @@ No autorices el acceso a tu cuenta si no conoces cuál es la razón exacta.
 	<notification name="ScriptDialog">
 		'&lt;nolink&gt;[TITLE]&lt;/nolink&gt;' de [NAME]
 [MESSAGE]
-		<form name="form"/>
 	</notification>
 	<notification name="ScriptDialogGroup">
 		&lt;nolink&gt;[GROUPNAME]&lt;/nolink&gt;'s '&lt;nolink&gt;[TITLE]&lt;/nolink&gt;' 
 [MESSAGE]
-		<form name="form"/>
 	</notification>
 	<notification name="BuyLindenDollarSuccess">¡Gracias por tu pago!
 
@@ -2539,7 +2534,6 @@ Consulta Alchemy.log para más detalles</notification>
 Con los siguientes Residentes:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Sólo puedes compartir una carpeta en cada momento.
@@ -2806,9 +2800,6 @@ Algunos de los linksets seleccionados no pueden configurarse como '[REQUESTED_TY
 		El objeto que has seleccionado afecta al navmesh. Al cambiarlo a una Ruta flexible se eliminará del navmesh.
 		<usetemplate ignoretext="El objeto que has seleccionado afecta al navmesh. Al cambiarlo a una Ruta flexible se eliminará del navmesh." name="okcancelignore" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Parece que no tienes el hardware apropiado para [APP_NAME]. [APP_NAME] requiere una tarjeta gráfica OpenGL que admita texturas múltiples ('multitexture support'). Si la tienes, comprueba que tienes los últimos 'drivers' para tu tarjeta gráfica, así como los últimos parches y 'service packs' para tu sistema operativo.
-
-Si los problemas persisten, por favor, acude a [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- Tu tarjeta gráfica no cumple los requerimientos mínimos.</global>

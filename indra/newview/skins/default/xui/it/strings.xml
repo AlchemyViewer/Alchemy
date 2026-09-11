@@ -12,9 +12,6 @@
 	<string name="SUPPORT_SITE">
 		Portale di supporto di Second Life
 	</string>
-	<string name="StartupDetectingHardware">
-		Ricerca hardware...
-	</string>
 	<string name="StartupLoading">
 		Caricamento di [APP_NAME]...
 	</string>
@@ -347,60 +344,6 @@ Prova ad accedere nuovamente tra un minuto.
 	</string>
 	<string name="TestingDisconnect">
 		Verifica scollegamento viewer
-	</string>
-	<string name="SocialFacebookConnecting">
-		Connessione a Facebook in corso...
-	</string>
-	<string name="SocialFacebookPosting">
-		Caricamento post...
-	</string>
-	<string name="SocialFacebookDisconnecting">
-		Disconnessione da Facebook in corso...
-	</string>
-	<string name="SocialFacebookErrorConnecting">
-		Problemi con la connessione a Facebook
-	</string>
-	<string name="SocialFacebookErrorPosting">
-		Problemi con la connessione a Facebook
-	</string>
-	<string name="SocialFacebookErrorDisconnecting">
-		Problemi con la disconnessione da Facebook
-	</string>
-	<string name="SocialFlickrConnecting">
-		Collegamento a Flickr...
-	</string>
-	<string name="SocialFlickrPosting">
-		Caricamento post...
-	</string>
-	<string name="SocialFlickrDisconnecting">
-		Interruzione del collegamento con Flickr...
-	</string>
-	<string name="SocialFlickrErrorConnecting">
-		Problema nel collegamento a Flickr
-	</string>
-	<string name="SocialFlickrErrorPosting">
-		Problema nel caricamento post su Flickr
-	</string>
-	<string name="SocialFlickrErrorDisconnecting">
-		Problema nell'interruzione del collegamento da Flickr
-	</string>
-	<string name="SocialTwitterConnecting">
-		Collegamento a Twitter...
-	</string>
-	<string name="SocialTwitterPosting">
-		Caricamento post...
-	</string>
-	<string name="SocialTwitterDisconnecting">
-		Interruzione del collegamento con Twitter...
-	</string>
-	<string name="SocialTwitterErrorConnecting">
-		Problema nel collegamento a Twitter
-	</string>
-	<string name="SocialTwitterErrorPosting">
-		Problema nel caricamento post su Twitter
-	</string>
-	<string name="SocialTwitterErrorDisconnecting">
-		Problema nell'interruzione del collegamento da Twitter
 	</string>
 	<string name="BlackAndWhite">
 		Bianco e nero
@@ -1152,7 +1095,6 @@ http://secondlife.com/support per risolvere il problema.
 	<string name="AgentNameSubst">
 		(Tu)
 	</string>
-	<string name="JoinAnExperience"/>
 	<string name="SilentlyManageEstateAccess">
 		Omette gli avvisi durante la gestione degli elenchi di accesso alle proprietà immobiliari
 	</string>
@@ -1525,14 +1467,12 @@ http://secondlife.com/support per risolvere il problema.
 	<string name="InventoryOutboxNotMerchantTitle">
 		Chiunque può vendere oggetti nel Marketplace.
 	</string>
-	<string name="InventoryOutboxNotMerchantTooltip"/>
 	<string name="InventoryOutboxNotMerchant">
 		Per diventare un venditore, devi [[MARKETPLACE_CREATE_STORE_URL] creare un negozio nel Marketplace].
 	</string>
 	<string name="InventoryOutboxNoItemsTitle">
 		La tua casella in uscita è vuota.
 	</string>
-	<string name="InventoryOutboxNoItemsTooltip"/>
 	<string name="InventoryOutboxNoItems">
 		Trascina le cartelle in questa area e clicca su "Invia a Marketplace" per metterle in vendita su [[MARKETPLACE_DASHBOARD_URL] Marketplace].
 	</string>
@@ -2642,9 +2582,6 @@ Se continui a ricevere questo messaggio, contatta l'assistenza Second Life su ht
 	<string name="GroupMoneyDebits">
 		Debiti
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc] [mth,datetime,utc] [day,datetime,utc], [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		Oggetti acquisiti
 	</string>
@@ -2653,9 +2590,6 @@ Se continui a ricevere questo messaggio, contatta l'assistenza Second Life su ht
 	</string>
 	<string name="UploadingCosts">
 		Il caricamento di [NAME] costa L$ [AMOUNT]
-	</string>
-	<string name="BuyingCosts">
-		L'acquisto di [NAME] costa L$ [AMOUNT]
 	</string>
 	<string name="UnknownFileExtension">
 		Estensione del file sconosciuta [.%s]
@@ -2902,16 +2836,6 @@ Visualizzazione corrente in modalità finestra.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Impossibile ottenere una descrizione del formato pixel
-	</string>
-	<string name="MBTrueColorWindow">
-		[APP_NAME] richiede True Color (32 bit) per funzionare.
-Vai alle impostazioni dello schermo del tuo computer e imposta il colore in modalità 32 bit.
-	</string>
-	<string name="MBAlpha">
-		[APP_NAME] non funziona poichè è impossibile trovare un canale alpha a 8 bit.  Questo problema normalmente deriva dai driver della scheda video.
-Assicurati di avere installato i driver della scheda video più recenti.
-Assicurati anche che il monitor sia impostato a True Color (32 bit) nel Pannello di controllo &gt; Schermo &gt; Impostazioni.
-Se il messaggio persiste, contatta [SUPPORT_SITE].
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Impossibile impostare il formato pixel
@@ -4500,15 +4424,6 @@ Se il messaggio persiste, contatta [SUPPORT_SITE].
 		Stai parlando con un bot, [NAME]. Non condividere informazioni personali.
 Scopri di più su https://second.life/scripted-agents.
 	</string>
-	<string name="facebook_post_success">
-		Hai pubblicato su Facebook.
-	</string>
-	<string name="flickr_post_success">
-		Hai pubblicato su Flickr.
-	</string>
-	<string name="twitter_post_success">
-		Hai pubblicato su Twitter.
-	</string>
 	<string name="no_session_message">
 		(La sessione IM non esiste)
 	</string>
@@ -4949,9 +4864,6 @@ Segnala abuso
 	<string name="dance8">
 		danza8
 	</string>
-	<string name="AvatarBirthDateFormat">
-		[day,datetime,slt]/[mthnum,datetime,slt]/[year,datetime,slt]
-	</string>
 	<string name="DefaultMimeType">
 		nessuna/nessuna
 	</string>
@@ -5037,7 +4949,7 @@ Consulta la pagina http://status.secondlifegrid.net per determinare se il proble
 	<string name="Notices">
 		Avvisi
 	</string>
-	<string name="Chat" value="Chat :">
+	<string name="Chat">
 		Chat
 	</string>
 	<string name="BaseMembership">
@@ -5441,12 +5353,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	<string name="Command_Environments_Label">
 		I miei ambienti
 	</string>
-	<string name="Command_Facebook_Label">
-		Facebook
-	</string>
-	<string name="Command_Flickr_Label">
-		Flickr
-	</string>
 	<string name="Command_Gestures_Label">
 		Gesture
 	</string>
@@ -5470,9 +5376,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	</string>
 	<string name="Command_Move_Label">
 		Cammina / corri / vola
-	</string>
-	<string name="Command_Outbox_Label">
-		Casella in uscita del rivenditore
 	</string>
 	<string name="Command_People_Label">
 		Persone
@@ -5500,9 +5403,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	</string>
 	<string name="Command_Speak_Label">
 		Parla
-	</string>
-	<string name="Command_Twitter_Label">
-		Twitter
 	</string>
 	<string name="Command_View_Label">
 		Controlli fotocamera
@@ -5537,12 +5437,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	<string name="Command_Environments_Tooltip">
 		I miei ambienti
 	</string>
-	<string name="Command_Facebook_Tooltip">
-		Pubblica su Facebook
-	</string>
-	<string name="Command_Flickr_Tooltip">
-		Carica su Flickr
-	</string>
 	<string name="Command_Gestures_Tooltip">
 		Gesti per il tuo avatar
 	</string>
@@ -5566,9 +5460,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	</string>
 	<string name="Command_Move_Tooltip">
 		Movimento avatar
-	</string>
-	<string name="Command_Outbox_Tooltip">
-		Trasferisci elementi al tuo mercato per la vendita
 	</string>
 	<string name="Command_People_Tooltip">
 		Amici, gruppi e persone vicine
@@ -5596,9 +5487,6 @@ Prova a racchiudere il percorso dell'editor in doppie virgolette.
 	</string>
 	<string name="Command_Speak_Tooltip">
 		Parla con persone vicine usando il microfono
-	</string>
-	<string name="Command_Twitter_Tooltip">
-		Twitter
 	</string>
 	<string name="Command_View_Tooltip">
 		Modifica angolo fotocamera

@@ -2665,15 +2665,6 @@ SHA1 指紋：[MD5_DIGEST]
 	<notification name="SystemMessage">
 		[MESSAGE]
 	</notification>
-	<notification name="FacebookConnect">
-		[MESSAGE]
-	</notification>
-	<notification name="FlickrConnect">
-		[MESSAGE]
-	</notification>
-	<notification name="TwitterConnect">
-		[MESSAGE]
-	</notification>
 	<notification name="PaymentReceived">
 		[MESSAGE]
 	</notification>
@@ -3337,7 +3328,6 @@ SHA1 指紋：[MD5_DIGEST]
 居民：
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="取消" yestext="確定"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		一次只能分享一個資料夾。
@@ -3670,11 +3660,6 @@ SHA1 指紋：[MD5_DIGEST]
 		所選的物件會影響導航網面。  將它改為彈性路徑，將使它從導航網面中被移除。
 		<usetemplate ignoretext="所選的物件會影響導航網面。  將它改為彈性路徑，將使它從導航網面中被移除。" name="okcancelignore" notext="取消" yestext="確定"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">
-		你的硬體設備似乎不符 [APP_NAME] 的要求。 [APP_NAME] 需要可以支援多材質的 OpenGL 顯像卡。 在這狀況下，請確定你的顯像卡安裝了最新的驅動程式，作業系統也安裝了最新的服務包和嵌補程式。
-
-如果你繼續遇到問題，請前往 [SUPPORT_SITE] 求助。
-	</global>
 	<global name="UnsupportedCPUAmount">
 		796
 	</global>

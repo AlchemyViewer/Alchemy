@@ -6,7 +6,5 @@
 	<text name="Loading...2">
 		Chargement...
 	</text>
-	<button label="" label_selected="" name="less" />
-	<button label="" label_selected="" name="more" />
 	<slider label="[DESC]" name="param slider" />
 </panel>

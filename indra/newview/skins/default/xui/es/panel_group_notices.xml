@@ -18,8 +18,8 @@ El máximo es de 200 por día y grupo.
 	<text name="notice_list_none_found">
 		No se han encontrado
 	</text>
-	<button label="Nuevo aviso" label_selected="Crear un aviso nuevo" name="create_new_notice" tool_tip="Crear un aviso nuevo"/>
-	<button label="Actualizar" label_selected="Actualizar la lista" name="refresh_notices" tool_tip="Actualizar la lista de avisos"/>
+	<button label="Nuevo aviso" name="create_new_notice" tool_tip="Crear un aviso nuevo"/>
+	<button name="refresh_notices" tool_tip="Actualizar la lista de avisos"/>
 	<panel label="Crear un aviso nuevo" name="panel_create_new_notice">
 		<text name="lbl">
 			Crear un aviso
@@ -37,7 +37,7 @@ El máximo es de 200 por día y grupo.
 			Arrastra y suelta aquí un ítem para adjuntarlo:
 		</text>
 		<button label="Inventario" name="open_inventory" tool_tip="Abrir inventario"/>
-		<button label="Quitar" label_selected="Remover lo anexado" name="remove_attachment" tool_tip="Quita el adjunto de tu aviso"/>
+		<button name="remove_attachment" tool_tip="Quita el adjunto de tu aviso"/>
 		<button label="Enviar" label_selected="Enviar" name="send_notice"/>
 		<group_drop_target name="drop_target" tool_tip="Para enviar un ítem con el aviso, arrástralo desde tu inventario hasta este cajetín. Para poder adjuntarlo, debes tener permiso para copiarlo y transferirlo."/>
 	</panel>
@@ -54,6 +54,6 @@ El máximo es de 200 por día y grupo.
 		<text name="lbl4">
 			Mensaje:
 		</text>
-		<button label="Abrir el adjunto" label_selected="Abrir lo anexado" name="open_attachment"/>
+		<button label="Abrir el adjunto" name="open_attachment"/>
 	</panel>
 </panel>

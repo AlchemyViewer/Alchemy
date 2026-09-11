@@ -22,7 +22,7 @@
 	<text name="ShadersPrefText4">
 		Ultra
 	</text>
-	<panel label="CustomGraphics" name="CustomGraphics Panel">
+	<panel name="CustomGraphics Panel">
 		<text name="ShadersText">
 			Overflader:
 		</text>
@@ -103,10 +103,7 @@
 		</radio_group>
 		--&gt;
 	</panel>
-	<button label="Benyt" label_selected="Benyt" name="Apply"/>
 	<button label="Nulstil" name="Defaults"/>
-	<button label="Avanceret" name="Advanced"/>
-	<button label="Hardware" label_selected="Hardware" name="GraphicsHardwareButton"/>
 	<text name="DrawDistanceMeterText2">
 			m
 		</text>

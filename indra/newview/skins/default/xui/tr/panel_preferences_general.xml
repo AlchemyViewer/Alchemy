@@ -42,7 +42,6 @@
 	</radio_group>
 	<check_box label="Adım" name="show_my_name_checkbox1"/>
 	<check_box label="Kullanıcı adları" name="show_slids" tool_tip="Kullanıcı adını göster, bobsmith123 gibi"/>
-	<check_box label="Grup unvanları" name="show_all_title_checkbox1" tool_tip="Grup unvanlarını göster, Görevli veya Üye gibi"/>
 	<check_box label="Arkadaşları vurgula" name="show_friends" tool_tip="Arkadaşlarının ad etiketlerini vurgula"/>
 	<check_box label="Ekran Adlarını Görüntüle" name="display_names_check" tool_tip="Sohbet, Aİ, ad etiketleri, vb.de ekran adlarını kullanmak için işaretle"/>
 	<text name="inworld_typing_rg_label">

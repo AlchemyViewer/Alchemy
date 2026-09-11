@@ -68,19 +68,6 @@
 			<text name="name_label">
 				Nazwa modelu:
 			</text>
-			<text name="model_category_label">
-				Ten model to...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item name="Choose one" label="Wybierz..." />
-				<combo_item name="Avatar shape" label="Kształt awatara" />
-				<combo_item name="Avatar attachment" label="Dodatek awatara" />
-				<combo_item name="Moving object (vehicle, animal)" label="Poruszający się obiekt (pojazd, zwierzę)" />
-				<combo_item name="Building Component" label="Element budynku" />
-				<combo_item name="Large, non moving etc" label="Duży obiekt, statyczny" />
-				<combo_item name="Smaller, non-moving etc" label="Mały obiekt, statyczny" />
-				<combo_item name="Not really any of these" label="Żadne z powyższych" />
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Poziom detali" name="lod_panel" title="Poziom detali">
@@ -90,7 +77,6 @@
 				<text initial_value="Wysoki" name="high_label" value="Wysoki" />
 				<combo_box name="lod_source_high">
 					<item name="Load from file" label="Ładuj z pliku" />
-					<item name="Generate" label="Generuj" />
 				</combo_box>
 				<button label="Przeglądaj" name="lod_browse_high" />
 				<combo_box name="lod_mode_high">
@@ -100,7 +86,6 @@
 				<text initial_value="Średni" name="medium_label" value="Średni" />
 				<combo_box name="lod_source_medium">
 					<item name="Load from file" label="Ładuj z pliku" />
-					<item name="Generate" label="Generuj" />
 					<item name="Use LoD above" label="Użyj poziomu detali (LoD) powyżej" />
 				</combo_box>
 				<button label="Przeglądaj" name="lod_browse_medium" />
@@ -111,7 +96,6 @@
 				<text initial_value="Niski" name="low_label" value="Niski" />
 				<combo_box name="lod_source_low">
 					<item name="Load from file" label="Ładuj z pliku" />
-					<item name="Generate" label="Generuj" />
 					<item name="Use LoD above" label="Użyj poziomu detali (LoD) powyżej" />
 				</combo_box>
 				<button label="Przeglądaj" name="lod_browse_low" />
@@ -122,7 +106,6 @@
 				<text initial_value="Najniższy" name="lowest_label" value="Najniższy" />
 				<combo_box name="lod_source_lowest">
 					<item name="Load from file" label="Ładuj z pliku" />
-					<item name="Generate" label="Generuj" />
 					<item name="Use LoD above" label="Użyj poziomu detali (LoD) powyżej" />
 				</combo_box>
 				<button label="Przeglądaj" name="lod_browse_lowest" />
@@ -147,8 +130,6 @@
 						<combo_item name="load_from_file">Z pliku</combo_item>
 					</combo_box>
 					<button name="physics_browse" label="Przeglądaj" />
-					<check_box name="physics_optimize" label="Optymalizuj" />
-					<check_box name="physics_use_hull" label="Użyj powłoki wypukłej" />
 				</panel>
 				<panel name="physics simplification">
 					<text name="second_step_label">
@@ -211,9 +192,6 @@
 					Wymiary:
 				</text>
 				<check_box name="upload_textures" label="Dołącz tekstury" />
-				<text name="include_label">
-					Tylko dla modeli awatarów:
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<text name="pelvis_offset_label">

@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Destacados" name="panel_picks">
 	<string name="no_picks" value="No hay destacados"/>
-	<text name="Tell everyone about your favorite places in Second Life.">
-		Cuéntale a todos sobre tus lugares favoritos de Second Life.
-	</text>
 	<layout_stack name="main_stack">
 		<layout_panel name="main_body">
 			<text name="picks_panel_text">

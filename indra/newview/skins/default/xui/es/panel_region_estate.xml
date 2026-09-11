@@ -25,26 +25,6 @@
 	<check_box label="Permitir el chat de voz" name="voice_chat_check"/>
 	<check_box label="Permitir el teleporte a cualquier punto" name="allow_direct_teleport"/>
 	<button label="Aplicar" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Administradores de estado:
-	</text>
-	<text name="allow_resident_label">
-		Siempre autorizado:
-	</text>
-	<button label="Añadir..." name="add_estate_manager_btn"/>
-	<button label="Quitar..." name="remove_estate_manager_btn"/>
-	<button label="Añadir..." name="add_allowed_avatar_btn"/>
-	<button label="Quitar..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Grupos siempre autorizados:
-	</text>
-	<text name="ban_resident_label">
-		Siempre prohibido:
-	</text>
-	<button label="Añadir..." name="add_allowed_group_btn"/>
-	<button label="Quitar..." name="remove_allowed_group_btn"/>
-	<button label="Añadir..." name="add_banned_avatar_btn"/>
-	<button label="Quitar..." name="remove_banned_avatar_btn"/>
 	<button label="Enviar un mensaje al estado..." name="message_estate_btn"/>
 	<button label="Expulsar a un Residente del estado..." name="kick_user_from_estate_btn"/>
 </panel>

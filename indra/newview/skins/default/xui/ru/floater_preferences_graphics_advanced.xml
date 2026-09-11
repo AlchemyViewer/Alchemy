@@ -34,15 +34,6 @@
 	<text name="HardwareText">
 		Аппаратное оборудование
 	</text>
-	<slider label="Память для текстур (МБ):" name="GraphicsCardTextureMemory" tool_tip="Объем памяти, отводимый для текстур. По умолчанию – объем памяти видеокарты. Уменьшение поможет увеличить производительность, но текстуры могут стать размытыми."/>
-	<slider label="Дистанция тумана:" name="fog"/>
-	<slider label="Гамма:" name="gamma"/>
-	<text name="(brightness, lower is brighter)">
-		(чем меньше, тем ярче, 0 – яркость по умолчанию)
-	</text>
-	<check_box label="Анизотропная фильтрация (медленнее, если включено)" name="ani"/>
-	<check_box initial_value="true" label="Включить объекты вершинных буферов OpenGL" name="vbo" tool_tip="Включение этого параметра на современном оборудовании даст увеличение производительности.  Однако на старом оборудовании это может привести к сбою приложения."/>
-	<check_box initial_value="true" label="Разрешить сжатие текстур (требует перезагрузки)" name="texture compression" tool_tip="Сжатие текстур в видеопамяти, что позволяет загружать текстуры большего размера за счет некоторого падения качества цвета."/>
 	<check_box initial_value="true" label="Активировать поддержку отображения HiDPI (требуется перезапуск)" name="use HiDPI" tool_tip="Активировать OpenGL для рисования с высоким разрешением."/>
 	<text name="antialiasing label">
 		Сглаживание:
@@ -76,28 +67,11 @@
 		Шейдеры
 	</text>
 	<check_box initial_value="true" label="Прозрачность воды" name="TransparentWater"/>
-	<check_box initial_value="true" label="Рельефность и сияние" name="BumpShiny"/>
-	<check_box initial_value="true" label="Локальный свет" name="LocalLights"/>
-	<slider label="Ландшафт:" name="TerrainDetail"/>
-	<text name="TerrainDetailText">
-		Низкая
-	</text>
-	<check_box initial_value="true" label="Аппаратная отрисовка аватаров" name="AvatarVertexProgram"/>
-	<check_box initial_value="true" label="Одежда аватара" name="AvatarCloth"/>
-	<text name="ReflectionsText">
-		Вода отражает:
-	</text>
 	<combo_box name="Reflections">
 		<combo_box.item label="Минимум" name="0"/>
 		<combo_box.item label="Ландшафт и деревья" name="1"/>
 		<combo_box.item label="Все статичные объекты" name="2"/>
 	</combo_box>
-	<check_box initial_value="true" label="Атмосферные шейдеры" name="WindLightUseAtmosShaders"/>
-	<slider label="Небо:" name="SkyMeshDetail"/>
-	<text name="SkyMeshDetailText">
-		Низкая
-	</text>
-	<check_box initial_value="true" label="Расширенная модель освещения" name="UseLightShaders"/>
 	<check_box initial_value="true" label="Объемный свет" name="UseSSAO"/>
 	<check_box initial_value="true" label="Глубина поля" name="UseDoF"/>
 	<text name="RenderShadowDetailText">

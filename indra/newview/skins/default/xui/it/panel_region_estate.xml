@@ -25,26 +25,6 @@
 	<check_box label="Permetti la chat voice" name="voice_chat_check"/>
 	<check_box label="Permetti teleport diretto" name="allow_direct_teleport"/>
 	<button label="Applica" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Manager delle proprietà:
-	</text>
-	<text name="allow_resident_label">
-		Sempre consentito:
-	</text>
-	<button label="Aggiungi..." name="add_estate_manager_btn"/>
-	<button label="Rimuovi..." name="remove_estate_manager_btn"/>
-	<button label="Aggiungi..." name="add_allowed_avatar_btn"/>
-	<button label="Rimuovi..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Gruppi sempre consentiti:
-	</text>
-	<text name="ban_resident_label">
-		Sempre escluso:
-	</text>
-	<button label="Aggiungi..." name="add_allowed_group_btn"/>
-	<button label="Rimuovi..." name="remove_allowed_group_btn"/>
-	<button label="Aggiungi..." name="add_banned_avatar_btn"/>
-	<button label="Rimuovi..." name="remove_banned_avatar_btn"/>
 	<button font="SansSerifSmall" label="Manda un messaggio di le proprietà..." name="message_estate_btn"/>
 	<button font="SansSerifSmall" label="Espelli residente dalla proprietà..." name="kick_user_from_estate_btn"/>
 </panel>

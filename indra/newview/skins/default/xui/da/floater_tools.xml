@@ -39,11 +39,11 @@
 	<floater.string name="grid_attachment_text">
 		Vedhæng
 	</floater.string>
-	<button label="" label_selected="" name="button focus" tool_tip="Fokus"/>
-	<button label="" label_selected="" name="button move" tool_tip="Flyt"/>
-	<button label="" label_selected="" name="button edit" tool_tip="Redigér"/>
-	<button label="" label_selected="" name="button create" tool_tip="Opret"/>
-	<button label="" label_selected="" name="button land" tool_tip="Land"/>
+	<button name="button focus" tool_tip="Fokus"/>
+	<button name="button move" tool_tip="Flyt"/>
+	<button name="button edit" tool_tip="Redigér"/>
+	<button name="button create" tool_tip="Opret"/>
+	<button name="button land" tool_tip="Land"/>
 	<text name="text status">
 		Træk for at flytte, shift+træk for at kopiere
 	</text>
@@ -66,13 +66,7 @@
 	<check_box label="Redigér lænkede" name="checkbox edit linked parts"/>
 	<button label="Sammenkæd" name="link_btn"/>
 	<button label="Adskil" name="unlink_btn"/>
-	<text name="RenderingCost" tool_tip="Hvis beregnede rendering omkostninger for dette objekt">
-		þ: [COUNT]
-	</text>
 	<check_box label="" name="checkbox uniform"/>
-	<text label="Stræk begge sider" name="checkbox uniform label">
-		Stræk begge sider
-	</text>
 	<check_box initial_value="true" label="Stræk teksturer" name="checkbox stretch textures"/>
 	<check_box initial_value="true" label="Benyt gitter" name="checkbox snap to grid"/>
 	<combo_box name="combobox grid mode" tool_tip="Vælg hvilken type lineal der skal bruges til positionering af objekt">
@@ -80,22 +74,22 @@
 		<combo_box.item label="Lokalt" name="Local"/>
 		<combo_box.item label="Reference" name="Reference"/>
 	</combo_box>
-	<button bottom_delta="-15" height="18" label="Valg..." label_selected="Valg..." name="Options..." tool_tip="Se flere muligheder for gitter"/>
-	<button label="" label_selected="" name="ToolCube" tool_tip="Terning"/>
-	<button label="" label_selected="" name="ToolPrism" tool_tip="Prisme"/>
-	<button label="" label_selected="" name="ToolPyramid" tool_tip="Pyramide"/>
-	<button label="" label_selected="" name="ToolTetrahedron" tool_tip="Tetraed"/>
-	<button label="" label_selected="" name="ToolCylinder" tool_tip="Cylinder"/>
-	<button label="" label_selected="" name="ToolHemiCylinder" tool_tip="Hemicylinder"/>
-	<button label="" label_selected="" name="ToolCone" tool_tip="Kegle"/>
-	<button label="" label_selected="" name="ToolHemiCone" tool_tip="Hemikegle"/>
-	<button label="" label_selected="" name="ToolSphere" tool_tip="Sfære"/>
-	<button label="" label_selected="" name="ToolHemiSphere" tool_tip="Hemisfære"/>
-	<button label="" label_selected="" name="ToolTorus" tool_tip="Kuglering"/>
-	<button label="" label_selected="" name="ToolTube" tool_tip="Rør"/>
-	<button label="" label_selected="" name="ToolRing" tool_tip="Ring"/>
-	<button label="" label_selected="" name="ToolTree" tool_tip="Træ"/>
-	<button label="" label_selected="" name="ToolGrass" tool_tip="Græs"/>
+	<button bottom_delta="-15" height="18" name="Options..." tool_tip="Se flere muligheder for gitter"/>
+	<button name="ToolCube" tool_tip="Terning"/>
+	<button name="ToolPrism" tool_tip="Prisme"/>
+	<button name="ToolPyramid" tool_tip="Pyramide"/>
+	<button name="ToolTetrahedron" tool_tip="Tetraed"/>
+	<button name="ToolCylinder" tool_tip="Cylinder"/>
+	<button name="ToolHemiCylinder" tool_tip="Hemicylinder"/>
+	<button name="ToolCone" tool_tip="Kegle"/>
+	<button name="ToolHemiCone" tool_tip="Hemikegle"/>
+	<button name="ToolSphere" tool_tip="Sfære"/>
+	<button name="ToolHemiSphere" tool_tip="Hemisfære"/>
+	<button name="ToolTorus" tool_tip="Kuglering"/>
+	<button name="ToolTube" tool_tip="Rør"/>
+	<button name="ToolRing" tool_tip="Ring"/>
+	<button name="ToolTree" tool_tip="Træ"/>
+	<button name="ToolGrass" tool_tip="Græs"/>
 	<check_box label="Hold værktøjet valgt" name="checkbox sticky"/>
 	<check_box label="Kopier valgte" name="checkbox copy selection"/>
 	<check_box initial_value="true" label="Centreret kopi" name="checkbox copy centers"/>
@@ -116,24 +110,6 @@
 		Styrke:
 	</text>
 	<button label="Apply" label_selected="Apply" name="button apply to selection" tool_tip="Ændre valgte land"/>
-	<text name="obj_count">
-		Objekter: [COUNT]
-	</text>
-	<text name="prim_count">
-		Prims: [COUNT]
-	</text>
-	<text name="linked_set_count">
-		Lænkede sæt: [COUNT]
-	</text>
-	<text name="linked_set_cost" tool_tip="Pris for nuværende valgte lænkede sæt som [prims] / [physics complexity]">
-		Pris: [COST] / [PHYSICS]
-	</text>
-	<text name="object_count">
-		Objekter: [COUNT]
-	</text>
-	<text name="object_cost" tool_tip="Pris for nuværende valgte objekter som [prims] / [physics complexity]">
-		Pris: [COST] / [PHYSICS]
-	</text>
 	<tab_container name="Object Info Tabs">
 		<panel label="Generelt" name="General">
 			<panel.string name="text deed continued">
@@ -187,8 +163,7 @@
 			<text name="Group:">
 				Gruppe:
 			</text>
-			<name_box initial_value="Henter..." name="Group Name Proxy"/>
-			<button label="Sæt..." label_selected="Sæt..." name="button set group" tool_tip="Vælg en gruppe der skal dele dette objekts rettigheder"/>
+			<button name="button set group" tool_tip="Vælg en gruppe der skal dele dette objekts rettigheder"/>
 			<check_box label="Del" name="checkbox share with group" tool_tip="Tillad alle medlemmer fra den valgte gruppe at dele dine &apos;redigere&apos; rettigheder for dette objekt. Du skal dedikere for åbne for rolle begrænsninger."/>
 			<button label="Dedikér" label_selected="Dedikér" name="button deed" tool_tip="Dedikering giver denne genstand væk med rettighederne for &apos;næste ejer&apos;. Gruppe-delte objekter kan dedikeres af gruppe-administrator."/>
 			<text name="label click action">
@@ -345,12 +320,10 @@
 				Sting type
 			</text>
 			<combo_box name="sculpt type control">
-				<combo_box.item label="(ingen)" name="None"/>
 				<combo_box.item label="Sfære" name="Sphere"/>
 				<combo_box.item label="Kuglering" name="Torus"/>
 				<combo_box.item label="Plan" name="Plane"/>
 				<combo_box.item label="Cylinder" name="Cylinder"/>
-				<combo_box.item label="Mesh" name="Mesh"/>
 			</combo_box>
 		</panel>
 		<panel label="Features" name="Features">
@@ -379,7 +352,7 @@
 			<spinner label="Kraft Y" label_width="78" name="FlexForceY" width="141"/>
 			<spinner label="Kraft Z" label_width="78" name="FlexForceZ" width="141"/>
 			<check_box label="Lys" name="Light Checkbox Ctrl" tool_tip="Medfårer at objektet afgiver lys"/>
-			<color_swatch label="" name="colorswatch" tool_tip="Klik for at åbne farvevælger"/>
+			<color_swatch name="colorswatch" tool_tip="Klik for at åbne farvevælger"/>
 			<texture_picker label="" name="light texture control" tool_tip="Klik for at vælge billede til projektion (har kun effekt hvis &apos;deferred rendering&apos; er aktiveret)"/>
 			<spinner label="Intensitet" name="Light Intensity"/>
 			<spinner label="Synsvidde" name="Light FOV"/>
@@ -406,84 +379,19 @@
 			<spinner label="Restitution" name="Physics Restitution"/>
 		</panel>
 		<panel label="Tekstur" name="Texture">
-			<panel.string name="string repeats per meter">
-				Gentagelser pr. meter
-			</panel.string>
-			<panel.string name="string repeats per face">
-				Gentagelser pr. overflade
-			</panel.string>
-			<texture_picker label="Tekstur" name="texture control" tool_tip="Klik for at vælge billede"/>
-			<color_swatch label="Farve" name="colorswatch" tool_tip="Klik for at åbne farvevælger"/>
-			<text left="170" name="color trans" width="105">
-				Gennemsigtighed%
-			</text>
+			<color_swatch name="colorswatch" tool_tip="Klik for at åbne farvevælger"/>
+			<text left="170" name="color trans" width="105"></text>
 			<spinner left="171" name="ColorTrans"/>
-			<text left="170" name="glow label">
-				Glød
-			</text>
+			<text left="170" name="glow label"></text>
 			<spinner left="170" name="glow"/>
-			<check_box label="Selvlysende" left="170" name="checkbox fullbright"/>
-			<text name="tex gen">
-				Afbildning
-			</text>
+			<check_box left="170" name="checkbox fullbright"/>
 			<combo_box name="combobox texgen">
 				<combo_box.item label="Standard" name="Default"/>
-				<combo_box.item label="Plan" name="Planar"/>
 			</combo_box>
-			<text name="label shininess">
-				Blankhed
-			</text>
-			<combo_box name="combobox shininess">
-				<combo_box.item label="Ingen" name="None"/>
-				<combo_box.item label="Lav" name="Low"/>
-				<combo_box.item label="Mellem" name="Medium"/>
-				<combo_box.item label="Høj" name="High"/>
-			</combo_box>
-			<text name="label bumpiness">
-				Struktur
-			</text>
-			<combo_box name="combobox bumpiness">
-				<combo_box.item label="Ingen" name="None"/>
-				<combo_box.item label="Lysintensitet" name="Brightness"/>
-				<combo_box.item label="Mørke" name="Darkness"/>
-				<combo_box.item label="Træårer" name="woodgrain"/>
-				<combo_box.item label="Bark" name="bark"/>
-				<combo_box.item label="Mursten" name="bricks"/>
-				<combo_box.item label="Tern" name="checker"/>
-				<combo_box.item label="Beton" name="concrete"/>
-				<combo_box.item label="Rustik flise" name="crustytile"/>
-				<combo_box.item label="Skåret sten" name="cutstone"/>
-				<combo_box.item label="Plader" name="discs"/>
-				<combo_box.item label="Grus" name="gravel"/>
-				<combo_box.item label="Petriskål" name="petridish"/>
-				<combo_box.item label="Udvendig beklædning" name="siding"/>
-				<combo_box.item label="Stenflise" name="stonetile"/>
-				<combo_box.item label="Puds" name="stucco"/>
-				<combo_box.item label="Rør" name="suction"/>
-				<combo_box.item label="Væv" name="weave"/>
-			</combo_box>
-			<spinner label="Vandret (U)" name="TexScaleU"/>
-			<check_box label="Vend" name="checkbox flip s"/>
-			<spinner label="Lodret (V)" name="TexScaleV"/>
-			<check_box label="Vend" name="checkbox flip t"/>
-			<button label="Gem" label_selected="Gem" left_delta="62" name="button apply"/>
-			<text name="tex offset">
-				Tekstur offset
-			</text>
-			<spinner label="Vandret (U)" name="TexOffsetU"/>
-			<spinner label="Lodret (V)" name="TexOffsetV"/>
-			<panel name="Add_Media">
-				<text name="media_tex">
-					Media
-				</text>
-				<button name="add_media" tool_tip="Tilføj media"/>
-				<button name="delete_media" tool_tip="Slet denne media tekstur"/>
-				<button name="edit_media" tool_tip="Redigér dette media"/>
-				<button label="Flugt" label_selected="Flugt Media" name="button align" tool_tip="Flugt media tekstur (skal hentes først)"/>
-			</panel>
+			<button left_delta="62" name="button apply"/>
 		</panel>
 		<panel label="Indhold" name="Contents">
-			<flyout_button label="Nyt script" label_selected="Nyt script" name="button new script"/>
+			<flyout_button label="Nyt script" name="button new script"/>
 			<button label="Rettigheder" name="button permissions"/>
 		</panel>
 	</tab_container>

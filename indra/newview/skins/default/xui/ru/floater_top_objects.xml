@@ -58,6 +58,4 @@
 	<button label="Фильтр" name="filter_parcel_btn"/>
 	<button label="Вернуть выбранное" name="return_selected_btn"/>
 	<button label="Вернуть все" name="return_all_btn"/>
-	<button label="Отключить выбранное" name="disable_selected_btn"/>
-	<button label="Отключить все" name="disable_all_btn"/>
 </floater>

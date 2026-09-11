@@ -24,5 +24,4 @@
 	<text name="remaining_capacity_label" value="Capacidade restante"/>
 	<text name="total_capacity" value="--"/>
 	<text name="total_capacity_label" value="Capacidade total"/>
-	<text name="help_SLURL" value="[secondlife:///app/help/object_weights What is all this?...]"/>
 </floater>

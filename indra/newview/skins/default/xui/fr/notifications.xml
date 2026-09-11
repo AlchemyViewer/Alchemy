@@ -1448,7 +1448,6 @@ or ce nombre dépasse la limite autorisée fixée à [LIMIT].
 	<notification label="Envoyer un message à tout le monde dans votre domaine" name="MessageEstate">
 		Saisissez un message court qui sera envoyé à tous les résidents se trouvant actuellement sur votre domaine.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annuler"/>
 		</form>
@@ -1694,7 +1693,6 @@ Publier cette petite annonce maintenant pour [AMOUNT] L$ ?
 	<notification label="Envoyer un message à la région" name="MessageRegion">
 		Saisissez un message qui sera envoyé à tous les résidents présents dans cette région.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annuler"/>
 		</form>
@@ -2538,7 +2536,6 @@ Voir Alchemy.log pour plus de détails.</notification>
 avec les résidents suivants :
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Vous ne pouvez partager qu'un dossier à la fois.
@@ -2808,9 +2805,6 @@ Voulez-vous continuer ?
 		L'objet sélectionné affecte le maillage de navigation. Si vous le modifiez en Flexibilité, il sera supprimé de ce maillage.
 		<usetemplate ignoretext="L'objet sélectionné affecte le maillage de navigation. Si vous le modifiez en Flexibilité, il sera supprimé de ce maillage." name="okcancelignore" notext="Annuler" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Vous semblez ne pas avoir le matériel requis pour utiliser [APP_NAME]. [APP_NAME] requiert une carte graphique OpenGL avec une prise en charge du multitexturing. Si vous avez une telle carte, assurez-vous que vous avez aussi les pilotes les plus récents pour la carte, ainsi que les service packs et les patchs pour votre système d'exploitation.
-
-Si vous avez toujours des problèmes, veuillez consulter la page [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- Votre carte graphique ne remplit pas les conditions minimum requises.</global>

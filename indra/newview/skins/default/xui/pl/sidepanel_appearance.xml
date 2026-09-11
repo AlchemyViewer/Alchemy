@@ -7,7 +7,6 @@
 	<panel name="panel_currentlook">
 		<button name="edit_outfit_btn" tool_tip="Edytuj ten strój" />
 	</panel>
-	<button label="Nowy strój" name="newlook_btn" />
 	<layout_stack name="top_menu_panel">
 		<layout_panel name="filter_panel">
 			<filter_editor label="Filtruj stroje" name="Filter" />

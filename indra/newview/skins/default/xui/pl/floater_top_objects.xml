@@ -58,6 +58,4 @@
 	<button label="Filtruj" name="filter_parcel_btn" />
 	<button label="Zwróć wybrane" name="return_selected_btn" />
 	<button label="Zwróć wszystko" name="return_all_btn" />
-	<button label="Dezakt. wybrane" name="disable_selected_btn" />
-	<button label="Dezakt. wszystko" name="disable_all_btn" />
 </floater>

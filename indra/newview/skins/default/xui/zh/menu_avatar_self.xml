@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <context_menu name="Self Pie">
-	<menu_item_call label="坐下" name="Sit Down Here"/>
-	<menu_item_call label="起立" name="Stand Up"/>
 	<context_menu label="脫下" name="Take Off &gt;">
 		<context_menu label="衣服" name="Clothes &gt;">
 			<menu_item_call label="襯衫" name="Shirt"/>
@@ -24,7 +22,6 @@
 	</context_menu>
 	<menu_item_call label="我的外觀" name="Chenge Outfit"/>
 	<menu_item_call label="編輯我的裝扮" name="Edit Outfit"/>
-	<menu_item_call label="編輯我的體形" name="Edit My Shape"/>
 	<menu_item_call label="懸浮高度" name="Hover Height"/>
 	<menu_item_call label="重設骨架" name="Reset Skeleton"/>
 	<menu_item_call label="重設骨架和動作" name="Reset Skeleton And Animations"/>

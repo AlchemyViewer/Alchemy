@@ -21,18 +21,6 @@
 	<panel.string name="origin_inworld">
 		(W świecie)
 	</panel.string>
-	<text name="title" value="Profil obiektu" />
-	<text name="origin" value="(Szafa)" />
-	<scroll_container name="item_profile_scroll">
-		<panel name="item_profile">
-			<text name="LabelItemNameTitle">
-				Nazwa:
-			</text>
-		</panel>
-	</scroll_container>
-	<panel name="button_panel">
-		<button label="Anuluj" name="cancel_btn" />
-	</panel>
 	<layout_stack name="main_stack">
 		<layout_panel name="layout_item_permissions_sale">
 			<spinner name="Edit Cost" label="Cena: L$" />

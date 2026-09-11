@@ -6,13 +6,6 @@
 	<floater.string name="Copy">
 		覆製到收納區
 	</floater.string>
-	<layout_stack name="preview_stack">
-		<layout_panel name="texture_panel">
-			<text name="aspect_ratio">
-				預覽長寬比
-			</text>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="aspect_combo_lp">
 			<combo_box name="combo_aspect_ratio" tool_tip="以固定長寬比預覽"/>

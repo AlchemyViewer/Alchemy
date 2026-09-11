@@ -23,7 +23,6 @@ Owner [OWNER]
 	<string name="Sit">
 		Sid
 	</string>
-	<text name="object_name" value="Test objekt navn der reelt er to linier og meget lang"/>
 	<text name="price_text">
 		L$30,000
 	</text>

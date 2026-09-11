@@ -3,9 +3,6 @@
 	<string name="SUPPORT_SITE">
 		Portal Pomocy Second Life
 	</string>
-	<string name="StartupDetectingHardware">
-		Detekcja konfiguracji sprzętowej...
-	</string>
 	<string name="StartupLoading">
 		Ładowanie [APP_NAME]...
 	</string>
@@ -2576,9 +2573,6 @@ Jeśli ciągle otrzymujesz tą wiadomość, to skontaktuj się z pomocą technic
 	<string name="GroupMoneyDebits">
 		Obciążenia
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc], [day,datetime,utc] [mth,datetime,utc] [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		Nabyte obiekty
 	</string>
@@ -2800,16 +2794,6 @@ Uruchomione w oknie.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Nie otrzymano opisu formatu pikselowego
-	</string>
-	<string name="MBTrueColorWindow">
-		Aplikacja [APP_NAME] wymaga ustawienia koloru na (32-bit) do uruchomienia.
-Ustaw tryb koloru swojego wyświetlacza na 32-bity.
-	</string>
-	<string name="MBAlpha">
-		Aplikacja [APP_NAME] nie może zostać uruchomiona, ponieważ nie może uzyskać dostępu do 8 bitowego kanału alpha. Najczęściej jest to spowodowane błędami sterowników karty video.
-Upewnij się, że posiadasz najnowsze aktualizacje sterowników karty video.
-Dodatkowo, sprawdź czy Twój monitor posiada poprawną konfigurację koloru (32-bity) w Panel Sterowania &gt; Ekran &gt; Ustawienia.
-Jeżeli nadal otrzymujesz ten komunikat, skontaktuj się z [SUPPORT_SITE].
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Nie można ustawić formatu pikselowego
@@ -4768,17 +4752,11 @@ Raport o Nadużyciu
 	<string name="Female - Wow">
 		Kobieta - Wow
 	</string>
-	<string name="New Day">
-		Nowy cykl dnia
-	</string>
 	<string name="New Water">
 		Nowa woda
 	</string>
 	<string name="New Sky">
 		Nowe niebo
-	</string>
-	<string name="AvatarBirthDateFormat">
-		[day,datetime,slt].[mthnum,datetime,slt].[year,datetime,slt]
 	</string>
 	<string name="DefaultMimeType">
 		brak/brak

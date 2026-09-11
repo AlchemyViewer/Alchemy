@@ -15,7 +15,6 @@
 		</layout_panel>
 		<layout_panel name="external_controls">
 			<button label="Apri nel web browser" name="open_browser"/>
-			<check_box label="Apri sempre nel web browser" name="open_always"/>
 			<button label="Chiudi" name="close"/>
 		</layout_panel>
 		<layout_panel name="time_controls">

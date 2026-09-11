@@ -23,7 +23,6 @@ Propietario [OWNER]
 	<string name="Sit">
 		Sentarme
 	</string>
-	<text name="object_name" value="Test Object Name That Is actually two lines and Really Long"/>
 	<text name="price_text">
 		30.000 L$
 	</text>

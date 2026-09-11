@@ -15,9 +15,6 @@
 	<string name="SUPPORT_SITE">
 		Second Life Destek Portalı
 	</string>
-	<string name="StartupDetectingHardware">
-		Donanım saptanıyor...
-	</string>
 	<string name="StartupLoading">
 		[APP_NAME] yükleniyor...
 	</string>
@@ -351,60 +348,6 @@ Lütfen bir dakika içerisinde tekrar oturum açmayı deneyin.
 	</string>
 	<string name="TestingDisconnect">
 		Görüntüleyici bağlantısının kesilmesi test ediliyor
-	</string>
-	<string name="SocialFacebookConnecting">
-		Facebook ile bağlantı kuruluyor...
-	</string>
-	<string name="SocialFacebookPosting">
-		Yayınlanıyor...
-	</string>
-	<string name="SocialFacebookDisconnecting">
-		Facebook bağlantısı kesiliyor...
-	</string>
-	<string name="SocialFacebookErrorConnecting">
-		Facebook ile bağlantı kurulurken sorun oluştu
-	</string>
-	<string name="SocialFacebookErrorPosting">
-		Facebook'ta yayınlarken sorun oluştu
-	</string>
-	<string name="SocialFacebookErrorDisconnecting">
-		Facebook bağlantısı kesilirken sorun oluştu
-	</string>
-	<string name="SocialFlickrConnecting">
-		Flickr bağlantısı kuruluyor...
-	</string>
-	<string name="SocialFlickrPosting">
-		Yayınlanıyor...
-	</string>
-	<string name="SocialFlickrDisconnecting">
-		Flickr bağlantısı kesiliyor...
-	</string>
-	<string name="SocialFlickrErrorConnecting">
-		Flickr bağlantısı kurulurken sorun çıktı
-	</string>
-	<string name="SocialFlickrErrorPosting">
-		Flickr'da yayınlarken sorun çıktı
-	</string>
-	<string name="SocialFlickrErrorDisconnecting">
-		Flickr bağlantısı kesilirken sorun çıktı
-	</string>
-	<string name="SocialTwitterConnecting">
-		Twitter bağlantısı kuruluyor...
-	</string>
-	<string name="SocialTwitterPosting">
-		Yayınlanıyor...
-	</string>
-	<string name="SocialTwitterDisconnecting">
-		Twitter bağlantısı kesiliyor...
-	</string>
-	<string name="SocialTwitterErrorConnecting">
-		Twitter bağlantısı kurulurken sorun çıktı
-	</string>
-	<string name="SocialTwitterErrorPosting">
-		Twitter'da yayınlarken sorun çıktı
-	</string>
-	<string name="SocialTwitterErrorDisconnecting">
-		Twitter bağlantısı kesilirken sorun çıktı
 	</string>
 	<string name="BlackAndWhite">
 		Siyah Beyaz
@@ -1159,7 +1102,6 @@ http://secondlife.com/support adresini ziyaret edin.
 	<string name="AgentNameSubst">
 		(Siz)
 	</string>
-	<string name="JoinAnExperience"/>
 	<string name="SilentlyManageEstateAccess">
 		Gayri menkul erişim listelerini yönetirken uyarıları bastır
 	</string>
@@ -1532,14 +1474,12 @@ http://secondlife.com/support adresini ziyaret edin.
 	<string name="InventoryOutboxNotMerchantTitle">
 		Pazaryerinde herkes öğe satabilir.
 	</string>
-	<string name="InventoryOutboxNotMerchantTooltip"/>
 	<string name="InventoryOutboxNotMerchant">
 		Eğer bir satıcı olmak istiyorsanız, [Pazaryerinde [MARKETPLACE_CREATE_STORE_URL] bir mağaza açmanız gerekir].
 	</string>
 	<string name="InventoryOutboxNoItemsTitle">
 		Giden kutunuz boş.
 	</string>
-	<string name="InventoryOutboxNoItemsTooltip"/>
 	<string name="InventoryOutboxNoItems">
 		Bu alana klasörleri sürükleyin ve bunları [[MARKETPLACE_DASHBOARD_URL] Pazaryerinde] satılık olarak duyurmak için "Pazaryerine Gönder" üzerine tıklayın.
 	</string>
@@ -2661,9 +2601,6 @@ Bu mesaj size gelmeye devam ederse lütfen http://support.secondlife.com adresin
 	<string name="GroupMoneyDebits">
 		Borçlar
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc] [mth,datetime,utc] [day,datetime,utc], [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		Alınan Öğeler
 	</string>
@@ -2672,9 +2609,6 @@ Bu mesaj size gelmeye devam ederse lütfen http://support.secondlife.com adresin
 	</string>
 	<string name="UploadingCosts">
 		[NAME] için karşıya yükleme maliyeti: L$ [AMOUNT]
-	</string>
-	<string name="BuyingCosts">
-		Bunu satın almanın maliyeti: L$ [AMOUNT]
 	</string>
 	<string name="UnknownFileExtension">
 		Bilinmeyen dosya uzantısı .%s
@@ -2957,16 +2891,6 @@ Pencerede çalışıyor.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Piksel formatı açıklaması alınamıyor
-	</string>
-	<string name="MBTrueColorWindow">
-		[APP_NAME] uygulamasının çalışması için Gerçek Renk (32 bit) gerekiyor.
-Lütfen bilgisayarınızın ekran ayarlarına gidin ve renk modunu 32 bit olarak ayarlayın.
-	</string>
-	<string name="MBAlpha">
-		[APP_NAME] çalışamıyor çünkü 8 bit bir alfa kanalı alamıyor.  Bunun nedeni genellikle video kartı sürücü sorunlarıdır.
-Lütfen en yeni video sürücülerinin yüklü olduğuna emin olun.
-Ayrıca Denetim Masaları &gt; Ekran &gt; Ayarlar içerisinde ekranınız için Gerçek Renk (32 bit) ayarı yapıldığına emin olun.
-Bu iletiyi almaya devam ederseniz, lütfen [SUPPORT_SITE] bölümüne başvurun.
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Piksel formatı ayarlanamıyor
@@ -4582,15 +4506,6 @@ Daha fazla bilgi için: https://second.life/scripted-agents.
 	<string name="share_alert">
 		Envanterinizden buraya öğeler sürükleyin
 	</string>
-	<string name="facebook_post_success">
-		Facebook'ta yayınladınız.
-	</string>
-	<string name="flickr_post_success">
-		Flickr'da yayınladınız.
-	</string>
-	<string name="twitter_post_success">
-		Twitter'da yayınladınız.
-	</string>
 	<string name="no_session_message">
 		(Aİ Oturumu Mevcut Değil)
 	</string>
@@ -5028,9 +4943,6 @@ Daha fazla bilgi için: https://second.life/scripted-agents.
 	</string>
 	<string name="dance8">
 		dans8
-	</string>
-	<string name="AvatarBirthDateFormat">
-		[mthnum,datetime,slt]/[day,datetime,slt]/[year,datetime,slt]
 	</string>
 	<string name="DefaultMimeType">
 		hiçbiri/hiçbiri
@@ -5527,12 +5439,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	<string name="Command_Environments_Label">
 		Ortamlarım
 	</string>
-	<string name="Command_Facebook_Label">
-		Facebook
-	</string>
-	<string name="Command_Flickr_Label">
-		Flickr
-	</string>
 	<string name="Command_Gestures_Label">
 		Mimikler
 	</string>
@@ -5556,9 +5462,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	</string>
 	<string name="Command_Move_Label">
 		Yürü / koş / uç
-	</string>
-	<string name="Command_Outbox_Label">
-		Satıcı giden kutusu
 	</string>
 	<string name="Command_People_Label">
 		Kişiler
@@ -5586,9 +5489,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	</string>
 	<string name="Command_Speak_Label">
 		Konuş
-	</string>
-	<string name="Command_Twitter_Label">
-		Twitter
 	</string>
 	<string name="Command_View_Label">
 		Kamera denetimleri
@@ -5623,12 +5523,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	<string name="Command_Environments_Tooltip">
 		Ortamlarım
 	</string>
-	<string name="Command_Facebook_Tooltip">
-		Facebook'ta Yayınla
-	</string>
-	<string name="Command_Flickr_Tooltip">
-		Flickr'a yükle
-	</string>
 	<string name="Command_Gestures_Tooltip">
 		Avatarınız için mimikler
 	</string>
@@ -5652,9 +5546,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	</string>
 	<string name="Command_Move_Tooltip">
 		Avatarınızı hareket ettirmek
-	</string>
-	<string name="Command_Outbox_Tooltip">
-		Satmak amacıyla Pazaryerinize öğeler taşıyın
 	</string>
 	<string name="Command_People_Tooltip">
 		Arkadaşlar, gruplar ve yakındaki kişiler
@@ -5682,9 +5573,6 @@ Düzenleyici yolunu çift tırnakla çevrelemeyi deneyin.
 	</string>
 	<string name="Command_Speak_Tooltip">
 		Mikrofonunuzu kullanarak yakındaki kişilerle konuşun
-	</string>
-	<string name="Command_Twitter_Tooltip">
-		Twitter
 	</string>
 	<string name="Command_View_Tooltip">
 		Kamera açısını değiştirmek

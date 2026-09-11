@@ -19,20 +19,11 @@
 	<text name="maturity_desired_prompt">
 		Jeg ønsker adgang til inhold med rating:
 	</text>
-	<text name="maturity_desired_textbox"/>
 	<combo_box name="maturity_desired_combobox">
 		<combo_box.item label="PG, Mature og Adult" name="Desired_Adult"/>
 		<combo_box.item label="PG og Mature" name="Desired_Mature"/>
 		<combo_box.item label="PG" name="Desired_PG"/>
 	</combo_box>
-	<text name="start_location_textbox">
-		Start lokation:
-	</text>
-	<combo_box name="start_location_combo">
-		<combo_box.item label="Min sidste lokation" name="MyLastLocation" tool_tip="Log ind til min sidste lokation som standard."/>
-		<combo_box.item label="Mit hjem" name="MyHome" tool_tip="Log ind til min hjemme lokation som standard."/>
-	</combo_box>
-	<check_box initial_value="true" label="Vis start lokation på login billedet" name="show_location_checkbox"/>
 	<text name="name_tags_textbox">
 		Navneskilte:
 	</text>
@@ -43,10 +34,8 @@
 	</radio_group>
 	<check_box label="Mit navn" name="show_my_name_checkbox1"/>
 	<check_box label="Brugernavne" name="show_slids" tool_tip="Vis brugernavne, som bobsmith123"/>
-	<check_box label="Gruppe titler" name="show_all_title_checkbox1" tool_tip="Vis hgruppetitler, som f.eks. administrator eller medlem"/>
 	<check_box label="Fremhæv venner" name="show_friends" tool_tip="Fremhæv navne-tags for dine venner"/>
 	<check_box label="Vis visningsnavne" name="display_names_check" tool_tip="Vælg for at bruge visningsnavne i chat, IM, navne-tags m.v."/>
-	<check_box label="Aktivér UI tips i klient" name="viewer_hints_check"/>
 	<text name="inworld_typing_rg_label">
 		Trykker bogstav taster:
 	</text>

@@ -3251,7 +3251,6 @@ Zobacz Alchemy.log, aby dowiedzieć się więcej.
 następującym Rezydentom:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Anuluj" />
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Możesz się podzielić tylko jednym folderem jednocześnie.

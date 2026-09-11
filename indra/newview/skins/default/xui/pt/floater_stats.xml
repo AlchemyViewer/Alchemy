@@ -30,23 +30,6 @@
 					<stat_bar label="Raw Mem" name="rawmemstat"/>
 					<stat_bar label="Bound Mem" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="Uso de memória" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="Interface" name="LLView"/>
-					<stat_bar label="Fontes" name="LLFontFreetype"/>
-					<stat_bar label="Inventário" name="LLInventoryObject"/>
-					<stat_bar label="Objetos do visualizador" name="LLViewerObject"/>
-					<stat_bar label="Dados do grupo de octrees" name="LLViewerOctreeGroup"/>
-					<stat_bar label="Dados da octree" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Cache de objetos do visualizador" name="LLVOCacheEntry"/>
-					<stat_bar label="Drawables" name="LLDrawable"/>
-					<stat_bar label="Dados do rosto" name="LLFace"/>
-					<stat_bar label="Informações de desenho" name="LLDrawInfo"/>
-					<stat_bar label="Dados de textura" name="LLTexture"/>
-					<stat_bar label="Dados de imagem" name="LLImage"/>
-					<stat_bar label="Dados de imagem do GL" name="LLImageGL"/>
-					<stat_bar label="Buffers do Vertex" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="Rede" name="network">
 					<stat_bar label="Packets In" name="packetsinstat"/>
 					<stat_bar label="Packets Out" name="packetsoutstat"/>

@@ -141,12 +141,12 @@ Vá para o menu Mundo &gt; Sobre o terreno ou selecione outro lote para mostrar 
 			<text name="DwellText">
 				Carregando...
 			</text>
-			<button label="Comprar terreno..." label_selected="Comprar terreno..." left="130" name="Buy Land..." width="125"/>
+			<button label="Comprar terreno..." left="130" name="Buy Land..." width="125"/>
 			<button label="Venda Linden" name="Linden Sale..." tool_tip="O terreno precisa ser possuído, estar com o conteúdo configurado e não estar pronto para leilão."/>
 			<button label="Dados do script" name="Scripts..."/>
 			<button label="Comprar para o grupo" name="Buy For Group..."/>
-			<button label="Comprar passe..." label_selected="Comprar passe..." left="130" name="Buy Pass..." tool_tip="Um passe concede a você acesso temporário a este terreno." width="125"/>
-			<button label="Abandonar terreno..." label_selected="Abandonar terreno..." name="Abandon Land..."/>
+			<button label="Comprar passe..." left="130" name="Buy Pass..." tool_tip="Um passe concede a você acesso temporário a este terreno." width="125"/>
+			<button label="Abandonar terreno..." name="Abandon Land..."/>
 			<button label="Pedir terreno" name="Reclaim Land..."/>
 		</panel>
 		<panel label="CONTRATO" name="land_covenant_panel">
@@ -275,8 +275,8 @@ Vá para o menu Mundo &gt; Sobre o terreno ou selecione outro lote para mostrar 
 			<text name="Object Owners:">
 				Donos dos objetos:
 			</text>
-			<button label="Atualizar lista" label_selected="Atualizar lista" name="Refresh List" tool_tip="Refresh Object List"/>
-			<button label="Devolver objetos..." label_selected="Devolver objetos..." name="Return objects..."/>
+			<button name="Refresh List" tool_tip="Refresh Object List"/>
+			<button label="Devolver objetos..." name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="Tipo" name="type"/>
 				<name_list.columns label="Nome" name="name"/>
@@ -360,11 +360,11 @@ Apenas lotes maiores podem ser listados na busca.
 			<text name="Snapshot:">
 				Foto:
 			</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Clique para escolher uma imagem"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Clique para escolher uma imagem"/>
 			<text name="allow_see_label" top="170">
 				Avatares em outros lotes podem ver e conversar com avatares neste lote
 			</text>
-			<check_box label="Ver avatares" name="SeeAvatarsCheck" top="170" tool_tip="Permite que os avatares em outros lotes vejam e batam papo com avatares neste lote. Você poderá vê-los e conversar com eles."/>
+			<check_box name="SeeAvatarsCheck" top="170" tool_tip="Permite que os avatares em outros lotes vejam e batam papo com avatares neste lote. Você poderá vê-los e conversar com eles."/>
 			<text name="landing_point" width="225">
 				Ponto de Aterrissagem: [LANDING]
 			</text>
@@ -388,7 +388,7 @@ Apenas lotes maiores podem ser listados na busca.
 				Página web:
 			</text>
 			<line_editor left="97" name="media_url"/>
-			<button label="Definir..." label_selected="Definir..." name="set_media_url"/>
+			<button label="Definir..." name="set_media_url"/>
 			<text name="Description:">
 				Descrição:
 			</text>
@@ -397,7 +397,7 @@ Apenas lotes maiores podem ser listados na busca.
 				Substituir
 Textura:
 			</text>
-			<texture_picker label="" left="97" name="media texture" tool_tip="Clique para escolher uma imagem"/>
+			<texture_picker left="97" name="media texture" tool_tip="Clique para escolher uma imagem"/>
 			<text name="replace_texture_help">
 				Objetos com esta textura vão aparecer no filme ou página da web depois de clicar em Tocar. Selecione outras texturas clicando nas miniaturas.
 			</text>

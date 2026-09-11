@@ -25,26 +25,6 @@
 	<check_box label="Sesli Sohbete İzin Ver" name="voice_chat_check"/>
 	<check_box label="Doğrudan Işınlamaya İzin Ver" name="allow_direct_teleport"/>
 	<button label="Uygula" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Gayrimenkul Yöneticileri:
-	</text>
-	<text name="allow_resident_label">
-		Her zaman izin verilen:
-	</text>
-	<button label="Ekle..." name="add_estate_manager_btn"/>
-	<button label="Kaldır..." name="remove_estate_manager_btn"/>
-	<button label="Ekle..." name="add_allowed_avatar_btn"/>
-	<button label="Kaldır..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Her zaman izin verilen gruplar:
-	</text>
-	<text name="ban_resident_label">
-		Her zaman engellenen:
-	</text>
-	<button label="Ekle..." name="add_allowed_group_btn"/>
-	<button label="Kaldır..." name="remove_allowed_group_btn"/>
-	<button label="Ekle..." name="add_banned_avatar_btn"/>
-	<button label="Kaldır..." name="remove_banned_avatar_btn"/>
 	<button label="Gayrimenkule İleti Gönder..." name="message_estate_btn"/>
 	<button label="Sakinlerini Gayrimenkulden Çıkar..." name="kick_user_from_estate_btn"/>
 </panel>

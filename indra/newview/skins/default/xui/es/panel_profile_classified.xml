@@ -112,8 +112,6 @@
 							<icons_combo_box.item label="Contenido general" name="pg_ci" value="General"/>
 						</icons_combo_box>
 						<check_box label="Renovar automáticamente cada semana" name="auto_renew_edit"/>
-						<text name="price_for_listing_edit_label" value="Precio por publicarlo:"/>
-						<spinner label="L$" name="price_for_listing_edit" tool_tip="Precio por publicarlo." value="50"/>
 					</panel>
 				</panel>
 			</scroll_container>

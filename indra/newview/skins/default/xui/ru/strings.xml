@@ -15,9 +15,6 @@
 	<string name="SUPPORT_SITE">
 		Портал поддержки Second Life
 	</string>
-	<string name="StartupDetectingHardware">
-		Проверка оборудования...
-	</string>
 	<string name="StartupLoading">
 		Загружается [APP_NAME]...
 	</string>
@@ -351,60 +348,6 @@ support@secondlife.com.
 	</string>
 	<string name="TestingDisconnect">
 		Тестирование отключения клиента
-	</string>
-	<string name="SocialFacebookConnecting">
-		Подключение к Facebook...
-	</string>
-	<string name="SocialFacebookPosting">
-		Публикация...
-	</string>
-	<string name="SocialFacebookDisconnecting">
-		Отключение от Facebook...
-	</string>
-	<string name="SocialFacebookErrorConnecting">
-		Проблема с подключением к Facebook
-	</string>
-	<string name="SocialFacebookErrorPosting">
-		Проблемы при публикации в Facebook
-	</string>
-	<string name="SocialFacebookErrorDisconnecting">
-		Проблема с отключением от Facebook
-	</string>
-	<string name="SocialFlickrConnecting">
-		Подключение к Flickr...
-	</string>
-	<string name="SocialFlickrPosting">
-		Публикация...
-	</string>
-	<string name="SocialFlickrDisconnecting">
-		Отключение от Flickr...
-	</string>
-	<string name="SocialFlickrErrorConnecting">
-		Неполадка при подключении к Flickr
-	</string>
-	<string name="SocialFlickrErrorPosting">
-		Неполадка при публикации в Flickr
-	</string>
-	<string name="SocialFlickrErrorDisconnecting">
-		Неполадка при отключении от Flickr
-	</string>
-	<string name="SocialTwitterConnecting">
-		Подключение к Twitter...
-	</string>
-	<string name="SocialTwitterPosting">
-		Публикация...
-	</string>
-	<string name="SocialTwitterDisconnecting">
-		Отключение от Twitter...
-	</string>
-	<string name="SocialTwitterErrorConnecting">
-		Неполадка при подключении к Twitter
-	</string>
-	<string name="SocialTwitterErrorPosting">
-		Неполадка при публикации в Twitter
-	</string>
-	<string name="SocialTwitterErrorDisconnecting">
-		Неполадка при отключении от Twitter
 	</string>
 	<string name="BlackAndWhite">
 		Черно-белый
@@ -1159,7 +1102,6 @@ support@secondlife.com.
 	<string name="AgentNameSubst">
 		(Вы)
 	</string>
-	<string name="JoinAnExperience"/>
 	<string name="SilentlyManageEstateAccess">
 		Отключить извещения при управлении списками доступа к землевладениям
 	</string>
@@ -1532,14 +1474,12 @@ support@secondlife.com.
 	<string name="InventoryOutboxNotMerchantTitle">
 		Продавать вещи в торговом центре может кто угодно.
 	</string>
-	<string name="InventoryOutboxNotMerchantTooltip"/>
 	<string name="InventoryOutboxNotMerchant">
 		Если вы хотите стать торговцем, [[MARKETPLACE_CREATE_STORE_URL] создайте магазин].
 	</string>
 	<string name="InventoryOutboxNoItemsTitle">
 		Ваша папка «Исходящие» пуста.
 	</string>
-	<string name="InventoryOutboxNoItemsTooltip"/>
 	<string name="InventoryOutboxNoItems">
 		Перетащите папки в эту область и щелкните «Отправить в торговый центр», чтобы выставить их на продажу в [[MARKETPLACE_DASHBOARD_URL] Торговом центре].
 	</string>
@@ -2661,9 +2601,6 @@ support@secondlife.com.
 	<string name="GroupMoneyDebits">
 		Приход
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc], [day,datetime,utc] [mth,datetime,utc] [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		Купленные вещи
 	</string>
@@ -2672,9 +2609,6 @@ support@secondlife.com.
 	</string>
 	<string name="UploadingCosts">
 		Передача [NAME] стоит L$[AMOUNT]
-	</string>
-	<string name="BuyingCosts">
-		Стоимость покупки: L$[AMOUNT]
 	</string>
 	<string name="UnknownFileExtension">
 		Неизвестное расширение файла .%s
@@ -2955,16 +2889,6 @@ support@secondlife.com.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Не удается получить описание формата пикселей
-	</string>
-	<string name="MBTrueColorWindow">
-		Для работы [APP_NAME] необходим режим True Color (32 бита).
-Задайте в настройках дисплея 32-битный режим цвета.
-	</string>
-	<string name="MBAlpha">
-		Не удается запустить [APP_NAME] из-за отсутствия доступа к 8-битному альфа-каналу.  Обычно эта проблема возникает из-за неполадок с драйвером видеокарты.
-Установите новые драйверы видеокарты.
-Также задайте для монитора 32-битный режим True Color (Панель управления &gt; Экран &gt; Параметры).
-Если это сообщение продолжает отображаться, обратитесь на сайт [SUPPORT_SITE].
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Не удается задать формат пикселей
@@ -4579,15 +4503,6 @@ support@secondlife.com.
 	<string name="share_alert">
 		Перетаскивайте вещи из инвентаря сюда
 	</string>
-	<string name="facebook_post_success">
-		Вы опубликовали сообщение в Facebook.
-	</string>
-	<string name="flickr_post_success">
-		Вы опубликовали сообщение в Flickr.
-	</string>
-	<string name="twitter_post_success">
-		Вы опубликовали сообщение в Twitter.
-	</string>
 	<string name="no_session_message">
 		(Сеанс IM не существует)
 	</string>
@@ -5027,9 +4942,6 @@ support@secondlife.com.
 	</string>
 	<string name="dance8">
 		танец8
-	</string>
-	<string name="AvatarBirthDateFormat">
-		[day,datetime,slt].[mthnum,datetime,slt].[year,datetime,slt]
 	</string>
 	<string name="DefaultMimeType">
 		нет/нет
@@ -5532,12 +5444,6 @@ support@secondlife.com.
 	<string name="Command_Environments_Label">
 		Моя окружающая среда
 	</string>
-	<string name="Command_Facebook_Label">
-		Facebook
-	</string>
-	<string name="Command_Flickr_Label">
-		Flickr
-	</string>
 	<string name="Command_Gestures_Label">
 		Жесты
 	</string>
@@ -5561,9 +5467,6 @@ support@secondlife.com.
 	</string>
 	<string name="Command_Move_Label">
 		Ходьба / бег / полет
-	</string>
-	<string name="Command_Outbox_Label">
-		Торговые исходящие
 	</string>
 	<string name="Command_People_Label">
 		Люди
@@ -5591,9 +5494,6 @@ support@secondlife.com.
 	</string>
 	<string name="Command_Speak_Label">
 		Говорить
-	</string>
-	<string name="Command_Twitter_Label">
-		Twitter
 	</string>
 	<string name="Command_View_Label">
 		Управление камерой
@@ -5628,12 +5528,6 @@ support@secondlife.com.
 	<string name="Command_Environments_Tooltip">
 		Моя окружающая среда
 	</string>
-	<string name="Command_Facebook_Tooltip">
-		Опубликовать в Facebook
-	</string>
-	<string name="Command_Flickr_Tooltip">
-		Загрузить на Flickr
-	</string>
 	<string name="Command_Gestures_Tooltip">
 		Жесты для аватара
 	</string>
@@ -5657,9 +5551,6 @@ support@secondlife.com.
 	</string>
 	<string name="Command_Move_Tooltip">
 		Перемещение аватара
-	</string>
-	<string name="Command_Outbox_Tooltip">
-		Перенести предметы в торговый центр для продажи
 	</string>
 	<string name="Command_People_Tooltip">
 		Друзья, группы и люди поблизости
@@ -5687,9 +5578,6 @@ support@secondlife.com.
 	</string>
 	<string name="Command_Speak_Tooltip">
 		Говорите с людьми вокруг вас с помощью микрофона
-	</string>
-	<string name="Command_Twitter_Tooltip">
-		Twitter
 	</string>
 	<string name="Command_View_Tooltip">
 		Изменение угла камеры

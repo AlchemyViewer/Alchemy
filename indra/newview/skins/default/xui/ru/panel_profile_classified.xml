@@ -112,8 +112,6 @@
 							<icons_combo_box.item label="Общий контент" name="pg_ci" value="C разрешения родителей"/>
 						</icons_combo_box>
 						<check_box label="Автоматическое обновление каждую неделю" name="auto_renew_edit"/>
-						<text name="price_for_listing_edit_label" value="Стоимость размещения:"/>
-						<spinner label="L$" name="price_for_listing_edit" tool_tip="Цена за размещение." value="50"/>
 					</panel>
 				</panel>
 			</scroll_container>

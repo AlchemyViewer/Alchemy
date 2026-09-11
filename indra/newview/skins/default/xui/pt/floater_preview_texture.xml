@@ -6,13 +6,6 @@
 	<floater.string name="Copy">
 		Copiar para inventário
 	</floater.string>
-	<layout_stack name="preview_stack">
-		<layout_panel name="texture_panel">
-			<text name="aspect_ratio">
-				Visualizar relação de aspecto
-			</text>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="aspect_combo_lp">
 			<combo_box name="combo_aspect_ratio" tool_tip="Visualizar com proporção de aspecto fixa"/>

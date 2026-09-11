@@ -27,5 +27,4 @@
 		00h00 PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="Arrêter tous les médias (musique, vidéo, pages web)."/>
-	<button name="volume_btn" tool_tip="Régler le volume global."/>
 </panel>

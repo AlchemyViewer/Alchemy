@@ -6,5 +6,4 @@
 	<panel label="im_header" name="im_header">
 		<text name="time_box" value="23:30"/>
 	</panel>
-	<button label="Répondre" name="reply"/>
 </panel>

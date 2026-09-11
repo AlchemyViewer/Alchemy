@@ -15,7 +15,7 @@
 	<text name="help_text" width="214">
 		Selecione um ou mais residentes para convidar.  Clique em &apos;Abrir seletor de residentes&apos; para começar.
 	</text>
-	<button label="Abrir Seletor de Residente" name="add_button" tool_tip=""/>
+	<button label="Abrir Seletor de Residente" name="add_button"/>
 	<name_list name="invitee_list" tool_tip="Pressione Ctrl enquanto clica nos nomes dos residentes"/>
 	<button label="Remove os selecionados acima da lista" left_delta="-7" name="remove_button" tool_tip="Exclui os residentes selecionados acima da lista de convidados" width="214"/>
 	<text name="role_text">

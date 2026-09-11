@@ -71,15 +71,15 @@
 			<text_editor name="group_money_details_text">
 				Caricamento in corso...
 			</text_editor>
-			<button label="&lt; Precedente" label_selected="&lt; Precedente" name="earlier_details_button" tool_tip="Indietro" width="90"/>
-			<button label="Successivo &gt;" label_selected="Successivo &gt;" left_delta="260" name="later_details_button" tool_tip="Avanti" width="90"/>
+			<button name="earlier_details_button" tool_tip="Indietro" width="90"/>
+			<button left_delta="260" name="later_details_button" tool_tip="Avanti" width="90"/>
 		</panel>
 		<panel label="VENDITE" name="group_money_sales_tab">
 			<text_editor name="group_money_sales_text">
 				Caricamento in corso...
 			</text_editor>
-			<button label="&lt; Precedente" label_selected="&lt; Precedente" name="earlier_sales_button" tool_tip="Indietro" width="90"/>
-			<button label="Successivo &gt;" label_selected="Successivo &gt;" left_delta="260" name="later_sales_button" tool_tip="Avanti" width="90"/>
+			<button name="earlier_sales_button" tool_tip="Indietro" width="90"/>
+			<button left_delta="260" name="later_sales_button" tool_tip="Avanti" width="90"/>
 		</panel>
 	</tab_container>
 </panel>

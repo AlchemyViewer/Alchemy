@@ -76,7 +76,7 @@ cliccando sui loro nomi.</panel.string>
 		<text name="static2">Descrizione</text>
 		<text name="static4">Ruoli assegnati</text>
 		<check_box label="Visualizza membri" name="role_visible_in_list" tool_tip="Imposta nella scheda Generale se i membri con questo ruolo possono essere visti dai residenti esterni a questo gruppo."/>
-		<text name="static5" tool_tip="Una lista delle abilità che il ruolo ora selezionato può eseguire.">Abilità permesse</text>
+		<text name="static5">Abilità permesse</text>
 		<scroll_list name="role_allowed_actions" tool_tip="Per i dettagli di ogni abilità consentita vedi la scheda abilità."/>
 	</panel>
 	<panel name="roles_header">

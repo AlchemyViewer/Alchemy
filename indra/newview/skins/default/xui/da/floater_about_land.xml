@@ -266,7 +266,7 @@ Gå til &apos;Verden&apos; &gt; &apos;Om land&apos; eller vælg en anden parcel 
 			<text name="Object Owners:">
 				Objekt ejere:
 			</text>
-			<button label="Gentegn liste" label_selected="Gentegn liste" name="Refresh List" tool_tip="Refresh Object List"/>
+			<button name="Refresh List" tool_tip="Refresh Object List"/>
 			<button label="Returnér objekter" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="Type" name="type"/>
@@ -310,7 +310,6 @@ Kun større parceller kan vises i søgning.
 			<text name="allow_label">
 				Tillad andre beboere at:
 			</text>
-			<check_box label="Redigere terræn" name="edit land check" tool_tip="Hvis dette er valg, kan enhver redigere dit land. Det er bedst ikke at vælge her, da det altid er muligt for dig som ejer at ændre terræn på dit eget land."/>
 			<check_box label="Flyve" name="check fly" tool_tip="Hvis valgt, kan beboere flyve på dit land. Hvis ikke valgt kan beboere kun flyve ind på dit land og over dit land."/>
 			<text name="allow_label2">
 				Lave objekter:
@@ -327,16 +326,12 @@ Kun større parceller kan vises i søgning.
 			</text>
 			<check_box label="Alle beboere" name="check other scripts"/>
 			<check_box label="Gruppe" name="check group scripts"/>
-			<text name="land_options_label">
-				Land instillinger:
-			</text>
 			<check_box label="Sikker (ingen skade)" name="check safe" tool_tip="Hvis valgt, er det ikke muligt at forårsage skade på andre beboere. Hvis fravalgt er det muligt at få skader (f.eks. ved kamp)."/>
 			<check_box label="Skub forbudt" name="PushRestrictCheck" tool_tip="Forhindrer scripts i at skubbe. Valg af denne mulighed, kan være nyttigt for at forhindre forstyrrende adfærd på dit land."/>
 			<check_box label="Vis sted i søgning (L$30/uge)" name="ShowDirectoryCheck" tool_tip="Lad dit parcel blive vist i søge resultaterne"/>
 			<combo_box name="land category with adult">
 				<combo_box.item label="Enhver kategori" name="item0"/>
 				<combo_box.item label="Linden sted" name="item1"/>
-				<combo_box.item label="Adult" name="item2"/>
 				<combo_box.item label="Kunst &amp; kultur" name="item3"/>
 				<combo_box.item label="Business" name="item4"/>
 				<combo_box.item label="Uddannelse" name="item5"/>
@@ -368,7 +363,7 @@ Kun større parceller kan vises i søgning.
 			<text name="Snapshot:">
 				Foto:
 			</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Klik for at vælge et billede"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Klik for at vælge et billede"/>
 			<text name="landing_point">
 				Landingspunkt: [LANDING]
 			</text>
@@ -399,7 +394,7 @@ Kun større parceller kan vises i søgning.
 			<text left="4" name="Media texture:">
 				Erstat tekstur:
 			</text>
-			<texture_picker label="" name="media texture" tool_tip="Klik for at vælge billede"/>
+			<texture_picker name="media texture" tool_tip="Klik for at vælge billede"/>
 			<text name="replace_texture_help">
 				Objekter der har denne tekstur vil vise filmen eller web-siden, efter du klikker på play knappen. Vælg 
 				Objects using this texture will show the movie or web page after you click the play arrow.  Select the thumbnail for at vælge anden tekstur.
@@ -427,19 +422,10 @@ Kun større parceller kan vises i søgning.
 			<panel.string name="access_estate_defined">
 				(Defineret via estate)
 			</panel.string>
-			<panel.string name="allow_public_access">
-				Tillad offentlig adgang ([MATURITY]) (Bemærk: Ellers oprettes blokeringslinier)
-			</panel.string>
 			<panel.string name="estate_override">
 				En eller flere af disse valg er indstillet på estate niveau
 			</panel.string>
-			<text name="Limit access to this parcel to:">
-				Adgang til denne parcel
-			</text>
 			<check_box label="Tillad offentlig adgang [MATURITY]" name="public_access"/>
-			<text name="Only Allow">
-				Blokér adgang for::
-			</text>
 			<check_box label="Beboere der ikke har givet betalings oplysninger til Linden Lab [ESTATE_PAYMENT_LIMIT]" name="limit_payment" tool_tip="Blokér for uidentificerede beboere."/>
 			<check_box label="Alders verifikation [ESTATE_AGE_LIMIT]" name="limit_age_verified" tool_tip="Blokér for beboere som ikke er alders-verificerede. Se [SUPPORT_SITE] for mere information."/>
 			<check_box label="Tillad adgang til gruppen: [GROUP]" name="GroupCheck" tool_tip="Vælg gruppe under fanen &apos;generelt&apos;."/>

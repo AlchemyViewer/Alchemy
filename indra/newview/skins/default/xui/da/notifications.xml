@@ -1811,7 +1811,7 @@ Klik hvorsomhelst i verden for at rotere din visning
 			<button name="cancel" text="Annullér"/>
 		</form>
 	</notification>
-	<notification label="" name="ModeChange">
+	<notification name="ModeChange">
 		For at skifte tilstand skal du genstarte programmet.
 		<usetemplate name="okcancelbuttons" notext="Afslut ikke" yestext="Afslut"/>
 	</notification>
@@ -1859,11 +1859,6 @@ Klik hvorsomhelst i verden for at rotere din visning
 		Søgning er kun mulig i avanceret tilstand. Ønsker du at logge ud og logge på i avanceret tilstand.
 		<usetemplate name="okcancelbuttons" notext="Afslut ikke" yestext="Afslut"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">
-		Det ser ikke ud til at din hardware opfylder minimumskravene til [APP_NAME]. [APP_NAME] kræver et OpenGL grafikkort som understøter &apos;multitexture&apos;. Check eventuelt om du har de nyeste drivere for grafikkortet, og de nyeste service-packs og patches til dit operativsystem.
-
-Hvis du bliver ved med at have problemer, besøg venligst [SUPPORT_SITE].
-	</global>
 	<global name="You can only set your &apos;Home Location&apos; on your land or at a mainland Infohub.">
 		Hvis du selv ejer land, kan du benytte det til hjemme lokation.
 Ellers kan du se på verdenskortet og finde steder markeret med &quot;Infohub&quot;.

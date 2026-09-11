@@ -15,7 +15,7 @@
 	<text bottom_delta="-96" height="72" name="help_text" width="214">
 		Puedes elegir a varios Residentes para invitarles a tu grupo. Para empezar, pulsa &apos;Abrir el selector de residentes&apos;.
 	</text>
-	<button bottom_delta="-10" label="Abrir el selector de residentes" name="add_button" tool_tip=""/>
+	<button bottom_delta="-10" label="Abrir el selector de residentes" name="add_button"/>
 	<name_list bottom_delta="-160" height="156" name="invitee_list" tool_tip="Para seleccionar a varios residentes, ve pulsando sus nombres mientras mantienes apretada la tecla Ctrl"/>
 	<button label="Eliminar de la lista a los seleccionados" left_delta="-7" name="remove_button" tool_tip="Quitar de la lista a los Residentes seleccionados arriba" width="214"/>
 	<text name="role_text">

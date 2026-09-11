@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Joystick" title="CONFIGURATION DU JOYSTICK">
-	<check_box label="Activer :" name="enable_joystick"/>
 	<spinner label="Mapping axe des X " name="JoystickAxis1" left="20" width="154" label_width="130"/>
 	<spinner label="Mapping axe des Y" name="JoystickAxis2" width="154" label_width="130"/>
 	<spinner label="Mapping axe des Z" name="JoystickAxis0" width="154" label_width="130"/>
@@ -73,7 +72,4 @@
 		<stat_bar label="Axe 4" name="axis4"/>
 		<stat_bar label="Axe 5" name="axis5"/>
 	</stat_view>
-	<string name="NoDevice">
-		aucun joystick détecté
-	</string>
 </floater>

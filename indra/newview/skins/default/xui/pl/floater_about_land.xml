@@ -74,7 +74,6 @@
 			<text name="Owner:">
 				Właściciel:
 			</text>
-			<button label="Profil" name="Profile..." />
 			<text name="Group:">
 				Grupa:
 			</text>
@@ -114,7 +113,7 @@
 			<text name="DwellText">
 				Wczytywanie...
 			</text>
-			<button label="Kup działkę" label_selected="Kup działkę" name="Buy Land..." />
+			<button label="Kup działkę" name="Buy Land..." />
 			<button label="Sprzedaż przez Lindenów" name="Linden Sale..." tool_tip="Działka musi mieć Właściciela, zawartość oraz nie może być wystawiona na Aukcję." />
 			<button label="Skrypty" name="Scripts..."/>
 			<button label="Kup dla Grupy" name="Buy For Group..." />
@@ -220,8 +219,8 @@
 			<text name="Object Owners:">
 				Właściciele:
 			</text>
-			<button label="Odśwież listę" label_selected="Odśwież listę" name="Refresh List" tool_tip="Odśwież listę obiektów" />
-			<button label="Zwróć obiekty" label_selected="Zwróć obiekty" name="Return objects..." />
+			<button name="Refresh List" tool_tip="Odśwież listę obiektów" />
+			<button label="Zwróć obiekty" name="Return objects..." />
 			<name_list name="owner list">
 				<name_list.columns label="Typ" name="type" />
 				<name_list.columns label="Nazwa" name="name" />
@@ -309,7 +308,7 @@ Jedynie większe działki mogą być umieszczone w bazie wyszukiwarki.
 			<text name="allow_see_label">
 				Awatary na innych działkach mogą rozmawiać/widzieć awatary na tej działce
 			</text>
-			<check_box label="Widzieć awatary" name="SeeAvatarsCheck" tool_tip="Pozwala Rezydentom z innych działek widzieć i rozmawiać z Rezydentami na tej działce - oraz Tobie, widzieć ich i rozmawiać z nimi." />
+			<check_box name="SeeAvatarsCheck" tool_tip="Pozwala Rezydentom z innych działek widzieć i rozmawiać z Rezydentami na tej działce - oraz Tobie, widzieć ich i rozmawiać z nimi." />
 			<text name="landing_point">
 				Punkt Lądowania: [LANDING]
 			</text>

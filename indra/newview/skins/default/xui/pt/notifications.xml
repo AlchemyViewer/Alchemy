@@ -1442,7 +1442,6 @@ Por favor volte mais tarde.</notification>
 	<notification label="Mensagem para todos na sua Propriedade" name="MessageEstate">
 		Digite um breve anúncio que será enviado para todos que estejam atualmente na sua propriedade.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1688,7 +1687,6 @@ Publicar este classificado agora por L$ [AMOUNT]?
 	<notification label="Mensagem para todos desta Região" name="MessageRegion">
 		Digite um breve aviso que será enviado para todos nesta região.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -1765,7 +1763,6 @@ Você tem certeza de que deseja prosseguir com esta compra?
 Você tem certeza de que deseja prosseguir com esta compra?
 Por favor, re-insira sua senha e clique 'Confirmar Compra'.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="Confirmar Compra"/>
 			<button name="Cancel" text="Cancelar"/>
 		</form>
@@ -2528,7 +2525,6 @@ Acesse Alchemy.log para detalhes</notification>
 Com os seguintes residentes:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		É possível compartilhar apenas uma pasta de cada vez.
@@ -2796,9 +2792,6 @@ Deseja continuar?
 		O objeto selecionado afeta o navmesh.  Alterá-lo para um Caminho Flexível irá removê-lo do navmesh.
 		<usetemplate ignoretext="O objeto selecionado afeta o navmesh.  Alterá-lo para um Caminho Flexível irá removê-lo do navmesh." name="okcancelignore" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Aparentemente a sua máquina não atende os requisitos de hardware do [APP_NAME].  [APP_NAME] requer placas de vídeo OpenGL com suporte a multitexturas.  Se sua place de vídeo tiver este perfil, atualize o driver da placa de vídeo, assim como patches e service packs do sistema operacional. 
-
-Se você continuar a receber esta mensagem, consulte o [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- A sua placa de vídeo não atende os requisitos mínimos exigidos.</global>

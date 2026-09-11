@@ -81,7 +81,7 @@
 		<combo_box.item label="Yerel" name="Local"/>
 		<combo_box.item label="Referans" name="Reference"/>
 	</combo_box>
-	<button label="" name="Options..." tool_tip="İlave ağ seçeneklerine bak"/>
+	<button name="Options..." tool_tip="İlave ağ seçeneklerine bak"/>
 	<button name="ToolCube" tool_tip="Küp"/>
 	<button name="ToolPrism" tool_tip="Prizma"/>
 	<button name="ToolPyramid" tool_tip="Piramit"/>
@@ -189,7 +189,6 @@
 			<text name="Group:">
 				Grup:
 			</text>
-			<name_box initial_value="Yükleniyor..." name="Group Name Proxy"/>
 			<button name="button set group" tool_tip="Bu nesnenin izinlerini paylaşmak için bir grup seçin"/>
 			<check_box label="Paylaş" name="checkbox share with group" tool_tip="Ayarlanan grubun tüm üyelerinin, bu nesne için değiştirme izinlerinizi paylaşmasına izin verir. Rol kısıtlamalarını etkinleştirmek için Devretme yapmalısınız."/>
 			<button label="Devret" label_selected="Devret" name="button deed" tool_tip="Bu nesne devredilerek verildiğinde, nesnenin sonraki sahibi için izinler geçerli olur. Grup içerisinde paylaşılan nesneler bir grup yetkilisi tarafından devredilebilir."/>
@@ -414,7 +413,7 @@
 		</panel>
 		<panel label="Doku" name="Texture"/>
 		<panel label="İçerik" name="Contents">
-			<flyout_button label="Yeni Komut Dosyası" label_selected="Yeni Komut Dosyası" name="button new script"/>
+			<flyout_button label="Yeni Komut Dosyası" name="button new script"/>
 			<button label="İzinler" name="button permissions"/>
 		</panel>
 	</tab_container>

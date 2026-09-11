@@ -26,6 +26,5 @@
 				<text name="folder_label" value="Localización del hito:"/>
 			</panel>
 		</panel>
-		<text name="region_title" value="Región de muestra"/>
 	</scroll_container>
 </panel>

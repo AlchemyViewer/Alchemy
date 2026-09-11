@@ -27,26 +27,6 @@ domaine.
 	<check_box label="Autoriser les chats vocaux" name="voice_chat_check"/>
 	<check_box label="Autoriser la téléportation directe" name="allow_direct_teleport"/>
 	<button label="Appliquer" name="apply_btn"/>
-	<text name="estate_manager_label">
-		Gérants du domaine :
-	</text>
-	<text name="allow_resident_label">
-		Toujours autorisé :
-	</text>
-	<button label="Ajouter..." name="add_estate_manager_btn"/>
-	<button label="Supprimer..." name="remove_estate_manager_btn"/>
-	<button label="Ajouter..." name="add_allowed_avatar_btn"/>
-	<button label="Supprimer..." name="remove_allowed_avatar_btn"/>
-	<text name="allow_group_label">
-		Groupes toujours autorisés :
-	</text>
-	<text name="ban_resident_label">
-		Toujours interdit :
-	</text>
-	<button label="Ajouter..." name="add_allowed_group_btn"/>
-	<button label="Supprimer..." name="remove_allowed_group_btn"/>
-	<button label="Ajouter..." name="add_banned_avatar_btn"/>
-	<button label="Supprimer..." name="remove_banned_avatar_btn"/>
 	<button label="Message au domaine..." name="message_estate_btn"/>
 	<button label="Éjecter du domaine..." name="kick_user_from_estate_btn"/>
 </panel>

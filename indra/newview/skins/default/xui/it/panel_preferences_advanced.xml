@@ -3,9 +3,6 @@
 	<panel.string name="aspect_ratio_text">
 		[NUM]:[DEN]
 	</panel.string>
-	<text name="Cache:">
-		Cache:
-	</text>
 	<spinner label="Dimensioni cache (256 - 9984MB)" name="cachesizespinner"/>
 	<text name="text_box5">
 		MB
@@ -19,11 +16,6 @@
 	<text name="UI Size:">
 		Dimensioni UI:
 	</text>
-	<check_box label="Mostra errori dello script in:" name="show_script_errors"/>
-	<radio_group name="show_location">
-		<radio_item label="Chat nei dintorni" name="0"/>
-		<radio_item label="Finestra separata" name="1"/>
-	</radio_group>
 	<check_box label="Consenti più Viewer" name="allow_multiple_viewer_check"/>
 	<check_box label="Mostra selezione griglia all&apos;accesso" name="show_grid_selection_check"/>
 	<check_box label="Mostra menu Avanzato" name="show_advanced_menu_check"/>

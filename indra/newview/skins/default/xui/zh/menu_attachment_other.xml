@@ -9,8 +9,6 @@
 	<menu_item_call label="放大" name="Zoom In"/>
 	<menu_item_call label="支付" name="Pay..."/>
 	<menu_item_call label="物件檔案" name="Object Inspect"/>
-	<context_menu label="呈現化身" name="Render Avatar">
-	</context_menu>
 	<context_menu name="Avatar Attachment Manage">
 		<menu_item_call label="踢出" name="Eject..."/>
 		<menu_item_call label="凍結" name="Freeze..."/>

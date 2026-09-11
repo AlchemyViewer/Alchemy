@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Communication" name="Privacy panel">
-	<check_box label="Seuls mes amis et groupes peuvent m&apos;appeler ou m&apos;envoyer un IM" name="voice_call_friends_only_check"/>
-	<check_box label="Afficher mes repères favoris à la connexion (liste déroulante Lieu de départ)" name="favorites_on_login_check"/>
-	<text name="Logs:">
-		Journaux de chat :
-	</text>
-	<check_box label="Sauvegarder les chats près de moi sur mon ordinateur" name="log_nearby_chat"/>
-	<check_box label="Sauvegarder les IM sur mon ordinateur" name="log_instant_messages"/>
-	<check_box label="Inclure la date et l&apos;heure pour chaque ligne du journal de chat" name="show_timestamps_check_im"/>
-	<check_box label="Inclure la date dans le nom du fichier journal" name="logfile_name_datestamp"/>
-	<text name="log_path_desc">
-		Emplacement journaux :
-	</text>
 	<line_editor left="308" name="log_path_string" right="-20"/>
-	<button label="Parcourir" label_selected="Parcourir" name="log_path_button" width="150"/>
+	<button name="log_path_button" width="150"/>
 	<tab_container name="privacy_tab_container">
 		<panel name="privacy_preferences_general">
 			<text name="block_list_label">

@@ -5,9 +5,6 @@
 			Legenda
 		</text>
 	</panel>
-	<panel name="layout_panel_6">
-		<slider label="Zoom" name="zoom slider"/>
-	</panel>
 	<layout_stack name="floater_map_stack">
 		<layout_panel name="controls_lp">
 			<panel name="layout_panel_5">
@@ -16,9 +13,9 @@
 		</text>
 			</panel>
 			<panel name="layout_panel_7">
-				<button font="SansSerifSmall" label="Mostrar seleção" label_selected="Mostrar Destino" left_delta="91" name="Show Destination" tool_tip="Centrar mapa no local selecionado" width="135"/>
+				<button font="SansSerifSmall" label="Mostrar seleção" left_delta="91" name="Show Destination" tool_tip="Centrar mapa no local selecionado" width="135"/>
 				<button font="SansSerifSmall" label="Copiar SLurl" name="copy_slurl" tool_tip="Copia a localização atual como um SLurl para usar na web."/>
-				<button font="SansSerifSmall" label="Teletransportar" label_selected="Teletransporte" name="Teleport" tool_tip="Teletransportar para o lugar selecionado"/>
+				<button font="SansSerifSmall" label="Teletransportar" name="Teleport" tool_tip="Teletransportar para o lugar selecionado"/>
 			</panel>
 			<panel name="layout_panel_4">
 				<combo_box label="Amigos online" name="friend combo" tool_tip="Mostrar amigos no mapa">
@@ -40,19 +37,16 @@
 		</text>
 			</panel>
 			<panel name="layout_panel_2">
-				<button font="SansSerifSmall" label="Mostra minha localização" label_selected="Mostra minha localização" left_delta="91" name="Show My Location" tool_tip="Centrar o mapa na localização do meu avatar"/>
+				<button font="SansSerifSmall" left_delta="91" name="Show My Location" tool_tip="Centrar o mapa na localização do meu avatar"/>
 				<text name="me_label">
 			Eu
 		</text>
-				<check_box label="Residente" name="people_chk"/>
 				<text name="person_label">
 			Pessoa
 		</text>
-				<check_box label="Infohub" name="infohub_chk"/>
 				<text name="infohub_label">
 			Infohub
 		</text>
-				<check_box label="Terra à Venda" name="land_for_sale_chk"/>
 				<text name="land_sale_label">
 			Terreno à venda
 		</text>
@@ -62,22 +56,20 @@
 				<text name="by_owner_label">
 			pelo dono
 		</text>
-				<button label="Voltar ao meu início" label_selected="Voltar ao meu início" name="Go Home" tool_tip="Teletransportar para meu início"/>
+				<button name="Go Home" tool_tip="Teletransportar para meu início"/>
 				<text name="Home_label">
 			Início
 		</text>
 				<text name="events_label">
 					Eventos:
 				</text>
-				<check_box label="PG" name="event_chk"/>
 				<text name="pg_label">
 			Geral
 		</text>
-				<check_box initial_value="true" label="Mature" name="events_mature_chk"/>
+				<check_box initial_value="true" name="events_mature_chk"/>
 				<text name="events_mature_label">
 			Moderado
 		</text>
-				<check_box label="Adult" name="events_adult_chk"/>
 				<text name="events_adult_label">
 			Adulto
 		</text>

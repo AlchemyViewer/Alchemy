@@ -30,23 +30,6 @@
 					<stat_bar label="Ham Bellek" name="rawmemstat"/>
 					<stat_bar label="Bağlı Doku Belleği" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="Bellek Kullanımı" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="KA" name="LLView"/>
-					<stat_bar label="Fontlar" name="LLFontFreetype"/>
-					<stat_bar label="Envanter" name="LLInventoryObject"/>
-					<stat_bar label="Görüntüleyici Nesneleri" name="LLViewerObject"/>
-					<stat_bar label="Gölgeleme Ağacı Grup Verileri" name="LLViewerOctreeGroup"/>
-					<stat_bar label="Gölgeleme Ağacı Verileri" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Görüntüleyici Nesne Önbelleği" name="LLVOCacheEntry"/>
-					<stat_bar label="Çizilebilir nesneler" name="LLDrawable"/>
-					<stat_bar label="Yüz Verileri" name="LLFace"/>
-					<stat_bar label="Çizim Bilgileri" name="LLDrawInfo"/>
-					<stat_bar label="Doku Verileri" name="LLTexture"/>
-					<stat_bar label="Görüntü Verileri" name="LLImage"/>
-					<stat_bar label="GL Görüntü Verileri" name="LLImageGL"/>
-					<stat_bar label="Vertex Tamponları" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="Ağ" name="network">
 					<stat_bar label="Gelen Paketler" name="packetsinstat"/>
 					<stat_bar label="Giden Paketler" name="packetsoutstat"/>

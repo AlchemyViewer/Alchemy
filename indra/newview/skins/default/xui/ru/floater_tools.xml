@@ -81,7 +81,7 @@
 		<combo_box.item label="Локальная" name="Local"/>
 		<combo_box.item label="Точка отсчета" name="Reference"/>
 	</combo_box>
-	<button label="" name="Options..." tool_tip="Дополнительные параметры сетки"/>
+	<button name="Options..." tool_tip="Дополнительные параметры сетки"/>
 	<button name="ToolCube" tool_tip="Куб"/>
 	<button name="ToolPrism" tool_tip="Призма"/>
 	<button name="ToolPyramid" tool_tip="Пирамида"/>
@@ -189,7 +189,6 @@
 			<text name="Group:">
 				Группа:
 			</text>
-			<name_box initial_value="Загрузка..." name="Group Name Proxy"/>
 			<button name="button set group" tool_tip="Выберите группу для передачи ей прав доступа к объекту"/>
 			<check_box label="Поделиться" name="checkbox share with group" tool_tip="Позволить всем участникам выбранной группы получить установленные вам права на этот объект. Для включения ролевых ограничений необходимо произвести сделку."/>
 			<button label="Сделка" label_selected="Сделка" name="button deed" tool_tip="В результате сделки объект передается группе, при этом права на него будут соответствовать правам следующего владельца. Переданный группе объект может передаваться должностным лицом группы."/>
@@ -414,7 +413,7 @@
 		</panel>
 		<panel label="Текстура" name="Texture"/>
 		<panel label="Контент" name="Contents">
-			<flyout_button label="Создать скрипт" label_selected="Создать скрипт" name="button new script"/>
+			<flyout_button label="Создать скрипт" name="button new script"/>
 			<button label="Разрешения" name="button permissions"/>
 		</panel>
 	</tab_container>

@@ -1,18 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Kommunikation" name="Privacy panel">
-	<check_box label="Kun venner og grupper kan sende besked til mig" name="voice_call_friends_only_check"/>
-	<check_box label="Vis mine favorit landemærker ved login (via &quot;Start ved&quot; menuen)" name="favorites_on_login_check"/>
-	<text name="Logs:">
-		Chat Logs:
-	</text>
-	<check_box label="Gem en log med lokal chat på min computer" name="log_nearby_chat"/>
-	<check_box label="Gem en log med private beskeder (IM) på min computer" name="log_instant_messages"/>
-	<check_box label="Tilføj klokkeslæt til hver linie i chat log" name="show_timestamps_check_im"/>
-	<check_box label="Tilføj datostempel til log filnavn." name="logfile_name_datestamp"/>
-	<text name="log_path_desc">
-		Placering af logfiler:
-	</text>
-	<button label="Ændre sti" label_selected="Ændre sti" left="150" name="log_path_button"/>
+	<button left="150" name="log_path_button"/>
 	<tab_container name="privacy_tab_container">
 		<panel name="privacy_preferences_general">
 			<text name="block_list_label">

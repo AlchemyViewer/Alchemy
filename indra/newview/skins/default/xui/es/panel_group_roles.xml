@@ -85,7 +85,7 @@ Seleccione varios nombres manteniendo pulsada la tecla Ctrl y pulsando en cada u
 		<text name="static2">Descripción</text>
 		<text name="static4">Roles asignados</text>
 		<check_box label="Mostrar los miembros" name="role_visible_in_list" tool_tip="Establece si los miembros de este rol pueden ser vistos en la pestaña General por personas ajenas al grupo."/>
-		<text name="static5" tool_tip="Una lista de las capacidades que puede desarrollar el rol seleccionado actualmente.">Capacidades asignadas</text>
+		<text name="static5">Capacidades asignadas</text>
 		<scroll_list name="role_allowed_actions" tool_tip="Para más detalles de cada capacidad, ver la pestaña Capacidades">
 			<scroll_list.columns label="" name="icon"/>
 			<scroll_list.columns label="" name="checkbox"/>

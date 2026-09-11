@@ -30,23 +30,6 @@
 					<stat_bar label="原始記憶" name="rawmemstat"/>
 					<stat_bar label="界限記憶" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="記憶體使用狀況" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="使用者界面" name="LLView"/>
-					<stat_bar label="字型" name="LLFontFreetype"/>
-					<stat_bar label="收納區" name="LLInventoryObject"/>
-					<stat_bar label="Viewer物件" name="LLViewerObject"/>
-					<stat_bar label="八叉樹群資料" name="LLViewerOctreeGroup"/>
-					<stat_bar label="八叉樹資料" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Viewer物件快取" name="LLVOCacheEntry"/>
-					<stat_bar label="可繪物件" name="LLDrawable"/>
-					<stat_bar label="臉部資料" name="LLFace"/>
-					<stat_bar label="描繪資訊" name="LLDrawInfo"/>
-					<stat_bar label="材質資料" name="LLTexture"/>
-					<stat_bar label="圖像資料" name="LLImage"/>
-					<stat_bar label="GL圖像資料" name="LLImageGL"/>
-					<stat_bar label="頂點緩衝" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="網路" name="network">
 					<stat_bar label="進入封包" name="packetsinstat"/>
 					<stat_bar label="出去封包" name="packetsoutstat"/>

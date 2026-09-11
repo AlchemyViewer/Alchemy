@@ -42,7 +42,6 @@
 	</radio_group>
 	<check_box label="我的名字" name="show_my_name_checkbox1"/>
 	<check_box label="使用者名稱" name="show_slids" tool_tip="顯示使用者名稱，就像 bobsmith123 這類的"/>
-	<check_box label="群組頭銜" name="show_all_title_checkbox1" tool_tip="顯示群組頭銜，如職員或成員"/>
 	<check_box label="高亮標示朋友" name="show_friends" tool_tip="高亮顯示你朋友的名稱標籤"/>
 	<check_box label="察看顯示名稱" name="display_names_check" tool_tip="若勾選，將在聊天、IM 和名稱標籤等處使用顯示名稱。"/>
 	<text name="inworld_typing_rg_label">

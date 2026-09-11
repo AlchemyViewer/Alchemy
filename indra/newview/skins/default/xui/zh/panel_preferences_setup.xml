@@ -19,8 +19,6 @@
 		<radio_item label="僅在開啟Second Life連結時使用內建瀏覽器" name="external" tool_tip="使用系統預設的瀏覽器瀏覽幫助，開啟網頁。僅在開啟「LindenLab/Second Life」的連結時才會使用內建瀏覽器。" value="1"/>
 		<radio_item label="用內建瀏覽器開啟所有連結" name="external_all" tool_tip="使用內建的瀏覽器瀏覽幫助，開啟網頁。該瀏覽器將透過 [APP_NAME] 開啟新視窗。" value="2"/>
 	</radio_group>
-	<check_box initial_value="true" label="啟用外掛" name="browser_plugins_enabled"/>
-	<check_box initial_value="true" label="接受 cookies" name="cookies_enabled"/>
 	<check_box initial_value="true" label="啟用 Javascript" name="browser_javascript_enabled"/>
 	<text name="Software updates:">
 		軟體更新：

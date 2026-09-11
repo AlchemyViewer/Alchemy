@@ -71,15 +71,15 @@
 			<text_editor name="group_money_details_text">
 				Carregando...
 			</text_editor>
-			<button label="&lt; Mais Cedo" label_selected="&lt; Cedo" name="earlier_details_button" tool_tip="Atrás"/>
-			<button label="Mais Tarde &gt;" label_selected="Tarde &gt;" name="later_details_button" tool_tip="Próximo"/>
+			<button name="earlier_details_button" tool_tip="Atrás"/>
+			<button name="later_details_button" tool_tip="Próximo"/>
 		</panel>
 		<panel label="VENDAS" name="group_money_sales_tab">
 			<text_editor name="group_money_sales_text">
 				Carregando...
 			</text_editor>
-			<button label="&lt; Mais Cedo" label_selected="&lt; Mais Cedo" name="earlier_sales_button" tool_tip="Atrás"/>
-			<button label="Mais Tarde &gt;" label_selected="Mais Tarde &gt;" name="later_sales_button" tool_tip="Próximo"/>
+			<button name="earlier_sales_button" tool_tip="Atrás"/>
+			<button name="later_sales_button" tool_tip="Próximo"/>
 		</panel>
 	</tab_container>
 </panel>

@@ -11,29 +11,10 @@
 	</text>
 	<check_box label="Speciel port" name="connection_port_enabled"/>
 	<spinner label="Port nummer:" name="connection_port"/>
-	<text name="cache_size_label_l">
-		Cache størrelse
-	</text>
-	<text name="text_box5">
-		MB
-	</text>
-	<text name="Cache location">
-		Cache placering:
-	</text>
-	<button label="Vælg" label_selected="Vælg" name="set_cache"/>
-	<button label="Nulstil" label_selected="Nulstil" name="reset_cache"/>
 	<text name="Web:">
 		Web:
 	</text>
-	<check_box initial_value="true" label="Aktivér plugins" name="browser_plugins_enabled"/>
-	<check_box initial_value="true" label="Acceptér cookies" name="cookies_enabled"/>
-	<check_box initial_value="true" label="Aktivér Javascript" name="browser_javascript_enabled"/>
-	<check_box initial_value="false" label="Tilad media browser pop-ups" name="media_popup_enabled"/>	
-	<text name="Proxy location">
-		Proxy placering:
-	</text>
-	<line_editor name="web_proxy_editor" tool_tip="Angiv navn eller IP addresse på den proxy du ønsker at anvende"/>
-	<spinner label="Port nummer:" name="web_proxy_port"/>
+	<check_box initial_value="true" label="Aktivér Javascript" name="browser_javascript_enabled"/>	
 	<text name="Software updates:">
 		Software opdateringer:
 	</text>

@@ -85,7 +85,7 @@ Pour sélectionner plusieurs membres, cliquez sur leurs noms en maintenant la to
 		<text name="static2">Description</text>
 		<text name="static4">Membres assignés</text>
 		<check_box label="Afficher les membres" name="role_visible_in_list" tool_tip="Détermine si les personnes n'appartenant pas au groupe peuvent voir les membres de ce rôle dans l'onglet Général."/>
-		<text name="static5" tool_tip="Une liste des pouvoirs auquel le rôle sélectionné a accès.">Pouvoirs attribués</text>
+		<text name="static5">Pouvoirs attribués</text>
 		<scroll_list name="role_allowed_actions" tool_tip="Pour en savoir plus sur chaque pouvoir, consultez l'onglet Pouvoirs">
 			<scroll_list.columns label="" name="checkbox"/>
 			<scroll_list.columns label="" name="action"/>

@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater name="floater_translation_settings" title="USTAWIENIA TŁUMACZENIA CZATU">
-	<string name="bing_api_key_not_verified">
-		Nie można zweryfikować Bing appID. Spróbuj ponownie.
-	</string>
 	<string name="google_api_key_not_verified">
 		Nie można zweryfikować klucza Google API. Spróbuj ponownie.
-	</string>
-	<string name="bing_api_key_verified">
-		Bing appID zweryfikowany.
 	</string>
 	<string name="google_api_key_verified">
 		Klucz Google API zweryfikowany.
@@ -37,9 +31,7 @@
 	</combo_box>
 	<text name="tip">
 		Usługa tłumacząca:
-	</text>
-	<line_editor default_text="Wpisz Bing AppID i kliknij na &quot;Weryfikuj&quot;" name="bing_api_key" />
-	<button label="Weryfikuj" name="verify_bing_api_key_btn" />	
+	</text>	
 	<line_editor default_text="Wpisz klucz Google API i kliknij na &quot;Weryfikuj&quot;" name="google_api_key" />
 	<button label="Verify" name="verify_google_api_key_btn" />
 	<text name="google_links_text">

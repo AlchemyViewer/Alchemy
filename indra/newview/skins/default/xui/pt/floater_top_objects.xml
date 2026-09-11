@@ -62,6 +62,6 @@
 	<button label="Atualizar" name="refresh_btn"/>
 	<button label="Retornar Selecionado" name="return_selected_btn" width="170"/>
 	<button label="Retornar Tudo" left="190" name="return_all_btn"/>
-	<button label="Desabilitar Selecionado" name="disable_selected_btn" width="170"/>
-	<button label="Desabilitar Tudo" left="190" name="disable_all_btn"/>
+	<button name="disable_selected_btn" width="170"/>
+	<button left="190" name="disable_all_btn"/>
 </floater>

@@ -112,8 +112,6 @@
 							<icons_combo_box.item label="Conteúdo Geral" name="pg_ci" value="Adequado para menores"/>
 						</icons_combo_box>
 						<check_box label="Renovar automaticamente todas as semanas" name="auto_renew_edit"/>
-						<text name="price_for_listing_edit_label" value="Preço do anúncio:"/>
-						<spinner label="L$" name="price_for_listing_edit" tool_tip="Preço do anúncio." value="50"/>
 					</panel>
 				</panel>
 			</scroll_container>

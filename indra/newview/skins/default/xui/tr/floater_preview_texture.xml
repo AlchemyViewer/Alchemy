@@ -6,13 +6,6 @@
 	<floater.string name="Copy">
 		Envantere Kopyala
 	</floater.string>
-	<layout_stack name="preview_stack">
-		<layout_panel name="texture_panel">
-			<text name="aspect_ratio">
-				En boy oranını önizle
-			</text>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="button_row_ls">
 		<layout_panel name="aspect_combo_lp">
 			<combo_box name="combo_aspect_ratio" tool_tip="Sabit en boy oranında önizle"/>

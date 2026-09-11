@@ -183,7 +183,6 @@
 			<text name="Group:">
 				Grupa:
 			</text>
-			<name_box initial_value="Wczytywanie..." name="Group Name Proxy" />
 			<button name="button set group" tool_tip="Wybierz grupę, z którą chcesz się podzielić dostępem do praw tego obiektu" />
 			<check_box label="Udostępnij" name="checkbox share with group" tool_tip="Pozwól członkom grupy na dzielenie praw do modyfikacji tego obiektu. Musisz przypisać obiekt, aby uaktywnić ograniczenia dla ról." />
 			<button label="Przypisz" label_selected="Przypisz" name="button deed" tool_tip="Przypisanie oddaje prawa następnemu właścicielowi. Obiekty posiadane przez grupę mogą zostać przypisane przez oficera grupy." />
@@ -369,7 +368,7 @@
 		</panel>
 		<panel label="Tekstura" name="Texture" />
 		<panel label="Zawart." name="Contents">
-			<flyout_button label="Nowy skrypt" label_selected="Nowy skrypt" name="button new script" />
+			<flyout_button label="Nowy skrypt" name="button new script" />
 			<button label="Prawa" name="button permissions" />
 		</panel>
 	</tab_container>

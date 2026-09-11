@@ -3,17 +3,8 @@
 	<floater.string name="buy_currency">
 		Yaklaşık [LOCALAMOUNT] karşılığında [LINDENS] L$ satın al
 	</floater.string>
-	<text name="buying_label">
-		Fiyatı:
-	</text>
-	<text name="buy_action">
-		[ACTION]
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php ödeme yöntemi] | [http://www.secondlife.com/my/account/currency.php para birimi]
-	</text>
-	<text name="purchase_warning_notenough">
-		Yeterli L$ satın almıyorsunuz. Lütfen miktarı artırın.
 	</text>
 	<floater.string name="info_cannot_buy">
 		Satın Alınamıyor

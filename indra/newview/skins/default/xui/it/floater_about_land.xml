@@ -115,7 +115,7 @@ Vai al menu Mondo &gt; Informazioni sul terreno oppure seleziona un altro appezz
 				Prezzo: [PRICE]L$ ([PRICE_PER_SQM]L$/m²).
 			</text>
 			<text name="SalePending" width="321"/>
-			<button bottom="-242" label="Vendi la terra..." label_selected="Vendi la terra..." name="Sell Land..."/>
+			<button bottom="-242" label="Vendi la terra..." name="Sell Land..."/>
 			<text name="For sale to">
 				In vendita a: [BUYER]
 			</text>
@@ -144,11 +144,11 @@ Vai al menu Mondo &gt; Informazioni sul terreno oppure seleziona un altro appezz
 			<text name="DwellText" width="140">
 				Caricamento in corso...
 			</text>
-			<button label="Acquista il terreno..." label_selected="Acquista il terreno..." left="130" name="Buy Land..." width="125"/>
+			<button label="Acquista il terreno..." left="130" name="Buy Land..." width="125"/>
 			<button label="Vendita Linden" name="Linden Sale..." tool_tip="La terra deve essere di proprietà, con contenuto impostato, e non già messa all&apos;asta."/>
 			<button label="Informazioni script" name="Scripts..."/>
 			<button label="Acquista per il gruppo" name="Buy For Group..."/>
-			<button label="Compra Pass..." label_selected="Compra Pass..." left="130" name="Buy Pass..." tool_tip="Un pass ti da un accesso temporaneo in questo territorio." width="125"/>
+			<button label="Compra Pass..." left="130" name="Buy Pass..." tool_tip="Un pass ti da un accesso temporaneo in questo territorio." width="125"/>
 			<button label="Abbandona la terra" name="Abandon Land..."/>
 			<button label="Reclama la terra" name="Reclaim Land..."/>
 		</panel>
@@ -280,8 +280,8 @@ o suddivisa.
 			<text name="Object Owners:">
 				Proprietari degli oggetti:
 			</text>
-			<button label="Aggiorna Elenco" label_selected="Aggiorna Elenco" name="Refresh List" tool_tip="Refresh Object List"/>
-			<button label="Restituisci oggetti..." label_selected="Restituisci oggetti..." name="Return objects..."/>
+			<button name="Refresh List" tool_tip="Refresh Object List"/>
+			<button label="Restituisci oggetti..." name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="Tipo" name="type"/>
 				<name_list.columns label="Nome" name="name"/>
@@ -365,11 +365,11 @@ Solamente terreni più grandi possono essere abilitati nella ricerca.
 			<text name="Snapshot:">
 				Fotografia:
 			</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Clicca per scegliere una immagine"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Clicca per scegliere una immagine"/>
 			<text name="allow_see_label" top="170">
 				Gli avatar di altri lotti possono vedere gli avatar che si trovano in questo lotto e chattare con loro
 			</text>
-			<check_box label="Vedi avatar" top="170" name="SeeAvatarsCheck" tool_tip="Consente ad avatar in altri lotti di vedere e chattare con avatar in questo lotto e viceversa."/>
+			<check_box top="170" name="SeeAvatarsCheck" tool_tip="Consente ad avatar in altri lotti di vedere e chattare con avatar in questo lotto e viceversa."/>
 			<text name="landing_point" width="225">
 				Punto di atterraggio: [LANDING]
 			</text>
@@ -402,7 +402,7 @@ Solamente terreni più grandi possono essere abilitati nella ricerca.
 				Cambia
 Texture:
 			</text>
-			<texture_picker label="" left="97" name="media texture" tool_tip="Clicca per scegliere un&apos;immagine"/>
+			<texture_picker left="97" name="media texture" tool_tip="Clicca per scegliere un&apos;immagine"/>
 			<text name="replace_texture_help" width="285">
 				Gli oggetti che utilizzano questa texture mostreranno il video o la pagina web dopo aver cliccato sulla freccia di riproduzione.  Seleziona la miniatura per scegliere una texture diversa.
 			</text>

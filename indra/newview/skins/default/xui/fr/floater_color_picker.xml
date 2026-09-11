@@ -10,14 +10,11 @@
 		Lum :
 	</text>
 	<check_box label="Appliquer maintenant" left="4" name="apply_immediate" width="108"/>
-	<button label="" label_selected="" left_delta="138" name="color_pipette"/>
+	<button left_delta="138" name="color_pipette"/>
 	<button label="Annuler" label_selected="Annuler" name="cancel_btn"/>
 	<button label="OK" label_selected="OK" name="select_btn"/>
 	<text left="8" name="Current color:">
 		Couleur actuelle :
-	</text>
-	<text name="(Drag below to save.)">
-		Enr. : faire glisser dessous
 	</text>
 	<tab_container name="color_type_container">
 		<panel name="RGB">

@@ -95,7 +95,7 @@ ting i denne gruppe. Der er en bred vifte af rettigheder.
 			Tildelte roller
 		</text>
 		<check_box label="Vis medlemmer for andre" name="role_visible_in_list" tool_tip="Angiver om medlemmer med denne rolle er synlige i fanen &apos;Generelt&apos; for avatarer uden for gruppen."/>
-		<text name="static5" tool_tip="A list of Abilities the currently selected role can perform.">
+		<text name="static5">
 			Tilladte rettigheder
 		</text>
 		<scroll_list name="role_allowed_actions" tool_tip="For detaljer om hver rettighed se under rettigheder fanebladet.">

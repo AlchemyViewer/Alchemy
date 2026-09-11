@@ -112,8 +112,6 @@
 							<icons_combo_box.item label="一般普級內容" name="pg_ci" value="一般普級"/>
 						</icons_combo_box>
 						<check_box label="每星期自動續訂" name="auto_renew_edit"/>
-						<text name="price_for_listing_edit_label" value="刊登費："/>
-						<spinner label="L$" name="price_for_listing_edit" tool_tip="刊登費。" value="50"/>
 					</panel>
 				</panel>
 			</scroll_container>

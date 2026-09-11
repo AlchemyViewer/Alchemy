@@ -45,11 +45,9 @@
 	<text name="title" value="Профиль места"/>
 	<scroll_container name="place_scroll">
 		<panel name="scrolling_panel">
-			<text name="region_title" value="Образец_региона"/>
 			<text name="parcel_title" value="Образец_участка, название Long (145, 228, 26)"/>
 			<expandable_text name="description" value="Du waltz die spritz"/>
 			<text name="owner_label" value="Владелец:"/>
-			<text name="owner_value" value="Алексей Сверхдлинноеимянов"/>
 			<text name="maturity_value" value="неизвестен"/>
 			<accordion name="advanced_info_accordion">
 				<accordion_tab name="parcel_characteristics_tab" title="Участок">

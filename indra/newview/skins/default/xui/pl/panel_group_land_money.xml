@@ -18,9 +18,6 @@
 	<panel.string name="land_contrib_error">
 		Nie można ustalić Twoich kontrybucji.
 	</panel.string>
-	<text name="group_land_heading">
-		Własność grupy
-	</text>
 	<panel name="layout_panel_landmoney">
 		<scroll_list name="group_parcel_list">
 			<scroll_list.columns label="Działka" name="name" />

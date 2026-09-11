@@ -3,36 +3,6 @@
 	<panel.string name="forgot_password_url">
 		http://secondlife.com/account/request.php
 	</panel.string>
-	<layout_stack name="login_widgets">
-		<layout_panel name="login">
-			<text name="log_in_text">
-				LOG PÅ
-			</text>
-			<text name="username_text">
-				Brugernavn:
-			</text>
-			<text name="password_text">
-				Password:
-			</text>
-		</layout_panel>
-		<layout_panel name="start_location_panel">
-			<text name="start_location_text">
-				Start ved:
-			</text>
-		</layout_panel>
-		<layout_panel name="links_login_panel">
-			<text name="login_help">
-				Hjælp til login
-			</text>
-			<check_box label="Husk password" name="remember_check"/>
-		</layout_panel>
-		<layout_panel name="links">
-			<text name="create_account_text">
-				CREATE YǾUR ACCǾUNT
-			</text>
-			<button name="create_new_account_btn" label="Opret bruger"/>
-		</layout_panel>
-	</layout_stack>
 	<layout_stack name="main_stack">
 		<layout_panel name="center_stage">
 			<layout_stack name="ui_stack">
@@ -48,7 +18,6 @@
 					<combo_box name="start_location_combo">
 						<combo_box.item label="Min sidste lokation" name="MyLastLocation"/>
 						<combo_box.item label="Hjem" name="MyHome"/>
-						<combo_box.item label="&lt;Indtast regionnavn&gt;" name="Typeregionname"/>
 					</combo_box>
 					<combo_box name="username_combo" tool_tip="Brugernavnet du valgte da du registrerde dig, som f.eks. bobsmith12 or Steller Sunshine"/>
 				</layout_panel>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="Scene Load Statistics" title="СТАТИСТИКА ЗАГРУЗКИ СЦЕН">
-	<button label="Пауза" name="playpause"/>
 	<scroll_container name="statistics_scroll">
 		<container_view name="statistics_view">
 			<stat_view label="Основной" name="basic">

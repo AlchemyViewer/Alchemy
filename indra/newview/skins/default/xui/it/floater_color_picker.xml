@@ -22,9 +22,6 @@
 	<text name="Current color:">
 		Colore attuale:
 	</text>
-	<text name="(Drag below to save.)">
-		(Trascina sotto per salvare)
-	</text>
 	<tab_container name="color_type_container">
 		<panel name="RGB">
 			<text name="b_val_text">

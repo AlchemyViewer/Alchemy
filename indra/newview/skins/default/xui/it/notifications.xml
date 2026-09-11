@@ -1453,7 +1453,6 @@ più del limite [LIMIT].
 	<notification label="Manda un messaggio a tutti nella tua proprietà" name="MessageEstate">
 		Scrivi un annuncio breve che verrà mandato a tutti quelli che sono in questo momento nella tua proprietà.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annulla"/>
 		</form>
@@ -1698,7 +1697,6 @@ Pubblica questo annuncio adesso per [AMOUNT]L$?
 	<notification label="Manda un messaggio a tutti in questa regione" name="MessageRegion">
 		Scrivi un breve annuncio che verrà mandato a tutti in questa regione.
 		<form name="form">
-			<input name="message"/>
 			<button name="OK" text="OK"/>
 			<button name="Cancel" text="Annulla"/>
 		</form>
@@ -1775,7 +1773,6 @@ Confermi di voler procedere all'acquisto?
 Confermi di voler procedere all'acquisto?
 Ridigita la tua password e premi OK.
 		<form name="form">
-			<input name="message"/>
 			<button name="ConfirmPurchase" text="OK"/>
 			<button name="Cancel" text="Annulla"/>
 		</form>
@@ -2541,7 +2538,6 @@ Vedi Alchemy.log per ulteriori dettagli</notification>
 Con i seguenti residenti:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="OK"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Si può condividere solo una cartella alla volta.
@@ -2811,9 +2807,6 @@ Vuoi continuare?
 		L'oggetto selezionato influenza il navmesh.  Se lo si trasforma in un percorso flessibile verrà rimosso dal navmesh.
 		<usetemplate ignoretext="L'oggetto selezionato influenza il navmesh.  Se lo si trasforma in un percorso flessibile verrà rimosso dal navmesh." name="okcancelignore" notext="Annulla" yestext="OK"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">Non sembra che tu abbia i requisiti hardware adeguati per [APP_NAME]. [APP_NAME] richiede una scheda grafica OpenGL con supporto multitexture. Se ne hai una in dotazione, accertati di avere i driver, i service pack e i patch più recenti per la scheda grafica e per il sistema operativo.
-
-Se continui ad avere problemi, visita la pagina [SUPPORT_SITE].</global>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
 	<global name="UnsupportedGPU">- La tua scheda grafica non soddisfa i requisiti minimi.</global>

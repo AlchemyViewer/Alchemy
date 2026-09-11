@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="Comunicação" name="Privacy panel">
-	<check_box label="Apenas amigos e grupos podem me chamar ou enviar MI" name="voice_call_friends_only_check"/>
-	<check_box label="Mostrar meus marcos preferidos na página de login (menu &apos;Começar em&apos;:)" name="favorites_on_login_check"/>
-	<text name="Logs:">
-		Registro de bate-papos:
-	</text>
-	<check_box label="Salvar logs de bate- papo das proximidades no meu computador" name="log_nearby_chat"/>
-	<check_box label="Salvar logs de MI no meu computador" name="log_instant_messages"/>
-	<check_box label="Anotar horas de cada linha de bate-papo" name="show_timestamps_check_im"/>
-	<check_box label="Anotar a data ao arquivo." name="logfile_name_datestamp"/>
-	<text name="log_path_desc">
-		Localização dos logs:
-	</text>
 	<line_editor left="278" name="log_path_string" right="-20"/>
-	<button label="Procurar" label_selected="Procurar" name="log_path_button" width="120"/>
+	<button name="log_path_button" width="120"/>
 	<tab_container name="privacy_tab_container">
 		<panel name="privacy_preferences_general">
 			<text name="block_list_label">

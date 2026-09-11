@@ -126,21 +126,21 @@
 	<floater.string name="bigger_label">
 		&lt;&lt;
 	</floater.string>
-	<button label="" label_selected="" name="client_lagmeter" tool_tip="Status for klient lag"/>
+	<button name="client_lagmeter" tool_tip="Status for klient lag"/>
 	<text name="client">
 		Klient
 	</text>
 	<text name="client_text">
 		Normal
 	</text>
-	<button label="" label_selected="" name="network_lagmeter" tool_tip="Network lag status"/>
+	<button name="network_lagmeter" tool_tip="Network lag status"/>
 	<text name="network">
 		Netværk
 	</text>
 	<text name="network_text">
 		Normal
 	</text>
-	<button label="" label_selected="" name="server_lagmeter" tool_tip="Status for server lag"/>
+	<button name="server_lagmeter" tool_tip="Status for server lag"/>
 	<text name="server">
 		Server
 	</text>

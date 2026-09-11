@@ -1,18 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="溝通" name="Privacy panel">
-	<check_box label="只有我的朋友和群組可以 IM 或與我通話。" name="voice_call_friends_only_check"/>
-	<check_box label="登入時顯示我最愛的地標位置（經由 &apos;開始於&apos; 的下拉式選單）" name="favorites_on_login_check"/>
-	<text name="Logs:">
-		聊天紀錄：
-	</text>
-	<check_box label="儲存附近的聊天紀錄到我的電腦" name="log_nearby_chat"/>
-	<check_box label="儲存 IM 紀錄到我的電腦中" name="log_instant_messages"/>
-	<check_box label="添加時間戳記到聊天紀錄的每一行" name="show_timestamps_check_im"/>
-	<check_box label="添加時間戳記到紀錄檔檔名。" name="logfile_name_datestamp"/>
-	<text name="log_path_desc">
-		位置紀錄：
-	</text>
-	<button label="瀏覽" label_selected="瀏覽" name="log_path_button"/>
 	<tab_container name="privacy_tab_container">
 		<panel name="privacy_preferences_general">
 			<text name="block_list_label">

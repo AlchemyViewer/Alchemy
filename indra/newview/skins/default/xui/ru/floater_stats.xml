@@ -30,23 +30,6 @@
 					<stat_bar label="Неформатированная память" name="rawmemstat"/>
 					<stat_bar label="Ограничение памяти" name="glboundmemstat"/>
 				</stat_view>
-				<stat_view label="Использование памяти" name="memory">
-					<stat_bar label="LLTrace" name="LLTrace"/>
-					<stat_bar label="Интерфейс пользователя" name="LLView"/>
-					<stat_bar label="Шрифты" name="LLFontFreetype"/>
-					<stat_bar label="Инвентарь" name="LLInventoryObject"/>
-					<stat_bar label="Объекты клиента" name="LLViewerObject"/>
-					<stat_bar label="Данные группы октадеревьев" name="LLViewerOctreeGroup"/>
-					<stat_bar label="Данные октадерева" name="LLViewerOctreeEntry"/>
-					<stat_bar label="Кэш объектов клиента" name="LLVOCacheEntry"/>
-					<stat_bar label="Рисуемые предметы" name="LLDrawable"/>
-					<stat_bar label="Данные лица" name="LLFace"/>
-					<stat_bar label="Информация отрисовки" name="LLDrawInfo"/>
-					<stat_bar label="Данные текстуры" name="LLTexture"/>
-					<stat_bar label="Данные изображения" name="LLImage"/>
-					<stat_bar label="Данные изображения GL" name="LLImageGL"/>
-					<stat_bar label="Вершинные буферы" name="LLVertexBuffer"/>
-				</stat_view>
 				<stat_view label="Сеть" name="network">
 					<stat_bar label="Входящие пакеты" name="packetsinstat"/>
 					<stat_bar label="Исходящие пакеты" name="packetsoutstat"/>

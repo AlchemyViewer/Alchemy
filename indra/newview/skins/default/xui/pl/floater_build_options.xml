@@ -3,7 +3,6 @@
 	<spinner label="Jednostki (metry)" name="GridResolution" />
 	<spinner label="Rozmiary (metry)" name="GridDrawSize" />
 	<check_box label="Przyciągaj do podjednostek" name="GridSubUnit" />
-	<check_box label="Pokaż przekroje" name="GridCrossSection" />
 	<text tool_tip="Nieprzezroczystość siatki" name="grid_opacity_label">
 		Nieprzezroczystość:
 	</text>

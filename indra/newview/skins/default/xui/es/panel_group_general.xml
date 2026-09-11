@@ -16,7 +16,6 @@ Deja el cursor sobre las opciones para ver más ayuda.
 		<text name="prepend_founded_by">
 			Fundador:
 		</text>
-		<name_box initial_value="(obteniendo)" name="founder_name"/>
 		<text name="join_cost_text">
 			Gratis
 		</text>
@@ -26,9 +25,8 @@ Deja el cursor sobre las opciones para ver más ayuda.
 		Carta del grupo
 	</text_editor>
 	<name_list name="visible_members">
-		<name_list.columns label="Miembro" name="name" relwidth="0.40"/>
-		<name_list.columns label="Etiqueta" name="title" relwidth="0.25"/>
-		<name_list.columns label="Estado" name="status"/>
+		<name_list.columns name="name" relwidth="0.40"/>
+		<name_list.columns name="title" relwidth="0.25"/>
 	</name_list>
 	<text name="my_group_settngs_label">
 		Yo

@@ -12,7 +12,6 @@
 				<stat_view label="Render" name="render">
 					<stat_bar label="KTris tegnet" name="ktrisframe"/>
 					<stat_bar label="KTris tegnet" name="ktrissec"/>
-					<stat_bar label="Total antal objekter" name="objs"/>
 					<stat_bar label="Nye objekter" name="newobjs"/>
 				</stat_view>
 				<stat_view label="Texture" name="texture">
@@ -26,12 +25,6 @@
 				<stat_view label="Netværk" name="network">
 					<stat_bar label="Packets In" name="packetsinstat"/>
 					<stat_bar label="Packets Out" name="packetsoutstat"/>
-					<stat_bar label="Objekter" name="objectkbitstat"/>
-					<stat_bar label="Texture" name="texturekbitstat"/>
-					<stat_bar label="Asset" name="assetkbitstat"/>
-					<stat_bar label="Layers" name="layerskbitstat"/>
-					<stat_bar label="Actual In" name="actualinkbitstat"/>
-					<stat_bar label="Actual Out" name="actualoutkbitstat"/>
 				</stat_view>
 			</stat_view>
 			<stat_view label="Simulator" name="sim">

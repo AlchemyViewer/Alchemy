@@ -21,7 +21,6 @@
 	<text name="covenant_timestamp_text">
 		Última modificación el miér. 31 de dic. de 1969, 16:00:00
 	</text>
-	<button label="?" name="covenant_help"/>
 	<text_editor bottom="-263" height="178" name="covenant_editor">
 		No se ha aportado un contrato para este estado.
 	</text_editor>

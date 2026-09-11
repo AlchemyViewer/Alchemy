@@ -15,9 +15,6 @@
 	<string name="SUPPORT_SITE">
 		第二人生支援入口
 	</string>
-	<string name="StartupDetectingHardware">
-		硬體偵測中...
-	</string>
 	<string name="StartupLoading">
 		[APP_NAME] 載入中...
 	</string>
@@ -347,60 +344,6 @@ http://secondlife.com/viewer-access-faq
 	</string>
 	<string name="TestingDisconnect">
 		測試瀏覽器斷線
-	</string>
-	<string name="SocialFacebookConnecting">
-		連通臉書中…
-	</string>
-	<string name="SocialFacebookPosting">
-		發佈中…
-	</string>
-	<string name="SocialFacebookDisconnecting">
-		臉書連通中斷中…
-	</string>
-	<string name="SocialFacebookErrorConnecting">
-		連通臉書時出問題
-	</string>
-	<string name="SocialFacebookErrorPosting">
-		發佈到臉書時出問題
-	</string>
-	<string name="SocialFacebookErrorDisconnecting">
-		試圖中斷臉書連通時出問題
-	</string>
-	<string name="SocialFlickrConnecting">
-		連通 Flickr 中…
-	</string>
-	<string name="SocialFlickrPosting">
-		發佈中…
-	</string>
-	<string name="SocialFlickrDisconnecting">
-		Flickr 連通中斷中…
-	</string>
-	<string name="SocialFlickrErrorConnecting">
-		連通臉書時出問題
-	</string>
-	<string name="SocialFlickrErrorPosting">
-		發佈到 Flickr 時出問題
-	</string>
-	<string name="SocialFlickrErrorDisconnecting">
-		試圖中斷 Flickr 連通時出問題
-	</string>
-	<string name="SocialTwitterConnecting">
-		連通推特中…
-	</string>
-	<string name="SocialTwitterPosting">
-		發佈中…
-	</string>
-	<string name="SocialTwitterDisconnecting">
-		推特連通中斷中…
-	</string>
-	<string name="SocialTwitterErrorConnecting">
-		連通推特時出問題
-	</string>
-	<string name="SocialTwitterErrorPosting">
-		發佈到推特時出問題
-	</string>
-	<string name="SocialTwitterErrorDisconnecting">
-		試圖中斷推特連通時出問題
 	</string>
 	<string name="BlackAndWhite">
 		黑白
@@ -1155,7 +1098,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="AgentNameSubst">
 		（你）
 	</string>
-	<string name="JoinAnExperience"/>
 	<string name="SilentlyManageEstateAccess">
 		管理領出入許可名單時，不顯示警示
 	</string>
@@ -1528,14 +1470,12 @@ http://secondlife.com/support 求助解決問題。
 	<string name="InventoryOutboxNotMerchantTitle">
 		任何人都可在第二人生購物市集出售物品。
 	</string>
-	<string name="InventoryOutboxNotMerchantTooltip"/>
 	<string name="InventoryOutboxNotMerchant">
 		如果你想成為商家，你需要在第二人生購物市集[[MARKETPLACE_CREATE_STORE_URL]開設一間商店]。
 	</string>
 	<string name="InventoryOutboxNoItemsTitle">
 		你的發件匣目前是空的。
 	</string>
-	<string name="InventoryOutboxNoItemsTooltip"/>
 	<string name="InventoryOutboxNoItems">
 		將資料夾拖曳到這個區域，再點按「送往第二人生購物市集」，即可在[[MARKETPLACE_DASHBOARD_URL]第二人生購物市集]登列出售。
 	</string>
@@ -2654,9 +2594,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="GroupMoneyDebits">
 		借記
 	</string>
-	<string name="GroupMoneyDate">
-		[weekday,datetime,utc] [mth,datetime,utc] [day,datetime,utc], [year,datetime,utc]
-	</string>
 	<string name="AcquiredItems">
 		取得物品
 	</string>
@@ -2665,9 +2602,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="UploadingCosts">
 		上傳 [NAME] 費用 L$ [AMOUNT]
-	</string>
-	<string name="BuyingCosts">
-		購買這個需要 L$ [AMOUNT]
 	</string>
 	<string name="UnknownFileExtension">
 		未知的副檔名 .%s
@@ -2950,16 +2884,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="MBPixelFmtDescErr">
 		無法取得像素格式描述
-	</string>
-	<string name="MBTrueColorWindow">
-		[APP_NAME] 需要全彩（32位元）才能執行。
-請到電腦的顯示設定，將色彩模式設為 32 位元。
-	</string>
-	<string name="MBAlpha">
-		[APP_NAME] 無法執行，無法取得 8 位元 alpha 頻道。  這通常是因為顯示卡驅動程式出問題。
-請確定你安裝了最新的顯示卡驅動程式。
-請到控制台 &gt; 顯示 &gt; 設定處將螢幕設為全彩（32 位元）。
-如果你繼續看到此訊息，請聯絡 [SUPPORT_SITE]。
 	</string>
 	<string name="MBPixelFmtSetErr">
 		無法設定像素格式
@@ -4575,15 +4499,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="share_alert">
 		將收納區物品拖曳到這裡
 	</string>
-	<string name="facebook_post_success">
-		成功發佈到臉書。
-	</string>
-	<string name="flickr_post_success">
-		成功發佈到 Flickr。
-	</string>
-	<string name="twitter_post_success">
-		已成功發佈到推特。
-	</string>
 	<string name="no_session_message">
 		（IM 會話不存在）
 	</string>
@@ -5023,9 +4938,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="dance8">
 		跳舞8
-	</string>
-	<string name="AvatarBirthDateFormat">
-		[mthnum,datetime,slt]/[day,datetime,slt]/[year,datetime,slt]
 	</string>
 	<string name="DefaultMimeType">
 		無/無
@@ -5519,12 +5431,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="Command_Environments_Label">
 		我的環境
 	</string>
-	<string name="Command_Facebook_Label">
-		臉書
-	</string>
-	<string name="Command_Flickr_Label">
-		Flickr
-	</string>
 	<string name="Command_Gestures_Label">
 		姿勢
 	</string>
@@ -5548,9 +5454,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="Command_Move_Label">
 		行走 / 跑步 / 飛行
-	</string>
-	<string name="Command_Outbox_Label">
-		商家發件匣
 	</string>
 	<string name="Command_People_Label">
 		人群
@@ -5578,9 +5481,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="Command_Speak_Label">
 		說話
-	</string>
-	<string name="Command_Twitter_Label">
-		推特
 	</string>
 	<string name="Command_View_Label">
 		攝影機控制
@@ -5615,12 +5515,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="Command_Environments_Tooltip">
 		我的環境
 	</string>
-	<string name="Command_Facebook_Tooltip">
-		發佈到臉書
-	</string>
-	<string name="Command_Flickr_Tooltip">
-		上傳到 Flickr
-	</string>
 	<string name="Command_Gestures_Tooltip">
 		你化身可用的姿勢
 	</string>
@@ -5644,9 +5538,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="Command_Move_Tooltip">
 		移動化身
-	</string>
-	<string name="Command_Outbox_Tooltip">
-		將物項轉移到第二人生購物市集待售
 	</string>
 	<string name="Command_People_Tooltip">
 		朋友、群組和附近的人
@@ -5674,9 +5565,6 @@ http://secondlife.com/support 求助解決問題。
 	</string>
 	<string name="Command_Speak_Tooltip">
 		用麥克風和附近人們交談
-	</string>
-	<string name="Command_Twitter_Tooltip">
-		推特
 	</string>
 	<string name="Command_View_Tooltip">
 		調整攝影機角度

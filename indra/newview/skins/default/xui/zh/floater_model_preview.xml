@@ -77,19 +77,6 @@
 			<text name="name_label">
 				模型名稱：
 			</text>
-			<text name="model_category_label">
-				這模型代表…
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="選擇一項…" name="Choose one"/>
-				<combo_item label="化身形狀" name="Avatar shape"/>
-				<combo_item label="化身附件" name="Avatar attachment"/>
-				<combo_item label="會移動的物件（車輛、動物）" name="Moving object (vehicle, animal)"/>
-				<combo_item label="建製元件" name="Building Component"/>
-				<combo_item label="大型、不會移動等類型" name="Large, non moving etc"/>
-				<combo_item label="較小型、不會移動等類型" name="Smaller, non-moving etc"/>
-				<combo_item label="並非其中任何一個" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="細節層次" name="lod_panel" title="細節層次">
@@ -99,7 +86,6 @@
 				<text initial_value="高" name="high_label" value="高"/>
 				<combo_box name="lod_source_high">
 					<item label="從檔案載入" name="Load from file" value="從檔案載入"/>
-					<item label="產生" name="Generate" value="產生"/>
 				</combo_box>
 				<button label="瀏覽…" name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="中" name="medium_label" value="中"/>
 				<combo_box name="lod_source_medium">
 					<item label="從檔案載入" name="Load from file" value="從檔案載入"/>
-					<item label="產生" name="Generate" value="產生"/>
 					<item label="以上使用低階細節" name="Use LoD above" value="以上使用低階細節"/>
 				</combo_box>
 				<button label="瀏覽…" name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="低" name="low_label" value="低"/>
 				<combo_box name="lod_source_low">
 					<item label="從檔案載入" name="Load from file" value="從檔案載入"/>
-					<item label="產生" name="Generate" value="產生"/>
 					<item label="以上使用低階細節" name="Use LoD above" value="以上使用低階細節"/>
 				</combo_box>
 				<button label="瀏覽…" name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="最低" name="lowest_label" value="最低"/>
 				<combo_box name="lod_source_lowest">
 					<item label="從檔案載入" name="Load from file" value="從檔案載入"/>
-					<item label="產生" name="Generate" value="產生"/>
 					<item label="以上使用低階細節" name="Use LoD above" value="以上使用低階細節"/>
 				</combo_box>
 				<button label="瀏覽…" name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="包含材質" name="upload_textures"/>
-				<text name="include_label">
-					僅限化身模型：
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

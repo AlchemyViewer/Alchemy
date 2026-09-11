@@ -5,7 +5,6 @@
     <panel name="general_sound_panel">
 	<slider label="Vol. principale" name="System Volume"/>
 	<check_box initial_value="true" label="" name="mute_when_minimized"/>
-	<text name="mute_chb_label">Disatt. audio se minimizzato</text>
 	<slider label="Pulsanti" name="UI Volume"/>
 	<slider label="Ambiente" name="Wind Volume"/>
 	<slider label="Effetti sonori" name="SFX Volume"/>
@@ -15,14 +14,8 @@
 	<check_box label="Abilitato" name="enable_media"/>
 	<slider label="Chat vocale" name="Voice Volume"/>
 	<check_box label="Abilitato" name="enable_voice_check"/>
-	<check_box label="Consenti riproduzione multimediale automatica" name="media_auto_play_btn" tool_tip="Seleziona qui per consentire la riproduzione multimediale automatica" value="true"/>
 	<check_box label="Riproduci media in uso da altri avatar" name="media_show_on_others_btn" tool_tip="Deseleziona qui per nascondere i media in uso dagli altri avatar nei dintorni" value="true"/>
 	<check_box label="Riproduci suoni dai gesti" name="gesture_audio_play_btn" tool_tip="Seleziona per ascoltare i suoni dai gesti" value="true"/>
-	<text name="voice_chat_settings">Impostazioni Chat vocale</text>
-	<line_editor label="Pulsante di comando della funzione Premi per parlare" name="modifier_combo"/>
-	<button label="Imposta tasto" name="set_voice_hotkey_button"/>
-	<button name="set_voice_middlemouse_button" tool_tip="Reimposta sul pulsante centrale del mouse"/>
-	<panel label="Impostazioni del dispositivo" name="device_settings_panel"/>
 	<combo_box name="media_auto_play_combo">
 		<item name="autoplay_enabled" label="Si"/>
 		<item name="autoplay_ask" label="Chiedi"/>

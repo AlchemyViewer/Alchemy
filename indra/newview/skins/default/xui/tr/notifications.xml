@@ -3369,7 +3369,6 @@ Detaylar için Alchemy.log&apos;a bakın
 Paylaşmanın yapılacağı Second Life Sakinleri:
 
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		Bir defada sadece bir klasör paylaşılabilir.
@@ -3699,11 +3698,6 @@ Devam etmek istiyor musunuz?
 		Seçilen nesne navigasyon örgüsünü etkiliyor.  Bunu bir Esnek Yol olarak değiştirirseniz, navigasyon örgüsünden çıkartmış olursunuz.
 		<usetemplate ignoretext="Seçilen nesne navigasyon örgüsünü etkiliyor.  Bunu bir Esnek Yol olarak değiştirirseniz, navigasyon örgüsünden çıkartmış olursunuz." name="okcancelignore" notext="İptal" yestext="Tamam"/>
 	</notification>
-	<global name="UnsupportedGLRequirements">
-		[APP_NAME] uygulaması için gerekli donanım gereksinimlerine sahip olmadığınız görünüyor. [APP_NAME] çoklu doku desteği sunan bir OpenGL grafik kartı gerektiriyor. Eğer grafik kartınız bu özellikteyse, grafik kartınızın en son sürücülerine ve işletim sisteminiz için gerekli Service Pack ve yamalara sahip olup olmadığınızı kontrol etmeyi deneyebilirsiniz.
-
-Sorun yaşamaya devam ederseniz, lütfen [SUPPORT_SITE] bölümünü ziyaret edin.
-	</global>
 	<global name="UnsupportedCPUAmount">
 		796
 	</global>

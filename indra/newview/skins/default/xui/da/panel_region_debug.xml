@@ -7,11 +7,8 @@
 		ukendt
 	</text>
 	<check_box label="Deaktivér scripts" name="disable_scripts_check" tool_tip="Deaktivér alle scripts i denne region"/>
-	<button label="?" name="disable_scripts_help"/>
 	<check_box label="Deaktivér kollisioner" name="disable_collisions_check" tool_tip="Deaktivér kollisioner mellem objekter i denne region"/>
-	<button label="?" name="disable_collisions_help"/>
 	<check_box label="Deaktivér fysik" name="disable_physics_check" tool_tip="Deaktivér alt fysik i denne region"/>
-	<button label="?" name="disable_physics_help"/>
 	<button label="Gem" name="apply_btn"/>
 	<text name="objret_text_lbl">
 		Returnér objekter
@@ -31,10 +28,7 @@
 	<check_box label="I hver eneste region i denne estate" name="return_estate_wide" tool_tip="Returnér objekter i alle regioner der tilhører denne estate"/>
 	<button label="Returnér" name="return_btn"/>
 	<button label="Mest kolliderende..." name="top_colliders_btn" tool_tip="Liste med de objekter der oplever flest kollissioner"/>
-	<button label="?" name="top_colliders_help"/>
 	<button label="Mest krævende scripts..." name="top_scripts_btn" tool_tip="Liste med de objekter der kræver mest script tid"/>
-	<button label="?" name="top_scripts_help"/>
 	<button label="Genstart region" name="restart_btn" tool_tip="Genstart region om 2 minutter (sender advarsel først)"/>
-	<button label="?" name="restart_help"/>
 	<button label="Udskyd genstart" name="cancel_restart_btn" tool_tip="Udsæt genstart med en time"/>
 </panel>

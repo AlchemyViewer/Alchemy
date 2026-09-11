@@ -6,10 +6,7 @@
 	<string name="payee_resident">
 		Betal beboer
 	</string>
-	<text left="5" name="payee_label" width="81">
-		Betal:
-	</text>
-	<icon name="icon_person" tool_tip="Person"/>
+	<text left="5" name="payee_label" width="81"></text>
 	<text name="payee_name">
 		Test navn der er meget lang for at checke afkortning
 	</text>

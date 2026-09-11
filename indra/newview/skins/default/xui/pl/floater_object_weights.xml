@@ -13,5 +13,4 @@
 	<text name="rezzed_on_land_label" value="Zrezzowane na ziemi"/>
 	<text name="remaining_capacity_label" value="Pozostała pojemność"/>
 	<text name="total_capacity_label" value="Całkowita pojemność"/>
-	<text name="help_SLURL" value="[secondlife:///app/help/object_weights Co to jest?...]"/>
 </floater>

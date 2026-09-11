@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <menu name="Popup">
 	<menu_item_call label="Udostępnij" name="Share" />
-	<menu_item_call label="Kupuj" name="Task Buy" />
 	<menu_item_call label="Otwórz" name="Task Open" />
 	<menu_item_call label="Odtwarzaj" name="Task Play" />
 	<menu_item_call label="Właściwości" name="Task Properties" />
@@ -39,7 +38,6 @@
 	<menu_item_call label="Kopiuj" name="Copy" />
 	<menu_item_call label="Wklej" name="Paste" />
 	<menu_item_call label="Wklej jako link" name="Paste As Link" />
-	<menu_item_call label="Usuń ten link" name="Remove Link" />
 	<menu_item_call label="Usuń" name="Delete" />
 	<menu_item_call label="Usuń folder systemowy" name="Delete System Folder" />
 	<menu_item_call label="Rozpocznij konferencję czatową" name="Conference Chat Folder" />
@@ -65,8 +63,6 @@
 	<menu_item_call label="Edytuj" name="Wearable Edit" />
 	<menu_item_call label="Dodaj/dołącz" name="Wearable Add" />
 	<menu_item_call label="Zdejmij" name="Take Off" />
-	<menu_item_call label="Kopiuj do Skrzynki Kupca" name="Merchant Copy" />
-	<menu_item_call label="Wyślij na Marketplace" name="Marketplace Send" />
 	<menu_item_call label="--brak opcji--" name="--no options--" />
 	<menu name="create_new">
 		<menu label="Nowa część ciała" name="New Body Parts">

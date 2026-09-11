@@ -3,18 +3,10 @@
 	<floater.string name="buy_currency">
 		acquistare [LINDENS] L$ per circa [LOCALAMOUNT]
 	</floater.string>
-	<text name="buying_label">
-		Al prezzo
-	</text>
-	<text name="buy_action">
-		[ACTION]
-	</text>
 	<text name="currency_links">
 		[http://www.secondlife.com/my/account/payment_method_management.php metodo di pagamento] | [http://www.secondlife.com/my/account/currency.php valuta]
 	</text>
-	<text bottom_delta="16" name="purchase_warning_notenough">
-		Non stai acquistando abbastanza L$. Aumenta l&apos;importo.
-	</text>
+	<text bottom_delta="16" name="purchase_warning_notenough"></text>
 	<floater.string name="info_cannot_buy" left="160" font="SansSerifBig">
 		Non in grado di acquistare
 	</floater.string>

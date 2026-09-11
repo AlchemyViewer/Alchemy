@@ -58,6 +58,4 @@
 	<button label="Filtrele" name="filter_parcel_btn"/>
 	<button label="Seçileni İade Et" name="return_selected_btn"/>
 	<button label="Tümünü İade Et" name="return_all_btn"/>
-	<button label="Seçileni Devre Dışı Bırak" name="disable_selected_btn"/>
-	<button label="Tümüni Devre Dışı Bırak" name="disable_all_btn"/>
 </floater>

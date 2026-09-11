@@ -6,7 +6,6 @@
 	<string name="payee_resident">
 		Betal beboer
 	</string>
-	<icon name="icon_person" tool_tip="Person"/>
 	<text name="payee_name">
 		Ericacita Moostopolison
 	</text>

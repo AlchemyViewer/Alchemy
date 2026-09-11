@@ -15,7 +15,7 @@
 	<floater.string name="searching">
 		Ricerca...
 	</floater.string>
-	<string label="Seleziona" label_selected="Seleziona" name="Select">
+	<string name="Select">
 		Seleziona
 	</string>
 	<string name="Close">
@@ -45,7 +45,7 @@
 			<text name="meters">
 				Metri
 			</text>
-			<button font="SansSerifSmall" label="Aggiorna la lista" label_selected="Aggiorna l&apos;elenco" left_delta="6" name="Refresh" width="110"/>
+			<button font="SansSerifSmall" left_delta="6" name="Refresh" width="110"/>
 			<scroll_list bottom_delta="-169" height="159" name="NearMe">
 				<columns label="Nome" name="name"/>
 				<columns label="Nome utente" name="username"/>

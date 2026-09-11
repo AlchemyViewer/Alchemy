@@ -6,9 +6,6 @@
 	<string name="SUPPORT_SITE">
 		Second Life Support Portal
 	</string>
-	<string name="StartupDetectingHardware">
-		Detekterer hardware...
-	</string>
 	<string name="StartupLoading">
 		Henter [APP_NAME]...
 	</string>
@@ -550,17 +547,11 @@ Prøv venligst om lidt igen.
 	<string name="mesh">
 		mesh
 	</string>
-	<string name="settings">
-		indstillinger
-	</string>
 	<string name="AvatarEditingAppearance">
 		(Redigering Udseende)
 	</string>
 	<string name="AvatarAway">
 		Væk
-	</string>
-	<string name="AvatarBusy">
-		Optaget
 	</string>
 	<string name="AvatarMuted">
 		Blokeret
@@ -927,18 +918,6 @@ Prøv venligst om lidt igen.
 	</string>
 	<string name="choose_the_directory">
 		Vælg bibliotek
-	</string>
-	<string name="AvatarSetNotAway">
-		Sæt "til stede"
-	</string>
-	<string name="AvatarSetAway">
-		Sæt "væk"
-	</string>
-	<string name="AvatarSetNotBusy">
-		Sæt "ledig"
-	</string>
-	<string name="AvatarSetBusy">
-		Sæt "optaget"
 	</string>
 	<string name="shape">
 		Form
@@ -1768,12 +1747,6 @@ Prøv venligst om lidt igen.
 	<string name="ATTACH_BELLY">
 		Mave
 	</string>
-	<string name="ATTACH_RPEC">
-		Højre bryst
-	</string>
-	<string name="ATTACH_LPEC">
-		Venstre bryst
-	</string>
 	<string name="ATTACH_HUD_CENTER_2">
 		HUD Center 2
 	</string>
@@ -1809,9 +1782,6 @@ Prøv venligst om lidt igen.
 	</string>
 	<string name="PanelContentsNewScript">
 		Nyt script
-	</string>
-	<string name="BusyModeResponseDefault">
-		Beboeren du sendte en besked er 'optaget', hvilket betyder at han/hun ikke vil forstyrres. Din besked vil blive vis i hans/hendes IM panel til senere visning.
 	</string>
 	<string name="MuteByName">
 		(Efter navn)
@@ -1915,9 +1885,6 @@ Prøv venligst om lidt igen.
 	<string name="GroupMoneyDebits">
 		Debet
 	</string>
-	<string name="ViewerObjectContents">
-		Indhold
-	</string>
 	<string name="AcquiredItems">
 		Anskaffede genstande
 	</string>
@@ -1926,9 +1893,6 @@ Prøv venligst om lidt igen.
 	</string>
 	<string name="UploadingCosts">
 		Uploader [NAME] pris L$ [AMOUNT]
-	</string>
-	<string name="BuyingCosts">
-		At købe dette koster L$ [AMOUNT]
 	</string>
 	<string name="UnknownFileExtension">
 		Ukendt fil efternavn [.%s]
@@ -2166,16 +2130,6 @@ Afvikler i vindue.
 	</string>
 	<string name="MBPixelFmtDescErr">
 		Kan ikke finde "pixel format" beskrivelse
-	</string>
-	<string name="MBTrueColorWindow">
-		[APP_NAME] kræver "True Color (32-bit)" for at kunne køre.
-Gå venligst til din computers skærmopsætning og sæt "color mode" til 32-bit.
-	</string>
-	<string name="MBAlpha">
-		[APP_NAME] kan ikke køre, da den ikke kan finde en "8 bit alpha channel".  Normalt skyldes dette et problem med en video driver.
-Venligst undersøg om du har de nyeste drivere til dit videokort installeret.
-Din skærm skal også være sat op til at køre "True Color (32-bit)"  i din displayopsætning.
-Hvis du bliver ved med at modtage denne besked, kontakt [SUPPORT_SITE].
 	</string>
 	<string name="MBPixelFmtSetErr">
 		Kan ikke sætte "pixel format"
@@ -4048,9 +4002,6 @@ Krænkelsesanmeldelse
 	<string name="Female - Wow">
 		Kvinde - Wow
 	</string>
-	<string name="AvatarBirthDateFormat">
-		[mthnum,datetime,slt]/[day,datetime,slt]/[year,datetime,slt]
-	</string>
 	<string name="DefaultMimeType">
 		ingen/ingen
 	</string>
@@ -4124,7 +4075,7 @@ Krænkelsesanmeldelse
 	<string name="Notices">
 		Beskeder
 	</string>
-	<string name="Chat" value=" Chat : ">
+	<string name="Chat">
 		Chat
 	</string>
 	<string name="DeleteItems">

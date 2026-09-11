@@ -71,15 +71,15 @@
 			<text_editor name="group_money_details_text">
 				Chargement...
 			</text_editor>
-			<button label="&lt; Plus tôt" label_selected="&lt; Plus tôt" name="earlier_details_button" tool_tip="Précédent"/>
-			<button label="Plus tard &gt;" label_selected="Plus tard &gt;" name="later_details_button" tool_tip="Suivant"/>
+			<button name="earlier_details_button" tool_tip="Précédent"/>
+			<button name="later_details_button" tool_tip="Suivant"/>
 		</panel>
 		<panel label="VENTES" name="group_money_sales_tab">
 			<text_editor name="group_money_sales_text">
 				Chargement...
 			</text_editor>
-			<button label="&lt; Plus tôt" label_selected="&lt; Plus tôt" name="earlier_sales_button" tool_tip="Précédent"/>
-			<button label="Plus tard &gt;" label_selected="Plus tard &gt;" name="later_sales_button" tool_tip="Suivant"/>
+			<button name="earlier_sales_button" tool_tip="Précédent"/>
+			<button name="later_sales_button" tool_tip="Suivant"/>
 		</panel>
 	</tab_container>
 </panel>

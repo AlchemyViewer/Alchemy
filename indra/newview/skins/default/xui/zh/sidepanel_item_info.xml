@@ -27,18 +27,6 @@
 	<panel.string name="origin_inworld">
 		（在虛擬世界）
 	</panel.string>
-	<text name="title" value="物品檔案"/>
-	<text name="origin" value="（收納區）"/>
-	<scroll_container name="item_profile_scroll">
-		<panel label="" name="item_profile">
-			<text name="LabelItemNameTitle">
-				名稱：
-			</text>
-		</panel>
-	</scroll_container>
-	<panel name="button_panel">
-		<button label="取消" name="cancel_btn"/>
-	</panel>
 	<layout_stack name="main_stack">
 		<layout_panel name="layout_item_permissions_sale">
 			<spinner label="價格： L$" name="Edit Cost" tool_tip="物件成本。"/>

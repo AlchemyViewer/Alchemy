@@ -13,7 +13,4 @@
 		<accordion_tab name="1_month_and_older" title="1 ay önce ve daha eski"/>
 		<accordion_tab name="6_months_and_older" title="6 ay önce ve daha eski"/>
 	</accordion>
-	<panel name="bottom_panel">
-		<menu_button name="gear_btn" tool_tip="İlave seçenekleri göster"/>
-	</panel>
 </panel>

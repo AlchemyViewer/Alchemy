@@ -15,9 +15,6 @@
 		找不到你要找的嗎？ 請試試[secondlife:///app/search/people/[SEARCH_TERM] 搜尋]。
 	</string>
 	<string name="no_filtered_groups_msg" value="找不到你要找的嗎？ 請試試[secondlife:///app/search/groups/[SEARCH_TERM] 搜尋]。"/>
-	<string name="no_groups_msg" value="要尋找群組考慮加入嗎？ 請試試[secondlife:///app/search/groups 搜尋]。"/>
-	<string name="MiniMapToolTipMsg" value="[REGION]（雙擊以開啟地圖，按下 shift 鍵拖曳來平移）"/>
-	<string name="AltMiniMapToolTipMsg" value="[REGION]（雙擊以瞬間傳送，按下 shift 鍵拖曳來平移）"/>
 	<string name="GroupCountWithInfo" value="你目前屬於 [COUNT] 個群組，可再加入 [REMAINING] 個。  [secondlife:/// 想要更多？]"/>
 	<tab_container name="tabs">
 		<panel label="附近" name="nearby_panel">
@@ -40,7 +37,6 @@
 			<accordion name="friends_accordion">
 				<accordion_tab name="tab_online" title="上線"/>
 				<accordion_tab name="tab_all" title="全部"/>
-				<accordion_tab name="tab_suggested_friends" title="你可能想要加為好友的人"/>
 			</accordion>
 		</panel>
 		<panel label="群組" name="groups_panel">
@@ -63,9 +59,6 @@
 				<button name="add_friend_btn" tool_tip="向某位居民發出交友邀請"/>
 				<dnd_button name="recent_del_btn" tool_tip="將選取的人從朋友名單移除"/>
 			</panel>
-		</panel>
-		<panel label="已封鎖的" name="blocked_panel">
-			<panel label="被封鎖的居民與物件" name="panel_block_list_sidetray"/>
 		</panel>
 	</tab_container>
 </panel>

@@ -10,7 +10,6 @@
 						<combo_box.item label="Ostatnia lokalizacja" name="MyLastLocation" />
 						<combo_box.item label="Moje miejsce startu" name="MyHome" />
 					</combo_box>
-					<check_box label="Pamiętaj mnie" name="remember_check" />
 					<layout_stack name="login_stack">
 						<layout_panel name="login_panel">
 							<text name="forgot_password_text">

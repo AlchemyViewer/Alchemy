@@ -2,20 +2,12 @@
 <menu_bar name="Main Menu">
 	<menu label="我自己" name="Me">
 		<menu_item_call label="檔案..." name="Profile"/>
-		<menu_item_call label="選擇一個化身…" name="Avatar Picker"/>
 		<menu_item_check label="收納區…" name="Inventory"/>
 		<menu_item_call label="新收納區視窗" name="NewInventoryWindow"/>
 		<menu_item_call label="地點…" name="Places"/>
 		<menu_item_call label="精選地點…" name="Picks"/>
 		<menu_item_call label="體驗…" name="Experiences"/>
 		<menu_item_call label="攝影機控制…" name="Camera Controls"/>
-		<menu label="動作" name="Movement">
-			<menu_item_call label="坐下" name="Sit Down Here"/>
-			<menu_item_call label="起立" name="Stand up"/>
-			<menu_item_check label="飛行" name="Fly"/>
-		</menu>
-		<menu label="狀態" name="Status">
-		</menu>
 		<menu_item_call label="購買 L$…" name="Buy and Sell L$"/>
 		<menu_item_call label="Marketplace 刊登…" name="MarketplaceListings"/>
 		<menu_item_call label="帳戶主控臺…" name="Manage My Account"/>
@@ -33,9 +25,6 @@
 		<menu_item_check label="說話" name="Speak"/>
 		<menu_item_check label="交談記錄…" name="Conversation Log..."/>
 		<menu_item_check label="聊天提醒…" name="Chat Alerts"/>
-		<menu_item_call label="臉書…" name="Facebook"/>
-		<menu_item_call label="推特…" name="Twitter"/>
-		<menu_item_call label="Flickr…" name="Flickr"/>
 		<menu_item_check label="姿勢…" name="Gestures"/>
 		<menu_item_check label="朋友" name="My Friends"/>
 		<menu_item_check label="群組" name="My Groups"/>
@@ -59,7 +48,6 @@
 		<menu_item_call label="我所擁有的土地…" name="My Land"/>
 		<menu_item_call label="購買這塊土地" name="Buy Land"/>
 		<menu label="顯示" name="LandShow">
-			<menu_item_check label="禁越線" name="Ban Lines"/>
 			<menu_item_check label="指標" name="beacons"/>
 			<menu_item_check label="地產邊界" name="Property Lines"/>
 			<menu_item_check label="地主" name="Land Owners"/>
@@ -153,13 +141,10 @@
 		<menu_item_call label="重做" name="Redo"/>
 	</menu>
 	<menu label="幫助" name="Help">
-		<menu_item_call label="簡易教學…" name="How To"/>
-		<menu_item_call label="快速上手" name="Quickstart"/>
 		<menu_item_call label="知識庫" name="Knowledge Base"/>
 		<menu_item_call label="維基" name="Wiki"/>
 		<menu_item_call label="社群論壇" name="Community Forums"/>
 		<menu_item_call label="支援入口" name="Support portal"/>
-		<menu_item_call label="[SECOND_LIFE] 最新消息" name="Second Life News"/>
 		<menu_item_call label="[SECOND_LIFE] 部落格" name="Second Life Blogs"/>
 		<menu_item_call label="違規舉報" name="Report Abuse"/>
 		<menu_item_call label="回報臭蟲" name="Report Bug"/>
@@ -194,7 +179,6 @@
 			<menu_item_check label="表面修補" name="Rendering Type Surface Patch"/>
 			<menu_item_check label="天空" name="Rendering Type Sky"/>
 			<menu_item_check label="水文" name="Rendering Type Water"/>
-			<menu_item_check label="地面" name="Rendering Type Ground"/>
 			<menu_item_check label="體積" name="Rendering Type Volume"/>
 			<menu_item_check label="草地" name="Rendering Type Grass"/>
 			<menu_item_check label="雲彩" name="Rendering Type Clouds"/>
@@ -216,7 +200,6 @@
 		<menu_item_check label="滑鼠平滑移動" name="Mouse Smoothing"/>
 		<menu_item_call label="釋出按鍵" name="Release Keys"/>
 		<menu label="快速鍵" name="Shortcuts">
-			<menu_item_check label="顯示進階選單 － 舊版捷徑" name="Show Advanced Menu - legacy shortcut"/>
 			<menu_item_call label="關閉視窗" name="Close Window"/>
 			<menu_item_call label="關閉全部視窗" name="Close All Windows"/>
 			<menu_item_call label="拍攝快照到硬碟" name="Snapshot to Disk"/>
@@ -233,10 +216,8 @@
 			<menu_item_check label="材質控制台" name="Texture Console"/>
 			<menu_item_check label="除錯控制台" name="Debug Console"/>
 			<menu_item_check label="地區除錯控制台" name="Region Debug Console"/>
-			<menu_item_check label="記憶體" name="Memory"/>
 			<menu_item_check label="場景統計資料" name="Scene Statistics"/>
 			<menu_item_check label="場景載入監控器" name="Scene Loading Monitor"/>
-			<menu_item_call label="材質擷取除錯控制台" name="Texture Fetch Debug Console"/>
 			<menu_item_call label="地區資訊傳至除錯控制台" name="Region Info to Debug Console"/>
 			<menu_item_call label="群組資訊至除錯控制台" name="Group Info to Debug Console"/>
 			<menu_item_call label="性能資訊傳至除錯控制台" name="Capabilities Info to Debug Console"/>
@@ -269,7 +250,6 @@
 			<menu_item_check label="攝影機位移" name="Camera Offset"/>
 			<menu_item_check label="隨機變動幀率" name="Randomize Framerate"/>
 			<menu_item_check label="定期出現慢幀率" name="Periodic Slow Frame"/>
-			<menu_item_check label="畫面測試" name="Frame Test"/>
 			<menu_item_call label="幀特性" name="Frame Profile"/>
 			<menu_item_call label="標竿測試" name="Benchmark"/>
 		</menu>
@@ -288,7 +268,6 @@
 			<menu_item_check label="臉區域" name="Face Area"/>
 			<menu_item_check label="細節層次資訊" name="LOD Info"/>
 			<menu_item_check label="三角數量" name="Triangle Count"/>
-			<menu_item_check label="建製佇列" name="Build Queue"/>
 			<menu_item_check label="燈光" name="Lights"/>
 			<menu_item_check label="粒子效果" name="Particles"/>
 			<menu_item_check label="碰撞骨架" name="Collision Skeleton"/>
@@ -310,7 +289,6 @@
 			<menu_item_call label="所選材料資訊" name="Selected Material Info"/>
 			<menu_item_check label="線框" name="Wireframe"/>
 			<menu_item_check label="物件導向的遮蔽" name="Object-Object Occlusion"/>
-			<menu_item_check label="進階照明模型" name="Advanced Lighting Model"/>
 			<menu_item_check label="來自日/月/投影物的陰影" name="Shadows from Sun/Moon/Projectors"/>
 			<menu_item_check label="屏幕空間環境光遮蔽和陰影平滑技術" name="SSAO and Shadow Smoothing"/>
 			<menu_item_check label="GL 除錯" name="Debug GL"/>
@@ -319,13 +297,9 @@
 			<menu_item_check label="自動半透明遮罩（非遞延）" name="Automatic Alpha Masks (non-deferred)"/>
 			<menu_item_check label="動作材質" name="Animation Textures"/>
 			<menu_item_check label="關閉材質" name="Disable Textures"/>
-			<menu_item_check label="停用環境光" name="Disable Ambient"/>
-			<menu_item_check label="停用日光" name="Disable Sunlight"/>
-			<menu_item_check label="停用本地光線" name="Disable Local Lights"/>
 			<menu_item_check label="全解析度材質" name="Rull Res Textures"/>
 			<menu_item_check label="使附著燈光呈像" name="Render Attached Lights"/>
 			<menu_item_check label="使附著例子效果呈像" name="Render Attached Particles"/>
-			<menu_item_check label="停懸發光物件" name="Hover Glow Objects"/>
 			<menu_item_call label="立即清除快取" name="Cache Clear"/>
 		</menu>
 		<menu label="網路" name="Network">
@@ -353,7 +327,6 @@
 			<menu_item_call label="媒體瀏覽器" name="Media Browser"/>
 			<menu_item_call label="傾印 SelectMgr" name="Dump SelectMgr"/>
 			<menu_item_call label="傾印收納區" name="Dump Inventory"/>
-			<menu_item_call label="傾印碼錶" name="Dump Timers"/>
 			<menu_item_call label="傾印焦點容器" name="Dump Focus Holder"/>
 			<menu_item_call label="列印所選物件資訊" name="Print Selected Object Info"/>
 			<menu_item_call label="列印用戶資訊" name="Print Agent Info"/>
@@ -407,9 +380,7 @@
 			<menu_item_call label="除錯化身材質" name="Debug Avatar Textures"/>
 			<menu_item_call label="傾印本地材質" name="Dump Local Textures"/>
 		</menu>
-		<menu_item_check label="HTTP 材質" name="HTTP Textures"/>
 		<menu_item_call label="壓縮圖像" name="Compress Images"/>
-		<menu_item_call label="啟用記憶體洩漏視覺偵測器" name="Enable Visual Leak Detector"/>
 		<menu_item_check label="輸出除錯小型傾印" name="Output Debug Minidump"/>
 		<menu_item_check label="下次執行時顯示控制台視窗" name="Console Window"/>
 		<menu label="設定記錄細節" name="Set Logging Level">

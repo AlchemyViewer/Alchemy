@@ -8,8 +8,6 @@
 	<menu_item_call label="Пригласить в группу" name="Invite..."/>
 	<menu_item_call label="Приблизить" name="Zoom In"/>
 	<menu_item_call label="Заплатить" name="Pay..."/>
-	<context_menu label="Прорисовать аватар" name="Render Avatar">
-	</context_menu>
 	<context_menu name="Avatar Manage">
 		<menu_item_call label="Выкинуть" name="Eject..."/>
 		<menu_item_call label="Заморозить" name="Freeze..."/>

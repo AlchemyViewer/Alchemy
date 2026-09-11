@@ -27,18 +27,6 @@
 	<panel.string name="origin_inworld">
 		(dans Second Life)
 	</panel.string>
-	<text name="title" value="Profil de l&apos;article"/>
-	<text name="origin" value="(inventaire)"/>
-	<scroll_container name="item_profile_scroll">
-		<panel label="" name="item_profile">
-			<text name="LabelItemNameTitle">
-				Nom :
-			</text>
-		</panel>
-	</scroll_container>
-	<panel name="button_panel">
-		<button label="Annuler" name="cancel_btn"/>
-	</panel>
 	<layout_stack name="main_stack">
 		<layout_panel name="layout_item_permissions_sale">
 			<spinner label="Prix : L$" name="Edit Cost" tool_tip="Coût de l'objet."/>

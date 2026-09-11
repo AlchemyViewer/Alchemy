@@ -77,19 +77,6 @@
 			<text name="name_label">
 				Nome modello:
 			</text>
-			<text name="model_category_label">
-				Questo modello rappresenta...
-			</text>
-			<combo_box name="model_category_combo">
-				<combo_item label="Seleziona uno..." name="Choose one"/>
-				<combo_item label="Forma avatar" name="Avatar shape"/>
-				<combo_item label="Elemento collegato all&apos;avatar" name="Avatar attachment"/>
-				<combo_item label="Oggetto mobile (veicolo, animale)" name="Moving object (vehicle, animal)"/>
-				<combo_item label="Componente edificio" name="Building Component"/>
-				<combo_item label="Grande, immobile, ecc." name="Large, non moving etc"/>
-				<combo_item label="Piccolo, immobile, ecc." name="Smaller, non-moving etc"/>
-				<combo_item label="Nessuno di questi" name="Not really any of these"/>
-			</combo_box>
 		</panel>
 		<tab_container name="import_tab">
 			<panel label="Livello di dettaglio" name="lod_panel" title="Livello di dettaglio">
@@ -99,7 +86,6 @@
 				<text initial_value="Alto" name="high_label" value="Alto"/>
 				<combo_box name="lod_source_high">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_high"/>
 				<combo_box name="lod_mode_high">
@@ -111,7 +97,6 @@
 				<text initial_value="Medio" name="medium_label" value="Medio"/>
 				<combo_box name="lod_source_medium">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_medium"/>
@@ -124,7 +109,6 @@
 				<text initial_value="Basso" name="low_label" value="Basso"/>
 				<combo_box name="lod_source_low">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_low"/>
@@ -137,7 +121,6 @@
 				<text initial_value="Bassissimo" name="lowest_label" value="Bassissimo"/>
 				<combo_box name="lod_source_lowest">
 					<item label="Carica da file" name="Load from file" value="Carica da file"/>
-					<item label="Genera" name="Generate" value="Genera"/>
 					<item label="Usa livello di dettaglio indicato in precedenza" name="Use LoD above" value="Usa livello di dettaglio indicato in precedenza"/>
 				</combo_box>
 				<button label="Sfoglia..." name="lod_browse_lowest"/>
@@ -244,9 +227,6 @@
 					[X] X [Y] X [Z]
 				</text>
 				<check_box label="Includi texture" name="upload_textures"/>
-				<text name="include_label">
-					Solo per modelli avatar:
-				</text>
 			</panel>
 			<panel name="rigging_panel">
 				<spinner name="pelvis_offset" value="0.0"/>

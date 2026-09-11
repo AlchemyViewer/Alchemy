@@ -24,11 +24,6 @@
 	<text_editor name="charter">
 		群組規章
 	</text_editor>
-	<name_list name="visible_members">
-		<name_list.columns label="成員" name="name"/>
-		<name_list.columns label="頭銜" name="title"/>
-		<name_list.columns label="狀態" name="status"/>
-	</name_list>
 	<text name="my_group_settngs_label">
 		我自己
 	</text>

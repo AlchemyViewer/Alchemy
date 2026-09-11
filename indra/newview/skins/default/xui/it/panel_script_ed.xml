@@ -15,9 +15,6 @@
 	<panel.string name="Title">
 		Script: [NAME]
 	</panel.string>
-	<panel.string name="external_editor_not_set">
-		Seleziona un editor impostando la variabile di ambiente LL_SCRIPT_EDITOR o l&apos;impostazione ExternalEditor.
-	</panel.string>
 	<menu_bar name="script_menu">
 		<menu label="File" name="File">
 			<menu_item_call label="Salva" name="Save"/>
@@ -38,7 +35,6 @@
 			<menu_item_call label="Passa alla riga..." name="Go to line..."/>
 		</menu>
 		<menu label="Guida" name="Help">
-			<menu_item_call label="Aiuto..." name="Help..."/>
 			<menu_item_call label="Aiuto con parole chiave..." name="Keyword Help..."/>
 		</menu>
 	</menu_bar>

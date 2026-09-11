@@ -363,7 +363,7 @@
 			<text name="allow_see_label">
 				其他地段的化身可以看見本地段裡的化身，並與之交談
 			</text>
-			<check_box label="察看化身" name="SeeAvatarsCheck" tool_tip="允許其他地段的化身看到本地段包括你在內的化身，並可互相交談。"/>
+			<check_box name="SeeAvatarsCheck" tool_tip="允許其他地段的化身看到本地段包括你在內的化身，並可互相交談。"/>
 			<text name="landing_point">
 				登陸點：[LANDING]
 			</text>

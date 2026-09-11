@@ -74,7 +74,7 @@
 		<text name="static2">Descrição</text>
 		<text name="static4">Cargos desempenhados</text>
 		<check_box label="Revelar membros" name="role_visible_in_list" tool_tip="Define se os membros dessa função são visíveis na guia geral para pessoas de fora do grupo."/>
-		<text name="static5" tool_tip="Uma lista de habilidades que a função selecionada atualmente pode executar.">Habilidades permitidas</text>
+		<text name="static5">Habilidades permitidas</text>
 		<scroll_list name="role_allowed_actions" tool_tip="Clique na guia Funções para ver mais detalhes"/>
 	</panel>
 	<panel name="roles_header">

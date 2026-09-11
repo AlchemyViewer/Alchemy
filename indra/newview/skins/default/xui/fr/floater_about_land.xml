@@ -98,9 +98,9 @@
 			<text name="Group:">
 				Groupe :
 			</text>
-			<button label="Choisir" label_selected="Définir..." name="Set..."/>
+			<button label="Choisir" name="Set..."/>
 			<check_box label="Autoriser la cession au groupe" name="check deed" tool_tip="Un officier du groupe peut céder ce terrain à ce groupe, afin qu&apos;il soit pris en charge par l&apos;allocation de terrains du groupe."/>
-			<button label="Céder" label_selected="Céder..." name="Deed..." tool_tip="Vous ne pouvez céder le terrain que si vous avez un rôle d&apos;officier dans le groupe sélectionné."/>
+			<button label="Céder" name="Deed..." tool_tip="Vous ne pouvez céder le terrain que si vous avez un rôle d&apos;officier dans le groupe sélectionné."/>
 			<check_box label="Le propriétaire contribue en cédant du terrain" name="check contrib" tool_tip="Lorsqu&apos;un terrain est cédé au groupe, l&apos;ancien propriétaire fait également un don de terrain suffisant."/>
 			<text name="For Sale:">
 				À vendre :
@@ -111,7 +111,7 @@
 			<text name="For Sale: Price L$[PRICE].">
 				Prix : [PRICE] L$ ([PRICE_PER_SQM] L$/m²)
 			</text>
-			<button label="Vendre le terrain" label_selected="Vendre le terrain..." name="Sell Land..."/>
+			<button label="Vendre le terrain" name="Sell Land..."/>
 			<text name="For sale to">
 				À vendre à : [BUYER]
 			</text>
@@ -140,13 +140,13 @@
 			<text name="DwellText">
 				Chargement...
 			</text>
-			<button label="Acheter le terrain" label_selected="Acheter le terrain..." left_delta="60" name="Buy Land..." width="125"/>
-			<button label="Vente Linden" label_selected="Vente Linden..." name="Linden Sale..." tool_tip="Le terrain doit être la propriété d&apos;un résident, avoir un contenu défini et ne pas être aux enchères."/>
+			<button label="Acheter le terrain" left_delta="60" name="Buy Land..." width="125"/>
+			<button label="Vente Linden" name="Linden Sale..." tool_tip="Le terrain doit être la propriété d&apos;un résident, avoir un contenu défini et ne pas être aux enchères."/>
 			<button label="Infos sur les scripts" name="Scripts..." width="110"/>
-			<button label="Acheter pour le groupe" label_selected="Acheter pour le groupe..." name="Buy For Group..."/>
-			<button label="Acheter un pass" label_selected="Acheter un pass..." left_delta="-127" name="Buy Pass..." tool_tip="Un pass vous donne un accès temporaire à ce terrain." width="125"/>
-			<button label="Abandonner le terrain" label_selected="Abandonner le terrain..." name="Abandon Land..."/>
-			<button label="Récupérer le terrain" label_selected="Redemander le terrain…" name="Reclaim Land..."/>
+			<button label="Acheter pour le groupe" name="Buy For Group..."/>
+			<button label="Acheter un pass" left_delta="-127" name="Buy Pass..." tool_tip="Un pass vous donne un accès temporaire à ce terrain." width="125"/>
+			<button label="Abandonner le terrain" name="Abandon Land..."/>
+			<button label="Récupérer le terrain" name="Reclaim Land..."/>
 		</panel>
 		<panel label="RÈGLEMENT" name="land_covenant_panel">
 			<panel.string name="can_resell">
@@ -247,7 +247,7 @@ ou divisé.
 				[COUNT]
 			</text>
 			<button label="Afficher" label_selected="Afficher" name="ShowOwner"/>
-			<button label="Retour" label_selected="Renvoyer..." name="ReturnOwner..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
+			<button label="Retour" name="ReturnOwner..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
 			<text name="Set to group:">
 				Données au groupe :
 			</text>
@@ -255,7 +255,7 @@ ou divisé.
 				[COUNT]
 			</text>
 			<button label="Afficher" label_selected="Afficher" name="ShowGroup"/>
-			<button label="Retour" label_selected="Renvoyer..." name="ReturnGroup..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
+			<button label="Retour" name="ReturnGroup..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
 			<text name="Owned by others:">
 				Appartenant à d&apos;autres :
 			</text>
@@ -263,7 +263,7 @@ ou divisé.
 				[COUNT]
 			</text>
 			<button label="Afficher" label_selected="Afficher" name="ShowOther"/>
-			<button label="Retour" label_selected="Renvoyer..." name="ReturnOther..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
+			<button label="Retour" name="ReturnOther..." tool_tip="Renvoyer les objets à leurs propriétaires."/>
 			<text name="Selected / sat upon:">
 				Sélectionnées/où quelqu&apos;un est assis :
 			</text>
@@ -276,9 +276,9 @@ ou divisé.
 			<text name="Object Owners:">
 				Propriétaires :
 			</text>
-			<button label="Rafraîchir" label_selected="Rafraîchir" name="Refresh List" tool_tip="Actualiser la liste des objets"/>
-			<button label="Renvoi des objets" label_selected="Renvoyer les objets..." name="Return objects..."/>
-			<name_list label="Plus récents" name="owner list">
+			<button name="Refresh List" tool_tip="Actualiser la liste des objets"/>
+			<button label="Renvoi des objets" name="Return objects..."/>
+			<name_list name="owner list">
 				<name_list.columns label="Type" name="type"/>
 				<name_list.columns label="Nom" name="name"/>
 				<name_list.columns label="Nombre" name="count"/>
@@ -361,11 +361,11 @@ Seules les parcelles de grande taille peuvent apparaître dans la recherche.
 			<text name="Snapshot:">
 				Photo :
 			</text>
-			<texture_picker label="" name="snapshot_ctrl" tool_tip="Cliquez pour sélectionner une image"/>
+			<texture_picker name="snapshot_ctrl" tool_tip="Cliquez pour sélectionner une image"/>
 			<text name="allow_see_label" top="170">
 				Les avatars sur d&apos;autres parcelles peuvent voir et chatter avec les avatars sur cette parcelle.
 			</text>
-			<check_box label="Voir les avatars" name="SeeAvatarsCheck" top="170" tool_tip="Permettre aux avatars présents sur d&apos;autres parcelles de voir et chatter avec les avatars présents sur cette parcelle et à vous de les voir et de chatter avec eux."/>
+			<check_box name="SeeAvatarsCheck" top="170" tool_tip="Permettre aux avatars présents sur d&apos;autres parcelles de voir et chatter avec les avatars présents sur cette parcelle et à vous de les voir et de chatter avec eux."/>
 			<text name="landing_point">
 				Lieu d&apos;arrivée : [LANDING]
 			</text>
@@ -398,7 +398,7 @@ Seules les parcelles de grande taille peuvent apparaître dans la recherche.
 				Remplacer la 
 texture :
 			</text>
-			<texture_picker label="" left="97" name="media texture" tool_tip="Cliquez pour sélectionner une image"/>
+			<texture_picker left="97" name="media texture" tool_tip="Cliquez pour sélectionner une image"/>
 			<text name="replace_texture_help">
 				Les objets avec cette texture affichent le film ou la page web quand vous cliquez sur la flèche Jouer.  Sélectionnez l&apos;image miniature pour choisir une texture différente.
 			</text>

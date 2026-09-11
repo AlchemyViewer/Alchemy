@@ -3,8 +3,6 @@
 	<menu_item_call label="Teleportar" name="teleport"/>
 	<menu_item_call label="Más información" name="more_info"/>
 	<menu_item_call label="Mostrar en el mapa" name="show_on_map"/>
-	<menu_item_call label="Añadir un hito" name="add_landmark"/>
-	<menu_item_call label="Añadir una carpeta" name="add_folder"/>
 	<menu_item_call label="Restaurar ítem" name="restore_item"/>
 	<menu_item_call label="Cortar" name="cut"/>
 	<menu_item_call label="Copiar el hito" name="copy_landmark"/>
@@ -12,8 +10,5 @@
 	<menu_item_call label="Pegar" name="paste"/>
 	<menu_item_call label="Renombrar" name="rename"/>
 	<menu_item_call label="Eliminar" name="delete"/>
-	<menu_item_call label="Abrir todas las carpetas" name="expand_all"/>
-	<menu_item_call label="Cerrar todas las carpetas" name="collapse_all"/>
-	<menu_item_check label="Ordenar por fecha" name="sort_by_date"/>
 	<menu_item_call label="Crear un Destacado" name="create_pick"/>
 </toggleable_menu>

@@ -27,5 +27,4 @@
 		24:00 AM PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="開始/停止全部媒體（音樂、影片、網頁）"/>
-	<button name="volume_btn" tool_tip="全域音量控制"/>
 </panel>

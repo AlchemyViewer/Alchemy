@@ -3,9 +3,6 @@
 	<text name="object_owner_label">
 		Właściciel:
 	</text>
-	<text name="object_slurl_label">
-		Lokalizacja:
-	</text>
 	<button label="Mapa" name="map_btn" />
 	<button label="Zablokuj" name="block_btn" />
 	<button label="Zamknij" name="close_btn" />
