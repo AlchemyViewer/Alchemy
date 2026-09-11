@@ -193,7 +193,10 @@ public:
     const path_t& lastPath() const { return mLastPath; }
 
     // What the element at that path now writes for a field, which after an
-    // undo is what was in force before the step. False where it writes none.
+    // undo is what was in force before the step, as the parser reads it:
+    // this is put onto a view, which takes what the parser would have
+    // handed it, not the entity spellings the file holds. False where the
+    // element writes none.
     bool fieldText(const path_t& path, std::string_view field, std::string& out) const;
 
     // An attribute's value as the file writes it, entity spellings and

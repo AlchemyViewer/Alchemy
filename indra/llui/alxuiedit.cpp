@@ -517,7 +517,13 @@ void ALXUIEdit::clearHistory()
 bool ALXUIEdit::fieldText(const path_t& path, std::string_view field, std::string& out) const
 {
     const pugi::xml_node node = resolve(path);
-    return node && valueText(node, field, out);
+    const pugi::xml_attribute attribute = node ? node.attribute(std::string(field).c_str()) : pugi::xml_attribute();
+    if (!attribute)
+    {
+        return false;
+    }
+    out = attribute.value();
+    return true;
 }
 
 // From the '<' of a tag to the '>' that ends it. An angle bracket inside

@@ -960,4 +960,31 @@ namespace tut
         ensure_equals("as typed", written.front().second, std::string("Monospace"));
         grid->die();
     }
+
+    // A field filed under a heading the caller never named goes under the
+    // last one, as the field says it will; it used to go nowhere.
+    template<> template<>
+    void alpropertygrid_object::test<21>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity", "position" });
+
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("name", 0));
+        fields.push_back(field("stray", 7));
+        fields.push_back(field("below", -3));
+        grid->setFields(fields);
+
+        LLPanel* position = grid->getChild<LLPanel>("position_rows", true);
+        LLPanel* identity = grid->getChild<LLPanel>("identity_rows", true);
+        ensure("a field past the last heading is under the last",
+               position->findChild<LLPanel>("stray_row", true) != nullptr);
+        ensure("and one before the first is under the first",
+               identity->findChild<LLPanel>("below_row", true) != nullptr);
+        grid->die();
+    }
 }

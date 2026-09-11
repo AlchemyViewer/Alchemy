@@ -1115,4 +1115,25 @@ namespace tut
             "    <panel name=\"after\"/>\n"
             "</panel>\n");
     }
+
+    // What a field reads after a step is what the parser reads, since it
+    // is put onto a view: a value with an ampersand in it was handed over
+    // with the entity still spelt out.
+    template<> template<>
+    void alxuiedit_object::test<27>()
+    {
+        ALXUIEdit edit;
+        ensure("loads", edit.loadBuffer(
+            "<panel name=\"root\">\n"
+            "    <button name=\"a\" label=\"Save\"/>\n"
+            "</panel>\n"));
+        ensure("writes", edit.setAttribute({ "a" }, "label", "Save & Close"));
+        ensure_equals("escaped in the file", edit.text(),
+            "<panel name=\"root\">\n"
+            "    <button name=\"a\" label=\"Save &amp; Close\"/>\n"
+            "</panel>\n");
+        std::string value;
+        ensure("the field reads", edit.fieldText({ "a" }, "label", value));
+        ensure_equals("as the parser reads it", value, std::string("Save & Close"));
+    }
 }

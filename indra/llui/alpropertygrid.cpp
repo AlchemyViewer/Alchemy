@@ -327,6 +327,13 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
 void ALPropertyGrid::setFields(std::vector<Field> fields)
 {
     mFields = std::move(fields);
+    // A heading the caller never named is the last one: a row has to be
+    // somewhere, and a field filed past the end was not shown at all.
+    const S32 last = (S32)mSections.size() - 1;
+    for (Field& field : mFields)
+    {
+        field.group = last < 0 ? 0 : llclamp(field.group, 0, last);
+    }
     std::sort(mFields.begin(), mFields.end(), [](const Field& a, const Field& b)
     {
         // The headings first, in the order they were named; what the file
