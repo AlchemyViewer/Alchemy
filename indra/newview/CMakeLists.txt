@@ -1959,6 +1959,8 @@ target_precompile_headers(${VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheade
 # modern version.
 
 target_link_libraries(${VIEWER_BINARY_NAME}
+        PRIVATE
+        al::flags
         llaudio
         llcharacter
         llimage
@@ -1990,14 +1992,14 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         )
 
 if (TARGET ll::velopack)
-   target_link_libraries(${VIEWER_BINARY_NAME} ll::velopack )
+   target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE ll::velopack)
 endif ()
 
 if (NOT DISABLE_WEBRTC)
     if(WINDOWS)
-        target_link_libraries(${VIEWER_BINARY_NAME} $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
+        target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
     else()
-        target_link_libraries(${VIEWER_BINARY_NAME} llwebrtc)
+        target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE llwebrtc)
     endif()
 endif()
 
@@ -2005,6 +2007,7 @@ if (DARWIN)
     find_library(IOSURFACE_FRAMEWORK IOSurface)
     find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
     target_link_libraries(${VIEWER_BINARY_NAME}
+      PRIVATE
       ${IOSURFACE_FRAMEWORK}
       ${COREGRAPHICS_FRAMEWORK}
     )
@@ -2013,7 +2016,7 @@ endif()
 # These are the generated targets that are copied for packaging that we do not directly link to
 # We special case for windows due to targets incompatible with Debug builds
 if (WINDOWS)
-  target_link_libraries(${VIEWER_BINARY_NAME} d3d11 dxgi )
+  target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
@@ -2100,7 +2103,7 @@ elseif(DARWIN)
     endif()
   endif()
 
-  target_link_libraries(${VIEWER_BINARY_NAME} llphysicsextensionsos)
+  target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
 
   set(MANIFEST_DEST_DIR $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>)
   set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
@@ -2317,6 +2320,7 @@ elseif(BUILD_TESTING)
 
 # Create a dummy executable for test projects to generate against when viewer build is disabled
 add_executable(${VIEWER_BINARY_NAME} cmake_dummy.cpp)
+target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE al::flags)
 target_include_directories(${VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 endif(BUILD_VIEWER)

@@ -291,6 +291,8 @@ endif ()
 
 target_link_libraries(
         llcommon
+        PRIVATE
+        al::flags
         PUBLIC
         ll::apr
         ll::zlib-ng

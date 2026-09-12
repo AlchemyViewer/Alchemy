@@ -13,6 +13,8 @@ target_sources(llimagej2coj
     )
 
 target_link_libraries(llimagej2coj
+        PRIVATE
+        al::flags
         PUBLIC
         llimage
         llcommon

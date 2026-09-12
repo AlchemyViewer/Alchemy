@@ -103,7 +103,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_LIBRARIES ${${name}_test_additional_LIBRARIES}")
 
     # Add to project
-    target_link_libraries(PROJECT_${project}_TEST_${name} ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
+    target_link_libraries(PROJECT_${project}_TEST_${name} PRIVATE al::flags ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
     # Compile-time Definitions
     GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_CFLAGS ${source} LL_TEST_ADDITIONAL_CFLAGS)
     target_compile_options(PROJECT_${project}_TEST_${name} PRIVATE ${${name}_test_additional_CFLAGS})
@@ -122,7 +122,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_CFLAGS ${${name}_test_additional_CFLAGS}")
 
     if (WINDOWS)
-      target_link_options(PROJECT_${project}_TEST_${name} PRIVATE $<$<CONFIG:Release>:/DEBUG:NONE>)
+      set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
     elseif (DARWIN)
       # test binaries always need to be signed for local development
       set_target_properties(PROJECT_${project}_TEST_${name}
@@ -204,7 +204,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
   )
 
   if (WINDOWS)
-    target_link_options(INTEGRATION_TEST_${testname} PRIVATE $<$<CONFIG:Release>:/DEBUG:NONE>)
+    set_target_properties(INTEGRATION_TEST_${testname} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
   endif()
 
   if (DARWIN)
@@ -220,7 +220,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
   # Add link deps to the executable
   message(DEBUG "TARGET_LINK_LIBRARIES(INTEGRATION_TEST_${testname} ${libraries})")
 
-  target_link_libraries(INTEGRATION_TEST_${testname} ${libraries})
+  target_link_libraries(INTEGRATION_TEST_${testname} PRIVATE al::flags ${libraries})
   target_include_directories (INTEGRATION_TEST_${testname} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
 
   # Create the test running command

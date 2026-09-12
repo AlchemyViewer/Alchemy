@@ -24,6 +24,8 @@ if (DARWIN)
 endif ()
 
 target_link_libraries(media_plugin_example
+        PRIVATE
+        al::flags
         media_plugin_base
         llplugin
         llmessage

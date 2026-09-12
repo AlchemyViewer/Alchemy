@@ -57,6 +57,8 @@ target_include_directories(llcharacter INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(
     llcharacter
+    PRIVATE
+    al::flags
     PUBLIC
     llcommon
     llmath

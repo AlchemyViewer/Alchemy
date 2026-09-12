@@ -24,6 +24,8 @@ add_executable(media_plugin_gstreamer10
 )
 
 target_link_libraries(media_plugin_gstreamer10
+        PRIVATE
+        al::flags
         media_plugin_base
         ll::gstreamer10
         llplugin

@@ -25,7 +25,7 @@ target_sources(lltut_runner_lib
     test.h
     )
 
-target_link_libraries(lltut_runner_lib PUBLIC llcommon ll::tut)
+target_link_libraries(lltut_runner_lib PRIVATE al::flags PUBLIC llcommon ll::tut)
 
 set_target_properties(lltut_runner_lib
         PROPERTIES

@@ -48,16 +48,20 @@ option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
 option(USE_FAUDIO "Enable support for the FAudio audio engine" ON)
 option(USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
 
-# SIMD Options (x86_64 only)
-option(USE_SSE4_2 "Use SSE4.2/x86-64-v2 instruction sets (x86_64 only)" OFF)
-option(USE_AVX "Use AVX/x86-64-v2+avx instruction sets (x86_64 only)" OFF)
-option(USE_AVX2 "Use AVX2/x86-64-v3 instruction sets (x86_64 only)" ON)
-option(USE_AVX512 "Use AVX512/x86-64-v4 instruction sets (x86_64 only)" OFF)
+# Instruction set: an x86-64 microarchitecture level, for the viewer and the
+# vcpkg triplet alike (baseline = x86-64, v2 = SSE4.2, v3 = AVX2, v4 = AVX-512).
+# Ignored on macOS, where x86_64 is pinned to SSE4.2 for Rosetta 2.
+set(AL_ISA_TIER "v3" CACHE STRING "x86-64 microarchitecture level to build for: baseline, v2, v3 or v4")
+set_property(CACHE AL_ISA_TIER PROPERTY STRINGS baseline v2 v3 v4)
+if(NOT AL_ISA_TIER MATCHES "^(baseline|v2|v3|v4)$")
+  message(FATAL_ERROR "AL_ISA_TIER must be one of baseline, v2, v3, v4 (got '${AL_ISA_TIER}')")
+endif()
 
-# Sanitizers (Mac and Linux Only)
-option(ENABLE_ASAN "Enable Address Sanitizer" OFF)
-option(ENABLE_UBSAN "Enable Undefined Behavior Sanitizer" OFF)
-option(ENABLE_THREADSAN "Enable Thread Sanitizer" OFF)
+# Sanitizers (GCC and Clang only): any of address, undefined, thread.
+set(AL_SANITIZERS "" CACHE STRING "Sanitizers to build with: a list drawn from address, undefined, thread")
+
+# Warnings
+option(AL_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 # Proprietary Libraries
 option(INSTALL_PROPRIETARY "Build with support for non-free libraries" OFF)
@@ -109,6 +113,13 @@ option(USE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
 option(USE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." ON)
 option(USE_TRACY_GPU "Use Tracy GPU profiling" OFF)
 option(USE_TRACY_GUI "Enable building Tracy profiler GUI" OFF)
+
+# Debug logging stays available in Release builds of the Test channel only.
+if(BUILDING_TEST_CHANNEL)
+  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" OFF)
+else()
+  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" ON)
+endif()
 
 # Signing
 option(ENABLE_SIGNING "Enable signing the viewer" OFF)
@@ -387,7 +398,9 @@ if (BUILD_TESTING)
   add_subdirectory(integration_tests)
 endif ()
 
-# Last, after every add_subdirectory(), so nothing below can change a row.
+# Last, after every add_subdirectory(): every buildable target must carry the
+# shared flags, and nothing below can change a report row.
+al_check_flags_target()
 include(ConfigurationReport)
 al_feature_summary()
 al_configuration_report()

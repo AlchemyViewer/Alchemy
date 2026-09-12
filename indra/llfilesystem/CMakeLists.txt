@@ -62,6 +62,8 @@ if (WINDOWS)
 endif ()
 
 target_link_libraries(llfilesystem
+      PRIVATE
+      al::flags
       PUBLIC
       llmath
       llcommon

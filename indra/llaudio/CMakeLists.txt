@@ -25,6 +25,8 @@ target_sources(llaudio
 
 target_include_directories( llaudio  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries( llaudio
+        PRIVATE
+        al::flags
         PUBLIC
         llcommon
         llmath

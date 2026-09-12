@@ -77,6 +77,9 @@ if (BUILD_HEADLESS)
   target_include_directories(llrenderheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
   target_link_libraries(llrenderheadless
+          PRIVATE
+          al::flags
+          PUBLIC
           llcommon
           llimage
           llmath
@@ -99,6 +102,9 @@ target_include_directories(llrender INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llrender
+        PRIVATE
+        al::flags
+        PUBLIC
         llcommon
         llimage
         llmath
@@ -118,6 +124,7 @@ target_precompile_headers(llrender REUSE_FROM llprecompiled)
 # OpenGL link explicit there regardless of the window backend.
 if (DARWIN OR WINDOWS OR NOT USE_SDL_WINDOW)
   target_link_libraries(llrender
+          PUBLIC
           OpenGL::GL
           )
 endif()
@@ -192,7 +199,7 @@ if (BUILD_TESTING)
   if (TARGET INTEGRATION_TEST_alfontshaping)
     # Both Unicode tables in one place, so the test can hold them against each
     # other. llrender itself has no need of ICU.
-    target_link_libraries(INTEGRATION_TEST_alfontshaping ll::icu)
+    target_link_libraries(INTEGRATION_TEST_alfontshaping PRIVATE ll::icu)
     target_compile_definitions(INTEGRATION_TEST_alfontshaping PRIVATE
         "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   endif()

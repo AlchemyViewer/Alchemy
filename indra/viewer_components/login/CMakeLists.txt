@@ -19,6 +19,9 @@ add_library(lllogin STATIC
 target_include_directories( lllogin  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(lllogin
+        PRIVATE
+        al::flags
+        PUBLIC
         llmessage
         llcorehttp
         llcommon

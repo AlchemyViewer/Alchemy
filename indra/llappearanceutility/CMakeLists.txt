@@ -43,6 +43,8 @@ list(APPEND appearance_utility_SOURCE_FILES ${appearance_utility_HEADER_FILES})
 add_executable(appearance-utility-bin ${appearance_utility_SOURCE_FILES})
 
 target_link_libraries(appearance-utility-bin
+    PRIVATE
+    al::flags
     llcharacter
     llinventory
     llappearance
@@ -57,6 +59,8 @@ if (BUILD_HEADLESS)
   add_executable(appearance-utility-headless-bin ${appearance_utility_SOURCE_FILES})
 
   target_link_libraries(appearance-utility-headless-bin
+    PRIVATE
+    al::flags
     llcharacter
     llinventory
     llappearanceheadless

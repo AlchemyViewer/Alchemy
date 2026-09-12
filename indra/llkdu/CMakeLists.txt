@@ -16,7 +16,7 @@ target_sources(llkdu
     llkdumem.h
     )
 
-  target_link_libraries(llkdu PUBLIC ll::kdu llimage llcommon)
+  target_link_libraries(llkdu PRIVATE al::flags PUBLIC ll::kdu llimage llcommon)
   target_include_directories(llkdu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
   # Add tests

@@ -33,13 +33,7 @@ set(AL_CONFIGURATION_OPTIONS
     USE_FMODSTUDIO
     USE_FAUDIO
     USE_OPENAL
-    USE_SSE4_2
-    USE_AVX
-    USE_AVX2
-    USE_AVX512
-    ENABLE_ASAN
-    ENABLE_UBSAN
-    ENABLE_THREADSAN
+    AL_WARNINGS_AS_ERRORS
     INSTALL_PROPRIETARY
     USE_KDU
     USE_DISCORD
@@ -112,21 +106,18 @@ function(_al_count_tests dir out)
   set(${out} ${count} PARENT_SCOPE)
 endfunction()
 
-# Mirrors the ISA selection in 00-Common.cmake: Darwin ignores the USE_*
-# options and pins x86_64 to SSE4.2; Windows and Linux take the highest
-# enabled tier.
+# Mirrors the ISA selection in 00-Common.cmake: Darwin ignores AL_ISA_TIER
+# and pins x86_64 to SSE4.2; Windows and Linux build the named tier.
 function(_al_isa_description out)
   if(BUILD_TARGET_IS_ARM64)
     set(isa "arm64")
   elseif(DARWIN)
     set(isa "SSE4.2 (x86-64-v2, fixed for macOS x86_64)")
-  elseif(USE_AVX512)
+  elseif(AL_ISA_TIER STREQUAL "v4")
     set(isa "AVX-512 (x86-64-v4)")
-  elseif(USE_AVX2)
+  elseif(AL_ISA_TIER STREQUAL "v3")
     set(isa "AVX2 (x86-64-v3)")
-  elseif(USE_AVX)
-    set(isa "AVX (x86-64-v2 + AVX)")
-  elseif(USE_SSE4_2)
+  elseif(AL_ISA_TIER STREQUAL "v2")
     set(isa "SSE4.2 (x86-64-v2)")
   else()
     set(isa "baseline (x86-64)")
@@ -182,17 +173,7 @@ function(al_configuration_report)
   _al_report_row("LTO" "${USE_LTO}")
   _al_report_row("PCH" "${USE_PRECOMPILED_HEADERS}")
 
-  set(sanitizers)
-  if(ENABLE_ASAN)
-    list(APPEND sanitizers address)
-  endif()
-  if(ENABLE_UBSAN)
-    list(APPEND sanitizers undefined)
-  endif()
-  if(ENABLE_THREADSAN)
-    list(APPEND sanitizers thread)
-  endif()
-  _al_report_list(sanitizers_text "none" ${sanitizers})
+  _al_report_list(sanitizers_text "none" ${AL_SANITIZERS})
   _al_report_row("Sanitizers" "${sanitizers_text}")
 
   if(CMAKE_COMPILE_WARNING_AS_ERROR)

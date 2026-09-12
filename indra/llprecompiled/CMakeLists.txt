@@ -7,6 +7,9 @@ set(llprecompiled_SOURCE_FILES
 add_library (llprecompiled STATIC ${llprecompiled_SOURCE_FILES})
 
 target_link_libraries(llprecompiled
+        PRIVATE
+        al::flags
+        PUBLIC
         llcommon
         ll::apr
         ll::zlib-ng
@@ -37,6 +40,8 @@ target_precompile_headers(llprecompiled PRIVATE
 add_executable(llprecompiled_exe ${llprecompiled_SOURCE_FILES})
 
 target_link_libraries(llprecompiled_exe
+        PRIVATE
+        al::flags
         llcommon
         ll::apr
         ll::zlib-ng

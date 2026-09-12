@@ -91,7 +91,7 @@ target_sources(llmath
     xform.h
     )
 
-target_link_libraries(llmath PUBLIC llcommon ll::mikktspace ll::sse2neon ll::meshoptimizer)
+target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::mikktspace ll::sse2neon ll::meshoptimizer)
 target_include_directories(llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
 

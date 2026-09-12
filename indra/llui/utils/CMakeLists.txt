@@ -17,6 +17,8 @@ add_executable(llui_libtest ${llui_libtest_SOURCE_FILES})
 # Libraries on which this depends, needed for Linux builds.
 # Sort by high-level to low-level.
 target_link_libraries(llui_libtest
+        PRIVATE
+        al::flags
         llui
         llinventory
         llmessage
@@ -27,7 +29,7 @@ target_link_libraries(llui_libtest
 
 # The llkdu target only exists in a proprietary build.
 if (USE_KDU)
-    target_link_libraries(llui_libtest llkdu)
+    target_link_libraries(llui_libtest PRIVATE llkdu)
 endif (USE_KDU)
 
 set_target_properties(llui_libtest
@@ -53,7 +55,7 @@ target_compile_definitions(llui_libtest PRIVATE
 # guards the merge as well as the instrument a repair pass is measured
 # with.
 add_executable(xui_overlay_check xui_overlay_check.cpp)
-target_link_libraries(xui_overlay_check llxml llmessage llcorehttp llcommon)
+target_link_libraries(xui_overlay_check PRIVATE al::flags llxml llmessage llcorehttp llcommon)
 set_target_properties(xui_overlay_check
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
@@ -64,7 +66,7 @@ set_target_properties(xui_overlay_check
 # own action from a console: a repair pass is then a command and the diff
 # it leaves.
 add_executable(xui_translate_repair xui_translate_repair.cpp)
-target_link_libraries(xui_translate_repair llui llmessage llcorehttp llxml llrender llcommon)
+target_link_libraries(xui_translate_repair PRIVATE al::flags llui llmessage llcorehttp llxml llrender llcommon)
 set_target_properties(xui_translate_repair
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"

@@ -50,7 +50,7 @@ target_sources(llwindow
     llpreeditor.h
 )
 
-target_link_libraries(llwindow llrender ${llwindow_BASE_LINK_LIBRARIES} ll::uilibraries)
+target_link_libraries(llwindow PRIVATE al::flags PUBLIC llrender ${llwindow_BASE_LINK_LIBRARIES} ll::uilibraries)
 target_include_directories(llwindow INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llwindow REUSE_FROM llprecompiled)
 
@@ -85,6 +85,7 @@ if(USE_SDL_WINDOW)
   endif()
 
   target_link_libraries(llwindow
+    PUBLIC
     ll::SDL3
   )
 endif()
@@ -145,6 +146,9 @@ if(BUILD_HEADLESS)
   target_compile_definitions(llwindowheadless PUBLIC LL_MESA_HEADLESS=1)
 
   target_link_libraries(llwindowheadless
+    PRIVATE
+    al::flags
+    PUBLIC
     llrenderheadless
     ${llwindow_BASE_LINK_LIBRARIES}
     ll::osmesa

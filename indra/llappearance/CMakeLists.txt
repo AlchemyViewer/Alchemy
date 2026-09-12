@@ -45,6 +45,8 @@ list(APPEND llappearance_SOURCE_FILES ${llappearance_HEADER_FILES})
 add_library (llappearance ${llappearance_SOURCE_FILES})
 
 target_link_libraries(llappearance
+        PRIVATE
+        al::flags
         PUBLIC
         llcharacter
         llinventory
@@ -65,6 +67,8 @@ if (BUILD_HEADLESS)
   target_include_directories( llappearanceheadless  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
   target_link_libraries(llappearanceheadless
+          PRIVATE
+          al::flags
           PUBLIC
           llcharacter
           llinventory

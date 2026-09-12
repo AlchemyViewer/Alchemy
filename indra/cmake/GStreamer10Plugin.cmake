@@ -16,11 +16,3 @@ if (LINUX)
   target_link_libraries( ll::gstreamer10 INTERFACE  ll::glib_headers)
 
 endif ()
-
-if (GSTREAMER10_FOUND AND GSTREAMER10_PLUGINS_BASE_FOUND)
-  set(GSTREAMER10 ON CACHE BOOL "Build with GStreamer-1.0 streaming media support.")
-endif (GSTREAMER10_FOUND AND GSTREAMER10_PLUGINS_BASE_FOUND)
-
-if (GSTREAMER10)
-  add_compile_definitions(LL_GSTREAMER10_ENABLED=1)
-endif (GSTREAMER10)

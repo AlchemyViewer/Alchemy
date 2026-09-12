@@ -26,6 +26,8 @@ if (DARWIN)
 endif ()
 
 target_link_libraries(media_plugin_libvlc
+        PRIVATE
+        al::flags
         media_plugin_base
         ll::libvlc
         llplugin

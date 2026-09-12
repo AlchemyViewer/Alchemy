@@ -42,6 +42,7 @@ target_sources(llimage
 target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
+target_link_libraries(llimage PRIVATE al::flags)
 if (USE_KDU)
   target_link_libraries(llimage PUBLIC llkdu)
 else ()

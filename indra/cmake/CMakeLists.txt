@@ -80,3 +80,4 @@ add_library(cmake
         ${cmake_SOURCE_FILES}
         ${master_SOURCE_FILES}
         )
+target_link_libraries(cmake PRIVATE al::flags)

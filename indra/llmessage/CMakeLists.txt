@@ -163,6 +163,8 @@ target_sources(llmessage
 
 target_link_libraries(
         llmessage
+        PRIVATE
+        al::flags
         PUBLIC
         llcommon
         llfilesystem

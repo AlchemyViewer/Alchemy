@@ -67,6 +67,8 @@ target_sources(llcorehttp
 
 target_link_libraries(
         llcorehttp
+        PRIVATE
+        al::flags
         PUBLIC
         llmath
         llcommon
@@ -145,10 +147,10 @@ if (BUILD_TESTING AND LLCOREHTTP_TESTS)
                         FOLDER "Tests/llcorehttp"
                         )
 
-  target_link_libraries(http_texture_load ${example_libs})
+  target_link_libraries(http_texture_load PRIVATE al::flags ${example_libs})
 
   if (WINDOWS)
-    target_link_options(http_texture_load PRIVATE $<$<CONFIG:Release>:/DEBUG:NONE>)
+    set_target_properties(http_texture_load PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
   endif()
 
 endif (BUILD_TESTING AND LLCOREHTTP_TESTS)

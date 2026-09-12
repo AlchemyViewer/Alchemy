@@ -48,6 +48,8 @@ target_sources(llprimitive
 target_include_directories( llprimitive  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(llprimitive
+        PRIVATE
+        al::flags
         PUBLIC
         llcharacter
         llrender

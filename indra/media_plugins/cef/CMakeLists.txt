@@ -54,7 +54,7 @@ list(APPEND media_plugin_cef_SOURCE_FILES ${media_plugin_cef_HEADER_FILES})
 # libcef (which exhausts the static TLS block on Linux) and is the basis for the
 # Windows-sandbox single-image host.
 add_library(media_plugin_cef_objs OBJECT ${media_plugin_cef_SOURCE_FILES})
-target_link_libraries(media_plugin_cef_objs PUBLIC
+target_link_libraries(media_plugin_cef_objs PRIVATE al::flags PUBLIC
         media_plugin_base
         dullahan
         ll::cef
@@ -98,6 +98,8 @@ else ()
 endif ()
 
 target_link_libraries(media_plugin_cef
+        PRIVATE
+        al::flags
         media_plugin_base
         dullahan
         ll::cef
@@ -110,7 +112,7 @@ target_link_libraries(media_plugin_cef
 
 if (WINDOWS)
     # zero-copy paint producer: D3D11 keyed-mutex shared texture
-    target_link_libraries(media_plugin_cef d3d11 dxgi)
+    target_link_libraries(media_plugin_cef PRIVATE d3d11 dxgi)
 endif ()
 
 add_dependencies(media_plugin_cef dullahan_host)
@@ -186,6 +188,7 @@ elseif (DARWIN)
     find_library(AUDIOUNIT_LIBRARY AudioUnit)
 
     target_link_libraries(media_plugin_cef
+    PRIVATE
     ${IOSURFACE_FRAMEWORK}
     ${COREGRAPHICS_FRAMEWORK}
     ${CORESERVICES_LIBRARY}     # for Component Manager calls
