@@ -403,6 +403,18 @@ void LLVolumeImplFlexible::doIdleUpdate()
                             gPipeline.markRebuild(drawablep, LLDrawable::REBUILD_POSITION);
                         }
                     }
+                    else if (pixel_area <= 256.f)
+                    {
+                        // Too small on screen to simulate. Come back on the same schedule as an
+                        // invisible flexi rather than next frame: this case wrote neither field, so
+                        // updateClass's test stayed true and a small visible flexi re-ran this every
+                        // frame for as long as it stayed small, never simulating. update_period comes
+                        // from its size, so this is about as often as it would be simulated if it were
+                        // just over the line. A flexi waiting on a rebuild still comes back every
+                        // frame, to be simulated as soon as the rebuild lands.
+                        mLastFrameNum = virtual_frame_num;
+                        mLastUpdatePeriod = update_period;
+                    }
                 }
                 else
                 {
