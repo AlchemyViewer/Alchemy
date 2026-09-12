@@ -22,9 +22,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
   #
   # More info and examples at: https://wiki.secondlife.com/wiki/How_to_add_unit_tests_to_indra_code
 
-  if(LL_TEST_VERBOSE)
-    message("LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} sources: ${sources}")
-  endif()
+  message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} sources: ${sources}")
 
   # Start with the header and project-wide setup before making targets
   #project(UNITTEST_PROJECT_${project})
@@ -49,9 +47,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
   foreach (source ${sources})
     string( REGEX REPLACE "(.*)\\.[^.]+$" "\\1" name ${source} )
     string( REGEX REPLACE ".*\\.([^.]+)$" "\\1" extension ${source} )
-    if(LL_TEST_VERBOSE)
-      message("LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} individual source: ${source} (${name}.${extension})")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} individual source: ${source} (${name}.${extension})")
 
     #
     # Per-codefile additional / external source, header, and include dir property extraction
@@ -63,17 +59,13 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
             tests/${name}_test.${extension}
             ${alltest_SOURCE_FILES}
             ${${name}_test_additional_SOURCE_FILES} )
-    if(LL_TEST_VERBOSE)
-      message("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_SOURCE_FILES ${${name}_test_SOURCE_FILES}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_SOURCE_FILES ${${name}_test_SOURCE_FILES}")
 
     # Headers
     GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_HEADER_FILES ${source} LL_TEST_ADDITIONAL_HEADER_FILES)
     set(${name}_test_HEADER_FILES ${name}.h ${${name}_test_additional_HEADER_FILES})
     list(APPEND ${name}_test_SOURCE_FILES ${${name}_test_HEADER_FILES})
-    if(LL_TEST_VERBOSE)
-      message("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_HEADER_FILES ${${name}_test_HEADER_FILES}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_HEADER_FILES ${${name}_test_HEADER_FILES}")
 
     # Setup target
     add_executable(PROJECT_${project}_TEST_${name} ${${name}_test_SOURCE_FILES})
@@ -107,10 +99,8 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     # Libraries
     GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_LIBRARIES ${source} LL_TEST_ADDITIONAL_LIBRARIES)
 
-    if(LL_TEST_VERBOSE)
-      message("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_PROJECTS ${${name}_test_additional_PROJECTS}")
-      message("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_LIBRARIES ${${name}_test_additional_LIBRARIES}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_PROJECTS ${${name}_test_additional_PROJECTS}")
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_LIBRARIES ${${name}_test_additional_LIBRARIES}")
 
     # Add to project
     target_link_libraries(PROJECT_${project}_TEST_${name} ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
@@ -129,9 +119,7 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
             "LL_TEST_${name}"
     )
 
-    if(LL_TEST_VERBOSE)
-      message("LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_CFLAGS ${${name}_test_additional_CFLAGS}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_CFLAGS ${${name}_test_additional_CFLAGS}")
 
     if (WINDOWS)
       target_link_options(PROJECT_${project}_TEST_${name} PRIVATE $<$<CONFIG:Release>:/DEBUG:NONE>)
@@ -150,15 +138,11 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
     set(TEST_CMD ${TEST_EXE} --touch=${TEST_OUTPUT} --sourcedir=${CMAKE_CURRENT_SOURCE_DIR})
 
     # daveh - what configuration does this use? Debug? it's cmake-time, not build time. + poppy 2009-04-19
-    if(LL_TEST_VERBOSE)
-      message(STATUS "LL_ADD_PROJECT_UNIT_TESTS ${name} test_cmd  = ${TEST_CMD}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name} test_cmd  = ${TEST_CMD}")
 
     SET_TEST_PATH(LD_LIBRARY_PATH)
     LL_TEST_COMMAND(TEST_SCRIPT_CMD "${LD_LIBRARY_PATH}" ${TEST_CMD})
-    if(LL_TEST_VERBOSE)
-      message(STATUS "LL_ADD_PROJECT_UNIT_TESTS ${name} test_script  = ${TEST_SCRIPT_CMD}")
-    endif()
+    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name} test_script  = ${TEST_SCRIPT_CMD}")
 
     # Add test
     add_test(
@@ -192,9 +176,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
         testproject
         # variable args
         )
-  if(TEST_DEBUG)
-    message(STATUS "Adding INTEGRATION_TEST_${testname} - debug output is on")
-  endif()
+  message(DEBUG "Adding INTEGRATION_TEST_${testname}")
 
   set(source_files
           tests/${testname}_test.cpp
@@ -208,9 +190,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
           )
 
   # Add test executable build target
-  if(TEST_DEBUG)
-    message(STATUS "ADD_EXECUTABLE(INTEGRATION_TEST_${testname} ${source_files})")
-  endif()
+  message(DEBUG "ADD_EXECUTABLE(INTEGRATION_TEST_${testname} ${source_files})")
 
   add_executable(INTEGRATION_TEST_${testname} ${source_files})
   set_target_properties(INTEGRATION_TEST_${testname}
@@ -238,9 +218,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
   endif ()
 
   # Add link deps to the executable
-  if(TEST_DEBUG)
-    message(STATUS "TARGET_LINK_LIBRARIES(INTEGRATION_TEST_${testname} ${libraries})")
-  endif()
+  message(DEBUG "TARGET_LINK_LIBRARIES(INTEGRATION_TEST_${testname} ${libraries})")
 
   target_link_libraries(INTEGRATION_TEST_${testname} ${libraries})
   target_include_directories (INTEGRATION_TEST_${testname} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
@@ -269,9 +247,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
   SET_TEST_PATH(LD_LIBRARY_PATH)
   LL_TEST_COMMAND(TEST_SCRIPT_CMD "${LD_LIBRARY_PATH}" ${test_command})
 
-  if(TEST_DEBUG)
-    message(STATUS "TEST_SCRIPT_CMD: ${TEST_SCRIPT_CMD}")
-  endif()
+  message(DEBUG "TEST_SCRIPT_CMD: ${TEST_SCRIPT_CMD}")
 
   add_test(NAME INTEGRATION_TEST_RUNNER_${testname} COMMAND ${TEST_SCRIPT_CMD})
 

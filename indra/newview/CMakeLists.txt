@@ -1,5 +1,7 @@
 # -*- cmake -*-
 
+list(APPEND CMAKE_MESSAGE_CONTEXT viewer)
+
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
@@ -27,8 +29,8 @@ configure_file("${LSL_DEFINITIONS_DIR}/lsl_keywords.xml"
 configure_file("${LSL_DEFINITIONS_DIR}/lua_keywords.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
 
-message(STATUS "Copying fonts")
 find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
+message(VERBOSE "Copying fonts from ${ALCHEMY_FONTS_DIR}")
 file(GLOB FONT_FILE_GLOB_LIST
   "${ALCHEMY_FONTS_DIR}/*"
 )
@@ -36,8 +38,8 @@ file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts"
 
 # Copy over the Emoji/shortcodes mapping XML files (and create dependency
 # if they are changed, CMake will run again and copy over new versions)
-message(STATUS "Copying Emoji/shortcode mappings")
 find_package(unofficial-emoji-shortcodes CONFIG REQUIRED)
+message(VERBOSE "Copying emoji shortcode mappings from ${EMOJI_SHORTCODES_XUI_DIR}")
 set(emoji_mapping_src_folder ${EMOJI_SHORTCODES_XUI_DIR})
 set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
 
@@ -69,7 +71,7 @@ elseif(channel_lower MATCHES "^alchemy project")
     set(ICON_PATH "project")
     set(VIEWER_MACOSX_PHASE "a")
 endif()
-message(STATUS "Copying icons for ${ICON_PATH}")
+message(VERBOSE "Copying icons for ${ICON_PATH}")
 
 find_package(unofficial-alchemy-branding CONFIG REQUIRED)
 set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")

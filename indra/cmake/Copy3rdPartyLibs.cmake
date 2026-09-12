@@ -99,7 +99,7 @@ elseif(LINUX)
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
     set(release_libs "")
 else(WINDOWS)
-    message(STATUS "WARNING: unrecognized platform for staging 3rd party libs, skipping...")
+    message(WARNING "Unrecognized platform for staging third-party libraries; skipping")
     set(vcpkg_lib_dir "")
 endif(WINDOWS)
 

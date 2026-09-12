@@ -259,63 +259,74 @@ if (BUILD_TESTING)
         )
 endif ()
 
-# Declare All Dependency Includes
-include(APR)
-include(AVIF)
-include(Boost)
-include(bugsplat)
-include(CEFPlugin)
-include(Collada-Dom)
-include(CURL)
-include(DBUS)
-include(Discord)
-include(FastFloat)
-include(FAudio)
-include(FMODSTUDIO)
-include(FMT)
-include(FontConfig)
-include(FreeType)
-include(GLEXT)
-include(GLIB)
-include(GLM)
-include(Harfbuzz)
-include(Havok)
-include(Hunspell)
-include(ICU)
-include(JPEG)
-include(LLKDU)
-include(LLPhysicsExtensions)
-include(Mesa)
-include(Meshoptimizer)
-include(Mikktspace)
-include(NDOF)
-include(NSSpellChecker)
-include(NVAPI)
-include(OpenAL)
-include(OpenGL)
-include(OpenJPEG)
-include(OpenSSL)
-include(OpenXR)
-include(PlutoSVG)
-include(PNG)
-include(PugiXML)
-include(SDL3)
-include(Sentry)
-include(simdjson)
-include(simdutf)
-include(SSE2NEON)
-include(TinyEXR)
-include(TinyGLTF)
-include(Tracy)
-include(Tut)
-include(VHACD)
-include(Vorbis)
-include(WebP)
-include(WebRTC)
-include(websocketpp)
-include(WinSpellCheck)
-include(xxHash)
-include(ZLIBNG)
+# Dependency modules, in dependency order. Each is included under a message
+# context of its own name, so `cmake --log-context` attributes every line a
+# module prints -- including the find_package() output inside it -- to that
+# module.
+set(AL_DEPENDENCY_MODULES
+    APR
+    AVIF
+    Boost
+    bugsplat
+    CEFPlugin
+    Collada-Dom
+    CURL
+    DBUS
+    Discord
+    FastFloat
+    FAudio
+    FMODSTUDIO
+    FMT
+    FontConfig
+    FreeType
+    GLEXT
+    GLIB
+    GLM
+    Harfbuzz
+    Havok
+    Hunspell
+    ICU
+    JPEG
+    LLKDU
+    LLPhysicsExtensions
+    Mesa
+    Meshoptimizer
+    Mikktspace
+    NDOF
+    NSSpellChecker
+    NVAPI
+    OpenAL
+    OpenGL
+    OpenJPEG
+    OpenSSL
+    OpenXR
+    PlutoSVG
+    PNG
+    PugiXML
+    SDL3
+    Sentry
+    simdjson
+    simdutf
+    SSE2NEON
+    TinyEXR
+    TinyGLTF
+    Tracy
+    Tut
+    VHACD
+    Vorbis
+    WebP
+    WebRTC
+    websocketpp
+    WinSpellCheck
+    xxHash
+    ZLIBNG
+    )
+
+foreach(module IN LISTS AL_DEPENDENCY_MODULES)
+  list(APPEND CMAKE_MESSAGE_CONTEXT ${module})
+  include(${module})
+  list(POP_BACK CMAKE_MESSAGE_CONTEXT)
+endforeach()
 
 # Add our test macros
 if (BUILD_TESTING)
@@ -381,3 +392,8 @@ if (BUILD_TESTING)
   # individual apps can add themselves as dependencies
   add_subdirectory(integration_tests)
 endif ()
+
+# Last, after every add_subdirectory(), so nothing below can change a row.
+include(ConfigurationReport)
+al_feature_summary()
+al_configuration_report()

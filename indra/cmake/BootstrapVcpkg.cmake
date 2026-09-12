@@ -17,7 +17,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 
     if(NOT EXISTS "${VCPKG_EXECUTABLE}")
-        message("Bootstrapping vcpkg in ${VCPKG_ROOT}")
+        message(STATUS "Bootstrapping vcpkg in ${VCPKG_ROOT}")
         execute_process(COMMAND "${VCPKG_BOOTSTRAP}" WORKING_DIRECTORY "${VCPKG_ROOT}")
         if(NOT EXISTS "${VCPKG_EXECUTABLE}")
             message(FATAL_ERROR "Could not bootstrap vcpkg")

@@ -50,7 +50,7 @@ if (USE_FMODSTUDIO)
       if(NOT FMOD_LIBRARY_RELEASE AND NOT FMOD_INCLUDE_DIR)
         message(FATAL_ERROR "Provided FMODSTUDIO_SDK_DIR path not found '{$FMODSTUDIO_SDK_DIR}'")
       else()
-        message(STATUS "Using system-provided FMOD Studio Libraries")
+        message(VERBOSE "Using FMOD Studio from ${FMODSTUDIO_SDK_DIR}")
       endif()
     endif ()
 

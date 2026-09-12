@@ -14,14 +14,14 @@ if (LINUX)
       target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
       target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
   else()
-      message("pkgconfig could not find wayland client, compiling without full wayland support")
+      message(WARNING "pkg-config could not find wayland-client; building without full Wayland support")
   endif()
 
   find_package(X11)
   if(X11_FOUND)
       target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
   else()
-      message("Could not find X11, compiling without full X11 support")
+      message(WARNING "Could not find X11; building without full X11 support")
   endif()
 
 
