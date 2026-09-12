@@ -45,6 +45,30 @@ with the same filename but different name
   <texture name="AddItem_Off" file_name="icons/AddItem_Off.png" preload="false" />
   <texture name="AddItem_Press" file_name="icons/AddItem_Press.png" preload="false" />
 
+  <texture name="AlignBottom_Disabled" file_name="icons/AlignBottom_Disabled.png" preload="false" />
+  <texture name="AlignBottom_Off" file_name="icons/AlignBottom_Off.png" preload="false" />
+  <texture name="AlignBottom_Press" file_name="icons/AlignBottom_Press.png" preload="false" />
+
+  <texture name="AlignCenter_Disabled" file_name="icons/AlignCenter_Disabled.png" preload="false" />
+  <texture name="AlignCenter_Off" file_name="icons/AlignCenter_Off.png" preload="false" />
+  <texture name="AlignCenter_Press" file_name="icons/AlignCenter_Press.png" preload="false" />
+
+  <texture name="AlignLeft_Disabled" file_name="icons/AlignLeft_Disabled.png" preload="false" />
+  <texture name="AlignLeft_Off" file_name="icons/AlignLeft_Off.png" preload="false" />
+  <texture name="AlignLeft_Press" file_name="icons/AlignLeft_Press.png" preload="false" />
+
+  <texture name="AlignMiddle_Disabled" file_name="icons/AlignMiddle_Disabled.png" preload="false" />
+  <texture name="AlignMiddle_Off" file_name="icons/AlignMiddle_Off.png" preload="false" />
+  <texture name="AlignMiddle_Press" file_name="icons/AlignMiddle_Press.png" preload="false" />
+
+  <texture name="AlignRight_Disabled" file_name="icons/AlignRight_Disabled.png" preload="false" />
+  <texture name="AlignRight_Off" file_name="icons/AlignRight_Off.png" preload="false" />
+  <texture name="AlignRight_Press" file_name="icons/AlignRight_Press.png" preload="false" />
+
+  <texture name="AlignTop_Disabled" file_name="icons/AlignTop_Disabled.png" preload="false" />
+  <texture name="AlignTop_Off" file_name="icons/AlignTop_Off.png" preload="false" />
+  <texture name="AlignTop_Press" file_name="icons/AlignTop_Press.png" preload="false" />
+
   <texture name="add_payment_image_center"  file_name="windows/add_payment_image_center.png" preload="true" />
   <texture name="add_payment_image_left"  file_name="windows/add_payment_image_left.png" preload="true" />
   <texture name="add_payment_image_right"  file_name="windows/add_payment_image_right.png" preload="true" />
@@ -667,6 +691,18 @@ with the same filename but different name
   <texture name="Sidebar_Icon_Dock_Press" file_name="taskpanel/Sidebar_Icon_Dock_Press.png" preload="false" />
   <texture name="Sidebar_Icon_Undock_Foreground" file_name="taskpanel/Sidebar_Icon_Undock_Foreground.png" preload="false" />
   <texture name="Sidebar_Icon_Undock_Press" file_name="taskpanel/Sidebar_Icon_Undock_Press.png" preload="false" />
+
+  <texture name="SidebarBottom_Disabled" file_name="icons/SidebarBottom_Disabled.png" preload="false" />
+  <texture name="SidebarBottom_Off" file_name="icons/SidebarBottom_Off.png" preload="false" />
+  <texture name="SidebarBottom_Press" file_name="icons/SidebarBottom_Press.png" preload="false" />
+
+  <texture name="SidebarLeft_Disabled" file_name="icons/SidebarLeft_Disabled.png" preload="false" />
+  <texture name="SidebarLeft_Off" file_name="icons/SidebarLeft_Off.png" preload="false" />
+  <texture name="SidebarLeft_Press" file_name="icons/SidebarLeft_Press.png" preload="false" />
+
+  <texture name="SidebarRight_Disabled" file_name="icons/SidebarRight_Disabled.png" preload="false" />
+  <texture name="SidebarRight_Off" file_name="icons/SidebarRight_Off.png" preload="false" />
+  <texture name="SidebarRight_Press" file_name="icons/SidebarRight_Press.png" preload="false" />
 
   <texture name="Shop" file_name="icons/Shop.png" preload="false" />
 
