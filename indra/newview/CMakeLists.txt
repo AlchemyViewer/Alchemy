@@ -1974,17 +1974,7 @@ target_link_libraries(${AL_VIEWER_BINARY_NAME}
         ll::pugixml
         )
 
-if (TARGET ll::velopack)
-   target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack)
-endif ()
-
-if (AL_USE_WEBRTC)
-    if(WINDOWS)
-        target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
-    else()
-        target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llwebrtc)
-    endif()
-endif()
+target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack ll::webrtc)
 
 if (DARWIN)
     find_library(IOSURFACE_FRAMEWORK IOSurface)
@@ -2123,6 +2113,13 @@ elseif(LINUX)
   set(MANIFEST_PACKAGE_OUT_FILE ${product}.tar.xz)
 endif()
 
+# The manifest ships the Discord runtime library from the SDK directory.
+if (AL_USE_DISCORD)
+  set(AL_DISCORD_MANIFEST_ARG "${DISCORD_SDK_RUNTIME_DIR}")
+else ()
+  set(AL_DISCORD_MANIFEST_ARG OFF)
+endif ()
+
 # Viewer Manifest Copy
 add_custom_command(
   TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
@@ -2133,7 +2130,7 @@ add_custom_command(
     --arch=${ARCH}
     --artwork=${AL_ARTWORK_DIR}
     "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-    "--discord=${AL_USE_DISCORD}"
+    "--discord=${AL_DISCORD_MANIFEST_ARG}"
     "--openal=${AL_USE_OPENAL}"
     "--tracy=${AL_USE_TRACY}"
     --build=${CMAKE_CURRENT_BINARY_DIR}
@@ -2166,7 +2163,7 @@ if(IS_DIRECTORY ${AL_LOCAL_DIST_DIR})
       --arch=${ARCH}
       --artwork=${AL_ARTWORK_DIR}
       "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-      "--discord=${AL_USE_DISCORD}"
+      "--discord=${AL_DISCORD_MANIFEST_ARG}"
       "--openal=${AL_USE_OPENAL}"
       "--tracy=${AL_USE_TRACY}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
@@ -2205,7 +2202,7 @@ if (AL_BUILD_PACKAGE)
           --artwork=${AL_ARTWORK_DIR}
           "--bugsplat=${AL_BUGSPLAT_DATABASE}"
               --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
-          "--discord=${AL_USE_DISCORD}"
+          "--discord=${AL_DISCORD_MANIFEST_ARG}"
           "--openal=${AL_USE_OPENAL}"
           "--tracy=${AL_USE_TRACY}"
               "--velopack=${AL_USE_VELOPACK}"

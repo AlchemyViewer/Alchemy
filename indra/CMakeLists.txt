@@ -73,8 +73,9 @@ option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
 cmake_dependent_option(AL_USE_KDU "Enable support for the Kakadu JPEG2000 decoding library" ON "AL_ENABLE_PROPRIETARY" OFF)
 
-# Uncomment when support for Discord is finalized
-#cmake_dependent_option(AL_USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "AL_ENABLE_PROPRIETARY" OFF)
+# The Discord Social SDK is downloaded per application from Discord and
+# points to by AL_DISCORD_SDK_DIR; see cmake/Discord.cmake.
+cmake_dependent_option(AL_USE_DISCORD "Enable Discord presence and friends through the Discord Social SDK" OFF "AL_ENABLE_PROPRIETARY" OFF)
 
 # SDL Options
 if (UNIX)
@@ -175,6 +176,10 @@ endif()
 
 if(AL_USE_OPENXR)
   list(APPEND VCPKG_MANIFEST_FEATURES "openxr")
+endif()
+
+if(AL_USE_WEBRTC)
+  list(APPEND VCPKG_MANIFEST_FEATURES "webrtc")
 endif()
 
 if(AL_USE_BUGSPLAT)
@@ -368,7 +373,9 @@ add_subdirectory(llphysicsextensionsos)
 add_subdirectory(llprimitive)
 add_subdirectory(llrender)
 add_subdirectory(llfilesystem)
-add_subdirectory(llwebrtc)
+if (AL_USE_WEBRTC)
+  add_subdirectory(llwebrtc)
+endif ()
 add_subdirectory(llwindow)
 add_subdirectory(llxml)
 add_subdirectory(llplugin)

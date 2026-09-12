@@ -313,14 +313,6 @@ if(NOT AL_ENABLE_RELEASE_DEBUG_LOGGING)
   target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
 endif()
 
-# libwebrtc has no Debug build on Windows, and no sanitized build anywhere.
-if(WINDOWS)
-  target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Debug>:DISABLE_WEBRTC=1>)
-endif()
-if(NOT AL_USE_WEBRTC)
-  target_compile_definitions(al_flags INTERFACE DISABLE_WEBRTC=1)
-endif()
-
 # Per platform.
 if(WINDOWS)
   target_compile_definitions(al_flags INTERFACE

@@ -1,21 +1,16 @@
 # -*- cmake -*-
 include_guard()
+add_library(ll::sentry INTERFACE IMPORTED)
 
 if (AL_USE_SENTRY)
-    add_library( al::sentry INTERFACE IMPORTED )
-
     if (WINDOWS OR LINUX)
         find_package(sentry CONFIG REQUIRED)
-        target_link_libraries( al::sentry INTERFACE sentry::sentry)
-    elseif (DARWIN)
-        # find_library(SENTRY_LIBRARIES Sentry REQUIRED
-        #     NO_DEFAULT_PATH PATHS "${ARCH_PREBUILT_DIRS_RELEASE}")
-        # target_link_libraries( al::sentry INTERFACE ${SENTRY_LIBRARIES})
+        target_link_libraries(ll::sentry INTERFACE sentry::sentry)
     endif ()
 
-    if(NOT DEFINED AL_SENTRY_DSN OR AL_SENTRY_DSN STREQUAL "")
-        message(FATAL_ERROR "You must set a DSN url with -DAL_SENTRY_DSN= to enable sentry")
-    endif()
+    if (NOT AL_SENTRY_DSN)
+        message(FATAL_ERROR "AL_USE_SENTRY needs the DSN of the project to report to: -DAL_SENTRY_DSN=<url>")
+    endif ()
 
-    target_compile_definitions( al::sentry INTERFACE AL_SENTRY=1 AL_SENTRY_DSN="${AL_SENTRY_DSN}")
+    target_compile_definitions(ll::sentry INTERFACE AL_SENTRY=1 AL_SENTRY_DSN="${AL_SENTRY_DSN}")
 endif ()

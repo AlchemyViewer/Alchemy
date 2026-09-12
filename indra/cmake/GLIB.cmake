@@ -7,5 +7,5 @@ if( LINUX )
   pkg_search_module(GLIB REQUIRED glib-2.0)
 
   target_include_directories( ll::glib_headers SYSTEM INTERFACE ${GLIB_INCLUDE_DIRS}  )
-  target_compile_definitions( ll::glib_headers INTERFACE -DLL_GLIB=1)
+  target_compile_definitions( ll::glib_headers INTERFACE LL_GLIB=1)
 endif()

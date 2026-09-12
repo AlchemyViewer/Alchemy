@@ -1,83 +1,23 @@
 # -*- cmake -*-
+#
+# The build system's own files, listed so they show in the IDE. Nothing is
+# built; a new module joins the list on the next configure.
 
-set(cmake_SOURCE_FILES
-        00-Common.cmake
-        APR.cmake
-        AVIF.cmake
-        Boost.cmake
-        BootstrapVcpkg.cmake
-        bugsplat.cmake
-        BuildPackagesInfo.cmake
-        BuildVersion.cmake
-        CEFPlugin.cmake
-        CMakeCopyIfDifferent.cmake
-        Collada-Dom.cmake
-        ConfigurationReport.cmake
-        Copy3rdPartyLibs.cmake
-        CURL.cmake
-        DBUS.cmake
-        Discord.cmake
-        FAudio.cmake
-        FindPipeWire.cmake
-        FMODSTUDIO.cmake
-        FontConfig.cmake
-        FreeType.cmake
-        GLEXT.cmake
-        GLIB.cmake
-        GLM.cmake
-        GStreamer10Plugin.cmake
-        Hunspell.cmake
-        JPEG.cmake
-        LibVLCPlugin.cmake
-        Linking.cmake
-        LLAddBuildTest.cmake
-        LLKDU.cmake
-        Mesa.cmake
-        Meshoptimizer.cmake
-        Mikktspace.cmake
-        NDOF.cmake
-        NVAPI.cmake
-        OpenAL.cmake
-        OpenGL.cmake
-        OpenJPEG.cmake
-        OpenSSL.cmake
-        OpenXR.cmake
-        PluginAPI.cmake
-        PNG.cmake
-        PugiXML.cmake
-        Python.cmake
-        RetiredOptions.cmake
-        SDL3.cmake
-        SSE2NEON.cmake
-        TemplateCheck.cmake
-        TinyEXR.cmake
-        TinyGLTF.cmake
-        Tracy.cmake
-        Tut.cmake
-        UI.cmake
-        Variables.cmake
-        Velopack.cmake
-        VHACD.cmake
-        Vorbis.cmake
-        WebRTC.cmake
-        websocketpp.cmake
-        xxHash.cmake
-        ZLIBNG.cmake
-        )
+file(GLOB cmake_MODULES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.cmake)
+file(GLOB cmake_TRIPLETS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/triplets/*.cmake)
 
-source_group("Shared Rules" FILES ${cmake_SOURCE_FILES})
-
+source_group("Shared Rules" FILES ${cmake_MODULES})
+source_group("Triplets" FILES ${cmake_TRIPLETS})
 source_group("CMake Rules" FILES CMakeLists.txt)
+source_group("Master Rules" FILES ${CMAKE_SOURCE_DIR}/CMakeLists.txt ${CMAKE_SOURCE_DIR}/CMakePresets.json ${CMAKE_SOURCE_DIR}/vcpkg.json ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json)
 
-set(master_SOURCE_FILES
-        ${CMAKE_SOURCE_DIR}/CMakeLists.txt
-        )
-
-source_group("Master Rules" FILES ${master_SOURCE_FILES})
-
-add_library(cmake
-        cmake_dummy.cpp
-        ${cmake_SOURCE_FILES}
-        ${master_SOURCE_FILES}
-        )
-target_link_libraries(cmake PRIVATE al::flags)
+add_custom_target(cmake_rules
+    SOURCES
+    ${cmake_MODULES}
+    ${cmake_TRIPLETS}
+    CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakePresets.json
+    ${CMAKE_SOURCE_DIR}/vcpkg.json
+    ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json
+    )

@@ -310,10 +310,19 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 
 ### Audio
 
-| Option           | Default | Description                            |
-|:-----------------|:--------|:---------------------------------------|
-| `AL_USE_OPENAL`     | ON      | OpenAL audio engine                    |
-| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary) |
+| Option              | Default | Description                                                          |
+|:--------------------|:--------|:---------------------------------------------------------------------|
+| `AL_USE_FAUDIO`     | ON      | FAudio audio engine                                                  |
+| `AL_USE_OPENAL`     | OFF     | OpenAL audio engine                                                  |
+| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary; `AL_FMODSTUDIO_SDK_DIR` names the SDK, or the Windows installer's registry entry does) |
+
+### Proprietary SDKs
+
+| Option           | Default | Description                                                                 |
+|:-----------------|:--------|:----------------------------------------------------------------------------|
+| `AL_ENABLE_PROPRIETARY` | OFF | Allow the non-free libraries below                                     |
+| `AL_USE_KDU`     | ON      | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
+| `AL_USE_DISCORD` | OFF     | Discord presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY`; `AL_DISCORD_SDK_DIR` names the SDK unpacked from the developer portal) |
 
 ### Profiling
 

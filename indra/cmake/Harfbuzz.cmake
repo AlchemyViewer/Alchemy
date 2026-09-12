@@ -6,6 +6,6 @@
 
   target_link_libraries(ll::harfbuzz INTERFACE harfbuzz::harfbuzz)
 
-  find_package(PkgConfig)
+  find_package(PkgConfig REQUIRED)
   pkg_check_modules(HB-RASTER REQUIRED IMPORTED_TARGET GLOBAL harfbuzz-raster)
   target_link_libraries(ll::harfbuzz INTERFACE PkgConfig::HB-RASTER)

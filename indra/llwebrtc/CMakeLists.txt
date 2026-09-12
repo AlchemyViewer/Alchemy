@@ -1,5 +1,8 @@
 # -*- cmake -*-
 
+# The one wrapper of the vendor library. libwebrtc ships no Debug build on
+# Windows, so this target is not built for that configuration; ll::webrtc
+# tells the viewer so.
 add_library(llwebrtc SHARED)
 
 target_sources(llwebrtc
@@ -28,6 +31,8 @@ else()
     target_compile_options(llwebrtc PRIVATE -fno-rtti)
 endif()
 
+target_link_libraries(llwebrtc PRIVATE unofficial::webrtc::webrtc)
+
 if (WINDOWS)
     set_target_properties(llwebrtc
         PROPERTIES
@@ -36,7 +41,7 @@ if (WINDOWS)
         )
 
     target_link_options(llwebrtc PRIVATE /MANIFEST:NO)
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc
+    target_link_libraries(llwebrtc PRIVATE
                                        secur32
                                        winmm
                                        dmoguids
@@ -50,7 +55,7 @@ if (WINDOWS)
         set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
     endif (AL_USE_BUGSPLAT)
 elseif(DARWIN)
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc
+    target_link_libraries(llwebrtc PRIVATE ll::oslibraries
                                    "-framework AVFoundation"
                                    "-framework AudioToolbox"
                                    "-framework CoreAudio"
@@ -72,6 +77,6 @@ elseif(DARWIN)
         endif()
     endif (AL_USE_BUGSPLAT)
 else()
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc ${CMAKE_DL_LIBS})
+    target_link_libraries(llwebrtc PRIVATE ${CMAKE_DL_LIBS})
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 endif (WINDOWS)

@@ -10,7 +10,7 @@ if (WINDOWS)
     $<$<TARGET_EXISTS:apr::libaprapp-1>:apr::libaprapp-1>
   )
 else()
-  find_package(PkgConfig)
+  find_package(PkgConfig REQUIRED)
   pkg_check_modules(APR REQUIRED IMPORTED_TARGET GLOBAL apr-1)
   target_link_libraries(ll::apr INTERFACE PkgConfig::APR)
 endif()

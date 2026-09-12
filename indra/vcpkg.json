@@ -151,19 +151,6 @@
       "name": "vlc-bin",
       "platform": "windows | osx"
     },
-    {
-      "name": "webrtc",
-      "features": [
-        {
-          "name": "alsa",
-          "platform": "linux"
-        },
-        {
-          "name": "pulseaudio",
-          "platform": "linux"
-        }
-      ]
-    },
     "websocketpp",
     "xxhash",
     "zlib"
@@ -314,6 +301,24 @@
       "description": "Build with support for the Velopack install and update framework",
       "dependencies": [
         "velopack"
+      ]
+    },
+    "webrtc": {
+      "description": "Build with WebRTC voice",
+      "dependencies": [
+        {
+          "name": "webrtc",
+          "features": [
+            {
+              "name": "alsa",
+              "platform": "linux"
+            },
+            {
+              "name": "pulseaudio",
+              "platform": "linux"
+            }
+          ]
+        }
       ]
     }
   }

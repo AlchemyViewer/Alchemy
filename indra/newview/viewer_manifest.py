@@ -816,6 +816,10 @@ class DarwinManifest(ViewerManifest):
                 if self.args.get('bugsplat'):
                     self.path("BugSplat.framework")
 
+                if self.args['discord'] != 'OFF':
+                    with self.prefix(src=self.args['discord']):
+                        self.path("libdiscord_partner_sdk.dylib")
+
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())
                 # Xcode generator handles stripping as part of deploy processing
@@ -1270,9 +1274,10 @@ class Linux_x86_64_Manifest(LinuxManifest):
     def construct(self):
         super(Linux_x86_64_Manifest, self).construct()
 
-        vcpkgdir = os.path.join(self.args['vcpkg_dir'], 'lib')
-        with self.prefix(src=vcpkgdir, dst="lib"):
-            if self.args['discord'] == 'ON':
+        # The Discord Social SDK comes from outside vcpkg; the argument is
+        # the directory its runtime library sits in.
+        if self.args['discord'] != 'OFF':
+            with self.prefix(src=self.args['discord'], dst="lib"):
                 self.path("libdiscord_partner_sdk.so*")
 
 ################################################################
@@ -1286,7 +1291,7 @@ if __name__ == "__main__":
     extra_arguments = [
         dict(name='bugsplat', description="""BugSplat database to which to post crashes,
              if BugSplat crash reporting is desired""", default=''),
-        dict(name='discord', description="""Indication discord social sdk libraries are needed""", default='OFF'),
+        dict(name='discord', description="""Directory holding the Discord Social SDK runtime library, or OFF""", default='OFF'),
         dict(name='openal', description="""Indication openal libraries are needed""", default='OFF'),
         dict(name='tracy', description="""Indication tracy profiler is enabled""", default='OFF'),
         dict(name='velopack', description="""Use Velopack installer instead of NSIS""", default='OFF'),
