@@ -31,6 +31,7 @@
 #include "llsdserialize.h"
 #include "llhost.h"
 #include "llsdjson.h"
+#include "llthread.h"
 
 #include <websocketpp/config/boost_config.hpp>
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -410,6 +411,7 @@ bool LLWebsocketMgr::WSServer::start()
 
     // Start the server thread
     mServerThread = std::thread([this]() {
+        set_thread_fp_mode();
         LL_INFOS("WebSocket") << "WebSocket server thread starting for: " << mServerName << LL_ENDL;
 
         // Run the controlled server loop that checks the stop flag

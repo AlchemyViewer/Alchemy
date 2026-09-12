@@ -29,6 +29,7 @@
 #include "llmemory.h"
 #include "llmath.h"
 #include "llquantize.h"
+#include "llthread.h"
 
 extern const LLQuad F_ZERO_4A       = { 0, 0, 0, 0 };
 extern const LLQuad F_APPROXIMATELY_ZERO_4A = {
@@ -43,6 +44,11 @@ extern const LLQuad F_APPROXIMATELY_ZERO_4A = {
 // LLQuad ctor is a plain value copy of the __m128 into mQ.
 extern const LLVector4a LL_V4A_ZERO(F_ZERO_4A);
 extern const LLVector4a LL_V4A_EPSILON(F_APPROXIMATELY_ZERO_4A);
+
+/*static */void LLVector4a::initClass()
+{
+    set_thread_fp_mode();
+}
 
 /*static */void LLVector4a::memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes)
 {

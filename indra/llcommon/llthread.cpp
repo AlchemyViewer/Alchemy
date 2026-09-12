@@ -47,6 +47,12 @@
 #include <pthread.h>
 #endif
 
+#if LL_ARM64
+#include "sse2neon/sse2neon.h"
+#else
+#include <pmmintrin.h>
+#endif
+
 
 #ifdef LL_WINDOWS
 
@@ -86,6 +92,13 @@ void set_thread_name(const char* threadName)
     std::string truncated_name(std::string_view(threadName).substr(0, 15));
     pthread_setname_np(pthread_self(), truncated_name.c_str());
 #endif
+}
+
+void set_thread_fp_mode()
+{
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
+    _MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
 }
 
 //----------------------------------------------------------------------------
@@ -234,6 +247,7 @@ void setThreadLocalSlot(size_t slot, void* value)
 void LLThread::threadRun()
 {
     set_thread_name(mName.c_str());
+    set_thread_fp_mode();
     LL_PROFILER_SET_THREAD_NAME( mName.c_str() );
 
     // this is the first point at which we're actually running in the new thread

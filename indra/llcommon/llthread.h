@@ -32,6 +32,12 @@
 
 extern LL_COMMON_API void set_thread_name(const char* threadName);
 
+// Floating-point control for the calling thread: flush-to-zero and
+// denormals-are-zero on, round to nearest. The state is per thread and a
+// new Windows thread starts with the defaults rather than its creator's, so
+// every thread entry point calls this, not only the main thread.
+extern LL_COMMON_API void set_thread_fp_mode();
+
 namespace LLTrace
 {
     class ThreadRecorder;

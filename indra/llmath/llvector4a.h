@@ -59,12 +59,9 @@ public:
     // STATIC METHODS
     ///////////////////////////////////
 
-    // Call initClass() at startup to avoid 15,000+ cycle penalties from denormalized numbers
-    static void initClass()
-    {
-        _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
-        _MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
-    }
+    // Sets the main thread's floating-point mode at startup; worker threads
+    // set their own at entry (set_thread_fp_mode in llthread.h).
+    static void initClass();
 
     // Return a vector of all zeros
     static inline const LLVector4a& getZero()

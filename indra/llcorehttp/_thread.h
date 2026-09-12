@@ -33,6 +33,7 @@
 #include <thread>
 
 #include "_refcounted.h"
+#include "llthread.h"
 
 namespace LLCoreInt
 {
@@ -47,6 +48,7 @@ public:
 private:
     void run()
     { // THREAD CONTEXT
+        set_thread_fp_mode();
         // run the thread function
         mThreadFunc(this);
     } // THREAD CONTEXT

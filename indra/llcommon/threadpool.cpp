@@ -79,6 +79,7 @@ void LL::ThreadPoolBase::start()
         mThreads.emplace_back(tname, [this, tname]()
             {
                 set_thread_name(tname.c_str());
+                set_thread_fp_mode();
                 LL_PROFILER_SET_THREAD_NAME(tname.c_str());
                 run(tname);
             });
