@@ -124,34 +124,6 @@ execute_process(
     "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
   )
 
-if (HAVOK)
-   # When using HAVOK_TPV, the library is precompiled, so no need for this
-
-   # Stub and probably havok lib itself is a hack, autobuild loads a 3p that really is a source tarball
-   # which includes a CMakeList.txt and then this whole source tree gets pushed into out build ... :/
-   # To make matters worse there is a internal assumption about the structure of the viewers CMake layout,
-   # which means we need to duct tape this togther ...
-
-   add_subdirectory(${LLPHYSICSEXTENSIONS_SRC_DIR} llphysicsextensions)
-   if (NOT "${LLPHYSICSEXTENSIONS_STUB_DIR}" STREQUAL "")
-      # for darwin universal builds we need both real llphysicsextensions and the stub for aarch64 fallback
-      # this will only be set when HAVOK is ON, otherwise the normal stub fallback will be in effect
-      add_subdirectory(${LLPHYSICSEXTENSIONS_STUB_DIR} llphysicsextensionsstub)
-   endif()
-
-   # Another hack that works with newer cmake versions:
-   cmake_policy( SET CMP0079 NEW)
-   if( TARGET llphysicsextensionsstub )
-      target_link_libraries(llphysicsextensionsstub llcommon llmath)
-   endif()
-   if( TARGET llphysicsextensions )
-      target_link_libraries(llphysicsextensions llrender )
-      if (DARWIN)
-        target_compile_options( llphysicsextensions  PRIVATE -Wno-unused-local-typedef)
-      endif (DARWIN)
-   endif()
-endif ()
-
 set(viewer_SOURCE_FILES
     ao.cpp
     aoengine.cpp
@@ -936,7 +908,6 @@ set(viewer_SOURCE_FILES
     )
 
 set(viewer_HEADER_FILES
-    ViewerInstall.cmake
     ao.h
     aoengine.h
     aoset.h
@@ -1718,8 +1689,6 @@ set(viewer_HEADER_FILES
     roles_constants.h
     )
 
-source_group("CMake Rules" FILES ViewerInstall.cmake)
-
 #build_data.json creation moved to viewer_manifest.py MAINT-6413
 # the viewer_version.txt file created here is for passing to viewer_manifest and autobuild
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
@@ -1947,17 +1916,6 @@ set_source_files_properties(${viewer_MISC_FILES}
 
 list(APPEND viewer_SOURCE_FILES ${viewer_MISC_FILES})
 
-if (WINDOWS)
-  file(GLOB viewer_INSTALLER_FILES installers/windows/*.nsi)
-
-  source_group("Installer Files" FILES ${viewer_INSTALLER_FILES})
-
-  set_source_files_properties(${viewer_INSTALLER_FILES}
-                              PROPERTIES HEADER_FILE_ONLY TRUE)
-
-  list(APPEND viewer_SOURCE_FILES ${viewer_INSTALLER_FILES})
-endif (WINDOWS)
-
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
 add_executable(${VIEWER_BINARY_NAME}
@@ -2019,7 +1977,6 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         lllogin
         llprimitive
         llappearance
-        ${LLPHYSICSEXTENSIONS_LIBRARIES}
         ll::bugsplat
         ll::ndof
         ll::tracy
@@ -2101,10 +2058,6 @@ if (WINDOWS)
       VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
       )
 
-  if(HAVOK)
-      target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"alchemy-bin.MAP\"") # generate symbol map for havok_tpv scripts
-  endif()
-
   set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
   set(MANIFEST_DEST_DIR ${VIEWER_STAGING_DIR})
   set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
@@ -2123,9 +2076,6 @@ elseif(DARWIN)
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
   set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
-
-  # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
-  set(CMAKE_MACOSX_RPATH 1)
 
   set_target_properties(
     ${VIEWER_BINARY_NAME}
@@ -2150,31 +2100,7 @@ elseif(DARWIN)
     endif()
   endif()
 
-  if(HAVOK)
-    set_target_properties(${VIEWER_BINARY_NAME}
-        PROPERTIES
-        # arch specific flags for universal builds: https://stackoverflow.com/a/77942065
-        XCODE_ATTRIBUTE_OTHER_CFLAGS[arch=x86_64]  "$(inherited) -DLLPHYSICSEXTENSIONS_USE_FULL -DLL_HAVOK=1"
-        XCODE_ATTRIBUTE_OTHER_CFLAGS[arch=arm64]   "$(inherited) -DLLPHYSICSEXTENSIONS_USE_STUB"
-        # only generate the .MAP file for llphysicsextensions_tpv on x86_64
-        XCODE_ATTRIBUTE_OTHER_LDFLAGS[arch=x86_64] "$(inherited) -L${CMAKE_CURRENT_BINARY_DIR}/llphysicsextensions/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/ -lllphysicsextensions  -Xlinker -map -Xlinker ${VIEWER_BINARY_DIR}/${VIEWER_BINARY_NAME}.MAP"
-        XCODE_ATTRIBUTE_OTHER_LDFLAGS[arch=arm64]  "$(inherited) -L${INDRA_BINARY_DIR}/llphysicsextensionsos/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/ -lllphysicsextensionsos"
-        )
-    add_dependencies(${VIEWER_BINARY_NAME} llphysicsextensionsos)
-  elseif(HAVOK_TPV)
-    set_target_properties(${VIEWER_BINARY_NAME}
-        PROPERTIES
-        # arch specific flags for universal builds: https://stackoverflow.com/a/77942065
-        XCODE_ATTRIBUTE_OTHER_CFLAGS[arch=x86_64]  "$(inherited) -DLLPHYSICSEXTENSIONS_USE_FULL -DLL_HAVOK=1"
-        XCODE_ATTRIBUTE_OTHER_CFLAGS[arch=arm64]   "$(inherited) -DLLPHYSICSEXTENSIONS_USE_STUB"
-        # only generate the .MAP file for llphysicsextensions_tpv on x86_64
-        XCODE_ATTRIBUTE_OTHER_LDFLAGS[arch=x86_64] "$(inherited) -L${ARCH_PREBUILT_DIRS}/ -lllphysicsextensions_tpv"
-        XCODE_ATTRIBUTE_OTHER_LDFLAGS[arch=arm64]  "$(inherited) -L${INDRA_BINARY_DIR}/llphysicsextensionsos/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/ -lllphysicsextensionsos"
-        )
-    add_dependencies(${VIEWER_BINARY_NAME} llphysicsextensionsos)
-  else()
-    target_link_libraries(${VIEWER_BINARY_NAME} llphysicsextensionsos)
-  endif()
+  target_link_libraries(${VIEWER_BINARY_NAME} llphysicsextensionsos)
 
   set(MANIFEST_DEST_DIR $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>)
   set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
@@ -2189,11 +2115,6 @@ elseif(LINUX)
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}/bin/
     )
-
-  if (HAVOK OR HAVOK_TPV)
-    # Linux
-    target_link_options(${VIEWER_BINARY_NAME} PRIVATE -no-pie "LINKER:--Map=${VIEWER_BINARY_NAME}.MAP")
-  endif ()
 
   if(USE_BUGSPLAT)
     find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
@@ -2329,10 +2250,6 @@ if (PACKAGE)
           ${MANIFEST_PACKAGE_OUT_FILE}
     )
 endif (PACKAGE)
-
-if (INSTALL)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/ViewerInstall.cmake)
-endif (INSTALL)
 
 if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
   if (USE_BUGSPLAT)

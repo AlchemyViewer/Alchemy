@@ -29,8 +29,6 @@
 
 #if LL_WINDOWS
 
-#if LL_OS_DRAGDROP_ENABLED
-
 #include "llwin32headers.h"
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
 #include <shellapi.h>
@@ -50,24 +48,6 @@ class LLDragDropWin32
         IDropTarget* mDropTarget;
         HWND mDropWindowHandle;
 };
-
-#else // LL_OS_DRAGDROP_ENABLED
-
-#include "llwin32headerslean.h"
-#include <ole2.h>
-
-// impostor class that does nothing
-class LLDragDropWin32
-{
-    public:
-        LLDragDropWin32() {};
-        ~LLDragDropWin32() {};
-
-        bool init( HWND hWnd ) { return false; };
-        void reset() { };
-};
-
-#endif // LL_OS_DRAGDROP_ENABLED
 
 #endif // LL_WINDOWS
 

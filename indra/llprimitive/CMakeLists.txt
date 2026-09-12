@@ -61,15 +61,9 @@ target_link_libraries(llprimitive
         ll::tinygltf
         )
 
-if (HAVOK OR HAVOK_TPV)
-    target_link_libraries(llprimitive PUBLIC
-        llphysicsextensions_impl
-        )
-else()
-    target_link_libraries(llprimitive PUBLIC
-        llphysicsextensionsos
-        )
-endif ()
+target_link_libraries(llprimitive PUBLIC
+    llphysicsextensionsos
+    )
 
 target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 

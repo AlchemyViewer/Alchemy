@@ -309,8 +309,6 @@ jobs:
       - name: Configure
         id: configure
         shell: bash
-        env:
-          HAVOK: false # ${{ needs.setup.outputs.build_type == 'proprietary' }}
         run: |
           set -x
 
@@ -356,7 +354,6 @@ jobs:
             -DBUILD_TESTING:BOOL="$BUILD_TESTS" \
             -DPACKAGE:BOOL=ON \
             -DUSE_VELOPACK:BOOL=ON \
-            -DHAVOK:BOOL="$HAVOK" \
             -DUSE_LTO:BOOL="$USE_LTO" \
             -DDISABLE_RELEASE_DEBUG_LOGGING=ON \
             -DRELEASE_CRASH_REPORTING:BOOL="$RELEASE_CRASH_REPORTING" \

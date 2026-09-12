@@ -34,12 +34,12 @@ option(BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
 option(BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
 option(BUILD_VLC_PLUGIN "Build support for SLPlugin VLC media plugin." ON)
 cmake_dependent_option(BUILD_GSTREAMER_PLUGIN "Build support for SLPlugin Gstreamer media plugin." ON "UNIX;NOT APPLE" OFF)
+# Off since CEF 139: dlopen of the PulseAudio/PipeWire client libraries fails inside the CEF host process.
+cmake_dependent_option(USE_LINUX_VOLUME_CATCHER "Build the PulseAudio/PipeWire volume catcher into the CEF media plugin." OFF "UNIX;NOT APPLE;BUILD_CEF_PLUGIN" OFF)
 
 # Build feature and optimization options
-option(OS_DRAG_DROP "Build the viewer with OS level drag and drop support" ON)
 option(USE_NDOF "Use NDOF space navigator joystick library." ON)
 option(USE_LTO "Enable Link Time Optimization" OFF)
-option(USE_NVAPI "Use NVidia NVAPI library for gpu profile support (Windows Only)" ON)
 option(USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
 option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
 
@@ -62,10 +62,6 @@ option(ENABLE_THREADSAN "Enable Thread Sanitizer" OFF)
 # Proprietary Libraries
 option(INSTALL_PROPRIETARY "Build with support for non-free libraries" OFF)
 cmake_dependent_option(USE_KDU "Enable support for the Kakadu JPEG2000 decoding library" ON "INSTALL_PROPRIETARY" OFF)
-
-# TODO: Replace with commented option below once Havok support is added to vcpkg
-option(HAVOK "Use Havok physics library" OFF)
-#cmake_dependent_option(HAVOK "Use Havok physics library" ON "INSTALL_PROPRIETARY" OFF)
 
 # Uncomment when support for Discord is finalized
 #cmake_dependent_option(USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "INSTALL_PROPRIETARY" OFF)
@@ -203,7 +199,7 @@ if(NOT USE_PRECOMPILED_HEADERS)
 endif()
 
 # Include our cmake module directory
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_BINARY_DIR}")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 # Setup VCPKG toolchains and targets
 include(BootstrapVcpkg)
@@ -283,12 +279,10 @@ set(AL_DEPENDENCY_MODULES
     GLIB
     GLM
     Harfbuzz
-    Havok
     Hunspell
     ICU
     JPEG
     LLKDU
-    LLPhysicsExtensions
     Mesa
     Meshoptimizer
     Mikktspace

@@ -26,8 +26,6 @@
 
 #if LL_WINDOWS
 
-#if LL_OS_DRAGDROP_ENABLED
-
 #include "linden_common.h"
 
 #include "llwindowwin32.h"
@@ -478,8 +476,6 @@ void LLDragDropWin32::reset()
 
     OleUninitialize();
 }
-
-#endif // LL_OS_DRAGDROP_ENABLED
 
 #endif // LL_WINDOWS
 

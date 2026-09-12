@@ -1,118 +1,37 @@
 # -*- cmake -*-
-
-# The copy_win_libs folder contains file lists and a script used to
-# copy dlls, exes and such needed to run the SecondLife from within
-# VisualStudio.
+#
+# Stages the third-party shared libraries vcpkg does not place next to the
+# viewer itself: FMOD Studio's DLL on Windows and the hunspell dylib on macOS.
+# Everything else a static vcpkg build needs is linked in.
 include_guard()
 include(CMakeCopyIfDifferent)
 include(Linking)
 
-# When we copy our dependent libraries, we almost always want to copy them to
-# both the Release and the RelWithDebInfo staging directories. This has
-# resulted in duplicate (or worse, erroneous attempted duplicate)
-# copy_if_different commands. Encapsulate that usage.
-# Pass FROM_DIR, TARGETS and the files to copy. TO_DIR is implicit.
-# to_staging_dirs diverges from copy_if_different in that it appends to TARGETS.
+# Pass FROM_DIR, TARGETS and the files to copy; TO_DIR is the shared-library
+# staging directory. Appends the generated outputs to TARGETS.
 macro(to_staging_dirs from_dir targets)
-    set(targetDir "${SHARED_LIB_STAGING_DIR}")
-    copy_if_different("${from_dir}" "${targetDir}" out_targets ${ARGN})
-
+    copy_if_different("${from_dir}" "${SHARED_LIB_STAGING_DIR}" out_targets ${ARGN})
     list(APPEND "${targets}" "${out_targets}")
 endmacro()
 
 macro(to_viewer_staging_dirs from_dir targets)
-    set(targetDir "${VIEWER_STAGING_DIR}")
-    copy_if_different("${from_dir}" "${targetDir}" out_targets ${ARGN})
-
+    copy_if_different("${from_dir}" "${VIEWER_STAGING_DIR}" out_targets ${ARGN})
     list(APPEND "${targets}" "${out_targets}")
 endmacro()
 
-macro(to_viewer_staging_subdirs sub_dir from_dir targets)
-    set(targetDir "${VIEWER_STAGING_DIR}/${sub_dir}")
-    copy_if_different("${from_dir}" "${targetDir}" out_targets ${ARGN})
-
-    list(APPEND "${targets}" "${out_targets}")
-endmacro()
-
-###################################################################
-# set up platform specific lists of files that need to be copied
-###################################################################
-if(WINDOWS)
-    set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
-
-    # Files that vcpkg fails to automatically stage
-    # set(release_libs "legacy.dll") # OpenSSL legacy engine
-
-    #*******************************
-    # Copy MS C runtime dlls, required for packaging.
-    # set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
-    # include(InstallRequiredSystemLibraries)
-
-    # foreach(system_lib_file IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
-    #     get_filename_component(system_lib_directory ${system_lib_file} DIRECTORY)
-    #     get_filename_component(system_lib_filename ${system_lib_file} NAME )
-    #     MESSAGE(DEBUG "Copying redist file from ${system_lib_directory}/${system_lib_filename}")
-    #     to_staging_dirs(
-    #         ${system_lib_directory}
-    #         third_party_targets
-    #         ${system_lib_filename}
-    #     )
-    #     to_viewer_staging_dirs(
-    #         ${system_lib_directory}
-    #         third_party_targets
-    #         ${system_lib_filename}
-    #     )
-    #     to_viewer_staging_subdirs(
-    #         "llplugin"
-    #         ${system_lib_directory}
-    #         third_party_targets
-    #         ${system_lib_filename}
-    #     )
-    # endforeach()
-
-    # to_viewer_staging_dirs(
-    #     ${vcpkg_lib_dir}
-    #     third_party_targets
-    #     ${release_libs}
-    # )
-
-    if(USE_FMODSTUDIO)
-        list(APPEND fmod_libs
-            fmod$<$<CONFIG:Debug>:L>.dll
-            )
-        to_viewer_staging_dirs(
-            ${fmod_lib_paths}
-            third_party_targets
-            ${fmod_libs}
-            )
-    endif()
-elseif(DARWIN)
-    set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
-    if (USE_NSSPELLCHECKER)
-        set(release_libs "")
-    else()
-        set(release_libs
-        "libhunspell-1.7.0.dylib"
+if(WINDOWS AND USE_FMODSTUDIO)
+    to_viewer_staging_dirs(
+        ${fmod_lib_paths}
+        third_party_targets
+        fmod$<$<CONFIG:Debug>:L>.dll
         )
-    endif()
-elseif(LINUX)
-    set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
-    set(release_libs "")
-else(WINDOWS)
-    message(WARNING "Unrecognized platform for staging third-party libraries; skipping")
-    set(vcpkg_lib_dir "")
-endif(WINDOWS)
-
-
-################################################################
-# Done building the file lists, now set up the copy commands.
-################################################################
-
-to_staging_dirs(
-    ${vcpkg_lib_dir}
-    third_party_targets
-    ${release_libs}
-)
+elseif(DARWIN AND NOT USE_NSSPELLCHECKER)
+    to_staging_dirs(
+        "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"
+        third_party_targets
+        libhunspell-1.7.0.dylib
+        )
+endif()
 
 add_custom_target(
         stage_third_party_libs ALL

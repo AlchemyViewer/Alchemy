@@ -48,13 +48,6 @@ if (LINUX)
       FILES
       lldir_linux.h
       )
-
-  if (INSTALL)
-    set_source_files_properties(lldir_linux.cpp
-                                PROPERTIES COMPILE_FLAGS
-                                "-DAPP_RO_DATA_DIR=\\\"${APP_SHARE_DIR}\\\""
-                                )
-  endif ()
 endif ()
 
 if (WINDOWS)

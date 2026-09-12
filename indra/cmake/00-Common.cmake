@@ -129,9 +129,6 @@ if(WINDOWS)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-  # Don't build DLLs.
-  set(BUILD_SHARED_LIBS OFF)
-
   add_link_options(
     $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/OPT:ICF>
@@ -352,9 +349,6 @@ if(LINUX)
 endif(LINUX)
 
 if(DARWIN)
-  # Use rpath loading on macos
-  set(CMAKE_MACOSX_RPATH TRUE)
-
   # Only generate top-level xcodeproj
   set(CMAKE_XCODE_GENERATE_TOP_LEVEL_PROJECT_ONLY ON)
 
@@ -485,8 +479,3 @@ if(LINUX OR DARWIN)
     add_compile_options(-m${ADDRESS_SIZE})
   endif()
 endif()
-
-# Enable support for Drag and Drop
-if(OS_DRAG_DROP)
-  add_compile_definitions(LL_OS_DRAGDROP_ENABLED=1)
-endif(OS_DRAG_DROP)

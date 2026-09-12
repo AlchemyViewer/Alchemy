@@ -14,7 +14,7 @@ set(media_plugin_cef_HEADER_FILES
     )
 
 # Select which VolumeCatcher implementation to use
-if (FALSE) # Disable linux volume catcher due to issues dlopening with CEF 139
+if (USE_LINUX_VOLUME_CATCHER)
   foreach( PULSE_FILE pulse/introspect.h pulse/context.h pulse/subscribe.h pulse/glib-mainloop.h )
     find_path( PULSE_FILE_${PULSE_FILE}_FOUND ${PULSE_FILE} NO_CACHE)
     if( NOT PULSE_FILE_${PULSE_FILE}_FOUND )

@@ -25,10 +25,9 @@ set(AL_CONFIGURATION_OPTIONS
     BUILD_CEF_PLUGIN
     BUILD_VLC_PLUGIN
     BUILD_GSTREAMER_PLUGIN
-    OS_DRAG_DROP
+    USE_LINUX_VOLUME_CATCHER
     USE_NDOF
     USE_LTO
-    USE_NVAPI
     USE_OPENXR
     USE_PRECOMPILED_HEADERS
     USE_FMODSTUDIO
@@ -43,7 +42,6 @@ set(AL_CONFIGURATION_OPTIONS
     ENABLE_THREADSAN
     INSTALL_PROPRIETARY
     USE_KDU
-    HAVOK
     USE_DISCORD
     USE_SDL_WINDOW
     USE_NSSPELLCHECKER
@@ -303,6 +301,9 @@ function(al_configuration_report)
   if(BUILD_GSTREAMER_PLUGIN)
     list(APPEND plugins "GStreamer")
   endif()
+  if(USE_LINUX_VOLUME_CATCHER)
+    list(APPEND plugins "CEF volume catcher")
+  endif()
   if(BUILD_EXAMPLE_PLUGIN)
     list(APPEND plugins "example")
   endif()
@@ -313,20 +314,11 @@ function(al_configuration_report)
   if(USE_NDOF)
     list(APPEND extras "NDOF")
   endif()
-  if(USE_NVAPI AND WINDOWS)
-    list(APPEND extras "NVAPI")
-  endif()
   if(USE_OPENXR)
     list(APPEND extras "OpenXR")
   endif()
   if(USE_DISCORD)
     list(APPEND extras "Discord")
-  endif()
-  if(OS_DRAG_DROP)
-    list(APPEND extras "OS drag and drop")
-  endif()
-  if(HAVOK)
-    list(APPEND extras "Havok")
   endif()
   _al_report_list(extras_text "none" ${extras})
   _al_report_row("Extras" "${extras_text}")

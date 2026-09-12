@@ -25,14 +25,12 @@ set(cmake_SOURCE_FILES
         GLIB.cmake
         GLM.cmake
         GStreamer10Plugin.cmake
-        Havok.cmake
         Hunspell.cmake
         JPEG.cmake
         LibVLCPlugin.cmake
         Linking.cmake
         LLAddBuildTest.cmake
         LLKDU.cmake
-        LLPhysicsExtensions.cmake
         LLTestCommand.cmake
         Mesa.cmake
         Meshoptimizer.cmake
@@ -57,7 +55,6 @@ set(cmake_SOURCE_FILES
         Tracy.cmake
         Tut.cmake
         UI.cmake
-        UnixInstall.cmake
         Variables.cmake
         Velopack.cmake
         VHACD.cmake
