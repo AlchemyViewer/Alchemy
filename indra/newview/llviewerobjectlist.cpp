@@ -1019,12 +1019,34 @@ void LLViewerObjectList::update(LLAgent &agent)
     }
     else
     {
+        // Objects first, then avatars. A seated avatar pulls its seat's drawable forward from inside
+        // its own idleUpdate (LLPipeline::updateMoveDampedAsync), so that it can pose its skeleton on
+        // the seat's position for this frame -- which only works if the seat has already been
+        // interpolated. Left to list order, it depended on which of the two had rezzed first: when
+        // the rider came first it moved the seat toward last frame's position and stamped it
+        // EARLY_MOVE, the seat's own fresh move was then skipped, and vehicle and rider were drawn a
+        // frame behind -- or not, for the next vehicle over, and it could change when an unrelated
+        // object was removed from the list. No non-avatar idleUpdate reads avatar state, so nothing
+        // needs the reverse order.
         for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
             idle_iter != idle_end; idle_iter++)
         {
             objectp = *idle_iter;
             llassert(objectp->isActive());
+            if (!objectp->isAvatar())
+            {
                 objectp->idleUpdate(agent, frame_time);
+            }
+        }
+
+        for (std::vector<LLViewerObject*>::iterator idle_iter = idle_list.begin();
+            idle_iter != idle_end; idle_iter++)
+        {
+            objectp = *idle_iter;
+            if (objectp->isAvatar())
+            {
+                objectp->idleUpdate(agent, frame_time);
+            }
         }
 
         //update flexible objects
