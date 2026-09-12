@@ -3259,9 +3259,16 @@ void LLPipeline::markMoved(LLDrawable *drawablep, bool damped_motion)
         }
         drawablep->setState(LLDrawable::ON_MOVE_LIST);
     }
+    // The last request this frame wins. This used to be labelled "UNDAMPED trumps DAMPED", which is
+    // not what it does: a damped call clears the flag an earlier undamped one set. That is relied
+    // on -- LLSelectMgr::selectionMove, the joystick edit path, moves a selected object (which marks
+    // itself undamped) and then asks for a damped move so a noisy analog device eases rather than
+    // snaps. A caller that needs a snap to survive must not be followed by a damped call for the
+    // same drawable; LLViewerObject::updateDrawable, the common one, only ever upgrades a drawable
+    // that is already queued. updateMovedList clears the flag once the move is processed.
     if (! damped_motion)
     {
-        drawablep->setState(LLDrawable::MOVE_UNDAMPED); // UNDAMPED trumps DAMPED
+        drawablep->setState(LLDrawable::MOVE_UNDAMPED);
     }
     else if (drawablep->isState(LLDrawable::MOVE_UNDAMPED))
     {

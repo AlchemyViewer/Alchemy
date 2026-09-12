@@ -6550,8 +6550,7 @@ void LLViewerObject::updateDrawable(bool force_damped)
     if (!isChanged(MOVED))
     { //most common case, having an empty if case here makes for better branch prediction
     }
-    else if (mDrawable.notNull() &&
-        !mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+    else if (mDrawable.notNull())
     {
         bool damped_motion =
             !isChanged(SHIFTED) &&                                      // not shifted between regions this frame and...
@@ -6565,7 +6564,27 @@ void LLViewerObject::updateDrawable(bool force_damped)
                     mDrawable->getGeneration() != -1                    // ...was not created this frame.
                 )
             );
-        gPipeline.markMoved(mDrawable, damped_motion);
+
+        if (!mDrawable->isState(LLDrawable::ON_MOVE_LIST))
+        {
+            gPipeline.markMoved(mDrawable, damped_motion);
+        }
+        else if (!damped_motion && !isSelected() && !getVelocity().isExactlyZero())
+        {
+            // Already queued, but the object is now moving under physics, which is never damped.
+            // A drawable that was mid-lerp when that motion began used to keep easing, because a
+            // queued drawable was never re-marked: extrapolated forward, then lagged back behind
+            // that by the damping, for as long as it moved. Upgrade it to a snap, never the
+            // reverse -- a snap asked for earlier this frame (a parent change, a region cross) must
+            // not be turned back into a lerp by a later, ordinary update.
+            //
+            // Only for that case. Any other move that comes out undamped here still leaves a
+            // queued lerp alone, as it always has: a selected object is undamped by the formula
+            // above, and while a joystick edit is easing it (LLSelectMgr::selectionMove) the
+            // simulator's echo of the edit arrives through here -- snapping to each echo would
+            // put back the jitter the damping is there to hide.
+            gPipeline.markMoved(mDrawable, false);
+        }
     }
     clearChanged(SHIFTED);
 }
