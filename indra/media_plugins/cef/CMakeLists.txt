@@ -5,11 +5,11 @@ include(GLIB)
 
 ### media_plugin_cef
 
-set(media_plugin_cef_SOURCE_FILES
+set(media_plugin_cef_SOURCES
     media_plugin_cef.cpp
     )
 
-set(media_plugin_cef_HEADER_FILES
+set(media_plugin_cef_HEADERS
     volume_catcher.h
     )
 
@@ -30,7 +30,7 @@ if (AL_USE_LINUX_VOLUME_CATCHER)
 
   message( "Building with Linux volume catcher for PipeWire and PulseAudio" )
 
-  list(APPEND media_plugin_cef_HEADER_FILES
+  list(APPEND media_plugin_cef_HEADERS
     linux/volume_catcher_linux.h
   )
 
@@ -40,20 +40,25 @@ if (AL_USE_LINUX_VOLUME_CATCHER)
     linux/volume_catcher_pipewire.cpp
   )
 
-  list(APPEND media_plugin_cef_SOURCE_FILES ${LINUX_VOLUME_CATCHER})
+  list(APPEND media_plugin_cef_SOURCES ${LINUX_VOLUME_CATCHER})
 elseif (WINDOWS)
-  list(APPEND media_plugin_cef_SOURCE_FILES windows_volume_catcher.cpp)
+  list(APPEND media_plugin_cef_SOURCES windows_volume_catcher.cpp)
 else()
-  list(APPEND media_plugin_cef_SOURCE_FILES volume_catcher_null.cpp)
+  list(APPEND media_plugin_cef_SOURCES volume_catcher_null.cpp)
 endif ()
-
-list(APPEND media_plugin_cef_SOURCE_FILES ${media_plugin_cef_HEADER_FILES})
 
 # Compile the plugin sources once into an object library, statically linked into
 # the media_plugin_cef host executable below. Static linking avoids dlopen of
 # libcef (which exhausts the static TLS block on Linux) and is the basis for the
 # Windows-sandbox single-image host.
-add_library(media_plugin_cef_objs OBJECT ${media_plugin_cef_SOURCE_FILES})
+add_library(media_plugin_cef_objs OBJECT)
+
+target_sources(media_plugin_cef_objs
+    PRIVATE
+    ${media_plugin_cef_SOURCES}
+    ${media_plugin_cef_HEADERS}
+    )
+
 target_link_libraries(media_plugin_cef_objs PRIVATE al::flags PUBLIC
         media_plugin_base
         dullahan
@@ -69,32 +74,30 @@ target_link_libraries(media_plugin_cef_objs PRIVATE al::flags PUBLIC
 ### executable (shipped renamed to media_plugin_cef.exe) which sets up the
 ### sandbox; elsewhere it is a plain executable.
 if (WINDOWS)
-    add_library(media_plugin_cef MODULE
-        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
-        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
-        slplugin_cef.cpp
-        slplugin_cef_bootstrap.cpp
-        $<TARGET_OBJECTS:media_plugin_cef_objs>
-        )
+    add_library(media_plugin_cef MODULE)
+    target_sources(media_plugin_cef PRIVATE slplugin_cef_bootstrap.cpp)
 else ()
-    add_executable(media_plugin_cef
-        MACOSX_BUNDLE
-        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
-        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
-        slplugin_cef.cpp
-        $<TARGET_OBJECTS:media_plugin_cef_objs>
-        )
-    if (DARWIN)
-        target_sources(media_plugin_cef PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
-        set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
-            PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+    add_executable(media_plugin_cef MACOSX_BUNDLE)
+endif ()
 
-        set_target_properties(media_plugin_cef PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/SLPluginCEF-Info.plist.in
-            MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
-        )
-    endif ()
+target_sources(media_plugin_cef
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
+    slplugin_cef.cpp
+    $<TARGET_OBJECTS:media_plugin_cef_objs>
+    )
+
+if (DARWIN)
+    target_sources(media_plugin_cef PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
+    set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
+        PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+
+    set_target_properties(media_plugin_cef PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/SLPluginCEF-Info.plist.in
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
+    )
 endif ()
 
 target_link_libraries(media_plugin_cef

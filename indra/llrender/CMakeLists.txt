@@ -1,6 +1,6 @@
 # -*- cmake -*-
 
-set(llrender_SOURCE_FILES
+set(llrender_SOURCES
     alsamplerstate.cpp
     altexture3d.cpp
     altextureslot.cpp
@@ -32,7 +32,7 @@ set(llrender_SOURCE_FILES
     llglcommonfunc.cpp
     )
 
-set(llrender_HEADER_FILES
+set(llrender_HEADERS
     alsamplerstate.h
     altexture3d.h
     altextureslot.h
@@ -68,13 +68,16 @@ set(llrender_HEADER_FILES
     llglcommonfunc.h
     )
 
-list(APPEND llrender_SOURCE_FILES ${llrender_HEADER_FILES})
-
 if (AL_BUILD_HEADLESS)
-  add_library (llrenderheadless STATIC
-    ${llrender_SOURCE_FILES}
-    )
-  target_include_directories(llrenderheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_library(llrenderheadless STATIC)
+  target_sources(llrenderheadless
+      PRIVATE
+      ${llrender_SOURCES}
+      PUBLIC
+      FILE_SET HEADERS
+      FILES
+      ${llrender_HEADERS}
+      )
 
   target_link_libraries(llrenderheadless
           PRIVATE
@@ -96,8 +99,15 @@ if (AL_BUILD_HEADLESS)
   target_precompile_headers(llrenderheadless REUSE_FROM llprecompiled)
 endif (AL_BUILD_HEADLESS)
 
-add_library (llrender STATIC ${llrender_SOURCE_FILES})
-target_include_directories(llrender INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(llrender STATIC)
+target_sources(llrender
+    PRIVATE
+    ${llrender_SOURCES}
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
+    ${llrender_HEADERS}
+    )
 
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level

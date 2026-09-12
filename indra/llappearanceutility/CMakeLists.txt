@@ -1,6 +1,6 @@
 # -*- cmake -*-
 
-set(appearance_utility_SOURCE_FILES
+set(appearance_utility_SOURCES
     appearance_utility.cpp
     llappappearanceutility.cpp
     llbakingavatar.cpp
@@ -18,7 +18,7 @@ set(appearance_utility_SOURCE_FILES
     llprocesstexture.cpp
     )
 
-set(appearance_utility_HEADER_FILES
+set(appearance_utility_HEADERS
     llappappearanceutility.h
     llbakingavatar.h
     llbakingjoint.h
@@ -35,12 +35,13 @@ set(appearance_utility_HEADER_FILES
     llprocesstexture.h
     )
 
-set_source_files_properties(${appearance_utility_HEADER_FILES}
-                            PROPERTIES HEADER_FILES_ONLY TRUE)
+add_executable(appearance-utility-bin)
 
-list(APPEND appearance_utility_SOURCE_FILES ${appearance_utility_HEADER_FILES})
-
-add_executable(appearance-utility-bin ${appearance_utility_SOURCE_FILES})
+target_sources(appearance-utility-bin
+    PRIVATE
+    ${appearance_utility_SOURCES}
+    ${appearance_utility_HEADERS}
+    )
 
 target_link_libraries(appearance-utility-bin
     PRIVATE
@@ -56,7 +57,13 @@ target_link_libraries(appearance-utility-bin
 target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
 
 if (AL_BUILD_HEADLESS)
-  add_executable(appearance-utility-headless-bin ${appearance_utility_SOURCE_FILES})
+  add_executable(appearance-utility-headless-bin)
+
+  target_sources(appearance-utility-headless-bin
+      PRIVATE
+      ${appearance_utility_SOURCES}
+      ${appearance_utility_HEADERS}
+      )
 
   target_link_libraries(appearance-utility-headless-bin
     PRIVATE

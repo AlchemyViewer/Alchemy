@@ -92,7 +92,6 @@ target_sources(llmath
     )
 
 target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::mikktspace ll::sse2neon ll::meshoptimizer)
-target_include_directories(llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests

@@ -3,18 +3,12 @@
 # Integration tests of the llimage library (JPEG2000, PNG, jpeg, etc... images reading and writing)
 if (AL_BUILD_TESTS)
 
-set(llimage_libtest_SOURCE_FILES
+add_executable(llimage_libtest)
+
+target_sources(llimage_libtest
+    PRIVATE
     llimage_libtest.cpp
-    )
-
-set(llimage_libtest_HEADER_FILES
     llimage_libtest.h
-    )
-
-list(APPEND llimage_libtest_SOURCE_FILES ${llimage_libtest_HEADER_FILES})
-
-add_executable(llimage_libtest
-    ${llimage_libtest_SOURCE_FILES}
     )
 
 set_target_properties(llimage_libtest

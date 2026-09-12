@@ -1,11 +1,12 @@
 # -*- cmake -*-
 
-set(llappearance_SOURCE_FILES
+# llappearance and, when AL_BUILD_HEADLESS is on, llappearanceheadless are the
+# same sources against different render libraries.
+set(llappearance_SOURCES
     llavatarappearance.cpp
     llavatarjoint.cpp
     llavatarjointmesh.cpp
     lldriverparam.cpp
-    lljointdata.h
     lllocaltextureobject.cpp
     llpolyskeletaldistortion.cpp
     llpolymesh.cpp
@@ -20,11 +21,12 @@ set(llappearance_SOURCE_FILES
     llavatarappearancedefines.cpp
     )
 
-set(llappearance_HEADER_FILES
+set(llappearance_HEADERS
     llavatarappearance.h
     llavatarjoint.h
     llavatarjointmesh.h
     lldriverparam.h
+    lljointdata.h
     lljointpickname.h
     lllocaltextureobject.h
     llpolyskeletaldistortion.h
@@ -40,9 +42,16 @@ set(llappearance_HEADER_FILES
     llavatarappearancedefines.h
     )
 
-list(APPEND llappearance_SOURCE_FILES ${llappearance_HEADER_FILES})
+add_library(llappearance STATIC)
 
-add_library (llappearance ${llappearance_SOURCE_FILES})
+target_sources(llappearance
+    PRIVATE
+    ${llappearance_SOURCES}
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
+    ${llappearance_HEADERS}
+    )
 
 target_link_libraries(llappearance
         PRIVATE
@@ -59,12 +68,19 @@ target_link_libraries(llappearance
         llcorehttp
         llcommon
     )
-target_include_directories( llappearance  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llappearance REUSE_FROM llprecompiled)
 
 if (AL_BUILD_HEADLESS)
-  add_library (llappearanceheadless ${llappearance_SOURCE_FILES})
-  target_include_directories( llappearanceheadless  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
+  add_library(llappearanceheadless STATIC)
+
+  target_sources(llappearanceheadless
+      PRIVATE
+      ${llappearance_SOURCES}
+      PUBLIC
+      FILE_SET HEADERS
+      FILES
+      ${llappearance_HEADERS}
+      )
 
   target_link_libraries(llappearanceheadless
           PRIVATE
@@ -83,4 +99,4 @@ if (AL_BUILD_HEADLESS)
       )
 
   target_precompile_headers(llappearanceheadless REUSE_FROM llprecompiled)
-endif (AL_BUILD_HEADLESS)
+endif ()

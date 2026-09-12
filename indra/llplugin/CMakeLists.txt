@@ -27,7 +27,6 @@ target_sources(llplugin
     )
 
 target_link_libraries(llplugin PRIVATE al::flags PUBLIC llcommon llmath llmessage llxml)
-target_include_directories(llplugin INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llplugin REUSE_FROM llprecompiled)
 
 add_subdirectory(slplugin)

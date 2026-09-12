@@ -7,16 +7,13 @@ include(LibVLCPlugin)
 ### LibVLC media plugin together with the slplugin host driver (there is no
 ### dlopen'd plugin library any more).
 
-set(media_plugin_libvlc_SOURCE_FILES
-    media_plugin_libvlc.cpp
-    )
+add_executable(media_plugin_libvlc WIN32 MACOSX_BUNDLE)
 
-add_executable(media_plugin_libvlc
-    WIN32
-    MACOSX_BUNDLE
+target_sources(media_plugin_libvlc
+    PRIVATE
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
-    ${media_plugin_libvlc_SOURCE_FILES}
+    media_plugin_libvlc.cpp
     )
 
 if (DARWIN)

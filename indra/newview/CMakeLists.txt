@@ -124,7 +124,7 @@ execute_process(
     "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
   )
 
-set(viewer_SOURCE_FILES
+set(viewer_SOURCES
     ao.cpp
     aoengine.cpp
     aoset.cpp
@@ -907,7 +907,7 @@ set(viewer_SOURCE_FILES
     rlvui.cpp
     )
 
-set(viewer_HEADER_FILES
+set(viewer_HEADERS
     ao.h
     aoengine.h
     aoset.h
@@ -1695,12 +1695,12 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
 if (DARWIN)
-  LIST(APPEND viewer_SOURCE_FILES llvelopack.cpp)
-  LIST(APPEND viewer_HEADER_FILES llvelopack.h)
+  list(APPEND viewer_SOURCES llvelopack.cpp)
+  list(APPEND viewer_HEADERS llvelopack.h)
 
   # Crash-metadata helpers shared by both the legacy Cocoa and SDL backends.
-  LIST(APPEND viewer_SOURCE_FILES llbugsplat_mac.cpp)
-  LIST(APPEND viewer_HEADER_FILES llbugsplat_mac.h)
+  list(APPEND viewer_SOURCES llbugsplat_mac.cpp)
+  list(APPEND viewer_HEADERS llbugsplat_mac.h)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
@@ -1713,17 +1713,17 @@ if (DARWIN)
     Korean.lproj/language.txt
     )
 
-  LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
-  LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
-  LIST(APPEND viewer_RESOURCE_FILES
+  list(APPEND viewer_SOURCES llappviewersdl.cpp)
+  list(APPEND viewer_HEADERS llappviewersdl.h)
+  list(APPEND viewer_RESOURCE_FILES
     Info-AlchemySDL.plist
     )
 
   set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
 
   # Preserved for possible build option to fall back to native macos filepicker
-  # LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
-  # LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
+  # list(APPEND viewer_SOURCES llfilepicker_mac.mm)
+  # list(APPEND viewer_HEADERS llfilepicker_mac.h)
 
   # set_source_files_properties(
   #   llfilepicker_mac.mm
@@ -1731,23 +1731,22 @@ if (DARWIN)
   #   SKIP_PRECOMPILE_HEADERS TRUE
   # )
 
-  SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
-  list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
+  source_group("Resources" FILES ${viewer_RESOURCE_FILES})
 endif (DARWIN)
 
 if (LINUX)
-    LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
-    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
+    list(APPEND viewer_SOURCES llappviewersdl.cpp)
+    list(APPEND viewer_HEADERS llappviewersdl.h)
 endif (LINUX)
 
 if (WINDOWS)
-    list(APPEND viewer_SOURCE_FILES
+    list(APPEND viewer_SOURCES
          llappviewerwin32.cpp
          llvelopack.cpp
          llwindebug.cpp
          )
 
-    list(APPEND viewer_HEADER_FILES
+    list(APPEND viewer_HEADERS
          llappviewerwin32.h
          llvelopack.h
          llwindebug.h
@@ -1758,13 +1757,12 @@ if (WINDOWS)
         # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
         # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
         # platform overrides.
-        list(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
-        list(APPEND viewer_HEADER_FILES llappviewersdl.h)
+        list(APPEND viewer_SOURCES llappviewersdl.cpp)
+        list(APPEND viewer_HEADERS llappviewersdl.h)
     endif ()
 
-    # Add resource files to the project.
-    # viewerRes.rc is the only buildable file, but
-    # the rest are all dependencies of it.
+    # What viewerRes.rc reads. Listed for the IDE; the .rc itself is the
+    # build input.
     set(viewer_RESOURCE_FILES
         res/arrow.cur
         res/arrowcop.cur
@@ -1809,24 +1807,15 @@ if (WINDOWS)
         res/toolsit.cur
         )
 
-    set_source_files_properties(${viewer_RESOURCE_FILES}
-                                PROPERTIES HEADER_FILE_ONLY TRUE)
-
-    configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
-                    ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
-                    )
-    set(viewer_RESOURCE_FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
-        ${viewer_RESOURCE_FILES}
-        )
-
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
+                   ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
+                   )
     set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
       PROPERTIES COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/res"
       )
+    list(APPEND viewer_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc)
 
-    SOURCE_GROUP("Resource Files" FILES ${viewer_RESOURCE_FILES})
-
-    list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
+    source_group("Resource Files" FILES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc ${viewer_RESOURCE_FILES})
 
     if (ADDRESS_SIZE EQUAL 64)
         # We deliberately omit this from the 32bit build because it declares that
@@ -1834,7 +1823,7 @@ if (WINDOWS)
         # the Windows version, but doing so causes systems with certain HD video
         # cards to fail because Windows 10 does not support them.  Leaving this out
         # causes those systems to run in a Windows 8 compatibility mode, which works.
-        LIST(APPEND viewer_SOURCE_FILES windows.manifest)
+        list(APPEND viewer_SOURCES windows.manifest)
     endif (ADDRESS_SIZE EQUAL 64)
 
 endif (WINDOWS)
@@ -1844,17 +1833,11 @@ endif (WINDOWS)
 file(GLOB_RECURSE viewer_XUI_FILES LIST_DIRECTORIES FALSE
     ${CMAKE_CURRENT_SOURCE_DIR}/skins/*.xml)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/skins PREFIX "XUI Files" FILES ${viewer_XUI_FILES})
-set_source_files_properties(${viewer_XUI_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-list(APPEND viewer_SOURCE_FILES ${viewer_XUI_FILES})
 
 # Add the shader sources
 file(GLOB_RECURSE viewer_SHADER_FILES LIST_DIRECTORIES FALSE
     ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders/*.glsl)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders PREFIX "Shaders" FILES ${viewer_SHADER_FILES})
-set_source_files_properties(${viewer_SHADER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-list(APPEND viewer_SOURCE_FILES ${viewer_SHADER_FILES})
 
 # note that the scripts which publish these files are sensitive to the file
 # extensions. Be cautious about adding new file types here.
@@ -1888,11 +1871,6 @@ set(viewer_APPSETTINGS_FILES
 
 source_group("App Settings" FILES ${viewer_APPSETTINGS_FILES})
 
-set_source_files_properties(${viewer_APPSETTINGS_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-
-list(APPEND viewer_SOURCE_FILES ${viewer_APPSETTINGS_FILES})
-
 set(viewer_CHARACTER_FILES
     character/attentions.xml
     character/attentionsN.xml
@@ -1903,25 +1881,30 @@ set(viewer_CHARACTER_FILES
 
 source_group("Character File" FILES ${viewer_CHARACTER_FILES})
 
-set_source_files_properties(${viewer_CHARACTER_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
-list(APPEND viewer_SOURCE_FILES ${viewer_CHARACTER_FILES})
-
 set(viewer_MISC_FILES
     viewer_manifest.py
     )
 
-set_source_files_properties(${viewer_MISC_FILES}
-                            PROPERTIES HEADER_FILE_ONLY TRUE)
+# What the viewer loads at run time and the script that packages it, kept in
+# the IDE beside the code. None of it is compiled, so it hangs off its own
+# target and the viewer's project holds only what the compiler and linker
+# consume.
+add_custom_target(viewer_resources
+    SOURCES
+    ${viewer_XUI_FILES}
+    ${viewer_SHADER_FILES}
+    ${viewer_APPSETTINGS_FILES}
+    ${viewer_CHARACTER_FILES}
+    ${viewer_MISC_FILES}
+    ${viewer_RESOURCE_FILES}
+    )
 
-list(APPEND viewer_SOURCE_FILES ${viewer_MISC_FILES})
+add_executable(${AL_VIEWER_BINARY_NAME} WIN32 MACOSX_BUNDLE)
 
-list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
-
-add_executable(${AL_VIEWER_BINARY_NAME}
-    WIN32
-    MACOSX_BUNDLE
-    ${viewer_SOURCE_FILES}
+target_sources(${AL_VIEWER_BINARY_NAME}
+    PRIVATE
+    ${viewer_SOURCES}
+    ${viewer_HEADERS}
     )
 
 check_message_template(${AL_VIEWER_BINARY_NAME})

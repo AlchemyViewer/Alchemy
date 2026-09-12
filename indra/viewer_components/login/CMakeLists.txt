@@ -1,22 +1,15 @@
 # -*- cmake -*-
 
-set(login_SOURCE_FILES
-    lllogin.cpp
-    )
+add_library(lllogin STATIC)
 
-set(login_HEADER_FILES
+target_sources(lllogin
+    PRIVATE
+    lllogin.cpp
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
     lllogin.h
     )
-
-list(APPEND
-    login_SOURCE_FILES
-    ${login_HEADER_FILES}
-    )
-
-add_library(lllogin STATIC
-            ${login_SOURCE_FILES}
-            )
-target_include_directories( lllogin  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(lllogin
         PRIVATE

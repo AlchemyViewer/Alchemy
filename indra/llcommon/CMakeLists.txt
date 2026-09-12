@@ -310,8 +310,6 @@ target_link_libraries(
         ll::icu
     )
 
-target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
 add_dependencies(llcommon stage_third_party_libs)
 
 if (AL_BUILD_TESTS)

@@ -51,7 +51,6 @@ target_sources(llinventory
     )
 
 target_link_libraries(llinventory PRIVATE al::flags PUBLIC llcommon llmath llmessage llxml)
-target_include_directories( llinventory  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llinventory REUSE_FROM llprecompiled)
 
 # add unit tests

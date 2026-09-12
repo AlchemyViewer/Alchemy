@@ -76,7 +76,6 @@ target_link_libraries(
         ll::openssl
         ll::websocketpp
   )
-target_include_directories( llcorehttp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 # llmessage depends on llcorehttp, yet llcorehttp also depends on llmessage (at least for includes).
 # Cannot/Should not use target_link_libraries here to add llmessage to the dependencies, as that would
 # lead to circular dependencies (or in case of cmake, the first project declaring it's dependencies wins)
@@ -128,26 +127,14 @@ if (AL_BUILD_TESTS AND LLCOREHTTP_TESTS)
   #
   # Example Programs
   #
-  SET(llcorehttp_EXAMPLE_SOURCE_FILES
-      examples/http_texture_load.cpp
-      )
-
-  set(example_libs
-          llcorehttp
-          llmessage
-          llcommon
-      )
-
-  add_executable(http_texture_load
-                 ${llcorehttp_EXAMPLE_SOURCE_FILES}
-                 )
+  add_executable(http_texture_load examples/http_texture_load.cpp)
   set_target_properties(http_texture_load
                         PROPERTIES
                         RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
                         FOLDER "Tests/llcorehttp"
                         )
 
-  target_link_libraries(http_texture_load PRIVATE al::flags ${example_libs})
+  target_link_libraries(http_texture_load PRIVATE al::flags llcorehttp llmessage llcommon)
 
   if (WINDOWS)
     set_target_properties(http_texture_load PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)

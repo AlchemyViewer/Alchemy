@@ -24,7 +24,6 @@ target_sources(llphysicsextensionsos
         LLPhysicsExtensionsStubImpl.h
         )
 
-target_include_directories(llphysicsextensionsos INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(llphysicsextensionsos
         PRIVATE
         al::flags

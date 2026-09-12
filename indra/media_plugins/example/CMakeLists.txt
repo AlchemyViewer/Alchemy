@@ -5,16 +5,13 @@ include(PluginAPI)
 ### media_plugin_example - dedicated host executable that statically links the
 ### example media plugin together with the slplugin host driver (no dlopen).
 
-set(media_plugin_example_SOURCE_FILES
-    media_plugin_example.cpp
-    )
+add_executable(media_plugin_example WIN32 MACOSX_BUNDLE)
 
-add_executable(media_plugin_example
-    WIN32
-    MACOSX_BUNDLE
+target_sources(media_plugin_example
+    PRIVATE
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
-    ${media_plugin_example_SOURCE_FILES}
+    media_plugin_example.cpp
     )
 
 if (DARWIN)

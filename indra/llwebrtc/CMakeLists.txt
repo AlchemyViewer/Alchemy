@@ -1,21 +1,21 @@
 # -*- cmake -*-
 
-set(llwebrtc_SOURCE_FILES
+add_library(llwebrtc SHARED)
+
+target_sources(llwebrtc
+    PRIVATE
     alaudiodevicenotifier.cpp
     alaudioechobuffer.cpp
     llwebrtc.cpp
-    )
-
-set(llwebrtc_HEADER_FILES
     alaudiodevicenotifier.h
     alaudioechobuffer.h
-    llwebrtc.h
     llwebrtc_impl.h
+    PUBLIC
+    FILE_SET HEADERS
+    FILES
+    llwebrtc.h
     )
 
-list(APPEND llwebrtc_SOURCE_FILES ${llwebrtc_HEADER_FILES})
-
-add_library(llwebrtc SHARED ${llwebrtc_SOURCE_FILES})
 set_target_properties(llwebrtc PROPERTIES PUBLIC_HEADER llwebrtc.h)
 target_link_libraries(llwebrtc PRIVATE al::flags)
 
@@ -75,8 +75,6 @@ else()
     target_link_libraries(llwebrtc PRIVATE ll::webrtc ${CMAKE_DL_LIBS})
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 endif (WINDOWS)
-
-target_include_directories(llwebrtc INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add tests
 if (AL_BUILD_TESTS)

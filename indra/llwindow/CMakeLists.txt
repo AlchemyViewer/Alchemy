@@ -10,7 +10,7 @@
 
 include(UI)
 
-set(llwindow_BASE_SOURCE_FILES
+set(llwindow_BASE_SOURCES
   llcursortypes.cpp
   llkeyboard.cpp
   llkeyboardheadless.cpp
@@ -20,7 +20,7 @@ set(llwindow_BASE_SOURCE_FILES
   llwindowcallbacks.cpp
 )
 
-set(llwindow_BASE_HEADER_FILES
+set(llwindow_BASE_HEADERS
   llcursortypes.h
   llkeyboard.h
   llkeyboardheadless.h
@@ -44,14 +44,15 @@ add_library(llwindow STATIC)
 
 target_sources(llwindow
   PRIVATE
-    ${llwindow_BASE_SOURCE_FILES}
+    ${llwindow_BASE_SOURCES}
   PUBLIC
-    ${llwindow_BASE_HEADER_FILES}
+  FILE_SET HEADERS
+  FILES
+    ${llwindow_BASE_HEADERS}
     llpreeditor.h
 )
 
 target_link_libraries(llwindow PRIVATE al::flags PUBLIC llrender ${llwindow_BASE_LINK_LIBRARIES} ll::uilibraries)
-target_include_directories(llwindow INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llwindow REUSE_FROM llprecompiled)
 
 if(AL_USE_SDL_WINDOW)
@@ -61,6 +62,8 @@ if(AL_USE_SDL_WINDOW)
       llkeyboardsdl.cpp
       llwindowsdl.cpp
     PUBLIC
+    FILE_SET HEADERS
+    FILES
       llsdl.h
       llkeyboardsdl.h
       llwindowsdl.h
@@ -75,6 +78,8 @@ if(AL_USE_SDL_WINDOW)
       PRIVATE
         llsdl_macos.mm
       PUBLIC
+      FILE_SET HEADERS
+      FILES
         llsdl_macos.h
     )
 
@@ -94,6 +99,8 @@ if(DARWIN)
   # IOKit deployment-target shim, consumed by newview's llmachineid.cpp.
   target_sources(llwindow
     PUBLIC
+    FILE_SET HEADERS
+    FILES
       llwindowmacosx_iokit.h
   )
 endif(DARWIN)
@@ -106,6 +113,8 @@ if(WINDOWS)
     PRIVATE
       lldxhardware.cpp
     PUBLIC
+    FILE_SET HEADERS
+    FILES
       lldxhardware.h
   )
 
@@ -124,6 +133,8 @@ if(WINDOWS)
   endif()
   target_sources(llwindow
     PUBLIC
+    FILE_SET HEADERS
+    FILES
       llwindowwin32.h
       llkeyboardwin32.h
       lldragdropwin32.h
@@ -136,10 +147,12 @@ if(AL_BUILD_HEADLESS)
 
   target_sources(llwindowheadless
     PRIVATE
-      ${llwindow_BASE_SOURCE_FILES}
+      ${llwindow_BASE_SOURCES}
       llwindowmesaheadless.cpp
     PUBLIC
-      ${llwindow_BASE_HEADER_FILES}
+    FILE_SET HEADERS
+    FILES
+      ${llwindow_BASE_HEADERS}
       llwindowmesaheadless.h
   )
 
@@ -153,6 +166,5 @@ if(AL_BUILD_HEADLESS)
     ${llwindow_BASE_LINK_LIBRARIES}
     ll::osmesa
   )
-  target_include_directories(llwindowheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
   target_precompile_headers(llwindowheadless REUSE_FROM llprecompiled)
 endif(AL_BUILD_HEADLESS)

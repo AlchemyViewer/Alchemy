@@ -68,7 +68,6 @@ target_link_libraries(llfilesystem
       llmath
       llcommon
     )
-target_include_directories( llfilesystem  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llfilesystem REUSE_FROM llprecompiled)
 
 # Add tests

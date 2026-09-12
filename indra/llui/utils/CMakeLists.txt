@@ -3,7 +3,10 @@
 # The console utilities over the UI. What each is for, and how it is run,
 # is at the top of its own file.
 
-set(llui_libtest_SOURCE_FILES
+add_executable(llui_libtest)
+
+target_sources(llui_libtest
+    PRIVATE
     alparamfingerprint.cpp
     llui_libtest.cpp
     llwidgetreg.cpp
@@ -11,8 +14,6 @@ set(llui_libtest_SOURCE_FILES
     llui_libtest.h
     llwidgetreg.h
     )
-
-add_executable(llui_libtest ${llui_libtest_SOURCE_FILES})
 
 # Libraries on which this depends, needed for Linux builds.
 # Sort by high-level to low-level.

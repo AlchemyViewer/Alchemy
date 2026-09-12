@@ -17,7 +17,6 @@ target_sources(llkdu
     )
 
   target_link_libraries(llkdu PRIVATE al::flags PUBLIC ll::kdu llimage llcommon)
-  target_include_directories(llkdu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
   # Add tests
   if (AL_BUILD_TESTS)

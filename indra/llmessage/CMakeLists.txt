@@ -171,7 +171,6 @@ target_link_libraries(
         llmath
         llcorehttp
 )
-target_include_directories( llmessage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
 # tests

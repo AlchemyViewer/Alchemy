@@ -28,7 +28,6 @@ target_sources(llcharacter
 target_sources(llcharacter
     PUBLIC
     FILE_SET HEADERS
-    BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     FILES
     llanimationstates.h
     llbvhloader.h
@@ -52,8 +51,6 @@ target_sources(llcharacter
     lltargetingmotion.h
     llvisualparam.h
     )
-
-target_include_directories(llcharacter INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(
     llcharacter

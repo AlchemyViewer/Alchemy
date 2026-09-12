@@ -35,7 +35,6 @@ target_link_libraries(llxml
     llcommon
     ll::pugixml
     )
-target_include_directories( llxml  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
