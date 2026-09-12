@@ -69,6 +69,12 @@ function(al_add_test name)
     set(libraries lltut_runner_lib ll::tut)
   endif()
 
+  # vcpkg's toolchain hangs an app-local copy step on every executable it
+  # sees declared. A test runs from the build tree with its libraries on the
+  # search path above, so the step has nothing to copy, and launching vcpkg
+  # once per test fails now and then under a parallel build when the
+  # executable is already open. Off for the scope of this declaration.
+  set(VCPKG_APPLOCAL_DEPS OFF)
   add_executable(${target} ${sources})
   target_link_libraries(${target} PRIVATE al::flags ${libraries} ${arg_LIBRARIES})
   if(arg_UNIT)
