@@ -182,18 +182,26 @@ if(WINDOWS)
   endforeach()
 endif()
 
-# Floating point. MSVC's /fp:fast permits reassociation, contraction and
-# reciprocal transforms and drops the signed-zero, exception and errno
-# guarantees, but still treats NaN and infinity as values that occur.
-# GCC and Clang's -ffast-math goes further (-ffinite-math-only), which
-# folds the renderer's isnan/isinf guards to constants; they stay at the
-# strict default here. Both compilers skip errno.
+# Floating point. Optimised builds take MSVC's /fp:fast contract on every
+# compiler: reassociation, contraction and reciprocal transforms allowed,
+# signed zero, FP exceptions and errno not guaranteed -- and NaN and
+# infinity still treated as values that occur. GCC and Clang get that as
+# the component flags rather than -ffast-math, which adds
+# -ffinite-math-only (folding every isnan/isinf guard in the renderer to a
+# constant) and, on the link line, crtfastmath.o (FTZ/DAZ for every thread
+# in the process, including ones that are not ours). Compile options never
+# reach the link line, and these spellings never trigger crtfastmath.o.
 if(WINDOWS)
   target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:/fp:fast>)
-elseif(LINUX)
-  target_compile_options(al_flags INTERFACE -fno-math-errno)
-elseif(DARWIN)
-  target_compile_options(al_flags INTERFACE -fno-fast-math)
+elseif(LINUX OR DARWIN)
+  target_compile_options(al_flags INTERFACE
+    -fno-math-errno
+    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-ffp-contract=fast>
+    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-trapping-math>
+    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-signed-zeros>
+    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fassociative-math>
+    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-freciprocal-math>
+  )
 endif()
 
 # Instruction set. AL_ISA_TIER names an x86-64 microarchitecture level

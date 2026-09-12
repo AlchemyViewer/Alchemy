@@ -37,6 +37,8 @@
 #include "../llmath.h"
 #include "../v3math.h"
 
+#include <cmath>
+
 namespace tut
 {
     struct math_data
@@ -565,6 +567,34 @@ namespace tut
             ensure("measured intersection should pass near known point",
                     measured_intersection.intersects(some_point, LARGE_RADIUS * allowable_relative_error));
         }
+    }
+
+    // The floating-point environment this executable was linked with. The
+    // build sets flush-to-zero and denormals-are-zero per thread on purpose,
+    // in code; nothing may impose them on the whole process from the link
+    // line. A denormal that survives a multiply here means no crtfastmath.o
+    // was linked.
+    template<> template<>
+    void math_object::test<12>()
+    {
+        volatile float denormal = 1.0e-40f;
+        volatile float one = 1.0f;
+        float product = denormal * one;
+        ensure("denormals are not flushed by the process default", product != 0.0f);
+        ensure("a denormal is still a denormal", product == 1.0e-40f);
+    }
+
+    // Optimised builds relax floating-point semantics to MSVC's /fp:fast
+    // contract, which keeps NaN and infinity. -ffinite-math-only would fold
+    // both of these guards to a constant.
+    template<> template<>
+    void math_object::test<13>()
+    {
+        volatile float zero = 0.0f;
+        float nan = zero / zero;
+        float inf = 1.0f / zero;
+        ensure("isnan sees a NaN", std::isnan(nan));
+        ensure("isinf sees an infinity", std::isinf(inf));
     }
 }
 
