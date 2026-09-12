@@ -81,13 +81,8 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
 
     target_include_directories (PROJECT_${project}_TEST_${name} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
 
-    set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}")
     if (DARWIN)
-      set_target_properties(PROJECT_${project}_TEST_${name}
-          PROPERTIES
-          BUILD_WITH_INSTALL_RPATH 1
-          INSTALL_RPATH "@executable_path/Frameworks"
-          )
+      set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES BUILD_RPATH "${SHARED_LIB_STAGING_DIR}")
     endif(DARWIN)
 
     #
@@ -195,7 +190,6 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
   add_executable(INTEGRATION_TEST_${testname} ${source_files})
   set_target_properties(INTEGRATION_TEST_${testname}
           PROPERTIES
-          RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}"
           FOLDER "Tests/${testproject}"
           )
   target_compile_definitions(INTEGRATION_TEST_${testname} PRIVATE
@@ -212,8 +206,7 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
     set_target_properties(INTEGRATION_TEST_${testname}
             PROPERTIES
             XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
-            BUILD_WITH_INSTALL_RPATH 1
-            INSTALL_RPATH "@executable_path/Frameworks"
+            BUILD_RPATH "${SHARED_LIB_STAGING_DIR}"
             )
   endif ()
 
@@ -258,19 +251,12 @@ ENDFUNCTION(LL_ADD_INTEGRATION_TEST)
 #*****************************************************************************
 #   SET_TEST_PATH
 #*****************************************************************************
+# The directories the runner puts on PATH or LD_LIBRARY_PATH for a test:
+# where the project's own shared libraries are staged.
 MACRO(SET_TEST_PATH LISTVAR)
   IF(WINDOWS)
-    # We typically build/package only Release variants of third-party
-    # libraries, so append the Release staging dir in case the library being
-    # sought doesn't have a debug variant.
-    set(${LISTVAR} ${SHARED_LIB_STAGING_DIR} ${SHARED_LIB_STAGING_DIR}/Release)
-  ELSEIF(DARWIN)
-    # We typically build/package only Release variants of third-party
-    # libraries, so append the Release staging dir in case the library being
-    # sought doesn't have a debug variant.
-    set(${LISTVAR} ${SHARED_LIB_STAGING_DIR} ${SHARED_LIB_STAGING_DIR}/Release/Frameworks /usr/lib)
+    set(${LISTVAR} ${SHARED_LIB_STAGING_DIR})
   ELSE(WINDOWS)
-    # Linux uses a single staging directory anyway.
     set(${LISTVAR} ${SHARED_LIB_STAGING_DIR} /usr/lib)
   ENDIF(WINDOWS)
 ENDMACRO(SET_TEST_PATH)
