@@ -1,7 +1,5 @@
 # -*- cmake -*-
 
-set(VERSION_BUILD "0" CACHE STRING "Revision number passed in from the outside")
-
 # Construct the viewer version number based on the indra/VIEWER_VERSION file
 if (NOT DEFINED VIEWER_SHORT_VERSION) # will be true in indra/, false in indra/newview/
     set(VIEWER_VERSION_BASE_FILE "${INDRA_SOURCE_DIR}/newview/VIEWER_VERSION.txt")

@@ -19,13 +19,13 @@ macro(to_viewer_staging_dirs from_dir targets)
     list(APPEND "${targets}" "${out_targets}")
 endmacro()
 
-if(WINDOWS AND USE_FMODSTUDIO)
+if(WINDOWS AND AL_USE_FMODSTUDIO)
     to_viewer_staging_dirs(
         ${fmod_lib_paths}
         third_party_targets
         fmod$<$<CONFIG:Debug>:L>.dll
         )
-elseif(DARWIN AND NOT USE_NSSPELLCHECKER)
+elseif(DARWIN AND NOT AL_USE_NSSPELLCHECKER)
     to_staging_dirs(
         "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"
         third_party_targets

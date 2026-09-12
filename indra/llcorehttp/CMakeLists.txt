@@ -85,7 +85,7 @@ target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
 option(LLCOREHTTP_TESTS "Build and run llcorehttp integration tests specifically" ON)
-if (BUILD_TESTING AND LLCOREHTTP_TESTS)
+if (AL_BUILD_TESTS AND LLCOREHTTP_TESTS)
   SET(llcorehttp_TEST_SOURCE_FILES
       )
 
@@ -153,4 +153,4 @@ if (BUILD_TESTING AND LLCOREHTTP_TESTS)
     set_target_properties(http_texture_load PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
   endif()
 
-endif (BUILD_TESTING AND LLCOREHTTP_TESTS)
+endif (AL_BUILD_TESTS AND LLCOREHTTP_TESTS)

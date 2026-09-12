@@ -55,7 +55,7 @@ target_link_libraries(appearance-utility-bin
 
 target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
 
-if (BUILD_HEADLESS)
+if (AL_BUILD_HEADLESS)
   add_executable(appearance-utility-headless-bin ${appearance_utility_SOURCE_FILES})
 
   target_link_libraries(appearance-utility-headless-bin
@@ -70,5 +70,5 @@ if (BUILD_HEADLESS)
     )
 
   target_precompile_headers(appearance-utility-headless-bin REUSE_FROM llprecompiled_exe)
-endif (BUILD_HEADLESS)
+endif (AL_BUILD_HEADLESS)
 

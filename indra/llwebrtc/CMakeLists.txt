@@ -46,9 +46,9 @@ if (WINDOWS)
                                        iphlpapi
                                        ole32)
 
-    if (USE_BUGSPLAT)
+    if (AL_USE_BUGSPLAT)
         set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
-    endif (USE_BUGSPLAT)
+    endif (AL_USE_BUGSPLAT)
 elseif(DARWIN)
     target_link_libraries(llwebrtc PRIVATE ll::webrtc
                                    "-framework AVFoundation"
@@ -61,7 +61,7 @@ elseif(DARWIN)
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 
 
-    if (USE_BUGSPLAT)
+    if (AL_USE_BUGSPLAT)
         set_target_properties(llwebrtc PROPERTIES XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
                                                   XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs")
         if(NOT XCODE)
@@ -70,7 +70,7 @@ elseif(DARWIN)
                     COMMAND dsymutil $<TARGET_FILE:llwebrtc>
                     COMMENT "Generating llwebrtc.dSYM")
         endif()
-    endif (USE_BUGSPLAT)
+    endif (AL_USE_BUGSPLAT)
 else()
     target_link_libraries(llwebrtc PRIVATE ll::webrtc ${CMAKE_DL_LIBS})
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
@@ -79,5 +79,5 @@ endif (WINDOWS)
 target_include_directories(llwebrtc INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
 endif ()

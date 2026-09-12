@@ -39,7 +39,7 @@ target_include_directories( llxml  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
     # unit tests
     SET(llxml_TEST_SOURCE_FILES
       llxmlnode.cpp

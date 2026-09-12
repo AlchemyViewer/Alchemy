@@ -28,9 +28,9 @@ target_link_libraries(llui_libtest
         )
 
 # The llkdu target only exists in a proprietary build.
-if (USE_KDU)
+if (AL_USE_KDU)
     target_link_libraries(llui_libtest PRIVATE llkdu)
-endif (USE_KDU)
+endif (AL_USE_KDU)
 
 set_target_properties(llui_libtest
     PROPERTIES
@@ -73,7 +73,7 @@ set_target_properties(xui_translate_repair
     FOLDER "Utils"
     )
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
     add_dependencies(BUILD_TESTS llui_libtest xui_overlay_check xui_translate_repair)
     add_test(NAME xui_overlay_check
         COMMAND xui_overlay_check "${INDRA_SOURCE_DIR}/newview/skins"

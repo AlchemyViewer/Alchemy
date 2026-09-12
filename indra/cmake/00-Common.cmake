@@ -51,7 +51,7 @@ set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
-if(USE_LTO)
+if(AL_USE_LTO)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
@@ -94,7 +94,7 @@ endif()
 set(AL_SANITIZING OFF)
 if(AL_SANITIZERS AND (LINUX OR DARWIN))
   set(AL_SANITIZING ON)
-  set(DISABLE_WEBRTC ON)
+  set(AL_USE_WEBRTC OFF)
   foreach(sanitizer IN LISTS AL_SANITIZERS)
     if(NOT sanitizer MATCHES "^(address|undefined|thread)$")
       message(FATAL_ERROR "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)")
@@ -114,7 +114,7 @@ endif()
 # Diagnostics
 #------------------------------------------------------------------------------
 
-if(AL_WARNINGS_AS_ERRORS AND NOT AL_SANITIZING)
+if(AL_ENABLE_WARNINGS_AS_ERRORS AND NOT AL_SANITIZING)
   set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 endif()
 
@@ -305,11 +305,11 @@ target_compile_definitions(al_flags INTERFACE
   SSE2NEON_SUPPRESS_WARNINGS=1         # SSE2NEON warns under optimisation for no reason
 )
 
-if(RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING)
+if(AL_ENABLE_CRASH_REPORTING)
   target_compile_definitions(al_flags INTERFACE LL_SEND_CRASH_REPORTS=1)
 endif()
 
-if(DISABLE_RELEASE_DEBUG_LOGGING)
+if(NOT AL_ENABLE_RELEASE_DEBUG_LOGGING)
   target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
 endif()
 
@@ -317,7 +317,7 @@ endif()
 if(WINDOWS)
   target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Debug>:DISABLE_WEBRTC=1>)
 endif()
-if(DISABLE_WEBRTC)
+if(NOT AL_USE_WEBRTC)
   target_compile_definitions(al_flags INTERFACE DISABLE_WEBRTC=1)
 endif()
 
@@ -378,7 +378,7 @@ elseif(DARWIN)
     "LINKER:-search_paths_first"
   )
   # ld64 needs somewhere to keep LTO intermediates or dsymutil finds no symbols.
-  if(USE_LTO AND NOT XCODE)
+  if(AL_USE_LTO AND NOT XCODE)
     target_link_options(al_flags INTERFACE
       "LINKER:-cache_path_lto,${CMAKE_BINARY_DIR}/LTOCache"
       "LINKER:-object_path_lto,$<TARGET_PROPERTY:BINARY_DIR>/CMakeFiles/$<TARGET_PROPERTY:NAME>.dir/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>$<TARGET_PROPERTY:NAME>_lto.o"

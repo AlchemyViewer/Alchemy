@@ -1,6 +1,6 @@
 # -*- cmake -*-
 
-if (USE_KDU)
+if (AL_USE_KDU)
   add_library (llkdu STATIC)
 
 
@@ -20,7 +20,7 @@ target_sources(llkdu
   target_include_directories(llkdu INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
   # Add tests
-  if (BUILD_TESTING)
+  if (AL_BUILD_TESTS)
     SET(llkdu_TEST_SOURCE_FILES
       llimagej2ckdu.cpp
       )

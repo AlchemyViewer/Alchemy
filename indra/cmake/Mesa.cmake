@@ -1,5 +1,5 @@
 include_guard()
-if(BUILD_HEADLESS)
+if(AL_BUILD_HEADLESS)
   add_library(ll::osmesa INTERFACE IMPORTED)
 
   find_package(PkgConfig)

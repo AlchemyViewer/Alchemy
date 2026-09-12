@@ -16,43 +16,44 @@ include(FeatureSummary)
 # order the root defines them. Descriptions come from the cache HELPSTRING so
 # they are written once.
 set(AL_CONFIGURATION_OPTIONS
-    BUILD_VIEWER
-    BUILD_APPEARANCE_UTIL
-    BUILD_TESTING
-    BUILD_HEADLESS
-    BUILD_DULLAHAN_EXAMPLE
-    BUILD_EXAMPLE_PLUGIN
-    BUILD_CEF_PLUGIN
-    BUILD_VLC_PLUGIN
-    BUILD_GSTREAMER_PLUGIN
-    USE_LINUX_VOLUME_CATCHER
-    USE_NDOF
-    USE_LTO
-    USE_OPENXR
-    USE_PRECOMPILED_HEADERS
-    USE_FMODSTUDIO
-    USE_FAUDIO
-    USE_OPENAL
-    AL_WARNINGS_AS_ERRORS
-    INSTALL_PROPRIETARY
-    USE_KDU
-    USE_DISCORD
-    USE_SDL_WINDOW
-    USE_NSSPELLCHECKER
-    USE_WINSPELLCHECK
-    RELEASE_CRASH_REPORTING
-    NON_RELEASE_CRASH_REPORTING
-    USE_BUGSPLAT
-    USE_SENTRY
-    USE_TRACY
-    USE_TRACY_ON_DEMAND
-    USE_TRACY_LOCAL_ONLY
-    USE_TRACY_GPU
-    USE_TRACY_GUI
-    ENABLE_SIGNING
-    USE_VELOPACK
-    DISABLE_RELEASE_DEBUG_LOGGING
-    PACKAGE
+    AL_BUILD_VIEWER
+    AL_BUILD_APPEARANCE_UTILITY
+    AL_BUILD_TESTS
+    AL_BUILD_HEADLESS
+    AL_BUILD_DULLAHAN_EXAMPLE
+    AL_BUILD_EXAMPLE_PLUGIN
+    AL_BUILD_CEF_PLUGIN
+    AL_BUILD_VLC_PLUGIN
+    AL_BUILD_GSTREAMER_PLUGIN
+    AL_USE_LINUX_VOLUME_CATCHER
+    AL_USE_NDOF
+    AL_USE_LTO
+    AL_USE_OPENXR
+    AL_USE_PRECOMPILED_HEADERS
+    AL_USE_FMODSTUDIO
+    AL_USE_FAUDIO
+    AL_USE_OPENAL
+    AL_ENABLE_WARNINGS_AS_ERRORS
+    AL_ENABLE_PROPRIETARY
+    AL_USE_KDU
+    AL_USE_DISCORD
+    AL_USE_SDL_WINDOW
+    AL_USE_NSSPELLCHECKER
+    AL_USE_WINSPELLCHECK
+    AL_USE_WEBRTC
+    AL_ENABLE_CRASH_REPORTING
+    AL_USE_BUGSPLAT
+    AL_USE_SENTRY
+    AL_USE_TRACY
+    AL_ENABLE_TRACY_ON_DEMAND
+    AL_ENABLE_TRACY_LOCAL_ONLY
+    AL_ENABLE_TRACY_GPU
+    AL_BUILD_TRACY_GUI
+    AL_ENABLE_SIGNING
+    AL_USE_VELOPACK
+    AL_ENABLE_RELEASE_DEBUG_LOGGING
+    AL_BUILD_PACKAGE
+    AL_BUILD_SHARED_LLCOMMON
     )
 
 function(al_feature_summary)
@@ -127,7 +128,7 @@ endfunction()
 
 function(al_configuration_report)
   message(STATUS "")
-  message(STATUS "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION} (revision from ${VIEWER_VERSION_REVISION_SOURCE})")
+  message(STATUS "${AL_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION} (revision from ${VIEWER_VERSION_REVISION_SOURCE})")
 
   # Toolchain
   if(LL_GENERATOR_IS_MULTI_CONFIG)
@@ -170,8 +171,8 @@ function(al_configuration_report)
   # Code generation
   _al_isa_description(isa)
   _al_report_row("ISA" "${isa}")
-  _al_report_row("LTO" "${USE_LTO}")
-  _al_report_row("PCH" "${USE_PRECOMPILED_HEADERS}")
+  _al_report_row("LTO" "${AL_USE_LTO}")
+  _al_report_row("PCH" "${AL_USE_PRECOMPILED_HEADERS}")
 
   _al_report_list(sanitizers_text "none" ${AL_SANITIZERS})
   _al_report_row("Sanitizers" "${sanitizers_text}")
@@ -183,51 +184,51 @@ function(al_configuration_report)
   endif()
 
   # Platform backends
-  if(USE_SDL_WINDOW)
+  if(AL_USE_SDL_WINDOW)
     _al_report_row("Window" "SDL3")
   else()
     _al_report_row("Window" "native")
   endif()
 
   set(audio)
-  if(USE_FMODSTUDIO)
+  if(AL_USE_FMODSTUDIO)
     list(APPEND audio "FMOD Studio")
   endif()
-  if(USE_FAUDIO)
+  if(AL_USE_FAUDIO)
     list(APPEND audio "FAudio")
   endif()
-  if(USE_OPENAL)
+  if(AL_USE_OPENAL)
     list(APPEND audio "OpenAL")
   endif()
   _al_report_list(audio_text "none" ${audio})
   _al_report_row("Audio" "${audio_text}")
 
-  if(USE_NSSPELLCHECKER)
+  if(AL_USE_NSSPELLCHECKER)
     _al_report_row("Spellcheck" "NSSpellChecker")
-  elseif(USE_WINSPELLCHECK)
+  elseif(AL_USE_WINSPELLCHECK)
     _al_report_row("Spellcheck" "Windows Spell Checking API")
   else()
     _al_report_row("Spellcheck" "Hunspell")
   endif()
 
-  if(USE_KDU)
+  if(AL_USE_KDU)
     _al_report_row("JPEG2000" "Kakadu")
   else()
     _al_report_row("JPEG2000" "OpenJPEG")
   endif()
 
-  if(USE_TRACY)
+  if(AL_USE_TRACY)
     set(tracy)
-    if(USE_TRACY_ON_DEMAND)
+    if(AL_ENABLE_TRACY_ON_DEMAND)
       list(APPEND tracy "on-demand")
     endif()
-    if(USE_TRACY_LOCAL_ONLY)
+    if(AL_ENABLE_TRACY_LOCAL_ONLY)
       list(APPEND tracy "local only")
     endif()
-    if(USE_TRACY_GPU)
+    if(AL_ENABLE_TRACY_GPU)
       list(APPEND tracy "GPU")
     endif()
-    if(USE_TRACY_GUI)
+    if(AL_BUILD_TRACY_GUI)
       list(APPEND tracy "GUI")
     endif()
     _al_report_list(tracy_text "default" ${tracy})
@@ -237,100 +238,96 @@ function(al_configuration_report)
   endif()
 
   set(crash)
-  if(USE_BUGSPLAT)
-    list(APPEND crash "BugSplat '${BUGSPLAT_DB}'")
+  if(AL_USE_BUGSPLAT)
+    list(APPEND crash "BugSplat '${AL_BUGSPLAT_DATABASE}'")
   endif()
-  if(USE_SENTRY)
+  if(AL_USE_SENTRY)
     list(APPEND crash "Sentry")
   endif()
   if(crash)
-    set(sending)
-    if(RELEASE_CRASH_REPORTING)
-      list(APPEND sending "release")
-    endif()
-    if(NON_RELEASE_CRASH_REPORTING)
-      list(APPEND sending "developer")
-    endif()
     _al_report_list(crash_text "off" ${crash})
-    _al_report_list(sending_text "no" ${sending})
-    _al_report_row("Crash reports" "${crash_text}; sent from ${sending_text} builds")
+    if(AL_ENABLE_CRASH_REPORTING)
+      _al_report_row("Crash reports" "${crash_text}, sending enabled")
+    else()
+      _al_report_row("Crash reports" "${crash_text}, sending disabled")
+    endif()
   else()
     _al_report_row("Crash reports" "off")
   endif()
 
   # Components
   set(targets)
-  if(BUILD_VIEWER)
+  if(AL_BUILD_VIEWER)
     list(APPEND targets "viewer")
   endif()
-  if(BUILD_APPEARANCE_UTIL)
+  if(AL_BUILD_APPEARANCE_UTILITY)
     list(APPEND targets "appearance utility")
   endif()
-  if(BUILD_DULLAHAN_EXAMPLE)
+  if(AL_BUILD_DULLAHAN_EXAMPLE)
     list(APPEND targets "dullahan example")
   endif()
   _al_report_list(targets_text "none" ${targets})
   _al_report_row("Targets" "${targets_text}")
 
   set(plugins)
-  if(BUILD_CEF_PLUGIN)
+  if(AL_BUILD_CEF_PLUGIN)
     list(APPEND plugins "CEF")
   endif()
-  if(BUILD_VLC_PLUGIN)
+  if(AL_BUILD_VLC_PLUGIN)
     list(APPEND plugins "VLC")
   endif()
-  if(BUILD_GSTREAMER_PLUGIN)
+  if(AL_BUILD_GSTREAMER_PLUGIN)
     list(APPEND plugins "GStreamer")
   endif()
-  if(USE_LINUX_VOLUME_CATCHER)
+  if(AL_USE_LINUX_VOLUME_CATCHER)
     list(APPEND plugins "CEF volume catcher")
   endif()
-  if(BUILD_EXAMPLE_PLUGIN)
+  if(AL_BUILD_EXAMPLE_PLUGIN)
     list(APPEND plugins "example")
   endif()
   _al_report_list(plugins_text "none" ${plugins})
   _al_report_row("Media plugins" "${plugins_text}")
 
   set(extras)
-  if(USE_NDOF)
+  if(AL_USE_NDOF)
     list(APPEND extras "NDOF")
   endif()
-  if(USE_OPENXR)
+  if(AL_USE_OPENXR)
     list(APPEND extras "OpenXR")
   endif()
-  if(USE_DISCORD)
+  if(AL_USE_DISCORD)
     list(APPEND extras "Discord")
   endif()
   _al_report_list(extras_text "none" ${extras})
   _al_report_row("Extras" "${extras_text}")
 
-  _al_report_row("Headless" "${BUILD_HEADLESS}")
-  _al_report_row("Proprietary" "${INSTALL_PROPRIETARY}")
-  _al_report_row("Grid" "${GRID}")
+  _al_report_row("Headless" "${AL_BUILD_HEADLESS}")
+  _al_report_row("Proprietary" "${AL_ENABLE_PROPRIETARY}")
+  _al_report_row("Grid" "${AL_GRID}")
 
-  if(DISABLE_RELEASE_DEBUG_LOGGING)
-    _al_report_row("Debug logging" "disabled in Release")
-  else()
+  if(AL_ENABLE_RELEASE_DEBUG_LOGGING)
     _al_report_row("Debug logging" "enabled in Release")
+  else()
+    _al_report_row("Debug logging" "disabled in Release")
   endif()
 
   # Packaging
-  if(DEFINED PACKAGE AND NOT PACKAGE)
-    _al_report_row("Installer" "none (PACKAGE off)")
+  if(DEFINED AL_BUILD_PACKAGE AND NOT AL_BUILD_PACKAGE)
+    _al_report_row("Installer" "none (AL_BUILD_PACKAGE off)")
   elseif(LINUX)
     _al_report_row("Installer" "tar.xz")
-  elseif(USE_VELOPACK)
+  elseif(AL_USE_VELOPACK)
     _al_report_row("Installer" "Velopack")
   else()
-    _al_report_row("Installer" "none (USE_VELOPACK off)")
+    _al_report_row("Installer" "none (AL_USE_VELOPACK off)")
   endif()
-  if(ENABLE_SIGNING)
-    _al_report_row("Signing" "identity '${SIGNING_IDENTITY}'")
+  if(AL_ENABLE_SIGNING)
+    _al_report_row("Signing" "identity '${AL_SIGNING_IDENTITY}'")
   else()
     _al_report_row("Signing" "off")
   endif()
 
-  if(BUILD_TESTING)
+  if(AL_BUILD_TESTS)
     _al_count_tests("${INDRA_SOURCE_DIR}" test_count)
     _al_report_row("Tests" "on, ${test_count} registered")
   else()

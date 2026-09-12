@@ -20,5 +20,5 @@ add_custom_command(OUTPUT packages-info.txt
   COMMAND ${Python3_EXECUTABLE}
           ${INDRA_SOURCE_DIR}/cmake/run_build_test.py -DAUTOBUILD_ADDRSIZE=${ADDRESS_SIZE} -DAUTOBUILD=${AUTOBUILD_EXECUTABLE}
           ${Python3_EXECUTABLE}
-          ${SCRIPTS_DIR}/packages-formatter.py "${VIEWER_CHANNEL}" "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}" "${AUTOBUILD_INSTALL_DIR}" > packages-info.txt
+          ${SCRIPTS_DIR}/packages-formatter.py "${AL_CHANNEL}" "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}" "${AUTOBUILD_INSTALL_DIR}" > packages-info.txt
   )

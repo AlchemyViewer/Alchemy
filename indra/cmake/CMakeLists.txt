@@ -12,6 +12,7 @@ set(cmake_SOURCE_FILES
         CEFPlugin.cmake
         CMakeCopyIfDifferent.cmake
         Collada-Dom.cmake
+        ConfigurationReport.cmake
         Copy3rdPartyLibs.cmake
         CURL.cmake
         DBUS.cmake
@@ -46,6 +47,7 @@ set(cmake_SOURCE_FILES
         PNG.cmake
         PugiXML.cmake
         Python.cmake
+        RetiredOptions.cmake
         run_build_test.py
         SDL3.cmake
         SSE2NEON.cmake

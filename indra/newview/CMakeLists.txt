@@ -8,13 +8,13 @@ include(CMakeCopyIfDifferent)
 include(Velopack)
 include(TemplateCheck)
 
-set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
+set(AL_VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
     "The name of the viewer executable to create.")
 
 # Generate version vars header
 configure_file(llversioninfovars.h.in llversioninfovars.h @ONLY)
 
-if (BUILD_VIEWER)
+if (AL_BUILD_VIEWER)
 
 # Javascript files for 3D snapshot functionality
 configure_file("${INDRA_SOURCE_DIR}/externals/js/CubemapToEquirectangular.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/CubemapToEquirectangular.js" COPYONLY)
@@ -60,7 +60,7 @@ endforeach()
 # ('test' is the default)
 set(ICON_PATH "test")
 set(VIEWER_MACOSX_PHASE "d")
-string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+string(TOLOWER ${AL_CHANNEL} channel_lower)
 if(channel_lower MATCHES "^alchemy release")
     set(ICON_PATH "release")
     set(VIEWER_MACOSX_PHASE "f")
@@ -1753,7 +1753,7 @@ if (WINDOWS)
          llwindebug.h
          )
 
-    if (USE_SDL_WINDOW)
+    if (AL_USE_SDL_WINDOW)
         # Unified SDL main-callbacks entry point shared with Linux/macOS.
         # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
         # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
@@ -1918,17 +1918,17 @@ list(APPEND viewer_SOURCE_FILES ${viewer_MISC_FILES})
 
 list(APPEND viewer_SOURCE_FILES ${viewer_HEADER_FILES})
 
-add_executable(${VIEWER_BINARY_NAME}
+add_executable(${AL_VIEWER_BINARY_NAME}
     WIN32
     MACOSX_BUNDLE
     ${viewer_SOURCE_FILES}
     )
 
-check_message_template(${VIEWER_BINARY_NAME})
+check_message_template(${AL_VIEWER_BINARY_NAME})
 
-target_include_directories(${VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-target_precompile_headers(${VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheaders.h)
+target_precompile_headers(${AL_VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheaders.h)
 
 # *NOTE: - this list is very sensitive to ordering, test carefully on all
 # platforms if you change the relative order of the entries here.
@@ -1958,7 +1958,7 @@ target_precompile_headers(${VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheade
 # dumped into the target binary and runtime lookup will find the most
 # modern version.
 
-target_link_libraries(${VIEWER_BINARY_NAME}
+target_link_libraries(${AL_VIEWER_BINARY_NAME}
         PRIVATE
         al::flags
         llaudio
@@ -1992,21 +1992,21 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         )
 
 if (TARGET ll::velopack)
-   target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE ll::velopack)
+   target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack)
 endif ()
 
-if (NOT DISABLE_WEBRTC)
+if (AL_USE_WEBRTC)
     if(WINDOWS)
-        target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
+        target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:llwebrtc>)
     else()
-        target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE llwebrtc)
+        target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llwebrtc)
     endif()
 endif()
 
 if (DARWIN)
     find_library(IOSURFACE_FRAMEWORK IOSurface)
     find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
-    target_link_libraries(${VIEWER_BINARY_NAME}
+    target_link_libraries(${AL_VIEWER_BINARY_NAME}
       PRIVATE
       ${IOSURFACE_FRAMEWORK}
       ${COREGRAPHICS_FRAMEWORK}
@@ -2016,7 +2016,7 @@ endif()
 # These are the generated targets that are copied for packaging that we do not directly link to
 # We special case for windows due to targets incompatible with Debug builds
 if (WINDOWS)
-  target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
+  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
@@ -2035,25 +2035,22 @@ else()
       $<TARGET_NAME_IF_EXISTS:media_plugin_example>
       )
 endif()
-add_dependencies(${VIEWER_BINARY_NAME} copy_input_dependencies)
+add_dependencies(${AL_VIEWER_BINARY_NAME} copy_input_dependencies)
 
-set(ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
+set(AL_ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
     "Path to artwork files.")
-
-set(PACKAGE ON CACHE BOOL
-    "Add a package target that builds an installer package.")
 
 set(VIEWER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,/$<CONFIG>,>)
 
 if (WINDOWS)
-    string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+    string(TOLOWER ${AL_CHANNEL} channel_lower)
     if(channel_lower MATCHES "^alchemy release")
         set(OUTPUT_BINARY_NAME "AlchemyViewer")
     else()
-        set(OUTPUT_BINARY_NAME "${VIEWER_CHANNEL_ONEWORD}")
+        set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
     endif()
 
-  set_target_properties(${VIEWER_BINARY_NAME}
+  set_target_properties(${AL_VIEWER_BINARY_NAME}
       PROPERTIES
       OUTPUT_NAME "${OUTPUT_BINARY_NAME}"
       RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
@@ -2068,12 +2065,12 @@ elseif(DARWIN)
   # These all get set with PROPERTIES. It's not that the property names are
   # magically known to CMake -- it's that these names are referenced in the
   # Info-Alchemy.plist file in the configure_file() directive below.
-  set(product "${VIEWER_CHANNEL}")
-  set(MACOSX_EXECUTABLE_NAME "${VIEWER_CHANNEL}")
-  set(MACOSX_BUNDLE_INFO_STRING "${VIEWER_CHANNEL}")
+  set(product "${AL_CHANNEL}")
+  set(MACOSX_EXECUTABLE_NAME "${AL_CHANNEL}")
+  set(MACOSX_BUNDLE_INFO_STRING "${AL_CHANNEL}")
   set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
   set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
-  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
+  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${AL_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
@@ -2081,7 +2078,7 @@ elseif(DARWIN)
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
   set_target_properties(
-    ${VIEWER_BINARY_NAME}
+    ${AL_VIEWER_BINARY_NAME}
     PROPERTIES
     OUTPUT_NAME "${product}"
     RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
@@ -2094,36 +2091,36 @@ elseif(DARWIN)
 
   # Support generating dsym for non-xcode generators
   if(NOT XCODE)
-    if(USE_BUGSPLAT)
+    if(AL_USE_BUGSPLAT)
       set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
       find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
-      add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-            COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${VIEWER_BINARY_NAME}>
+      add_custom_command(TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
+            COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>
             COMMENT "Generating Alchemy.dSYM")
     endif()
   endif()
 
-  target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
+  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
 
-  set(MANIFEST_DEST_DIR $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>)
+  set(MANIFEST_DEST_DIR $<TARGET_BUNDLE_DIR:${AL_VIEWER_BINARY_NAME}>)
   set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
-  if (ENABLE_SIGNING)
-    set(SIGNING_SETTING "--signature=${SIGNING_IDENTITY}")
-  else (ENABLE_SIGNING)
+  if (AL_ENABLE_SIGNING)
+    set(SIGNING_SETTING "--signature=${AL_SIGNING_IDENTITY}")
+  else (AL_ENABLE_SIGNING)
     set(SIGNING_SETTING "")
-  endif (ENABLE_SIGNING)
+  endif (AL_ENABLE_SIGNING)
 elseif(LINUX)
   set_target_properties(
-    ${VIEWER_BINARY_NAME}
+    ${AL_VIEWER_BINARY_NAME}
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}/bin/
     )
 
-  if(USE_BUGSPLAT)
+  if(AL_USE_BUGSPLAT)
     find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
-    set(DEBUG_BINARY_TARGET $<TARGET_FILE:${VIEWER_BINARY_NAME}>)
-    set(DEBUG_FILE_NAME "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${VIEWER_BINARY_NAME}>.debug")
-    add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+    set(DEBUG_BINARY_TARGET $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>)
+    set(DEBUG_FILE_NAME "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug")
+    add_custom_command(TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E make_directory ${SYMBOLS_STAGING_DIR}
           COMMAND ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib ${DEBUG_BINARY_TARGET} ${DEBUG_FILE_NAME}
           COMMAND ${OBJCOPY_PROGRAM} --strip-debug --strip-unneeded ${DEBUG_BINARY_TARGET}
@@ -2131,11 +2128,11 @@ elseif(LINUX)
           COMMENT "Generating ${DEBUG_FILE_NAME}")
   endif()
 
-  string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
+  string(TOLOWER ${AL_CHANNEL} channel_lower)
   if(channel_lower MATCHES "^alchemy release")
     set(OUTPUT_PRODUCT_NAME "AlchemyViewer")
   else()
-    set(OUTPUT_PRODUCT_NAME "${VIEWER_CHANNEL_ONEWORD}")
+    set(OUTPUT_PRODUCT_NAME "${AL_CHANNEL_ONEWORD}")
   endif()
 
   set(product ${OUTPUT_PRODUCT_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
@@ -2145,98 +2142,98 @@ endif()
 
 # Viewer Manifest Copy
 add_custom_command(
-  TARGET ${VIEWER_BINARY_NAME} POST_BUILD
+  TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
   COMMAND ${Python3_EXECUTABLE}
   ARGS
     ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
     --actions=copy
     --arch=${ARCH}
-    --artwork=${ARTWORK_DIR}
-    "--bugsplat=${BUGSPLAT_DB}"
-    "--discord=${USE_DISCORD}"
-    "--openal=${USE_OPENAL}"
-    "--tracy=${USE_TRACY}"
+    --artwork=${AL_ARTWORK_DIR}
+    "--bugsplat=${AL_BUGSPLAT_DATABASE}"
+    "--discord=${AL_USE_DISCORD}"
+    "--openal=${AL_USE_OPENAL}"
+    "--tracy=${AL_USE_TRACY}"
     --build=${CMAKE_CURRENT_BINARY_DIR}
     --buildtype=$<CONFIG>
     --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-    "--channel=${VIEWER_CHANNEL}"
+    "--channel=${AL_CHANNEL}"
     --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
     --dest=${MANIFEST_DEST_DIR}
     "--generator=${CMAKE_GENERATOR}"
-    --grid=${GRID}
+    --grid=${AL_GRID}
     --source=${CMAKE_CURRENT_SOURCE_DIR}
     --touch=${VIEWER_BINARY_DIR}/copy_touched.bat
     --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
     --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
-    "--velopack=${USE_VELOPACK}"
+    "--velopack=${AL_USE_VELOPACK}"
   COMMENT "Performing viewer_manifest copy"
   )
 
 # Useful for remote debugging or profiling if set to target a shared drive. for example, brad sets it to "dist/secondlife" to deploy under
 # the build tree (and then I share that directory) or "f:/dist/secondlife" to deploy to a network mounted drive (although this can be slow).
 # this will also create an "unpacked" tarball at build-<platform>/newview/unpacked_<platform>_7_1_11_<build num>.tar
-set(LOCAL_DIST_DIR "" CACHE PATH "Path for 'local' unpacked copy of viewer distribution to be deployed to.")
-if(IS_DIRECTORY ${LOCAL_DIST_DIR})
+set(AL_LOCAL_DIST_DIR "" CACHE PATH "Path for 'local' unpacked copy of viewer distribution to be deployed to.")
+if(IS_DIRECTORY ${AL_LOCAL_DIST_DIR})
   add_custom_command(
-      OUTPUT  ${LOCAL_DIST_DIR}/.${product}.copy_touched
+      OUTPUT  ${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
       COMMAND ${Python3_EXECUTABLE}
       ARGS
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
       "--actions=\"copy package unpacked\""
       --arch=${ARCH}
-      --artwork=${ARTWORK_DIR}
-      "--bugsplat=${BUGSPLAT_DB}"
-      "--discord=${USE_DISCORD}"
-      "--openal=${USE_OPENAL}"
-      "--tracy=${USE_TRACY}"
+      --artwork=${AL_ARTWORK_DIR}
+      "--bugsplat=${AL_BUGSPLAT_DATABASE}"
+      "--discord=${AL_USE_DISCORD}"
+      "--openal=${AL_USE_OPENAL}"
+      "--tracy=${AL_USE_TRACY}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=$<CONFIG>
       --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-      "--channel=${VIEWER_CHANNEL}"
+      "--channel=${AL_CHANNEL}"
       --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
-      --dest=${LOCAL_DIST_DIR}
+      --dest=${AL_LOCAL_DIST_DIR}
       "--generator=${CMAKE_GENERATOR}"
-      --grid=${GRID}
+      --grid=${AL_GRID}
       --source=${CMAKE_CURRENT_SOURCE_DIR}
-      "--velopack=${USE_VELOPACK}"
+      "--velopack=${AL_USE_VELOPACK}"
       --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-      --touch=${LOCAL_DIST_DIR}/.${product}.copy_touched
+      --touch=${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
       --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
       ${SIGNING_SETTING}
       DEPENDS
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
       ${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-      ${VIEWER_BINARY_NAME}
+      ${AL_VIEWER_BINARY_NAME}
       COMMENT "Performing viewer_manifest local dist copy"
       )
 
-  add_custom_target(copy_local_dist_viewer_manifest ALL DEPENDS ${LOCAL_DIST_DIR}/.${product}.copy_touched)
-elseif (NOT LOCAL_DIST_DIR STREQUAL "")
-  message(FATAL_ERROR "LOCAL_DIST_DIR ${LOCAL_DIST_DIR} specified but is not valid target directory to copy viewer distribution into.  Please create the directory and try again")
-endif ()  # IS_DIRECTORY ${LOCAL_DIST_DIR}
+  add_custom_target(copy_local_dist_viewer_manifest ALL DEPENDS ${AL_LOCAL_DIST_DIR}/.${product}.copy_touched)
+elseif (NOT AL_LOCAL_DIST_DIR STREQUAL "")
+  message(FATAL_ERROR "AL_LOCAL_DIST_DIR ${AL_LOCAL_DIST_DIR} specified but is not valid target directory to copy viewer distribution into.  Please create the directory and try again")
+endif ()  # IS_DIRECTORY ${AL_LOCAL_DIST_DIR}
 
-if (PACKAGE)
+if (AL_BUILD_PACKAGE)
   add_custom_command(
     OUTPUT ${MANIFEST_PACKAGE_OUT_FILE}
     COMMAND ${Python3_EXECUTABLE}
     ARGS
           ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
           --arch=${ARCH}
-          --artwork=${ARTWORK_DIR}
-          "--bugsplat=${BUGSPLAT_DB}"
+          --artwork=${AL_ARTWORK_DIR}
+          "--bugsplat=${AL_BUGSPLAT_DATABASE}"
               --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
-          "--discord=${USE_DISCORD}"
-          "--openal=${USE_OPENAL}"
-          "--tracy=${USE_TRACY}"
-              "--velopack=${USE_VELOPACK}"
+          "--discord=${AL_USE_DISCORD}"
+          "--openal=${AL_USE_OPENAL}"
+          "--tracy=${AL_USE_TRACY}"
+              "--velopack=${AL_USE_VELOPACK}"
           --build=${CMAKE_CURRENT_BINARY_DIR}
           --buildtype=$<CONFIG>
           --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-          "--channel=${VIEWER_CHANNEL}"
+          "--channel=${AL_CHANNEL}"
           --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
           --dest=${MANIFEST_DEST_DIR}
           "--generator=${CMAKE_GENERATOR}"
-          --grid=${GRID}
+          --grid=${AL_GRID}
           --source=${CMAKE_CURRENT_SOURCE_DIR}
           --touch=${VIEWER_BINARY_DIR}/touched.bat # Intentionally left as touched.bat
           --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
@@ -2245,21 +2242,21 @@ if (PACKAGE)
       DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
         ${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-        ${VIEWER_BINARY_NAME} # Prevents two copies of manifest from running at the same time
+        ${AL_VIEWER_BINARY_NAME} # Prevents two copies of manifest from running at the same time
     COMMENT "Performing viewer_manifest package"
     )
 
   add_custom_target(llpackage ALL DEPENDS
           ${MANIFEST_PACKAGE_OUT_FILE}
     )
-endif (PACKAGE)
+endif (AL_BUILD_PACKAGE)
 
-if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
-  if (USE_BUGSPLAT)
+if (AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
+  if (AL_USE_BUGSPLAT)
     # BugSplat symbol-file generation
     if (WINDOWS)
       # Redirect symbols to staging directory for upload to BugSplat.
-      set_target_properties(${VIEWER_BINARY_NAME}
+      set_target_properties(${AL_VIEWER_BINARY_NAME}
           PROPERTIES
           PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
           )
@@ -2272,21 +2269,21 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
         COMMAND "tar"
         ARGS
           "cJf"
-          "${VIEWER_CHANNEL}.sym.tar.xz"
-          "${VIEWER_CHANNEL}"
-        DEPENDS "${VIEWER_BINARY_NAME}"
+          "${AL_CHANNEL}.sym.tar.xz"
+          "${AL_CHANNEL}"
+        DEPENDS "${AL_VIEWER_BINARY_NAME}"
         WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
         COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
         )
       add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
-      add_dependencies(generate_symbols ${VIEWER_BINARY_NAME})
+      add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
 
     endif (WINDOWS)
     if (DARWIN)
       set(VIEWER_APP_XCARCHIVE "${SYMBOLS_STAGING_DIR}.xcarchive.zip")
 
       # we only need an xcarchive with dSYMs (including the application)
-      set_target_properties(${VIEWER_BINARY_NAME}
+      set_target_properties(${AL_VIEWER_BINARY_NAME}
             PROPERTIES
             XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
             XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs")
@@ -2296,9 +2293,9 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
         ARGS
           "-r"
           "${VIEWER_APP_XCARCHIVE}"
-            "${VIEWER_CHANNEL}"
+            "${AL_CHANNEL}"
           WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
-          DEPENDS "${VIEWER_BINARY_NAME}"
+          DEPENDS "${AL_VIEWER_BINARY_NAME}"
           COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload to BugSplat"
         )
       add_custom_target(generate_symbols DEPENDS
@@ -2310,22 +2307,22 @@ if (PACKAGE AND (RELEASE_CRASH_REPORTING OR NON_RELEASE_CRASH_REPORTING))
     endif (LINUX)
 
     add_dependencies(llpackage generate_symbols)
-  endif (USE_BUGSPLAT)
+  endif (AL_USE_BUGSPLAT)
 endif ()
 
 add_custom_target(viewer)
-add_dependencies(viewer ${VIEWER_BINARY_NAME})
+add_dependencies(viewer ${AL_VIEWER_BINARY_NAME})
 
-elseif(BUILD_TESTING)
+elseif(AL_BUILD_TESTS)
 
 # Create a dummy executable for test projects to generate against when viewer build is disabled
-add_executable(${VIEWER_BINARY_NAME} cmake_dummy.cpp)
-target_link_libraries(${VIEWER_BINARY_NAME} PRIVATE al::flags)
-target_include_directories(${VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+add_executable(${AL_VIEWER_BINARY_NAME} cmake_dummy.cpp)
+target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE al::flags)
+target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-endif(BUILD_VIEWER)
+endif(AL_BUILD_VIEWER)
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   # To add a viewer unit test, just add the test .cpp file below
   # This creates a separate test project per file listed.
 
@@ -2389,7 +2386,7 @@ if (BUILD_TESTING)
     lllogin
   )
 
-  set(test_project ${VIEWER_BINARY_NAME})
+  set(test_project ${AL_VIEWER_BINARY_NAME})
 
   set_property(SOURCE
     ${viewer_TEST_SOURCE_FILES}
@@ -2413,7 +2410,7 @@ if (BUILD_TESTING)
     llversioninfo.cpp
   )
 
-  LL_ADD_PROJECT_UNIT_TESTS(${VIEWER_BINARY_NAME} "${viewer_TEST_SOURCE_FILES}")
+  LL_ADD_PROJECT_UNIT_TESTS(${AL_VIEWER_BINARY_NAME} "${viewer_TEST_SOURCE_FILES}")
 
   #set(TEST_DEBUG on)
   LL_ADD_INTEGRATION_TEST(cppfeatures

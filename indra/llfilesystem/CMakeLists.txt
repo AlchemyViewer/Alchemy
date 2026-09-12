@@ -72,7 +72,7 @@ target_include_directories( llfilesystem  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR
 target_precompile_headers(llfilesystem REUSE_FROM llprecompiled)
 
 # Add tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
     # UNIT TESTS
     SET(llfilesystem_TEST_SOURCE_FILES
       lldiriterator.cpp

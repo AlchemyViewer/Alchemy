@@ -1,7 +1,7 @@
 # -*- cmake -*-
 
 # Integration tests of the llimage library (JPEG2000, PNG, jpeg, etc... images reading and writing)
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
 
 set(llimage_libtest_SOURCE_FILES
     llimage_libtest.cpp
@@ -33,9 +33,9 @@ target_link_libraries(llimage_libtest
         llimage
         )
 
-if (BUILD_VIEWER)
+if (AL_BUILD_VIEWER)
     # Ensure people working on the viewer don't break this library
     add_dependencies(viewer llimage_libtest)
-endif (BUILD_VIEWER)
+endif (AL_BUILD_VIEWER)
 
 endif()

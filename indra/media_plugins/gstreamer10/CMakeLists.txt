@@ -7,7 +7,7 @@ include(GStreamer10Plugin)
 
 ### media_plugin_gstreamer10 - dedicated host executable that statically links the
 ### GStreamer media plugin together with the slplugin host driver (no dlopen). This
-### plugin is only built on UNIX-but-not-Apple (see BUILD_GSTREAMER_PLUGIN).
+### plugin is only built on UNIX-but-not-Apple (see AL_BUILD_GSTREAMER_PLUGIN).
 
 set(media_plugin_gstreamer10_SOURCE_FILES
     media_plugin_gstreamer10.cpp

@@ -2,7 +2,7 @@
 
 include_guard()
 
-if(NOT BUILD_TESTING)
+if(NOT AL_BUILD_TESTS)
   return()
 endif()
 

@@ -51,7 +51,7 @@
       "name": "nonfree",
       "hidden": true,
       "cacheVariables": {
-        "INSTALL_PROPRIETARY": true
+        "AL_ENABLE_PROPRIETARY": true
       }
     },
     {
@@ -95,7 +95,7 @@
         "vs2026-os"
       ],
       "cacheVariables": {
-        "USE_SDL_WINDOW": true
+        "AL_USE_SDL_WINDOW": true
       }
     },
     {

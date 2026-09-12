@@ -2,7 +2,7 @@
 
 include_guard()
 
-if (USE_NSSPELLCHECKER)
+if (AL_USE_NSSPELLCHECKER)
   # Link target for the macOS NSSpellChecker engine (llspellcheckengine_mac.mm). No compile
   # definitions are needed: the engine is selected by which source CMake compiles, and the shared
   # llspellcheck.h is platform-clean (it only forward-declares the abstract LLSpellCheckEngine).

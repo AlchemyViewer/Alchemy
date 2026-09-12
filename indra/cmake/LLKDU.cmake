@@ -2,7 +2,7 @@
 include_guard()
 add_library( ll::kdu INTERFACE IMPORTED )
 
-if (USE_KDU)
+if (AL_USE_KDU)
   find_library(KDU_LIBRARY
     NAMES
     kdu
@@ -17,4 +17,4 @@ if (USE_KDU)
           ${KDU_INCLUDE_DIRS}
           )
   target_compile_definitions(ll::kdu INTERFACE KDU_NO_THREADS=1)
-endif (USE_KDU)
+endif (AL_USE_KDU)

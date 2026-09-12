@@ -29,7 +29,7 @@ cmake -S indra --preset ninja-os
 cmake -S indra --preset xcode-os
 ```
 
-Append `-os` presets for open-source builds, omit `-os` for proprietary builds (adds `-DINSTALL_PROPRIETARY=ON`). List available presets: `cmake -S indra --list-presets`
+Append `-os` presets for open-source builds, omit `-os` for proprietary builds (adds `-DAL_ENABLE_PROPRIETARY=ON`). List available presets: `cmake -S indra --list-presets`
 
 ### Build
 
@@ -50,7 +50,7 @@ The viewer executable lands at `build-<OS>-<preset>/newview/<CONFIG>/` (e.g., `S
 
 ### Tests
 
-Tests are off by default. To enable: add `-DBUILD_TESTING=ON` to the configure command. Then run via CTest:
+Tests are off by default. To enable: add `-DAL_BUILD_TESTS=ON` to the configure command. Then run via CTest:
 
 ```
 ctest --test-dir build-<OS>-<preset> --output-on-failure

@@ -69,7 +69,7 @@ target_link_libraries(
 
 target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
 #   SET(llcharacter_TEST_SOURCE_FILES
 #     )
 #   LL_ADD_PROJECT_UNIT_TESTS(llcharacter "${llcharacter_TEST_SOURCE_FILES}")

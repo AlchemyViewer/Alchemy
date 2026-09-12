@@ -54,7 +54,7 @@ target_link_libraries(llwindow PRIVATE al::flags PUBLIC llrender ${llwindow_BASE
 target_include_directories(llwindow INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llwindow REUSE_FROM llprecompiled)
 
-if(USE_SDL_WINDOW)
+if(AL_USE_SDL_WINDOW)
   target_sources(llwindow
     PRIVATE
       llsdl.cpp
@@ -114,7 +114,7 @@ if(WINDOWS)
   # NATIVE_KEY_TYPE typedef switches to the SDL flavor), and the factory never
   # instantiates LLWindowWin32 on an SDL build anyway. Headers stay listed so
   # llviewerwindow.cpp's (guarded) include still resolves.
-  if(NOT USE_SDL_WINDOW)
+  if(NOT AL_USE_SDL_WINDOW)
     target_sources(llwindow
       PRIVATE
         llwindowwin32.cpp
@@ -130,7 +130,7 @@ if(WINDOWS)
   )
 endif(WINDOWS)
 
-if(BUILD_HEADLESS)
+if(AL_BUILD_HEADLESS)
   include(Mesa)
   add_library(llwindowheadless STATIC)
 
@@ -155,4 +155,4 @@ if(BUILD_HEADLESS)
   )
   target_include_directories(llwindowheadless INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
   target_precompile_headers(llwindowheadless REUSE_FROM llprecompiled)
-endif(BUILD_HEADLESS)
+endif(AL_BUILD_HEADLESS)

@@ -2,32 +2,32 @@
 
 include_guard()
 
-if (USE_FMODSTUDIO)
+if (AL_USE_FMODSTUDIO)
   add_library(ll::fmodstudio INTERFACE IMPORTED )
   target_compile_definitions(ll::fmodstudio INTERFACE LL_FMODSTUDIO=1)
 
-  if (FMODSTUDIO_LIBRARY AND FMODSTUDIO_INCLUDE_DIR)
+  if (AL_FMODSTUDIO_LIBRARY AND AL_FMODSTUDIO_INCLUDE_DIR)
     # If the path have been specified in the arguments, use that
 
-    target_link_libraries(ll::fmodstudio INTERFACE ${FMODSTUDIO_LIBRARY})
-    target_include_directories(ll::fmodstudio SYSTEM INTERFACE  ${FMODSTUDIO_INCLUDE_DIR})
+    target_link_libraries(ll::fmodstudio INTERFACE ${AL_FMODSTUDIO_LIBRARY})
+    target_include_directories(ll::fmodstudio SYSTEM INTERFACE  ${AL_FMODSTUDIO_INCLUDE_DIR})
   else ()
     unset(FMOD_LIBRARY_RELEASE CACHE)
     unset(FMOD_LIBRARY_DEBUG CACHE)
     unset(FMOD_INCLUDE_DIR CACHE)
 
-    if (NOT FMODSTUDIO_SDK_DIR AND WINDOWS)
+    if (NOT AL_FMODSTUDIO_SDK_DIR AND WINDOWS)
       GET_FILENAME_COMPONENT(REG_DIR [HKEY_CURRENT_USER\\Software\\FMOD\ Studio\ API\ Windows] ABSOLUTE)
-      set(FMODSTUDIO_SDK_DIR ${REG_DIR} CACHE PATH "Path to the FMOD Studio SDK." FORCE)
+      set(AL_FMODSTUDIO_SDK_DIR ${REG_DIR} CACHE PATH "Path to the FMOD Studio SDK." FORCE)
     endif ()
 
-    if(FMODSTUDIO_SDK_DIR)
+    if(AL_FMODSTUDIO_SDK_DIR)
       if(WINDOWS)
-        set(fmod_lib_paths "${FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
+        set(fmod_lib_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
       elseif(LINUX)
-        set(fmod_lib_paths "${FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
+        set(fmod_lib_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
       endif()
-      set(fmod_inc_paths "${FMODSTUDIO_SDK_DIR}/api/core/inc")
+      set(fmod_inc_paths "${AL_FMODSTUDIO_SDK_DIR}/api/core/inc")
 
       if(WINDOWS)
         set(CMAKE_FIND_LIBRARY_SUFFIXES_OLD ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -48,9 +48,9 @@ if (USE_FMODSTUDIO)
 
       find_path(FMOD_INCLUDE_DIR fmod.hpp ${fmod_inc_paths})
       if(NOT FMOD_LIBRARY_RELEASE AND NOT FMOD_INCLUDE_DIR)
-        message(FATAL_ERROR "Provided FMODSTUDIO_SDK_DIR path not found '{$FMODSTUDIO_SDK_DIR}'")
+        message(FATAL_ERROR "Provided AL_FMODSTUDIO_SDK_DIR path not found '{$AL_FMODSTUDIO_SDK_DIR}'")
       else()
-        message(VERBOSE "Using FMOD Studio from ${FMODSTUDIO_SDK_DIR}")
+        message(VERBOSE "Using FMOD Studio from ${AL_FMODSTUDIO_SDK_DIR}")
       endif()
     endif ()
 

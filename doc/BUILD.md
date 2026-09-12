@@ -20,7 +20,7 @@ Every platform needs a C++ toolchain plus:
 - **CMake** 3.27+
 - **Git**
 - **Python** 3.13+ — used for build-time scripts
-- **Rust** and **.NET SDK** — only required when producing installer packages (the default; disable with `-DPACKAGE=OFF` to skip)
+- **Rust** and **.NET SDK** — only required when producing installer packages (the default; disable with `-DAL_BUILD_PACKAGE=OFF` to skip)
 
 Install commands are platform-specific; see below.
 
@@ -199,7 +199,7 @@ cmake -S indra --list-presets
 Preset names follow the pattern `<generator>[-<arch>][-os]`:
 
 - **`-os` suffix** — open-source only. Excludes proprietary components (KDU JPEG2000 codec, FMOD audio, and other non-free libraries).
-- **No `-os` suffix** — sets `INSTALL_PROPRIETARY=ON`. Requires licensed source for the proprietary components and is only useful if you have access to them.
+- **No `-os` suffix** — sets `AL_ENABLE_PROPRIETARY=ON`. Requires licensed source for the proprietary components and is only useful if you have access to them.
 
 Most contributors want the `-os` variants.
 
@@ -275,7 +275,7 @@ The viewer executable lands under `build-<OS>-<preset>/newview/<Config>/`:
 | macOS    | `build-Darwin-<preset>/newview/<Config>/<ChannelName>.app`  |
 | Linux    | `build-Linux-<preset>/newview/<Config>/<ChannelName>`       |
 
-`<ChannelName>` follows `VIEWER_CHANNEL` (default `Alchemy Test` → `AlchemyTest.exe` / `AlchemyTest.app`).
+`<ChannelName>` follows `AL_CHANNEL` (default `Alchemy Test` → `AlchemyTest.exe` / `AlchemyTest.app`).
 
 ## Configuration types
 
@@ -293,7 +293,7 @@ Ninja and Xcode presets are multi-config; Visual Studio presets always are. Pick
 Override any option at configure time with `-D<NAME>=<VALUE>`. For example:
 
 ```
-cmake -S indra --preset ninja-os -DBUILD_TESTING=ON -DUSE_FMODSTUDIO=ON
+cmake -S indra --preset ninja-os -DAL_BUILD_TESTS=ON -DAL_USE_FMODSTUDIO=ON
 ```
 
 Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The most commonly used:
@@ -302,62 +302,67 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 
 | Option                  | Default | Description                                                           |
 |:------------------------|:--------|:----------------------------------------------------------------------|
-| `BUILD_VIEWER`          | ON      | Build the viewer executable                                           |
-| `BUILD_APPEARANCE_UTIL` | OFF     | Build the appearance utility                                          |
-| `BUILD_TESTING`         | OFF     | Build and run unit + integration tests                                |
-| `PACKAGE`               | ON      | Produce installer packages after the viewer build (requires Velopack) |
-| `USE_VELOPACK`          | OFF     | Use Velopack for installer packaging (instead of NSIS/DMG)            |
+| `AL_BUILD_VIEWER`          | ON      | Build the viewer executable                                           |
+| `AL_BUILD_APPEARANCE_UTILITY` | OFF     | Build the appearance utility                                          |
+| `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
+| `AL_BUILD_PACKAGE`               | ON      | Produce installer packages after the viewer build (requires Velopack) |
+| `AL_USE_VELOPACK`          | OFF     | Use Velopack for installer packaging (instead of NSIS/DMG)            |
 
 ### Audio
 
 | Option           | Default | Description                            |
 |:-----------------|:--------|:---------------------------------------|
-| `USE_OPENAL`     | ON      | OpenAL audio engine                    |
-| `USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary) |
+| `AL_USE_OPENAL`     | ON      | OpenAL audio engine                    |
+| `AL_USE_FMODSTUDIO` | OFF     | FMOD Studio audio engine (proprietary) |
 
 ### Profiling
 
 | Option                 | Default            | Description                               |
 |:-----------------------|:-------------------|:------------------------------------------|
-| `USE_TRACY`            | ON for test builds | Tracy profiler support                    |
-| `USE_TRACY_ON_DEMAND`  | ON                 | Only profile when a Tracy server connects |
-| `USE_TRACY_LOCAL_ONLY` | ON                 | Disallow remote Tracy profiling           |
-| `USE_TRACY_GPU`        | OFF                | Tracy GPU profiling                       |
+| `AL_USE_TRACY`            | ON for test builds | Tracy profiler support                    |
+| `AL_ENABLE_TRACY_ON_DEMAND`  | ON                 | Only profile when a Tracy server connects |
+| `AL_ENABLE_TRACY_LOCAL_ONLY` | ON                 | Disallow remote Tracy profiling           |
+| `AL_ENABLE_TRACY_GPU`        | OFF                | Tracy GPU profiling                       |
 
 ### Optimization / instrumentation
 
 | Option                                            | Default | Description                                                        |
 |:--------------------------------------------------|:--------|:-------------------------------------------------------------------|
-| `USE_LTO`                                         | OFF     | Link Time Optimization                                             |
-| `USE_SSE4_2`, `USE_AVX`, `USE_AVX2`               | OFF     | Target SIMD instruction sets (x86_64 only)                         |
-| `ENABLE_ASAN`, `ENABLE_UBSAN`, `ENABLE_THREADSAN` | OFF     | Sanitizers (macOS and Linux only)                                  |
-| `<COMPILER>_DISABLE_FATAL_WARNINGS`               | OFF     | Don't treat warnings as errors. `<COMPILER>` is `VS`, `GCC`, or `CLANG` |
-| `DISABLE_RELEASE_DEBUG_LOGGING`                   | varies  | Strip debug-level logging from Release builds                      |
+| `AL_USE_LTO`                     | OFF     | Link Time Optimization                                                      |
+| `AL_ISA_TIER`                    | `v3`    | x86-64 level for the viewer and its vcpkg ports: `baseline`, `v2` (SSE4.2), `v3` (AVX2), `v4` (AVX-512). Ignored on macOS |
+| `AL_SANITIZERS`                  | empty   | Any of `address`, `undefined`, `thread` (GCC and Clang only)                |
+| `AL_ENABLE_WARNINGS_AS_ERRORS`   | ON      | Treat compiler warnings as errors                                           |
+| `AL_ENABLE_RELEASE_DEBUG_LOGGING`| Test channel only | Keep debug-level logging in Release builds                        |
+| `AL_USE_WEBRTC`                  | ON      | WebRTC voice (off automatically in sanitized builds)                        |
 
 ### Media plugins
 
 | Option                   | Default     | Description                                |
 |:-------------------------|:------------|:-------------------------------------------|
-| `BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
-| `BUILD_VLC_PLUGIN`       | ON          | VLC media plugin                           |
-| `BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only)        |
-| `BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
+| `AL_BUILD_CEF_PLUGIN`       | ON          | Chromium Embedded Framework (in-world web) |
+| `AL_BUILD_VLC_PLUGIN`       | ON          | VLC media plugin                           |
+| `AL_BUILD_GSTREAMER_PLUGIN` | ON on Linux | GStreamer media plugin (Linux only)        |
+| `AL_BUILD_EXAMPLE_PLUGIN`   | ON          | Reference/example plugin                   |
 
 ### Platform-specific
 
 | Option           | Default     | Description                                            |
 |:-----------------|:------------|:-------------------------------------------------------|
-| `USE_NVAPI`      | ON          | NVIDIA NVAPI for GPU profile support (Windows only)    |
-| `USE_OPENXR`     | OFF         | OpenXR VR support (experimental)                       |
-| `USE_SDL_WINDOW` | ON on Linux | SDL-based window management (Linux only; Wayland path) |
+| `AL_USE_OPENXR`     | OFF         | OpenXR VR support (experimental)                       |
+| `AL_USE_SDL_WINDOW` | ON on Linux | SDL-based window management (Linux only; Wayland path) |
 
 ### Crash reporting
 
 | Option                        | Default | Description                                |
 |:------------------------------|:--------|:-------------------------------------------|
-| `USE_SENTRY`                  | OFF     | Sentry crash reporting                     |
-| `RELEASE_CRASH_REPORTING`     | OFF     | Enable crash reporting in Release builds   |
-| `NON_RELEASE_CRASH_REPORTING` | OFF     | Enable crash reporting in developer builds |
+| `AL_USE_SENTRY`                  | OFF     | Sentry crash reporting                     |
+| `AL_ENABLE_CRASH_REPORTING`   | OFF     | Send crash reports from this build         |
+
+Every option the project defines carries the `AL_` prefix. Booleans use one of
+three verbs: `AL_BUILD_<x>` produces a target or artifact, `AL_USE_<x>` pulls
+in a dependency or picks a backend, `AL_ENABLE_<x>` switches a behaviour.
+Values are `AL_<NOUN>`. Configuring with a name from before this scheme
+prints a warning naming the replacement.
 
 See [`indra/CMakeLists.txt`](../indra/CMakeLists.txt) for the complete list.
 
@@ -366,7 +371,7 @@ See [`indra/CMakeLists.txt`](../indra/CMakeLists.txt) for the complete list.
 Enable tests at configure time:
 
 ```
-cmake -S indra --preset <preset> -DBUILD_TESTING=ON
+cmake -S indra --preset <preset> -DAL_BUILD_TESTS=ON
 ```
 
 Build, then run with CTest:
@@ -398,10 +403,10 @@ A few files under `xui/` are data rather than widget trees — `strings.xml`, `m
 
 ## Packaging
 
-Release packages are produced by [Velopack](https://velopack.io). The packaging step runs automatically after a successful build when `PACKAGE=ON` (the default). To skip it during development:
+Release packages are produced by [Velopack](https://velopack.io). The packaging step runs automatically after a successful build when `AL_BUILD_PACKAGE=ON` (the default). To skip it during development:
 
 ```
-cmake -S indra --preset <preset> -DPACKAGE=OFF
+cmake -S indra --preset <preset> -DAL_BUILD_PACKAGE=OFF
 ```
 
 Velopack also requires `dotnet tool restore` to have been run so the `vpk` CLI is on PATH.
@@ -445,7 +450,7 @@ Velopack needs the `vpk` .NET tool. Install it once per clone:
 dotnet tool restore
 ```
 
-If you don't intend to produce installers, disable packaging entirely with `-DPACKAGE=OFF` and skip the Rust / .NET setup.
+If you don't intend to produce installers, disable packaging entirely with `-DAL_BUILD_PACKAGE=OFF` and skip the Rust / .NET setup.
 
 ### Rust / `cargo` missing during packaging
 
@@ -455,21 +460,14 @@ Packaging uses Velopack, which invokes `cargo`. Install a stable Rust toolchain:
 rustup default stable
 ```
 
-Only required when `PACKAGE=ON` (the default).
+Only required when `AL_BUILD_PACKAGE=ON` (the default).
 
 ### Warnings fail the build
 
-By default, warnings are treated as errors. New compiler releases sometimes introduce diagnostics the tree hasn't yet cleaned up. Disable fatal warnings for the affected toolchain at configure time:
+By default, warnings are treated as errors. New compiler releases sometimes introduce diagnostics the tree hasn't yet cleaned up. Disable fatal warnings at configure time:
 
 ```
-# MSVC / Visual Studio
-cmake -S indra --preset vs2026-os -DVS_DISABLE_FATAL_WARNINGS=TRUE
-
-# GCC
-cmake -S indra --preset ninja-os -DGCC_DISABLE_FATAL_WARNINGS=TRUE
-
-# Clang
-cmake -S indra --preset ninja-os -DCLANG_DISABLE_FATAL_WARNINGS=TRUE
+cmake -S indra --preset vs2026-os -DAL_ENABLE_WARNINGS_AS_ERRORS=OFF
 ```
 
 ### Visual Studio doesn't recognize `Alchemy.slnx`

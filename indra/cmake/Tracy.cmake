@@ -2,10 +2,10 @@
 include_guard()
 add_library(ll::tracy INTERFACE IMPORTED)
 
-if (USE_TRACY)
+if (AL_USE_TRACY)
   find_package(Tracy CONFIG REQUIRED)
 
-  if (USE_TRACY_GPU AND NOT DARWIN) # Tracy OpenGL mode is incompatible with macOS/iOS
+  if (AL_ENABLE_TRACY_GPU AND NOT DARWIN) # Tracy OpenGL mode is incompatible with macOS/iOS
     target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_ENABLE_TRACY_OPENGL=1)
   endif ()
 
@@ -16,5 +16,5 @@ if (USE_TRACY)
 else()
   # See: indra/llcommon/llprofiler.h
   target_compile_definitions(ll::tracy INTERFACE LL_PROFILER_CONFIGURATION=1)
-endif (USE_TRACY)
+endif (AL_USE_TRACY)
 

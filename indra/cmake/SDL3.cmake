@@ -3,7 +3,7 @@ include_guard()
 
 # SDL's video and GL bring-up on its own, with none of the window backend's
 # other appetites. The GL-backed llrender tests want a context and nothing else,
-# and they want it on platforms where USE_SDL_WINDOW is off -- so this half is
+# and they want it on platforms where AL_USE_SDL_WINDOW is off -- so this half is
 # always available, and the window backend below builds on it.
 add_library(ll::SDL3core INTERFACE IMPORTED)
 find_package(SDL3 CONFIG REQUIRED)
@@ -11,7 +11,7 @@ target_link_libraries(ll::SDL3core INTERFACE SDL3::SDL3)
 
 add_library(ll::SDL3 INTERFACE IMPORTED)
 
-if(NOT USE_SDL_WINDOW)
+if(NOT AL_USE_SDL_WINDOW)
     return()
 endif()
 

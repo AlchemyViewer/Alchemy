@@ -175,7 +175,7 @@ target_include_directories( llmessage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
 # tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   SET(llmessage_TEST_SOURCE_FILES
     llcoproceduremanager.cpp
     llnamevalue.cpp

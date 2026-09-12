@@ -1,7 +1,7 @@
 # -*- cmake -*-
 include_guard()
 
-if (USE_OPENAL)
+if (AL_USE_OPENAL)
     add_library( ll::openal INTERFACE IMPORTED )
     target_compile_definitions( ll::openal INTERFACE LL_OPENAL=1)
 

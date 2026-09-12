@@ -1,6 +1,6 @@
 # -*- cmake -*-
 
-if (LL_COMMON_LINK_SHARED)
+if (AL_BUILD_SHARED_LLCOMMON)
   add_library(llcommon SHARED)
 
   target_compile_definitions(llcommon PUBLIC LL_COMMON_LINK_SHARED=1)
@@ -280,7 +280,7 @@ if (DARWIN)
   )
 endif (DARWIN)
 
-if (USE_TRACY)
+if (AL_USE_TRACY)
   # Skip precompiled headers on these files due to special compilation needs
   set_source_files_properties(
     llfasttimer.cpp
@@ -314,7 +314,7 @@ target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(llcommon stage_third_party_libs)
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   SET(llcommon_TEST_SOURCE_FILES
     # unit-testing llcommon is not possible right now as the test-harness *itself* depends upon llcommon, causing a circular dependency.  Add your 'unit' tests as integration tests for now.
     )

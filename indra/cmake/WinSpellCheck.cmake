@@ -2,7 +2,7 @@
 
 include_guard()
 
-if (USE_WINSPELLCHECK)
+if (AL_USE_WINSPELLCHECK)
   # Link target for the Windows Spell Checking engine (llspellcheckengine_win32.cpp). ole32 provides
   # CoInitializeEx/CoCreateInstance/CoTaskMemFree/CoUninitialize; <spellcheck.h> ships with the
   # Windows SDK and the API uses LPCWSTR (not BSTR), so no oleaut32/uuid.lib is required. No compile

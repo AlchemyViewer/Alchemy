@@ -8,45 +8,51 @@ cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
-set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
+set(AL_PROJECT_NAME "Alchemy" CACHE STRING
     "The root project/makefile/solution name. Defaults to Alchemy.")
 
 # Set our base channel
-set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
+set(AL_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 
 # Default deploy grid
-set(GRID agni CACHE STRING "Target Grid")
+set(AL_GRID agni CACHE STRING "Target Grid")
 
-# USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
-option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
+# AL_USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
+option(AL_USE_VELOPACK "Use Velopack for installer packaging" OFF)
 
 # Build executable options
-option(BUILD_VIEWER "Build the viewer project" ON)
-option(BUILD_APPEARANCE_UTIL "Build the appearance utility project" OFF)
-option(BUILD_TESTING "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
-option(BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
+option(AL_BUILD_VIEWER "Build the viewer project" ON)
+option(AL_BUILD_APPEARANCE_UTILITY "Build the appearance utility project" OFF)
+option(AL_BUILD_TESTS "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
+option(AL_BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
+option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
+option(AL_BUILD_PACKAGE "Add a package target that builds an installer package" ON)
+
+# CMake's own BUILD_TESTING, from the CTest module, is what ctest and IDE
+# integrations read; it follows AL_BUILD_TESTS.
+set(BUILD_TESTING ${AL_BUILD_TESTS})
 
 # Dullahan build options
-option(BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
+option(AL_BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
 
 # Plugin Build Options
-option(BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
-option(BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
-option(BUILD_VLC_PLUGIN "Build support for SLPlugin VLC media plugin." ON)
-cmake_dependent_option(BUILD_GSTREAMER_PLUGIN "Build support for SLPlugin Gstreamer media plugin." ON "UNIX;NOT APPLE" OFF)
+option(AL_BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
+option(AL_BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
+option(AL_BUILD_VLC_PLUGIN "Build support for SLPlugin VLC media plugin." ON)
+cmake_dependent_option(AL_BUILD_GSTREAMER_PLUGIN "Build support for SLPlugin Gstreamer media plugin." ON "UNIX;NOT APPLE" OFF)
 # Off since CEF 139: dlopen of the PulseAudio/PipeWire client libraries fails inside the CEF host process.
-cmake_dependent_option(USE_LINUX_VOLUME_CATCHER "Build the PulseAudio/PipeWire volume catcher into the CEF media plugin." OFF "UNIX;NOT APPLE;BUILD_CEF_PLUGIN" OFF)
+cmake_dependent_option(AL_USE_LINUX_VOLUME_CATCHER "Build the PulseAudio/PipeWire volume catcher into the CEF media plugin." OFF "UNIX;NOT APPLE;AL_BUILD_CEF_PLUGIN" OFF)
 
 # Build feature and optimization options
-option(USE_NDOF "Use NDOF space navigator joystick library." ON)
-option(USE_LTO "Enable Link Time Optimization" OFF)
-option(USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
-option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
+option(AL_USE_NDOF "Use NDOF space navigator joystick library." ON)
+option(AL_USE_LTO "Enable Link Time Optimization" OFF)
+option(AL_USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
+option(AL_USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
 
 # Audio Engines
-option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
-option(USE_FAUDIO "Enable support for the FAudio audio engine" ON)
-option(USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
+option(AL_USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
+option(AL_USE_FAUDIO "Enable support for the FAudio audio engine" ON)
+option(AL_USE_OPENAL "Enable support for the OpenAL audio engine" OFF)
 
 # Instruction set: an x86-64 microarchitecture level, for the viewer and the
 # vcpkg triplet alike (baseline = x86-64, v2 = SSE4.2, v3 = AVX2, v4 = AVX-512).
@@ -61,69 +67,70 @@ endif()
 set(AL_SANITIZERS "" CACHE STRING "Sanitizers to build with: a list drawn from address, undefined, thread")
 
 # Warnings
-option(AL_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 # Proprietary Libraries
-option(INSTALL_PROPRIETARY "Build with support for non-free libraries" OFF)
-cmake_dependent_option(USE_KDU "Enable support for the Kakadu JPEG2000 decoding library" ON "INSTALL_PROPRIETARY" OFF)
+option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
+cmake_dependent_option(AL_USE_KDU "Enable support for the Kakadu JPEG2000 decoding library" ON "AL_ENABLE_PROPRIETARY" OFF)
 
 # Uncomment when support for Discord is finalized
-#cmake_dependent_option(USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "INSTALL_PROPRIETARY" OFF)
+#cmake_dependent_option(AL_USE_DISCORD "Enable Discord SDK and Rich Prescence support" ON "AL_ENABLE_PROPRIETARY" OFF)
 
 # SDL Options
 if (UNIX)
-  option(USE_SDL_WINDOW "Build with SDL based window management and input" ON)
+  option(AL_USE_SDL_WINDOW "Build with SDL based window management and input" ON)
 else ()
-  option(USE_SDL_WINDOW "Build with SDL based window management and input (experimental on Windows)" OFF)
+  option(AL_USE_SDL_WINDOW "Build with SDL based window management and input (experimental on Windows)" OFF)
 endif ()
 
 # Spell checking backend
-cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" ON "APPLE" OFF)
-cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" ON "WIN32" OFF)
+cmake_dependent_option(AL_USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" ON "APPLE" OFF)
+cmake_dependent_option(AL_USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" ON "WIN32" OFF)
 
-# Configure crash reporting
-option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
-option(NON_RELEASE_CRASH_REPORTING "Enable use of crash reporting in developer builds" OFF)
+# Crash reporting
+option(AL_ENABLE_CRASH_REPORTING "Send crash reports from this build" OFF)
 
 # Bugsplat setup
-if (INSTALL_PROPRIETARY AND (WIN32 OR APPLE))
-    # Note that viewer_manifest.py makes decision based on BUGSPLAT_DB and not USE_BUGSPLAT
-    if (BUGSPLAT_DB)
-        set(USE_BUGSPLAT ON  CACHE BOOL "Use the BugSplat crash reporting system")
-    else (BUGSPLAT_DB)
-        set(USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-    endif (BUGSPLAT_DB)
+if (AL_ENABLE_PROPRIETARY AND (WIN32 OR APPLE))
+    # Note that viewer_manifest.py makes decision based on AL_BUGSPLAT_DATABASE and not AL_USE_BUGSPLAT
+    if (AL_BUGSPLAT_DATABASE)
+        set(AL_USE_BUGSPLAT ON  CACHE BOOL "Use the BugSplat crash reporting system")
+    else (AL_BUGSPLAT_DATABASE)
+        set(AL_USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
+    endif (AL_BUGSPLAT_DATABASE)
 else ()
-    set(USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-    set(BUGSPLAT_DB "" CACHE STRING "BugSplat crash database name")
+    set(AL_USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
+    set(AL_BUGSPLAT_DATABASE "" CACHE STRING "BugSplat crash database name")
 endif ()
 
 # Sentry Setup
-option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
+option(AL_USE_SENTRY "Use the Sentry crash reporting system" OFF)
 
 # Tracy Profiler
 # Default Tracy profiling on for test builds, but off for all others
 set(BUILDING_TEST_CHANNEL OFF)
-string(TOLOWER "${VIEWER_CHANNEL}" channel_lower)
+string(TOLOWER "${AL_CHANNEL}" channel_lower)
 if(channel_lower MATCHES "^alchemy test")
   set(BUILDING_TEST_CHANNEL ON)
 endif()
-cmake_dependent_option(USE_TRACY "Enable support for Tracy profiler" ON "BUILDING_TEST_CHANNEL" OFF)
-option(USE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
-option(USE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." ON)
-option(USE_TRACY_GPU "Use Tracy GPU profiling" OFF)
-option(USE_TRACY_GUI "Enable building Tracy profiler GUI" OFF)
+cmake_dependent_option(AL_USE_TRACY "Enable support for Tracy profiler" ON "BUILDING_TEST_CHANNEL" OFF)
+option(AL_ENABLE_TRACY_ON_DEMAND "Use on-demand Tracy profiling." ON)
+option(AL_ENABLE_TRACY_LOCAL_ONLY "Disallow remote Tracy profiling." ON)
+option(AL_ENABLE_TRACY_GPU "Use Tracy GPU profiling" OFF)
+option(AL_BUILD_TRACY_GUI "Enable building Tracy profiler GUI" OFF)
 
 # Debug logging stays available in Release builds of the Test channel only.
-if(BUILDING_TEST_CHANNEL)
-  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" OFF)
-else()
-  option(DISABLE_RELEASE_DEBUG_LOGGING "Disable building with debug logging in Release" ON)
-endif()
+cmake_dependent_option(AL_ENABLE_RELEASE_DEBUG_LOGGING "Keep debug logging in Release builds" ON "BUILDING_TEST_CHANNEL" OFF)
+
+# WebRTC voice. Off in sanitized builds, which cannot link libwebrtc.
+option(AL_USE_WEBRTC "Build with WebRTC voice" ON)
 
 # Signing
-option(ENABLE_SIGNING "Enable signing the viewer" OFF)
-set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
+option(AL_ENABLE_SIGNING "Enable signing the viewer" OFF)
+set(AL_SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if necessary.")
+
+# Warn about any option name from before the AL_ scheme.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RetiredOptions.cmake)
 
 # macOS deploy target(must be set BEFORE first project call)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value.")
@@ -145,67 +152,67 @@ endif (NOT CMAKE_BUILD_TYPE)
 # vcpkg feature flags MUST be set before the first project() call below  #
 ##########################################################################
 
-if (USE_KDU)
+if (AL_USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
 endif()
 
 # Setup Tracy feature flags
-if (USE_TRACY)
+if (AL_USE_TRACY)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy")
 endif()
 
-if (USE_TRACY AND USE_TRACY_LOCAL_ONLY)
+if (AL_USE_TRACY AND AL_ENABLE_TRACY_LOCAL_ONLY)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-local")
 endif()
 
-if(USE_TRACY AND USE_TRACY_ON_DEMAND)
+if(AL_USE_TRACY AND AL_ENABLE_TRACY_ON_DEMAND)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-on-demand")
 endif()
 
-if(USE_TRACY AND USE_TRACY_GUI)
+if(AL_USE_TRACY AND AL_BUILD_TRACY_GUI)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy-gui")
 endif()
 
-if(USE_OPENXR)
+if(AL_USE_OPENXR)
   list(APPEND VCPKG_MANIFEST_FEATURES "openxr")
 endif()
 
-if(USE_BUGSPLAT)
+if(AL_USE_BUGSPLAT)
   list(APPEND VCPKG_MANIFEST_FEATURES "bugsplat")
 endif()
 
-if(USE_VELOPACK)
+if(AL_USE_VELOPACK)
   list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
 endif()
 
-if(USE_SENTRY)
+if(AL_USE_SENTRY)
   list(APPEND VCPKG_MANIFEST_FEATURES "sentry")
 endif()
 
-if(BUILD_HEADLESS)
+if(AL_BUILD_HEADLESS)
   list(APPEND VCPKG_MANIFEST_FEATURES "offscreen")
 endif()
 
-if(USE_FAUDIO)
+if(AL_USE_FAUDIO)
   list(APPEND VCPKG_MANIFEST_FEATURES "faudio")
 endif()
 
-if(USE_OPENAL)
+if(AL_USE_OPENAL)
   list(APPEND VCPKG_MANIFEST_FEATURES "openal")
 endif()
 
-if(BUILD_DULLAHAN_EXAMPLE)
+if(AL_BUILD_DULLAHAN_EXAMPLE)
   list(APPEND VCPKG_MANIFEST_FEATURES "dullahan-example")
 endif()
 
-if (NOT USE_NSSPELLCHECKER AND NOT USE_WINSPELLCHECK)
+if (NOT AL_USE_NSSPELLCHECKER AND NOT AL_USE_WINSPELLCHECK)
   list(APPEND VCPKG_MANIFEST_FEATURES "hunspell")
 endif()
 
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(NOT USE_PRECOMPILED_HEADERS)
+if(NOT AL_USE_PRECOMPILED_HEADERS)
     set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
 endif()
 
@@ -216,7 +223,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(BootstrapVcpkg)
 
 # Generate base project after setting pre-generation variables
-project(${ROOT_PROJECT_NAME})
+project(${AL_PROJECT_NAME})
 
 # Location of indra directory
 set(INDRA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -242,7 +249,7 @@ include(Linking)
 # Set up version number generation
 include(BuildVersion)
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   set(CMAKE_SKIP_TEST_ALL_DEPENDENCY FALSE)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
@@ -334,7 +341,7 @@ foreach(module IN LISTS AL_DEPENDENCY_MODULES)
 endforeach()
 
 # Add our test macros
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   include(LLAddBuildTest)
 endif ()
 
@@ -368,7 +375,7 @@ add_subdirectory(llplugin)
 add_subdirectory(llui)
 add_subdirectory(viewer_components)
 
-if(BUILD_TESTING)
+if(AL_BUILD_TESTS)
   # Legacy C++ tests.
   add_subdirectory(test)
 endif()
@@ -376,7 +383,7 @@ endif()
 # viewer media plugins
 add_subdirectory(media_plugins)
 
-if (BUILD_APPEARANCE_UTIL)
+if (AL_BUILD_APPEARANCE_UTILITY)
   # Avatar Appearance Utility
   add_subdirectory(llappearanceutility)
 endif()
@@ -389,10 +396,10 @@ add_subdirectory(doxygen EXCLUDE_FROM_ALL)
 # sets the 'startup project' for debugging from visual studio.
 set_property(
         DIRECTORY
-        PROPERTY VS_STARTUP_PROJECT ${VIEWER_BINARY_NAME}
+        PROPERTY VS_STARTUP_PROJECT ${AL_VIEWER_BINARY_NAME}
         )
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   # Define after the custom targets are created so
   # individual apps can add themselves as dependencies
   add_subdirectory(integration_tests)

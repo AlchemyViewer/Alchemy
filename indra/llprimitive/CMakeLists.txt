@@ -70,7 +70,7 @@ target_link_libraries(llprimitive PUBLIC
 target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 
 # add unit tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
     INCLUDE(LLAddBuildTest)
     SET(llprimitive_TEST_SOURCE_FILES
       llmediaentry.cpp

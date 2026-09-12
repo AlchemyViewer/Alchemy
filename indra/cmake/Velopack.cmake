@@ -4,7 +4,7 @@
 
 include_guard()
 
-if(NOT USE_VELOPACK)
+if(NOT AL_USE_VELOPACK)
     return()
 endif()
 

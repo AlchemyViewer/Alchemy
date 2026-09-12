@@ -43,7 +43,7 @@ target_include_directories( llimage  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llimage PRIVATE al::flags)
-if (USE_KDU)
+if (AL_USE_KDU)
   target_link_libraries(llimage PUBLIC llkdu)
 else ()
   target_link_libraries(llimage PUBLIC llimagej2coj)
@@ -63,7 +63,7 @@ target_link_libraries(llimage
 target_precompile_headers(llimage REUSE_FROM llprecompiled)
 
 # Add tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   SET(llimage_TEST_SOURCE_FILES
     llimageworker.cpp
     )

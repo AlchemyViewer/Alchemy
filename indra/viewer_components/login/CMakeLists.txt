@@ -29,7 +29,7 @@ target_link_libraries(lllogin
         llxml
     )
 
-if(BUILD_TESTING)
+if(AL_BUILD_TESTS)
   SET(lllogin_TEST_SOURCE_FILES
       lllogin.cpp
       )

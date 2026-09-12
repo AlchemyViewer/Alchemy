@@ -55,7 +55,7 @@ target_include_directories( llinventory  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR}
 target_precompile_headers(llinventory REUSE_FROM llprecompiled)
 
 # add unit tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
     INCLUDE(LLAddBuildTest)
     SET(llinventory_TEST_SOURCE_FILES
       # no real unit tests yet!

@@ -70,7 +70,7 @@ set(llrender_HEADER_FILES
 
 list(APPEND llrender_SOURCE_FILES ${llrender_HEADER_FILES})
 
-if (BUILD_HEADLESS)
+if (AL_BUILD_HEADLESS)
   add_library (llrenderheadless STATIC
     ${llrender_SOURCE_FILES}
     )
@@ -94,7 +94,7 @@ if (BUILD_HEADLESS)
           )
 
   target_precompile_headers(llrenderheadless REUSE_FROM llprecompiled)
-endif (BUILD_HEADLESS)
+endif (AL_BUILD_HEADLESS)
 
 add_library (llrender STATIC ${llrender_SOURCE_FILES})
 target_include_directories(llrender INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -122,26 +122,26 @@ target_precompile_headers(llrender REUSE_FROM llprecompiled)
 # llgl.cpp talks to WGL directly on Windows (wglGetCurrentDC for the
 # extensions string) even when SDL owns context creation, so keep the
 # OpenGL link explicit there regardless of the window backend.
-if (DARWIN OR WINDOWS OR NOT USE_SDL_WINDOW)
+if (DARWIN OR WINDOWS OR NOT AL_USE_SDL_WINDOW)
   target_link_libraries(llrender
           PUBLIC
           OpenGL::GL
           )
 endif()
 
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   # llrender pulls in llcommon / llimage / llmath / llfilesystem / llxml /
   # llwindow + ll::freetype / ll::harfbuzz / ll::plutosvg / ll::glext via
   # its own target_link_libraries; transitive linking propagates them to
   # consumers, so listing llrender alone is enough.
   #
-  # When BUILD_HEADLESS=ON, llfontregistry_test gets re-pointed at
+  # When AL_BUILD_HEADLESS=ON, llfontregistry_test gets re-pointed at
   # llrenderheadless (with LL_MESA_HEADLESS=1) so the trailing GL tests
   # at the bottom of that file activate. alfontcolrv1 stays on regular
   # llrender — it doesn't need GL.
   set(test_project llrender)
   set(test_libs llrender)
-  if (BUILD_HEADLESS)
+  if (AL_BUILD_HEADLESS)
     set(registry_test_libs llrenderheadless)
   else()
     set(registry_test_libs llrender)
@@ -208,7 +208,7 @@ if (BUILD_TESTING)
         "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   endif()
 
-  if (BUILD_HEADLESS)
+  if (AL_BUILD_HEADLESS)
     # Headless GL tests: link against llrenderheadless (which transitively
     # pulls llwindowheadless + ll::osmesa) so the tests can stand up an
     # OSMesa GL context and exercise GL-backed code paths. LL_MESA_HEADLESS=1

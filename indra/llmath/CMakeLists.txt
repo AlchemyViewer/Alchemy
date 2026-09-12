@@ -96,7 +96,7 @@ target_include_directories(llmath  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
-if (BUILD_TESTING)
+if (AL_BUILD_TESTS)
   # UNIT TESTS
   SET(llmath_TEST_SOURCE_FILES
     llbboxlocal.cpp

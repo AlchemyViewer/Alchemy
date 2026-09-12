@@ -2,7 +2,7 @@
 include_guard()
 add_library(ll::ndof INTERFACE IMPORTED)
 
-if (USE_NDOF)
+if (AL_USE_NDOF)
   target_compile_definitions(ll::ndof INTERFACE LIB_NDOF=1)
 
   # libndofdev on Windows and macOS, open-libndofdev on Linux; both ship the
@@ -14,4 +14,4 @@ if (USE_NDOF)
     include(SDL3)
     target_link_libraries(ll::ndof INTERFACE ll::SDL3)
   endif()
-endif (USE_NDOF)
+endif (AL_USE_NDOF)

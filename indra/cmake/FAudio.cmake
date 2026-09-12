@@ -1,7 +1,7 @@
 # -*- cmake -*-
 include_guard()
 
-if (USE_FAUDIO)
+if (AL_USE_FAUDIO)
     add_library( ll::faudio INTERFACE IMPORTED )
     target_compile_definitions( ll::faudio INTERFACE LL_FAUDIO=1)
 
