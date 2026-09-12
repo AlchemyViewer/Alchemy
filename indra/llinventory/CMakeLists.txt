@@ -55,18 +55,7 @@ target_precompile_headers(llinventory REUSE_FROM llprecompiled)
 
 # add unit tests
 if (AL_BUILD_TESTS)
-    INCLUDE(LLAddBuildTest)
-    SET(llinventory_TEST_SOURCE_FILES
-      # no real unit tests yet!
-      )
-    LL_ADD_PROJECT_UNIT_TESTS(llinventory "${llinventory_TEST_SOURCE_FILES}")
-
-    #set(TEST_DEBUG on)
-    set(test_libs llinventory llmath llcorehttp llfilesystem )
-    set(test_project llinventory)
-    LL_ADD_INTEGRATION_TEST(inventorymisc "" "${test_libs}" "${test_project}")
-    LL_ADD_INTEGRATION_TEST(llparcel "" "${test_libs}" "${test_project}")
-    LL_ADD_INTEGRATION_TEST(llpermissions "" "${test_libs}" "${test_project}")
-    LL_ADD_INTEGRATION_TEST(llsaleinfo "" "${test_libs}" "${test_project}")
-    LL_ADD_INTEGRATION_TEST(lluserrelations "" "${test_libs}" "${test_project}")
+    foreach(test inventorymisc llparcel llpermissions llsaleinfo lluserrelations)
+      al_add_test(${test} PROJECT llinventory LIBRARIES llinventory llmath llcorehttp llfilesystem)
+    endforeach()
 endif ()

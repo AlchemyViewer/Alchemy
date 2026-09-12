@@ -75,7 +75,3 @@ else()
     target_link_libraries(llwebrtc PRIVATE ll::webrtc ${CMAKE_DL_LIBS})
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 endif (WINDOWS)
-
-# Add tests
-if (AL_BUILD_TESTS)
-endif ()

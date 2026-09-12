@@ -63,10 +63,7 @@ target_precompile_headers(llimage REUSE_FROM llprecompiled)
 
 # Add tests
 if (AL_BUILD_TESTS)
-  SET(llimage_TEST_SOURCE_FILES
-    llimageworker.cpp
-    )
-  LL_ADD_PROJECT_UNIT_TESTS(llimage "${llimage_TEST_SOURCE_FILES}")
+  al_add_test(llimageworker UNIT PROJECT llimage)
 endif ()
 
 

@@ -32,7 +32,6 @@ set(cmake_SOURCE_FILES
         Linking.cmake
         LLAddBuildTest.cmake
         LLKDU.cmake
-        LLTestCommand.cmake
         Mesa.cmake
         Meshoptimizer.cmake
         Mikktspace.cmake
@@ -48,7 +47,6 @@ set(cmake_SOURCE_FILES
         PugiXML.cmake
         Python.cmake
         RetiredOptions.cmake
-        run_build_test.py
         SDL3.cmake
         SSE2NEON.cmake
         TemplateCheck.cmake

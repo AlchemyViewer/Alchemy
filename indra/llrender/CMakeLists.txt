@@ -145,12 +145,10 @@ if (AL_BUILD_TESTS)
   # its own target_link_libraries; transitive linking propagates them to
   # consumers, so listing llrender alone is enough.
   #
-  # When AL_BUILD_HEADLESS=ON, llfontregistry_test gets re-pointed at
-  # llrenderheadless (with LL_MESA_HEADLESS=1) so the trailing GL tests
-  # at the bottom of that file activate. alfontcolrv1 stays on regular
-  # llrender — it doesn't need GL.
-  set(test_project llrender)
-  set(test_libs llrender)
+  # When AL_BUILD_HEADLESS=ON, the font tests are re-pointed at
+  # llrenderheadless (with LL_MESA_HEADLESS=1) so the GL-gated groups at the
+  # bottom of those files activate over an OSMesa context. lluitransform and
+  # the pure-table tests need no GL either way.
   if (AL_BUILD_HEADLESS)
     set(registry_test_libs llrenderheadless)
   else()
@@ -167,108 +165,54 @@ if (AL_BUILD_TESTS)
   set(font_test_data_dir "${ALCHEMY_FONTS_DIR}/")
   set(font_test_fonts_xml "${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml")
 
+  # The font directory reaches a test as a string literal. Tests that need a
+  # real font file (Noto-COLRv1.ttf, InterVariable.woff2) locate it relative
+  # to this dir; absent files cause the affected tests to skip rather than
+  # fail, so a partial font set still runs the rest of the suite.
+  set(font_data_define "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
+  set(font_app_defines
+      "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
+      "${font_data_define}"
+      "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\"")
+
+  # Headless GL tests link llrenderheadless (which transitively pulls
+  # llwindowheadless + ll::osmesa) so they can stand up an OSMesa GL context.
+  # LL_MESA_HEADLESS=1 matches the lib's compile-time configuration; the
+  # LLFONT_TEST_* defines feed the package font paths to the tests.
+  if (AL_BUILD_HEADLESS)
+    set(headless_defines LL_MESA_HEADLESS=1 ${font_app_defines})
+  else()
+    set(headless_defines)
+  endif()
+
   # Arithmetic only: where a local coordinate lands under the UI transform.
-  LL_ADD_INTEGRATION_TEST(lluitransform "" "${registry_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alfontcolrv1 "" "${registry_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfontregistry "" "${registry_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alfontshaping "" "${registry_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfontfreetype "" "${registry_test_libs}" "${test_project}")
+  al_add_test(lluitransform PROJECT llrender LIBRARIES ${registry_test_libs})
+  al_add_test(alfontcolrv1 PROJECT llrender LIBRARIES ${registry_test_libs}
+    DEFINES "${font_data_define}" ${headless_defines})
+  al_add_test(llfontregistry PROJECT llrender LIBRARIES ${registry_test_libs}
+    DEFINES ${headless_defines})
+  al_add_test(llfontbitmapcache PROJECT llrender LIBRARIES ${registry_test_libs}
+    DEFINES ${headless_defines})
+  # Both Unicode tables in one place, so the test can hold them against each
+  # other. llrender itself has no need of ICU.
+  al_add_test(alfontshaping PROJECT llrender LIBRARIES ${registry_test_libs} ll::icu
+    DEFINES "${font_data_define}" ${headless_defines})
+  al_add_test(llfontfreetype PROJECT llrender LIBRARIES ${registry_test_libs}
+    DEFINES "${font_data_define}" ${headless_defines})
 
   # Wholly GL-backed suites. The context comes from SDL on a window that is
   # never shown -- the same GL the viewer runs on -- so these want plain
   # llrender and none of the headless library set, and they run everywhere
   # rather than only where OSMesa happens to be installed.
   set(gl_test_libs llrender ll::SDL3core)
-  set(gl_test_compile_defs
-      LL_TEST_GL=1
-      "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
-      "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\""
-      "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\"")
-
-  LL_ADD_INTEGRATION_TEST(llfontgl "" "${gl_test_libs}" "${test_project}")
-  if (TARGET INTEGRATION_TEST_llfontgl)
-    target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE ${gl_test_compile_defs})
-  endif()
-
-  LL_ADD_INTEGRATION_TEST(llfonttextcache "" "${gl_test_libs}" "${test_project}")
-  if (TARGET INTEGRATION_TEST_llfonttextcache)
-    target_compile_definitions(INTEGRATION_TEST_llfonttextcache PRIVATE ${gl_test_compile_defs})
-  endif()
-
-  LL_ADD_INTEGRATION_TEST(lluiimage "" "${gl_test_libs}" "${test_project}")
-  if (TARGET INTEGRATION_TEST_alfontcolrv1)
-    # Hand the source-tree font directory to the test as a string literal.
-    # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
-    # locate it relative to this dir; absent files cause the affected tests
-    # to skip rather than fail, so a partial font set still runs the rest
-    # of the suite.
-    target_compile_definitions(INTEGRATION_TEST_alfontcolrv1 PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
-  endif()
-  if (TARGET INTEGRATION_TEST_alfontshaping)
-    # Both Unicode tables in one place, so the test can hold them against each
-    # other. llrender itself has no need of ICU.
-    target_link_libraries(INTEGRATION_TEST_alfontshaping PRIVATE ll::icu)
-    target_compile_definitions(INTEGRATION_TEST_alfontshaping PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
-  endif()
-  if (TARGET INTEGRATION_TEST_llfontfreetype)
-    target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
-  endif()
+  al_add_test(llfontgl PROJECT llrender LIBRARIES ${gl_test_libs}
+    DEFINES LL_TEST_GL=1 ${font_app_defines})
+  al_add_test(llfonttextcache PROJECT llrender LIBRARIES ${gl_test_libs}
+    DEFINES LL_TEST_GL=1 ${font_app_defines})
+  al_add_test(lluiimage PROJECT llrender LIBRARIES ${gl_test_libs})
 
   if (AL_BUILD_HEADLESS)
-    # Headless GL tests: link against llrenderheadless (which transitively
-    # pulls llwindowheadless + ll::osmesa) so the tests can stand up an
-    # OSMesa GL context and exercise GL-backed code paths. LL_MESA_HEADLESS=1
-    # matches the lib's compile-time configuration; the LLFONT_TEST_*
-    # defs feed the package font paths to the tests.
-    set(headless_test_compile_defs
-        LL_MESA_HEADLESS=1
-        "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
-        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\""
-        "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\"")
-
-    if (TARGET INTEGRATION_TEST_llfontregistry)
-      # llfontregistry's GL tests live in the same source file under
-      # #if LL_MESA_HEADLESS — same defs as the standalone llfontgl test.
-      target_compile_definitions(INTEGRATION_TEST_llfontregistry PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    if (TARGET INTEGRATION_TEST_llfontbitmapcache)
-      # llfontbitmapcache's GL-gated group activates with these defs;
-      # the binary already linked llrenderheadless above via registry_test_libs.
-      target_compile_definitions(INTEGRATION_TEST_llfontbitmapcache PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    if (TARGET INTEGRATION_TEST_alfontshaping)
-      # alfontshaping's GL-gated monospace tests — same library swap
-      # pattern as llfontbitmapcache and llfontregistry.
-      target_compile_definitions(INTEGRATION_TEST_alfontshaping PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    if (TARGET INTEGRATION_TEST_llfontfreetype)
-      # llfontfreetype's GL-gated rasterizer tests need the OSMesa fixture.
-      target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    if (TARGET INTEGRATION_TEST_alfontcolrv1)
-      # alfontcolrv1's GL-gated tests cover the integration of the
-      # painter with the font atlas — same library swap pattern as
-      # llfontbitmapcache and llfontfreetype.
-      target_compile_definitions(INTEGRATION_TEST_alfontcolrv1 PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    LL_ADD_INTEGRATION_TEST(llimagegl "" "llrenderheadless" "${test_project}")
-    if (TARGET INTEGRATION_TEST_llimagegl)
-      target_compile_definitions(INTEGRATION_TEST_llimagegl PRIVATE
-          ${headless_test_compile_defs})
-    endif()
+    al_add_test(llimagegl PROJECT llrender LIBRARIES llrenderheadless
+      DEFINES ${headless_defines})
   endif()
 endif()

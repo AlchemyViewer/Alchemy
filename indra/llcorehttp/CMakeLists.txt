@@ -85,44 +85,23 @@ target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 # tests
 option(LLCOREHTTP_TESTS "Build and run llcorehttp integration tests specifically" ON)
 if (AL_BUILD_TESTS AND LLCOREHTTP_TESTS)
-  SET(llcorehttp_TEST_SOURCE_FILES
-      )
-
-  set(llcorehttp_TEST_HEADER_FILES
-      tests/test_httpstatus.hpp
-      tests/test_refcounted.hpp
-      tests/test_httpoperation.hpp
-      tests/test_httprequest.hpp
-      tests/test_httprequestqueue.hpp
-      tests/test_httpheaders.hpp
-      tests/test_bufferarray.hpp
-      tests/test_bufferstream.hpp
-      tests/test_jsonrpcws.hpp
-      )
-
-  list(APPEND llcorehttp_TEST_SOURCE_FILES ${llcorehttp_TEST_HEADER_FILES})
-
-  # LL_ADD_PROJECT_UNIT_TESTS(llcorehttp "${llcorehttp_TEST_SOURCE_FILES}")
-
-  #    set(TEST_DEBUG on)
-  set(test_libs
-          llcorehttp
-          llmessage
-          llcommon
-      )
-  set(test_project llcorehttp)
-
-  # If http_proxy is in the current environment (e.g. to fetch s3-proxy
-  # autobuild packages), suppress it for this integration test: it screws up
-  # the tests.
-  LL_ADD_INTEGRATION_TEST(llcorehttp
-                          "${llcorehttp_TEST_SOURCE_FILES}"
-                          "${test_libs}"
-                          "${test_project}"
-                          "-Dhttp_proxy"
-                          ${Python3_EXECUTABLE}
-                          "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
-                          )
+  # The suite runs under a Python peer that serves the requests it makes.
+  # An http_proxy in the environment would put a proxy between the two, so
+  # the run clears it.
+  al_add_test(llcorehttp PROJECT llcorehttp
+    SOURCES
+    tests/test_httpstatus.hpp
+    tests/test_refcounted.hpp
+    tests/test_httpoperation.hpp
+    tests/test_httprequest.hpp
+    tests/test_httprequestqueue.hpp
+    tests/test_httpheaders.hpp
+    tests/test_bufferarray.hpp
+    tests/test_bufferstream.hpp
+    tests/test_jsonrpcws.hpp
+    LIBRARIES llcorehttp llmessage llcommon
+    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
+    ENVIRONMENT "http_proxy=")
 
   #
   # Example Programs

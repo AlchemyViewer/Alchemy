@@ -313,67 +313,24 @@ target_link_libraries(
 add_dependencies(llcommon stage_third_party_libs)
 
 if (AL_BUILD_TESTS)
-  SET(llcommon_TEST_SOURCE_FILES
-    # unit-testing llcommon is not possible right now as the test-harness *itself* depends upon llcommon, causing a circular dependency.  Add your 'unit' tests as integration tests for now.
-    )
-  LL_ADD_PROJECT_UNIT_TESTS(llcommon "${llcommon_TEST_SOURCE_FILES}")
-
-  #set(TEST_DEBUG on)
-  set(test_libs llcommon)
-  set(test_project llcommon)
-  LL_ADD_INTEGRATION_TEST(apply "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(bitpack "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(classic_callback "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(commonmisc "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lazyeventapi "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llapp "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llbase64 "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llcond "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldate "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldeadmantimer "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldependencies "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldoubledispatch "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llerror "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lleventcoro "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lleventdispatcher "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lleventfilter "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llevents "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfile "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llframetimer "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llhttpdate "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llheteromap "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llinitparam "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llinstancetracker "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llleap "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmainthreadtask "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmutex "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llpounceable "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llprocess "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llprocessor "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llprocinfo "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llrand "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsd "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdjson "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdutil "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llstreamtools "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llstring_utf "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lltrace "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lltreeiterators "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llunits "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lluri "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lluuid "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(stringize "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(threadsafeschedule "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(tuple "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(workqueue "" "${test_libs}" "${test_project}")
+  # No unit tests: the harness itself links llcommon, so a test of one of its
+  # files could not stand alone. Every test here links the library.
+  foreach(test
+      apply bitpack classic_callback commonmisc lazyeventapi llapp llbase64
+      llcond lldate lldeadmantimer lldependencies lldoubledispatch llerror
+      lleventcoro lleventdispatcher lleventfilter llevents llfile llframetimer
+      llhttpdate llheteromap llinitparam llinstancetracker llleap
+      llmainthreadtask llmutex llpounceable llprocess llprocessor llprocinfo
+      llrand llsd llsdjson llsdserialize llsdutil llsingleton llstreamtools
+      llstring llstring_utf lltrace lltreeiterators llunits lluri lluuid
+      stringize threadsafeschedule tuple workqueue)
+    al_add_test(${test} PROJECT llcommon LIBRARIES llcommon)
+  endforeach()
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run
 ## every build. It's to help a developer make implementation choices about
 ## throwing and catching exceptions.
-##LL_ADD_INTEGRATION_TEST(llexception "" "${test_libs}" "${test_project}")
+##al_add_test(llexception PROJECT llcommon LIBRARIES llcommon)
 
   # Skip precompiled header for tests that need special handling
   set_source_files_properties(

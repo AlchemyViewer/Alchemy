@@ -39,28 +39,7 @@ target_precompile_headers(llxml REUSE_FROM llprecompiled)
 
 # tests
 if (AL_BUILD_TESTS)
-    # unit tests
-    SET(llxml_TEST_SOURCE_FILES
-      llxmlnode.cpp
-      )
-    set_source_files_properties(llxmlnode.cpp
-      PROPERTIES
-      LL_TEST_ADDITIONAL_SOURCE_FILES alxmldocument.cpp
-      LL_TEST_ADDITIONAL_LIBRARIES "ll::pugixml"
-      )
-    LL_ADD_PROJECT_UNIT_TESTS(llxml "${llxml_TEST_SOURCE_FILES}")
-
-    # integration tests
-
-    # set(TEST_DEBUG on)
-    set(test_libs
-            llxml
-            llmath
-            llcommon
-            )
-    set(test_project llxml)
-
-    LL_ADD_INTEGRATION_TEST(llcontrol "" "${test_libs}" "${test_project}")
-    LL_ADD_INTEGRATION_TEST(alxmllayermerge "" "${test_libs}" "${test_project}")
-
+    al_add_test(llxmlnode UNIT PROJECT llxml SOURCES alxmldocument.cpp LIBRARIES ll::pugixml)
+    al_add_test(llcontrol PROJECT llxml LIBRARIES llxml llmath llcommon)
+    al_add_test(alxmllayermerge PROJECT llxml LIBRARIES llxml llmath llcommon)
 endif ()

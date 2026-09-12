@@ -2306,57 +2306,6 @@ target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINAR
 endif(AL_BUILD_VIEWER)
 
 if (AL_BUILD_TESTS)
-  # To add a viewer unit test, just add the test .cpp file below
-  # This creates a separate test project per file listed.
-
-  SET(viewer_TEST_SOURCE_FILES
-    alagentlocationformat.cpp
-    alcolorwheelmodel.cpp
-    alcurvemodel.cpp
-    aldaycyclelandmarks.cpp
-    algradehistory.cpp
-    alsceneexplorerpredicate.cpp
-    alscopedata.cpp
-    alwhitebalancesolver.cpp
-    llagentaccess.cpp
-    lldateutil.cpp
-#    llmediadataclient.cpp
-    lllogininstance.cpp
-#    llremoteparcelrequest.cpp
-    llviewerhelputil.cpp
-    llversioninfo.cpp
-    llvocache.cpp
-    llworldmap.cpp
-    llworldmipmap.cpp
-    lutcube.cpp
-  )
-
-  set_source_files_properties(
-    llworldmap.cpp
-    llworldmipmap.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
-    tests/llviewertexture_stub.cpp
-    #llviewertexturelist.cpp
-  )
-
-  # The vectorscope bins on the colour wheels' own chroma plane, so the scope
-  # data test links the model that defines it rather than keeping a second copy
-  # of the basis that could drift from it.
-  set_source_files_properties(
-    alscopedata.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
-    alcolorwheelmodel.cpp
-  )
-
-#  set_source_files_properties(
-#    llvocache.cpp
-#    PROPERTIES
-#    LL_TEST_ADDITIONAL_SOURCE_FILES ../llmessage/lldatapacker.cpp
-#    LL_TEST_ADDITIONAL_PROJECTS "llprimitive"
-#  )
-
   set(test_libs
     llfilesystem
     llmath
@@ -2368,104 +2317,55 @@ if (AL_BUILD_TESTS)
     llprimitive
     lllogin
   )
-
   set(test_project ${AL_VIEWER_BINARY_NAME})
 
-  set_property(SOURCE
-    ${viewer_TEST_SOURCE_FILES}
-    PROPERTY
-    LL_TEST_ADDITIONAL_LIBRARIES
-    ${test_libs}
-  )
+  # A unit test compiles one viewer source file on its own. Each line is one
+  # such file and its test under tests/.
+  foreach(test
+      alagentlocationformat alcolorwheelmodel alcurvemodel aldaycyclelandmarks
+      algradehistory alsceneexplorerpredicate alwhitebalancesolver
+      llagentaccess lldateutil llviewerhelputil llversioninfo llvocache
+      lutcube)
+    al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
+  endforeach()
+  # The vectorscope bins on the colour wheels' own chroma plane, so the scope
+  # data test links the model that defines it rather than keeping a second copy
+  # of the basis that could drift from it.
+  al_add_test(alscopedata UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES alcolorwheelmodel.cpp)
+  al_add_test(lllogininstance UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llversioninfo.cpp)
+  al_add_test(llworldmap UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES tests/llviewertexture_stub.cpp)
+  al_add_test(llworldmipmap UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES tests/llviewertexture_stub.cpp)
 
-  set_source_files_properties(
-    llworldmap.cpp
-    llworldmipmap.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
-    tests/llviewertexture_stub.cpp
-  )
-
-  set_source_files_properties(
-    lllogininstance.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_SOURCE_FILES
-    llversioninfo.cpp
-  )
-
-  LL_ADD_PROJECT_UNIT_TESTS(${AL_VIEWER_BINARY_NAME} "${viewer_TEST_SOURCE_FILES}")
-
-  #set(TEST_DEBUG on)
-  LL_ADD_INTEGRATION_TEST(cppfeatures
-    ""
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(altexturetable
-    ""
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(llsechandler_basic
-    llsechandler_basic.cpp
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(llsecapi
-    llsecapi.cpp
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  set(llslurl_test_sources
-    llslurl.cpp
-    llviewernetwork.cpp
-  )
-
-  LL_ADD_INTEGRATION_TEST(llslurl
-    "${llslurl_test_sources}"
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  set(llviewercontrollistener_test_sources
+  al_add_test(cppfeatures PROJECT ${test_project} LIBRARIES ${test_libs})
+  al_add_test(altexturetable PROJECT ${test_project} LIBRARIES ${test_libs})
+  al_add_test(llsechandler_basic PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llsechandler_basic.cpp)
+  al_add_test(llsecapi PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llsecapi.cpp)
+  al_add_test(llslurl PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llslurl.cpp llviewernetwork.cpp)
+  al_add_test(llviewercontrollistener PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES
     llviewercontrollistener.cpp
     ../llxml/llcontrol.cpp
     ../llxml/llxmltree.cpp
     ../llxml/alxmldocument.cpp
-    ../llcommon/commoncontrol.cpp
-  )
-
-  LL_ADD_INTEGRATION_TEST(llviewercontrollistener
-    "${llviewercontrollistener_test_sources}"
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(llviewernetwork
-    llviewernetwork.cpp
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(llviewerassetstats
-    llviewerassetstats.cpp
-    "${test_libs}"
-    "${test_project}"
-  )
-
-  LL_ADD_INTEGRATION_TEST(llhttpretrypolicy "llhttpretrypolicy.cpp" "${test_libs}" "${test_project}")
-
-  set(lltextureinfo_test_sources
+    ../llcommon/commoncontrol.cpp)
+  al_add_test(llviewernetwork PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llviewernetwork.cpp)
+  al_add_test(llviewerassetstats PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llviewerassetstats.cpp)
+  al_add_test(llhttpretrypolicy PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES llhttpretrypolicy.cpp)
+  al_add_test(lltextureinfo PROJECT ${test_project} LIBRARIES ${test_libs}
+    SOURCES
     lltextureinfo.cpp
     ../llxml/llcontrol.cpp
     ../llxml/llxmltree.cpp
     ../llxml/alxmldocument.cpp
-    ../llcommon/commoncontrol.cpp
-  )
-  LL_ADD_INTEGRATION_TEST(lltextureinfo "${lltextureinfo_test_sources}" "${test_libs}" "${test_project}")
-  #LL_ADD_INTEGRATION_TEST(lltextureinfodetails "" "${test_libs}" "${test_project}") test cases currently empty
+    ../llcommon/commoncontrol.cpp)
 endif ()

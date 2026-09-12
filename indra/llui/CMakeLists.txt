@@ -313,16 +313,6 @@ else ()
   target_sources(llui PRIVATE llspellcheckengine_hunspell.cpp)
 endif ()
 
-SET(llurlentry_TEST_DEPENDENCIES
-    llurlmatch.cpp
-    llurlregistry.cpp
-    )
-
-set_source_files_properties(llurlentry.cpp
-    PROPERTIES LL_TEST_ADDITIONAL_SOURCE_FILES
-    "${llurlentry_TEST_DEPENDENCIES}"
-    )
-
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llui
@@ -369,74 +359,30 @@ if(AL_BUILD_TESTS)
   else ()
     set(spellcheck_lib ll::hunspell)
   endif ()
+
   set(test_libs llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
+  al_add_test(llchatautocompletemodel UNIT PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
 
-  SET(llui_TEST_SOURCE_FILES
-      llchatautocompletemodel.cpp
-      llurlmatch.cpp
-      )
-  set_property( SOURCE ${llui_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ${test_libs})
-  LL_ADD_PROJECT_UNIT_TESTS(llui "${llui_TEST_SOURCE_FILES}")
-
-  # INTEGRATION TESTS
-  set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
-  set(test_project llui)
-  LL_ADD_INTEGRATION_TEST(llstatbar "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llview "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lluistring "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfocusmgr "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lllayoutstack "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llresizebar "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llaccordionctrltab "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llspinctrl "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llcombobox "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llradiogroup "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lltabcontainer "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alpropertygrid "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alcolorfield "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alcolorpicker "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alfontfield "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alflagsfield "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuinotes "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alfollowscontrol "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alcanvasview "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(aldockpanel "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alemptystate "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuioverlay "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuifill "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alviewtype "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuidiagnostics "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuishellbuild "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuicatalog "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuilint "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuiedit "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuidocuments "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuifindings "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alhistorylist "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alpopover "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alscopebar "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(aljumpbar "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alspecimenlist "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(altabstrip "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alquickopen "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuitranslate "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuischema "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuiselection "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuisourcemap "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alxuitreemodel "" "${test_libs}" "${test_project}")
+  set(test_libs llui ${test_libs})
+  foreach(test llstatbar llview lluistring llxuiparser llfocusmgr
+      alxuioverlay alxuidocuments alxuifindings alxuitranslate)
+    al_add_test(${test} PROJECT llui LIBRARIES ${test_libs})
+  endforeach()
+  al_add_test(llurlentry PROJECT llui SOURCES llurlentry.cpp LIBRARIES ${test_libs})
+  al_add_test(llemojidictionary PROJECT llui SOURCES llemojidictionary.cpp LIBRARIES ${test_libs})
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
-  foreach(ui_test alcolorfield alcolorpicker alfontfield alflagsfield alxuinotes alhistorylist aljumpbar alpopover alquickopen alscopebar alspecimenlist altabstrip lllayoutstack llresizebar llfloater llaccordionctrltab llspinctrl llcombobox lltabcontainer alpropertygrid alfollowscontrol alcanvasview aldockpanel alemptystate alxuifill alviewtype alxuidiagnostics alxuishellbuild
-                  alxuicatalog alxuiselection alxuisourcemap alxuitreemodel alxuilint
-                  alxuiedit alxuischema llradiogroup)
-    if (TARGET INTEGRATION_TEST_${ui_test})
-      target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
-          "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")
-    endif()
+  foreach(test
+      lllayoutstack llresizebar llaccordionctrltab llspinctrl llcombobox
+      llradiogroup lltabcontainer llfloater alpropertygrid alcolorfield
+      alcolorpicker alfontfield alflagsfield alxuinotes alfollowscontrol
+      alcanvasview aldockpanel alemptystate alxuifill alviewtype
+      alxuidiagnostics alxuishellbuild alxuicatalog alxuilint alxuiedit
+      alhistorylist alpopover alscopebar aljumpbar alspecimenlist altabstrip
+      alquickopen alxuischema alxuiselection alxuisourcemap alxuitreemodel)
+    al_add_test(${test} PROJECT llui LIBRARIES ${test_libs}
+      DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")
   endforeach()
 endif()

@@ -67,27 +67,18 @@ target_link_libraries(
 target_precompile_headers(llcharacter REUSE_FROM llprecompiled)
 
 if (AL_BUILD_TESTS)
-#   SET(llcharacter_TEST_SOURCE_FILES
-#     )
-#   LL_ADD_PROJECT_UNIT_TESTS(llcharacter "${llcharacter_TEST_SOURCE_FILES}")
+  al_add_test(lljoint PROJECT llcharacter SOURCES lljoint.cpp LIBRARIES llcommon llmath)
 
-  #set(TEST_DEBUG on)
-  set(test_libs llcommon llmath)
-  set(test_project llcharacter)
-  LL_ADD_INTEGRATION_TEST(lljoint "lljoint.cpp" "${test_libs}" "${test_project}")
+  foreach(test llpose llcharacter llmotioncontroller llkeyframemotion llmultigesture)
+    al_add_test(${test} PROJECT llcharacter LIBRARIES llcharacter)
+  endforeach()
 
-  set(character_test_libs llcharacter)
-  LL_ADD_INTEGRATION_TEST(llpose "" "${character_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llcharacter "" "${character_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmotioncontroller "" "${character_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llkeyframemotion "" "${character_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmultigesture "" "${character_test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llbvhloader "" "${character_test_libs}" "${test_project}")
   # The translation table this parser reads is shipped by newview, and one it
   # refuses stops every BVH upload, so the test reads the shipped file itself.
   # The joint names a .bvh may use come from the shipped skeleton, and the
   # root joint check will not pass without them, so the test reads it too.
-  target_compile_definitions(INTEGRATION_TEST_llbvhloader
-    PRIVATE "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\""
-            "AL_SHIPPED_AVATAR_SKELETON=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/character/avatar_skeleton.xml\"")
+  al_add_test(llbvhloader PROJECT llcharacter LIBRARIES llcharacter
+    DEFINES
+    "AL_SHIPPED_ANIM_INI=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/app_settings/anim.ini\""
+    "AL_SHIPPED_AVATAR_SKELETON=\"${CMAKE_CURRENT_SOURCE_DIR}/../newview/character/avatar_skeleton.xml\"")
 endif()

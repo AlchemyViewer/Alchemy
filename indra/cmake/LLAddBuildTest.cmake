@@ -1,4 +1,7 @@
 # -*- cmake -*-
+#
+# The test harness. One function declares a TUT test executable and
+# registers it with CTest.
 
 include_guard()
 
@@ -6,257 +9,115 @@ if(NOT AL_BUILD_TESTS)
   return()
 endif()
 
-include(LLTestCommand)
+# The directories a test's shared libraries are staged in, put on the loader's
+# search path for the test's run. macOS takes the same directory as an rpath
+# instead, since the loader there ignores the environment.
+if(WINDOWS)
+  set(AL_TEST_ENVIRONMENT "PATH=path_list_prepend:${SHARED_LIB_STAGING_DIR}")
+elseif(LINUX)
+  set(AL_TEST_ENVIRONMENT "LD_LIBRARY_PATH=path_list_prepend:${SHARED_LIB_STAGING_DIR}")
+else()
+  set(AL_TEST_ENVIRONMENT "")
+endif()
 
-#*****************************************************************************
-#   LL_ADD_PROJECT_UNIT_TESTS
-#*****************************************************************************
-MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
-  # Given a project name and a list of sourcefiles (with optional properties on each),
-  # add targets to build and run the tests specified.
-  # ASSUMPTIONS:
-  # * this macro is being executed in the project file that is passed in
-  # * current working SOURCE dir is that project dir
-  # * there is a subfolder tests/ with test code corresponding to the filenames passed in
-  # * properties for each sourcefile passed in indicate what libs to link that file with (MAKE NO ASSUMPTIONS ASIDE FROM TUT)
-  #
-  # More info and examples at: https://wiki.secondlife.com/wiki/How_to_add_unit_tests_to_indra_code
-
-  message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} sources: ${sources}")
-
-  # Start with the header and project-wide setup before making targets
-  #project(UNITTEST_PROJECT_${project})
-  # Setup includes, paths, etc
-  set(alltest_SOURCE_FILES
-          )
-  set(alltest_LIBRARIES
-          lltut_runner_lib
-          llcommon
-          ll::tut
-          )
-  if(NOT "${project}" STREQUAL "llmath")
-    # add llmath as a dep unless the tested module *is* llmath!
-    list(APPEND alltest_LIBRARIES llmath )
+# al_add_test(<name> PROJECT <project> [UNIT]
+#             [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
+#             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
+#
+# Builds tests/<name>_test.cpp into an executable and registers it as a test
+# of <project>.
+#
+# A UNIT test compiles the project's own <name>.cpp into the executable and
+# sees the project's include directories instead of linking the project, so
+# the test decides what that one file links against; <name>.h is listed with
+# it. Any other test links whatever LIBRARIES names. Both link the TUT runner,
+# and a unit test also links llcommon and llmath, the libraries every source
+# file in the tree reaches for.
+#
+# COMMAND runs the test through another program; "{}" stands for the test
+# executable and is appended when absent. ENVIRONMENT sets variables for the
+# run, VAR=value each; PYTHON is always set to the interpreter CMake found,
+# for the tests that spawn a Python peer.
+#
+# Targets are PROJECT_<project>_TEST_<name> for a unit test and
+# INTEGRATION_TEST_<name> otherwise; the registered test names are
+# PROJECT_<project>_TEST_<name> and INTEGRATION_TEST_RUNNER_<name>.
+function(al_add_test name)
+  cmake_parse_arguments(PARSE_ARGV 1 arg
+    "UNIT"
+    "PROJECT"
+    "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT")
+  if(NOT arg_PROJECT)
+    message(FATAL_ERROR "al_add_test(${name}): PROJECT is required")
+  endif()
+  if(arg_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "al_add_test(${name}): unexpected arguments: ${arg_UNPARSED_ARGUMENTS}")
   endif()
 
-  # Headers, for convenience in targets.
-  set(alltest_HEADER_FILES ${INDRA_SOURCE_DIR}/test/test.h)
-
-  # start the source test executable definitions
-  set(${project}_TEST_OUTPUT "")
-  foreach (source ${sources})
-    string( REGEX REPLACE "(.*)\\.[^.]+$" "\\1" name ${source} )
-    string( REGEX REPLACE ".*\\.([^.]+)$" "\\1" extension ${source} )
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS UNITTEST_PROJECT_${project} individual source: ${source} (${name}.${extension})")
-
-    #
-    # Per-codefile additional / external source, header, and include dir property extraction
-    #
-    # Source
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_SOURCE_FILES ${source} LL_TEST_ADDITIONAL_SOURCE_FILES)
-    set(${name}_test_SOURCE_FILES
-            ${source}
-            tests/${name}_test.${extension}
-            ${alltest_SOURCE_FILES}
-            ${${name}_test_additional_SOURCE_FILES} )
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_SOURCE_FILES ${${name}_test_SOURCE_FILES}")
-
-    # Headers
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_HEADER_FILES ${source} LL_TEST_ADDITIONAL_HEADER_FILES)
-    set(${name}_test_HEADER_FILES ${name}.h ${${name}_test_additional_HEADER_FILES})
-    list(APPEND ${name}_test_SOURCE_FILES ${${name}_test_HEADER_FILES})
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_HEADER_FILES ${${name}_test_HEADER_FILES}")
-
-    # Setup target
-    add_executable(PROJECT_${project}_TEST_${name} ${${name}_test_SOURCE_FILES})
-
-    # Cannot declare a dependency on ${project} because the executable create above will later declare
-    # add_dependencies( ${project} ${project}_tests)
-    # as such grab ${project}'s interface include dirs and inject them here
-    get_property( ${name}_test_additional_INCLUDE_DIRS TARGET ${project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES )
-    target_include_directories (PROJECT_${project}_TEST_${name} PRIVATE ${${name}_test_additional_INCLUDE_DIRS} )
-
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_INCLUDE_DIRS ${source} LL_TEST_ADDITIONAL_INCLUDE_DIRS)
-    target_include_directories (PROJECT_${project}_TEST_${name} PRIVATE ${${name}_test_additional_INCLUDE_DIRS} )
-
-    target_include_directories (PROJECT_${project}_TEST_${name} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
-
-    if (DARWIN)
-      set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES BUILD_RPATH "${SHARED_LIB_STAGING_DIR}")
-    endif(DARWIN)
-
-    #
-    # Per-codefile additional / external project dep and lib dep property extraction
-    #
-    # WARNING: it's REALLY IMPORTANT to not mix these. I guarantee it will not work in the future. + poppy 2009-04-19
-    # Projects
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_PROJECTS ${source} LL_TEST_ADDITIONAL_PROJECTS)
-    # Libraries
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_LIBRARIES ${source} LL_TEST_ADDITIONAL_LIBRARIES)
-
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_PROJECTS ${${name}_test_additional_PROJECTS}")
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_LIBRARIES ${${name}_test_additional_LIBRARIES}")
-
-    # Add to project
-    target_link_libraries(PROJECT_${project}_TEST_${name} PRIVATE al::flags ${alltest_LIBRARIES} ${${name}_test_additional_PROJECTS} ${${name}_test_additional_LIBRARIES} )
-    # Compile-time Definitions
-    GET_OPT_SOURCE_FILE_PROPERTY(${name}_test_additional_CFLAGS ${source} LL_TEST_ADDITIONAL_CFLAGS)
-    target_compile_options(PROJECT_${project}_TEST_${name} PRIVATE ${${name}_test_additional_CFLAGS})
-
-    # Add to Tests folder in IDE
-    set_target_properties(PROJECT_${project}_TEST_${name}
-            PROPERTIES
-            FOLDER "Tests/${project}"
-    )
-
-    target_compile_definitions(PROJECT_${project}_TEST_${name} PRIVATE
-            "LL_TEST=${name}"
-            "LL_TEST_${name}"
-    )
-
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name}_test_additional_CFLAGS ${${name}_test_additional_CFLAGS}")
-
-    if (WINDOWS)
-      set_target_properties(PROJECT_${project}_TEST_${name} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
-    elseif (DARWIN)
-      # test binaries always need to be signed for local development
-      set_target_properties(PROJECT_${project}_TEST_${name}
-          PROPERTIES
-              XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-")
-    endif ()
-
-    #
-    # Setup test targets
-    #
-    set(TEST_EXE $<TARGET_FILE:PROJECT_${project}_TEST_${name}>)
-    set(TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/PROJECT_${project}_TEST_${name}_ok.txt)
-    set(TEST_CMD ${TEST_EXE} --touch=${TEST_OUTPUT} --sourcedir=${CMAKE_CURRENT_SOURCE_DIR})
-
-    # daveh - what configuration does this use? Debug? it's cmake-time, not build time. + poppy 2009-04-19
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name} test_cmd  = ${TEST_CMD}")
-
-    SET_TEST_PATH(LD_LIBRARY_PATH)
-    LL_TEST_COMMAND(TEST_SCRIPT_CMD "${LD_LIBRARY_PATH}" ${TEST_CMD})
-    message(VERBOSE "LL_ADD_PROJECT_UNIT_TESTS ${name} test_script  = ${TEST_SCRIPT_CMD}")
-
-    # Add test
-    add_test(
-            NAME PROJECT_${project}_TEST_${name}
-            COMMAND ${TEST_SCRIPT_CMD}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-
-    add_dependencies(BUILD_TESTS PROJECT_${project}_TEST_${name})
-    list(APPEND ${project}_TEST_OUTPUT ${TEST_OUTPUT})
-  endforeach (source)
-ENDMACRO(LL_ADD_PROJECT_UNIT_TESTS)
-
-#*****************************************************************************
-#   GET_OPT_SOURCE_FILE_PROPERTY
-#*****************************************************************************
-MACRO(GET_OPT_SOURCE_FILE_PROPERTY var filename property)
-  get_source_file_property(${var} "${filename}" "${property}")
-  if("${${var}}" MATCHES NOTFOUND)
-    set(${var} "")
-  endif()
-ENDMACRO(GET_OPT_SOURCE_FILE_PROPERTY)
-
-#*****************************************************************************
-#   LL_ADD_INTEGRATION_TEST
-#*****************************************************************************
-FUNCTION(LL_ADD_INTEGRATION_TEST
-        testname
-        additional_source_files
-        library_dependencies
-        testproject
-        # variable args
-        )
-  message(DEBUG "Adding INTEGRATION_TEST_${testname}")
-
-  set(source_files
-          tests/${testname}_test.cpp
-          ${additional_source_files}
-          )
-
-  set(libraries
-          lltut_runner_lib
-          ll::tut
-          ${library_dependencies}
-          )
-
-  # Add test executable build target
-  message(DEBUG "ADD_EXECUTABLE(INTEGRATION_TEST_${testname} ${source_files})")
-
-  add_executable(INTEGRATION_TEST_${testname} ${source_files})
-  set_target_properties(INTEGRATION_TEST_${testname}
-          PROPERTIES
-          FOLDER "Tests/${testproject}"
-          )
-  target_compile_definitions(INTEGRATION_TEST_${testname} PRIVATE
-          "LL_TEST=${testname}"
-          "LL_TEST_${testname}"
-  )
-
-  if (WINDOWS)
-    set_target_properties(INTEGRATION_TEST_${testname} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
+  if(arg_UNIT)
+    set(target PROJECT_${arg_PROJECT}_TEST_${name})
+    set(test_name ${target})
+    set(sources ${name}.cpp tests/${name}_test.cpp ${arg_SOURCES} ${name}.h)
+    set(libraries lltut_runner_lib llcommon ll::tut)
+    if(NOT arg_PROJECT STREQUAL "llmath")
+      list(APPEND libraries llmath)
+    endif()
+  else()
+    set(target INTEGRATION_TEST_${name})
+    set(test_name INTEGRATION_TEST_RUNNER_${name})
+    set(sources tests/${name}_test.cpp ${arg_SOURCES})
+    set(libraries lltut_runner_lib ll::tut)
   endif()
 
-  if (DARWIN)
-    # test binaries always need to be signed for local development
-    set_target_properties(INTEGRATION_TEST_${testname}
-            PROPERTIES
-            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
-            BUILD_RPATH "${SHARED_LIB_STAGING_DIR}"
-            )
-  endif ()
+  add_executable(${target} ${sources})
+  target_link_libraries(${target} PRIVATE al::flags ${libraries} ${arg_LIBRARIES})
+  if(arg_UNIT)
+    # The project's include directories, since the test compiles one of its
+    # files without linking it.
+    get_property(project_includes TARGET ${arg_PROJECT} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(${target} PRIVATE ${project_includes})
+  endif()
+  target_include_directories(${target} PRIVATE
+    ${arg_INCLUDES}
+    ${INDRA_SOURCE_DIR}/test
+    ${INDRA_SOURCE_DIR}/llmath
+    ${INDRA_SOURCE_DIR}/llui)
+  target_compile_definitions(${target} PRIVATE
+    "LL_TEST=${name}"
+    "LL_TEST_${name}"
+    ${arg_DEFINES})
+  set_target_properties(${target} PROPERTIES FOLDER "Tests/${arg_PROJECT}")
 
-  # Add link deps to the executable
-  message(DEBUG "TARGET_LINK_LIBRARIES(INTEGRATION_TEST_${testname} ${libraries})")
-
-  target_link_libraries(INTEGRATION_TEST_${testname} PRIVATE al::flags ${libraries})
-  target_include_directories (INTEGRATION_TEST_${testname} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
-
-  # Create the test running command
-  set(test_command ${ARGN})
-  set(TEST_EXE $<TARGET_FILE:INTEGRATION_TEST_${testname}>)
-  list(FIND test_command "{}" test_exe_pos)
-  if(test_exe_pos LESS 0)
-    # The {} marker means "the full pathname of the test executable."
-    # test_exe_pos -1 means we didn't find it -- so append the test executable
-    # name to $ARGN, the variable part of the arg list. This is convenient
-    # shorthand for both straightforward execution of the test program (empty
-    # $ARGN) and for running a "wrapper" program of some kind accepting the
-    # pathname of the test program as the last of its args. You need specify
-    # {} only if the test program's pathname isn't the last argument in the
-    # desired command line.
-    list(APPEND test_command "${TEST_EXE}")
-  else (test_exe_pos LESS 0)
-    # Found {} marker at test_exe_pos. Remove the {}...
-    list(REMOVE_AT test_command test_exe_pos)
-    # ...and replace it with the actual name of the test executable.
-    list(INSERT test_command test_exe_pos "${TEST_EXE}")
+  if(WINDOWS)
+    set_target_properties(${target} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
+  elseif(DARWIN)
+    # A test binary is run straight from the build tree, so it is ad-hoc signed.
+    set_target_properties(${target} PROPERTIES
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
+      BUILD_RPATH "${SHARED_LIB_STAGING_DIR}")
   endif()
 
-  SET_TEST_PATH(LD_LIBRARY_PATH)
-  LL_TEST_COMMAND(TEST_SCRIPT_CMD "${LD_LIBRARY_PATH}" ${test_command})
+  set(command ${arg_COMMAND})
+  list(FIND command "{}" executable_position)
+  if(executable_position LESS 0)
+    list(APPEND command "$<TARGET_FILE:${target}>")
+  else()
+    list(REMOVE_AT command ${executable_position})
+    list(INSERT command ${executable_position} "$<TARGET_FILE:${target}>")
+  endif()
+  if(arg_UNIT)
+    list(APPEND command
+      "--touch=${CMAKE_CURRENT_BINARY_DIR}/${target}_ok.txt"
+      "--sourcedir=${CMAKE_CURRENT_SOURCE_DIR}")
+  endif()
 
-  message(DEBUG "TEST_SCRIPT_CMD: ${TEST_SCRIPT_CMD}")
+  set(environment "PYTHON=${Python3_EXECUTABLE}" ${arg_ENVIRONMENT})
+  add_test(NAME ${test_name}
+    COMMAND ${command}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(${test_name} PROPERTIES
+    ENVIRONMENT "${environment}"
+    ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}")
 
-  add_test(NAME INTEGRATION_TEST_RUNNER_${testname} COMMAND ${TEST_SCRIPT_CMD})
-
-  add_dependencies(BUILD_TESTS INTEGRATION_TEST_${testname})
-
-ENDFUNCTION(LL_ADD_INTEGRATION_TEST)
-
-#*****************************************************************************
-#   SET_TEST_PATH
-#*****************************************************************************
-# The directories the runner puts on PATH or LD_LIBRARY_PATH for a test:
-# where the project's own shared libraries are staged.
-MACRO(SET_TEST_PATH LISTVAR)
-  IF(WINDOWS)
-    set(${LISTVAR} ${SHARED_LIB_STAGING_DIR})
-  ELSE(WINDOWS)
-    set(${LISTVAR} ${SHARED_LIB_STAGING_DIR} /usr/lib)
-  ENDIF(WINDOWS)
-ENDMACRO(SET_TEST_PATH)
+  add_dependencies(BUILD_TESTS ${target})
+endfunction()

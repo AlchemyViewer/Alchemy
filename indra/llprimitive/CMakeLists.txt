@@ -70,15 +70,8 @@ target_precompile_headers(llprimitive REUSE_FROM llprecompiled)
 
 # add unit tests
 if (AL_BUILD_TESTS)
-    INCLUDE(LLAddBuildTest)
-    SET(llprimitive_TEST_SOURCE_FILES
-      llmediaentry.cpp
-      llprimitive.cpp
-      llgltfmaterial.cpp
-      llmaterialid.cpp
-      llmaterial.cpp
-      )
-
-    set_property(SOURCE llprimitive.cpp PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmessage)
-    LL_ADD_PROJECT_UNIT_TESTS(llprimitive "${llprimitive_TEST_SOURCE_FILES}")
+    foreach(test llmediaentry llgltfmaterial llmaterialid llmaterial)
+      al_add_test(${test} UNIT PROJECT llprimitive)
+    endforeach()
+    al_add_test(llprimitive UNIT PROJECT llprimitive LIBRARIES llmessage)
 endif ()

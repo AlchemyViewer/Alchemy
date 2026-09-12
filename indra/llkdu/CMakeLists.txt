@@ -20,19 +20,9 @@ target_sources(llkdu
 
   # Add tests
   if (AL_BUILD_TESTS)
-    SET(llkdu_TEST_SOURCE_FILES
-      llimagej2ckdu.cpp
-      )
-    SET(llkdu_test_additional_HEADER_FILES
-      llimagej2ckdu.h
-      llkdumem.h
-      lltut.h
-      )
-
     get_property(llimage_include_dir TARGET llimage PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-    set_property(SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ll::kdu llcommon)
-    set_property(SOURCE ${llkdu_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_INCLUDE_DIRS ${llimage_include_dir})
-
-    LL_ADD_PROJECT_UNIT_TESTS(llkdu "${llkdu_TEST_SOURCE_FILES}")
+    al_add_test(llimagej2ckdu UNIT PROJECT llkdu
+      LIBRARIES ll::kdu llcommon
+      INCLUDES ${llimage_include_dir})
   endif ()
 endif ()

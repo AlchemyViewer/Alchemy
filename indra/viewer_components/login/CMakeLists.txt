@@ -23,14 +23,5 @@ target_link_libraries(lllogin
     )
 
 if(AL_BUILD_TESTS)
-  SET(lllogin_TEST_SOURCE_FILES
-      lllogin.cpp
-      )
-  set_source_files_properties(
-    lllogin.cpp
-    PROPERTIES
-    LL_TEST_ADDITIONAL_LIBRARIES llmessage llcorehttp llcommon
-    )
-
-  LL_ADD_PROJECT_UNIT_TESTS(lllogin "${lllogin_TEST_SOURCE_FILES}")
+  al_add_test(lllogin UNIT PROJECT lllogin LIBRARIES llmessage llcorehttp llcommon)
 endif()

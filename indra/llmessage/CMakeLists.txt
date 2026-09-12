@@ -175,42 +175,18 @@ target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
 # tests
 if (AL_BUILD_TESTS)
-  SET(llmessage_TEST_SOURCE_FILES
-    llcoproceduremanager.cpp
-    llnamevalue.cpp
-    lltrustedmessageservice.cpp
-    lltemplatemessagedispatcher.cpp
-    )
-  set_property( SOURCE ${llmessage_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES llmath llcorehttp)
-  LL_ADD_PROJECT_UNIT_TESTS(llmessage "${llmessage_TEST_SOURCE_FILES}")
+  foreach(test llcoproceduremanager llnamevalue lltrustedmessageservice lltemplatemessagedispatcher)
+    al_add_test(${test} UNIT PROJECT llmessage LIBRARIES llmath llcorehttp)
+  endforeach()
 
-  #    set(TEST_DEBUG on)
-
-  set(test_libs
-          llfilesystem
-          llmath
-          llcorehttp
-          llmessage
-          llcommon
-          )
-
-  set(test_project llmessage)
-
-  LL_ADD_INTEGRATION_TEST(io "tests/llpipeutil.cpp" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llavatarnamecache "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llbuffer "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lldatapacker "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llhost "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llhttpnode "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdmessagebuilder "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdmessagereader "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmessageconfig "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llmessagetemplateparser "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llpartdata "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lltemplatemessagebuilder "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxfer_file "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llxorcipher "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llzerocode "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(message "" "${test_libs}" "${test_project}")
+  set(test_libs llfilesystem llmath llcorehttp llmessage llcommon)
+  al_add_test(io PROJECT llmessage SOURCES tests/llpipeutil.cpp LIBRARIES ${test_libs})
+  foreach(test
+      llavatarnamecache llbuffer lldatapacker llhost llhttpnode
+      llsdmessagebuilder llsdmessagereader llmessageconfig
+      llmessagetemplateparser llpartdata lltemplatemessagebuilder llxfer_file
+      llxorcipher llzerocode message)
+    al_add_test(${test} PROJECT llmessage LIBRARIES ${test_libs})
+  endforeach()
 endif ()
 
