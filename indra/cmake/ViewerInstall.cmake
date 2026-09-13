@@ -84,8 +84,17 @@ else()
 endif()
 
 # A relocatable Linux tree finds its shared libraries from the executable.
+# The viewer links straight into the staging tree, where the install rule
+# below finds it already in place. Built with the install RPATH it has
+# nothing to patch there, so the rule neither deletes the binary as one with
+# the wrong RPATH (file(RPATH_CHECK), which runs before the copy and would
+# take the source with it) nor rewrites it. macOS does the same for its
+# bundle.
 if(LINUX)
-  set_target_properties(${AL_VIEWER_BINARY_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
+  set_target_properties(
+    ${AL_VIEWER_BINARY_NAME}
+    PROPERTIES INSTALL_RPATH "$ORIGIN/../lib" BUILD_WITH_INSTALL_RPATH ON
+  )
 endif()
 
 # ---------------------------------------------------------------------------
@@ -125,37 +134,60 @@ if(AL_BUILD_SHARED_LLCOMMON)
   endif()
 endif()
 
+# al_install_shared_library(<library> [CONFIGURATIONS <config>...]): a
+# library the viewer loads at run time, under every name it goes by. The
+# name the linker was given is one symlink and the name the loader asks for
+# is another beside it -- libhunspell-1.7.so and libhunspell-1.7.so.0, both
+# to libhunspell-1.7.so.0.1.0 -- and install(FILES) keeps a symlink a
+# symlink, so the file goes with its links. A DLL is one file and goes alone.
+function(al_install_shared_library library)
+  cmake_path(GET library PARENT_PATH directory)
+  cmake_path(GET library FILENAME name)
+  string(REGEX REPLACE "\\.(so|dylib)(\\..*)?$" "" stem "${name}")
+  file(
+    GLOB names
+    "${directory}/${stem}.so*"
+    "${directory}/${stem}.dylib"
+    "${directory}/${stem}.*.dylib"
+  )
+  list(APPEND names "${library}")
+  list(REMOVE_DUPLICATES names)
+  install(FILES ${names} ${ARGN} DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer)
+endfunction()
+
 # The LGPL ports link dynamically on every platform. Hunspell comes through
 # pkg-config, which resolves the library the linker sees: the shared library
-# itself on Linux and macOS, whose symlink chain the loader follows, and an
-# import library on Windows, where the DLL sits in vcpkg's bin directory.
+# itself on Linux and macOS, and an import library on Windows, where the DLL
+# sits in vcpkg's bin directory. OpenAL is an imported target, which knows
+# its own SONAME.
 if(NOT AL_USE_NSSPELLCHECKER AND NOT AL_USE_WINSPELLCHECK)
   if(WINDOWS)
     file(GLOB al_hunspell_libraries "${al_vcpkg_dir}/bin/*hunspell*.dll")
     install(FILES ${al_hunspell_libraries} DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer)
   else()
-    install(
-      FILES ${hunspell_LINK_LIBRARIES} FOLLOW_SYMLINK_CHAIN
-      DESTINATION "${AL_INSTALL_LIBDIR}"
-      COMPONENT viewer
-    )
+    foreach(library IN LISTS hunspell_LINK_LIBRARIES)
+      al_install_shared_library("${library}")
+    endforeach()
   endif()
 endif()
 if(AL_USE_OPENAL AND NOT WINDOWS)
   install(
-    FILES $<TARGET_SONAME_FILE:OpenAL::OpenAL> FOLLOW_SYMLINK_CHAIN
-    DESTINATION "${AL_INSTALL_LIBDIR}"
-    COMPONENT viewer
+    IMPORTED_RUNTIME_ARTIFACTS OpenAL::OpenAL
+    LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}" COMPONENT viewer
   )
 endif()
 
-# The SDKs from outside vcpkg ship the library the viewer loads at run time.
+# The SDKs from outside vcpkg ship the library the viewer loads at run time;
+# FMOD's logging build serves the Debug configuration.
 if(AL_USE_FMODSTUDIO AND FMOD_LIBRARY_RELEASE)
-  install(
-    FILES "$<IF:$<CONFIG:Debug>,${FMOD_LIBRARY_DEBUG},${FMOD_LIBRARY_RELEASE}>" FOLLOW_SYMLINK_CHAIN
-    DESTINATION "${AL_INSTALL_LIBDIR}"
-    COMPONENT viewer
+  al_install_shared_library(
+    "${FMOD_LIBRARY_RELEASE}"
+    CONFIGURATIONS
+    OptDebug
+    RelWithDebInfo
+    Release
   )
+  al_install_shared_library("${FMOD_LIBRARY_DEBUG}" CONFIGURATIONS Debug)
 endif()
 if(AL_USE_DISCORD)
   if(WINDOWS)

@@ -705,15 +705,7 @@ PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV = nullptr;
 PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV = nullptr;
 #endif
 
-#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
-// GLX_MESA_query_renderer
-PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC glXQueryCurrentRendererIntegerMESA = nullptr;
-PFNGLXQUERYCURRENTRENDERERSTRINGMESAPROC glXQueryCurrentRendererStringMESA = nullptr;
-PFNGLXQUERYRENDERERINTEGERMESAPROC glXQueryRendererIntegerMESA = nullptr;
-PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA = nullptr;
-#endif
-
-#if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
+#if LL_LINUX && !LL_MESA_HEADLESS
 // EGL_VERSION_1_0
 PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
 
@@ -1539,31 +1531,9 @@ void LLGLManager::initWGL()
 #endif
 }
 
-void LLGLManager::initGLX()
-{
-#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
-    if (!mIsX11)
-        return;
-
-    reloadExtensionsString();
-
-    mHasGLXMESAQueryRenderer = mGLExtensions.contains("GLX_MESA_query_renderer");
-    if (mHasGLXMESAQueryRenderer)
-    {
-        glXQueryCurrentRendererIntegerMESA = (PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC)LL_GET_PROC_ADDRESS("glXQueryCurrentRendererIntegerMESA");
-        glXQueryCurrentRendererStringMESA = (PFNGLXQUERYCURRENTRENDERERSTRINGMESAPROC)LL_GET_PROC_ADDRESS("glXQueryCurrentRendererStringMESA");
-        glXQueryRendererIntegerMESA = (PFNGLXQUERYRENDERERINTEGERMESAPROC)LL_GET_PROC_ADDRESS("glXQueryRendererIntegerMESA");
-        glXQueryRendererStringMESA = (PFNGLXQUERYRENDERERSTRINGMESAPROC)LL_GET_PROC_ADDRESS("glXQueryRendererStringMESA");
-    }
-#endif
-}
-
 void LLGLManager::initEGL()
 {
-#if LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
-    if (!mIsWayland)
-        return;
-
+#if LL_LINUX && !LL_MESA_HEADLESS
     reloadExtensionsString();
 
     // EGL_VERSION_1_0
@@ -1787,22 +1757,9 @@ bool LLGLManager::initGL()
     } else
 #endif
 
-#if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
-    if(mHasGLXMESAQueryRenderer && mVRAM == 0)
-    {
-        unsigned int vram_val = 0;
-        if(glXQueryCurrentRendererIntegerMESA(GLX_RENDERER_VIDEO_MEMORY_MESA, &vram_val))
-        {
-            gGLManager.mVRAM = vram_val;
-
-            if (mVRAM != 0)
-            {
-                LL_INFOS("RenderInit") << "VRAM Detected (GLXMesaQueryRenderer):" << mVRAM << LL_ENDL;
-            }
-        }
-    }
-#endif
-
+    // On Linux these two are what Mesa offers as well as the vendor drivers:
+    // every gallium driver that can report memory exposes both, which is what
+    // GLX_MESA_query_renderer used to be asked for on X11.
 #if LL_WINDOWS || LL_LINUX
     {
         if (mHasNVXGpuMemoryInfo && mVRAM == 0)
@@ -2046,29 +2003,7 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-#if LL_SDL_WINDOW && LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
-    if (mIsX11)
-    {
-        if (LLWindowSDL::sX11Data.xdisplay && LLWindowSDL::sX11Data.xwindow)
-        {
-            typedef const char *(*PFNEGLXQUERYEXTENSIONSSTRINGPROC) (Display *dpy, int screen );
-            PFNEGLXQUERYEXTENSIONSSTRINGPROC llglXQueryExtensionsString = (PFNEGLXQUERYEXTENSIONSSTRINGPROC)LL_GET_PROC_ADDRESS("glXQueryExtensionsString");
-            if (llglXQueryExtensionsString)
-            {
-                std::string glx_exts = ll_safe_string((const char*)llglXQueryExtensionsString(LLWindowSDL::sX11Data.xdisplay, LLWindowSDL::sX11Data.xscreen));
-                boost::char_separator<char> sep(" ");
-                boost::tokenizer<boost::char_separator<char> > tok(glx_exts, sep);
-                for (boost::tokenizer<boost::char_separator<char> >::iterator i = tok.begin(); i != tok.end(); ++i)
-                {
-                    mGLExtensions.insert(*i);
-                }
-            }
-        }
-    }
-#endif
-
-#if LL_SDL_WINDOW && LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
-    if (mIsWayland)
+#if LL_SDL_WINDOW && LL_LINUX && !LL_MESA_HEADLESS
     {
         SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
         if (egl_display)

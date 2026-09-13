@@ -15,9 +15,11 @@
 # text, and the first line of it that opens with a copyright statement is
 # the holder shown in the About floater. attribution.json fills in what
 # vcpkg cannot know -- the viewer's own notice, the pieces under externals/,
-# the SDKs from outside vcpkg, and overrides where a port's data is missing
-# or its copyright file has no usable holder line. A shipped port with no
-# licence in either place, or no copyright file, stops the build.
+# the SDKs from outside vcpkg, overrides where a port's data is missing or
+# its copyright file has no usable holder line, and the installed ports that
+# ship nothing: build tools, empty ports that stand for a system library,
+# and what is built only for those. A shipped port with no licence in either
+# place, or no copyright file, stops the build.
 
 cmake_minimum_required(VERSION 4.0)
 
@@ -38,9 +40,6 @@ foreach(
   endif()
 endforeach()
 string(REPLACE "," ";" ENABLED "${ENABLED}")
-
-# Build tools that vcpkg installs into the target triplet and are not shipped.
-set(excluded pkgconf boost-uninstall)
 
 file(READ "${TABLE}" table)
 
@@ -133,6 +132,47 @@ function(
   set(records "${records}" PARENT_SCOPE)
 endfunction()
 
+# The ports the table skips. Each entry is the reason, or an object with the
+# reason and the platform it holds on: the OS of the triplet, or ! and an OS
+# for every other.
+if(NOT TRIPLET MATCHES "^[^-]+-([^-]+)")
+  message(FATAL_ERROR "Attribution.cmake: no OS in triplet ${TRIPLET}")
+endif()
+set(os "${CMAKE_MATCH_1}")
+set(skipped "")
+string(JSON skip ERROR_VARIABLE error GET "${table}" skip)
+if(error)
+  set(skip "{}")
+endif()
+string(JSON count LENGTH "${skip}")
+if(count GREATER 0)
+  math(EXPR last "${count} - 1")
+  foreach(i RANGE ${last})
+    string(JSON port MEMBER "${skip}" ${i})
+    string(JSON type TYPE "${skip}" "${port}")
+    string(JSON entry GET "${skip}" "${port}")
+    set(platform "")
+    set(reason "")
+    if(type STREQUAL "OBJECT")
+      al_table_get("${entry}" platform platform)
+      al_table_get("${entry}" reason reason)
+    elseif(type STREQUAL "STRING")
+      set(reason "${entry}")
+    endif()
+    if(NOT reason)
+      list(APPEND problems "skip.${port}: a reason is required")
+    endif()
+    if(platform MATCHES "^!(.+)$")
+      if(os STREQUAL "${CMAKE_MATCH_1}")
+        continue()
+      endif()
+    elseif(platform AND NOT os STREQUAL "${platform}")
+      continue()
+    endif()
+    list(APPEND skipped "${port}")
+  endforeach()
+endif()
+
 # The ports. Boost is ninety ports under one licence; it is one entry.
 set(boost_seen OFF)
 string(JSON overrides ERROR_VARIABLE error GET "${table}" overrides)
@@ -141,7 +181,7 @@ if(error)
 endif()
 
 foreach(port IN LISTS ports)
-  if(port IN_LIST excluded OR port MATCHES "^vcpkg-")
+  if(port IN_LIST skipped OR port MATCHES "^vcpkg-")
     continue()
   endif()
   set(name "${port}")

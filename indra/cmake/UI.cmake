@@ -6,26 +6,8 @@ include(DBUS)
 add_library(ll::uilibraries INTERFACE IMPORTED)
 
 if(LINUX)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(WAYLAND_CLIENT wayland-client)
-
-  if(WAYLAND_CLIENT_FOUND)
-    target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
-    target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
-  else()
-    message(
-      WARNING
-      "pkg-config could not find wayland-client; building without full Wayland support"
-    )
-  endif()
-
-  find_package(X11)
-  if(X11_FOUND)
-    target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
-  else()
-    message(WARNING "Could not find X11; building without full X11 support")
-  endif()
-
+  # The window is SDL's and GL is EGL on Wayland and X11 alike, so the viewer
+  # itself needs neither wayland-client nor X11: no headers, no defines.
   target_link_libraries(ll::uilibraries INTERFACE ll::fontconfig ll::freetype ll::dbus)
 elseif(DARWIN)
   target_link_libraries(ll::uilibraries INTERFACE ${CARBON_LIBRARY})

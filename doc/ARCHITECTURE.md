@@ -16,7 +16,7 @@
 
 **Rendering layer:**
 - **llrender** - OpenGL abstraction: shaders (`LLGLSLShader`, `LLShaderMgr`), vertex buffers (`LLVertexBuffer`), render targets (`LLRenderTarget`), textures, font rendering (FreeType + HarfBuzz)
-- **llwindow** - Platform window management and input (native Win32/Cocoa/X11 and SDL3 on Linux). Depends on llrender
+- **llwindow** - Platform window management and input (native Win32/Cocoa, and SDL3 on Linux, where GL is EGL on Wayland and X11 alike -- the viewer includes no X11 or GLX header). Depends on llrender
 
 **Content model layer:**
 - **llinventory** - Inventory item/folder data model

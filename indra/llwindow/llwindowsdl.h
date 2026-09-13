@@ -42,15 +42,6 @@
 #include "llwin32headers.h" // HWND / WNDPROC for the WM_COPYDATA subclass
 #endif
 
-#ifdef LL_WAYLAND
-#include <wayland-client-protocol.h>
-#endif
-
-#if LL_X11
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#endif
-
 class LLPreeditor;
 
 class LLWindowSDL final : public LLWindow
@@ -438,8 +429,10 @@ private:
     // create the contexts with the platform-native GL API behind SDL:
     //   * Windows  — WGL sibling context on the main window's HDC
     //   * macOS    — CGL context sharing the current CGLContextObj (drawable-less)
-    //   * X11      — GLX context bound to a 1x1 GLXPbuffer (offscreen, no WM)
-    //   * Wayland  — EGL context made current surfaceless (EGL_NO_SURFACE)
+    //   * Linux    — EGL context made current surfaceless (EGL_NO_SURFACE), on
+    //                Wayland and X11 alike: set_sdl_hints() has SDL create the
+    //                main context with EGL (SDL_HINT_VIDEO_FORCE_EGL), so there
+    //                is no GLX path and no X11 header in the viewer.
     // Each returns an opaque heap handle (LLSDLSharedContext, defined in the
     // .cpp). mSharedContexts tracks the live handles ONLY so destroyContext can
     // warn about and reclaim any a worker failed to release; it is touched only
@@ -483,27 +476,6 @@ private:
 
     HWND mWin32Hwnd = nullptr;
     WNDPROC mPrevWndProc = nullptr;
-#endif
-public:
-#if LL_X11
-    // X11
-    struct X11_DATA
-    {
-        Display* xdisplay = nullptr;
-        Window xwindow = 0;
-        int xscreen = -1;
-    };
-    static X11_DATA sX11Data;
-#endif
-
-#if LL_WAYLAND
-    // Wayland
-    struct WAYLAND_DATA
-    {
-        struct wl_display* display = nullptr;
-        struct wl_surface* surface = nullptr;
-    };
-    static WAYLAND_DATA sWaylandData;
 #endif
 };
 

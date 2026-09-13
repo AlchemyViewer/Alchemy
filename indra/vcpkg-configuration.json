@@ -2,7 +2,7 @@
   "registries": [
     {
       "kind": "git",
-      "baseline": "04bc9c570840a5d8f6d8b5fa0c7c643595befa3e",
+      "baseline": "3953a7196fd50af737c1fd02f463475cfd9d12dd",
       "reference": "main",
       "repository": "https://github.com/AlchemyViewer/alchemy-registry",
       "packages": [
@@ -11,6 +11,8 @@
         "alchemy-fonts",
         "alsa",
         "apr",
+        "bugsplat",
+        "bugsplat-apple",
         "cef-bin",
         "collada-dom",
         "curl",
@@ -28,7 +30,6 @@
         "pulseaudio",
         "sdl3",
         "secondlife-emoji-shortcodes",
-        "sentry-cocoa",
         "tinygltf",
         "tracy",
         "v-hacd",

@@ -41,7 +41,7 @@ void mirrorClip(vec3 pos);
 // PBR interface
 vec2 BRDF(float NoV, float roughness);
 
-void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
 
 void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     float perceptualRoughness,

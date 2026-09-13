@@ -5,7 +5,7 @@
  *
  * The context comes from SDL, on a window that is never shown. That
  * is deliberately the same GL the viewer itself runs on -- WGL on
- * Windows, EGL or GLX on Linux -- where OSMesa, which this used to
+ * Windows, EGL on Linux -- where OSMesa, which this used to
  * use, is a software path we do not ship and so did not test.
  * It also drops a dependency that distributions have begun removing.
  *
@@ -316,6 +316,9 @@ namespace ll_test
             {
                 SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
             }
+            // As the viewer does (set_sdl_hints): EGL under the x11 driver
+            // too, never GLX.
+            SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 #endif
 
             if (!SDL_Init(SDL_INIT_VIDEO))
