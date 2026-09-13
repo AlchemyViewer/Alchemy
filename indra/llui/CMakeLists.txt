@@ -121,6 +121,7 @@ target_sources(
     alpopover.cpp
     alquickopen.cpp
     alscopebar.cpp
+    alsettingrow.cpp
     alspecimenlist.cpp
     altabstrip.cpp
     alfollowscontrol.cpp
@@ -277,6 +278,7 @@ target_sources(
         alpopover.h
         alquickopen.h
         alscopebar.h
+        alsettingrow.h
         alspecimenlist.h
         alstringmatch.h
         altabstrip.h
@@ -429,6 +431,7 @@ if(AL_BUILD_TESTS)
     alxuiselection
     alxuisourcemap
     alxuitreemodel
+    alsettingrow
     alcolorsheet
     lluicolortable
   )

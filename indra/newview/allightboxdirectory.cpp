@@ -26,6 +26,7 @@
 #include "allightboxdirectory.h"
 
 #include "alcurveeditorctrl.h"
+#include "alsettingrow.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "llcheckboxctrl.h"
@@ -409,7 +410,21 @@ void ALLightboxDirectory::addSetting(const std::string& key, LLUICtrl* ctrl, siz
 
     // A vector row's spinners carry a channel letter each, which is no name
     // for the setting; the row's caption is the text to their left.
-    LLTextBox* box = vector_row ? nullptr : ownLabelOf(ctrl);
+    LLTextBox* box = nullptr;
+    if (ALSettingRow* row = ALViewType::as<ALSettingRow>(ctrl))
+    {
+        // A setting row says its own name; its label is inside the slider it
+        // holds, a level below where a control's own label is looked for.
+        // (This is also the viewer's reference to ALSettingRow, which is what
+        // links the widget -- and its registrar -- in from llui: a static
+        // library leaves out an object file nothing refers to, and the tag
+        // would then build nothing. Keep a reference if this goes.)
+        box = row->getLabelBox();
+    }
+    else if (!vector_row)
+    {
+        box = ownLabelOf(ctrl);
+    }
     if (!box)
     {
         box = labelToLeftOf(ctrl);
