@@ -330,7 +330,7 @@
 		 label="Lens"
 		 layout="topleft"
 		 name="tab_lens"
-		 tool_tip="Camera and film effects: depth of field, bloom, glow, lens flare, chromatic aberration, vignette, grain and sharpening." />
+		 tool_tip="Camera and film effects: depth of field and bokeh, lens aberrations, bloom/glow and the cross filter, lens flare, lens dirt, chromatic aberration, distortion, vignette, grain and sharpening." />
 		<panel
 		 filename="panel_lightbox_scene.xml"
 		 label="Scene"
