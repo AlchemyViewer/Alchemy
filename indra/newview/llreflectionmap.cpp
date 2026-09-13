@@ -358,7 +358,7 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
             if (mViewerObject->mDrawable != nullptr)
             {
                 // object to agent space (no scale)
-                glm::mat4 rm(glm::make_mat4((F32*)mViewerObject->mDrawable->getWorldMatrix().mMatrix));
+                glm::mat4 rm(glm::make_mat4(mViewerObject->mDrawable->getWorldMatrix().getF32ptr()));
 
                 // construct object to camera space (with scale)
                 mv = mv * rm * scale;
