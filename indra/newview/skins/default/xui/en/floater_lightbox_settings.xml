@@ -356,25 +356,29 @@
 
 		     In the tab_container and not laid over it as a sibling: a
 		     tab_container makes a tab of every panel it is given but keeps
-		     any other child as it is, and inside it the button overlaps
-		     nothing. So never wrap strip buttons in a panel of their own; a
-		     panel here would be a fifth tab. The button stays out of the
-		     tabs' mouse capture, which ends where tab_padding_right begins
-		     (lltabcontainer test 28 pins all of that).
+		     any other child as it is, and a sibling laid over the strip would
+		     overlap the whole tab_container for XUI Studio's lint. So never
+		     wrap strip buttons in a panel of their own; a panel here would be
+		     a fifth tab. The button stays out of the tabs' mouse capture,
+		     which ends where tab_padding_right begins (lltabcontainer test 28
+		     pins all of that).
 
 		     right="-6" puts it under Find in the bar above, so the right edge
-		     of the two rows is one column. It is 23 tall where the bar's
-		     buttons are 24, because 23 is the strip's height: at 24 it would
-		     hang a pixel into the page. The icon and tooltip are set from C++
-		     to match the tab that is up (while its page is out, the button
-		     brings it back), so the ones here are only the starting state. -->
+		     of the two rows is one column. It is 24x24 like the bar's
+		     buttons, by eye: the strip is 23 tall, so by the numbers its
+		     bottom edge sits a pixel into the page, but in the viewer 24
+		     reads as the same height as the tabs, and 23 looked misaligned.
+		     The lint only reports overlaps of 2px or more. The icon and
+		     tooltip are set from C++ to match the tab that is up (while its
+		     page is out, the button brings it back), so the ones here are
+		     only the starting state. -->
 		<button
 		 follows="top|right"
 		 layout="topleft"
 		 right="-6"
 		 top="0"
 		 width="24"
-		 height="23"
+		 height="24"
 		 label=""
 		 image_overlay="Conv_toolbar_arrow_ne"
 		 name="lightbox_pop_out"

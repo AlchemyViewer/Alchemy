@@ -892,9 +892,15 @@ pages. That is load-bearing three ways:
 Pop-out and Find both sit at `right="-6"`, and the bar and the tab container
 both end at `right="-4"`, so the right edge of the two rows is one column. The
 tab container starts at `left="7"`, one pixel in from the bar's `left="6"`, so
-that its left edge lines up with the combo's. **Pop-out is 23 tall where the
-bar's buttons are 24**: 23 is the strip's height (`tab_height`; the page starts
-right under it), and at 24, at `top="0"`, it would hang a pixel into the page.
+that its left edge lines up with the combo's.
+
+**Pop-out is 24×24 like the bar's buttons, and that was judged by eye.** The
+strip is 23 tall (`tab_height`; the page starts right under it), so by the
+numbers a 24px button at `top="0"` reaches a pixel into the page. In the
+viewer, though, 24 reads as the same height as the tabs. 23, the strip's exact
+height, was tried and looked misaligned. XUI Studio's lint only reports
+siblings that overlap by 2px or more, so it says nothing about this one. Change
+this size by looking at it, not by arithmetic.
 
 Everything but the combo is an **18px icon on a button with an empty label**,
 and the tooltip carries the name. That is not decoration. Four text labels cost
