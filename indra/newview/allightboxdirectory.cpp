@@ -443,3 +443,15 @@ const ALLightboxDirectory::Setting* ALLightboxDirectory::setting(std::string_vie
     const auto found = mSettingIndex.find(key);
     return found != mSettingIndex.end() ? &mSettings[found->second] : nullptr;
 }
+
+std::string ALLightboxDirectory::captionFor(const std::string& key) const
+{
+    const Setting* found = setting(key);
+    return found ? found->mCaption : readableKey(key);
+}
+
+const ALLightboxDirectory::Section* ALLightboxDirectory::sectionOf(std::string_view key) const
+{
+    const Setting* found = setting(key);
+    return found ? &mSections[found->mSection] : nullptr;
+}

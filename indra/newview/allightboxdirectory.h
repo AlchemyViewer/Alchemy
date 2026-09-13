@@ -109,6 +109,12 @@ public:
     /// By setting name, or null.
     const Setting* setting(std::string_view key) const;
 
+    /// What a setting is called: its row's caption, or, for a setting no row
+    /// here shows, its key made into words.
+    std::string captionFor(const std::string& key) const;
+    /// The section a setting's row is in, or null for one no row shows.
+    const Section* sectionOf(std::string_view key) const;
+
     /// The widget naming contract of the vector rows, "vec3_<Setting>_<0|1|2>".
     /// Setting names never contain '_', so the parse is unambiguous.
     static bool parseVec3Name(const std::string& name, std::string& setting, S32& component);

@@ -31,6 +31,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "alhistorylist.h"
 #include "alpopover.h"
 #include "alquickopen.h"
 #include "llaccordionctrl.h"
@@ -66,10 +67,15 @@
 
 namespace
 {
-/// Everything recorded while this lives becomes a single undo step.
+/// Everything recorded while this lives becomes a single undo step, called
+/// @a label in the history list.
 struct ScopedHistoryGroup
 {
-    explicit ScopedHistoryGroup(ALGradeHistory& history) : mHistory(history) { mHistory.beginGroup(); }
+    explicit ScopedHistoryGroup(ALGradeHistory& history, const std::string& label = std::string())
+    :   mHistory(history)
+    {
+        mHistory.beginGroup(label);
+    }
     ~ScopedHistoryGroup() { mHistory.endGroup(); }
     ScopedHistoryGroup(const ScopedHistoryGroup&) = delete;
     ScopedHistoryGroup& operator=(const ScopedHistoryGroup&) = delete;
@@ -160,6 +166,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
     mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
+    mCommitCallbackRegistrar.add("LightBox.History", std::bind(&ALFloaterLightBox::openHistory, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
@@ -253,6 +260,7 @@ bool ALFloaterLightBox::postBuild()
 
     mUndoButton = findChild<LLUICtrl>("look_undo");
     mRedoButton = findChild<LLUICtrl>("look_redo");
+    mHistoryButton = findChild<LLUICtrl>("look_history");
     mReferenceClear = findChild<LLUICtrl>("reference_clear");
     mReferenceMode = findChild<LLUICtrl>("reference_mode");
     mReferencePosition = findChild<LLUICtrl>("reference_position");
@@ -443,6 +451,13 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
     LLControlVariable* controlp = gSavedSettings.getControl(control_name);
     if (controlp)
     {
+        // A group, though it is one control: it names the step, and a reset
+        // straight after a drag of the same control is a second thing done
+        // rather than the end of the drag, which it would otherwise coalesce
+        // into.
+        LLStringUtil::format_map_t args;
+        args["[SETTING]"] = mDirectory.captionFor(control_name);
+        ScopedHistoryGroup group(mHistory, getString("history_reset_setting", args));
         controlp->resetToDefault(true);
     }
 }
@@ -484,7 +499,9 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
 
     // One thing the user did, however many controls it moves: undoing a Reset
     // All eleven times would be absurd.
-    ScopedHistoryGroup group(mHistory);
+    LLStringUtil::format_map_t args;
+    args["[SECTION]"] = mainp ? mainp->mTitle : section;
+    ScopedHistoryGroup group(mHistory, getString("history_reset_section", args));
     for (const std::string& key : keys)
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
@@ -667,6 +684,13 @@ void ALFloaterLightBox::draw()
         }
     }
 
+    // The history list follows the stack while it is up: Ctrl+Z pressed in
+    // it, a drag in the floater behind it, a Look applied from the bar.
+    if (mHistoryList.get() && mHistory.revision() != mHistoryListRevision)
+    {
+        fillHistoryList();
+    }
+
     LLFloater::draw();
 }
 
@@ -738,6 +762,161 @@ void ALFloaterLightBox::onPopoverClosed(const LLView* which, bool escaped)
     }
     mPopover.markDead();
     mPopoverKind = PopoverKind::None;
+    mHistoryList.markDead();
+}
+
+void ALFloaterLightBox::openHistory()
+{
+    constexpr S32 WIDTH = 340;
+    constexpr S32 HEIGHT = 280;
+    ALHistoryList::Params hp(LLUICtrlFactory::getDefaultParams<ALHistoryList>());
+    hp.name = "lightbox_history_list";
+    hp.rect = LLRect(0, HEIGHT, WIDTH, 0);
+    hp.empty_headline = getString("history_empty_headline");
+    hp.empty_sentence = getString("history_empty_sentence");
+    ALHistoryList* list = LLUICtrlFactory::create<ALHistoryList>(hp);
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<ALHistoryList> list_handle = list->getDerivedHandle<ALHistoryList>();
+    LLView* anchor = mHistoryButton ? static_cast<LLView*>(mHistoryButton)
+                                    : (mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this));
+    ALPopover* popover = showPopover(PopoverKind::History, anchor, list,
+        [self, list_handle](KEY key, MASK mask) -> bool
+        {
+            ALFloaterLightBox* floater = self.get();
+            if (!floater)
+            {
+                return false;
+            }
+            if (key == KEY_RETURN && mask == MASK_NONE)
+            {
+                if (ALHistoryList* steps = list_handle.get())
+                {
+                    steps->goToSelected();
+                }
+                floater->closePopover(false);
+                return true;
+            }
+            // The floater's own undo keys, stepping the list while it stays
+            // up: watching the marker move is the point of having it open.
+            const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
+            const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
+                                  (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+            if (undo_key || redo_key)
+            {
+                floater->applyHistory(redo_key);
+                return true;
+            }
+            if (key == 'F' && mask == MASK_CONTROL)
+            {
+                floater->openFind();
+                return true;
+            }
+            return false;
+        });
+    if (!popover)
+    {
+        return;
+    }
+
+    mHistoryList = list->getHandle();
+    list->onGoTo([self](size_t in_force)
+    {
+        // The list counts its first row, which is the start of the history
+        // rather than a step, so the cursor is one less than it asks for.
+        ALFloaterLightBox* floater = self.get();
+        if (floater && in_force > 0)
+        {
+            floater->goToHistory(in_force - 1);
+        }
+    });
+    fillHistoryList();
+}
+
+void ALFloaterLightBox::fillHistoryList()
+{
+    ALHistoryList* list = ALViewType::as<ALHistoryList>(mHistoryList.get());
+    if (!list)
+    {
+        return;
+    }
+    mHistoryListRevision = mHistory.revision();
+
+    // Nothing done yet: an empty list, which is what makes it say so.
+    std::vector<ALHistoryList::Step> steps;
+    if (mHistory.depth() == 0)
+    {
+        list->setSteps(std::move(steps), 0);
+        return;
+    }
+
+    // A first row that is no step at all: where the history starts. Without
+    // it no row could ask for nothing to be in force, and undoing everything
+    // is the one trip back a person is most likely to want.
+    steps.push_back({ getString("history_start"), std::string() });
+    for (size_t index = 0; index < mHistory.depth(); ++index)
+    {
+        const ALGradeHistory::Transaction& changes = mHistory.at(index);
+        ALHistoryList::Step step;
+        step.what = mHistory.labelOf(index);
+        if (step.what.empty())
+        {
+            if (changes.size() == 1)
+            {
+                step.what = mDirectory.captionFor(changes.front().mName);
+            }
+            else
+            {
+                LLStringUtil::format_map_t args;
+                args["[COUNT]"] = llformat("%d", (S32)changes.size());
+                step.what = getString("history_settings", args);
+            }
+        }
+
+        // Where, when every change in the step is in one section: that is
+        // what tells five Strength steps apart. A step across sections --
+        // a Look, a section with an Advanced tail -- says it in its name.
+        const ALLightboxDirectory::Section* common = nullptr;
+        bool one_section = !changes.empty();
+        for (const ALGradeHistory::Change& change : changes)
+        {
+            const ALLightboxDirectory::Section* in = mDirectory.sectionOf(change.mName);
+            if (!in || (common && in != common))
+            {
+                one_section = false;
+                break;
+            }
+            common = in;
+        }
+        if (one_section && common)
+        {
+            step.where = common->mTitle;
+        }
+        steps.push_back(std::move(step));
+    }
+    list->setSteps(std::move(steps), mHistory.cursor() + 1);
+}
+
+void ALFloaterLightBox::goToHistory(size_t cursor)
+{
+    // A step at a time through applyHistory, so every step is written back
+    // exactly the way Ctrl+Z and Ctrl+Y write it. The guard is for a stack
+    // that stops moving, which applyHistory reports rather than loops on.
+    size_t guard = mHistory.depth() + 1;
+    while (mHistory.cursor() > cursor && guard-- > 0)
+    {
+        if (!applyHistory(false))
+        {
+            break;
+        }
+    }
+    while (mHistory.cursor() < cursor && guard-- > 0)
+    {
+        if (!applyHistory(true))
+        {
+            break;
+        }
+    }
 }
 
 std::string ALFloaterLightBox::pageLabel(size_t page) const
@@ -1823,7 +2002,7 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
 
     // One pick is one thing the user did, though it moves two sliders: without
     // the group it undid as two steps, temperature first and then tint.
-    ScopedHistoryGroup group(mHistory);
+    ScopedHistoryGroup group(mHistory, getString("history_white_balance"));
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceCCT", solved.mCCTOffset);
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }
@@ -1836,7 +2015,9 @@ void ALFloaterLightBox::onLookSelected()
         // Applying a Look writes every whitelisted key it carries. That is one
         // choice, so it is one undo step -- and it is the step a user most
         // wants back, having tried a Look on top of work they liked.
-        ScopedHistoryGroup group(mHistory);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = name;
+        ScopedHistoryGroup group(mHistory, getString("history_look", args));
         LLPresetsManager::getInstance()->loadLooksPreset(name);
     }
 }
@@ -1874,7 +2055,9 @@ void ALFloaterLightBox::onClickLookRevert()
     {
         // Same reasoning as onLookSelected: a revert throws away every edit
         // since the Look was applied, and that had better be one Ctrl+Z.
-        ScopedHistoryGroup group(mHistory);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = last;
+        ScopedHistoryGroup group(mHistory, getString("history_revert", args));
         LLPresetsManager::getInstance()->loadLooksPreset(last);
     }
 }

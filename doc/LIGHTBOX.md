@@ -111,6 +111,7 @@ The floater's C++ provides:
 - `LightBox.OpenLUTFolder` — reveals the user's colour-LUT folder, creating it
   on first use.
 - `LightBox.Find` — the Find popover (§4j).
+- `LightBox.History` — the undo history popover (§4f).
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
 
 **Asset-picker rows are a third kind of dropdown**, distinct from the enum
@@ -741,12 +742,27 @@ being broken just as surely as a hundred steps for one drag does. The history
 drops them itself (`llsd_equals` on each change's before and after), and a
 no-op write does not even cost the user their redo tail.
 
-**A group can be named** — `beginGroup(label)` — and the step it makes carries
-the name, for a history that is shown rather than only stepped through
-(`at`, `labelOf` and `revision` read it). The outermost group's name wins, so a
-Look apply that resets a section on the way through is still called after the
-Look. Steps made any other way are named by whoever shows them, from their
-changes.
+**A group can be named** — `ScopedHistoryGroup(mHistory, label)` — and the step
+it makes carries the name (`at`, `labelOf` and `revision` read the stack). The
+outermost group's name wins, so a Look apply that resets a section on the way
+through is still called after the Look. Every group here is named, from the
+`history_*` strings in the floater XML: "Reset Bloom (HDR)", "Reset Strength",
+"Look: Soft Film", "Revert to Soft Film", "White balance pick". A per-row reset
+is a group too, though it is one control, so that it is named and so that a
+reset straight after a drag of the same slider is its own step rather than the
+end of the drag. **A new discrete action should take a label** for the same
+reason.
+
+**The History button** (after Redo) shows the stack as `ALHistoryList` in a
+popover (§4j): every step by name, the present marked, and a double-click on any
+step goes back or forward to it — `goToHistory` steps through `applyHistory`
+one transaction at a time, so a jump writes exactly what that many Ctrl+Z
+presses would. A step without a label is named after the setting it changed,
+by the caption its row shows (§4i), with its section beside it; one that
+changed several unnamed settings says how many. The first row, "Start of
+history", is not a step: it is what lets one double-click undo everything.
+While the list is up it follows the stack (`draw()` refills it when
+`revision()` moves), and Ctrl+Z / Ctrl+Y step it in place.
 
 Undo restores **values only**. The active Look stays dirty, exactly as it would
 had the user typed the old numbers back in; restoring that faithfully would mean
@@ -786,10 +802,10 @@ part of this floater with a fixed width budget: **412px at `min_width`** — the
 floater's 420 less its own `left="4"`/`right="-4"`, and nothing else, because
 the bar sits directly in the floater. A row inside an accordion section starts
 from the same 420 and loses far more (§5); the two budgets are different on
-purpose. The bar currently spends 374 of its 412.
+purpose. The bar currently spends 398 of its 412.
 
 Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
-then Undo / Redo, then Scopes, then Find. Four groups, separated by 12px where
+then Undo / Redo / History, then Scopes, then Find. Four groups, separated by 12px where
 the adjacent buttons inside a group are separated by 4. **That gap is the only
 thing that says they are different kinds of thing** — the first group acts on
 the Look, the second on the grade's own history, the third opens another window,
@@ -802,8 +818,8 @@ the 412; the same four icons cost 80. It also sidesteps §5's silent clipping th
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar
 of labels has no reflow and no scrollbar to save it. Take the overlays from the
 viewer's existing set (`Script_Save`, `Conv_toolbar_plus`, `TrashItem_Off`,
-`Refresh_Off`, `Script_Undo`, `Script_Redo`, `Command_Stats_Icon`,
-`Command_Search_Icon`) rather than adding art; picking a glyph that already
+`Refresh_Off`, `Script_Undo`, `Script_Redo`, `Conv_toolbar_call_log`,
+`Command_Stats_Icon`, `Command_Search_Icon`) rather than adding art; picking a glyph that already
 means the right thing elsewhere is most of the work.
 
 **A button that opens another floater needs no C++ at all** — `Floater.Toggle`
@@ -972,7 +988,9 @@ which any new popover here should go through `showPopover` to get:
 - **The floater's shortcuts come along.** A key pressed in a popover never
   climbs to the Lightbox, since the popover is a window of its own, so each
   popover can carry a key hook (it then claims accelerators, for the reason in
-  §4f). Find's hook takes Ctrl+F back to the field.
+  §4f). Find's hook takes Ctrl+F back to the field; History's steps the stack
+  on Ctrl+Z / Ctrl+Y, goes to the selected step on Return, and swaps itself for
+  Find on Ctrl+F.
 
 Two more things learned the hard way. A popover given a **title** lays its
 content over the title bar, so these have none. And a popover whose content is
@@ -1181,6 +1199,8 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   Finally, confirm the presets land somewhere plausible on a region whose day
   cycle is not the default one, because a hardcoded fraction would also look
   right on a default region.
+- For a new discrete action: do it, open History, and confirm it is one step
+  under its own name, and that double-clicking the step before it undoes it.
 - For a new row: Ctrl+F, type its caption, and confirm it is listed under the
   name its row shows (not its setting key — §4i says what a row needs for that)
   and that Return lands on it, scrolled into view with its caption lit.

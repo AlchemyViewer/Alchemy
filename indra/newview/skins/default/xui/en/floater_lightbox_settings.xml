@@ -28,6 +28,44 @@
 	 name="find_placeholder">
 		Find a setting or section
 	</floater.string>
+	<!-- What the undo history calls its steps. A step made some other way is
+	     called after the setting it changed, by the name its row shows. -->
+	<floater.string
+	 name="history_reset_section">
+		Reset [SECTION]
+	</floater.string>
+	<floater.string
+	 name="history_reset_setting">
+		Reset [SETTING]
+	</floater.string>
+	<floater.string
+	 name="history_look">
+		Look: [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_revert">
+		Revert to [NAME]
+	</floater.string>
+	<floater.string
+	 name="history_white_balance">
+		White balance pick
+	</floater.string>
+	<floater.string
+	 name="history_settings">
+		[COUNT] settings
+	</floater.string>
+	<floater.string
+	 name="history_start">
+		Start of history
+	</floater.string>
+	<floater.string
+	 name="history_empty_headline">
+		Nothing to undo yet
+	</floater.string>
+	<floater.string
+	 name="history_empty_sentence">
+		Each change to the grade is listed here as you make it. Double-click one to go back to it.
+	</floater.string>
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
@@ -146,6 +184,22 @@
 		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)">
 			<button.commit_callback
 			 function="LightBox.Redo" />
+		</button>
+		<!-- The same stack as the two above, as a list: in their group. -->
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Conv_toolbar_call_log"
+		 name="look_history"
+		 tool_tip="History: every grading change since the Lightbox opened, by name. Double-click one to go back or forward to it.">
+			<button.commit_callback
+			 function="LightBox.History" />
 		</button>
 		<!-- Set apart again, for the third kind of thing in this bar: the two
 		     groups above act on this floater's own state, and this opens

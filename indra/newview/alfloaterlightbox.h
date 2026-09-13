@@ -94,6 +94,7 @@ public:
     {
         None,
         Find,
+        History,
     };
     /// A key the popover gets first while it has the keyboard: the floater's
     /// own shortcuts, which would otherwise fall to the menu bar.
@@ -118,6 +119,15 @@ public:
     void jumpTo(const std::string& target);
     /// A tab page's label ("Look"), by index.
     std::string pageLabel(size_t page) const;
+
+    /// The undo stack as a list: every step by name, the present marked, and
+    /// a double-click on any step goes back or forward to it.
+    void openHistory();
+    /// Put the stack into the open history list. Also run from draw() when the
+    /// stack has moved under it.
+    void fillHistoryList();
+    /// Undo or redo, one step at a time, until @a cursor steps are in force.
+    void goToHistory(size_t cursor);
 
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
@@ -302,6 +312,11 @@ public:
     // refresh off each of those is more places to forget.
     LLUICtrl* mUndoButton = nullptr;
     LLUICtrl* mRedoButton = nullptr;
+    LLUICtrl* mHistoryButton = nullptr;
+    /// The list in the history popover while it is up, and the stack revision
+    /// it shows.
+    LLHandle<LLView> mHistoryList;
+    U32 mHistoryListRevision = 0;
     /// Bit 0 can-undo, bit 1 can-redo; -1 until the first refresh.
     S32 mHistoryButtonState = -1;
 
