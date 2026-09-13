@@ -197,7 +197,6 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #else  // ! LL_WINDOWS
 
-#if ! AL_SENTRY
     //
     // Start up signal handling.
     //
@@ -205,7 +204,6 @@ void LLApp::setupErrorHandling(bool second_instance)
     // thread, asynchronous signals can be delivered to any thread (in theory)
     //
     setup_signals();
-#endif // ! AL_SENTRY
 
 #endif // ! LL_WINDOWS
 }
@@ -377,6 +375,12 @@ void LLApp::sendOutOfDiskSpaceNotification()
 }
 
 #ifndef LL_WINDOWS
+// With a crash reporter in the process, the crash signals are its own:
+// crashpad on Linux and SentryCrash on macOS install their handlers after
+// this runs, and a handler of ours underneath would run the app's shutdown
+// from inside a crashed process once the reporter re-raises. The signals the
+// app answers itself, for a graceful quit or to ignore, stay with it either
+// way.
 void setup_signals()
 {
     //
@@ -387,14 +391,11 @@ void setup_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   if ! AL_SENTRY
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -402,6 +403,20 @@ void setup_signals()
 
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
+
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#else // AL_SENTRY
+    // SentryCrash counts a broken pipe as a crash, and leaves an ignored
+    // signal alone.
+    struct sigaction ignore;
+    ignore.sa_handler = SIG_IGN;
+    sigemptyset( &ignore.sa_mask );
+    ignore.sa_flags = 0;
+    sigaction(SIGPIPE, &ignore, NULL);
+#endif // AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
 
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
@@ -413,10 +428,6 @@ void setup_signals()
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGQUIT, &act, NULL);
-
 }
 
 void clear_signals()
@@ -426,14 +437,11 @@ void clear_signals()
     sigemptyset( &act.sa_mask );
     act.sa_flags = SA_SIGINFO;
 
+#if ! AL_SENTRY
     // Synchronous signals
-#   if ! AL_SENTRY
     sigaction(SIGABRT, &act, NULL);
-#   endif
-    sigaction(SIGALRM, &act, NULL);
     sigaction(SIGBUS, &act, NULL);
     sigaction(SIGFPE, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGILL, &act, NULL);
     sigaction(SIGPIPE, &act, NULL);
     sigaction(SIGSEGV, &act, NULL);
@@ -442,19 +450,22 @@ void clear_signals()
     sigaction(LL_HEARTBEAT_SIGNAL, &act, NULL);
     sigaction(LL_SMACKDOWN_SIGNAL, &act, NULL);
 
+    // Asynchronous signals that result in core
+    sigaction(SIGQUIT, &act, NULL);
+#endif // ! AL_SENTRY
+
+    sigaction(SIGALRM, &act, NULL);
+
     // Asynchronous signals that are normally ignored
 #ifndef LL_IGNORE_SIGCHLD
     sigaction(SIGCHLD, &act, NULL);
 #endif // LL_IGNORE_SIGCHLD
+    sigaction(SIGUSR2, &act, NULL);
 
     // Asynchronous signals that result in attempted graceful exit
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
-
-    // Asynchronous signals that result in core
-    sigaction(SIGUSR2, &act, NULL);
-    sigaction(SIGQUIT, &act, NULL);
 }
 
 const char* signal_to_string(int sig) {
@@ -497,7 +508,8 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
         return;
     case SIGABRT:
-        // Note that this handler is not set for SIGABRT when using Bugsplat
+        // With a crash reporter in the process this handler is not installed
+        // for SIGABRT, or any other crash signal; see setup_signals().
         // Abort just results in termination of the app, no funky error handling.
         if (LLApp::sLogInSignal)
         {

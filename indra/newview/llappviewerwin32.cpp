@@ -77,17 +77,10 @@ static void exceptionTerminateHandler()
     // treat this like a regular viewer crash, with nice stacktrace etc.
     long *null_ptr;
     null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception that will trigger breakpad.
+    *null_ptr = 0xDEADBEEF; //Force an exception for the crash reporter to catch.
 
     // we've probably been killed-off before now, but...
     gOldTerminateHandler(); // call old terminate() handler
-}
-
-LONG WINAPI catchallCrashHandler(EXCEPTION_POINTERS * /*ExceptionInfo*/)
-{
-    LL_WARNS() << "Hit last ditch-effort attempt to catch crash." << LL_ENDL;
-    exceptionTerminateHandler();
-    return 0;
 }
 
 

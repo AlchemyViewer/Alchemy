@@ -92,7 +92,7 @@ static void handleUrl(const char* url_utf8);
 #define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
 #endif
 
-#if LL_DARWIN
+#if LL_DARWIN && ! AL_SENTRY
 // *FIX:Mani It would be nice to provide a clean interface to get the
 // default_unix_signal_handler for the LLApp class.
 extern void default_unix_signal_handler(int, siginfo_t *, void *);
@@ -425,7 +425,7 @@ static void exceptionTerminateHandler()
     // treat this like a regular viewer crash, with nice stacktrace etc.
     long *null_ptr;
     null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception that will trigger breakpad.
+    *null_ptr = 0xDEADBEEF; //Force an exception for the crash reporter to catch.
     // we've probably been killed-off before now, but...
     gOldTerminateHandler(); // call old terminate() handler
 }
@@ -640,7 +640,7 @@ bool LLAppViewerSDL::init()
 
 bool LLAppViewerSDL::restoreErrorTrap()
 {
-#if LL_DARWIN
+#if LL_DARWIN && ! AL_SENTRY
     // This method intends to reinstate signal handlers.
     // *NOTE:Mani It was found that the first execution of a shader was overriding
     // our initial signal handlers somehow.
@@ -663,9 +663,7 @@ bool LLAppViewerSDL::restoreErrorTrap()
 #define SET_SIG(SIGNAL) sigaction(SIGNAL, &act, &old_act); \
 if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
     // Synchronous signals
-#   if ! AL_SENTRY
-    SET_SIG(SIGABRT) // the crash reporter's otherwise
-#   endif
+    SET_SIG(SIGABRT)
     SET_SIG(SIGALRM)
     SET_SIG(SIGBUS)
     SET_SIG(SIGFPE)
@@ -696,6 +694,8 @@ if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
     // *NOTE:Mani there is a case for implementing this on the mac.
     // Linux doesn't need it to my knowledge.
     // Windows has its own exception handling that doesn't use Unix signals at all.
+    // With a crash reporter in the process the crash signals are its own, and
+    // reinstalling the viewer's over them every frame would take them away.
     return true;
 #endif
 }
