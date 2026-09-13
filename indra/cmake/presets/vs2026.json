@@ -1,0 +1,270 @@
+{
+  "version": 10,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "include": [
+    "base.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "vs2026-os",
+      "displayName": "Visual Studio 2026",
+      "inherits": [
+        "base",
+        "windows"
+      ],
+      "generator": "Visual Studio 18 2026"
+    },
+    {
+      "name": "vs2026",
+      "displayName": "Visual Studio 2026 Proprietary",
+      "inherits": [
+        "vs2026-os",
+        "proprietary"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl",
+      "displayName": "Visual Studio 2026 (SDL window)",
+      "inherits": [
+        "vs2026-os"
+      ],
+      "cacheVariables": {
+        "AL_USE_SDL_WINDOW": true
+      }
+    },
+    {
+      "name": "vs2026-os-fullopt",
+      "displayName": "Visual Studio 2026 (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "vs2026-os",
+        "fullopt"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt",
+      "displayName": "Visual Studio 2026 Proprietary (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "vs2026",
+        "fullopt"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs2026-os-debug",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-optdebug",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-relwithdebinfo",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-release",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-debug",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-optdebug",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-relwithdebinfo",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-release",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-debug",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-optdebug",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-relwithdebinfo",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-release",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-debug",
+      "configurePreset": "vs2026-os-fullopt",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-optdebug",
+      "configurePreset": "vs2026-os-fullopt",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-relwithdebinfo",
+      "configurePreset": "vs2026-os-fullopt",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-release",
+      "configurePreset": "vs2026-os-fullopt",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-debug",
+      "configurePreset": "vs2026-fullopt",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-optdebug",
+      "configurePreset": "vs2026-fullopt",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-relwithdebinfo",
+      "configurePreset": "vs2026-fullopt",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-release",
+      "configurePreset": "vs2026-fullopt",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "vs2026-os-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs2026-os"
+        },
+        {
+          "type": "build",
+          "name": "vs2026-os-release"
+        }
+      ]
+    },
+    {
+      "name": "vs2026-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs2026"
+        },
+        {
+          "type": "build",
+          "name": "vs2026-release"
+        }
+      ]
+    },
+    {
+      "name": "vs2026-os-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs2026-os-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "vs2026-os-fullopt-release"
+        }
+      ]
+    },
+    {
+      "name": "vs2026-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "vs2026-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "vs2026-fullopt-release"
+        }
+      ]
+    }
+  ]
+}

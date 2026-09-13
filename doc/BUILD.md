@@ -180,7 +180,7 @@ After pulling upstream changes, run the same command to keep the submodule in sy
 
 ## Configure
 
-Build configuration is driven by CMake presets defined in [`indra/CMakePresets.json`](../indra/CMakePresets.json). A preset selects the generator (Visual Studio, Ninja, Xcode), the target architecture, and whether proprietary components are enabled.
+Build configuration is driven by CMake presets. [`indra/CMakePresets.json`](../indra/CMakePresets.json) includes one file per generator under [`indra/cmake/presets/`](../indra/cmake/presets/) (`vs2026.json`, `ninja.json`, `xcode.json`), each of which includes `base.json`, the hidden bases they are composed from. `generate.py` beside them writes all five; edit its tables, not the JSON. A preset selects the generator (Visual Studio, Ninja, Xcode), the target architecture, and whether proprietary components are enabled.
 
 List all available presets:
 
@@ -196,6 +196,8 @@ Preset names follow the pattern `<generator>[-<arch>][-os]`:
 - **No `-os` suffix** — sets `AL_ENABLE_PROPRIETARY=ON`. Requires licensed source for the proprietary components and is only useful if you have access to them.
 
 Most contributors want the `-os` variants.
+
+`<generator>[-os]-fullopt` (with `-arm64` / `-x64` on macOS) is that preset with the optimizations of a shipped build: LTO on, Tracy and Release-configuration debug logging off. The channel is not part of it — pass `-DAL_CHANNEL=...` as for any preset — and neither is the Velopack update client (`-DAL_USE_VELOPACK=ON`), which CI adds. The Ninja ones default to the Release configuration. The hidden `fullopt` preset carries the three settings for a preset of your own, for example `{"name": "mine", "inherits": ["ninja-os", "fullopt", "mold"]}` in `CMakeUserPresets.json`.
 
 ### Common presets
 
@@ -230,9 +232,10 @@ Workflow presets run configure and build as a single command. Useful for CI and 
 cmake --workflow --preset ninja-os-release
 cmake --workflow --preset vs2026-os-release
 cmake --workflow --preset xcode-os-release
+cmake --workflow --preset vs2026-os-fullopt-release
 ```
 
-See `workflowPresets` in `indra/CMakePresets.json` for the full set.
+See `workflowPresets` in the generator files under `indra/cmake/presets/` for the full set.
 
 ## Build
 

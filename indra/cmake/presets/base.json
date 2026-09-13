@@ -1,0 +1,129 @@
+{
+  "version": 10,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceParentDir}/build-${hostSystemName}-${presetName}"
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "macos",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "macos-arm64",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64"
+      }
+    },
+    {
+      "name": "macos-x64",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "x86_64"
+      }
+    },
+    {
+      "name": "proprietary",
+      "hidden": true,
+      "cacheVariables": {
+        "AL_ENABLE_PROPRIETARY": true
+      }
+    },
+    {
+      "name": "lld",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_LINKER_TYPE": "LLD"
+      }
+    },
+    {
+      "name": "mold",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_LINKER_TYPE": "MOLD"
+      }
+    },
+    {
+      "name": "ccache",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "sccache",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_LAUNCHER": "sccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "sccache"
+      }
+    },
+    {
+      "name": "fullopt",
+      "hidden": true,
+      "cacheVariables": {
+        "AL_USE_LTO": true,
+        "AL_USE_TRACY": false,
+        "AL_ENABLE_RELEASE_DEBUG_LOGGING": false
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "macos",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "configuration": "Debug"
+    },
+    {
+      "name": "optdebug",
+      "hidden": true,
+      "configuration": "OptDebug"
+    },
+    {
+      "name": "relwithdebinfo",
+      "hidden": true,
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "release",
+      "hidden": true,
+      "configuration": "Release"
+    }
+  ]
+}

@@ -1,0 +1,548 @@
+{
+  "version": 10,
+  "$schema": "https://cmake.org/cmake/help/latest/_downloads/3e2d73bff478d88a7de0de736ba5e361/schema.json",
+  "include": [
+    "base.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "ninja-os",
+      "displayName": "Ninja Multi-Config",
+      "inherits": [
+        "base"
+      ],
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "ninja",
+      "displayName": "Ninja Multi-Config Proprietary",
+      "inherits": [
+        "ninja-os",
+        "proprietary"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64",
+      "displayName": "Ninja Multi-Config (arm64)",
+      "inherits": [
+        "ninja-os",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-os-x64",
+      "displayName": "Ninja Multi-Config (x86_64)",
+      "inherits": [
+        "ninja-os",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-arm64",
+      "displayName": "Ninja Multi-Config Proprietary (arm64)",
+      "inherits": [
+        "ninja",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-x64",
+      "displayName": "Ninja Multi-Config Proprietary (x86_64)",
+      "inherits": [
+        "ninja",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt",
+      "displayName": "Ninja Multi-Config (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "ninja-os",
+        "fullopt"
+      ],
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ninja-os-fullopt-arm64",
+      "displayName": "Ninja Multi-Config (fully optimized, arm64)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64",
+      "displayName": "Ninja Multi-Config (fully optimized, x86_64)",
+      "inherits": [
+        "ninja-os-fullopt",
+        "macos",
+        "macos-x64"
+      ]
+    },
+    {
+      "name": "ninja-fullopt",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized)",
+      "description": "The optimizations of a shipped build on any channel: LTO on, Tracy and Release debug logging off",
+      "inherits": [
+        "ninja",
+        "fullopt"
+      ],
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ninja-fullopt-arm64",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, arm64)",
+      "inherits": [
+        "ninja-fullopt",
+        "macos",
+        "macos-arm64"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64",
+      "displayName": "Ninja Multi-Config Proprietary (fully optimized, x86_64)",
+      "inherits": [
+        "ninja-fullopt",
+        "macos",
+        "macos-x64"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ninja-os-debug",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-optdebug",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-relwithdebinfo",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-release",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-debug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-optdebug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-relwithdebinfo",
+      "configurePreset": "ninja",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-release",
+      "configurePreset": "ninja",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-debug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-optdebug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-relwithdebinfo",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-release",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-debug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-optdebug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-relwithdebinfo",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-release",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-arm64-debug",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-arm64-optdebug",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-arm64-relwithdebinfo",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-arm64-release",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-x64-debug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-x64-optdebug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-x64-relwithdebinfo",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-x64-release",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-debug",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-optdebug",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-release",
+      "configurePreset": "ninja-os-fullopt",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-debug",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-optdebug",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-arm64-release",
+      "configurePreset": "ninja-os-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-debug",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-optdebug",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-relwithdebinfo",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-x64-release",
+      "configurePreset": "ninja-os-fullopt-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-debug",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-optdebug",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-relwithdebinfo",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-release",
+      "configurePreset": "ninja-fullopt",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-debug",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-optdebug",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-arm64-release",
+      "configurePreset": "ninja-fullopt-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-debug",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-optdebug",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-relwithdebinfo",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-fullopt-x64-release",
+      "configurePreset": "ninja-fullopt-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "ninja-os-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-os"
+        },
+        {
+          "type": "build",
+          "name": "ninja-os-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja"
+        },
+        {
+          "type": "build",
+          "name": "ninja-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-os-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-os-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "ninja-os-fullopt-release"
+        }
+      ]
+    },
+    {
+      "name": "ninja-fullopt-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "ninja-fullopt"
+        },
+        {
+          "type": "build",
+          "name": "ninja-fullopt-release"
+        }
+      ]
+    }
+  ]
+}

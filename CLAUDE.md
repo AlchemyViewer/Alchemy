@@ -8,7 +8,7 @@ Alchemy Viewer is a third-party client for Second Life, forked from the official
 
 ## Build System
 
-CMake with vcpkg for dependency management. The source root for CMake is `indra/` (not the repo root). All CMake presets are defined in `indra/CMakePresets.json`.
+CMake with vcpkg for dependency management. The source root for CMake is `indra/` (not the repo root). CMake presets are generated: `indra/CMakePresets.json` includes one file per generator under `indra/cmake/presets/`, written by `indra/cmake/presets/generate.py` from its tables — edit the script and rerun it, not the JSON.
 
 ### Prerequisites
 
