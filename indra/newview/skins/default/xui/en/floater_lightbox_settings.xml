@@ -104,12 +104,11 @@
 	 name="pane_put_back">
 		Put it back
 	</floater.string>
-	<!-- The bar is split by what its buttons act on. This bar holds the
-	     grade: which Look it is, and its history. The buttons that act on
-	     how the floater is looked at (Scopes, Find, pop-out) sit at the
-	     right end of the tab strip, beside the tabs they are about; they are
-	     at the end of the tab_container below. Split that way, the bar no
-	     longer sets min_width, and the Looks combo stretches with the floater
+	<!-- Every button the floater has but one: the Look, its history, Scopes
+	     and Find. The one that is not here is the pop-out, which acts on the
+	     tab that is up and so sits at the end of the tab strip (the bottom
+	     of the tab_container below). That move is what let the bar stop
+	     setting min_width, and let the Looks combo stretch with the floater
 	     instead of being the fixed 150px that was left over. -->
 	<panel
 	 name="lightbox_topbar"
@@ -120,13 +119,13 @@
 	 right="-4"
 	 height="22">
 		<!-- Everything left of the buttons, which are held to the right edge:
-		     184 is the seven of them with their gaps, and 6 of margin. -->
+		     248 is the nine of them with their gaps, and 6 of margin. -->
 		<combo_box
 		 follows="left|top|right"
 		 layout="topleft"
 		 left="6"
 		 top="1"
-		 right="-184"
+		 right="-248"
 		 height="20"
 		 name="looks_combo"
 		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
@@ -147,7 +146,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-158"
+		 right="-222"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -162,7 +161,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-134"
+		 right="-198"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -177,7 +176,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-110"
+		 right="-174"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -192,7 +191,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-86"
+		 right="-150"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -209,7 +208,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-54"
+		 right="-118"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -224,7 +223,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-30"
+		 right="-94"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -240,7 +239,7 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-6"
+		 right="-70"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -252,6 +251,55 @@
 			<button.commit_callback
 			 function="LightBox.History" />
 		</button>
+		<!-- Set apart again, for the third kind of thing in this bar: the two
+		     groups above act on this floater's own state, and this opens
+		     another window. Command_Stats_Icon is a bar graph and is the same
+		     18px as every other overlay here; it reads as what the window
+		     opens with, since the first pane is a histogram.
+
+		     Floater.Toggle, NOT Floater.ToggleOrBringToFront. The latter is
+		     written for toolbar buttons and closes its target only in an
+		     `else if (!instance->isFrontmost())` fall-through, so pressing a
+		     button that lives in *another floater* can never reach it, because
+		     that press makes this floater the frontmost one. From here it opens
+		     and raises Scopes and nothing else, and the button has no way to
+		     shut it again. Any "open that window" button added to this bar has
+		     the same problem; reach for Floater.Toggle. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-38"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Stats_Icon"
+		 name="open_scopes"
+		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
+			<button.commit_callback
+			 function="Floater.Toggle"
+			 parameter="scopes" />
+		</button>
+		<!-- A fourth kind of thing, so set apart again: this finds a place in
+		     the floater. The list it opens hangs from this bar and is as wide
+		     as it. It sits over the pop-out button at the end of the tab strip,
+		     so the right edge of the two rows is one column. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-6"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Search_Icon"
+		 name="lightbox_find"
+		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
+			<button.commit_callback
+			 function="LightBox.Find" />
+		</button>
 	</panel>
 	<!-- fill_width shares the strip between the four tabs instead of leaving
 	     the right-hand third of it empty. Each page's tool_tip is copied onto
@@ -259,10 +307,10 @@
 	     postBuild then clears it from the page itself, because a page's own
 	     tooltip would otherwise pop up over every caption and gap on it.
 
-	     tab_padding_right keeps the strip's right end for the three buttons
+	     tab_padding_right keeps the strip's right end for the pop-out button
 	     at the bottom of this element: fill_width shares out only what is
-	     left (LLTabContainer::stripRoom), so the tabs stop 8px short of the
-	     first button (451, the right of the pages, less 81, is 370). -->
+	     left (LLTabContainer::stripRoom), so the tabs stop 8px short of it
+	     (451, the right of the pages, less 33, is 418). -->
 	<tab_container
 	 follows="all"
 	 layout="topleft"
@@ -273,7 +321,7 @@
 	 name="lightbox_tabs"
 	 tab_position="top"
 	 tab_min_width="70"
-	 tab_padding_right="81"
+	 tab_padding_right="33"
 	 fill_width="true">
 		<panel
 		 filename="panel_lightbox_look.xml"
@@ -306,68 +354,23 @@
 		 layout="topleft"
 		 name="tab_sky"
 		 tool_tip="The day cycle, which changes the world's environment for you, and sky effects drawn only on your screen." />
-		<!-- The strip's own buttons: how the floater is looked at, beside the
-		     tabs, where the bar above holds the grade. In the tab_container
-		     and not laid over it as siblings: a tab_container makes a tab of
-		     every panel it is given but keeps any other child as it is, and
-		     inside it they overlap nothing. That is also why they are not
-		     grouped in a panel of their own; a panel here would be a fifth
-		     tab. They stay out of the tabs' mouse capture, which ends where
-		     tab_padding_right begins.
+		<!-- The strip's own button: it acts on the tab that is up, so it sits
+		     at the end of the tabs, and it is the only button that belongs
+		     here. Anything that is not about a tab goes in the bar above.
 
-		     Each sits under the matching button of the history group in the
-		     bar above (right -54, -30, -6), so the two rows make one column
-		     at the right edge. top="2" centres 20 in the strip's 23. -->
-		<!-- Opens another window. Command_Stats_Icon is a bar graph and is the
-		     same 18px as every other overlay here; it reads as what the
-		     window opens with, since the first pane is a histogram.
+		     In the tab_container and not laid over it as a sibling: a
+		     tab_container makes a tab of every panel it is given but keeps
+		     any other child as it is, and inside it the button overlaps
+		     nothing. So never wrap strip buttons in a panel of their own; a
+		     panel here would be a fifth tab. The button stays out of the
+		     tabs' mouse capture, which ends where tab_padding_right begins
+		     (lltabcontainer test 28 pins all of that).
 
-		     Floater.Toggle, NOT Floater.ToggleOrBringToFront. The latter is
-		     written for toolbar buttons and closes its target only in an
-		     `else if (!instance->isFrontmost())` fall-through, so pressing a
-		     button that lives in *another floater* can never reach it, because
-		     that press makes this floater the frontmost one. From here it opens
-		     and raises Scopes and nothing else, and the button has no way to
-		     shut it again. Any "open that window" button added to this floater
-		     has the same problem; reach for Floater.Toggle. -->
-		<button
-		 follows="top|right"
-		 layout="topleft"
-		 right="-54"
-		 top="2"
-		 width="20"
-		 height="20"
-		 label=""
-		 halign="center"
-		 image_overlay="Command_Stats_Icon"
-		 name="open_scopes"
-		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
-			<button.commit_callback
-			 function="Floater.Toggle"
-			 parameter="scopes" />
-		</button>
-		<!-- Finds a place among the tabs. The list it opens hangs from the bar
-		     above and is as wide as it, so its field lands over this strip:
-		     the row of tabs becomes the row you type into. -->
-		<button
-		 follows="top|right"
-		 layout="topleft"
-		 right="-30"
-		 top="2"
-		 width="20"
-		 height="20"
-		 label=""
-		 halign="center"
-		 image_overlay="Command_Search_Icon"
-		 name="lightbox_find"
-		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
-			<button.commit_callback
-			 function="LightBox.Find" />
-		</button>
-		<!-- Acts on the tab that is up, so it sits at the end of the tabs. The
-		     icon and tooltip are set from C++ to match that tab (while its
-		     page is out, the button brings it back), so the ones here are
-		     only the starting state. -->
+		     right="-6" puts it under Find in the bar above, so the right edge
+		     of the two rows is one column. top="2" centres 20 in the strip's
+		     23. The icon and tooltip are set from C++ to match the tab that
+		     is up (while its page is out, the button brings it back), so the
+		     ones here are only the starting state. -->
 		<button
 		 follows="top|right"
 		 layout="topleft"

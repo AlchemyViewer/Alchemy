@@ -61,7 +61,7 @@ the viewer's widget set was touched.
 | Curve / band graph | `<curve_editor>` | §4b |
 | Checkbox on an accordion header | `<accordion_tab.header_check_box>` | §3b |
 | Anti-aliased polyline and area fill | `gl_polyline_2d`, `gl_polyfill_2d` | §4b |
-| Floater top bar (Looks, history) and tab-strip buttons (scopes, find, pop-out) | ordinary buttons, `Floater.Toggle` | §4g |
+| Floater top bar (Looks, history, scopes, find) and the tab strip's pop-out | ordinary buttons, `Floater.Toggle` | §4g |
 | Scopes window | its own floater | §4d |
 | Sky tab (day cycle freeze) | ordinary rows, `LLEnvironment` behind them | §4h |
 
@@ -836,58 +836,51 @@ refresh off each of those is more places to forget than a polled compare costs.
 
 ### 4g. The top bar and the tab strip
 
-The floater's buttons live in two rows, split by what they act on. **The bar**
-(`lightbox_topbar` in `floater_lightbox_settings.xml`) holds the grade: the
-Looks `combo_box`, then Save / Save As / Delete / Revert, then Undo / Redo /
-History. **The tab strip** holds how the floater is looked at: Scopes, Find
-and Pop-out sit at its right end, after the tabs. They were all one bar of ten
-controls until it had spent every pixel it had at `min_width` (422 of 422, which
-had pushed `min_width` from 420 to 430 for the pop-out button). Split, the bar
-no longer sets `min_width`, which is back to 420, and the Looks combo stretches
-with the floater instead of being the 150px that was left over: 222 at
-`min_width`, 262 at the default 460.
+**The bar** (`lightbox_topbar` in `floater_lightbox_settings.xml`) holds every
+button the floater has but one. Left to right: the Looks `combo_box`, then Save
+/ Save As / Delete / Revert, then Undo / Redo / History, then Scopes, then
+Find. **The one button that is not there is Pop-out**, at the right end of the
+tab strip: it acts on the tab that is up, so it sits at the end of the tabs.
+**Only a button about a tab belongs on the strip**; Scopes and Find were tried
+there and read as out of place, since neither is about a tab. The bar used to
+hold Pop-out as well, and at `min_width` it had spent all 422px it had, which
+had pushed `min_width` from 420 to 430. With Pop-out on the strip, `min_width`
+is back to 420, and the bar has room to spare, which the Looks combo takes: it
+stretches with the floater instead of being the fixed 150px that was left over.
+It is 158 at `min_width` and 198 at the default 460.
 
-In the bar, the combo takes `left="6" right="-184"` and follows the right edge,
-and the seven buttons follow `top|right` and are placed by `right` rather than
-`left_pad`: the last is 6 in from the edge, each one before it 24 further in, and
-12 where the group changes. **Two groups, separated by 12px where the buttons
-inside a group are separated by 4.** That gap is the only thing that says the
-first group acts on the Look and the second on the grade's own history, so keep
-it if you add another kind, and use 4px if you are extending a group. A new
-button here comes out of the combo's width; add it to the 184.
+The combo takes `left="6" right="-248"` and follows the right edge, and the nine
+buttons follow `top|right` and are placed by `right` rather than `left_pad`: the
+last is 6 in from the edge, each one before it 24 further in, and 12 more where
+the group changes. **Four groups, separated by 12px where the buttons inside a
+group are separated by 4.** That gap is the only thing that says they are
+different kinds of thing: the first group acts on the Look, the second on the
+grade's own history, the third opens another window, and the fourth finds a
+place in this one. So keep it if you add another kind, and use 4px if you are
+extending a group. A new button here comes out of the combo's width; add it to
+the 248.
 
-**The strip's buttons are children of the `tab_container` itself,** after the
-four pages. That is load-bearing three ways:
+**The strip's button is a child of the `tab_container` itself,** after the four
+pages. That is load-bearing three ways:
 
 - A `tab_container` makes a tab of every *panel* it is given
-  (`LLTabContainer::addChild`) and keeps any other child as it is, so the
-  buttons must be direct children. Grouping them in a panel would make a fifth
+  (`LLTabContainer::addChild`) and keeps any other child as it is, so a strip
+  button must be a direct child. Wrapped in a panel, it would become a fifth
   tab.
-- `tab_padding_right="81"` keeps the strip's right end clear.
-  `fill_width` shares out only what is left (`stripRoom`), so the tabs stop 8px
-  short of the first button. The tabs' mouse capture (`tab_rect` in
-  `handleMouseDown`) ends where the padding begins, so a button there gets its
-  own clicks. Put a button inside the tabs' span and the container captures the
-  mouse on press, and the button never sees its release.
-- Laid over the strip as siblings of the `tab_container` instead, they would
+- `tab_padding_right="33"` keeps the strip's right end clear. `fill_width`
+  shares out only what is left (`stripRoom`), so the tabs stop 8px short of the
+  button. The tabs' mouse capture (`tab_rect` in `handleMouseDown`) ends where
+  the padding begins, so a button there gets its own clicks. Put a button inside
+  the tabs' span and the container captures the mouse on press, and the button
+  never sees its release. `lltabcontainer_test` test 28 pins all three.
+- Laid over the strip as a sibling of the `tab_container` instead, it would
   overlap its rect, and XUI Studio's lint reports every pair of visible
   siblings that intersect.
 
-The three sit directly under Undo / Redo / History (`right` -54, -30, -6 in both
-rows, which have the same `left="4"`/`right="-4"`), so the right edge reads as
-one column. They are one group with 4px gaps: Scopes opens another window, Find
-finds a place in this one, and Pop-out takes the tab that is up into a window of
-its own, which is why it sits next to the tabs. The strip leaves room for them
-with 4 tabs at `tab_min_width` 70 (280 of the 329 there is at `min_width`). A
-fifth tab or a fourth button has to fit that sum.
+Pop-out and Find both sit at `right="-6"` (the two rows have the same
+`left="4"`/`right="-4"`), so the right edge of the two rows is one column.
 
-Find's list still hangs from the bar and is as wide as it, so its field lands
-over the strip, and the row of tabs becomes the row you type into. The History
-list hangs from its button, which is now at the right edge, so it opens out past
-the floater's right side. Popovers are windows of their own and are shoved back
-on screen when that side is off it.
-
-Everything in both rows but the combo is an **18px icon with an empty label**, and the
+Everything but the combo is an **18px icon with an empty label**, and the
 tooltip carries the name. That is not decoration. Four text labels cost 192px of
 the bar; the same four icons cost 80. It also sidesteps §5's silent clipping the
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar

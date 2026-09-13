@@ -1446,10 +1446,8 @@ void ALFloaterLightBox::openFind()
 {
     LLView* anchor = mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this);
 
-    // As wide as the bar it hangs from, so it reads as part of the floater
-    // rather than as another window. The Find button is on the tab strip
-    // just under that bar, so the field lands over the strip: the row of
-    // tabs becomes the row being typed into.
+    // As wide as the bar it hangs from, so it reads as the bar opening rather
+    // than as another window.
     constexpr S32 HEIGHT = 300;
     const S32 width = llmax(anchor->getRect().getWidth(), 300);
     ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
