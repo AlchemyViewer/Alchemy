@@ -45,7 +45,6 @@ set(
   AL_USE_WINSPELLCHECK
   AL_USE_WEBRTC
   AL_ENABLE_CRASH_REPORTING
-  AL_USE_BUGSPLAT
   AL_USE_SENTRY
   AL_USE_TRACY
   AL_ENABLE_TRACY_ON_DEMAND
@@ -347,12 +346,12 @@ function(al_configuration_report)
     _al_report_row("Tests" "off")
   endif()
 
-  if(AL_BUILD_TESTS AND NOT Python3_Interpreter_FOUND)
-    _al_report_row("Python" "not found; the tests that spawn a Python peer are disabled")
-  elseif(Python3_EXECUTABLE)
+  if(NOT AL_BUILD_TESTS)
+    _al_report_row("Python" "not used (tests off)")
+  elseif(Python3_Interpreter_FOUND)
     _al_report_row("Python" "${Python3_VERSION} (${Python3_EXECUTABLE})")
   else()
-    _al_report_row("Python" "not found")
+    _al_report_row("Python" "not found; the tests that spawn a Python peer are disabled")
   endif()
 
   if(LL_GENERATOR_IS_MULTI_CONFIG)

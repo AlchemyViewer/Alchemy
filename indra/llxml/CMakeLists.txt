@@ -20,8 +20,6 @@ target_sources(
       FILES alxmldocument.h alxmllayermerge.h alxmlmergelog.h llcontrol.h llxmlnode.h llxmltree.h
 )
 
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
 target_link_libraries(llxml PRIVATE al::flags PUBLIC llfilesystem llmath llcommon ll::pugixml)
 target_precompile_headers(llxml REUSE_FROM llprecompiled)
 

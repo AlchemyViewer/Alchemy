@@ -79,8 +79,7 @@ target_include_directories(llcorehttp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../llm
 target_precompile_headers(llcorehttp REUSE_FROM llprecompiled)
 
 # tests
-option(LLCOREHTTP_TESTS "Build and run llcorehttp integration tests specifically" ON)
-if(AL_BUILD_TESTS AND LLCOREHTTP_TESTS)
+if(AL_BUILD_TESTS)
   # The suite runs under a Python peer that serves the requests it makes.
   # An http_proxy in the environment would put a proxy between the two, so
   # the run clears it.

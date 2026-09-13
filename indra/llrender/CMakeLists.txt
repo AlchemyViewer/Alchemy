@@ -105,8 +105,6 @@ target_sources(
   PUBLIC FILE_SET HEADERS FILES ${llrender_HEADERS}
 )
 
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
 target_link_libraries(
   llrender
   PRIVATE al::flags

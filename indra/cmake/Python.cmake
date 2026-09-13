@@ -5,11 +5,10 @@ if(DEFINED ENV{PYTHON})
   set(Python3_ROOT_DIR "$ENV{PYTHON}")
 endif()
 
-# On Windows, prefer registry entries to avoid Cygwin/MSYS Python
-# The registry is searched first by default, which finds native Windows Python
-# installations rather than Cygwin/MSYS Python
+# On Windows the registry names the native installations; a Cygwin or MSYS
+# python on the PATH would otherwise be found first.
 if(WINDOWS)
-  set(Python3_FIND_REGISTRY FIRST CACHE STRING "Python search order")
+  set(Python3_FIND_REGISTRY FIRST)
 endif()
 
 # We always want to find the active virtual env first

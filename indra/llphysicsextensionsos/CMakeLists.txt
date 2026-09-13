@@ -29,5 +29,3 @@ target_sources(
 target_link_libraries(llphysicsextensionsos PRIVATE al::flags PUBLIC llmath llcommon ll::vhacd)
 
 target_precompile_headers(llphysicsextensionsos REUSE_FROM llprecompiled)
-
-# Add tests

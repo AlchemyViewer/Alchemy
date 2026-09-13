@@ -8,8 +8,6 @@ if(AL_BUILD_TESTS)
 
   set_target_properties(llimage_libtest PROPERTIES FOLDER "Tests")
 
-  # Libraries on which this application depends on
-  # Sort by high-level to low-level
   target_link_libraries(
     llimage_libtest
     PRIVATE al::flags llcommon llfilesystem llmath llimage

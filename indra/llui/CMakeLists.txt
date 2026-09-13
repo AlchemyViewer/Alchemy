@@ -313,8 +313,6 @@ else()
   target_sources(llui PRIVATE llspellcheckengine_hunspell.cpp)
 endif()
 
-# Libraries on which this library depends, needed for Linux builds
-# Sort by high-level to low-level
 target_link_libraries(
   llui
   PRIVATE al::flags

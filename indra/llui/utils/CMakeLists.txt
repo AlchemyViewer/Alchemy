@@ -16,8 +16,6 @@ target_sources(
     llwidgetreg.h
 )
 
-# Libraries on which this depends, needed for Linux builds.
-# Sort by high-level to low-level.
 target_link_libraries(
   llui_libtest
   PRIVATE al::flags llui llinventory llmessage llrender llimage llimagej2coj

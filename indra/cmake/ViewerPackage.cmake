@@ -32,7 +32,7 @@ velopack_mac_main_exe=${al_velopack_main_exe}
 velopack_mac_bundle_id=${MACOSX_BUNDLE_GUI_IDENTIFIER}
 "
   )
-else()
+elseif(WINDOWS)
   set(
     al_package_env
     "velopack_pack_id=${AL_APP_NAME_ONEWORD}
@@ -46,6 +46,8 @@ velopack_splash_color=${al_velopack_splash_color}
 velopack_installer_base=${AL_PACKAGE_NAME}
 "
   )
+else()
+  set(al_package_env "")
 endif()
 file(
   CONFIGURE

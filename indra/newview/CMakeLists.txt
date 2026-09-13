@@ -104,22 +104,6 @@ if(AL_BUILD_VIEWER)
       "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
       ONLY_IF_DIFFERENT
     )
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
-      ONLY_IF_DIFFERENT
-    )
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
-      ONLY_IF_DIFFERENT
-    )
-  elseif(DARWIN)
-    file(
-      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
-      "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns"
-      ONLY_IF_DIFFERENT
-    )
   elseif(LINUX)
     file(
       COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
@@ -1721,7 +1705,6 @@ if(AL_BUILD_VIEWER)
     # Add resource files to the project.
     set(
       viewer_RESOURCE_FILES
-      alchemy.icns
       # CMake doesn't seem to support Xcode language variants well just yet
       English.lproj/InfoPlist.strings
       English.lproj/language.txt
@@ -1830,14 +1813,9 @@ if(AL_BUILD_VIEWER)
       FILES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc ${viewer_RESOURCE_FILES}
     )
 
-    if(ADDRESS_SIZE EQUAL 64)
-      # We deliberately omit this from the 32bit build because it declares that
-      # the viewer is compatible with Windows 10; we need that to properly detect
-      # the Windows version, but doing so causes systems with certain HD video
-      # cards to fail because Windows 10 does not support them.  Leaving this out
-      # causes those systems to run in a Windows 8 compatibility mode, which works.
-      list(APPEND viewer_SOURCES windows.manifest)
-    endif()
+    # Declares the viewer compatible with Windows 10, which the version query
+    # needs to answer truthfully.
+    list(APPEND viewer_SOURCES windows.manifest)
   endif()
 
   # Add the xui files. This is handy for searching for xui elements
@@ -1924,34 +1902,6 @@ if(AL_BUILD_VIEWER)
 
   target_precompile_headers(${AL_VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheaders.h)
 
-  # *NOTE: - this list is very sensitive to ordering, test carefully on all
-  # platforms if you change the relative order of the entries here.
-  # In particular, cmake 2.6.4 (when building with linux/makefile generators)
-  # appears to sometimes de-duplicate redundantly listed dependencies improperly.
-  # To work around this, higher level modules should be listed before the modules
-  # that they depend upon. -brad
-  #
-  # *NOTE:  On mixing system shared libraries and updated static archives.
-  # We use a number of libraries that have an existence as system libraries,
-  # internal-use libraries and applications libraries.  The most-referenced
-  # one of these being libz where you can find four or more versions in play
-  # at once.  On Linux, libz can be found at link and run time via a number
-  # of paths:
-  #
-  #      => -lfreetype
-  #        => libz.so.1 (on install machine, not build)
-  #      => -lSDL
-  #        => libz.so.1 (on install machine, not build)
-  #      => -lgdk-x11-2.0
-  #        => libz.so.1
-  #      => -lz
-  #
-  # We generally want the newest version of the library to provide all symbol
-  # resolution.  To that end, when using static archives, the *_PRELOAD_ARCHIVES
-  # variables, PNG_PRELOAD_ARCHIVES and ZLIBNG_PRELOAD_ARCHIVES, get the archives
-  # dumped into the target binary and runtime lookup will find the most
-  # modern version.
-
   target_link_libraries(
     ${AL_VIEWER_BINARY_NAME}
     PRIVATE
@@ -1972,7 +1922,6 @@ if(AL_BUILD_VIEWER)
       llcorehttp
       llcommon
       lllogin
-      llprimitive
       llappearance
       ll::bugsplat
       ll::ndof
@@ -1984,9 +1933,9 @@ if(AL_BUILD_VIEWER)
       ll::tinyexr
       ll::minizip
       ll::pugixml
+      ll::velopack
+      ll::webrtc
   )
-
-  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack ll::webrtc)
 
   if(DARWIN)
     find_library(IOSURFACE_FRAMEWORK IOSurface)
@@ -2024,15 +1973,11 @@ if(AL_BUILD_VIEWER)
       PROPERTIES
         OUTPUT_NAME "${OUTPUT_BINARY_NAME}"
         RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-        ENABLE_EXPORTS OFF
-        VS_DEBUGGER_WORKING_DIRECTORY
-          "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
+        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
   elseif(DARWIN)
-    # These all get set with PROPERTIES. It's not that the property names are
-    # magically known to CMake -- it's that these names are referenced in the
-    # Info-Alchemy.plist file in the configure_file() directive below.
+    # The MACOSX_BUNDLE_* variables are what Info-AlchemySDL.plist, named
+    # below as the bundle's Info.plist template, is configured with.
     set(product "${AL_CHANNEL}")
     set(MACOSX_EXECUTABLE_NAME "${AL_CHANNEL}")
     set(MACOSX_BUNDLE_INFO_STRING "${AL_CHANNEL}")
@@ -2046,10 +1991,9 @@ if(AL_BUILD_VIEWER)
     set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
     set(
       MACOSX_BUNDLE_BUNDLE_VERSION
-      "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}"
+      "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_VERSION_REVISION}"
     )
-    set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
-    set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
+    set(MACOSX_BUNDLE_COPYRIGHT "Copyright © 2013-2026 Alchemy Development Group")
 
     set_target_properties(
       ${AL_VIEWER_BINARY_NAME}
@@ -2099,35 +2043,6 @@ if(AL_BUILD_VIEWER)
       ${AL_VIEWER_BINARY_NAME}
       PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}/bin/
     )
-
-    if(AL_USE_BUGSPLAT)
-      find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
-      set(DEBUG_BINARY_TARGET $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>)
-      set(
-        DEBUG_FILE_NAME
-        "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug"
-      )
-      add_custom_command(
-        TARGET ${AL_VIEWER_BINARY_NAME}
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${SYMBOLS_STAGING_DIR}
-        COMMAND
-          ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib ${DEBUG_BINARY_TARGET}
-          ${DEBUG_FILE_NAME}
-        COMMAND ${OBJCOPY_PROGRAM} --strip-debug --strip-unneeded ${DEBUG_BINARY_TARGET}
-        COMMAND ${OBJCOPY_PROGRAM} --add-gnu-debuglink=${DEBUG_FILE_NAME} ${DEBUG_BINARY_TARGET}
-        COMMENT "Generating ${DEBUG_FILE_NAME}"
-      )
-    endif()
-
-    string(TOLOWER ${AL_CHANNEL} channel_lower)
-    if(channel_lower MATCHES "^alchemy release")
-      set(OUTPUT_BINARY_NAME "AlchemyViewer")
-    else()
-      set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
-    endif()
-
-    set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
   endif()
 
   # What ships, and where; the names the package goes by.

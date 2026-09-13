@@ -28,5 +28,3 @@ target_sources(
 
 target_link_libraries(llplugin PRIVATE al::flags PUBLIC llcommon llmath llmessage llxml)
 target_precompile_headers(llplugin REUSE_FROM llprecompiled)
-
-add_subdirectory(slplugin)

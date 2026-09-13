@@ -10,7 +10,7 @@ if(AL_USE_KDU)
   find_path(
     KDU_INCLUDE_DIRS
     NAMES kdu_arch.h
-    PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/kdu"
+    PATHS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/kdu"
     REQUIRED
     NO_DEFAULT_PATH
   )

@@ -1,12 +1,4 @@
 # -*- cmake -*-
-#
-# Compared to other libraries, compiling this one is a mess.  The
-# reason is that we have several source files that have two different
-# sets of behaviour, depending on whether they're intended to be part
-# of the viewer or the map server.
-#
-# Unfortunately, the affected code is a rat's nest of #ifdefs, so it's
-# easier to play compilation tricks than to actually fix the problem.
 
 include(UI)
 

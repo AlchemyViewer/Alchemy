@@ -120,8 +120,9 @@ endif()
 add_dependencies(media_plugin_cef dullahan_host)
 
 if(WINDOWS)
-  # media_plugin_cef.dll lives next to libcef.dll and the CEF bootstrap (deployed
-  # below) so the CEF runtime resolves from its own dir.
+  # media_plugin_cef.dll lives next to libcef.dll and the CEF bootstrap, which
+  # the install rules stage beside it, so the CEF runtime resolves from its
+  # own directory.
   set_target_properties(
     media_plugin_cef
     PROPERTIES
@@ -129,73 +130,6 @@ if(WINDOWS)
       LIBRARY_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
   )
   target_link_options(media_plugin_cef PRIVATE /IGNORE:4099)
-
-  set(CEF_BIN_BINARY_DIR "$<IF:$<CONFIG:Debug>,${CEF_BINARY_DIR_DEBUG},${CEF_BINARY_DIR_RELEASE}>")
-
-  # Ship CEF's bootstrap.exe renamed to media_plugin_cef.exe; matching base name
-  # makes it load media_plugin_cef.dll and call our exported RunWinMain with the
-  # sandbox info. The bootstrap.exe is part of the CEF Release payload copied below.
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different "${CEF_BIN_BINARY_DIR}/bootstrap.exe"
-      "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
-  )
-
-  # Copy the CEF runtime + resources to the packaging directory.
-  set(
-    CEF_BIN_FILES
-    "${CEF_BIN_BINARY_DIR}/chrome_elf.dll"
-    "${CEF_BIN_BINARY_DIR}/d3dcompiler_47.dll"
-    "${CEF_BIN_BINARY_DIR}/dxcompiler.dll"
-    "${CEF_BIN_BINARY_DIR}/dxil.dll"
-    "${CEF_BIN_BINARY_DIR}/libEGL.dll"
-    "${CEF_BIN_BINARY_DIR}/libGLESv2.dll"
-    "${CEF_BIN_BINARY_DIR}/v8_context_snapshot.bin"
-    "${CEF_BIN_BINARY_DIR}/vk_swiftshader.dll"
-    "${CEF_BIN_BINARY_DIR}/vk_swiftshader_icd.json"
-    "${CEF_BIN_BINARY_DIR}/vulkan-1.dll"
-  )
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
-
-  set(
-    CEF_RESOURCE_FILES
-    "${CEF_RESOURCE_DIR}/chrome_100_percent.pak"
-    "${CEF_RESOURCE_DIR}/chrome_200_percent.pak"
-    "${CEF_RESOURCE_DIR}/resources.pak"
-    "${CEF_RESOURCE_DIR}/icudtl.dat"
-  )
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES} "${VIEWER_STAGING_DIR}/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
-
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales"
-      "${VIEWER_STAGING_DIR}/llplugin/locales"
-  )
-
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:dullahan_host>"
-      "${VIEWER_STAGING_DIR}/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
-
 elseif(DARWIN)
   # macOS has extra helper bundles
   add_dependencies(
@@ -204,6 +138,13 @@ elseif(DARWIN)
     dullahan_host_gpu
     dullahan_host_plugin
     dullahan_host_renderer
+  )
+  set_target_properties(
+    media_plugin_cef
+    PROPERTIES
+      BUILD_WITH_INSTALL_RPATH 1
+      INSTALL_RPATH
+        "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
   )
 
   find_library(IOSURFACE_FRAMEWORK IOSurface)
@@ -222,38 +163,4 @@ elseif(DARWIN)
 
 elseif(LINUX)
   target_link_options(media_plugin_cef PRIVATE "LINKER:--build-id")
-
-  set(
-    CEF_RESOURCE_FILES
-    "${CEF_RESOURCE_DIR}/chrome_100_percent.pak"
-    "${CEF_RESOURCE_DIR}/chrome_200_percent.pak"
-    "${CEF_RESOURCE_DIR}/resources.pak"
-    "${CEF_RESOURCE_DIR}/icudtl.dat"
-  )
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/bin/llplugin"
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES}
-      "${VIEWER_STAGING_DIR}/bin/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
-  add_custom_command(
-    TARGET media_plugin_cef
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales"
-      "${VIEWER_STAGING_DIR}/bin/llplugin/locales"
-  )
-
-  if(CEF_BIN_FILES)
-    add_custom_command(
-      TARGET media_plugin_cef
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/lib"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/lib"
-      COMMAND_EXPAND_LISTS
-    )
-  endif()
 endif()

@@ -38,15 +38,6 @@ if(WINDOWS)
       RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
   )
   target_link_options(media_plugin_libvlc PRIVATE /MANIFEST:NO)
-
-  # Copy VLC runtime plugins to the packaging directory
-  add_custom_command(
-    TARGET media_plugin_libvlc
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_directory_if_different "${VLC_PLUGINS_DIR}"
-      "${VIEWER_STAGING_DIR}/llplugin/plugins"
-  )
 elseif(DARWIN)
   set_target_properties(
     media_plugin_libvlc

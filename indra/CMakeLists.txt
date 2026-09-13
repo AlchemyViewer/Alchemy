@@ -20,8 +20,9 @@ set(AL_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
 # Default deploy grid
 set(AL_GRID agni CACHE STRING "Target Grid")
 
-# AL_USE_VELOPACK controls whether to use Velopack for installer packaging (instead of NSIS/DMG)
-option(AL_USE_VELOPACK "Use Velopack for installer packaging" OFF)
+# The Velopack update client in the viewer, and the velopack target that
+# packs the installer and the update feed; see cmake/ViewerPackage.cmake.
+option(AL_USE_VELOPACK "Build the Velopack update client and the velopack packaging target" OFF)
 
 # Build executable options
 option(AL_BUILD_VIEWER "Build the viewer project" ON)
@@ -34,7 +35,7 @@ option(
 option(AL_BUILD_DOCS "Add the doc target that generates the API documentation with Doxygen" OFF)
 option(AL_BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
-option(AL_BUILD_PACKAGE "Add a package target that builds an installer package" ON)
+option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)
 
 # CMake's own BUILD_TESTING, from the CTest module, is what ctest and IDE
 # integrations read; it follows AL_BUILD_TESTS.
@@ -152,16 +153,13 @@ cmake_dependent_option(
 # Crash reporting
 option(AL_ENABLE_CRASH_REPORTING "Send crash reports from this build" OFF)
 
-# Bugsplat setup
-if(AL_ENABLE_PROPRIETARY AND (WIN32 OR APPLE))
-  if(AL_BUGSPLAT_DATABASE)
-    set(AL_USE_BUGSPLAT ON CACHE BOOL "Use the BugSplat crash reporting system")
-  else()
-    set(AL_USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-  endif()
-else()
-  set(AL_USE_BUGSPLAT OFF CACHE BOOL "Use the BugSplat crash reporting system")
-  set(AL_BUGSPLAT_DATABASE "" CACHE STRING "BugSplat crash database name")
+# BugSplat: a proprietary Windows and macOS build with a database named
+# reports to it. AL_USE_BUGSPLAT follows from that on every configure; it is
+# not an option of its own.
+set(AL_BUGSPLAT_DATABASE "" CACHE STRING "BugSplat crash database name")
+set(AL_USE_BUGSPLAT OFF)
+if(AL_ENABLE_PROPRIETARY AND (WIN32 OR APPLE) AND AL_BUGSPLAT_DATABASE)
+  set(AL_USE_BUGSPLAT ON)
 endif()
 
 # Sentry Setup
@@ -411,7 +409,7 @@ if(AL_BUILD_TESTS)
   include(LLAddBuildTest)
 endif()
 
-# Add our cmake modules to cmake
+# The build system's own files, for the IDE.
 add_subdirectory(cmake)
 add_subdirectory(template_verifier)
 
