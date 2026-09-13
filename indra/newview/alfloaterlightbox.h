@@ -46,11 +46,13 @@
 
 class ALCurveEditorCtrl;
 class LLComboBox;
+class LLPanel;
 class LLSettingsDay;
 class LLSettingsSky;
 class LLSettingsWater;
 class LLSliderCtrl;
 class LLSpinCtrl;
+class LLTabContainer;
 
 class ALFloaterLightBox final : public LLFloater
 {
@@ -171,6 +173,10 @@ public:
     void onClickLookDelete();
     void onClickLookRevert();
     void refreshLooksBar();
+
+    /// The tab strip and its pages, in tab order: Look, Lens, Scene, Sky.
+    LLTabContainer* mTabs = nullptr;
+    std::vector<LLPanel*> mTabPages;
 
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a

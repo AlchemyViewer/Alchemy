@@ -47,6 +47,7 @@
 #include "llsettingsvo.h"
 #include "llsliderctrl.h"
 #include "llspinctrl.h"
+#include "lltabcontainer.h"
 #include "lltimer.h"
 #include "lltoolmgr.h"
 #include "llviewercontrol.h"
@@ -225,6 +226,21 @@ ALFloaterLightBox::~ALFloaterLightBox()
 
 bool ALFloaterLightBox::postBuild()
 {
+    mTabs = getChild<LLTabContainer>("lightbox_tabs");
+    for (S32 i = 0; i < mTabs->getTabCount(); ++i)
+    {
+        if (LLPanel* page = mTabs->getPanelByIndex(i))
+        {
+            mTabPages.push_back(page);
+            // Each page's tool_tip is written for its tab button, and
+            // addTabPanel has already copied it there. Left on the page too it
+            // is worse than useless: LLView::handleToolTip offers a parent's
+            // tooltip before its children's, so it would pop up over every
+            // caption, gap and header on the page that has none of its own.
+            page->setToolTip(LLStringUtil::null);
+        }
+    }
+
     populateLUTCombo();
 
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(

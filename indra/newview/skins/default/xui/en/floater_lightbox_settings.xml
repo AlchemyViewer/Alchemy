@@ -167,6 +167,11 @@
 			 parameter="scopes" />
 		</button>
 	</panel>
+	<!-- fill_width shares the strip between the four tabs instead of leaving
+	     the right-hand third of it empty. Each page's tool_tip is copied onto
+	     its tab button when the page is added, which is where it belongs;
+	     postBuild then clears it from the page itself, because a page's own
+	     tooltip would otherwise pop up over every caption and gap on it. -->
 	<tab_container
 	 follows="all"
 	 layout="topleft"
@@ -176,32 +181,38 @@
 	 height="512"
 	 name="lightbox_tabs"
 	 tab_position="top"
-	 tab_min_width="70">
+	 tab_min_width="70"
+	 fill_width="true">
 		<panel
 		 filename="panel_lightbox_look.xml"
 		 label="Look"
 		 layout="topleft"
-		 name="tab_look" />
+		 name="tab_look"
+		 tool_tip="Exposure and tone mapping, color grading, the 3D LUT and the tone curve." />
 		<panel
 		 filename="panel_lightbox_lens.xml"
 		 label="Lens"
 		 layout="topleft"
-		 name="tab_lens" />
+		 name="tab_lens"
+		 tool_tip="Camera and film effects: depth of field, bloom, glow, lens flare, chromatic aberration, vignette, grain and sharpening." />
 		<panel
 		 filename="panel_lightbox_scene.xml"
 		 label="Scene"
 		 layout="topleft"
-		 name="tab_scene" />
+		 name="tab_scene"
+		 tool_tip="Render quality: anti-aliasing, reflections, mirrors, shadows and ambient occlusion, performance, and preview aids." />
 		<!-- Last, because it is the odd one out: the other three hold settings
 		     this floater owns, and this one also reaches out and changes the
 		     world's environment. It is the one you use first, though, before
 		     there is a grade to speak of, which is an argument for the other
-		     end; the tab strip has 452px and four tabs at tab_min_width fit in
-		     280, so the order is free to change if that reads better in use. -->
+		     end; fill_width gives the four tabs equal shares of the strip
+		     whatever their order, so the order is free to change if that reads
+		     better in use. -->
 		<panel
 		 filename="panel_lightbox_sky.xml"
 		 label="Sky"
 		 layout="topleft"
-		 name="tab_sky" />
+		 name="tab_sky"
+		 tool_tip="The day cycle, which changes the world's environment for you, and sky effects drawn only on your screen." />
 	</tab_container>
 </floater>

@@ -762,6 +762,15 @@ is a global commit callback in `llui.cpp`, with the floater's registered name as
 `parameter`. Use that one and not `Floater.ToggleOrBringToFront`; §4d explains
 why the second can only ever open.
 
+**The tab strip** below the bar is a stock `tab_container` with `fill_width`, so
+the four tabs share its whole width rather than bunching at the left. A tab's
+tooltip is written on its page element in the floater XML: `addTabPanel` copies
+a page's `tool_tip` onto its tab button, and `postBuild` then clears it from the
+page. The second half matters. `LLView::handleToolTip` offers a parent's tooltip
+before its children's, so a tooltip left on the page pops up over every caption,
+gap and header on it that has no tooltip of its own. A fifth tab gets both
+behaviours by being declared the same way.
+
 ### 4h. The Sky tab, and changing the world
 
 The Sky tab holds two kinds of thing and they do not behave alike.
