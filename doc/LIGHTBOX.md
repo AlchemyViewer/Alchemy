@@ -61,7 +61,7 @@ the viewer's widget set was touched.
 | Curve / band graph | `<curve_editor>` | §4b |
 | Checkbox on an accordion header | `<accordion_tab.header_check_box>` | §3b |
 | Anti-aliased polyline and area fill | `gl_polyline_2d`, `gl_polyfill_2d` | §4b |
-| Floater top bar (Looks, history, scopes) | ordinary buttons, `Floater.Toggle` | §4g |
+| Floater top bar (Looks, history) and tab-strip buttons (scopes, find, pop-out) | ordinary buttons, `Floater.Toggle` | §4g |
 | Scopes window | its own floater | §4d |
 | Sky tab (day cycle freeze) | ordinary rows, `LLEnvironment` behind them | §4h |
 
@@ -834,29 +834,60 @@ the reference row, are greyed from `draw()` rather than from a signal — the un
 stack moves on every commit, every undo and every Look apply, and hanging a
 refresh off each of those is more places to forget than a polled compare costs.
 
-### 4g. The top bar
+### 4g. The top bar and the tab strip
 
-`lightbox_topbar` in `floater_lightbox_settings.xml` is an ordinary `panel` of
-ordinary widgets, and worth reading before you add to it, because it is the one
-part of this floater with a fixed width budget: **422px at `min_width`** — the
-floater's 430 less its own `left="4"`/`right="-4"`, and nothing else, because
-the bar sits directly in the floater. A row inside an accordion section starts
-from the same 430 and loses far more (§5); the two budgets are different on
-purpose. **The bar spends all 422.** `min_width` was 420 until the pop-out
-button, and was raised by the ten pixels that button needed — which, as §5
-says, widens anyone who had the floater narrower, permanently. Do not do that
-again for one more icon: the next button here means taking width from the Looks
-combo, or finding it another home.
+The floater's buttons live in two rows, split by what they act on. **The bar**
+(`lightbox_topbar` in `floater_lightbox_settings.xml`) holds the grade: the
+Looks `combo_box`, then Save / Save As / Delete / Revert, then Undo / Redo /
+History. **The tab strip** holds how the floater is looked at: Scopes, Find
+and Pop-out sit at its right end, after the tabs. They were all one bar of ten
+controls until it had spent every pixel it had at `min_width` (422 of 422, which
+had pushed `min_width` from 420 to 430 for the pop-out button). Split, the bar
+no longer sets `min_width`, which is back to 420, and the Looks combo stretches
+with the floater instead of being the 150px that was left over: 222 at
+`min_width`, 262 at the default 460.
 
-Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
-then Undo / Redo / History, then Scopes, then Find / Pop-out. Four groups,
-separated by 12px where the adjacent buttons inside a group are separated by 4.
-**That gap is the only thing that says they are different kinds of thing** —
-the first group acts on the Look, the second on the grade's own history, the
-third opens another window, the fourth acts on this one's layout — so keep it if
-you add another kind, and use 4px if you are extending a group.
+In the bar, the combo takes `left="6" right="-184"` and follows the right edge,
+and the seven buttons follow `top|right` and are placed by `right` rather than
+`left_pad`: the last is 6 in from the edge, each one before it 24 further in, and
+12 where the group changes. **Two groups, separated by 12px where the buttons
+inside a group are separated by 4.** That gap is the only thing that says the
+first group acts on the Look and the second on the grade's own history, so keep
+it if you add another kind, and use 4px if you are extending a group. A new
+button here comes out of the combo's width; add it to the 184.
 
-Everything after the combo is an **18px icon with an empty label**, and the
+**The strip's buttons are children of the `tab_container` itself,** after the
+four pages. That is load-bearing three ways:
+
+- A `tab_container` makes a tab of every *panel* it is given
+  (`LLTabContainer::addChild`) and keeps any other child as it is, so the
+  buttons must be direct children. Grouping them in a panel would make a fifth
+  tab.
+- `tab_padding_right="81"` keeps the strip's right end clear.
+  `fill_width` shares out only what is left (`stripRoom`), so the tabs stop 8px
+  short of the first button. The tabs' mouse capture (`tab_rect` in
+  `handleMouseDown`) ends where the padding begins, so a button there gets its
+  own clicks. Put a button inside the tabs' span and the container captures the
+  mouse on press, and the button never sees its release.
+- Laid over the strip as siblings of the `tab_container` instead, they would
+  overlap its rect, and XUI Studio's lint reports every pair of visible
+  siblings that intersect.
+
+The three sit directly under Undo / Redo / History (`right` -54, -30, -6 in both
+rows, which have the same `left="4"`/`right="-4"`), so the right edge reads as
+one column. They are one group with 4px gaps: Scopes opens another window, Find
+finds a place in this one, and Pop-out takes the tab that is up into a window of
+its own, which is why it sits next to the tabs. The strip leaves room for them
+with 4 tabs at `tab_min_width` 70 (280 of the 329 there is at `min_width`). A
+fifth tab or a fourth button has to fit that sum.
+
+Find's list still hangs from the bar and is as wide as it, so its field lands
+over the strip, and the row of tabs becomes the row you type into. The History
+list hangs from its button, which is now at the right edge, so it opens out past
+the floater's right side. Popovers are windows of their own and are shoved back
+on screen when that side is off it.
+
+Everything in both rows but the combo is an **18px icon with an empty label**, and the
 tooltip carries the name. That is not decoration. Four text labels cost 192px of
 the bar; the same four icons cost 80. It also sidesteps §5's silent clipping the
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar
@@ -1075,7 +1106,7 @@ ring is what pays for it.
 
 ### 4k. Tabs in windows of their own
 
-The pop-out button (after Find) takes the tab that is up out into a window of
+The pop-out button (at the end of the tab strip) takes the tab that is up out into a window of
 its own, so Look and Lens can be open side by side, or a tab parked on another
 monitor. Each page is wrapped in XUI Studio's `ALDockPanel` at the very end of
 `postBuild`; popping out *moves* the page's contents into an `ALPanelFloater`
@@ -1139,10 +1170,10 @@ against them. The rules below are how.
   row's `top_pad` chains from the last one declared. Get this wrong and the
   panel is either 350px too tall or clipped.
 - **A row of buttons has to be sized for `min_width`, not for the default.**
-  The arithmetic that matters is 430 − 28 for the chrome − 15 for the accordion
-  scrollbar − 16 for `left="8"`/`right="-8"`, which leaves **371px** (361
-  before `min_width` went from 420 to 430 for the top bar, §4g — the rows here
-  were all laid out to 361, and that is still the safer figure to design to).
+  The arithmetic that matters is 420 − 28 for the chrome − 15 for the accordion
+  scrollbar − 16 for `left="8"`/`right="-8"`, which leaves **361px**. (For a
+  while `min_width` was 430, for the top bar, §4g. The rows here were all laid
+  out to 361 throughout.)
   The Sky tab's four presets are 85 wide with 6px gaps and end at 366. Laid out
   against the 460 default they looked fine and lost their last button the
   moment the floater was narrowed.

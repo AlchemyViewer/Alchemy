@@ -2,7 +2,7 @@
 <floater
  width="460"
  height="560"
- min_width="430"
+ min_width="420"
  min_height="420"
  layout="topleft"
  name="floater_lightbox_settings"
@@ -104,6 +104,13 @@
 	 name="pane_put_back">
 		Put it back
 	</floater.string>
+	<!-- The bar is split by what its buttons act on. This bar holds the
+	     grade: which Look it is, and its history. The buttons that act on
+	     how the floater is looked at (Scopes, Find, pop-out) sit at the
+	     right end of the tab strip, beside the tabs they are about; they are
+	     at the end of the tab_container below. Split that way, the bar no
+	     longer sets min_width, and the Looks combo stretches with the floater
+	     instead of being the fixed 150px that was left over. -->
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
@@ -112,29 +119,35 @@
 	 top="18"
 	 right="-4"
 	 height="22">
+		<!-- Everything left of the buttons, which are held to the right edge:
+		     184 is the seven of them with their gaps, and 6 of margin. -->
 		<combo_box
-		 follows="left|top"
+		 follows="left|top|right"
 		 layout="topleft"
 		 left="6"
 		 top="1"
-		 width="150"
+		 right="-184"
 		 height="20"
 		 name="looks_combo"
 		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
 			<combo_box.commit_callback
 			 function="LightBox.LookSelected" />
 		</combo_box>
-		<!-- Icons rather than labels. Four words cost 192px of a bar that has
-		     412 to spend at min_width, and the room they were using is what
-		     the history pair at the end now sits in. Every overlay here is an
-		     existing 18px viewer icon, so the tooltip carries the name.
-		     Save, Undo and Redo are all from the script editor's set, which is
-		     why they sit together without looking assembled: a floppy disk,
-		     not Cam_Save, which is a camcorder and reads as one. -->
+		<!-- Icons rather than labels: four words would cost 192px of a bar
+		     whose spare width is the Looks combo's to have. Every overlay
+		     here is an existing 18px viewer icon, so the tooltip carries the
+		     name. Save, Undo and Redo are all from the script editor's set,
+		     which is why they sit together without looking assembled: a
+		     floppy disk, not Cam_Save, which is a camcorder and reads as one.
+
+		     Placed by `right` rather than `left_pad`, since they follow the
+		     right edge: the last is 6 in from it, matching the combo's 6 at
+		     the left, and each one before it is 24 further in (20 and a gap
+		     of 4), plus 12 where the group changes. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="6"
+		 right="-158"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -147,9 +160,9 @@
 			 function="LightBox.LookSave" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
+		 right="-134"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -162,9 +175,9 @@
 			 function="LightBox.LookSaveAs" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
+		 right="-110"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -177,9 +190,9 @@
 			 function="LightBox.LookDelete" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
+		 right="-86"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -194,9 +207,9 @@
 		<!-- Set apart from the four above: those act on the Look, these on the
 		     grade's own history, and the gap is the only thing that says so. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="12"
+		 right="-54"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -209,9 +222,9 @@
 			 function="LightBox.Undo" />
 		</button>
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
+		 right="-30"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -225,9 +238,9 @@
 		</button>
 		<!-- The same stack as the two above, as a list: in their group. -->
 		<button
-		 follows="left|top"
+		 follows="top|right"
 		 layout="topleft"
-		 left_pad="4"
+		 right="-6"
 		 top="1"
 		 width="20"
 		 height="20"
@@ -239,80 +252,17 @@
 			<button.commit_callback
 			 function="LightBox.History" />
 		</button>
-		<!-- Set apart again, for the third kind of thing in this bar: the two
-		     groups above act on this floater's own state, and this opens
-		     another window. Command_Stats_Icon is a bar graph and is the same
-		     18px as every other overlay here; it reads as what the window
-		     opens with, since the first pane is a histogram.
-
-		     Floater.Toggle, NOT Floater.ToggleOrBringToFront. The latter is
-		     written for toolbar buttons and closes its target only in an
-		     `else if (!instance->isFrontmost())` fall-through, so pressing a
-		     button that lives in *another floater* can never reach it, because
-		     that press makes this floater the frontmost one. From here it opens
-		     and raises Scopes and nothing else, and the button has no way to
-		     shut it again. Any "open that window" button added to this bar has
-		     the same problem; reach for Floater.Toggle. -->
-		<button
-		 follows="left|top"
-		 layout="topleft"
-		 left_pad="12"
-		 top="1"
-		 width="20"
-		 height="20"
-		 label=""
-		 halign="center"
-		 image_overlay="Command_Stats_Icon"
-		 name="open_scopes"
-		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
-			<button.commit_callback
-			 function="Floater.Toggle"
-			 parameter="scopes" />
-		</button>
-		<!-- A fourth kind of thing, so set apart again: this acts on the floater
-		     itself, finding a place in it. The list it opens hangs from this
-		     bar and is as wide as it. -->
-		<button
-		 follows="left|top"
-		 layout="topleft"
-		 left_pad="12"
-		 top="1"
-		 width="20"
-		 height="20"
-		 label=""
-		 halign="center"
-		 image_overlay="Command_Search_Icon"
-		 name="lightbox_find"
-		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
-			<button.commit_callback
-			 function="LightBox.Find" />
-		</button>
-		<!-- In Find's group: both act on this floater's layout. The icon and
-		     tooltip are set from C++ to match the tab that is up (while its
-		     page is out, the button brings it back), so the ones here are only
-		     the starting state. This button is why min_width is 430: the bar
-		     needs 422. -->
-		<button
-		 follows="left|top"
-		 layout="topleft"
-		 left_pad="4"
-		 top="1"
-		 width="20"
-		 height="20"
-		 label=""
-		 halign="center"
-		 image_overlay="Conv_toolbar_arrow_ne"
-		 name="lightbox_pop_out"
-		 tool_tip="Take this tab out into a window of its own">
-			<button.commit_callback
-			 function="LightBox.PopOut" />
-		</button>
 	</panel>
 	<!-- fill_width shares the strip between the four tabs instead of leaving
 	     the right-hand third of it empty. Each page's tool_tip is copied onto
 	     its tab button when the page is added, which is where it belongs;
 	     postBuild then clears it from the page itself, because a page's own
-	     tooltip would otherwise pop up over every caption and gap on it. -->
+	     tooltip would otherwise pop up over every caption and gap on it.
+
+	     tab_padding_right keeps the strip's right end for the three buttons
+	     at the bottom of this element: fill_width shares out only what is
+	     left (LLTabContainer::stripRoom), so the tabs stop 8px short of the
+	     first button (451, the right of the pages, less 81, is 370). -->
 	<tab_container
 	 follows="all"
 	 layout="topleft"
@@ -323,6 +273,7 @@
 	 name="lightbox_tabs"
 	 tab_position="top"
 	 tab_min_width="70"
+	 tab_padding_right="81"
 	 fill_width="true">
 		<panel
 		 filename="panel_lightbox_look.xml"
@@ -355,5 +306,82 @@
 		 layout="topleft"
 		 name="tab_sky"
 		 tool_tip="The day cycle, which changes the world's environment for you, and sky effects drawn only on your screen." />
+		<!-- The strip's own buttons: how the floater is looked at, beside the
+		     tabs, where the bar above holds the grade. In the tab_container
+		     and not laid over it as siblings: a tab_container makes a tab of
+		     every panel it is given but keeps any other child as it is, and
+		     inside it they overlap nothing. That is also why they are not
+		     grouped in a panel of their own; a panel here would be a fifth
+		     tab. They stay out of the tabs' mouse capture, which ends where
+		     tab_padding_right begins.
+
+		     Each sits under the matching button of the history group in the
+		     bar above (right -54, -30, -6), so the two rows make one column
+		     at the right edge. top="2" centres 20 in the strip's 23. -->
+		<!-- Opens another window. Command_Stats_Icon is a bar graph and is the
+		     same 18px as every other overlay here; it reads as what the
+		     window opens with, since the first pane is a histogram.
+
+		     Floater.Toggle, NOT Floater.ToggleOrBringToFront. The latter is
+		     written for toolbar buttons and closes its target only in an
+		     `else if (!instance->isFrontmost())` fall-through, so pressing a
+		     button that lives in *another floater* can never reach it, because
+		     that press makes this floater the frontmost one. From here it opens
+		     and raises Scopes and nothing else, and the button has no way to
+		     shut it again. Any "open that window" button added to this floater
+		     has the same problem; reach for Floater.Toggle. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-54"
+		 top="2"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Stats_Icon"
+		 name="open_scopes"
+		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
+			<button.commit_callback
+			 function="Floater.Toggle"
+			 parameter="scopes" />
+		</button>
+		<!-- Finds a place among the tabs. The list it opens hangs from the bar
+		     above and is as wide as it, so its field lands over this strip:
+		     the row of tabs becomes the row you type into. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-30"
+		 top="2"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Search_Icon"
+		 name="lightbox_find"
+		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
+			<button.commit_callback
+			 function="LightBox.Find" />
+		</button>
+		<!-- Acts on the tab that is up, so it sits at the end of the tabs. The
+		     icon and tooltip are set from C++ to match that tab (while its
+		     page is out, the button brings it back), so the ones here are
+		     only the starting state. -->
+		<button
+		 follows="top|right"
+		 layout="topleft"
+		 right="-6"
+		 top="2"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Conv_toolbar_arrow_ne"
+		 name="lightbox_pop_out"
+		 tool_tip="Take this tab out into a window of its own">
+			<button.commit_callback
+			 function="LightBox.PopOut" />
+		</button>
 	</tab_container>
 </floater>
