@@ -17,6 +17,13 @@
 	 name="look_name_modified">
 		[NAME] *
 	</floater.string>
+	<!-- The badge on the Look tab while grading sections are switched off
+	     for comparison: how many. The tab's tooltip says what the number
+	     counts, since a badge has no tooltip of its own. -->
+	<floater.string
+	 name="bypass_badge">
+		[COUNT]
+	</floater.string>
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
@@ -188,7 +195,7 @@
 		 label="Look"
 		 layout="topleft"
 		 name="tab_look"
-		 tool_tip="Exposure and tone mapping, color grading, the 3D LUT and the tone curve." />
+		 tool_tip="Exposure and tone mapping, color grading, the 3D LUT and the tone curve. A number on this tab counts the grading sections switched off for comparison." />
 		<panel
 		 filename="panel_lightbox_lens.xml"
 		 label="Lens"

@@ -84,6 +84,11 @@ public:
     /// here. The settings are never touched, so a comparison cannot dirty
     /// the Look.
     void onToggleSection(LLUICtrl* ctrl, const LLSD& userdata);
+    /// Put the number of bypassed grading sections on the Look tab, or take
+    /// it off when there are none. A bypass is state nothing else on screen
+    /// shows once its section is scrolled away or another tab is up, and it
+    /// is easy to forget one is in force while judging the grade.
+    void refreshBypassBadge();
     void onCommitVec3(LLUICtrl* ctrl);
     void refreshVec3Row(const std::string& setting_name);
     void setupToneCurve();

@@ -240,6 +240,10 @@ bool ALFloaterLightBox::postBuild()
             page->setToolTip(LLStringUtil::null);
         }
     }
+    // Normally clear here -- a new Lightbox opens with every section switched
+    // on -- but the mask belongs to the pipeline, so read it rather than
+    // assume it.
+    refreshBypassBadge();
 
     populateLUTCombo();
 
@@ -529,6 +533,45 @@ void ALFloaterLightBox::onToggleSection(LLUICtrl* ctrl, const LLSD& userdata)
     {
         LLPipeline::sGradeBypassMask |= found->second;
     }
+
+    // The only writer of the mask, so the only place the badge can go stale.
+    refreshBypassBadge();
+}
+
+void ALFloaterLightBox::refreshBypassBadge()
+{
+    if (!mTabs || mTabPages.empty())
+    {
+        return;
+    }
+
+    // Counted from the mask rather than from the checkboxes: the mask is what
+    // the renderer obeys, and the badge is there to say what it is obeying.
+    static constexpr U32 section_bits[] = {
+        LLPipeline::GRADE_BYPASS_BASIC,
+        LLPipeline::GRADE_BYPASS_PRIMARIES,
+        LLPipeline::GRADE_BYPASS_SPLIT,
+        LLPipeline::GRADE_BYPASS_LUT,
+        LLPipeline::GRADE_BYPASS_CURVE,
+    };
+    S32 bypassed = 0;
+    for (U32 bit : section_bits)
+    {
+        if (LLPipeline::sGradeBypassMask & bit)
+        {
+            ++bypassed;
+        }
+    }
+
+    std::string label;
+    if (bypassed > 0)
+    {
+        LLStringUtil::format_map_t args;
+        args["[COUNT]"] = llformat("%d", bypassed);
+        label = getString("bypass_badge", args);
+    }
+    // The Look tab is the first page; the grading sections all live on it.
+    mTabs->setTabBadge(mTabPages.front(), label);
 }
 
 void ALFloaterLightBox::onClickReferenceGrab()

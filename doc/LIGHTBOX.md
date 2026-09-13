@@ -478,6 +478,15 @@ somewhere else, which is a liability the ordinary rows do not have.
   and one idea of "a section". Put the checkbox on the essentials tab only; the
   Advanced sibling is the tail of a section, not a section.
 
+  While any section is off, the Look tab carries a **badge counting them**
+  (`refreshBypassBadge`, the `bypass_badge` string). A bypass is the one piece of
+  grading state that nothing else on screen shows once its header is scrolled
+  away or another tab is up, and forgetting one is in force is how a grade gets
+  judged wrong. The badge is counted from `sGradeBypassMask`, not from the
+  checkboxes, and refreshed from `onToggleSection`, which is the mask's only
+  writer. A new section switch therefore needs its bit in `refreshBypassBadge`'s
+  list as well as in `onToggleSection`'s.
+
   These lived as a row of five in the Color Grading section until it turned out
   that the objection to putting them on the headers — that A/B work means
   flipping between them, and hunting through collapsed accordions is worse than
@@ -1053,10 +1062,10 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
 - For anything measured (scopes, vectorscope): change the thing it measures and
   confirm the readout moves the way the control says it should.
 - For a section switch: **untick** it (ticked is on) and confirm the image
-  changes **and the Looks `*` does not appear**. Then close the Lightbox with it
-  still unticked and confirm the render comes back — state parked outside the
-  floater is the failure mode here, and it looks like a renderer bug rather than
-  a UI one.
+  changes **and the Looks `*` does not appear**, and that the Look tab's badge
+  counts it. Then close the Lightbox with it still unticked and confirm the
+  render comes back — state parked outside the floater is the failure mode here,
+  and it looks like a renderer bug rather than a UI one.
 - For the Sky tab's day cycle: freeze, wait past the point the sky would have
   moved, and confirm it has not. Then untick and confirm you get back *what you
   had*, not the region default — set a Personal Lighting sky first, since that
