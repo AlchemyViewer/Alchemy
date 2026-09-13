@@ -66,6 +66,17 @@
 	 name="history_empty_sentence">
 		Each change to the grade is listed here as you make it. Double-click one to go back to it.
 	</floater.string>
+	<!-- The inline colour picker a colour row's swatch opens: the button that
+	     goes on to the viewer's own picker, for typed numbers and the
+	     eyedropper. -->
+	<floater.string
+	 name="color_full_picker">
+		Full picker...
+	</floater.string>
+	<floater.string
+	 name="color_full_picker_tooltip">
+		Open the viewer's color picker, with typed values and the eyedropper, starting from the color picked here
+	</floater.string>
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"

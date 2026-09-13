@@ -31,11 +31,14 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "alcolorpicker.h"
 #include "alhistorylist.h"
 #include "alpopover.h"
 #include "alquickopen.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
+#include "llbutton.h"
+#include "llcolorswatch.h"
 #include "llcombobox.h"
 #include "lleditmenuhandler.h"
 #include "lltextbox.h"
@@ -50,6 +53,7 @@
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
+#include "llsdutil.h"
 #include "llsettingsvo.h"
 #include "llsliderctrl.h"
 #include "llspinctrl.h"
@@ -129,6 +133,72 @@ public:
 
 private:
     KeyHook mKeyHook;
+};
+
+/// The inline picker for a colour row: XUI Studio's hue ring, shade square and
+/// channel tracks, under the row's name, with a way on to the viewer's full
+/// picker for typed numbers and the eyedropper.
+///
+/// The picker is a child of the popover itself and not of a panel inside it,
+/// and that is load-bearing: a panel takes Escape for itself and drops the
+/// keyboard, which closes the popover as *settled*, and Escape here has to
+/// mean "put the colour back".
+class ALLightboxColorPopover final : public ALPopover
+{
+public:
+    static constexpr S32 WIDTH = 300;
+    static constexpr S32 PICKER_HEIGHT = 196;
+    static constexpr S32 BUTTON_HEIGHT = 20;
+    static constexpr S32 BUTTON_WIDTH = 110;
+    static constexpr S32 GAP = 4;
+
+    /// Laid out under the title, which is drawn across the top of the rect.
+    static S32 heightFor(S32 header) { return header + GAP + PICKER_HEIGHT + GAP + BUTTON_HEIGHT + GAP; }
+
+    ALLightboxColorPopover(const LLFloater::Params& p, const LLColor4& start,
+                           std::function<void(const LLColor4&)> on_change,
+                           std::function<void()> on_full_picker,
+                           const std::string& full_picker_label, const std::string& full_picker_tooltip)
+    :   ALPopover(p)
+    {
+        const S32 width = getRect().getWidth();
+        const S32 top = getRect().getHeight() - getHeaderHeight();
+
+        ALColorPicker::Params pp(LLUICtrlFactory::getDefaultParams<ALColorPicker>());
+        pp.name = "picker";
+        pp.rect = LLRect(GAP, top - GAP, width - GAP, top - GAP - PICKER_HEIGHT);
+        pp.follows.flags = FOLLOWS_ALL;
+        // Every colour row here is a Color3 setting: an alpha track would be a
+        // control that does nothing.
+        pp.show_alpha = false;
+        ALColorPicker* picker = LLUICtrlFactory::create<ALColorPicker>(pp);
+        picker->setColor(start);
+        // Its value is text, "r, g, b, a"; the colour is what is wanted.
+        picker->setCommitCallback([picker, on_change](LLUICtrl*, const LLSD&)
+        {
+            if (on_change)
+            {
+                on_change(picker->color());
+            }
+        });
+        addChild(picker);
+
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name = "full_picker";
+        bp.label = full_picker_label;
+        bp.tool_tip = full_picker_tooltip;
+        bp.rect = LLRect(width - GAP - BUTTON_WIDTH, GAP + BUTTON_HEIGHT, width - GAP, GAP);
+        bp.follows.flags = FOLLOWS_RIGHT | FOLLOWS_BOTTOM;
+        LLButton* full = LLUICtrlFactory::create<LLButton>(bp);
+        full->setCommitCallback([on_full_picker](LLUICtrl*, const LLSD&)
+        {
+            if (on_full_picker)
+            {
+                on_full_picker();
+            }
+        });
+        addChild(full);
+    }
 };
 } // namespace
 
@@ -295,6 +365,25 @@ bool ALFloaterLightBox::postBuild()
         mHistoryConnections.emplace_back(controlp->getSignal()->connect(
             [this, setting](LLControlVariable*, const LLSD& new_value, const LLSD& old_value)
             { onGradeSettingChanged(setting, old_value, new_value); }));
+        mRecordedKeys.insert(setting);
+    }
+
+    // Colour rows pick inline. Only Color3 swatches: the inline picker has no
+    // alpha, and a Color4 row would lose its fourth number to it.
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+    {
+        LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(setting.mCtrl);
+        LLControlVariable* controlp = gSavedSettings.getControl(setting.mKey);
+        if (swatch && controlp && controlp->type() == TYPE_COL3)
+        {
+            const std::string key = setting.mKey;
+            swatch->setPickerOverride([self, key](LLColorSwatchCtrl* from)
+            {
+                ALFloaterLightBox* floater = self.get();
+                return floater && floater->openColorPopover(from, key);
+            });
+        }
     }
 
     ALLightboxDirectory::collectVec3Controls(this, mVec3Rows);
@@ -707,7 +796,6 @@ ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPa
         delete content;
         return nullptr;
     }
-    closePopover(true);
 
     // What ALPopover::show does, with the key hook added: no title, since
     // the content is laid out over the whole popover and a title bar would be
@@ -718,6 +806,14 @@ ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPa
     content->setOrigin(0, 0);
     content->setFollows(FOLLOWS_ALL);
     popover->addChild(content);
+
+    adoptPopover(kind, popover, anchor);
+    return popover;
+}
+
+void ALFloaterLightBox::adoptPopover(PopoverKind kind, ALPopover* popover, LLView* anchor)
+{
+    closePopover(true);
 
     mPopover = popover->getDerivedHandle<ALPopover>();
     mPopoverKind = kind;
@@ -734,7 +830,6 @@ ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPa
     });
 
     popover->openBeside(anchor);
-    return popover;
 }
 
 void ALFloaterLightBox::closePopover(bool escape)
@@ -760,9 +855,105 @@ void ALFloaterLightBox::onPopoverClosed(const LLView* which, bool escaped)
     {
         return;
     }
+    const PopoverKind kind = mPopoverKind;
     mPopover.markDead();
     mPopoverKind = PopoverKind::None;
     mHistoryList.markDead();
+
+    if (kind == PopoverKind::Color)
+    {
+        endColorSession(escaped);
+    }
+}
+
+bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::string& key)
+{
+    LLControlVariable* control = gSavedSettings.getControl(key);
+    if (!swatch || !control)
+    {
+        return false;
+    }
+    // Closed before the session below starts, so a colour popover already up
+    // finishes its own session with its own setting.
+    closePopover(true);
+
+    // A Color3 arrives as three numbers, which LLColor4 reads as transparent.
+    LLColor4 start(control->getValue());
+    start.mV[VALPHA] = 1.f;
+    mColorKey = key;
+    mColorOriginal = control->getValue();
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<LLView> swatch_handle = swatch->getHandle();
+    const S32 header = LLFloater::getDefaultParams().header_height;
+    ALLightboxColorPopover* popover = new ALLightboxColorPopover(
+        ALPopover::paramsFor(ALLightboxColorPopover::WIDTH, ALLightboxColorPopover::heightFor(header),
+                             mDirectory.captionFor(key)),
+        start,
+        [self](const LLColor4& color)
+        {
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->onColorPicked(color);
+            }
+        },
+        [self, swatch_handle]()
+        {
+            // Settled rather than escaped: the full picker starts from what
+            // was picked here, and keeps it if it is closed.
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->closePopover(false);
+            }
+            if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
+            {
+                swatch->showClassicPicker(true);
+            }
+        },
+        getString("color_full_picker"), getString("color_full_picker_tooltip"));
+    adoptPopover(PopoverKind::Color, popover, swatch);
+    return true;
+}
+
+void ALFloaterLightBox::onColorPicked(const LLColor4& color)
+{
+    LLControlVariable* control = gSavedSettings.getControl(mColorKey);
+    if (!control)
+    {
+        return;
+    }
+    // Live, as every row here is, and written the way the swatch writes a
+    // Color3: three numbers, never a fourth.
+    ScopedTrue writing(mColorWriting);
+    control->setValue(LLColor3(color).getValue());
+}
+
+void ALFloaterLightBox::endColorSession(bool escaped)
+{
+    const std::string key = mColorKey;
+    mColorKey.clear();
+    LLControlVariable* control = key.empty() ? nullptr : gSavedSettings.getControl(key);
+    if (!control)
+    {
+        return;
+    }
+
+    if (escaped)
+    {
+        // Escape keeps nothing, and nothing was recorded to take back.
+        ScopedTrue writing(mColorWriting);
+        control->setValue(mColorOriginal);
+        return;
+    }
+
+    // The whole pick, as one step, from the colour it started at to the one it
+    // was left at -- and none at all if it ended where it began.
+    const LLSD picked = control->getValue();
+    if (mRecordedKeys.count(key) && !llsd_equals(picked, mColorOriginal))
+    {
+        ScopedHistoryGroup group(mHistory);
+        mHistory.record(key, mColorOriginal, picked, (F32)LLTimer::getElapsedSeconds().value());
+    }
 }
 
 void ALFloaterLightBox::openHistory()
@@ -1389,6 +1580,11 @@ void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLS
         // between two values instead of walking backwards.
         return;
     }
+    if (mColorWriting)
+    {
+        // The inline picker, moving. The pick is recorded whole when it ends.
+        return;
+    }
 
     // A monotonic clock is all the history wants: it compares two of these to
     // decide whether one drag is still in progress, and never reads the value
@@ -1398,6 +1594,13 @@ void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLS
 
 bool ALFloaterLightBox::applyHistory(bool redo_direction)
 {
+    // A pick still open has not been recorded yet, so the stack does not know
+    // about it: put it back before stepping past it.
+    if (mPopoverKind == PopoverKind::Color)
+    {
+        closePopover(true);
+    }
+
     const ALGradeHistory::Transaction* stepp = redo_direction ? mHistory.redo() : mHistory.undo();
     if (!stepp)
     {

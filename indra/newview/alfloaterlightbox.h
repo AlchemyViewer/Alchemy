@@ -44,11 +44,14 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
 class ALCurveEditorCtrl;
 class ALPopover;
+class LLColor4;
+class LLColorSwatchCtrl;
 class LLComboBox;
 class LLPanel;
 class LLSettingsDay;
@@ -95,6 +98,7 @@ public:
         None,
         Find,
         History,
+        Color,
     };
     /// A key the popover gets first while it has the keyboard: the floater's
     /// own shortcuts, which would otherwise fall to the menu bar.
@@ -103,6 +107,8 @@ public:
     /// Put @a content in a popover under @a anchor, closing any other first:
     /// the Lightbox has one popover at a time.
     ALPopover* showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook);
+    /// Make @a popover the one that is up, and open it under @a anchor.
+    void adoptPopover(PopoverKind kind, ALPopover* popover, LLView* anchor);
     /// Close the popover that is up, keeping what it chose or, escaping,
     /// keeping nothing.
     void closePopover(bool escape);
@@ -128,6 +134,15 @@ public:
     void fillHistoryList();
     /// Undo or redo, one step at a time, until @a cursor steps are in force.
     void goToHistory(size_t cursor);
+
+    /// A colour row's swatch asking to open its picker: open the inline one
+    /// under it instead. False lets the swatch open the picker floater.
+    bool openColorPopover(LLColorSwatchCtrl* swatch, const std::string& key);
+    /// The inline picker moved: write the colour live, unrecorded.
+    void onColorPicked(const LLColor4& color);
+    /// The inline picker closed: put the colour back if it was escaped, or
+    /// record the whole pick as one undo step if it changed anything.
+    void endColorSession(bool escaped);
 
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
@@ -306,6 +321,19 @@ public:
     /// signals a user edit does, and recording them would append the undo to
     /// the stack it came from.
     bool mApplyingHistory = false;
+    /// The settings undo watches, for deciding whether a pick is a step.
+    std::set<std::string> mRecordedKeys;
+
+    // The inline colour picker's session: the setting, what it held when the
+    // picker opened, and a flag held while the picker writes it. Its writes
+    // are not recorded one by one -- a pick that took longer than the
+    // coalescing window would become several steps -- and the pick is
+    // recorded once, whole, when the picker closes. No undo group is held
+    // open for the length of it: a popover can die without saying it closed,
+    // and a group left open would take every later write into itself.
+    std::string mColorKey;
+    LLSD mColorOriginal;
+    bool mColorWriting = false;
 
     // Undo and Redo in the top bar, polled by draw() like the row below:
     // the stack moves on every commit and every Look apply, and hanging a

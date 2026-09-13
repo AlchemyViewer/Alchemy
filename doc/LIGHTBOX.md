@@ -39,6 +39,7 @@ statics), so edits preview live with no glue code.
 | Scene colour picker tool | `indra/newview/altoolscenepicker.{h,cpp}` |
 | 3D LUT (.cube) parser | `indra/newview/lutcube.{h,cpp}` |
 | Header checkbox on `accordion_tab` | `indra/llui/llaccordionctrltab.{h,cpp}` |
+| A swatch handing its picker to its owner | `indra/newview/llcolorswatch.{h,cpp}` |
 | Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
 
 Seven of those have unit tests, and the tests are the reason the maths in them
@@ -63,9 +64,11 @@ the viewer's widget set was touched.
 | Scopes window | its own floater | §4d |
 | Sky tab (day cycle freeze) | ordinary rows, `LLEnvironment` behind them | §4h |
 
-`accordion_tab` is the only **stock** widget altered, and the change is additive:
-a tab that does not ask for `header_check_box` gets exactly the header it always
-had. That mattered rather a lot — 26 other files in the English skin alone
+`accordion_tab` was the first **stock** widget altered, and the change is
+additive: a tab that does not ask for `header_check_box` gets exactly the header
+it always had. `color_swatch` is the second, and additive the same way: it can
+hand its picker to an owner (`setPickerOverride`), which only the Lightbox does,
+so every other swatch opens the colour picker floater exactly as before. That mattered rather a lot — 26 other files in the English skin alone
 declare accordion tabs, 75 of them, and every one is outfit editing, profiles,
 preferences or the About box. Which is the standard to hold anything else here
 to: if the Lightbox needs something from a shared widget, it asks for it by an
@@ -296,7 +299,13 @@ work only with values whose `%lg` stringification is exact ("2", "1", "0.5").
 at `left_delta="140" top_pad="-18" width="60" height="24"` with
 `can_apply_immediately="true"` and **`label_height="0"`** (without it the
 default label strip leaves ~1px of color) + reset at `top_pad="-21"`. Color3
-alpha handling lives in the widget — nothing else needed.
+alpha handling lives in the widget — nothing else needed. A swatch bound to a
+**Color3** setting picks inline without any XUI to say so (§4j): `postBuild`
+hands every such swatch's picker to the floater, and the popover it opens under
+the swatch previews live, puts the colour back on Escape, and records the whole
+pick as one undo step. Its "Full picker..." button is the way on to the
+viewer's own picker, for typed values and the eyedropper. Keep tints within
+0-1: the inline picker's tracks stop there.
 
 **Vector row**: label `text` (width 110, `top_pad="10"`) + spinners named
 `vec3_<Setting>_<0|1|2>` at `left_delta="110" top_pad="-16" width="68"
@@ -992,12 +1001,30 @@ which any new popover here should go through `showPopover` to get:
   on Ctrl+Z / Ctrl+Y, goes to the selected step on Return, and swaps itself for
   Find on Ctrl+F.
 
-Two more things learned the hard way. A popover given a **title** lays its
-content over the title bar, so these have none. And a popover whose content is
-an `LLPanel` never sees Escape — the panel takes it and drops the keyboard, and
-the popover then closes as *settled*, not escaped. A popover that has to tell
-Escape apart (the colour picker, which puts the old colour back) must hold its
+Two more things learned the hard way. A popover given a **title** through
+`ALPopover::show` lays its content over the title bar, so Find and History have
+none; one that wants a title lays its own controls out under
+`getHeaderHeight()`. And a popover whose content is an `LLPanel` never sees
+Escape — the panel takes it and drops the keyboard, and the popover then closes
+as *settled*, not escaped. A popover that has to tell Escape apart must hold its
 controls directly rather than in a panel.
+
+**The colour popover** is both of those: `ALLightboxColorPopover` is titled with
+the row's caption and holds XUI Studio's `ALColorPicker` directly, so Escape
+reaches it. Its session is kept by the floater (`mColorKey`, `mColorOriginal`):
+
+- The picker writes the setting on every move, as every row here does, under
+  `mColorWriting`, which the undo recorder skips. The picker's own value is
+  *text* ("r, g, b, a"); the colour is read from `color()` and written as three
+  numbers, the way the swatch writes a Color3.
+- Escape writes the original back. Anything else that closes it records one
+  step, from the colour it opened on to the one it was left at, and none if
+  they are the same.
+- No undo group is held open for the length of a pick. A popover can die
+  without saying it closed, and a group left open would swallow every later
+  write into itself.
+- A pick still open when the stack is stepped is put back first, since the
+  stack has not heard of it yet.
 
 ### 5. Height math (the part everyone gets wrong)
 
@@ -1199,6 +1226,9 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   Finally, confirm the presets land somewhere plausible on a region whose day
   cycle is not the default one, because a hardcoded fraction would also look
   right on a default region.
+- For a colour row: click the swatch, drag, and watch the render follow; press
+  Escape and confirm the colour comes back with no undo step; pick again and
+  click away, and confirm it is one step.
 - For a new discrete action: do it, open History, and confirm it is one step
   under its own name, and that double-clicking the step before it undoes it.
 - For a new row: Ctrl+F, type its caption, and confirm it is listed under the
