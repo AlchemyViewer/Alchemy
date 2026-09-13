@@ -875,4 +875,68 @@ namespace tut
         ensure("and the strip scrolls", tabs->getMaxScrollPos() > 0);
         tabs->die();
     }
+
+    // A strip can keep its right end for buttons of its own. fill_width
+    // shares out only what tab_padding_right leaves; a child that is not a
+    // panel stays a child rather than becoming a tab; and a button in the
+    // kept room gets its own clicks, because the tabs' mouse capture stops
+    // where that room begins. The Lightbox keeps Scopes, Find and its
+    // pop-out there.
+    template<> template<>
+    void lltabcontainer_object::test<28>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        constexpr S32 KEPT = 80;
+        LLTabContainer::Params p(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
+        p.name = "tabs";
+        p.rect = LLRect(0, 300, 400, 0);
+        p.fill_width = true;
+        p.tab_padding_right = KEPT;
+        LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(p);
+        // The way the XUI factory adds them, pages and button alike.
+        for (const char* name : { "a", "b", "c", "d" })
+        {
+            tabs->addChild(page(name, std::string()));
+        }
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name = "strip_button";
+        bp.rect = LLRect(400 - 26, 298, 400 - 6, 278);
+        bp.follows.flags = FOLLOWS_TOP | FOLLOWS_RIGHT;
+        LLButton* button = LLUICtrlFactory::create<LLButton>(bp);
+        S32 clicks = 0;
+        button->setCommitCallback([&clicks](LLUICtrl*, const LLSD&) { ++clicks; });
+        tabs->addChild(button);
+
+        ensure_equals("the button is not a tab", tabs->getTabCount(), 4);
+        ensure("it is the container's own child", button->getParent() == tabs);
+
+        // The 398 between the pages' sides, less the 80 kept.
+        S32 total = 0;
+        for (const char* name : { "a", "b", "c", "d" })
+        {
+            total += tabButton(tabs, name)->getRect().getWidth();
+        }
+        ensure_equals("the tabs fill what is left", total, 398 - KEPT);
+        ensure("and stop short of the button", 1 + total <= button->getRect().mLeft);
+
+        // Pressed and released on it: its own click, and the strip does not
+        // take the mouse from it in between.
+        const S32 x = button->getRect().getCenterX();
+        const S32 y = button->getRect().getCenterY();
+        tabs->handleMouseDown(x, y, MASK_NONE);
+        ensure("the button holds the mouse", gFocusMgr.getMouseCapture() == button);
+        button->handleMouseUp(x - button->getRect().mLeft, y - button->getRect().mBottom, MASK_NONE);
+        ensure_equals("and is clicked", clicks, 1);
+
+        // Over the tabs, the strip takes the mouse, and would take it from a
+        // button put there.
+        tabs->handleMouseDown(10, y, MASK_NONE);
+        ensure("the strip holds the mouse over the tabs", gFocusMgr.getMouseCapture() == tabs);
+        gFocusMgr.setMouseCapture(nullptr);
+        tabs->die();
+    }
 }
