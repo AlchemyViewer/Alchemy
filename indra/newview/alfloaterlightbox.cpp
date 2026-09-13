@@ -1535,6 +1535,9 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
         return;
     }
 
+    // One pick is one thing the user did, though it moves two sliders: without
+    // the group it undid as two steps, temperature first and then tint.
+    ScopedHistoryGroup group(mHistory);
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceCCT", solved.mCCTOffset);
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }

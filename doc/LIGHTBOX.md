@@ -728,8 +728,8 @@ Two rules if you add a control:
   per mouse-move. If you need one, the fix is in `ALGradeHistory`, not in the
   caller.
 - **A discrete action that moves many controls needs `ScopedHistoryGroup`.**
-  Reset All, applying a Look and Look revert each wrap one, so they undo in a
-  single step. Note that a group deliberately does *not* coalesce, so it must
+  Reset All, applying a Look, Look revert and a white balance pick (which sets
+  temperature *and* tint) each wrap one, so they undo in a single step. Note that a group deliberately does *not* coalesce, so it must
   only ever wrap a discrete action — wrapping a per-move commit in one would
   give you back the hundred-step drag.
 
