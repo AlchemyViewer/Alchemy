@@ -2182,6 +2182,12 @@ S32 LLTextBase::getLineOffsetFromDocIndex( S32 startpos, bool include_wordwrap) 
     else
     {
         line_list_t::const_iterator iter = std::upper_bound(mLineInfoList.begin(), mLineInfoList.end(), startpos, line_end_compare());
+        // Text changes invalidate line layout lazily. Until reflow runs, a
+        // valid cursor in the new text can sit beyond the last cached line.
+        if (iter == mLineInfoList.end())
+        {
+            return startpos - mLineInfoList.back().mDocIndexStart;
+        }
         return startpos - iter->mDocIndexStart;
     }
 }
