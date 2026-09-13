@@ -740,8 +740,22 @@ dies with the window rather than outliving it to rewrite a later session's edits
 Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z are bound in `handleKeyHere`, **floater-local and
 not a global action** — the opposite choice from hold-to-compare, and for the
 opposite reason: a global Ctrl+Z fires while the user is typing anywhere in the
-viewer. Being handled there also means a focused text field keeps Ctrl+Z for its
-own undo, since the focus chain is offered the key first.
+viewer.
+
+Floater-local is not enough on its own, though. `LLViewerWindow::handleKey`
+offers every Ctrl and Alt key to the **menu bar's accelerators before the
+focused floater**, unless something in the focus chain answers
+`hasAccelerators()`. Until the floater claimed them, Ctrl+Shift+Z never reached
+`handleKeyHere` at all: it is World > Environment > Midnight, so the documented
+redo set the sky to midnight. (Ctrl+Z and Ctrl+Y only ever got through because
+the Edit menu enables Undo and Redo only while the current edit handler can
+undo, and a Lightbox line editor has no undo of its own.) The floater now
+returns true from `hasAccelerators`, and a key it does not handle falls through
+to the menus exactly as before. The one thing the menu used to add, Edit > Undo
+for a text control with an edit history, is offered by `handleKeyHere` itself: a
+focused text control inside the floater that `canUndo()`/`canRedo()` gets the
+key before the grade does. Any new shortcut here has to be checked against
+`menu_viewer.xml`, because it is now the Lightbox that wins the clash.
 
 The Undo and Redo buttons in the top bar are the visible half of that. Both, and
 the reference row, are greyed from `draw()` rather than from a signal — the undo

@@ -33,6 +33,7 @@
 
 #include "llaccordionctrltab.h"
 #include "llcombobox.h"
+#include "lleditmenuhandler.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
 #include "alcurvemodel.h"
@@ -1022,20 +1023,34 @@ bool ALFloaterLightBox::applyHistory(bool redo_direction)
 
 bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
 {
-    // Reached only after the focus chain has declined the key, so a text field
-    // in the middle of an edit keeps Ctrl+Z for its own undo.
-    if (key == 'Z' && mask == MASK_CONTROL)
+    // Both spellings of redo: Ctrl+Y is the Windows convention and
+    // Ctrl+Shift+Z the one every grading application uses.
+    const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
+    const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
+                          (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+    if (undo_key || redo_key)
     {
-        applyHistory(false);
-        return true;
-    }
+        // hasAccelerators means these arrive before the menu bar has seen
+        // them, so the Edit menu's own undo -- which is what a text control
+        // with an edit history of its own would have got from them -- is
+        // offered here instead, and only a key it declines reaches the grade.
+        LLEditMenuHandler* text = LLEditMenuHandler::gEditMenuHandler;
+        LLView* text_view = text ? text->asView() : nullptr;
+        if (text_view && text_view->hasAncestor(this))
+        {
+            if (undo_key && text->canUndo())
+            {
+                text->undo();
+                return true;
+            }
+            if (redo_key && text->canRedo())
+            {
+                text->redo();
+                return true;
+            }
+        }
 
-    // Both spellings: Ctrl+Y is the Windows convention and Ctrl+Shift+Z the one
-    // every grading application uses.
-    if ((key == 'Y' && mask == MASK_CONTROL) ||
-        (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)))
-    {
-        applyHistory(true);
+        applyHistory(redo_key);
         return true;
     }
 

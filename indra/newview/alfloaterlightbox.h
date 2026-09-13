@@ -66,10 +66,17 @@ public:
     ///
     /// Floater-local rather than a global action, unlike the hold-to-compare
     /// key: a global Ctrl+Z would fire while the user is typing anywhere in
-    /// the viewer. Being handled here also means a text field that wants
-    /// Ctrl+Z for its own undo gets it first, since the focus chain is offered
-    /// the key before the floater is.
+    /// the viewer. A focused text control with an edit history of its own
+    /// keeps these keys for it.
     bool handleKeyHere(KEY key, MASK mask) override;
+    /// Ctrl and Alt keys go to the menu bar's accelerators before the focused
+    /// floater unless something in the focus chain claims accelerators of its
+    /// own, so without this Ctrl+Shift+Z never reached handleKeyHere at all:
+    /// it is World > Environment > Midnight, and pressing it in the Lightbox
+    /// set the sky to midnight instead of redoing. Claiming them costs nothing
+    /// else -- a key this floater does not handle falls through to the menus
+    /// exactly as before.
+    bool hasAccelerators() const override { return true; }
     /// Only to notice the reference still appearing or going away, which is
     /// render state and so has no signal to hang on. See refreshReferenceRow.
     void draw() override;
