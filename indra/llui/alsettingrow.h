@@ -27,6 +27,8 @@
 #include "lluictrl.h"
 #include "llsearchablecontrol.h"
 
+#include <functional>
+
 class LLButton;
 class LLSliderCtrl;
 class LLTextBox;
@@ -95,6 +97,13 @@ public:
     // it. False for a row bound to nothing.
     bool isModified();
 
+    // Hand the reset to the row's owner: when set, the reset button calls
+    // this instead of resetting the setting itself. For an owner that has
+    // more to do around a reset than the reset -- naming it as an undo step,
+    // say. Unset, the row resets the setting on its own.
+    typedef std::function<void(ALSettingRow*)> reset_handler_t;
+    void setResetHandler(reset_handler_t handler) { mResetHandler = std::move(handler); }
+
     LLSliderCtrl* getSlider() const { return mSlider; }
     LLButton* getResetButton() const { return mReset; }
 
@@ -117,6 +126,7 @@ private:
 
     LLSliderCtrl*   mSlider = nullptr;
     LLButton*       mReset = nullptr;
+    reset_handler_t mResetHandler;
     std::string     mLabel;
     S32             mDecimalDigits = 3;
     bool            mShowReset = true;

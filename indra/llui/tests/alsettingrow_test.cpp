@@ -464,6 +464,41 @@ namespace tut
         r->die();
     }
 
+    // An owner can take the reset: the button asks it instead of resetting,
+    // once, with the row, and the row does nothing itself -- the owner that
+    // took it is the one that resets.
+    template<> template<>
+    void alsettingrow_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLControlVariable* control = setting("SettingRowTestHandler", 0.5f);
+        ALSettingRow* r = row("SettingRowTestHandler");
+        control->set(LLSD(0.9));
+
+        S32 asked = 0;
+        ALSettingRow* asked_by = nullptr;
+        r->setResetHandler([&asked, &asked_by](ALSettingRow* from)
+        {
+            ++asked;
+            asked_by = from;
+        });
+        r->getResetButton()->onCommit();
+        ensure_equals("the owner is asked once", asked, 1);
+        ensure("with the row", asked_by == r);
+        ensure("and the row did not reset it itself", closeTo(control->getValue().asReal(), 0.9));
+
+        // The owner resetting is a reset like any other.
+        r->setResetHandler([](ALSettingRow* from) { from->getControlVariable()->resetToDefault(true); });
+        r->getResetButton()->onCommit();
+        ensure("reset by the owner", closeTo(control->getValue().asReal(), 0.5));
+        ensure("and the button gone", !r->getResetButton()->getVisible());
+        r->die();
+    }
+
     // A row says when a drag begins and ends, the way a slider does and by the
     // names a slider writes: a setting that is dear to apply waits for the
     // release. The callbacks are named in the file, so they are resolved

@@ -244,6 +244,11 @@ void ALSettingRow::onSliderCommit()
 
 void ALSettingRow::onResetClicked()
 {
+    if (mResetHandler)
+    {
+        mResetHandler(this);
+        return;
+    }
     // The setting's own reset, which fires the setting's signal: the slider
     // and the button come back through setValue like any other change, and
     // whatever listens to the setting hears it.
