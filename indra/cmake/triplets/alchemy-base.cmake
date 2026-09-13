@@ -9,7 +9,7 @@
 # file carries a revision, every triplet states the revision it was written
 # against, and the two must agree. Editing either file means bumping both,
 # which changes every triplet's hash and rebuilds the ports.
-set(ALCHEMY_TRIPLET_BASE_REVISION 1)
+set(ALCHEMY_TRIPLET_BASE_REVISION 2)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
   message(
     FATAL_ERROR
@@ -24,10 +24,12 @@ endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/../AlchemyTarget.cmake")
 
-# Everything static, linked into the viewer, but for the LGPL ports: they
-# link dynamically on every platform, so the libraries stay replaceable.
+# Everything static, linked into the viewer, but for the LGPL ports, which
+# link dynamically on every platform so the libraries stay replaceable, and
+# sentry-native, whose Windows Error Reporting module (the path fast-fail and
+# stack-overflow crashes take) exists only in its shared build.
 set(VCPKG_LIBRARY_LINKAGE static)
-if(PORT MATCHES "^(hunspell|openal-soft)$")
+if(PORT MATCHES "^(hunspell|openal-soft|sentry-native)$")
   set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
 

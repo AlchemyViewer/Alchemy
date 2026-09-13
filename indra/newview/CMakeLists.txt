@@ -1923,7 +1923,7 @@ if(AL_BUILD_VIEWER)
       llcommon
       lllogin
       llappearance
-      ll::bugsplat
+      ll::sentry
       ll::ndof
       ll::tracy
       ll::openxr
@@ -2009,7 +2009,7 @@ if(AL_BUILD_VIEWER)
 
     # Support generating dsym for non-xcode generators
     if(NOT XCODE)
-      if(AL_USE_BUGSPLAT)
+      if(AL_USE_SENTRY)
         set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
         find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
         add_custom_command(
@@ -2175,9 +2175,6 @@ ${settings_install}</map>
   else()
     set(build_data_platform lnx)
   endif()
-  if(AL_BUGSPLAT_DATABASE)
-    string(APPEND build_data_extra ", \"BugSplat DB\": \"${AL_BUGSPLAT_DATABASE}\"")
-  endif()
   file(
     CONFIGURE
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build_data.json"
@@ -2203,10 +2200,13 @@ ${settings_install}</map>
   )
 
   if(AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
-    if(AL_USE_BUGSPLAT)
-      # BugSplat symbol-file generation
+    if(AL_USE_SENTRY)
+      # The debug information Sentry symbolicates crash reports with, staged
+      # per platform as <channel>.sym.tar.xz or the dSYM archive. It is part
+      # of the default build: CPack's package target is created at generate
+      # time, so nothing can be made to depend on it.
       if(WINDOWS)
-        # Redirect symbols to staging directory for upload to BugSplat.
+        # Redirect symbols to staging directory for upload.
         set_target_properties(
           ${AL_VIEWER_BINARY_NAME}
           PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
@@ -2224,7 +2224,7 @@ ${settings_install}</map>
           COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
           VERBATIM
         )
-        add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
+        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
         add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
       endif()
       if(DARWIN)
@@ -2243,16 +2243,35 @@ ${settings_install}</map>
           COMMAND zip -r "${VIEWER_APP_XCARCHIVE}" "${AL_CHANNEL}"
           WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
           DEPENDS "${AL_VIEWER_BINARY_NAME}"
-          COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload to BugSplat"
+          COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload"
           VERBATIM
         )
-        add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_XCARCHIVE}")
+        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_XCARCHIVE}")
       endif()
       if(LINUX)
-        # TBD
+        # The debug information, split from the build-tree binary before the
+        # package strips its own copy; the two share a GNU build ID, which is
+        # how they are paired again.
+        find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
+        set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
+        set(
+          VIEWER_DEBUG_FILE
+          "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug"
+        )
+        add_custom_command(
+          OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
+          COMMAND ${CMAKE_COMMAND} -E make_directory "${SYMBOLS_STAGING_DIR}"
+          COMMAND
+            ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib
+            $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}> "${VIEWER_DEBUG_FILE}"
+          COMMAND tar cJf "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
+          DEPENDS "${AL_VIEWER_BINARY_NAME}"
+          WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
+          COMMENT "Packing the viewer's debug information into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
+          VERBATIM
+        )
+        add_custom_target(generate_symbols ALL DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
       endif()
-
-      add_dependencies(package generate_symbols)
     endif()
   endif()
 

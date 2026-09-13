@@ -157,19 +157,9 @@ cmake_dependent_option(
   OFF
 )
 
-# Crash reporting
+# Crash reporting. AL_USE_SENTRY links the SDK and bakes in the project it
+# reports to; AL_ENABLE_CRASH_REPORTING is whether the viewer engages it.
 option(AL_ENABLE_CRASH_REPORTING "Send crash reports from this build" OFF)
-
-# BugSplat: a proprietary Windows and macOS build with a database named
-# reports to it. AL_USE_BUGSPLAT follows from that on every configure; it is
-# not an option of its own.
-set(AL_BUGSPLAT_DATABASE "" CACHE STRING "BugSplat crash database name")
-set(AL_USE_BUGSPLAT OFF)
-if(AL_ENABLE_PROPRIETARY AND (WIN32 OR APPLE) AND AL_BUGSPLAT_DATABASE)
-  set(AL_USE_BUGSPLAT ON)
-endif()
-
-# Sentry Setup
 option(AL_USE_SENTRY "Use the Sentry crash reporting system" OFF)
 set(AL_SENTRY_DSN "" CACHE STRING "The DSN of the Sentry project crash reports go to")
 
@@ -288,10 +278,6 @@ if(AL_USE_WEBRTC)
   list(APPEND VCPKG_MANIFEST_FEATURES "webrtc")
 endif()
 
-if(AL_USE_BUGSPLAT)
-  list(APPEND VCPKG_MANIFEST_FEATURES "bugsplat")
-endif()
-
 if(AL_USE_VELOPACK)
   list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
 endif()
@@ -394,7 +380,6 @@ set(
   Dependencies
   APR
   Boost
-  bugsplat
   CEFPlugin
   CURL
   DBUS

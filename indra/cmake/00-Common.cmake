@@ -309,6 +309,12 @@ if(AL_ENABLE_CRASH_REPORTING)
   target_compile_definitions(al_flags INTERFACE LL_SEND_CRASH_REPORTS=1)
 endif()
 
+# Every library sees which crash reporter is in: llcommon's signal and
+# exception handling stands aside for it.
+if(AL_USE_SENTRY)
+  target_compile_definitions(al_flags INTERFACE AL_SENTRY=1)
+endif()
+
 if(NOT AL_ENABLE_RELEASE_DEBUG_LOGGING)
   target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
 endif()

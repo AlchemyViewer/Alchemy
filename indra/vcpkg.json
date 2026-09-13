@@ -156,29 +156,16 @@
     "zlib"
   ],
   "features": {
-    "bugsplat": {
-      "description": "Build with support for Bugsplat crash reporting",
-      "dependencies": [
-        {
-          "name": "bugsplat",
-          "platform": "windows & x64"
-        },
-        {
-          "name": "bugsplat-apple",
-          "platform": "osx"
-        }
-      ]
-    },
     "dullahan-example": {
       "description": "Build with support for Dullahan OpenGL example application",
       "dependencies": [
         {
           "name": "glad",
-          "platform": "windows | linux",
           "features": [
             "gl-api-41",
             "loader"
-          ]
+          ],
+          "platform": "windows | linux"
         },
         {
           "name": "imgui",

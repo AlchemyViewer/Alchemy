@@ -2,8 +2,14 @@
 include_guard()
 add_library(ll::sentry INTERFACE IMPORTED)
 
+# sentry-native on Windows and Linux, the Cocoa SDK's Objective-C framework on
+# macOS. AL_SENTRY itself rides al_flags (00-Common.cmake) so every library
+# sees it; the DSN is the reporter's alone.
 if(AL_USE_SENTRY)
-  if(WINDOWS OR LINUX)
+  if(DARWIN)
+    find_package(unofficial-sentry-cocoa CONFIG REQUIRED)
+    target_link_libraries(ll::sentry INTERFACE unofficial::sentry-cocoa::sentry)
+  else()
     find_package(sentry CONFIG REQUIRED)
     target_link_libraries(ll::sentry INTERFACE sentry::sentry)
   endif()
@@ -15,5 +21,5 @@ if(AL_USE_SENTRY)
     )
   endif()
 
-  target_compile_definitions(ll::sentry INTERFACE AL_SENTRY=1 AL_SENTRY_DSN="${AL_SENTRY_DSN}")
+  target_compile_definitions(ll::sentry INTERFACE AL_SENTRY_DSN="${AL_SENTRY_DSN}")
 endif()

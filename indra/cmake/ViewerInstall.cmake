@@ -176,23 +176,33 @@ if(AL_USE_DISCORD)
   endif()
 endif()
 
-if(AL_USE_BUGSPLAT)
+# The crash reporter. Its out-of-process handler sits beside the executable,
+# and on Windows the WER module beside the handler, which is where the client
+# looks for it; sentry.dll itself comes with the runtime DLLs above. On macOS
+# the SDK is a framework the viewer loads from Contents/Frameworks.
+if(AL_USE_SENTRY)
   if(WINDOWS)
     install(
-      PROGRAMS "${al_vcpkg_dir}/tools/BsSndRpt64.exe"
+      PROGRAMS "${al_vcpkg_dir}/tools/sentry-native/crashpad_handler.exe"
       DESTINATION "${AL_INSTALL_BINDIR}"
       COMPONENT viewer
     )
     install(
-      FILES "${al_vcpkg_dir}/bin/BugSplat64.dll" "${al_vcpkg_dir}/bin/BugSplatRc64.dll"
+      FILES "${al_vcpkg_dir}/bin/crashpad_wer.dll"
       DESTINATION "${AL_INSTALL_BINDIR}"
       COMPONENT viewer
     )
   elseif(DARWIN)
     install(
-      DIRECTORY "${al_vcpkg_dir}/lib/BugSplat.framework"
+      DIRECTORY "${SENTRY_COCOA_FRAMEWORK_DIR}"
       DESTINATION "${AL_INSTALL_LIBDIR}"
       USE_SOURCE_PERMISSIONS
+      COMPONENT viewer
+    )
+  else()
+    install(
+      PROGRAMS "${al_vcpkg_dir}/tools/sentry-native/crashpad_handler"
+      DESTINATION "${AL_INSTALL_BINDIR}"
       COMPONENT viewer
     )
   endif()
