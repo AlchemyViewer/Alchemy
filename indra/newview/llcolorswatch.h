@@ -32,6 +32,8 @@
 #include "llfloater.h"
 #include "lltextbox.h"
 
+#include <functional>
+
 //
 // Classes
 //
@@ -95,6 +97,16 @@ public:
 
     void            showPicker(bool take_focus);
 
+    /// Hand the picking to someone else. When set, opening the picker -- a
+    /// click, or the space bar -- asks this first, and the colour picker
+    /// floater opens only if it answers false. Unset, the swatch behaves
+    /// exactly as it always has.
+    typedef std::function<bool(LLColorSwatchCtrl*)> picker_override_t;
+    void            setPickerOverride(picker_override_t cb) { mPickerOverride = std::move(cb); }
+    /// The colour picker floater itself, whatever the override would say:
+    /// for an override that offers the full picker as a way on.
+    void            showClassicPicker(bool take_focus);
+
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool    handleDoubleClick(S32 x,S32 y,MASK mask) override;
@@ -120,6 +132,7 @@ protected:
     commit_callback_t       mOnCancelCallback,
                             mOnSelectCallback;
     commit_callback_t mPreviewCallback;
+    picker_override_t       mPickerOverride;
     S32                     mLabelWidth,
                             mLabelHeight;
 
