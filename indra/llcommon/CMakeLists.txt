@@ -302,12 +302,19 @@ if (AL_BUILD_TESTS)
       apply bitpack classic_callback commonmisc lazyeventapi llapp llbase64
       llcond lldate lldeadmantimer lldependencies lldoubledispatch llerror
       lleventcoro lleventdispatcher lleventfilter llevents llfile llframetimer
-      llhttpdate llheteromap llinitparam llinstancetracker llleap
-      llmainthreadtask llmutex llpounceable llprocess llprocessor llprocinfo
-      llrand llsd llsdjson llsdserialize llsdutil llsingleton llstreamtools
+      llhttpdate llheteromap llinitparam llinstancetracker
+      llmainthreadtask llmutex llpounceable llprocessor llprocinfo
+      llrand llsd llsdjson llsdutil llsingleton llstreamtools
       llstring llstring_utf lltrace lltreeiterators llunits lluri lluuid
       stringize threadsafeschedule tuple workqueue)
     al_add_test(${test} PROJECT llcommon LIBRARIES llcommon)
+  endforeach()
+
+  # These drive a Python peer: LEAP's protocol is to an external script,
+  # llprocess spawns one, and llsdserialize round-trips through the llsd
+  # package as an independent implementation.
+  foreach(test llleap llprocess llsdserialize)
+    al_add_test(${test} PROJECT llcommon LIBRARIES llcommon PYTHON)
   endforeach()
 
 ## llexception_test.cpp isn't a regression test, and doesn't need to be run

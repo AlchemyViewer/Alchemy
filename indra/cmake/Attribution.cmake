@@ -19,7 +19,7 @@
 # or its copyright file has no usable holder line. A shipped port with no
 # licence in either place, or no copyright file, stops the build.
 
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 4.0)
 
 foreach(var VCPKG_STATUS VCPKG_SHARE TRIPLET TABLE SOURCE_DIR CHANNEL VERSION OUTPUT_INFO OUTPUT_LICENSES)
   if(NOT DEFINED ${var})

@@ -256,8 +256,14 @@ jobs:
         with:
           python-version: "3.14"
 
+      # Linux builds with the CMake floor, so the floor is a floor.
       - name: Install python dependencies
-        run: pip3 install llsd cmake ninja
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]
+          then pip3 install llsd cmake==4.0.0 ninja
+          else pip3 install llsd cmake ninja
+          fi
 
       - name: Bootstrap vcpkg Windows
         if: runner.os == 'Windows'
@@ -359,7 +365,7 @@ jobs:
             -DAL_BUGSPLAT_DATABASE:STRING="${AL_BUGSPLAT_DATABASE:-}" \
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
             -DAL_GRID:STRING="\"$VIEWER_GRID\"" \
-            -DAL_TEMPLATE_VERIFIER_OPTIONS:STRING="$template_verifier_options" $template_verifier_master_url \
+            $template_verifier_master_url \
             "${SIGNING[@]}"
 
       - name: Build

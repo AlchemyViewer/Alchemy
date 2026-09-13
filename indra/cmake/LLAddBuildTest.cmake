@@ -20,7 +20,7 @@ else()
   set(AL_TEST_ENVIRONMENT "")
 endif()
 
-# al_add_test(<name> PROJECT <project> [UNIT]
+# al_add_test(<name> PROJECT <project> [UNIT] [PYTHON]
 #             [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
 #             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
 #
@@ -36,15 +36,16 @@ endif()
 #
 # COMMAND runs the test through another program; "{}" stands for the test
 # executable and is appended when absent. ENVIRONMENT sets variables for the
-# run, VAR=value each; PYTHON is always set to the interpreter CMake found,
-# for the tests that spawn a Python peer.
+# run, VAR=value each. A PYTHON test spawns a Python peer: PYTHON is set to
+# the interpreter for its run, and without one the test is registered
+# disabled.
 #
 # Targets are PROJECT_<project>_TEST_<name> for a unit test and
 # INTEGRATION_TEST_<name> otherwise; the registered test names are
 # PROJECT_<project>_TEST_<name> and INTEGRATION_TEST_RUNNER_<name>.
 function(al_add_test name)
   cmake_parse_arguments(PARSE_ARGV 1 arg
-    "UNIT"
+    "UNIT;PYTHON"
     "PROJECT"
     "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT")
   if(NOT arg_PROJECT)
@@ -117,13 +118,22 @@ function(al_add_test name)
       "--sourcedir=${CMAKE_CURRENT_SOURCE_DIR}")
   endif()
 
-  set(environment "PYTHON=${Python3_EXECUTABLE}" ${arg_ENVIRONMENT})
+  set(environment ${arg_ENVIRONMENT})
+  set(disabled FALSE)
+  if(arg_PYTHON)
+    if(Python3_Interpreter_FOUND)
+      list(APPEND environment "PYTHON=${Python3_EXECUTABLE}")
+    else()
+      set(disabled TRUE)
+    endif()
+  endif()
   add_test(NAME ${test_name}
     COMMAND ${command}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   set_tests_properties(${test_name} PROPERTIES
     ENVIRONMENT "${environment}"
-    ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}")
+    ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+    DISABLED ${disabled})
 
   add_dependencies(BUILD_TESTS ${target})
 endfunction()

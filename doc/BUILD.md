@@ -17,10 +17,10 @@ Everything you need to build Alchemy from source: platform setup, presets, optio
 
 Every platform needs a C++ toolchain plus:
 
-- **CMake** 3.27+
+- **CMake** 4.0+
 - **Git**
-- **Python** 3.13+ — used for build-time scripts
 - **Rust** and **.NET SDK** — only for Velopack installers (`-DAL_USE_VELOPACK=ON`)
+- **Python** 3 — only for the tests that spawn a Python peer (see [Running tests](#running-tests))
 
 Install commands are platform-specific; see below.
 
@@ -31,9 +31,8 @@ Install commands are platform-specific; see below.
 Install the following:
 
 - [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) — select the **Desktop development with C++** workload
-- [CMake](https://cmake.org/download/) 3.27+
+- [CMake](https://cmake.org/download/) 4.0+
 - [Git for Windows](https://git-scm.com/install/windows)
-- [Python 3.13+](https://www.python.org/downloads/) — tick **Add Python to PATH** during install
 - [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe` and accept defaults (packaging only)
 - [.NET SDK](https://dotnet.microsoft.com/en-us/download) (packaging only)
 
@@ -41,7 +40,6 @@ Sanity-check in a fresh terminal:
 
 ```
 cmake --version
-python --version
 git --version
 ```
 
@@ -164,16 +162,12 @@ rustup default stable
 
 ## Clone and bootstrap
 
-Alchemy vendors the [Dullahan](https://github.com/AlchemyViewer/dullahan) CEF wrapper — used by the in-world web media plugin — as a git submodule under `indra/dullahan`. It builds from source as part of the tree, so the submodule must be present before you configure. Clone with `--recurse-submodules`, then set up the Python venv and .NET tools:
+Alchemy vendors the [Dullahan](https://github.com/AlchemyViewer/dullahan) CEF wrapper — used by the in-world web media plugin — as a git submodule under `indra/dullahan`. It builds from source as part of the tree, so the submodule must be present before you configure. Clone with `--recurse-submodules`:
 
 ```
 git clone --recurse-submodules https://github.com/AlchemyViewer/Alchemy.git alchemy
 cd alchemy
-python3 -m venv .venv
-# Windows: .\.venv\Scripts\Activate.ps1
-# Unix:    source .venv/bin/activate
-pip install -r requirements.txt
-dotnet tool restore        # packaging only
+dotnet tool restore        # Velopack installers only
 ```
 
 Already cloned without `--recurse-submodules`? Fetch the submodules before configuring:
@@ -387,6 +381,8 @@ Enable tests at configure time:
 cmake -S indra --preset <preset> -DAL_BUILD_TESTS=ON
 ```
 
+Four tests drive a Python peer (`llleap`, `llprocess`, `llsdserialize`, `llcorehttp`); they need a Python 3 interpreter with the `llsd` package (`pip install -r requirements.txt`, in a venv if you like) and are registered disabled when configure finds none. Nothing else in the build runs Python.
+
 Build, then run with CTest:
 
 ```
@@ -461,7 +457,7 @@ If the run produces no output for a very long time it usually isn't hung — che
 
 ### CMake is too old
 
-Alchemy requires CMake 3.27+. If your distro ships something older, install a newer version via pip inside your venv:
+Alchemy requires CMake 4.0+. If your distro ships something older, install a newer version via pip:
 
 ```
 pip install --upgrade cmake ninja

@@ -15,5 +15,6 @@ endif()
 # We always want to find the active virtual env first
 set(Python3_FIND_VIRTUALENV FIRST)
 
-# Find Python 3 interpreter
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# The interpreter is for the tests that spawn a Python peer; without it they
+# are registered disabled. Nothing that builds or packages the viewer runs it.
+find_package(Python3 COMPONENTS Interpreter)

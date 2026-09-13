@@ -1,10 +1,9 @@
 # -*- cmake -*-
 
-# cmake_minimum_required should appear before any
-# other commands to guarantee full compatibility
-# with the version specified
-# 3.27 is our minimum required cmake version while 4.2 is our cmake policy max version(meaning any policies of version 4.2 or below are set to NEW)
-cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
+# The floor is 4.0: CMAKE_MSVC_RUNTIME_CHECKS, which the Debug configuration
+# relies on, is a plain unknown variable on anything older. Policies through
+# 4.4 are NEW.
+cmake_minimum_required(VERSION 4.0...4.4 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
@@ -234,7 +233,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(BootstrapVcpkg)
 
 # Generate base project after setting pre-generation variables
-project(${AL_PROJECT_NAME})
+project(${AL_PROJECT_NAME} LANGUAGES C CXX)
 
 # The vcpkg install ran inside project(); record what it was run against so
 # the next configure can skip it. See BootstrapVcpkg.cmake.
@@ -249,15 +248,9 @@ set(INDRA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 # Set up common variables
 include(Variables)
 
-# Enable supported languages
-enable_language(C CXX)
-
 if(DARWIN)
   enable_language(OBJC OBJCXX)
 endif()
-
-# Set up Python
-include(Python)
 
 # Set up our base build system variable and compiler flags
 include(00-Common)
@@ -267,6 +260,9 @@ include(Linking)
 include(BuildVersion)
 
 if (AL_BUILD_TESTS)
+  # Only the tests that spawn a Python peer need an interpreter.
+  include(Python)
+
   set(CMAKE_SKIP_TEST_ALL_DEPENDENCY FALSE)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
@@ -330,6 +326,7 @@ endif ()
 
 # Add our cmake modules to cmake
 add_subdirectory(cmake)
+add_subdirectory(template_verifier)
 
 add_subdirectory(dullahan)
 add_subdirectory(llprecompiled)

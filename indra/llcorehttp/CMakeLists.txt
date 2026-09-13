@@ -100,6 +100,7 @@ if (AL_BUILD_TESTS AND LLCOREHTTP_TESTS)
     tests/test_bufferstream.hpp
     tests/test_jsonrpcws.hpp
     LIBRARIES llcorehttp llmessage llcommon
+    PYTHON
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"
     ENVIRONMENT "http_proxy=")
 

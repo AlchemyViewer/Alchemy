@@ -1,2 +1,2 @@
-# Python modules required by the viewer build and test suite
+# Python modules for the tests that spawn a Python peer
 llsd
