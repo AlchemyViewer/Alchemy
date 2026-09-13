@@ -14,7 +14,13 @@ else()
   find_package(unofficial-webrtc CONFIG REQUIRED)
   if(WINDOWS)
     target_compile_definitions(ll::webrtc INTERFACE $<$<CONFIG:Debug>:DISABLE_WEBRTC=1>)
+    # A target name inside a configuration expression on an imported
+    # interface reaches the link line but not the build order: the viewer's
+    # project carried no reference to llwebrtc, and a build of the viewer
+    # alone failed to find its library. Dependencies added to an interface
+    # target are followed in its place by whatever links it.
     target_link_libraries(ll::webrtc INTERFACE $<$<NOT:$<CONFIG:Debug>>:llwebrtc>)
+    add_dependencies(ll::webrtc llwebrtc)
   else()
     target_link_libraries(ll::webrtc INTERFACE llwebrtc)
   endif()
