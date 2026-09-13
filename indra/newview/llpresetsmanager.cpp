@@ -43,9 +43,73 @@
 #include "llagentcamera.h"
 #include "llfile.h"
 
+#if !LL_RELEASE_FOR_DOWNLOAD
+// The Looks whitelist, the settings declarations, and the bundled Look files
+// must stay in lockstep by hand, and every consumer fails silent on drift:
+// loadLooksPreset writes only keys present in BOTH the whitelist and the
+// file, so a bundled Look that falls behind quietly stops resetting the keys
+// it lacks -- and "Neutral" stops meaning neutral. Say so loudly at startup
+// instead. One parse of a handful of small files, once per session.
+static void audit_bundled_looks(const std::vector<std::string>& whitelist)
+{
+    const std::string app_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
+    std::string file;
+    LLDirIterator look_iter(app_dir, "*.xml");
+    while (look_iter.next(file))
+    {
+        llifstream look_stream(gDirUtilp->add(app_dir, file));
+        if (!look_stream.is_open())
+        {
+            continue;
+        }
+        LLSD look;
+        LLSDSerialize::fromXML(look, look_stream);
+        if (!look.isMap())
+        {
+            LL_WARNS("Presets") << "Bundled Look '" << file << "' is not a settings map" << LL_ENDL;
+            continue;
+        }
+        for (const std::string& name : whitelist)
+        {
+            if (!look.has(name))
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' is missing whitelisted key '"
+                                    << name << "'; applying it will leave that setting untouched" << LL_ENDL;
+                continue;
+            }
+
+            // Presence was never the only way these files rot. Each Look
+            // carries a full copy of every setting's Comment, and nothing reads
+            // those copies -- loadLooksPreset takes only Value -- so a reworded
+            // description in settings_alchemy.xml leaves three stale duplicates
+            // behind with no symptom at all until someone diffs them by hand.
+            // Five had already drifted that way before this check existed.
+            const LLControlVariable* ctrl = gSavedSettings.getControl(name).get();
+            if (ctrl && look[name].isMap() && look[name].has("Comment")
+                && look[name]["Comment"].asString() != ctrl->getComment())
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' has a stale Comment for '"
+                                    << name << "'; it no longer matches the setting's own description"
+                                    << LL_ENDL;
+            }
+        }
+    }
+}
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+
 LLPresetsManager::LLPresetsManager()
 {
     copyDefaultLooks();
+
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // Developer check, not a runtime one: it verifies that files in the source
+    // tree agree with each other, which a shipped build can do nothing about.
+    {
+        std::vector<std::string> looks_whitelist;
+        getLooksControlNames(looks_whitelist);
+        audit_bundled_looks(looks_whitelist);
+    }
+#endif
 
     // Connect preset signals
     startWatching(PRESETS_GRAPHIC);
@@ -608,6 +672,53 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderChromaticAberrationOffsetRY",
         "RenderChromaticAberrationOffsetBX",
         "RenderChromaticAberrationOffsetBY",
+        // Lens distortion
+        "RenderLensDistortionAmount",
+        "RenderLensDistortionK1",
+        "RenderLensDistortionK2",
+        "RenderLensDistortionSqueeze",
+        "RenderLensDistortionFit",
+        "RenderLensDistortionCenter",
+        "RenderLensDistortionTangential",
+        // Bokeh aesthetics. The camera optics themselves (CameraFNumber,
+        // CameraFocalLength and friends) are deliberately absent from this
+        // list -- a Look is an aesthetic, not a shot setup -- and
+        // RenderBokehHighlightClamp stays out for a third reason: it is a
+        // firefly guard like RenderBloomFireflyClamp, a stability control
+        // rather than a look.
+        "RenderBokehHighlightGain",
+        "RenderBokehHighlightThreshold",
+        "RenderBokehApertureBlades",
+        "RenderBokehApertureRotation",
+        "RenderBokehApertureCurvature",
+        "RenderBokehAnamorphicSqueeze",
+        "RenderBokehCatEyeAmount",
+        "RenderBokehFringeAmount",
+        "RenderBokehFringeNearTint",
+        "RenderBokehFringeFarTint",
+        // Aberrations contributed by the glass rather than the iris
+        "RenderBokehSphericalAberration",
+        "RenderBokehFieldStretch",
+        "RenderBokehFieldFalloff",
+        "RenderBokehComaAsymmetry",
+        // Cross-screen filter
+        "RenderCrossFilterStrength",
+        "RenderCrossFilterPoints",
+        "RenderCrossFilterAngle",
+        "RenderCrossFilterLength",
+        "RenderCrossFilterFalloff",
+        "RenderCrossFilterChromatic",
+        // Lens dirt
+        "RenderLensDirtStrength",
+        "RenderLensDirtBloomResponse",
+        "RenderLensDirtFlareResponse",
+        "RenderLensDirtGrime",
+        "RenderLensDirtMoteScale",
+        "RenderLensDirtSmudge",
+        "RenderLensDirtScratches",
+        "RenderLensDirtSeed",
+        "RenderLensDirtToe",
+        "RenderLensDirtGain",
         // Vignette
         "RenderVignetteAmount",
         "RenderVignetteCenter",

@@ -92,10 +92,16 @@ public:
     /// Arm the scene picker; the click that follows sets Temperature and Tint.
     void onClickWhiteBalancePicker();
     void onWhiteBalancePicked(const LLColor3& sample);
+    void populateAssetCombo(const std::string& combo_name,
+                            const std::string& dir_name,
+                            const std::vector<std::string>& extensions,
+                            const std::string& setting_name);
     void populateLUTCombo();
+    void openUserAssetFolder(const std::string& dir_name);
     /// Open the user's LUT folder in the platform file browser, creating it
     /// first if this is its first use.
     void onClickOpenLUTFolder();
+    void onLensDirtSliderHeld(bool held);
     void updateTonemapperRows();
     /// Freeze the frame about to be presented, and switch the wipe on so the
     /// grab is visibly a grab.

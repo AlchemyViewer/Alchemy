@@ -177,6 +177,8 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
     mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
     mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderDown", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, true));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderUp", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, false));
     mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
     mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
@@ -283,26 +285,33 @@ bool ALFloaterLightBox::postBuild()
     return LLFloater::postBuild();
 }
 
-void ALFloaterLightBox::populateLUTCombo()
+// Shared by the colour LUT and lens dirt pickers. Both enumerate a bundled
+// directory and a user directory of the same name, list the bundled entries
+// first and the user ones behind a separator, and select whatever the setting
+// currently holds. Generalised rather than cloned: the two differ only in
+// directory, accepted extensions, and which setting they write.
+//
+// `extensions` must list only what the corresponding loader can actually
+// handle. Anything else in the directory -- a readme, a subfolder, a stray
+// .bak -- would become a selectable entry that fails at apply time with
+// nothing but a log line to say why. getExtension lowercases, so a .CUBE
+// passes here the same way it does when the renderer resolves it.
+void ALFloaterLightBox::populateAssetCombo(const std::string& combo_name,
+                                           const std::string& dir_name,
+                                           const std::vector<std::string>& extensions,
+                                           const std::string& setting_name)
 {
-    LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
-
-    // Only what setupGradingLUT can actually load. Anything else in the
-    // directory -- a readme, a subfolder, a stray .bak -- would become a
-    // selectable entry that fails at apply time with nothing but a log line
-    // to say why. getExtension lowercases, so a .CUBE passes here the same
-    // way it does when the renderer resolves it.
-    static const char* const LUT_EXTENSIONS[] = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+    LLComboBox* combo = getChild<LLComboBox>(combo_name);
 
     // Collected rather than added on the spot, so the caller can see whether
     // a directory contributed anything before committing to the separator.
-    auto collect_luts_from = [](const std::string& dir_name)
+    auto collect_from = [&extensions](const std::string& scan_dir)
     {
         std::vector<std::pair<std::string, std::string>> found; // stem, filename
 
         std::error_code ec;
-        std::filesystem::path luts_path = fsyspath(dir_name);
-        if (!std::filesystem::is_directory(luts_path, ec) || ec)
+        std::filesystem::path scan_path = fsyspath(scan_dir);
+        if (!std::filesystem::is_directory(scan_path, ec) || ec)
         {
             return found;
         }
@@ -312,65 +321,95 @@ void ALFloaterLightBox::populateLUTCombo()
         // parks the iterator at end instead, which is why ec is looked at
         // again once the loop is done.
         std::filesystem::directory_iterator end;
-        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != end && !ec; lut.increment(ec))
+        for (std::filesystem::directory_iterator entry(scan_path, ec); entry != end && !ec; entry.increment(ec))
         {
             std::error_code entry_ec;
-            if (!lut->is_regular_file(entry_ec) || entry_ec)
+            if (!entry->is_regular_file(entry_ec) || entry_ec)
             {
                 continue;
             }
 #if LL_WINDOWS
-            std::string lut_stem = ll_convert_wide_to_string(lut->path().stem().native());
-            std::string lut_filename = ll_convert_wide_to_string(lut->path().filename().native());
+            std::string entry_stem = ll_convert_wide_to_string(entry->path().stem().native());
+            std::string entry_filename = ll_convert_wide_to_string(entry->path().filename().native());
 #else
-            std::string lut_stem = lut->path().stem().native();
-            std::string lut_filename = lut->path().filename().native();
+            std::string entry_stem = entry->path().stem().native();
+            std::string entry_filename = entry->path().filename().native();
 #endif
-            const std::string exten = gDirUtilp->getExtension(lut_filename);
-            if (std::find(std::begin(LUT_EXTENSIONS), std::end(LUT_EXTENSIONS), exten) == std::end(LUT_EXTENSIONS))
+            const std::string exten = gDirUtilp->getExtension(entry_filename);
+            if (std::find(extensions.begin(), extensions.end(), exten) == extensions.end())
             {
                 continue;
             }
-            found.emplace_back(std::move(lut_stem), std::move(lut_filename));
+            found.emplace_back(std::move(entry_stem), std::move(entry_filename));
         }
         if (ec)
         {
-            LL_WARNS() << "Error reading LUT directory " << dir_name << ": " << ec.message() << LL_ENDL;
+            LL_WARNS() << "Error reading asset directory " << scan_dir << ": " << ec.message() << LL_ENDL;
         }
         return found;
     };
 
-    // Bundled LUTs first, then user LUTs behind a separator — the same order
+    // Bundled entries first, then user entries behind a separator — the same order
     // the renderer resolves a name in, where the user dir wins.
-    for (const auto& lut : collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut")))
+    for (const auto& entry : collect_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, dir_name)))
     {
-        lut_combo->add(lut.first, lut.second);
+        combo->add(entry.first, entry.second);
     }
 
-    const auto user_luts = collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut"));
-    if (!user_luts.empty())
+    const auto user_entries = collect_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, dir_name));
+    if (!user_entries.empty())
     {
-        lut_combo->addSeparator();
-        for (const auto& lut : user_luts)
+        combo->addSeparator();
+        for (const auto& entry : user_entries)
         {
-            lut_combo->add(lut.first, lut.second);
+            combo->add(entry.first, entry.second);
         }
     }
 
-    lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
-    lut_combo->resetDirty();
+    // Mandatory: the combo is allow_text_entry, so nothing else selects the
+    // saved value when the floater opens.
+    combo->selectByValue(gSavedSettings.getString(setting_name));
+    combo->resetDirty();
 }
 
-void ALFloaterLightBox::onClickOpenLUTFolder()
+void ALFloaterLightBox::populateLUTCombo()
+{
+    static const std::vector<std::string> LUT_EXTENSIONS = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+    populateAssetCombo("colorlut_combo", "colorlut", LUT_EXTENSIONS, "RenderColorGradeLUT");
+}
+
+// Parameterised by directory even though the colour LUT is once again the only
+// caller: the lens dirt plate that shared it is generated now. Kept general
+// because the shape is the shared part -- user folder, created on demand -- and
+// collapsing it back to a constant only has to be undone for the next asset.
+void ALFloaterLightBox::openUserAssetFolder(const std::string& dir_name)
 {
     // The user's folder, not the bundled one: it is the half of the pair that
     // is theirs to put files in, and the one the renderer prefers when a name
     // exists in both. Nothing creates it until there is something to put in
     // it, which is exactly now -- and LLFile::mkdir is quiet about a
     // directory that already exists.
-    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, dir_name);
     LLFile::mkdir(dir);
     gDirUtilp->openDir(dir);
+}
+
+// The lens dirt plate is regenerated whenever one of its parameters changes,
+// and at full resolution that is too expensive to do on every frame of a slider
+// drag. Rather than guess when a drag has ended from a timer, say so: the
+// renderer holds off while this is raised and rebuilds once on release.
+//
+// Only the generation sliders carry these. Strength and the two response
+// controls are applied per frame at composite time and rebuild nothing, so
+// holding them off would only make them feel broken.
+void ALFloaterLightBox::onLensDirtSliderHeld(bool held)
+{
+    gPipeline.mLensDirtSliderHeld = held;
+}
+
+void ALFloaterLightBox::onClickOpenLUTFolder()
+{
+    openUserAssetFolder("colorlut");
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)

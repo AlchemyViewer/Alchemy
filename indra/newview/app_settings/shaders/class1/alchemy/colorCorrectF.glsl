@@ -47,6 +47,8 @@ uniform sampler2D depthMap;
 // halation signal rides in the alpha channel; otherwise the pyramid is RGB-only.
 uniform sampler2D bloomMap;
 uniform float bloom_strength;
+uniform sampler2D crossFilterMap;   // streak accumulator; uCrossStrength gates it
+uniform float     uCrossStrength;   // 0 when the filter is off or unbound
 #ifdef BLOOM_HALATION
 uniform float halation_strength;
 uniform vec3  halation_tint;
@@ -82,7 +84,17 @@ vec3 applyChannelCurves(vec3 diff);
 #ifdef HAS_POST_EFFECTS
 vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv);
 vec4 applyChromaticAberration(sampler2D tex, vec2 uv);
+vec3 applyLensDirt(vec2 uv, vec3 lens_light);
 #endif
+
+// How much each source lights the grime. Only this shader composites the
+// terms they scale, but the declarations deliberately sit OUTSIDE the
+// HAS_POST_EFFECTS guard: uLensDirtBloomResponse is consumed in the
+// independently-guarded BLOOM_COMPOSITE block, and tying the declaration to
+// the other define made any future BLOOM_COMPOSITE-without-HAS_POST_EFFECTS
+// program a hard compile error. An unused uniform costs nothing.
+uniform float uLensDirtBloomResponse;
+uniform float uLensDirtFlareResponse;
 
 #ifdef DITHER
 vec3 applyDither(vec3 color, vec2 fragCoord);
@@ -108,9 +120,19 @@ void main()
 {
     // === LINEAR SPACE ========================================================
 
+    // Light falling on the front element, accumulated as it is composited.
+    // Lens dirt is only visible where something is already glowing, so it needs
+    // the flare and bloom terms themselves rather than the finished image --
+    // hence capturing them here instead of adding them anonymously.
+    vec3 lens_light = vec3(0.0);
+
 #ifdef HAS_POST_EFFECTS
     vec4 diff = applyChromaticAberration(diffuseRect, vary_fragcoord);
-    diff.rgb += computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
+    {
+        vec3 flare = computeLensFlare(diffuseRect, depthMap, vary_fragcoord);
+        diff.rgb   += flare;
+        lens_light += flare * uLensDirtFlareResponse;
+    }
 #else
     vec4 diff = texture(diffuseRect, vary_fragcoord);
 #endif
@@ -121,12 +143,32 @@ void main()
     {
         vec4 bloom_sample = texture(bloomMap, vary_fragcoord);
     #ifdef BLOOM_HALATION
-        diff.rgb += bloom_sample.rgb * bloom_strength
-                  + bloom_sample.a   * halation_strength * halation_tint;
+        vec3 bloom_term = bloom_sample.rgb * bloom_strength
+                        + bloom_sample.a   * halation_strength * halation_tint;
     #else
-        diff.rgb += bloom_sample.rgb * bloom_strength;
+        vec3 bloom_term = bloom_sample.rgb * bloom_strength;
     #endif
+        // Cross-filter streaks, composited here instead of in a pass of their
+        // own. Added to bloom_term rather than to diff so they inherit both of
+        // the couplings they had while they lived inside the pyramid: bloom
+        // strength scales them, and they light the lens dirt below.
+        if (uCrossStrength > 0.0)
+        {
+            bloom_term += texture(crossFilterMap, vary_fragcoord).rgb
+                        * uCrossStrength * bloom_strength;
+        }
+
+        diff.rgb   += bloom_term;
+        lens_light += bloom_term * uLensDirtBloomResponse;
     }
+#endif
+
+#ifdef HAS_POST_EFFECTS
+    // Still in linear light, so the dirt is exposed and tonemapped along with
+    // the light that lit it. In the non-HDR path lens_light carries the flare
+    // alone -- legacy glow composites in a separate pass much later, which is
+    // out of reach from here.
+    diff.rgb += applyLensDirt(vary_fragcoord, lens_light);
 #endif
 
 #ifdef TONEMAP
