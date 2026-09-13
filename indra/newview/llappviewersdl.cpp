@@ -838,14 +838,6 @@ bool LLAppViewerSDL::init()
     }
 #endif
 
-#if LL_SEND_CRASH_REPORTS
-    if (success)
-    {
-        LLAppViewer* pApp = LLAppViewer::instance();
-        pApp->initCrashReporting();
-    }
-#endif
-
     return success;
 }
 
@@ -874,8 +866,8 @@ bool LLAppViewerSDL::restoreErrorTrap()
 #define SET_SIG(SIGNAL) sigaction(SIGNAL, &act, &old_act); \
 if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
-    SET_SIG(SIGABRT) // let bugsplat catch this
+#   if ! AL_SENTRY
+    SET_SIG(SIGABRT) // the crash reporter's otherwise
 #   endif
     SET_SIG(SIGALRM)
     SET_SIG(SIGBUS)
@@ -1177,10 +1169,6 @@ void LLAppViewerSDL::setOSHibernationMode(eHibernationMode mode)
 #endif
 
     LL_INFOS("OS") << "OS hibernation mode set to " << (S32)mode << LL_ENDL;
-}
-
-void LLAppViewerSDL::initCrashReporting(bool reportFreeze)
-{
 }
 
 bool LLAppViewerSDL::beingDebugged()

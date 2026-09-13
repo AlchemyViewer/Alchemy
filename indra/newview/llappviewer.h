@@ -125,6 +125,11 @@ public:
     bool isSecondInstance() { return mSecondInstance; }
     void writeDebugInfo(bool isStatic=true);
 
+#if LL_WINDOWS
+    bool reportCrash(void* exception_pointers) override;
+#endif
+    bool reportFreeze(const std::string& description) override;
+
     void setServerReleaseNotesURL(const std::string& url) { mServerReleaseNotesURL = url; }
     LLSD getViewerInfo() const;
     std::string getViewerInfoString(bool default_string = false) const;

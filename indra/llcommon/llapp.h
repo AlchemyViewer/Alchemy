@@ -256,9 +256,13 @@ public:
     LLRunner& getRunner() { return mRunner; }
 
 #ifdef LL_WINDOWS
-    virtual bool reportCrashToBugsplat(void* pExcepInfo /*EXCEPTION_POINTERS*/) { return false; }
-    virtual bool reportCustomToBugsplat(const std::string& description) { return false; }
+    // A structured-exception filter on a worker thread hands the exception
+    // here before deciding; a crash reporter that takes it does not return.
+    virtual bool reportCrash(void* exception_pointers /*EXCEPTION_POINTERS*/) { return false; }
 #endif
+    // The watchdog's finding, reported without ending the process; false
+    // leaves the watchdog to end it.
+    virtual bool reportFreeze(const std::string& description) { return false; }
 
 public:
     typedef std::map<std::string, std::string> string_map;

@@ -43,9 +43,6 @@ public:
     bool init() override; // Override to do application initialization
     bool cleanup() override;
 
-    bool reportCrashToBugsplat(void* pExcepInfo) override;
-    bool reportCustomToBugsplat(const std::string& description) override;
-
     // returns true if other windows were found and are still running.
     static bool sendShutdownToOtherInstances(const std::wstring& install_dir);
 
@@ -67,7 +64,7 @@ protected:
     std::string generateSerialNumber();
 
 private:
-    void disableWinErrorReporting();
+    void setWinErrorReportingExcluded(bool excluded);
 
     std::string mCmdLine;
     bool mIsConsoleAllocated;

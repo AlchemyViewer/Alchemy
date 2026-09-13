@@ -52,7 +52,6 @@ protected:
     bool beingDebugged() override;
 
     bool restoreErrorTrap() override;
-    void initCrashReporting(bool reportFreeze);
 
     bool initParseCommandLine(LLCommandLineParser& clp) override;
 

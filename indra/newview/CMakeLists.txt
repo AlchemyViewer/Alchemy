@@ -165,6 +165,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
+    alcrashreporter.cpp
     alpanelaomini.cpp
     alparceliconstrip.cpp
     alpanelaopulldown.cpp
@@ -949,6 +950,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.h
     alobjectproperties.h
     alagentlocationformat.h
+    alcrashreporter.h
     alpanelaomini.h
     alparceliconstrip.h
     alpanelaopulldown.h
@@ -1737,6 +1739,11 @@ if(AL_BUILD_VIEWER)
     list(APPEND viewer_HEADERS llappviewersdl.h)
   endif()
 
+  # The crash reporter's body, where its SDK is.
+  if(AL_USE_SENTRY AND NOT DARWIN)
+    list(APPEND viewer_SOURCES alcrashreporter_native.cpp)
+  endif()
+
   if(WINDOWS)
     list(APPEND viewer_SOURCES llappviewerwin32.cpp llvelopack.cpp llwindebug.cpp)
 
@@ -2304,6 +2311,7 @@ if(AL_BUILD_TESTS)
     test
     alagentlocationformat
     alcolorwheelmodel
+    alcrashreporter
     alcurvemodel
     aldaycyclelandmarks
     algradehistory

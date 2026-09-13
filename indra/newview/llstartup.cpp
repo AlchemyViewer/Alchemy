@@ -92,6 +92,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include "alcrashreporter.h"
 #include "llappviewer.h"
 #include "llstartup.h"
 
@@ -3425,6 +3426,7 @@ void LLStartUp::setStartupState( EStartupState state )
     getPhases().stopPhase(getStartupStateString());
     gStartupState = state;
     getPhases().startPhase(getStartupStateString());
+    ALCrashReporter::setTag("app_state", startupStateToString(state));
 
     postStartupState();
 }

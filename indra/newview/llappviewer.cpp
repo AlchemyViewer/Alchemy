@@ -28,6 +28,8 @@
 
 #include "llappviewer.h"
 
+#include "alcrashreporter.h"
+
 // Viewer includes
 #include "llversioninfo.h"
 #include "llfeaturemanager.h"
@@ -709,14 +711,14 @@ LLAppViewer::LLAppViewer()
     // from the previous viewer run between this constructor call and the
     // init() call, which will overwrite the static_debug_info.log file for
     // THIS run. So setDebugFileNames() early.
-#   ifdef LL_BUGSPLAT
-    // MAINT-8917: don't create a dump directory just for the
-    // static_debug_info.log file
+#   if AL_SENTRY
+    // The crash reporter keeps its own database; the debug files need no
+    // per-run dump directory of their own.
     std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "");
-#   else // ! LL_BUGSPLAT
-    // write Google Breakpad minidump files to a per-run dump directory to avoid multiple viewer issues.
+#   else // ! AL_SENTRY
+    // write minidump files to a per-run dump directory to avoid multiple viewer issues.
     std::string logdir = gDirUtilp->getExpandedFilename(LL_PATH_DUMP, "");
-#   endif // ! LL_BUGSPLAT
+#   endif // ! AL_SENTRY
     mDumpPath = logdir;
 
     setDebugFileNames(logdir);
@@ -841,6 +843,19 @@ bool LLAppViewer::init()
         // _exit() rather than exit() because normal cleanup depends too
         // much on successful startup!
         LLError::setFatalFunction([rc](const std::string&){ _exit(rc); });
+    }
+
+    // The settings are read, so the opt-out can be honoured; anything that
+    // crashes before this point is a setup failure the log already shows.
+    if (ALCrashReporter::init())
+    {
+        gAgent.addRegionChangedCallback([]()
+        {
+            if (LLViewerRegion* region = gAgent.getRegion())
+            {
+                ALCrashReporter::setTag("region", region->getName());
+            }
+        });
     }
 
     // Initialize the non-LLCurl libcurl library.  Should be called
@@ -1066,6 +1081,12 @@ bool LLAppViewer::init()
 
     gGLManager.getGLInfo(gDebugInfo);
     gGLManager.printGLInfoString();
+
+    ALCrashReporter::setTag("gl_vendor", gGLManager.mGLVendor);
+    ALCrashReporter::setTag("gl_renderer", gGLManager.mGLRenderer);
+    ALCrashReporter::setTag("gl_version", gGLManager.mGLVersionString);
+    ALCrashReporter::setTag("gpu_driver", gGLManager.mDriverVersionVendorString);
+    ALCrashReporter::setTag("vram_mb", std::to_string(gGLManager.mVRAM));
 
     // If we don't have the right GL requirements, exit.
     // ? AG: It seems we never set mHasRequirements to false
@@ -2242,6 +2263,8 @@ bool LLAppViewer::cleanup()
     LLSplashScreen::hide();
 
     LL_INFOS() << "Goodbye!" << LL_ENDL;
+
+    ALCrashReporter::shutdown();
 
     removeDumpDir();
 
@@ -3522,13 +3545,9 @@ bool LLAppViewer::initWindow()
             },
             [](std::string &desc)
             {
-#if LL_WINDOWS && LL_BUGSPLAT
                 LLAppViewer* app = LLAppViewer::instance();
                 app->writeDebugInfo();
-                return app->reportCustomToBugsplat(desc);
-#else
-                return false;
-#endif
+                return app->reportFreeze(desc);
             },
             []()
             {
@@ -3608,11 +3627,23 @@ bool LLAppViewer::initWindow()
     return true;
 }
 
+#if LL_WINDOWS
+bool LLAppViewer::reportCrash(void* exception_pointers)
+{
+    return ALCrashReporter::handleException(exception_pointers);
+}
+#endif
+
+bool LLAppViewer::reportFreeze(const std::string& description)
+{
+    return ALCrashReporter::reportFreeze(description);
+}
+
 void LLAppViewer::writeDebugInfo(bool isStatic)
 {
-#if LL_WINDOWS && LL_BUGSPLAT
-    // bugsplat does not create dump folder and debug logs are written directly
-    // to logs folder, so it conflicts with main instance
+#if AL_SENTRY
+    // The debug files sit in the logs directory rather than a per-run dump
+    // directory, so a second instance would overwrite the first's.
     if (mSecondInstance)
     {
         return;
@@ -4017,14 +4048,10 @@ void LLAppViewer::writeSystemInfo()
     // crash processing in CrashMetadataSingleton reads SLLog. macOS reports a
     // crash on the NEXT run, so what it wants is the copy taken at shutdown.
     gDebugInfo["SLLog"] = getLogFileSibling(getActiveLogFileName(), ".crash");
-#elif LL_WINDOWS && !LL_BUGSPLAT
-    gDebugInfo["SLLog"] = getActiveLogFileName();
 #else
-    // The current log is still open and being written when the report is
-    // taken, so attach the previous run's instead; attachmentsForBugSplat
-    // expects that ".old" name.
-    // Far from ideal, especially when multiple instances get involved. Todo: improve.
-    gDebugInfo["SLLog"] = getOldLogFileName(getActiveLogFileName());
+    // The crash handler reads the attachment at crash time, so the live log
+    // is the one to name.
+    gDebugInfo["SLLog"] = getActiveLogFileName();
 #endif
 
     gDebugInfo["ClientInfo"]["Name"] = LLVersionInfo::instance().getChannel();
@@ -4061,16 +4088,16 @@ void LLAppViewer::writeSystemInfo()
     gDebugInfo["MainloopThreadID"] = (S32)thread_id;
 #endif
 
-#ifndef LL_BUGSPLAT
+#if ! AL_SENTRY
     // "CrashNotHandled" is set here, while things are running well,
     // in case of a freeze. If there is a freeze, the crash logger will be launched
     // and can read this value from the debug_info.log.
     gDebugInfo["CrashNotHandled"] = LLSD::Boolean(true);
-#else // LL_BUGSPLAT
+#else // AL_SENTRY
     // "CrashNotHandled" is obsolete; it used (not very successsfully)
     // to try to distinguish crashes from freezes - the intent here to to avoid calling it a freeze
     gDebugInfo["CrashNotHandled"] = LLSD::Boolean(false);
-#endif // ! LL_BUGSPLAT
+#endif // AL_SENTRY
 
     // Insert crash host url (url to post crash log to) if configured. This insures
     // that the crash report will go to the proper location in the case of a
@@ -6640,6 +6667,9 @@ void LLAppViewer::handleLoginComplete()
     {
         gWindowTitle.append(" - ").append(gAgentAvatarp->getFullname());
         gViewerWindow->getWindow()->setTitle(gWindowTitle);
+
+        ALCrashReporter::setUser(gAgent.getID(), gAgentAvatarp->getFullname());
+        ALCrashReporter::attach(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml"));
     }
 
     mOnLoginCompleted();

@@ -197,7 +197,7 @@ void LLApp::setupErrorHandling(bool second_instance)
 
 #else  // ! LL_WINDOWS
 
-#if ! defined(LL_BUGSPLAT)
+#if ! AL_SENTRY
     //
     // Start up signal handling.
     //
@@ -205,7 +205,7 @@ void LLApp::setupErrorHandling(bool second_instance)
     // thread, asynchronous signals can be delivered to any thread (in theory)
     //
     setup_signals();
-#endif // ! LL_BUGSPLAT
+#endif // ! AL_SENTRY
 
 #endif // ! LL_WINDOWS
 }
@@ -388,7 +388,7 @@ void setup_signals()
     act.sa_flags = SA_SIGINFO;
 
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
+#   if ! AL_SENTRY
     sigaction(SIGABRT, &act, NULL);
 #   endif
     sigaction(SIGALRM, &act, NULL);
@@ -427,7 +427,7 @@ void clear_signals()
     act.sa_flags = SA_SIGINFO;
 
     // Synchronous signals
-#   ifndef LL_BUGSPLAT
+#   if ! AL_SENTRY
     sigaction(SIGABRT, &act, NULL);
 #   endif
     sigaction(SIGALRM, &act, NULL);
