@@ -15,7 +15,7 @@
  *
  *   LINEAR SPACE (colorCorrectF)
  *     vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
- *     vec3 computeLensFlare       (sampler2D diff, sampler2D depth, vec2 uv)
+ *     vec3 computeLensFlare       (vec2 uv)
  *
  *   DISPLAY SPACE (blitWithEffectsF)
  *     vec3 applyVignette          (vec3 color, vec2 uv)
@@ -198,10 +198,10 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // Lens flare — anamorphic streak with optional glow, ghosts, halo, starburst
 // =============================================================================
 //
-// Screen-space approximation of an anamorphic lens flare. Driven by a
-// CPU-computed sun UV position and visibility (on-screen fade), plus a
-// multi-tap depth occlusion check done here so geometry in front of the sun
-// attenuates the flare smoothly.
+// Screen-space approximation of an anamorphic lens flare, driven by a
+// CPU-computed sun UV position and by the sun state texture that
+// lensFlareStateF.glsl measures and filters once per frame (its header says
+// why the measurement lives there and not here).
 //
 // Each sub-effect (glow / ghosts / halo / starburst) is gated by its own
 // intensity uniform (0 = disabled, else acts as a brightness multiplier), so
@@ -211,12 +211,11 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // ---- Driver inputs (set by the viewer each frame) --------------------------
 uniform float uLensFlareStrength;                 // master on/off + intensity
 uniform vec2  uLensFlareSunPos;                   // sun position in UV space
-uniform float uLensFlareSunVisibility;            // CPU-side on-screen fade
 uniform vec3  uLensFlareLightColor;               // artist tint applied to whole flare
 
-// ---- Depth occlusion -------------------------------------------------------
-uniform float uLensFlareOcclusionRadius;          // Poisson disk radius in UV space
-uniform int   uLensFlareOcclusionTaps;            // 1..32 — more taps = smoother partial occlusion
+// ---- Sun state (2x1, written by lensFlareStateF.glsl each frame) -----------
+// texel 0 rgb = the filtered, premultiplied flare drive; black means no flare.
+uniform sampler2D uLensFlareStateMap;
 
 // ---- Anamorphic streak -----------------------------------------------------
 uniform float uLensFlareStreakLength;             // horizontal extent in UV space
@@ -248,92 +247,19 @@ uniform int   uLensFlareStarburstSpikes;          // primary angular frequency �
 uniform float uLensFlareStarburstSharpness;       // pow() exponent — higher = tighter spikes
 uniform float uLensFlareStarburstFalloff;         // radial decay rate from the sun
 
-vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
+vec3 computeLensFlare(vec2 uv)
 {
     // Master gate: cheapest possible early-out.
-    float vis = uLensFlareSunVisibility * uLensFlareStrength;
-    if (vis <= 0.0)
+    if (uLensFlareStrength <= 0.0)
         return vec3(0.0);
 
-    vec2 sun_uv = uLensFlareSunPos;
-
-    // -------------------------------------------------------------------
-    // Depth-based occlusion.
-    //
-    // CPU-side visibility only tracks whether the sun is on-screen; it
-    // doesn't know about intervening geometry. Probe a Poisson disk of
-    // depth taps around the sun's UV and count how many are at the far
-    // plane (i.e. sky). This gives smooth partial occlusion when the sun
-    // is half-behind an object.
-    // -------------------------------------------------------------------
-    if (all(greaterThanEqual(sun_uv, vec2(0.0))) && all(lessThanEqual(sun_uv, vec2(1.0))))
-    {
-        // Pre-baked Poisson disk samples, good spatial distribution.
-        const vec2 taps[32] = vec2[32](
-            vec2( 0.0,     0.0),
-            vec2(-0.326,  -0.406),
-            vec2(-0.840,  -0.074),
-            vec2(-0.196,   0.457),
-            vec2( 0.498,   0.336),
-            vec2( 0.106,  -0.747),
-            vec2( 0.736,  -0.290),
-            vec2( 0.423,   0.767),
-            vec2(-0.621,   0.572),
-            vec2( 0.890,   0.156),
-            vec2(-0.453,  -0.780),
-            vec2( 0.215,  -0.945),
-            vec2(-0.928,   0.326),
-            vec2( 0.673,  -0.685),
-            vec2(-0.158,   0.892),
-            vec2( 0.952,   0.548),
-            vec2(-0.756,  -0.518),
-            vec2( 0.347,  -0.412),
-            vec2(-0.089,  -0.290),
-            vec2( 0.612,   0.710),
-            vec2(-0.544,   0.815),
-            vec2( 0.818,  -0.543),
-            vec2(-0.987,  -0.321),
-            vec2( 0.145,   0.623),
-            vec2(-0.412,   0.178),
-            vec2( 0.567,  -0.098),
-            vec2(-0.278,  -0.654),
-            vec2( 0.934,   0.389),
-            vec2(-0.703,   0.112),
-            vec2( 0.056,  -0.512),
-            vec2( 0.289,   0.934),
-            vec2(-0.867,   0.745)
-        );
-        int   num_taps = clamp(uLensFlareOcclusionTaps, 1, 32);
-        float occluded = 0.0;
-        for (int i = 0; i < num_taps; i++)
-        {
-            vec2  tap_uv = sun_uv + taps[i] * uLensFlareOcclusionRadius;
-            float d      = texture(depth, tap_uv).r;
-            // smoothstep against near-far plane — only sky counts as visible. Mirror the far
-            // end under reverse-Z (far=0): smoothstep(0.9999,1,1-d) == 1-smoothstep(0,1e-4,d).
-#ifdef REVERSE_Z
-            occluded += smoothstep(0.9999, 1.0, 1.0 - d);
-#else
-            occluded += smoothstep(0.9999, 1.0, d);
-#endif
-        }
-        vis *= occluded / float(num_taps);
-    }
-    if (vis <= 0.0)
+    // The filtered drive from the state pass: colour and visibility in one.
+    vec3 sun_color = texelFetch(uLensFlareStateMap, ivec2(0, 0), 0).rgb;
+    if (max(sun_color.r, max(sun_color.g, sun_color.b)) <= 0.0)
         return vec3(0.0);
 
-    // -------------------------------------------------------------------
-    // Sample sun brightness once, convert to a normalized "overbright"
-    // factor. We subtract 2.0 from luminance so only HDR-bright suns
-    // drive the flare — prevents diffuse bright surfaces from flaring.
-    // -------------------------------------------------------------------
-    vec3  sun_color  = texture(diffuse, clamp(sun_uv, vec2(0.0), vec2(1.0))).rgb;
-    float sun_lum    = dot(sun_color, LUMA);
-    float sun_bright = max(sun_lum - 2.0, 0.0) / max(sun_lum, 1e-4);
-    sun_color *= sun_bright;
-
-    if (sun_bright <= 0.0)
-        return vec3(0.0);
+    vec2  sun_uv = uLensFlareSunPos;
+    float vis    = uLensFlareStrength;
 
     float aspect = uResolution.x / max(uResolution.y, 1.0);
     vec2  delta  = uv - sun_uv;
@@ -457,7 +383,7 @@ vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
     }
 
     // Final scale: 0.15 tames peak intensity to a plausible lens-response
-    // range; tint and visibility factor apply equally to all sub-effects.
+    // range; tint and the master strength apply equally to all sub-effects.
     return max(flare * vis * uLensFlareLightColor * 0.15, vec3(0.0));
 }
 
