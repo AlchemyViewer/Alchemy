@@ -1,7 +1,6 @@
 # -*- cmake -*-
 include_guard()
 
-include(OpenGL)
 
 add_library( ll::pluginlibraries INTERFACE IMPORTED )
 
@@ -16,6 +15,6 @@ if (WINDOWS)
       )
 endif (WINDOWS)
 
-target_link_libraries( ll::pluginlibraries INTERFACE OpenGL::GL)
+target_link_libraries( ll::pluginlibraries INTERFACE ll::opengl)
 
 target_include_directories( ll::pluginlibraries INTERFACE ${INDRA_SOURCE_DIR}/llimage ${INDRA_SOURCE_DIR}/llrender)

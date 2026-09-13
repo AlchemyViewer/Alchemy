@@ -225,7 +225,7 @@ The first configure run downloads and builds every vcpkg dependency from source.
 #### Platform notes
 
 - **macOS** — `xcode-os` and `ninja-os` (no arch suffix) pick the host architecture. Use the explicit `-arm64` / `-x64` preset to cross-build (e.g. an arm64 bundle from an Intel Mac).
-- **Linux with Clang** (faster builds): append `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_LINKER_TYPE=LLD` to the configure command. The hidden `lld` and `mold` presets set `CMAKE_LINKER_TYPE` for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "mold"]}`.
+- **Linux with Clang** (faster builds): append `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_LINKER_TYPE=LLD` to the configure command. The hidden `lld` and `mold` presets set `CMAKE_LINKER_TYPE`, and `ccache` and `sccache` set the compiler launcher, for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "mold", "ccache"]}`. A compiler cache needs `/Z7`-style debug info on MSVC, which this tree does not use, so the launcher presets are for Linux and macOS.
 - **vcpkg triplet** — chosen from the generator, the architecture and `AL_ISA_TIER`: `<arch>-<os>-alchemy[-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
 
 ### Workflow presets (one-shot configure + build)
@@ -306,6 +306,8 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_BUILD_VIEWER`          | ON      | Build the viewer executable                                           |
 | `AL_BUILD_APPEARANCE_UTILITY` | OFF     | Build the appearance utility                                          |
 | `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
+| `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
+| `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
 | `AL_BUILD_PACKAGE`               | ON      | Produce installer packages after the viewer build (requires Velopack) |
 | `AL_USE_VELOPACK`          | OFF     | Use Velopack for installer packaging (instead of NSIS/DMG)            |
 

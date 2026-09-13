@@ -1,7 +1,6 @@
 # -*- cmake -*-
 include_guard()
 
-include(FreeType)
 include(DBUS)
 
 add_library(ll::uilibraries INTERFACE IMPORTED)

@@ -2,6 +2,9 @@
 include_guard()
 add_library(ll::libcurl INTERFACE IMPORTED)
 
+# The port exports no CMake config, so the probe for one FindCURL makes first
+# is a search that fails every configure.
+set(CURL_NO_CURL_CMAKE ON)
 find_package(CURL REQUIRED)
 target_link_libraries(ll::libcurl INTERFACE CURL::libcurl)
 

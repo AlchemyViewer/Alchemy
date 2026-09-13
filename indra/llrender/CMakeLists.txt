@@ -93,7 +93,7 @@ if (AL_BUILD_HEADLESS)
           ll::harfbuzz
           ll::plutosvg
           ll::glext
-          OpenGL::GL
+          ll::opengl
           )
 
   target_precompile_headers(llrenderheadless REUSE_FROM llprecompiled)
@@ -135,7 +135,7 @@ target_precompile_headers(llrender REUSE_FROM llprecompiled)
 if (DARWIN OR WINDOWS OR NOT AL_USE_SDL_WINDOW)
   target_link_libraries(llrender
           PUBLIC
-          OpenGL::GL
+          ll::opengl
           )
 endif()
 

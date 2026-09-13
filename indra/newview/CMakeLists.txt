@@ -5,7 +5,6 @@ list(APPEND CMAKE_MESSAGE_CONTEXT viewer)
 include(BuildPackagesInfo)
 include(BuildVersion)
 include(CMakeCopyIfDifferent)
-include(Velopack)
 include(TemplateCheck)
 
 set(AL_VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
@@ -76,53 +75,21 @@ message(VERBOSE "Copying icons for ${ICON_PATH}")
 find_package(unofficial-alchemy-branding CONFIG REQUIRED)
 set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")
 if (WINDOWS)
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
-    )
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico" "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico" ONLY_IF_DIFFERENT)
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP" ONLY_IF_DIFFERENT)
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP" ONLY_IF_DIFFERENT)
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico" "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico" ONLY_IF_DIFFERENT)
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif" "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif" ONLY_IF_DIFFERENT)
 elseif(DARWIN)
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
-      "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns"
-    )
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns" "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns" ONLY_IF_DIFFERENT)
 elseif(LINUX)
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
-      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
-    )
+  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP" ONLY_IF_DIFFERENT)
 endif ()
 
 # Branded splash icon for the SDL splash screen (LLSplashScreenSDL loads this
 # PNG at runtime from app_settings). Staged on all platforms so the SDL build
 # finds it regardless of which backend the package ends up using.
-execute_process(
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
-    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
-  )
+file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png" "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png" ONLY_IF_DIFFERENT)
 
 set(viewer_SOURCES
     ao.cpp
@@ -2120,32 +2087,39 @@ else ()
   set(AL_DISCORD_MANIFEST_ARG OFF)
 endif ()
 
+# What every viewer_manifest.py run is told; each run adds its actions, its
+# destination and the file it touches when done. The bundle id means
+# nothing off macOS and is harmless there.
+set(VIEWER_MANIFEST_ARGS
+    ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+    --arch=${ARCH}
+    --artwork=${AL_ARTWORK_DIR}
+    "--bugsplat=${AL_BUGSPLAT_DATABASE}"
+    --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
+    "--channel=${AL_CHANNEL}"
+    "--discord=${AL_DISCORD_MANIFEST_ARG}"
+    "--openal=${AL_USE_OPENAL}"
+    "--tracy=${AL_USE_TRACY}"
+    "--velopack=${AL_USE_VELOPACK}"
+    --build=${CMAKE_CURRENT_BINARY_DIR}
+    --buildtype=$<CONFIG>
+    --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
+    "--generator=${CMAKE_GENERATOR}"
+    --grid=${AL_GRID}
+    --source=${CMAKE_CURRENT_SOURCE_DIR}
+    --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
+    --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
+    )
+
 # Viewer Manifest Copy
 add_custom_command(
   TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
   COMMAND ${Python3_EXECUTABLE}
   ARGS
-    ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+    ${VIEWER_MANIFEST_ARGS}
     --actions=copy
-    --arch=${ARCH}
-    --artwork=${AL_ARTWORK_DIR}
-    "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-    "--discord=${AL_DISCORD_MANIFEST_ARG}"
-    "--openal=${AL_USE_OPENAL}"
-    "--tracy=${AL_USE_TRACY}"
-    --build=${CMAKE_CURRENT_BINARY_DIR}
-    --buildtype=$<CONFIG>
-    --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-    "--channel=${AL_CHANNEL}"
-    --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
     --dest=${MANIFEST_DEST_DIR}
-    "--generator=${CMAKE_GENERATOR}"
-    --grid=${AL_GRID}
-    --source=${CMAKE_CURRENT_SOURCE_DIR}
     --touch=${VIEWER_BINARY_DIR}/copy_touched.bat
-    --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-    --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
-    "--velopack=${AL_USE_VELOPACK}"
   COMMENT "Performing viewer_manifest copy"
   )
 
@@ -2158,27 +2132,10 @@ if(IS_DIRECTORY ${AL_LOCAL_DIST_DIR})
       OUTPUT  ${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
       COMMAND ${Python3_EXECUTABLE}
       ARGS
-      ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
+      ${VIEWER_MANIFEST_ARGS}
       "--actions=\"copy package unpacked\""
-      --arch=${ARCH}
-      --artwork=${AL_ARTWORK_DIR}
-      "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-      "--discord=${AL_DISCORD_MANIFEST_ARG}"
-      "--openal=${AL_USE_OPENAL}"
-      "--tracy=${AL_USE_TRACY}"
-      --build=${CMAKE_CURRENT_BINARY_DIR}
-      --buildtype=$<CONFIG>
-      --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-      "--channel=${AL_CHANNEL}"
-      --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
       --dest=${AL_LOCAL_DIST_DIR}
-      "--generator=${CMAKE_GENERATOR}"
-      --grid=${AL_GRID}
-      --source=${CMAKE_CURRENT_SOURCE_DIR}
-      "--velopack=${AL_USE_VELOPACK}"
-      --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
       --touch=${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
-      --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
       ${SIGNING_SETTING}
       DEPENDS
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
@@ -2197,27 +2154,9 @@ if (AL_BUILD_PACKAGE)
     OUTPUT ${MANIFEST_PACKAGE_OUT_FILE}
     COMMAND ${Python3_EXECUTABLE}
     ARGS
-          ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-          --arch=${ARCH}
-          --artwork=${AL_ARTWORK_DIR}
-          "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-              --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
-          "--discord=${AL_DISCORD_MANIFEST_ARG}"
-          "--openal=${AL_USE_OPENAL}"
-          "--tracy=${AL_USE_TRACY}"
-              "--velopack=${AL_USE_VELOPACK}"
-          --build=${CMAKE_CURRENT_BINARY_DIR}
-          --buildtype=$<CONFIG>
-          --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER} # Harmless to other platforms
-          "--channel=${AL_CHANNEL}"
-          --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
+          ${VIEWER_MANIFEST_ARGS}
           --dest=${MANIFEST_DEST_DIR}
-          "--generator=${CMAKE_GENERATOR}"
-          --grid=${AL_GRID}
-          --source=${CMAKE_CURRENT_SOURCE_DIR}
           --touch=${VIEWER_BINARY_DIR}/touched.bat # Intentionally left as touched.bat
-          --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-          --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
           ${SIGNING_SETTING}
       DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py

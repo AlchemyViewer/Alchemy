@@ -72,3 +72,53 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
 
   set(VCPKG_TARGET_TRIPLET "${triplet_arch}-${triplet_os}-alchemy${triplet_tier}${triplet_release}")
 endif()
+
+# vcpkg's toolchain runs `vcpkg install` inside project() on every configure,
+# and a run that installs nothing still costs seconds. It runs only when
+# something it reads has changed since the install that last ran: the
+# manifest, the registry configuration, the triplets and what they include,
+# the feature list, the triplet, and the vcpkg tool. The root writes the
+# stamp once project() has returned, which is after the install succeeded.
+# AL_VCPKG_INSTALL off leaves the ports to you; deleting the stamp file
+# forces one install.
+option(AL_VCPKG_INSTALL "Have vcpkg install the manifest's ports at configure when their inputs have changed" ON)
+set(AL_VCPKG_INSTALL_STAMP_FILE "${CMAKE_BINARY_DIR}/vcpkg-install.stamp")
+if(AL_VCPKG_INSTALL)
+  file(GLOB al_vcpkg_triplet_files "${CMAKE_SOURCE_DIR}/cmake/triplets/*.cmake")
+  set(al_vcpkg_install_key "")
+  foreach(input IN ITEMS
+      "${CMAKE_SOURCE_DIR}/vcpkg.json"
+      "${CMAKE_SOURCE_DIR}/vcpkg-configuration.json"
+      "${CMAKE_CURRENT_LIST_DIR}/AlchemyTarget.cmake"
+      ${al_vcpkg_triplet_files})
+    file(SHA256 "${input}" input_hash)
+    string(APPEND al_vcpkg_install_key "${input}=${input_hash};")
+  endforeach()
+  if(DEFINED VCPKG_EXECUTABLE AND EXISTS "${VCPKG_EXECUTABLE}")
+    file(SIZE "${VCPKG_EXECUTABLE}" vcpkg_size)
+    file(TIMESTAMP "${VCPKG_EXECUTABLE}" vcpkg_stamp)
+    string(APPEND al_vcpkg_install_key "vcpkg=${vcpkg_size}/${vcpkg_stamp};")
+  endif()
+  string(APPEND al_vcpkg_install_key "triplet=${VCPKG_TARGET_TRIPLET};")
+  string(APPEND al_vcpkg_install_key "features=${VCPKG_MANIFEST_FEATURES};")
+  string(APPEND al_vcpkg_install_key "toolchain=${CMAKE_TOOLCHAIN_FILE};")
+
+  if(DEFINED VCPKG_INSTALLED_DIR)
+    set(al_vcpkg_installed_dir "${VCPKG_INSTALLED_DIR}")
+  else()
+    set(al_vcpkg_installed_dir "${CMAKE_BINARY_DIR}/vcpkg_installed")
+  endif()
+  set(al_vcpkg_last_key "")
+  if(EXISTS "${AL_VCPKG_INSTALL_STAMP_FILE}")
+    file(READ "${AL_VCPKG_INSTALL_STAMP_FILE}" al_vcpkg_last_key)
+  endif()
+  if(al_vcpkg_last_key STREQUAL al_vcpkg_install_key AND EXISTS "${al_vcpkg_installed_dir}/vcpkg/status")
+    set(VCPKG_MANIFEST_INSTALL OFF CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+    message(STATUS "vcpkg: nothing changed since the last install, not running it")
+  else()
+    set(VCPKG_MANIFEST_INSTALL ON CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+    set(AL_VCPKG_INSTALL_KEY "${al_vcpkg_install_key}")
+  endif()
+else()
+  set(VCPKG_MANIFEST_INSTALL OFF CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+endif()

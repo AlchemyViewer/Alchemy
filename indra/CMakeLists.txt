@@ -24,6 +24,7 @@ option(AL_USE_VELOPACK "Use Velopack for installer packaging" OFF)
 option(AL_BUILD_VIEWER "Build the viewer project" ON)
 option(AL_BUILD_APPEARANCE_UTILITY "Build the appearance utility project" OFF)
 option(AL_BUILD_TESTS "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
+option(AL_BUILD_DOCS "Add the doc target that generates the API documentation with Doxygen" OFF)
 option(AL_BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
 option(AL_BUILD_PACKAGE "Add a package target that builds an installer package" ON)
@@ -232,6 +233,12 @@ include(BootstrapVcpkg)
 # Generate base project after setting pre-generation variables
 project(${AL_PROJECT_NAME})
 
+# The vcpkg install ran inside project(); record what it was run against so
+# the next configure can skip it. See BootstrapVcpkg.cmake.
+if(DEFINED AL_VCPKG_INSTALL_KEY)
+  file(WRITE "${AL_VCPKG_INSTALL_STAMP_FILE}" "${AL_VCPKG_INSTALL_KEY}")
+endif()
+
 # Location of indra directory
 set(INDRA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(INDRA_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
@@ -285,60 +292,26 @@ endif ()
 # module prints -- including the find_package() output inside it -- to that
 # module.
 set(AL_DEPENDENCY_MODULES
+    Dependencies
     APR
-    AVIF
     Boost
     bugsplat
     CEFPlugin
-    Collada-Dom
     CURL
     DBUS
     Discord
-    FastFloat
-    FAudio
     FMODSTUDIO
-    FMT
-    FontConfig
-    FreeType
-    GLEXT
     GLIB
-    GLM
     Harfbuzz
     Hunspell
     ICU
-    JPEG
     LLKDU
     Mesa
-    Meshoptimizer
-    Mikktspace
     NDOF
-    NSSpellChecker
-    NVAPI
-    OpenAL
-    OpenGL
-    OpenJPEG
-    OpenSSL
-    OpenXR
-    PlutoSVG
-    PNG
-    PugiXML
     SDL3
     Sentry
-    simdjson
-    simdutf
-    SSE2NEON
-    TinyEXR
-    TinyGLTF
     Tracy
-    Tut
-    VHACD
-    Vorbis
-    WebP
     WebRTC
-    websocketpp
-    WinSpellCheck
-    xxHash
-    ZLIBNG
     )
 
 foreach(module IN LISTS AL_DEPENDENCY_MODULES)
@@ -400,7 +373,9 @@ endif()
 # Viewer
 add_subdirectory(newview)
 
-add_subdirectory(doxygen EXCLUDE_FROM_ALL)
+if (AL_BUILD_DOCS)
+  add_subdirectory(doxygen EXCLUDE_FROM_ALL)
+endif ()
 
 # sets the 'startup project' for debugging from visual studio.
 set_property(
