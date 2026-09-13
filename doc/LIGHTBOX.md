@@ -733,6 +733,20 @@ Two rules if you add a control:
   only ever wrap a discrete action — wrapping a per-move commit in one would
   give you back the hundred-step drag.
 
+**A step that changed nothing is not kept.** A drag that comes back to where it
+started, a group whose writes cancel out, a write of the value already there —
+each would be an undo step that visibly does nothing, which reads as Ctrl+Z
+being broken just as surely as a hundred steps for one drag does. The history
+drops them itself (`llsd_equals` on each change's before and after), and a
+no-op write does not even cost the user their redo tail.
+
+**A group can be named** — `beginGroup(label)` — and the step it makes carries
+the name, for a history that is shown rather than only stepped through
+(`at`, `labelOf` and `revision` read it). The outermost group's name wins, so a
+Look apply that resets a section on the way through is still called after the
+Look. Steps made any other way are named by whoever shows them, from their
+changes.
+
 Undo restores **values only**. The active Look stays dirty, exactly as it would
 had the user typed the old numbers back in; restoring that faithfully would mean
 modelling the Looks system's history too. The stack is a floater member, so it
