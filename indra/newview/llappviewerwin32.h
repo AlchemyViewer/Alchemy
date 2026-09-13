@@ -46,6 +46,10 @@ public:
     // returns true if other windows were found and are still running.
     static bool sendShutdownToOtherInstances(const std::wstring& install_dir);
 
+    // Whether Windows Error Reporting leaves the viewer's crashes alone; the
+    // entry persists in the registry across runs.
+    static void setWinErrorReportingExcluded(bool excluded);
+
 protected:
     bool initWindow() override; // Override to initialize the viewer's window.
     void initLoggingAndGetLastDuration() override; // Override to clean stack_trace info.
@@ -64,8 +68,6 @@ protected:
     std::string generateSerialNumber();
 
 private:
-    void setWinErrorReportingExcluded(bool excluded);
-
     std::string mCmdLine;
     bool mIsConsoleAllocated;
 };

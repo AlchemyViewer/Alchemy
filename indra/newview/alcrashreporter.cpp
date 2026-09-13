@@ -1,6 +1,6 @@
 /**
  * @file alcrashreporter.cpp
- * @brief What every crash reporter files a report under
+ * @brief What every crash reporter files a report under, and the consent it starts on
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -26,10 +26,16 @@
 
 #include "alcrashreporter.h"
 
+#include "lldir.h"
+#include "llfile.h"
+#include "llsd.h"
+#include "llstring.h"
+#include "lluuid.h"
 #include "v3math.h"
 
 #include <fmt/format.h>
 
+#include <cerrno>
 #include <cmath>
 
 std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 build)
@@ -43,4 +49,48 @@ std::string ALCrashReporter::locationTag(std::string_view region, const LLVector
                        std::lround(position.mV[VX]),
                        std::lround(position.mV[VY]),
                        std::lround(position.mV[VZ]));
+}
+
+const std::string& ALCrashReporter::runId()
+{
+    static const std::string id = LLUUID::generateNewID().asString();
+    return id;
+}
+
+std::string ALCrashReporter::consentSentinel()
+{
+    return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "crash_reports_allowed");
+}
+
+bool ALCrashReporter::consentRecorded(const std::string& sentinel)
+{
+    return LLFile::isfile(sentinel);
+}
+
+void ALCrashReporter::recordConsent(const std::string& sentinel, bool allowed)
+{
+    if (allowed)
+    {
+        llofstream file(sentinel);
+        file << "Crash reports may be sent. Preferences holds the answer; this file lets the reporter start before Preferences is read.\n";
+    }
+    else
+    {
+        LLFile::remove(sentinel, ENOENT);
+    }
+}
+
+ALCrashReporter::PreviousRun ALCrashReporter::previousRun(const LLSD& info)
+{
+    PreviousRun run;
+    run.runId = info["RunId"].asString();
+    run.logFile = info["SLLog"].asString();
+    run.userSettingsFile = info["SettingsFilename"].asString();
+    run.accountSettingsFile = info["PerAccountSettingsFilename"].asString();
+    run.agentName = info["LoginName"].asString();
+    // The login name is written with the space replaced.
+    LLStringUtil::replaceChar(run.agentName, '_', ' ');
+    run.region = info["CurrentRegion"].asString();
+    run.fatalMessage = info["FatalMessage"].asString();
+    return run;
 }

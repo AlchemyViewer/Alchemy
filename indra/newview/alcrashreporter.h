@@ -30,22 +30,60 @@
 #include <string>
 #include <string_view>
 
+class LLSD;
 class LLUUID;
 class LLVector3;
 
-// Engaged once the settings are read, so the opt-out is honoured, and closed
-// last thing in cleanup. Where no reporter is built in, every entry point is
-// a no-op, so the call sites carry no conditions.
+// Engaged from the top of the viewer's init, on a consent it can read before
+// the settings exist, and closed last thing in cleanup. Where no reporter is
+// built in, every entry point is a no-op, so the call sites carry no
+// conditions.
 namespace ALCrashReporter
 {
+    // Whether this build has a reporter and sends.
+#if AL_SENTRY && LL_SEND_CRASH_REPORTS
+    inline constexpr bool available() { return true; }
+#else
+    inline constexpr bool available() { return false; }
+#endif
+
     // The release a report files under: "alchemy@1.2.3+4567".
     std::string releaseName(S32 major, S32 minor, S32 patch, U64 build);
 
     // Where the agent stood, "Region/128/64/22", in whole metres.
     std::string locationTag(std::string_view region, const LLVector3& position);
 
-#if AL_SENTRY && !LL_DARWIN
+    // One id per run, on every report this run sends and in its static debug
+    // file, so a report filed on the next launch can be joined to the crash.
+    const std::string& runId();
+
+    // Consent is a sentinel file in the user's settings directory: present
+    // means reports may be sent. It is what lets the reporter start before
+    // the settings are readable; once they are, they refresh it.
+    std::string consentSentinel();
+    bool consentRecorded(const std::string& sentinel);
+    void recordConsent(const std::string& sentinel, bool allowed);
+
+    // What the previous run's static debug file says, for a reporter that
+    // only notices a crash on the next launch.
+    struct PreviousRun
+    {
+        std::string runId;
+        std::string logFile;
+        std::string userSettingsFile;
+        std::string accountSettingsFile;
+        std::string agentName;
+        std::string region;
+        std::string fatalMessage;
+    };
+    PreviousRun previousRun(const LLSD& info);
+
+#if AL_SENTRY
+    // Engages if the sentinel allows it.
     bool init();
+    // The settings' answer, once readable and whenever it changes: recorded,
+    // and the reporter engaged or closed to match.
+    void refreshConsent(bool allowed);
     void shutdown();
     bool isEngaged();
     void setUser(const LLUUID& id, const std::string& name);
@@ -55,6 +93,7 @@ namespace ALCrashReporter
     bool handleException(void* exception_pointers);
 #else
     inline bool init() { return false; }
+    inline void refreshConsent(bool allowed) { recordConsent(consentSentinel(), allowed); }
     inline void shutdown() {}
     inline bool isEngaged() { return false; }
     inline void setUser(const LLUUID&, const std::string&) {}

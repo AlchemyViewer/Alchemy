@@ -420,6 +420,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyCrashReportConsent</key>
+        <map>
+            <key>Comment</key>
+            <string>Whether crash reports may be sent: 0 not yet asked, 1 allowed, 2 declined</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyDisableClickToSit</key>
         <map>
             <key>Comment</key>

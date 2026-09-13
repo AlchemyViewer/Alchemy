@@ -63,8 +63,6 @@
 #endif
 #include "llversioninfovars.h"
 
-#include "alcrashreporter.h"
-
 extern bool gGPUBenchmarkMode;
 
 namespace
@@ -493,8 +491,16 @@ void LLAppViewerWin32::setWinErrorReportingExcluded(bool excluded)
     const char* call = excluded ? "WerAddExcludedApplication" : "WerRemoveExcludedApplication";
     HRESULT result = excluded ? WerAddExcludedApplication(wide_name.c_str(), FALSE)
                               : WerRemoveExcludedApplication(wide_name.c_str(), FALSE);
-    LL_INFOS() << call << (S_OK == result ? "() succeeded for " : "() failed for ")
-               << executable_name << LL_ENDL;
+    if (S_OK == result)
+    {
+        LL_INFOS() << call << "() succeeded for " << executable_name << LL_ENDL;
+    }
+    else
+    {
+        // Removing an entry that is not there is the usual way here.
+        LL_INFOS() << call << "() returned 0x" << std::hex << result << std::dec
+                   << " for " << executable_name << LL_ENDL;
+    }
 }
 
 const S32 MAX_CONSOLE_LINES = 7500;
@@ -589,10 +595,12 @@ bool LLAppViewerWin32::init()
 
     bool success = LLAppViewer::init();
 
-    // Windows Error Reporting is kept away from Microsoft, unless the crash
-    // reporter is engaged: its handler receives fast-fail crashes through
-    // WER, and the exclusion outlives the run that wrote it.
-    setWinErrorReportingExcluded(!ALCrashReporter::isEngaged());
+#if ! AL_SENTRY
+    // Without a crash reporter, Windows Error Reporting is kept away from the
+    // viewer's crashes; with one, the reporter decides, since WER is how its
+    // handler receives fast-fail crashes.
+    setWinErrorReportingExcluded(true);
+#endif
 
     return success;
 }

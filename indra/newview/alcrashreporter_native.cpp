@@ -28,11 +28,11 @@
 
 #if LL_WINDOWS
 #include "llwin32headers.h"
+#include "llappviewerwin32.h"
 #endif
 #include <sentry.h>
 
 #include "llagent.h"
-#include "llapp.h"
 #include "llappviewer.h"
 #include "lldir.h"
 #include "llerrorcontrol.h"
@@ -94,6 +94,15 @@ namespace
     }
 #endif
 
+    // Windows Error Reporting is how the handler receives fast-fail crashes;
+    // without a reporter engaged, the viewer stays excluded from it.
+    void follow_wer(bool engaged)
+    {
+#if LL_WINDOWS
+        LLAppViewerWin32::setWinErrorReportingExcluded(!engaged);
+#endif
+    }
+
     void set_event_tag(sentry_value_t event, const char* key, const std::string& value)
     {
         sentry_value_t tags = sentry_value_get_by_key(event, "tags");
@@ -140,6 +149,51 @@ namespace
 
         return event;
     }
+
+    bool engage()
+    {
+        LLAppViewer* app = LLAppViewer::instance();
+        const LLVersionInfo& version = LLVersionInfo::instance();
+
+        sentry_options_t* options = sentry_options_new();
+        sentry_options_set_dsn(options, AL_SENTRY_DSN);
+        sentry_options_set_release(options, ALCrashReporter::releaseName(version.getMajor(), version.getMinor(),
+                                                                         version.getPatch(), version.getBuild()).c_str());
+        sentry_options_set_environment(options, version.getChannel().c_str());
+        sentry_options_set_dist(options, std::to_string(version.getBuild()).c_str());
+        set_handler_path(options, gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, HANDLER_NAME));
+        set_database_path(options, gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry"));
+        add_attachment(options, LLError::logFileName());
+        add_attachment(options, *app->getStaticDebugFile());
+        add_attachment(options, gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml"));
+        sentry_options_set_on_crash(options, on_crash, nullptr);
+
+        if (sentry_init(options) != 0)
+        {
+            LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
+            follow_wer(false);
+            return false;
+        }
+        sEngaged = true;
+        follow_wer(true);
+
+        sentry_set_tag("run_id", ALCrashReporter::runId().c_str());
+        sentry_set_tag("os", LLOSInfo::instance().getOSStringSimple().c_str());
+        sentry_set_tag("second_instance", app->isSecondInstance() ? "true" : "false");
+        sentry_set_tag("app_state", LLStartUp::getStartupStateString().c_str());
+
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
+        return true;
+    }
+
+    void close_sdk()
+    {
+        if (sEngaged)
+        {
+            sentry_close();
+            sEngaged = false;
+        }
+    }
 }
 
 bool ALCrashReporter::init()
@@ -147,51 +201,36 @@ bool ALCrashReporter::init()
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (LLApp::isCrashloggerDisabled())
+    if (!consentRecorded(consentSentinel()))
     {
-        LL_INFOS("CrashReporter") << "Crash reporting is off by setting" << LL_ENDL;
+        LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
+        follow_wer(false);
         return false;
     }
+    return engage();
+#endif
+}
 
-    LLAppViewer* app = LLAppViewer::instance();
-    const LLVersionInfo& version = LLVersionInfo::instance();
-
-    sentry_options_t* options = sentry_options_new();
-    sentry_options_set_dsn(options, AL_SENTRY_DSN);
-    sentry_options_set_release(options, releaseName(version.getMajor(), version.getMinor(),
-                                                    version.getPatch(), version.getBuild()).c_str());
-    sentry_options_set_environment(options, version.getChannel().c_str());
-    sentry_options_set_dist(options, std::to_string(version.getBuild()).c_str());
-    set_handler_path(options, gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, HANDLER_NAME));
-    set_database_path(options, gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry"));
-    add_attachment(options, LLError::logFileName());
-    add_attachment(options, *app->getStaticDebugFile());
-    add_attachment(options, gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml"));
-    sentry_options_set_on_crash(options, on_crash, nullptr);
-
-    if (sentry_init(options) != 0)
+void ALCrashReporter::refreshConsent(bool allowed)
+{
+    recordConsent(consentSentinel(), allowed);
+#if LL_SEND_CRASH_REPORTS
+    if (allowed && !sEngaged)
     {
-        LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
-        return false;
+        engage();
     }
-    sEngaged = true;
-
-    sentry_set_tag("os", LLOSInfo::instance().getOSStringSimple().c_str());
-    sentry_set_tag("second_instance", app->isSecondInstance() ? "true" : "false");
-    sentry_set_tag("app_state", LLStartUp::getStartupStateString().c_str());
-
-    LL_INFOS("CrashReporter") << "Sentry engaged for " << version.getChannelAndVersion() << LL_ENDL;
-    return true;
+    else if (!allowed && sEngaged)
+    {
+        close_sdk();
+        follow_wer(false);
+        LL_INFOS("CrashReporter") << "Consent to crash reports withdrawn; Sentry closed" << LL_ENDL;
+    }
 #endif
 }
 
 void ALCrashReporter::shutdown()
 {
-    if (sEngaged)
-    {
-        sentry_close();
-        sEngaged = false;
-    }
+    close_sdk();
 }
 
 bool ALCrashReporter::isEngaged()

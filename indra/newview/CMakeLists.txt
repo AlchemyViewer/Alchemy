@@ -1700,9 +1700,10 @@ if(AL_BUILD_VIEWER)
     list(APPEND viewer_SOURCES llvelopack.cpp)
     list(APPEND viewer_HEADERS llvelopack.h)
 
-    # Crash-metadata helpers shared by both the legacy Cocoa and SDL backends.
-    list(APPEND viewer_SOURCES llbugsplat_mac.cpp)
-    list(APPEND viewer_HEADERS llbugsplat_mac.h)
+    # The crash reporter's body, where its SDK is.
+    if(AL_USE_SENTRY)
+      list(APPEND viewer_SOURCES alcrashreporter_cocoa.mm)
+    endif()
 
     # Add resource files to the project.
     set(

@@ -13448,6 +13448,20 @@ Always Run disabled.
 	 Irrevocably destroying object. Hope you didn't need that.
  </notification>
 
+ <notification
+  icon="alertmodal.tga"
+  name="AlchemyCrashReportConsent"
+  type="alertmodal">
+Send crash reports to the Alchemy developers?
+
+A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Preferences can change the answer later.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Don't send"
+     yestext="Send reports"/>
+ </notification>
+
   <notification
    icon="alertmodal.tga"
    name="SceneExplorerFullRegion"

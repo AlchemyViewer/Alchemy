@@ -790,6 +790,10 @@ bool LLAppViewer::init()
 
     setupErrorHandling(mSecondInstance);
 
+    // As early as consent can be read: before the settings, on the sentinel
+    // they keep for it.
+    ALCrashReporter::init();
+
     //
     // Start of the application
     //
@@ -845,18 +849,25 @@ bool LLAppViewer::init()
         LLError::setFatalFunction([rc](const std::string&){ _exit(rc); });
     }
 
-    // The settings are read, so the opt-out can be honoured; anything that
-    // crashes before this point is a setup failure the log already shows.
-    if (ALCrashReporter::init())
+    // The settings hold the answer on crash reports from here: it refreshes
+    // the sentinel the reporter started on, and follows changes to it.
+    auto crash_reports_allowed = []()
     {
-        gAgent.addRegionChangedCallback([]()
+        return gSavedSettings.getS32("AlchemyCrashReportConsent") == 1 && !LLApp::isCrashloggerDisabled();
+    };
+    ALCrashReporter::refreshConsent(crash_reports_allowed());
+    gSavedSettings.getControl("AlchemyCrashReportConsent")->getSignal()->connect(
+        [crash_reports_allowed](LLControlVariable*, const LLSD&, const LLSD&)
         {
-            if (LLViewerRegion* region = gAgent.getRegion())
-            {
-                ALCrashReporter::setTag("region", region->getName());
-            }
+            ALCrashReporter::refreshConsent(crash_reports_allowed());
         });
-    }
+    gAgent.addRegionChangedCallback([]()
+    {
+        if (LLViewerRegion* region = gAgent.getRegion())
+        {
+            ALCrashReporter::setTag("region", region->getName());
+        }
+    });
 
     // Initialize the non-LLCurl libcurl library.  Should be called
     // before consumers (LLTextureFetch).
@@ -4044,9 +4055,12 @@ void LLAppViewer::writeSystemInfo()
     if (! gDebugInfo.has("Dynamic") )
         gDebugInfo["Dynamic"] = LLSD::emptyMap();
 
+    // The report filed on the next launch joins the crash by this.
+    gDebugInfo["RunId"] = ALCrashReporter::runId();
+
 #if LL_DARWIN
-    // crash processing in CrashMetadataSingleton reads SLLog. macOS reports a
-    // crash on the NEXT run, so what it wants is the copy taken at shutdown.
+    // macOS reports a crash on the NEXT run, so what the report filed then
+    // wants is the copy of the log taken at the next start.
     gDebugInfo["SLLog"] = getLogFileSibling(getActiveLogFileName(), ".crash");
 #else
     // The crash handler reads the attachment at crash time, so the live log

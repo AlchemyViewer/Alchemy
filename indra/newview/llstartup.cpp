@@ -356,6 +356,7 @@ void uninstall_nsis_if_required();
 void show_release_notes_if_required();
 void show_first_run_dialog();
 bool first_run_dialog_callback(const LLSD& notification, const LLSD& response);
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response);
 void set_startup_status(const F32 frac, const std::string& string, const std::string& msg);
 bool login_alert_status(const LLSD& notification, const LLSD& response);
 void register_viewer_callbacks(LLMessageSystem* msg);
@@ -1056,6 +1057,12 @@ bool idle_startup()
             // connect dialog is already shown, so fill in the names
             LLPanelLogin::populateFields( gUserCredential, gRememberUser, gRememberPassword);
             LLPanelLogin::giveFocus();
+
+            // The first launch asks before any crash report is sent.
+            if (ALCrashReporter::available() && gSavedSettings.getS32("AlchemyCrashReportConsent") == 0)
+            {
+                LLNotificationsUtil::add("AlchemyCrashReportConsent", LLSD(), LLSD(), crash_report_consent_callback);
+            }
 
             // MAINT-3231 Show first run dialog only for Desura viewer
             if (gSavedSettings.getString("sourceid") == "1208_desura")
@@ -3009,6 +3016,13 @@ void show_release_notes_if_required()
         }
         release_notes_shown = true;
     }
+}
+
+bool crash_report_consent_callback(const LLSD& notification, const LLSD& response)
+{
+    S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    gSavedSettings.setS32("AlchemyCrashReportConsent", option == 0 ? 1 : 2);
+    return false;
 }
 
 void show_first_run_dialog()
