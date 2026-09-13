@@ -29,6 +29,7 @@
 #if LL_WINDOWS
 #include "llwin32headers.h"
 #include "llappviewerwin32.h"
+#include <dbghelp.h>
 #endif
 #include <sentry.h>
 
@@ -266,12 +267,64 @@ void ALCrashReporter::attach(const std::string& path)
     }
 }
 
+namespace
+{
+#if LL_WINDOWS
+    // The frozen thread is the one worth reading, and it is not this one: a
+    // minidump of the whole process, taken from the watchdog's thread, is
+    // filed as the event, so every thread's stack is there.
+    bool report_freeze_as_minidump(const std::string& description)
+    {
+        const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "freeze.dmp");
+        const std::wstring wide_path = ll_convert<std::wstring>(path);
+
+        HANDLE file = CreateFileW(wide_path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                  FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE)
+        {
+            return false;
+        }
+        const MINIDUMP_TYPE type = static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithThreadInfo);
+        const BOOL written = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, type,
+                                               nullptr, nullptr, nullptr);
+        CloseHandle(file);
+        if (!written)
+        {
+            LLFile::remove(path);
+            return false;
+        }
+
+        sentry_value_t watchdog = sentry_value_new_object();
+        sentry_value_set_by_key(watchdog, "description", sentry_value_new_string(description.c_str()));
+        sentry_value_set_by_key(watchdog, "state",
+                                sentry_value_new_string(LLAppViewer::instance()->getMainloopWatchdogState().c_str()));
+        sentry_set_context("watchdog", watchdog);
+        sentry_set_tag("freeze", "true");
+
+        // The dump is read into the report as it is captured.
+        const sentry_uuid_t id = sentry_capture_minidumpw(wide_path.c_str());
+
+        sentry_remove_tag("freeze");
+        sentry_remove_context("watchdog");
+        LLFile::remove(path);
+        return !sentry_uuid_is_nil(&id);
+    }
+#endif
+}
+
 bool ALCrashReporter::reportFreeze(const std::string& description)
 {
     if (!sEngaged)
     {
         return false;
     }
+#if LL_WINDOWS
+    if (report_freeze_as_minidump(description))
+    {
+        return true;
+    }
+#endif
+    // Without a dump, the report is the watchdog's own stack and what it saw.
     sentry_value_t event = sentry_value_new_message_event(SENTRY_LEVEL_FATAL, "watchdog", description.c_str());
     set_event_tag(event, "watchdog_state", LLAppViewer::instance()->getMainloopWatchdogState());
     set_event_tag(event, "app_state", LLStartUp::getStartupStateString());

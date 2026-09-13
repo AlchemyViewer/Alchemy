@@ -102,6 +102,15 @@
      name="enable_selection_hints"
      top_pad="5"
      width="350" />
+    <check_box
+     height="16"
+     label="Send crash reports to the Alchemy developers"
+     tool_tip="A report carries where the viewer crashed, its log, your settings and your avatar name, and goes to Sentry, where only the Alchemy developers can see it"
+     layout="topleft"
+     left="30"
+     name="crash_reports_check"
+     top_pad="5"
+     width="350" />
         <text
          type="string"
          length="1"

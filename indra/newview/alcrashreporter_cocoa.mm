@@ -286,6 +286,8 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     {
         return false;
     }
+    // The frozen thread is the one worth reading, and it is not this one:
+    // every thread's stack goes with the event.
     SentryObjCEvent* event = [[SentryObjCEvent alloc] initWithLevel:SentryObjCLevelFatal];
     event.message = [[SentryObjCMessage alloc] initWithFormatted:ns(description)];
     event.logger = @"watchdog";
@@ -293,7 +295,7 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
         @"watchdog_state" : ns(LLAppViewer::instance()->getMainloopWatchdogState()),
         @"app_state" : ns(LLStartUp::getStartupStateString()),
     };
-    [SentryObjCSDK captureEvent:event];
+    [SentryObjCSDK captureEvent:event attachAllThreads:YES];
     return true;
 }
 

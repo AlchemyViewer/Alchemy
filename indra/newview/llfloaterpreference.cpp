@@ -39,6 +39,7 @@
 #include "llfloaterautoreplacesettings.h"
 #include "llagent.h"
 #include "llagentcamera.h"
+#include "alcrashreporter.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcolorswatch.h"
@@ -3033,9 +3034,30 @@ public:
         mAccountIndependentSettings.push_back("AutoDisengageMic");
     }
 
+    bool postBuild() override
+    {
+        // Not bound to the setting: unchecked means declined, not unasked.
+        // The answer applies at once, through the setting's own signal.
+        if (LLCheckBoxCtrl* box = getChild<LLCheckBoxCtrl>("crash_reports_check"))
+        {
+            box->setEnabled(ALCrashReporter::available());
+            box->setCommitCallback([](LLUICtrl*, const LLSD& value)
+            {
+                gSavedSettings.setS32("AlchemyCrashReportConsent", value.asBoolean() ? 1 : 2);
+            });
+        }
+        return LLPanelPreference::postBuild();
+    }
+
     /*virtual*/ void saveSettings() override
     {
         LLPanelPreference::saveSettings();
+
+        // Called as the floater opens: the box shows the answer as it stands.
+        if (LLCheckBoxCtrl* box = getChild<LLCheckBoxCtrl>("crash_reports_check"))
+        {
+            box->setValue(gSavedSettings.getS32("AlchemyCrashReportConsent") == 1);
+        }
 
         // Don't save (=erase from the saved values map) per-account privacy settings
         // if we're not logged in, otherwise they will be reset to defaults on log off.
