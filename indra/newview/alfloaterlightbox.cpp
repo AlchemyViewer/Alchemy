@@ -2293,8 +2293,16 @@ void ALFloaterLightBox::setupSplitToneGraph()
     {
         return;
     }
-    mSplitShadowWidthSlider = findChild<LLSliderCtrl>("split_shadow_width");
-    mSplitHighlightWidthSlider = findChild<LLSliderCtrl>("split_highlight_width");
+    // The widths are setting rows; the range widthRange reads is still the
+    // slider's own, reached through its row.
+    if (ALSettingRow* row = findChild<ALSettingRow>("split_shadow_width"))
+    {
+        mSplitShadowWidthSlider = row->getSlider();
+    }
+    if (ALSettingRow* row = findChild<ALSettingRow>("split_highlight_width"))
+    {
+        mSplitHighlightWidthSlider = row->getSlider();
+    }
 
     // Every input, not just the three the handles write: the tints decide
     // what colour a band is drawn in and the amounts decide how solid, so a
