@@ -2104,7 +2104,16 @@ if(AL_BUILD_VIEWER)
   )
   add_dependencies(${AL_VIEWER_BINARY_NAME} attribution)
 
-  set(AL_SOURCEID "$ENV{sourceid}" CACHE STRING "Referring agency recorded in settings_install.xml")
+  set(al_sourceid_default "")
+  if(DEFINED ENV{sourceid})
+    set(al_sourceid_default "$ENV{sourceid}")
+  endif()
+  set(
+    AL_SOURCEID
+    "${al_sourceid_default}"
+    CACHE STRING
+    "Referring agency recorded in settings_install.xml"
+  )
   set(settings_install "")
   if(AL_SOURCEID)
     string(

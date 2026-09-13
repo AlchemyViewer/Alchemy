@@ -106,17 +106,6 @@ if(WINDOWS)
   )
 endif()
 
-if(TARGET llwebrtc)
-  install(
-    TARGETS llwebrtc
-    COMPONENT viewer
-    ${al_release_configurations}
-    RUNTIME DESTINATION "${AL_INSTALL_BINDIR}"
-    LIBRARY DESTINATION "${AL_INSTALL_LIBDIR}"
-    ARCHIVE DESTINATION lib COMPONENT devel EXCLUDE_FROM_ALL
-  )
-endif()
-
 # A shared llcommon sits beside the viewer and beside the plugins.
 if(AL_BUILD_SHARED_LLCOMMON)
   install(
