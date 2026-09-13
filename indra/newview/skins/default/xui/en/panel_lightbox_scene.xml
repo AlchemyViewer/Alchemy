@@ -1380,6 +1380,11 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 height="15"
 				 name="ssao_effect_value_label"
 				 value="Occluded value" />
+				<!-- No scrub="true" on these two, unlike the labelled vector
+				     spinners on the Look and Lens tabs. Scrubbing drags a
+				     spinner's label, and these have none (the caption is the text
+				     beside them), so it would move onto the arrow buttons instead
+				     and cost them their hold-to-repeat. -->
 				<spinner
 				 follows="left|top"
 				 layout="topleft"

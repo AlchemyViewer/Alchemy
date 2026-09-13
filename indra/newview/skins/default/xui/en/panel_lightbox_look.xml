@@ -4,7 +4,8 @@ Lightbox "Look" tab: color science / tone.
 Full guide for adding sections: doc/LIGHTBOX.md. Quick reference:
 Row conventions:
   scalar  = <slider label=... can_edit_text="true" control_name=.../> + 18px reset button
-  vector  = <text> label + three <spinner name="vec3_<Setting>_<0|1|2>"> with LightBox.CommitVec3
+  vector  = <text> label + three <spinner name="vec3_<Setting>_<0|1|2>"> with LightBox.CommitVec3;
+            a spinner with a channel label also takes scrub="true" (drag the letter to change it)
   color   = <color_swatch control_name=.../> (0-1 tints only)
   section = <accordion_tab> "sec_<id>"; long tail in sibling "sec_<id>_adv"; "Reset All" resets
             every bound control in the section (essential sections include their Advanced tab)

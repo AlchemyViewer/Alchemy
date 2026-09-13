@@ -303,6 +303,15 @@ height="18"` (then `left_delta="72" top_delta="0"`), each with per-axis
 contain no underscores, so the name parse is unambiguous. Omit components that
 are unused — label the ones you keep by meaning.
 
+Give each spinner its channel letter as `label` (`label_width="10"`) and
+`scrub="true"`: dragging the letter sideways changes the value, 4px per
+increment, with Shift for 0.01×, Ctrl for 0.1× and Alt for 10×. Undo folds a
+whole scrub into one step on its own, because every move writes the same
+setting. Leave `scrub` off a spinner **without** a label: the drag then moves
+onto its arrow buttons, and they lose hold-to-repeat. The two SSAO spinners on
+the Scene tab have no label, their caption being the text beside them, so they
+do not scrub.
+
 A **bank** of the same component across many settings is the other shape this
 supports, and it wants ordinary slider rows rather than the compact spinner
 layout: one section per component, one slider per setting, named
