@@ -44,12 +44,9 @@ elseif(WINDOWS)
       dxguid
       opengl32
       kernel32
-      odbc32
-      odbccp32
       oleaut32
       shell32
       shlwapi
-      Vfw32
       wer
       winspool
       imm32

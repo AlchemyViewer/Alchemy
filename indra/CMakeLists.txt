@@ -22,7 +22,14 @@ set(AL_GRID agni CACHE STRING "Target Grid")
 
 # The Velopack update client in the viewer, and the velopack target that
 # packs the installer and the update feed; see cmake/ViewerPackage.cmake.
-option(AL_USE_VELOPACK "Build the Velopack update client and the velopack packaging target" OFF)
+# Windows and macOS ship through it; Linux does not.
+cmake_dependent_option(
+  AL_USE_VELOPACK
+  "Build the Velopack update client and the velopack packaging target"
+  OFF
+  "WIN32 OR APPLE"
+  OFF
+)
 
 # Build executable options
 option(AL_BUILD_VIEWER "Build the viewer project" ON)
@@ -164,6 +171,7 @@ endif()
 
 # Sentry Setup
 option(AL_USE_SENTRY "Use the Sentry crash reporting system" OFF)
+set(AL_SENTRY_DSN "" CACHE STRING "The DSN of the Sentry project crash reports go to")
 
 # Tracy Profiler
 # Default Tracy profiling on for test builds, but off for all others
@@ -237,6 +245,13 @@ if(NOT CMAKE_BUILD_TYPE)
     RelWithDebInfo
     CACHE STRING
     "Build type.  One of: Debug OptDebug Release RelWithDebInfo"
+  )
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
+if(NOT CMAKE_BUILD_TYPE IN_LIST CMAKE_CONFIGURATION_TYPES)
+  message(
+    FATAL_ERROR
+    "CMAKE_BUILD_TYPE must be one of ${CMAKE_CONFIGURATION_TYPES} (got '${CMAKE_BUILD_TYPE}')"
   )
 endif()
 

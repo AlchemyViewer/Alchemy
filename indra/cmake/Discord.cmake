@@ -31,8 +31,7 @@ if(AL_USE_DISCORD)
     REQUIRED
   )
 
-  # The library the viewer loads at run time, staged beside it by
-  # Copy3rdPartyLibs and shipped by the manifest.
+  # The library the viewer loads at run time; ViewerInstall.cmake ships it.
   if(WINDOWS)
     set(DISCORD_SDK_RUNTIME_DIR "${AL_DISCORD_SDK_DIR}/bin/release")
   else()

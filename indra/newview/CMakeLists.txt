@@ -2218,11 +2218,11 @@ ${settings_install}</map>
         # executables.
         add_custom_command(
           OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
-          COMMAND "tar"
-          ARGS "cJf" "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
+          COMMAND tar cJf "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
           DEPENDS "${AL_VIEWER_BINARY_NAME}"
           WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
           COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
+          VERBATIM
         )
         add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
         add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
@@ -2240,11 +2240,11 @@ ${settings_install}</map>
 
         add_custom_command(
           OUTPUT "${VIEWER_APP_XCARCHIVE}"
-          COMMAND "zip"
-          ARGS "-r" "${VIEWER_APP_XCARCHIVE}" "${AL_CHANNEL}"
+          COMMAND zip -r "${VIEWER_APP_XCARCHIVE}" "${AL_CHANNEL}"
           WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
           DEPENDS "${AL_VIEWER_BINARY_NAME}"
           COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload to BugSplat"
+          VERBATIM
         )
         add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_XCARCHIVE}")
       endif()
