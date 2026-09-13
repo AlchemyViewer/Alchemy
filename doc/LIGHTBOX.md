@@ -847,18 +847,29 @@ hold Pop-out as well, and at `min_width` it had spent all 422px it had, which
 had pushed `min_width` from 420 to 430. With Pop-out on the strip, `min_width`
 is back to 420, and the bar has room to spare, which the Looks combo takes: it
 stretches with the floater instead of being the fixed 150px that was left over.
-It is 158 at `min_width` and 198 at the default 460.
+It is 148 at `min_width` and 188 at the default 460.
 
-The combo takes `left="6" right="-248"` and follows the right edge, and the nine
-buttons follow `top|right` and are placed by `right` rather than `left_pad`: the
-last is 6 in from the edge, each one before it 24 further in, and 12 more where
-the group changes. **Four groups, separated by 12px where the buttons inside a
-group are separated by 4.** That gap is the only thing that says they are
-different kinds of thing: the first group acts on the Look, the second on the
-grade's own history, the third opens another window, and the fourth finds a
-place in this one. So keep it if you add another kind, and use 4px if you are
-extending a group. A new button here comes out of the combo's width; add it to
-the 248.
+The row was sized in XUI Studio: the bar is `left="6" top="16"`, 26 tall, and
+everything in it is 24 tall at `top="0"`. The buttons are 24×24. The combo
+takes `left="1" right="-261"` and follows the right edge; `left="1"` puts it at
+the floater's x 7, over the tab container's left edge. The nine buttons follow
+`top|right` and are placed by `right` rather than `left_pad`: the last is 6 in
+from the edge, each one before it 25 further in (24 and a gap of 1), and 10 more
+where the group changes. **Four groups, separated by 11px where the buttons
+inside a group are separated by 1.** That gap is the only thing that says they
+are different kinds of thing: the first group acts on the Look, the second on
+the grade's own history, the third opens another window, and the fourth finds a
+place in this one. So keep it if you add another kind, and use 1px if you are
+extending a group. A new button here comes out of the combo's width: add 25 to
+the 261, or 35 if it starts a group of its own.
+
+**Every `top` in this file is measured from under the title bar**, not from the
+window's top edge. The floater sets no `legacy_header_height`, so once its
+widgets are built, `LLFloater::initFloaterXML` grows the window upward by the
+whole `header_height` (25px in the default skin), and `LLView::setRect` moves
+none of the widgets. So the bar's `top="16"` is 16px below the title bar. A
+floater that sets `legacy_header_height="18"`, as most of the viewer's do, only
+grows by 7px, so there a `top` under 18 lands in the title bar.
 
 **The strip's button is a child of the `tab_container` itself,** after the four
 pages. That is load-bearing three ways:
@@ -867,9 +878,10 @@ pages. That is load-bearing three ways:
   (`LLTabContainer::addChild`) and keeps any other child as it is, so a strip
   button must be a direct child. Wrapped in a panel, it would become a fifth
   tab.
-- `tab_padding_right="33"` keeps the strip's right end clear. `fill_width`
+- `tab_padding_right="37"` keeps the strip's right end clear. `fill_width`
   shares out only what is left (`stripRoom`), so the tabs stop 8px short of the
-  button. The tabs' mouse capture (`tab_rect` in `handleMouseDown`) ends where
+  button. The padding is the button's width plus its 6px margin plus that 8px,
+  less the page border; resize the button and it has to change with it. The tabs' mouse capture (`tab_rect` in `handleMouseDown`) ends where
   the padding begins, so a button there gets its own clicks. Put a button inside
   the tabs' span and the container captures the mouse on press, and the button
   never sees its release. `lltabcontainer_test` test 28 pins all three.
@@ -877,12 +889,16 @@ pages. That is load-bearing three ways:
   overlap its rect, and XUI Studio's lint reports every pair of visible
   siblings that intersect.
 
-Pop-out and Find both sit at `right="-6"` (the two rows have the same
-`left="4"`/`right="-4"`), so the right edge of the two rows is one column.
+Pop-out and Find both sit at `right="-6"`, and the bar and the tab container
+both end at `right="-4"`, so the right edge of the two rows is one column. The
+tab container starts at `left="7"`, one pixel in from the bar's `left="6"`, so
+that its left edge lines up with the combo's. **Pop-out is 23 tall where the
+bar's buttons are 24**: 23 is the strip's height (`tab_height`; the page starts
+right under it), and at 24, at `top="0"`, it would hang a pixel into the page.
 
-Everything but the combo is an **18px icon with an empty label**, and the
-tooltip carries the name. That is not decoration. Four text labels cost 192px of
-the bar; the same four icons cost 80. It also sidesteps §5's silent clipping the
+Everything but the combo is an **18px icon on a button with an empty label**,
+and the tooltip carries the name. That is not decoration. Four text labels cost
+192px of the bar; the same four icons cost 99. It also sidesteps §5's silent clipping the
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar
 of labels has no reflow and no scrollbar to save it. Take the overlays from the
 viewer's existing set (`Script_Save`, `Conv_toolbar_plus`, `TrashItem_Off`,

@@ -4,7 +4,6 @@
  height="560"
  min_width="420"
  min_height="420"
- layout="topleft"
  name="floater_lightbox_settings"
  positioning="cascading"
  title="Lightbox"
@@ -114,19 +113,21 @@
 	 name="lightbox_topbar"
 	 follows="left|top|right"
 	 layout="topleft"
-	 left="4"
-	 top="18"
+	 left="6"
+	 top="16"
 	 right="-4"
-	 height="22">
+	 height="26">
 		<!-- Everything left of the buttons, which are held to the right edge:
-		     248 is the nine of them with their gaps, and 6 of margin. -->
+		     261 is the nine of them (24 each) with their gaps, and 6 of margin.
+		     left="1" puts its left edge at the floater's x 7, over the tab
+		     container's. -->
 		<combo_box
 		 follows="left|top|right"
 		 layout="topleft"
-		 left="6"
-		 top="1"
-		 right="-248"
-		 height="20"
+		 left="1"
+		 top="0"
+		 right="-261"
+		 height="24"
 		 name="looks_combo"
 		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
 			<combo_box.commit_callback
@@ -140,18 +141,17 @@
 		     floppy disk, not Cam_Save, which is a camcorder and reads as one.
 
 		     Placed by `right` rather than `left_pad`, since they follow the
-		     right edge: the last is 6 in from it, matching the combo's 6 at
-		     the left, and each one before it is 24 further in (20 and a gap
-		     of 4), plus 12 where the group changes. -->
+		     right edge: the last is 6 in from it, and each one before it is 25
+		     further in (24 and a gap of 1), plus 10 where the group changes,
+		     for a gap of 11. -->
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-222"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-236"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Save"
 		 name="look_save"
 		 tool_tip="Save: overwrite the current Look with the settings as they are now">
@@ -161,12 +161,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-198"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-211"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Conv_toolbar_plus"
 		 name="look_saveas"
 		 tool_tip="Save As: save the current settings as a new Look">
@@ -176,12 +175,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-174"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-186"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="TrashItem_Off"
 		 name="look_delete"
 		 tool_tip="Delete a saved Look">
@@ -191,12 +189,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-150"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-161"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Refresh_Off"
 		 name="look_revert"
 		 tool_tip="Revert: discard changes and re-apply the last applied Look">
@@ -208,12 +205,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-118"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-126"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Undo"
 		 name="look_undo"
 		 tool_tip="Undo the last grading change (Ctrl+Z). One drag of a control is one step.">
@@ -223,15 +219,14 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-94"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-101"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Script_Redo"
 		 name="look_redo"
-		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)">
+		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)"
+		 top="0">
 			<button.commit_callback
 			 function="LightBox.Redo" />
 		</button>
@@ -239,12 +234,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-70"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-76"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Conv_toolbar_call_log"
 		 name="look_history"
 		 tool_tip="History: every grading change since the Lightbox opened, by name. Double-click one to go back or forward to it.">
@@ -268,12 +262,11 @@
 		<button
 		 follows="top|right"
 		 layout="topleft"
-		 right="-38"
-		 top="1"
-		 width="20"
-		 height="20"
+		 right="-41"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Command_Stats_Icon"
 		 name="open_scopes"
 		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
@@ -289,11 +282,10 @@
 		 follows="top|right"
 		 layout="topleft"
 		 right="-6"
-		 top="1"
-		 width="20"
-		 height="20"
+		 top="0"
+		 width="24"
+		 height="24"
 		 label=""
-		 halign="center"
 		 image_overlay="Command_Search_Icon"
 		 name="lightbox_find"
 		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
@@ -310,18 +302,22 @@
 	     tab_padding_right keeps the strip's right end for the pop-out button
 	     at the bottom of this element: fill_width shares out only what is
 	     left (LLTabContainer::stripRoom), so the tabs stop 8px short of it
-	     (451, the right of the pages, less 33, is 418). -->
+	     (448, the right of the pages, less 37, is 411; the button starts at
+	     419).
+
+	     left="7" lines the tabs up with the Looks combo in the bar above,
+	     which is why this does not match the bar's left="6". -->
 	<tab_container
 	 follows="all"
 	 layout="topleft"
-	 left="4"
+	 left="7"
 	 top_pad="2"
 	 right="-4"
 	 height="512"
 	 name="lightbox_tabs"
 	 tab_position="top"
 	 tab_min_width="70"
-	 tab_padding_right="33"
+	 tab_padding_right="37"
 	 fill_width="true">
 		<panel
 		 filename="panel_lightbox_look.xml"
@@ -367,19 +363,19 @@
 		     (lltabcontainer test 28 pins all of that).
 
 		     right="-6" puts it under Find in the bar above, so the right edge
-		     of the two rows is one column. top="2" centres 20 in the strip's
-		     23. The icon and tooltip are set from C++ to match the tab that
-		     is up (while its page is out, the button brings it back), so the
-		     ones here are only the starting state. -->
+		     of the two rows is one column. It is 23 tall where the bar's
+		     buttons are 24, because 23 is the strip's height: at 24 it would
+		     hang a pixel into the page. The icon and tooltip are set from C++
+		     to match the tab that is up (while its page is out, the button
+		     brings it back), so the ones here are only the starting state. -->
 		<button
 		 follows="top|right"
 		 layout="topleft"
 		 right="-6"
-		 top="2"
-		 width="20"
-		 height="20"
+		 top="0"
+		 width="24"
+		 height="23"
 		 label=""
-		 halign="center"
 		 image_overlay="Conv_toolbar_arrow_ne"
 		 name="lightbox_pop_out"
 		 tool_tip="Take this tab out into a window of its own">
