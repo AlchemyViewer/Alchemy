@@ -33,9 +33,10 @@
 
 class LLNameListCtrl;
 
-class LLFloaterAvatarRenderSettings : public LLFloater
+class LLFloaterAvatarRenderSettings final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAvatarRenderSettings, LLFloater);
 
     LLFloaterAvatarRenderSettings(const LLSD& key);
     virtual ~LLFloaterAvatarRenderSettings();

@@ -36,9 +36,11 @@ class LLComboBox;
 class LLImageRaw;
 class LLLayoutPanel;
 
-class LLPreviewTexture : public LLPreview
+class LLPreviewTexture final : public LLPreview
 {
 public:
+    AL_VIEW_TYPE(LLPreviewTexture, LLPreview);
+
     LLPreviewTexture(const LLSD& key);
     ~LLPreviewTexture();
 

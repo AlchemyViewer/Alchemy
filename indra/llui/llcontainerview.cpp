@@ -36,12 +36,25 @@
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
+#include <utility>
+#include <vector>
+
 static LLDefaultChildRegistry::Register<LLContainerView> r1("container_view");
 
 #include "llpanel.h"
 #include "llstatview.h"
 static ContainerViewRegistry::Register<LLStatView> r2("stat_view");
 static ContainerViewRegistry::Register<LLPanel> r3("panel", &LLPanel::fromXML);
+
+// Padding above and below the label line. The row the label sits in is sized
+// from the live monospace metrics, the same way LLStatBar sizes its own rows,
+// so a taller face grows the reserve instead of clipping into it.
+const S32 CONTAINER_LABEL_VPAD = 4;
+
+static S32 label_row_height()
+{
+    return LLFontGL::getFontMonospace()->getLineHeight() + CONTAINER_LABEL_VPAD;
+}
 
 LLContainerView::LLContainerView(const LLContainerView::Params& p)
 :   LLView(p),
@@ -59,9 +72,37 @@ LLContainerView::~LLContainerView()
 
 bool LLContainerView::postBuild()
 {
+    // Parenting happens before postBuild, so the chain is there to look at.
+    // Only a container that is scrolled directly takes the scroll container:
+    // a section nested inside one would otherwise be told the whole window's
+    // height is its minimum, and every section would fill the window.
+    mScrollContainer = getParentAs<LLScrollContainer>();
+
     setDisplayChildren(mDisplayChildren);
     reshape(getRect().getWidth(), getRect().getHeight(), false);
     return true;
+}
+
+LLRect LLContainerView::getChildCullRectScreen()
+{
+    if (!mScrollContainer)
+    {
+        return LLRect::null;
+    }
+
+    // Everything scrolled out of the window is still on screen and still in the
+    // dirty region, so the general cull keeps all of it. It only stops being
+    // visible at the scissor, which is after each child has drawn itself.
+    //
+    // getContentWindowRect runs updateScroll, which can translate the scrolled
+    // view -- this one. It is only reached from that view's own drawChildren,
+    // which the container enters from its draw() right after running
+    // updateScroll itself, so the position is already settled and the second
+    // run translates by nothing. An empty rect culls nothing, which is the
+    // right answer for a window with no room in it.
+    LLRect visible;
+    mScrollContainer->localRectToScreen(mScrollContainer->getContentWindowRect(), &visible);
+    return visible;
 }
 
 bool LLContainerView::addChild(LLView* child, S32 tab_group)
@@ -88,7 +129,8 @@ bool LLContainerView::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (!handled)
     {
-        if( mShowLabel && (y >= getRect().getHeight() - 10) )
+        // The whole label row toggles the section, so the target matches what is drawn.
+        if( mShowLabel && (y >= getRect().getHeight() - label_row_height()) )
         {
             setDisplayChildren(!mDisplayChildren);
             reshape(getRect().getWidth(), getRect().getHeight(), false);
@@ -111,6 +153,8 @@ bool LLContainerView::handleMouseUp(S32 x, S32 y, MASK mask)
 
 void LLContainerView::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     {
         gGL.getTextureSlot(0)->unbind();
 
@@ -130,6 +174,8 @@ void LLContainerView::draw()
 
 void LLContainerView::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect scroller_rect;
     scroller_rect.setOriginAndSize(0, 0, width, height);
 
@@ -161,37 +207,50 @@ void LLContainerView::reshape(S32 width, S32 height, bool called_from_parent)
 
 void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Determine the sizes and locations of all contained views
     S32 total_height = 0;
-    S32 top, left, right, bottom;
-    //LLView *childp;
 
     // These will be used for the children
-    left = 10;
-    top = getRect().getHeight() - 4;
-    right = width - 2;
-    bottom = top;
+    const S32 left  = 10;
+    const S32 right = width - 2;
 
     // Leave some space for the top label/grab handle
     if (mShowLabel)
     {
-        total_height += 20;
+        total_height += label_row_height();
     }
+
+    // The rows and their heights are collected once and kept. Placing a row
+    // needs the total before it can put the first one down, so there are two
+    // walks either way -- but getRequiredRect recurses the whole subtree under
+    // each child, and asking twice walked all of it twice. Nothing moves in
+    // between: a row's required height follows from its own state, not from
+    // where this view then puts it.
+    //
+    // Carrying the views alongside their heights rather than re-filtering the
+    // child list is what keeps the second walk from having to agree with the
+    // first about which of them are visible.
+    std::vector<std::pair<LLView*, S32>> rows;
 
     if (mDisplayChildren)
     {
         // Determine total height
-        U32 child_height = 0;
+        S32 child_height = 0;
+        rows.reserve(getChildList()->size());
         for (child_list_const_iter_t child_iter = getChildList()->begin();
              child_iter != getChildList()->end(); ++child_iter)
         {
             LLView *childp = *child_iter;
+            // A hidden child is not drawn, so it does not reserve a row either.
             if (!childp->getVisible())
             {
-                LL_WARNS() << "Incorrect visibility!" << LL_ENDL;
+                continue;
             }
-            LLRect child_rect = childp->getRequiredRect();
-            child_height += child_rect.getHeight();
+            const S32 height_required = childp->getRequiredRect().getHeight();
+            rows.emplace_back(childp, height_required);
+            child_height += height_required;
             child_height += 2;
         }
         total_height += child_height;
@@ -213,29 +272,39 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
     my_rect.mRight = my_rect.mLeft + width;
     setRect(my_rect);
 
-    top = total_height;
+    S32 top = total_height;
     if (mShowLabel)
     {
-        top -= 20;
+        top -= label_row_height();
     }
 
-    bottom = top;
+    S32 bottom = top;
 
-    if (mDisplayChildren)
+    // Iterate through all rows, and put in container from top down.
+    for (const auto& [childp, height_required] : rows)
     {
-        // Iterate through all children, and put in container from top down.
-        for (child_list_const_iter_t child_iter = getChildList()->begin();
-             child_iter != getChildList()->end(); ++child_iter)
+        bottom -= height_required;
+        LLRect r(left, bottom + height_required, right, bottom);
+
+        // Whether the row needs relaying has to be asked before setRect, which
+        // applies the new size itself and would leave nothing to compare.
+        const bool resized = childp->getRect().getWidth()  != r.getWidth()
+                          || childp->getRect().getHeight() != r.getHeight();
+
+        childp->setRect(r);
+
+        // A row that only moved is already laid out: its contents sit in its
+        // own coordinates. LLView::reshape reaches the same conclusion from the
+        // deltas, but a row that is itself a container overrides it and
+        // re-arranges its whole subtree regardless -- so one section opening
+        // used to re-lay every other section in the floater, unchanged or not.
+        if (resized || LLView::sForceReshape)
         {
-            LLView *childp = *child_iter;
-            LLRect child_rect = childp->getRequiredRect();
-            bottom -= child_rect.getHeight();
-            LLRect r(left, bottom + child_rect.getHeight(), right, bottom);
-            childp->setRect(r);
-            childp->reshape(right - left, top - bottom);
-            top = bottom - 2;
-            bottom = top;
+            childp->reshape(r.getWidth(), r.getHeight());
         }
+
+        top = bottom - 2;
+        bottom = top;
     }
 
     if (!called_from_parent)
@@ -250,9 +319,10 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
 
 LLRect LLContainerView::getRequiredRect()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect req_rect;
-    //LLView *childp;
-    U32 total_height = 0;
+    S32 total_height = 0;
 
     // Determine the sizes and locations of all contained views
 
@@ -260,18 +330,23 @@ LLRect LLContainerView::getRequiredRect()
 
     if (mShowLabel)
     {
-        total_height = 20;
+        total_height = label_row_height();
     }
 
 
     if (mDisplayChildren)
     {
         // Determine total height
-        U32 child_height = 0;
+        S32 child_height = 0;
         for (child_list_const_iter_t child_iter = getChildList()->begin();
              child_iter != getChildList()->end(); ++child_iter)
         {
             LLView *childp = *child_iter;
+            // Matches arrange(): a hidden child reserves no row.
+            if (!childp->getVisible())
+            {
+                continue;
+            }
             LLRect child_rect = childp->getRequiredRect();
             child_height += child_rect.getHeight();
             child_height += 2;

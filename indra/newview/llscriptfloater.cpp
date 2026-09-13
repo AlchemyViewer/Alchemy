@@ -336,7 +336,7 @@ void LLScriptFloater::hideToastsIfNeeded()
     using namespace LLNotificationsUI;
 
     // find channel
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(LLChannelManager::getInstance()->findChannelByID(
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(LLChannelManager::getInstance()->findChannelByID(
         LLNotificationsUI::NOTIFICATION_CHANNEL_UUID));
     // update notification channel state
     if(channel)

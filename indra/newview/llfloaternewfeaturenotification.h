@@ -29,11 +29,13 @@
 
 #include "llfloater.h"
 
-class LLFloaterNewFeatureNotification:
+class LLFloaterNewFeatureNotification final:
     public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterNewFeatureNotification, LLFloater);
+
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
 

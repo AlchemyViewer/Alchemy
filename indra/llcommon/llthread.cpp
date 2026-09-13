@@ -277,7 +277,6 @@ void LLThread::tryRun()
     {
         LL_WARNS("THREAD") << "ContinueException on thread '" << mName <<
             "'. Error what is: '" << e.what() << "'" << LL_ENDL;
-        LLError::LLCallStacks::print();
 
         LOG_UNHANDLED_EXCEPTION("LLThread");
     }

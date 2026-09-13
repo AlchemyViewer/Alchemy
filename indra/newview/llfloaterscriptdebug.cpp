@@ -88,7 +88,7 @@ void LLFloaterScriptDebug::setVisible(bool visible)
         LLFloaterScriptDebugOutput* floater_output = LLFloaterReg::findTypedInstance<LLFloaterScriptDebugOutput>("script_debug_output", LLUUID::null);
         if (floater_output == NULL)
         {
-            floater_output = dynamic_cast<LLFloaterScriptDebugOutput*>(LLFloaterReg::showInstance("script_debug_output", LLUUID::null, false));
+            floater_output = LLFloaterReg::showTypedInstance<LLFloaterScriptDebugOutput>("script_debug_output", LLUUID::null, false);
             if (floater_output)
             {
                 addFloater(floater_output, false);

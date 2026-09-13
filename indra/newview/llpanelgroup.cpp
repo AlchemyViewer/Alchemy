@@ -241,14 +241,14 @@ void LLPanelGroup::reshape(S32 width, S32 height, bool called_from_parent )
 
 void LLPanelGroup::onBackBtnClick()
 {
-    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = getParentAs<ALFloaterGroupProfile>();
     if (parent)
     {
         parent->closeHostedFloater();
     }
     else
     {
-        LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* parent = getParentAs<LLSideTrayPanelContainer>();
         if (parent)
         {
             parent->openPreviousPanel();
@@ -336,7 +336,7 @@ void LLPanelGroup::update(LLGroupChange gc)
     if(gdatap)
     {
         {
-            ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
+            ALFloaterGroupProfile* parent = getParentAs<ALFloaterGroupProfile>();
             if (parent)
             {
                 parent->setGroupName(gdatap->mName);
@@ -524,7 +524,7 @@ bool LLPanelGroup::apply(LLPanelGroupTab* tab)
         //we skip refreshing group after ew manually apply changes since its very annoying
         //for those who are editing group
 
-        LLPanelGroupRoles * roles_tab = dynamic_cast<LLPanelGroupRoles*>(tab);
+        LLPanelGroupRoles * roles_tab = tab->as<LLPanelGroupRoles>();
         if (roles_tab)
         {
             LLGroupMgr* gmgrp = LLGroupMgr::getInstance();

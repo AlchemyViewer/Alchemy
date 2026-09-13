@@ -38,9 +38,11 @@ class LLMediaCtrl;
 class LLTextBox;
 class LLFloaterMediaSettings;
 
-class LLPanelMediaSettingsGeneral : public LLPanel
+class LLPanelMediaSettingsGeneral final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMediaSettingsGeneral, LLPanel);
+
     LLPanelMediaSettingsGeneral();
     ~LLPanelMediaSettingsGeneral();
 

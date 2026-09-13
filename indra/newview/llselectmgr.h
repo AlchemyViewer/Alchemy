@@ -440,6 +440,8 @@ private:
 class LLSelectMgr : public LLEditMenuHandler, public LLSimpleton<LLSelectMgr>
 {
 public:
+    LLView* asView() override { return nullptr; }
+
     static bool                 sRectSelectInclusive;   // do we need to surround an object to pick it?
     static bool                 sRenderHiddenSelections;    // do we show selection silhouettes that are occluded?
     static bool                 sRenderLightRadius; // do we show the radius of selected lights?

@@ -53,9 +53,11 @@ public:
     virtual bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) = 0;
 };
 
-class LLSetKeyBindDialog : public LLModalDialog
+class LLSetKeyBindDialog final : public LLModalDialog
 {
 public:
+    AL_VIEW_TYPE(LLSetKeyBindDialog, LLModalDialog);
+
     LLSetKeyBindDialog(const LLSD& key);
     ~LLSetKeyBindDialog();
 

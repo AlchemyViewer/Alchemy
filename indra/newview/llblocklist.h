@@ -42,10 +42,12 @@ enum BlockListActionType {NONE, ADD, REMOVE};
  * Each change in LLMuteList leads to rebuilding this list, so
  * it's always in actual state.
  */
-class LLBlockList: public LLFlatListViewEx, public LLMuteListObserver
+class LLBlockList final: public LLFlatListViewEx, public LLMuteListObserver
 {
     LOG_CLASS(LLBlockList);
 public:
+    AL_VIEW_TYPE(LLBlockList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Params(){};

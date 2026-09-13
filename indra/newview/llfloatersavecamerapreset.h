@@ -34,10 +34,12 @@ class LLComboBox;
 class LLRadioGroup;
 class LLLineEditor;
 
-class LLFloaterSaveCameraPreset : public LLModalDialog
+class LLFloaterSaveCameraPreset final : public LLModalDialog
 {
 
 public:
+    AL_VIEW_TYPE(LLFloaterSaveCameraPreset, LLModalDialog);
+
     LLFloaterSaveCameraPreset(const LLSD &key);
 
     bool postBuild() override;

@@ -377,7 +377,7 @@ void LLMediaCtrl::showContextMenu(S32 x, S32 y)
 
         // stinson 05/05/2014 : use this as the parent of the context menu if the static menu
         // container has yet to be created
-        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? dynamic_cast<LLPanel*>(LLMenuGL::sMenuContainer) : dynamic_cast<LLPanel*>(this);
+        LLPanel* menuParent = (LLMenuGL::sMenuContainer != NULL) ? static_cast<LLPanel*>(LLMenuGL::sMenuContainer) : this;
         llassert(menuParent != NULL);
         menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
             "menu_media_ctrl.xml", menuParent, LLViewerMenuHolderGL::child_registry_t::instance());
@@ -1467,7 +1467,7 @@ LLMediaCtrl* LLMediaCtrlListener::findMediaCtrl(const std::string& path)
     {
         return nullptr;
     }
-    return dynamic_cast<LLMediaCtrl*>(view);
+    return view->as<LLMediaCtrl>();
 }
 
 void LLMediaCtrlListener::getMediaInfo(const LLSD& request)

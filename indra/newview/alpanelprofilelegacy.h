@@ -51,6 +51,8 @@ class LLToggleableMenu;
 class ALPanelProfileLegacy final : public ALPanelProfileLegacyTab
 {
 public:
+    AL_VIEW_TYPE(ALPanelProfileLegacy, ALPanelProfileLegacyTab);
+
     ALPanelProfileLegacy();
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
@@ -129,6 +131,7 @@ public:
     {
         friend class ALPanelProfileLegacy;
     public:
+        AL_VIEW_TYPE(ALPanelProfilePicks, ALPanelProfileLegacyTab);
         ALPanelProfilePicks();
         ~ALPanelProfilePicks() override;
         bool postBuild() override;
@@ -197,6 +200,7 @@ public:
     {
         friend class ALPanelProfileLegacy;
     public:
+        AL_VIEW_TYPE(ALPanelProfileGroups, ALPanelProfileLegacyTab);
         ALPanelProfileGroups();
         bool postBuild() override;
 
@@ -216,6 +220,7 @@ public:
     class ALProfileGroupItem final : public LLPanel, public LLGroupMgrObserver
     {
       public:
+        AL_VIEW_TYPE(ALProfileGroupItem, LLPanel);
         ALProfileGroupItem();
         ~ALProfileGroupItem() override;
         static ALProfileGroupItem* create();

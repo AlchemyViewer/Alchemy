@@ -49,9 +49,10 @@ public:
 };
 typedef std::map<std::string, LLJointOverrideData> joint_override_data_map_t;
 
-class LLFloaterModelPreview : public LLFloaterModelUploadBase
+class LLFloaterModelPreview final : public LLFloaterModelUploadBase
 {
 public:
+    AL_VIEW_TYPE(LLFloaterModelPreview, LLFloaterModelUploadBase);
 
     class DecompRequest : public LLPhysicsDecomp::Request
     {

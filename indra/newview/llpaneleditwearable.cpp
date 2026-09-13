@@ -404,9 +404,10 @@ LLEditWearableDictionary::PickerControlEntry::PickerControlEntry(ETextureIndex t
 /**
  * Class to prevent hack in LLButton's constructor and use paddings declared in xml.
  */
-class LLLabledBackButton : public LLButton
+class LLLabledBackButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLLabledBackButton, LLButton);
         struct Params : public LLInitParam::Block<Params, LLButton::Params>
         {
                 Params() {}
@@ -985,7 +986,7 @@ void LLPanelEditWearable::onCommitSexChange()
 
 void LLPanelEditWearable::onTexturePickerCommit(const LLUICtrl* ctrl)
 {
-        const LLTextureCtrl* texture_ctrl = dynamic_cast<const LLTextureCtrl*>(ctrl);
+        const LLTextureCtrl* texture_ctrl = ALViewType::as<LLTextureCtrl>(ctrl);
         if (!texture_ctrl)
         {
                 LL_WARNS() << "got commit signal from not LLTextureCtrl." << LL_ENDL;

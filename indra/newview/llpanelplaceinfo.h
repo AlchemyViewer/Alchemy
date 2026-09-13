@@ -48,6 +48,8 @@ class LLViewerInventoryCategory;
 class LLPanelPlaceInfo : public LLPanel, LLRemoteParcelInfoObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelPlaceInfo, LLPanel);
+
     enum EInfoType
     {
         UNKNOWN,

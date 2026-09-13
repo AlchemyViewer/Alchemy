@@ -34,8 +34,11 @@ class LLTextureBar;
 class LLGLTexMemBar;
 class LLAvatarTexBar;
 
-class LLTextureView : public LLContainerView
+class LLTextureView final : public LLContainerView
 {
+public:
+    AL_VIEW_TYPE(LLTextureView, LLContainerView);
+private:
     friend class LLTextureBar;
     friend class LLGLTexMemBar;
     friend class LLAvatarTexBar;

@@ -32,6 +32,8 @@
 #include "lltextbox.h"      // Params
 #include "lllocationhistory.h"
 #include "llpathfindingnavmesh.h"
+#include "llfonttextcache.h"
+#include "alparceliconstrip.h"
 
 class LLLandmark;
 
@@ -42,13 +44,14 @@ class LLParcelChangeObserver;
 class LLMenuGL;
 class LLTeleportHistoryItem;
 class LLPathfindingNavMeshStatus;
+class LLViewerRegion;
 
 /**
  * Location input control.
  *
  * @see LLNavigationBar
  */
-class LLLocationInputCtrl
+class LLLocationInputCtrl final
 :   public LLComboBox
 {
     LOG_CLASS(LLLocationInputCtrl);
@@ -57,6 +60,8 @@ class LLLocationInputCtrl
     friend class LLParcelChangeObserver;
 
 public:
+    AL_VIEW_TYPE(LLLocationInputCtrl, LLComboBox);
+
     struct Params
     :   public LLInitParam::Block<Params, LLComboBox::Params>
     {
@@ -109,27 +114,13 @@ public:
     LLLineEditor*           getTextEntry() const { return mTextEntry; }
     void                    handleLoginComplete();
 
-    bool isNavMeshDirty() { return mIsNavMeshDirty; }
+    bool isNavMeshDirty() const { return mParcelIcons.isNavMeshDirty(); }
 
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
     void                    refresh();
 // [/RLVa:KB]
 
 private:
-
-    enum EParcelIcon
-    {
-        VOICE_ICON = 0,
-        FLY_ICON,                 // 1
-        PUSH_ICON,                // 2
-        BUILD_ICON,               // 3
-        SCRIPTS_ICON,             // 4
-        DAMAGE_ICON,              // 5
-        SEE_AVATARS_ICON,         // 6
-        PATHFINDING_DIRTY_ICON,   // 7
-        PATHFINDING_DISABLED_ICON,// 8
-        ICON_COUNT                // 9 total
-    };
 
     friend class LLUICtrlFactory;
     LLLocationInputCtrl(const Params&);
@@ -144,15 +135,17 @@ private:
 //  void                    refresh();
     void                    refreshLocation();
     void                    refreshParcelIcons();
-    // Refresh the value in the health percentage text field
-    void                    refreshHealth();
-    void                    refreshMaturityButton();
+    // Split, because the two halves have nothing in common but the widget.
+    // Which rating to show is a property of the region and changes when the
+    // region does; where the icon sits depends only on how wide the text
+    // turned out, and so belongs behind the same gate as the text.
+    void                    updateMaturityButtonImage();
     void                    positionMaturityButton();
 
     void                    addLocationHistoryEntry(const std::string& title, const LLSD& value);
     void                    rebuildLocationHistory(const std::string& filter = LLStringUtil::null);
     bool                    findTeleportItemsByTitle(const LLTeleportHistoryItem& item, const std::string& filter);
-    void                    setText(const LLStringExplicit& text);
+    void                    setText(ALStringViewExplicit text);
     void                    updateAddLandmarkButton();
     void                    updateAddLandmarkTooltip();
     void                    updateContextMenu();
@@ -168,12 +161,15 @@ private:
     void                    onAddLandmarkButtonClicked();
     void                    onAgentParcelChange();
     void                    onRegionBoundaryCrossed();
+    void                    onRegionInfoChanged(LLViewerRegion* regionp);
     void                    onNavMeshStatusChange(const LLPathfindingNavMeshStatus &pNavMeshStatus);
     // callbacks
     bool                    onLocationContextMenuItemEnabled(const LLSD& userdata);
     void                    onLocationContextMenuItemClicked(const LLSD& userdata);
     void                    callbackRebakeRegion(const LLSD& notification, const LLSD& response);
-    void                    onParcelIconClick(EParcelIcon icon);
+    // Only the pathfinding pair: rebaking needs a notification callback bound
+    // to this control, so the strip leaves these two to their owner.
+    void                    onPathfindingIconClick(ALParcelIconStrip::EIcon icon);
 
     void                    createNavMeshStatusListenerForCurrentRegion();
 
@@ -185,8 +181,7 @@ private:
     S32                     mAddLandmarkHPad;   // pad to left of landmark star
 
     LLButton*   mMaturityButton;
-    LLIconCtrl* mParcelIcon[ICON_COUNT];
-    LLTextBox* mDamageText;
+    ALParcelIconStrip mParcelIcons;
 
     LLAddLandmarkObserver*      mAddLandmarkObserver;
     LLRemoveLandmarkObserver*   mRemoveLandmarkObserver;
@@ -197,8 +192,9 @@ private:
     boost::signals2::connection mParcelMgrConnection;
     boost::signals2::connection mLocationHistoryConnection;
     boost::signals2::connection mRegionCrossingSlot;
+    boost::signals2::connection mRegionInfoConnection;
+    boost::signals2::connection mHealthConnection;
     LLPathfindingNavMesh::navmesh_slot_t mNavMeshSlot;
-    bool mIsNavMeshDirty = false;
     LLUIImage* mLandmarkImageOn;
     LLUIImage* mLandmarkImageOff;
     LLPointer<LLUIImage> mIconMaturityGeneral;
@@ -213,7 +209,34 @@ private:
     bool isHumanReadableLocationVisible = false;
     std::string mMaturityHelpTopic;
 
-    U8 mLastSimAccess = 0;
+    // Not SIM_ACCESS_MIN, which is a value a region can actually report: the
+    // first update has to run, and it is skipped when this already matches.
+    U8 mLastSimAccess = 255;
+    // Whether this sim access has a rating icon at all, kept apart from the
+    // button's visibility because positionMaturityButton hides the button when
+    // the text leaves no room for it. Conflating the two is how the icon used
+    // to stay hidden after the field was widened again.
+    bool mMaturityRatingShown = false;
+
+    // The rounded position baked into the text on screen. draw() compares the
+    // agent's current one against this to decide whether the readout can have
+    // moved; S32_MIN cannot be a real coordinate, so the first draw always
+    // builds.
+    S32 mDisplayPosX = S32_MIN;
+    S32 mDisplayPosY = S32_MIN;
+    S32 mDisplayPosZ = S32_MIN;
+
+    // Reused rather than declared per call, so a readout that rebuilds twice a
+    // second stops asking the allocator for the same string every time.
+    std::string mLocationScratch;
+
+    // Where the maturity icon sits depends on how wide the location text
+    // came out, and extracting that from a font shapes the whole string. The
+    // window and the navigation bar's own splitter both reshape this control
+    // on every frame of a drag, asking the same question of the same text
+    // each time.
+    LLFontTextCache mMaturityWidthCache;
+
 };
 
 #endif

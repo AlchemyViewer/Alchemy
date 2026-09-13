@@ -40,10 +40,13 @@ class LLScrollListItem;
 class LLSpinCtrl;
 class LLTextBox;
 
-class FloaterAO
+class FloaterAO final
 :   public LLTransientDockableFloater,
     public LLEventTimer
 {
+public:
+    AL_VIEW_TYPE(FloaterAO, LLTransientDockableFloater);
+private:
     friend class LLFloaterReg;
 
     private:

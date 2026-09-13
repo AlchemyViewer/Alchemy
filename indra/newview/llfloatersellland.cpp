@@ -56,6 +56,8 @@ class LLFloaterSellLandUI final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSellLandUI, LLFloater);
+
     LLFloaterSellLandUI(const LLSD& key);
     virtual ~LLFloaterSellLandUI();
     /*virtual*/ void onClose(bool app_quitting);

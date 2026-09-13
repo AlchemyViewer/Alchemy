@@ -950,7 +950,7 @@ void LLFloaterChangeItemThumbnail::showTexturePicker(const LLUUID &thumbnail_id)
 
         mPickerHandle = floaterp->getHandle();
 
-        LLFloaterTexturePicker* texture_floaterp = dynamic_cast<LLFloaterTexturePicker*>(floaterp);
+        LLFloaterTexturePicker* texture_floaterp = floaterp->as<LLFloaterTexturePicker>();
         if (texture_floaterp)
         {
             //texture_floaterp->setTextureSelectedCallback();

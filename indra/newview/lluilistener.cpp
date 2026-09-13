@@ -93,7 +93,7 @@ void LLUIListener::getValue(const LLSD&event) const
 
     const LLView* root = LLUI::getInstance()->getRootView();
     const LLView* view = LLUI::getInstance()->resolvePath(root, event["path"].asString());
-    const LLUICtrl* ctrl(dynamic_cast<const LLUICtrl*>(view));
+    const LLUICtrl* ctrl(view ? view->as<LLUICtrl>() : nullptr);
 
     if (ctrl)
     {
@@ -111,7 +111,7 @@ void LLUIListener::setSelectedByValue(const LLSD& event) const
 {
     Response response(LLSD(), event);
     std::string path(event["path"]);
-    LLComboBox* combo_ctrl = dynamic_cast<LLComboBox*>(LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path));
+    LLComboBox* combo_ctrl = ALViewType::as<LLComboBox>(LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), path));
     if (combo_ctrl)
     {
         response.setResponse(combo_ctrl->setSelectedByValue(event["value"], true));

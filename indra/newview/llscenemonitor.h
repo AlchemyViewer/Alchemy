@@ -107,9 +107,11 @@ private:
     LLTrace::Recording                      mMonitorRecording;
 };
 
-class LLSceneMonitorView : public LLFloater
+class LLSceneMonitorView final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLSceneMonitorView, LLFloater);
+
     LLSceneMonitorView(const LLRect& rect);
     ~LLSceneMonitorView();
     virtual void draw();

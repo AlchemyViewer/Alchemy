@@ -32,9 +32,11 @@
 //
 // Classes
 //
-class LLViewerTextEditor : public LLTextEditor
+class LLViewerTextEditor final : public LLTextEditor
 {
 public:
+    AL_VIEW_TYPE(LLViewerTextEditor, LLTextEditor);
+
     struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
     {};
 

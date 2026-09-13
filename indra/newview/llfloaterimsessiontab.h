@@ -56,6 +56,8 @@ class LLFloaterIMSessionTab
 // [/RLVa:KB]
 
 public:
+    AL_VIEW_TYPE(LLFloaterIMSessionTab, LLTransientDockableFloater);
+
     LOG_CLASS(LLFloaterIMSessionTab);
 
     LLFloaterIMSessionTab(const LLSD& session_id);

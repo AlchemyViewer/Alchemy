@@ -40,9 +40,10 @@ class LLToggleableMenu;
 class LLComboBox;
 class LLViewerMediaImpl;
 
-class LLPanelNearByMedia : public LLPanelPulldown
+class LLPanelNearByMedia final : public LLPanelPulldown
 {
 public:
+    AL_VIEW_TYPE(LLPanelNearByMedia, LLPanelPulldown);
 
     bool postBuild() override;
     void draw() override;

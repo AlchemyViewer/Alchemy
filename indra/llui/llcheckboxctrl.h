@@ -50,6 +50,7 @@ class LLCheckBoxCtrl
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLCheckBoxCtrl, LLUICtrl);
 
     enum EWordWrap
     {
@@ -79,6 +80,7 @@ public:
     };
 
     virtual ~LLCheckBoxCtrl();
+
 
 protected:
     LLCheckBoxCtrl(const Params&);

@@ -48,9 +48,11 @@ class LLPermissions;
 class LLTextBox;
 class LLTextEditor;
 
-class LLSidepanelItemInfo : public LLPanel, public LLInventoryObserver
+class LLSidepanelItemInfo final : public LLPanel, public LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelItemInfo, LLPanel);
+
     LLSidepanelItemInfo(const LLPanel::Params& p = getDefaultParams());
     virtual ~LLSidepanelItemInfo();
 

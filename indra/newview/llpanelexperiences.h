@@ -34,10 +34,12 @@ class LLExperienceItem;
 class LLPanelProfile;
 
 
-class LLPanelSearchExperiences
+class LLPanelSearchExperiences final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelSearchExperiences, LLPanel);
+
     LLPanelSearchExperiences(){}
     static LLPanelSearchExperiences* create(const std::string& name);
     /*virtual*/ bool postBuild(void);
@@ -45,10 +47,12 @@ public:
     void doSearch();
 };
 
-class LLPanelExperiences
+class LLPanelExperiences final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperiences, LLPanel);
+
     LLPanelExperiences();
 
     static LLPanelExperiences* create(const std::string& name);
@@ -83,10 +87,12 @@ public:
     virtual bool compare(const LLPanel* item1, const LLPanel* item2) const;
 };
 
-class LLExperienceItem
+class LLExperienceItem final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLExperienceItem, LLPanel);
+
     LLExperienceItem();
     ~LLExperienceItem();
 

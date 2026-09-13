@@ -151,9 +151,6 @@ size_t BufferArray::append(const void * src, size_t len)
         {
             LLMemory::logMemoryInfo(true);
 
-            //output possible call stacks to log file.
-            LLError::LLCallStacks::print();
-
             LL_WARNS() << "Bad memory allocation in thrown by Block::alloc in read!" << LL_ENDL;
             break;
         }

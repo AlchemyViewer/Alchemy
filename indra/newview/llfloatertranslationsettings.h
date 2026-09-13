@@ -35,9 +35,11 @@ class LLComboBox;
 class LLLineEditor;
 class LLRadioGroup;
 
-class LLFloaterTranslationSettings : public LLFloater
+class LLFloaterTranslationSettings final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTranslationSettings, LLFloater);
+
     LLFloaterTranslationSettings(const LLSD& key);
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

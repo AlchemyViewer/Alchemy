@@ -33,9 +33,11 @@
 
 #include "alpanelsearchbase.h"
 
-class ALPanelSearchLandSales : public ALPanelSearch
+class ALPanelSearchLandSales final : public ALPanelSearch
 {
 public:
+    AL_VIEW_TYPE(ALPanelSearchLandSales, ALPanelSearch);
+
     ALPanelSearchLandSales();
     bool postBuild() override;
 

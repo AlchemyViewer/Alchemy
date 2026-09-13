@@ -39,12 +39,13 @@
 #include <boost/signals2.hpp>
 
 #include <bit>
-#include <chrono>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
 
 extern const LLColor4 UI_VERTEX_COLOR;
+
+namespace ll_test { struct UIImageProbe; }
 
 class LLUIImage : public LLRefCount
 {
@@ -125,22 +126,21 @@ public:
     static void enableDisplayListsCollection(bool enable) { sEnableDisplayListsCollection = enable; }
 
 protected:
-    // Packed key for identifying unique display list configurations
+    // What a recording depends on. Position is deliberately not part of it: the
+    // geometry is recorded at the origin and placed through the modelview when it
+    // is drawn, so one recording serves an image wherever it appears. A floater
+    // being dragged replays every frame instead of rebuilding every image in it.
     struct PackedKey
     {
-        uint64_t position;    // x and y coordinates (32 bits each)
         uint64_t color_flags; // RGBA color (8 bits each) + solid_color flag (1 bit)
         uint64_t dimensions;  // width and height (32 bits each)
-        uint64_t translate;   // UI translation (32 bits each for X and Y)
         uint64_t scale;       // UI scale (32 bits each for X and Y)
         uint64_t tex_name;    // OpenGL texture name (32 bits) + padding
 
         constexpr bool operator==(const PackedKey& other) const
         {
-            return position == other.position &&
-                color_flags == other.color_flags &&
+            return color_flags == other.color_flags &&
                 dimensions == other.dimensions &&
-                translate == other.translate &&
                 scale == other.scale &&
                 tex_name == other.tex_name;
         }
@@ -149,16 +149,21 @@ protected:
         {
             std::size_t operator()(const PackedKey& key) const
             {
-                return static_cast<std::size_t>(key.position ^ key.color_flags ^
-                                               key.dimensions ^ key.translate ^
-                                               key.scale ^ key.tex_name);
+                // Mixed rather than xored: the fields are small integers in the
+                // same bit positions, and xor alone folds them onto each other.
+                uint64_t h = key.color_flags;
+                for (uint64_t field : { key.dimensions, key.scale, key.tex_name })
+                {
+                    h = (h ^ field) * 0x9E3779B97F4A7C15ull;
+                    h ^= h >> 29;
+                }
+                return static_cast<std::size_t>(h);
             }
         };
 
-        // Static factory function to create PackedKey from parameters
-        static constexpr PackedKey create(S32 x, S32 y, S32 width, S32 height,
+        static constexpr PackedKey create(S32 width, S32 height,
                                          const LLColor4& color, bool solid_color,
-                                         const LLVector3& translate, const LLVector3& scale,
+                                         const LLVector3& scale,
                                          LLGLuint texture_name)
         {
             auto float_to_u8 = [](F32 f) -> uint8_t {
@@ -174,9 +179,6 @@ protected:
             uint8_t b = float_to_u8(color.mV[VBLUE]);
             uint8_t a = float_to_u8(color.mV[VALPHA]);
 
-            uint64_t pos = (static_cast<uint64_t>(static_cast<uint32_t>(x)) << 32) |
-                static_cast<uint64_t>(static_cast<uint32_t>(y));
-
             uint64_t col = (static_cast<uint64_t>(r) << 56) |
                 (static_cast<uint64_t>(g) << 48) |
                 (static_cast<uint64_t>(b) << 40) |
@@ -186,16 +188,13 @@ protected:
             uint64_t dim = (static_cast<uint64_t>(static_cast<uint32_t>(width)) << 32) |
                 static_cast<uint64_t>(static_cast<uint32_t>(height));
 
-            uint64_t trns = (static_cast<uint64_t>(float_to_bits(translate.mV[VX])) << 32) |
-                static_cast<uint64_t>(float_to_bits(translate.mV[VY]));
-
             uint64_t scl = (static_cast<uint64_t>(float_to_bits(scale.mV[VX])) << 32) |
                 static_cast<uint64_t>(float_to_bits(scale.mV[VY]));
 
             // Store full 32-bit texture name in lower 32 bits (upper 32 bits unused/zero)
             uint64_t tex = static_cast<uint64_t>(texture_name);
 
-            return PackedKey{ pos, col, dim, trns, scl, tex };
+            return PackedKey{ col, dim, scl, tex };
         }
     };
 
@@ -203,13 +202,15 @@ protected:
     struct CachedDisplayList
     {
         buffer_data_list_t list;
-        std::chrono::steady_clock::time_point last_used;
+        F64 last_used; // LLFrameTimer::getTotalSeconds() at the last draw
     };
 
-    // Get a display list for the given configuration
-    buffer_data_list_t* findDisplayList(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
-    // Generate a new display list for the given configuration, draws immediately.
-    buffer_data_list_t* genDisplayList(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
+    // The cached path of draw(): replays the recording for this configuration, or
+    // makes one. Either way the image lands at (x, y) under the current UI transform.
+    void drawCached(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
+    static void replayDisplayList(buffer_data_list_t& list, const LLColor4& color, bool solid_color);
+    // Records the draw for this configuration, drawing it as it goes.
+    void recordDisplayList(const PackedKey& key, S32 width, S32 height, const LLColor4& color, bool solid_color) const;
 
     // Invalidate all cached display lists (called when image properties change)
     void invalidateDisplayLists();
@@ -235,6 +236,8 @@ protected:
     static std::vector<LLPointer<LLUIImage> > sImageList;
     static size_t sCleanupIndex;  // Round-robin cleanup position
     static bool sEnableDisplayListsCollection;
+
+    friend struct ll_test::UIImageProbe;
 };
 
 #include "lluiimage.inl"

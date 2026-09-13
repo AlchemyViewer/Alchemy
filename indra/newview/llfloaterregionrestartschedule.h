@@ -33,9 +33,11 @@
 class LLLineEditor;
 class LLButton;
 
-class LLFloaterRegionRestartSchedule : public LLFloater
+class LLFloaterRegionRestartSchedule final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterRegionRestartSchedule, LLFloater);
+
     LLFloaterRegionRestartSchedule(LLView* owner);
 
     virtual ~LLFloaterRegionRestartSchedule();

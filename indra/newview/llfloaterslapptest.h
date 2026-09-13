@@ -28,9 +28,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterSLappTest:
+class LLFloaterSLappTest final:
     public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterSLappTest, LLFloater);
+private:
     friend class LLFloaterReg;
     virtual bool postBuild() override;
 

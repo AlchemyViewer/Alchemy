@@ -61,6 +61,8 @@ class LLInventoryPanel : public LLPanel
     // Data
     //--------------------------------------------------------------------
 public:
+    AL_VIEW_TYPE(LLInventoryPanel, LLPanel);
+
     struct Filter : public LLInitParam::Block<Filter>
     {
         Optional<U32>           sort_order;
@@ -417,9 +419,11 @@ protected:
 };
 
 
-class LLInventorySingleFolderPanel : public LLInventoryPanel
+class LLInventorySingleFolderPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventorySingleFolderPanel, LLInventoryPanel);
+
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -476,6 +480,8 @@ protected:
 class LLAssetFilteredInventoryPanel : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLAssetFilteredInventoryPanel, LLInventoryPanel);
+
     struct Params
         : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {

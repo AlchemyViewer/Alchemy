@@ -158,7 +158,7 @@ void LLFolderViewModelItemInventory::addChild(LLFolderViewModelItem* child)
 void LLFolderViewModelItemInventory::requestSort()
 {
     LLFolderViewModelItemCommon::requestSort();
-    LLFolderViewFolder* folderp = dynamic_cast<LLFolderViewFolder*>(mFolderViewItem);
+    LLFolderViewFolder* folderp = ALViewType::as<LLFolderViewFolder>(mFolderViewItem);
     if (folderp)
     {
         folderp->requestArrange();

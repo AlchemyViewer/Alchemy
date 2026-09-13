@@ -44,9 +44,10 @@
  * and appropriate block list item will be created depending on
  * LLMute type (LLMute::EType) and other LLMute's info
  */
-class LLBlockedListItem : public LLPanel
+class LLBlockedListItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLBlockedListItem, LLPanel);
 
     LLBlockedListItem(const LLMute* item);
     virtual bool postBuild();

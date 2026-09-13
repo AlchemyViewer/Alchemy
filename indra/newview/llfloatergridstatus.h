@@ -35,10 +35,12 @@
 class LLMediaCtrl;
 
 
-class LLFloaterGridStatus :
+class LLFloaterGridStatus final :
     public LLFloaterWebContent
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGridStatus, LLFloaterWebContent);
+
     typedef LLSDParamAdapter<_Params> Params;
 
     LLFloaterGridStatus(const Params& key);

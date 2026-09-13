@@ -31,9 +31,11 @@
 #include "llfloater.h"
 #include "lluuid.h"
 
-class LLFloaterGroupBulkBan : public LLFloater
+class LLFloaterGroupBulkBan final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGroupBulkBan, LLFloater);
+
     virtual ~LLFloaterGroupBulkBan();
 
     static void showForGroup(const LLUUID& group_id, uuid_vec_t* agent_ids = NULL);

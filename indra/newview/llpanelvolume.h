@@ -45,9 +45,11 @@ class LLColorSwatchCtrl;
 class LLTextureCtrl;
 class LLVOVolume;
 
-class LLPanelVolume : public LLPanel
+class LLPanelVolume final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelVolume, LLPanel);
+
     LLPanelVolume();
     virtual ~LLPanelVolume();
 

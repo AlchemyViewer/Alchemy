@@ -65,11 +65,12 @@ class LLViewerObject;
 
 // Object Inspector, a small information window used when clicking
 // in the ambient inspector widget for objects in the 3D world.
-class LLInspectObject : public LLInspect
+class LLInspectObject final : public LLInspect
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLInspectObject, LLInspect);
     // object_id - Root object ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLInspectObject(const LLSD& object_id);

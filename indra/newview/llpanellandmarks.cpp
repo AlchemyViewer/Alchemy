@@ -440,7 +440,7 @@ void LLLandmarksPanel::initLandmarksPanel(LLPlacesInventoryPanel* inventory_list
     bool sorting_order = gSavedSettings.getBOOL("LandmarksSortedByDate");
     updateSortOrder(inventory_list, sorting_order);
 
-    LLPlacesFolderView* root_folder = dynamic_cast<LLPlacesFolderView*>(inventory_list->getRootFolder());
+    LLPlacesFolderView* root_folder = ALViewType::as<LLPlacesFolderView>(inventory_list->getRootFolder());
     if (root_folder)
     {
         if (mGearFolderMenu)
@@ -1122,7 +1122,7 @@ void LLLandmarksPanel::doProcessParcelInfo(LLLandmark* landmark,
     data.snapshot_id = parcel_data.snapshot_id;
     data.parcel_id = parcel_data.parcel_id;
 
-    LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgentID)));
+    LLFloaterProfile* profile_floater = LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgentID));
     if (profile_floater)
     {
         profile_floater->createPick(data);

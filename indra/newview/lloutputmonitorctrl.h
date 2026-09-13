@@ -40,10 +40,12 @@ class LLUICtrlFactory;
 // Classes
 //
 
-class LLOutputMonitorCtrl
+class LLOutputMonitorCtrl final
 : public LLView, public LLSpeakingIndicator, LLMuteListObserver
 {
 public:
+    AL_VIEW_TYPE(LLOutputMonitorCtrl, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<bool>  draw_border;

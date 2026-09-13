@@ -58,9 +58,10 @@ static const U32 ADD_LIMIT = 50;
 
 static const std::string COLLAPSED_BY_USER = "collapsed_by_user";
 
-class LLTeleportHistoryFlatItem : public LLPanel
+class LLTeleportHistoryFlatItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryFlatItem, LLPanel);
     LLTeleportHistoryFlatItem(S32 index, LLToggleableMenu *menu, const std::string &region_name,
                                              LLDate date, const std::string &hl);
     virtual ~LLTeleportHistoryFlatItem();
@@ -173,10 +174,13 @@ S32 LLTeleportHistoryFlatItem::notify(const LLSD& info)
 {
     if(info.has("detach"))
     {
-        delete mMouseDownSignal;
-        mMouseDownSignal = NULL;
-        delete mRightMouseDownSignal;
-        mRightMouseDownSignal = NULL;
+        if (mRareSignals)
+        {
+            delete mRareSignals->mMouseDown;
+            mRareSignals->mMouseDown = nullptr;
+            delete mRareSignals->mRightMouseDown;
+            mRareSignals->mRightMouseDown = nullptr;
+        }
         return 1;
     }
     return 0;
@@ -437,9 +441,8 @@ bool LLTeleportHistoryPanel::postBuild()
     {
         for (child_list_const_iter_t iter = mHistoryAccordion->beginChild(); iter != mHistoryAccordion->endChild(); iter++)
         {
-            if (dynamic_cast<LLAccordionCtrlTab*>(*iter))
+            if (LLAccordionCtrlTab* tab = (*iter)->as<LLAccordionCtrlTab>())
             {
-                LLAccordionCtrlTab* tab = (LLAccordionCtrlTab*)*iter;
                 tab->setRightMouseDownCallback(boost::bind(&LLTeleportHistoryPanel::onAccordionTabRightClick, this, _1, _2, _3, _4));
                 tab->setDisplayChildren(false);
                 tab->setDropDownStateChangedCallback(boost::bind(&LLTeleportHistoryPanel::onAccordionExpand, this, _1, _2));
@@ -507,7 +510,7 @@ void LLTeleportHistoryPanel::onShowOnMap()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 
     if(!itemp)
         return;
@@ -527,7 +530,7 @@ void LLTeleportHistoryPanel::onShowProfile()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 
     if(!itemp)
         return;
@@ -541,7 +544,7 @@ void LLTeleportHistoryPanel::onTeleport()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
     if(!itemp)
         return;
 
@@ -895,7 +898,7 @@ void LLTeleportHistoryPanel::showTeleportHistory()
 void LLTeleportHistoryPanel::handleItemSelect(LLFlatListView* selected)
 {
     mLastSelectedFlatlList = selected;
-    LLTeleportHistoryFlatItem* item = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* item = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
     if (item)
         mLastSelectedItemIndex = item->getIndex();
 
@@ -1005,9 +1008,9 @@ LLFlatListView* LLTeleportHistoryPanel::getFlatListViewFromTab(LLAccordionCtrlTa
 {
     for (child_list_const_iter_t iter = tab->beginChild(); iter != tab->endChild(); iter++)
     {
-        if (dynamic_cast<LLFlatListView*>(*iter))
+        if (LLFlatListView* list = (*iter)->as<LLFlatListView>())
         {
-            return (LLFlatListView*)*iter; // There should be one scroll list per tab.
+            return list; // There should be one scroll list per tab.
         }
     }
 
@@ -1062,7 +1065,7 @@ void LLTeleportHistoryPanel::onGearMenuAction(const LLSD& userdata)
     S32 index = -1;
     if (mLastSelectedFlatlList)
     {
-        LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+        LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
         if (itemp)
         {
             index = itemp->getIndex();
@@ -1154,7 +1157,7 @@ bool LLTeleportHistoryPanel::isActionEnabled(const LLSD& userdata) const
         {
             return false;
         }
-        LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+        LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 // [RLVa:KB]
         if ("teleport" == command_name)
         {

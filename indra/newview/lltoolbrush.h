@@ -47,6 +47,7 @@ class LLToolBrushLand : public LLTool, public LLEditMenuHandler, public LLSingle
     typedef std::set<LLViewerRegion*> region_list_t;
 
 public:
+    LLView* asView() override { return nullptr; }
 
     // x,y in window coords, 0,0 = left,bot
     virtual bool handleMouseDown( S32 x, S32 y, MASK mask ) override;

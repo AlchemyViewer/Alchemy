@@ -35,17 +35,21 @@
  * if text doesn't fit into text box. After pressing "More" the text box will expand to show
  * all text. If text is still too big, a scroll bar will appear inside expanded text box.
  */
-class LLExpandableTextBox : public LLUICtrl
+class LLExpandableTextBox final : public LLUICtrl
 {
+public:
+    AL_VIEW_TYPE(LLExpandableTextBox, LLUICtrl);
+private:
 protected:
 
     /**
      * Extended text box. "More" link will appear at end of text if
      * text is too long to fit into text box size.
      */
-    class LLTextBoxEx : public LLTextEditor
+    class LLTextBoxEx final : public LLTextEditor
     {
     public:
+        AL_VIEW_TYPE(LLTextBoxEx, LLTextEditor);
         struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
         {
             Params();
@@ -53,7 +57,7 @@ protected:
 
         // adds or removes "More" link as needed
         /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-        /*virtual*/ void setText(const LLStringExplicit& text, const LLStyle::Params& input_params = LLStyle::Params());
+        void setText(ALStringViewExplicit text, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
         void setTextBase(const std::string& text) { LLTextBase::setText(text); }
 
         /**

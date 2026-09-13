@@ -59,7 +59,7 @@ static LLDefaultChildRegistry::Register<LLSnapshotFloaterView> r("snapshot_float
 LLPanelSnapshot* LLFloaterSnapshot::Impl::getActivePanel(LLFloaterSnapshotBase* floater, bool ok_if_not_found)
 {
     LLSideTrayPanelContainer* panel_container = floater->getChild<LLSideTrayPanelContainer>("panel_container");
-    LLPanelSnapshot* active_panel = dynamic_cast<LLPanelSnapshot*>(panel_container->getCurrentPanel());
+    LLPanelSnapshot* active_panel = ALViewType::as<LLPanelSnapshot>(panel_container->getCurrentPanel());
 
     if (!ok_if_not_found)
     {

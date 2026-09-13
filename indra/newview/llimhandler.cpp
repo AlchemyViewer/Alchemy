@@ -103,7 +103,7 @@ bool LLIMHandler::processNotification(const LLNotificationPtr& notification, boo
         p.notification = notification;
         p.panel = im_box;
         p.can_be_stored = false;
-        LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+        LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
         if(channel)
             channel->addToast(p);
     }

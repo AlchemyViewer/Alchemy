@@ -30,10 +30,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterPreviewTrash
+class LLFloaterPreviewTrash final
 : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreviewTrash, LLFloater);
+
     static void show();
     static bool isVisible();
 

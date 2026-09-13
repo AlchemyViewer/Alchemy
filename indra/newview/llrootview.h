@@ -36,9 +36,11 @@ class LLRootViewRegistry : public LLChildRegistry<LLRootViewRegistry>
     LLSINGLETON(LLRootViewRegistry);
 };
 
-class LLRootView : public LLView
+class LLRootView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLRootView, LLView);
+
     typedef LLRootViewRegistry child_registry_t;
 
     LLRootView(const Params& p)

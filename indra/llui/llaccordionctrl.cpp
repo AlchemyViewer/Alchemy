@@ -128,7 +128,7 @@ bool LLAccordionCtrl::postBuild()
     std::vector<LLAccordionCtrlTab*> accordion_tabs;
     for(LLView* viewp : *getChildList())
     {
-        LLAccordionCtrlTab* accordion_tab = dynamic_cast<LLAccordionCtrlTab*>(viewp);
+        LLAccordionCtrlTab* accordion_tab = viewp->as<LLAccordionCtrlTab>();
         if (accordion_tab == NULL)
             continue;
         if (std::find(mAccordionTabs.begin(), mAccordionTabs.end(), accordion_tab) == mAccordionTabs.end())
@@ -682,7 +682,8 @@ void LLAccordionCtrl::onOpen(const LLSD& key)
 {
     for (LLAccordionCtrlTab* accordion_tab : mAccordionTabs)
     {
-        LLPanel* panel = dynamic_cast<LLPanel*>(accordion_tab->getAccordionView());
+        LLView* viewp = accordion_tab->getAccordionView();
+        LLPanel* panel = viewp ? viewp->as<LLPanel>() : nullptr;
         if (panel != NULL)
         {
             panel->onOpen(key);

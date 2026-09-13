@@ -39,9 +39,11 @@ class LLVisualParamHint;
 class LLViewerVisualParam;
 class LLJoint;
 
-class LLScrollingPanelParam : public LLScrollingPanelParamBase
+class LLScrollingPanelParam final : public LLScrollingPanelParamBase
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanelParam, LLScrollingPanelParamBase);
+
     LLScrollingPanelParam( const LLPanel::Params& panel_params,
                    LLViewerJointMesh* mesh, LLViewerVisualParam* param, bool allow_modify, LLWearable* wearable, LLJoint* jointp, bool use_hints = true );
     virtual ~LLScrollingPanelParam();

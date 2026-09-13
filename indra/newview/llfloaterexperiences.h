@@ -32,10 +32,12 @@
 
 class LLPanelExperiences;
 
-class LLFloaterExperiences :
+class LLFloaterExperiences final :
     public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterExperiences, LLFloater);
+
     LLFloaterExperiences(const LLSD& data);
     virtual void onClose(bool app_quitting);
 

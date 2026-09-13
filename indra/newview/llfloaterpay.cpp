@@ -81,9 +81,11 @@ typedef std::shared_ptr<LLGiveMoneyInfo> give_money_ptr;
 /// Class LLFloaterPay
 ///----------------------------------------------------------------------------
 
-class LLFloaterPay : public LLFloater
+class LLFloaterPay final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPay, LLFloater);
+
     LLFloaterPay(const LLSD& key);
     virtual ~LLFloaterPay();
     /*virtual*/ bool    postBuild();

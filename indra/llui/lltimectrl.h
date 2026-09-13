@@ -34,11 +34,13 @@
 
 class LLLineEditor;
 
-class LLTimeCtrl
+class LLTimeCtrl final
 : public LLUICtrl
 {
     LOG_CLASS(LLTimeCtrl);
 public:
+    AL_VIEW_TYPE(LLTimeCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<S32> label_width;

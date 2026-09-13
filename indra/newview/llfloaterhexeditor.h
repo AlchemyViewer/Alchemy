@@ -20,9 +20,11 @@
 
 class LLViewerInventoryItem;
 
-class LLFloaterHexEditor : public LLFloater
+class LLFloaterHexEditor final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterHexEditor, LLFloater);
+
     LLFloaterHexEditor(const LLSD& key);
 
     void onOpen(const LLSD& key) override;

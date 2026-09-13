@@ -43,6 +43,7 @@
 #include "llpanelpresetscamerapulldown.h"
 #include "llpanelpresetspulldown.h"
 #include "llpanelvolumepulldown.h"
+#include "llpanelpulldown.h"
 #include "llfloatermarketplace.h"
 #include "llfloaterregioninfo.h"
 #include "llfloaterscriptdebug.h"
@@ -101,13 +102,6 @@ S32 STATUS_BAR_HEIGHT = 26;
 extern S32 MENU_BAR_HEIGHT;
 
 
-// TODO: these values ought to be in the XML too
-const S32 SIM_STAT_WIDTH = 8;
-const LLColor4 SIM_OK_COLOR(0.f, 1.f, 0.f, 1.f);
-const LLColor4 SIM_WARN_COLOR(1.f, 1.f, 0.f, 1.f);
-const LLColor4 SIM_FULL_COLOR(1.f, 0.f, 0.f, 1.f);
-const F32 ICON_TIMER_EXPIRY     = 3.f; // How long the balance and health icons should flash after a change.
-
 static void onClickVolume(void*);
 
 LLStatusBar::LLStatusBar(const LLRect& rect)
@@ -118,7 +112,6 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
     mBalance(0),
     mBalanceClicked(false),
     mObscureBalance(false),
-    mHealth(100),
     mSquareMetersCredit(0),
     mSquareMetersCommitted(0),
     mFilterEdit(NULL),          // Edit for filtering
@@ -191,10 +184,22 @@ bool LLStatusBar::postBuild()
     mBtnVolume = getChild<LLButton>( "volume_btn" );
     mBtnVolume->setClickedCallback( onClickVolume, this );
     mBtnVolume->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterVolume, this));
+    // The per-frame poll that used to write this is gone, so the button starts
+    // out of step with a setting restored from the last session unless it is
+    // shunted into state once here.
+    mBtnVolume->setToggleState(LLAppViewer::instance()->getMasterSystemAudioMute());
 
     mMediaToggle = getChild<LLButton>("media_toggle_btn");
     mMediaToggle->setClickedCallback( &LLStatusBar::onClickMediaToggle, this );
     mMediaToggle->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterNearbyMedia, this));
+
+    // Built here rather than on first hover, unlike the other five. Its
+    // constructor is the only thing in the viewer listening for
+    // ParcelMediaAutoPlayEnable, and that listener initialises
+    // LLViewerParcelAskPlay and cancels a pending ask-to-play notification
+    // when the setting moves -- neither of which is the media panel's own
+    // business, and neither of which can wait for the user to hover a button.
+    ensurePulldown(mPanelNearByMedia);
 
     mBalanceBG = getChild<LLView>("balance_bg");
     LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
@@ -217,36 +222,6 @@ bool LLStatusBar::postBuild()
     mTextFPS->setClickedCallback([](void*) { LLFloaterReg::showInstance("stats"); });
 
     mTextFPS->setVisible(gSavedSettings.getBOOL("ShowStatusBarFPS"));
-
-    mPanelPresetsCameraPulldown = new LLPanelPresetsCameraPulldown();
-    addChild(mPanelPresetsCameraPulldown);
-    mPanelPresetsCameraPulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelPresetsCameraPulldown->setVisible(false);
-
-    mPanelPresetsPulldown = new LLPanelPresetsPulldown();
-    addChild(mPanelPresetsPulldown);
-    mPanelPresetsPulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelPresetsPulldown->setVisible(false);
-
-    mPanelVolumePulldown = new LLPanelVolumePulldown();
-    addChild(mPanelVolumePulldown);
-    mPanelVolumePulldown->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelVolumePulldown->setVisible(false);
-
-    mPanelAOPulldown = new ALPanelAOPulldown();
-    addChild(mPanelAOPulldown);
-    mPanelAOPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
-    mPanelAOPulldown->setVisible(false);
-
-    mPanelQuickSettingsPulldown = new ALPanelQuickSettingsPulldown();
-    addChild(mPanelQuickSettingsPulldown);
-    mPanelQuickSettingsPulldown->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
-    mPanelQuickSettingsPulldown->setVisible(false);
-
-    mPanelNearByMedia = new LLPanelNearByMedia();
-    addChild(mPanelNearByMedia);
-    mPanelNearByMedia->setFollows(FOLLOWS_TOP|FOLLOWS_RIGHT);
-    mPanelNearByMedia->setVisible(false);
 
     updateBalancePanelPosition();
 
@@ -274,6 +249,8 @@ bool LLStatusBar::postBuild()
 // Per-frame updates of visibility
 void LLStatusBar::refresh()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // update clock every 10 seconds
     static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
@@ -290,18 +267,16 @@ void LLStatusBar::refresh()
         sendMoneyBalanceRequest();
     }
 
-    LLRect r;
+    // Reshape the menu bar to its content's width. Kept as a poll: the bar
+    // does arrange itself when it is told its items moved, but the only thing
+    // that tells it is the menu search filter, and this catches whatever else
+    // hides a top-level menu without saying so. The walk stops at the first
+    // visible item from the right, so it costs an int compare.
     const S32 MENU_RIGHT = gMenuBarView->getRightmostMenuEdge();
-
-    // reshape menu bar to its content's width
     if (MENU_RIGHT != gMenuBarView->getRect().getWidth())
     {
         gMenuBarView->reshape(MENU_RIGHT, gMenuBarView->getRect().getHeight());
     }
-
-    // update the master volume button state
-    bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
-    mBtnVolume->setToggleState(mute_audio);
 
     // What the media button says is worth asking about several times a second,
     // not several times a frame. Answering it walks every media impl in the
@@ -382,11 +357,11 @@ void LLStatusBar::setBalance(S32 balance)
     }
     else
     {
-        string_args["[AMT]"] = llformat("%s", money_str.c_str());
+        string_args["[AMT]"] = money_str;
     }
     std::string label_str = getString("buycurrencylabel", string_args);
     mBoxBalance->setValue(label_str);
-    mBoxBalance->setToolTipArg(LLStringExplicit("[AMT]"), llformat("%s", money_str.c_str()));
+    mBoxBalance->setToolTipArg(LLStringExplicit("[AMT]"), money_str);
 
     updateBalancePanelPosition();
 
@@ -438,40 +413,11 @@ void LLStatusBar::sendMoneyBalanceRequest()
 }
 
 
-void LLStatusBar::setHealth(S32 health)
-{
-    //LL_INFOS() << "Setting health to: " << buffer << LL_ENDL;
-    if( mHealth > health )
-    {
-        if (mHealth > (health + gSavedSettings.getF32("UISndHealthReductionThreshold")))
-        {
-            if (isAgentAvatarValid())
-            {
-                if (gAgentAvatarp->getSex() == SEX_FEMALE)
-                {
-                    make_ui_sound("UISndHealthReductionF");
-                }
-                else
-                {
-                    make_ui_sound("UISndHealthReductionM");
-                }
-            }
-        }
-    }
-
-    mHealth = health;
-}
-
 S32 LLStatusBar::getBalance() const
 {
     return mBalance;
 }
 
-
-S32 LLStatusBar::getHealth() const
-{
-    return mHealth;
-}
 
 void LLStatusBar::setLandCredit(S32 credit)
 {
@@ -519,153 +465,83 @@ void LLStatusBar::onClickShop()
     }
 }
 
+template <typename T>
+T* LLStatusBar::ensurePulldown(T*& slot)
+{
+    if (!slot)
+    {
+        slot = new T();
+        addChild(slot);
+        slot->setFollows(FOLLOWS_TOP | FOLLOWS_RIGHT);
+        slot->setVisible(false);
+    }
+    return slot;
+}
+
+void LLStatusBar::showPulldown(LLPanelPulldown* shown, const LLView* anchor, bool centered)
+{
+    const LLRect anchor_rect = anchor->getRect();
+    LLRect rect = shown->getRect();
+
+    // How much wider the panel is than the button it hangs off: shared with
+    // the button's left edge, or split either side of it.
+    const S32 overhang = rect.getWidth() - anchor_rect.getWidth();
+    rect.setLeftTopAndSize(anchor_rect.mLeft - (centered ? overhang / 2 : overhang),
+                           anchor_rect.mBottom,
+                           rect.getWidth(),
+                           rect.getHeight());
+    // force onscreen
+    rect.translate(mPanelPopupHolder->getRect().getWidth() - rect.mRight, 0);
+    shown->setShape(rect);
+
+    LLUI::getInstance()->clearPopups();
+    LLUI::getInstance()->addPopup(shown);
+
+    // Only the ones that exist: a pull-down nobody has hovered has not been
+    // built, and one that was never built is not showing.
+    for (LLPanelPulldown* other : { static_cast<LLPanelPulldown*>(mPanelPresetsCameraPulldown),
+                                    static_cast<LLPanelPulldown*>(mPanelPresetsPulldown),
+                                    static_cast<LLPanelPulldown*>(mPanelQuickSettingsPulldown),
+                                    static_cast<LLPanelPulldown*>(mPanelAOPulldown),
+                                    static_cast<LLPanelPulldown*>(mPanelVolumePulldown),
+                                    static_cast<LLPanelPulldown*>(mPanelNearByMedia) })
+    {
+        if (other && other != shown)
+        {
+            other->setVisible(false);
+        }
+    }
+    shown->setVisible(true);
+}
+
 void LLStatusBar::onMouseEnterPresetsCamera()
 {
-    LLRect icon_rect = mIconPresetsCamera->getRect();
-    LLRect pulldown_rect = mPanelPresetsCameraPulldown->getRect();
-    pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
-         (pulldown_rect.getWidth() - icon_rect.getWidth()),
-                   icon_rect.mBottom,
-                   pulldown_rect.getWidth(),
-                   pulldown_rect.getHeight());
-
-    pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - pulldown_rect.mRight, 0);
-    mPanelPresetsCameraPulldown->setShape(pulldown_rect);
-
-    // show the master presets pull-down
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelPresetsCameraPulldown);
-    mPanelNearByMedia->setVisible(false);
-    mPanelVolumePulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(false);
-    mPanelPresetsCameraPulldown->setVisible(true);
+    showPulldown(ensurePulldown(mPanelPresetsCameraPulldown), mIconPresetsCamera, false);
 }
 
 void LLStatusBar::onMouseEnterPresets()
 {
-    LLRect icon_rect = mIconPresetsGraphic->getRect();
-    LLRect pulldown_rect = mPanelPresetsPulldown->getRect();
-    pulldown_rect.setLeftTopAndSize(icon_rect.mLeft -
-         (pulldown_rect.getWidth() - icon_rect.getWidth()),
-                   icon_rect.mBottom,
-                   pulldown_rect.getWidth(),
-                   pulldown_rect.getHeight());
-
-    pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - pulldown_rect.mRight, 0);
-    mPanelPresetsPulldown->setShape(pulldown_rect);
-
-    // show the master presets pull-down
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelPresetsPulldown);
-    mPanelPresetsCameraPulldown->setVisible(false);
-    mPanelNearByMedia->setVisible(false);
-    mPanelVolumePulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(true);
+    showPulldown(ensurePulldown(mPanelPresetsPulldown), mIconPresetsGraphic, false);
 }
 
 void LLStatusBar::onMouseEnterQuickSettings()
 {
-    LLRect qs_rect = mPanelQuickSettingsPulldown->getRect();
-    LLRect qs_btn_rect = mBtnQuickSettings->getRect();
-    qs_rect.setLeftTopAndSize(qs_btn_rect.mLeft -
-        (qs_rect.getWidth() - qs_btn_rect.getWidth()) / 2,
-        qs_btn_rect.mBottom,
-        qs_rect.getWidth(),
-        qs_rect.getHeight());
-    // force onscreen
-    qs_rect.translate(mPanelPopupHolder->getRect().getWidth() - qs_rect.mRight, 0);
-
-    // show the master volume pull-down
-    mPanelQuickSettingsPulldown->setShape(qs_rect);
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelQuickSettingsPulldown);
-
-    mPanelPresetsCameraPulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(false);
-    mPanelNearByMedia->setVisible(false);
-    mPanelVolumePulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(true);
+    showPulldown(ensurePulldown(mPanelQuickSettingsPulldown), mBtnQuickSettings, true);
 }
 
 void LLStatusBar::onMouseEnterAO()
 {
-    LLRect qs_rect = mPanelAOPulldown->getRect();
-    LLRect qs_btn_rect = mBtnAO->getRect();
-    qs_rect.setLeftTopAndSize(qs_btn_rect.mLeft -
-                              (qs_rect.getWidth() - qs_btn_rect.getWidth()) / 2,
-                              qs_btn_rect.mBottom,
-                              qs_rect.getWidth(),
-                              qs_rect.getHeight());
-    // force onscreen
-    qs_rect.translate(mPanelPopupHolder->getRect().getWidth() - qs_rect.mRight, 0);
-
-    mPanelAOPulldown->setShape(qs_rect);
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelAOPulldown);
-
-    mPanelPresetsCameraPulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(false);
-    mPanelNearByMedia->setVisible(false);
-    mPanelVolumePulldown->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(true);
+    showPulldown(ensurePulldown(mPanelAOPulldown), mBtnAO, true);
 }
 
 void LLStatusBar::onMouseEnterVolume()
 {
-    LLButton* volbtn =  getChild<LLButton>( "volume_btn" );
-    LLRect vol_btn_rect = volbtn->getRect();
-    LLRect volume_pulldown_rect = mPanelVolumePulldown->getRect();
-    volume_pulldown_rect.setLeftTopAndSize(vol_btn_rect.mLeft -
-         (volume_pulldown_rect.getWidth() - vol_btn_rect.getWidth()),
-                   vol_btn_rect.mBottom,
-                   volume_pulldown_rect.getWidth(),
-                   volume_pulldown_rect.getHeight());
-
-    volume_pulldown_rect.translate(mPanelPopupHolder->getRect().getWidth() - volume_pulldown_rect.mRight, 0);
-    mPanelVolumePulldown->setShape(volume_pulldown_rect);
-
-
-    // show the master volume pull-down
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelVolumePulldown);
-    mPanelPresetsCameraPulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(false);
-    mPanelNearByMedia->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(false);
-    mPanelVolumePulldown->setVisible(true);
+    showPulldown(ensurePulldown(mPanelVolumePulldown), mBtnVolume, false);
 }
 
 void LLStatusBar::onMouseEnterNearbyMedia()
 {
-    LLRect nearby_media_rect = mPanelNearByMedia->getRect();
-    LLButton* nearby_media_btn =  getChild<LLButton>( "media_toggle_btn" );
-    LLRect nearby_media_btn_rect = nearby_media_btn->getRect();
-    nearby_media_rect.setLeftTopAndSize(nearby_media_btn_rect.mLeft -
-                                        (nearby_media_rect.getWidth() - nearby_media_btn_rect.getWidth())/2,
-                                        nearby_media_btn_rect.mBottom,
-                                        nearby_media_rect.getWidth(),
-                                        nearby_media_rect.getHeight());
-    // force onscreen
-    nearby_media_rect.translate(mPanelPopupHolder->getRect().getWidth() - nearby_media_rect.mRight, 0);
-
-    // show the master volume pull-down
-    mPanelNearByMedia->setShape(nearby_media_rect);
-    LLUI::getInstance()->clearPopups();
-    LLUI::getInstance()->addPopup(mPanelNearByMedia);
-
-    mPanelPresetsCameraPulldown->setVisible(false);
-    mPanelPresetsPulldown->setVisible(false);
-    mPanelQuickSettingsPulldown->setVisible(false);
-    mPanelVolumePulldown->setVisible(false);
-    mPanelAOPulldown->setVisible(false);
-    mPanelNearByMedia->setVisible(true);
+    showPulldown(ensurePulldown(mPanelNearByMedia), mMediaToggle, true);
 }
 
 
@@ -725,7 +601,11 @@ bool can_afford_transaction(S32 cost)
 
 void LLStatusBar::onVolumeChanged(const LLSD& newvalue)
 {
-    refresh();
+    // The setting this rides on is the one the button reports, so the button
+    // is written here rather than read back out of the settings store on every
+    // frame. Both ways the value moves -- the button itself, and a script or
+    // the menu -- end up at this control, so both end up here.
+    mBtnVolume->setToggleState(newvalue.asBoolean());
 }
 
 void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
@@ -735,7 +615,6 @@ void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
         // Second instance starts with "VoiceMute_Off" icon, fix it
         mBtnVolume->setImageUnselected(LLUI::getUIImage("Audio_Off"));
     }
-    refresh();
 }
 
 void LLStatusBar::onObscureBalanceChanged(const LLSD& newvalue)
@@ -769,7 +648,7 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
         pItem->mLabel = utf8str_tolower( pMenu->ll::ui::SearchableControl::getSearchText() );
         aParentMenu->mChildren.push_back( pItem );
 
-        LLMenuItemBranchGL *pBranch = dynamic_cast< LLMenuItemBranchGL* >( pMenu );
+        LLMenuItemBranchGL *pBranch = pMenu->as<LLMenuItemBranchGL>();
         if( pBranch )
             collectChildren( pBranch->getBranch(), pItem );
     }

@@ -41,10 +41,12 @@
 
 class LLResizeBar;
 
-class LLFloaterIMNearbyChat
+class LLFloaterIMNearbyChat final
     :   public LLFloaterIMSessionTab
 {
 public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChat, LLFloaterIMSessionTab);
+
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     LLFloaterIMNearbyChat(const LLSD& key = LLSD(LLUUID()));
     ~LLFloaterIMNearbyChat();

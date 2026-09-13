@@ -75,8 +75,11 @@ protected:
 };
 
 // Inner, implementation class.  LLPreviewScript and LLLiveLSLEditor each own one of these.
-class LLScriptEdCore : public LLPanel
+class LLScriptEdCore final : public LLPanel
 {
+public:
+    AL_VIEW_TYPE(LLScriptEdCore, LLPanel);
+private:
     friend class LLPreviewScript;
     friend class LLPreviewLSL;
     friend class LLLiveLSLEditor;
@@ -221,6 +224,8 @@ class LLScriptEdContainer : public LLPreview
     friend class LLScriptEdCore;
 
 public:
+    AL_VIEW_TYPE(LLScriptEdContainer, LLPreview);
+
     LLScriptEdContainer(const LLSD& key);
     ~LLScriptEdContainer() override;
 
@@ -252,9 +257,11 @@ protected:
 };
 
 // Used to view and edit an LSL script from your inventory.
-class LLPreviewLSL : public LLScriptEdContainer
+class LLPreviewLSL final : public LLScriptEdContainer
 {
 public:
+    AL_VIEW_TYPE(LLPreviewLSL, LLScriptEdContainer);
+
     LLPreviewLSL(const LLSD& key );
     ~LLPreviewLSL() override;
 
@@ -302,10 +309,12 @@ protected:
 };
 
 // Used to view and edit an LSL script that is attached to an object.
-class LLLiveLSLEditor : public LLScriptEdContainer
+class LLLiveLSLEditor final : public LLScriptEdContainer
 {
     friend class LLLiveLSLFile;
 public:
+    AL_VIEW_TYPE(LLLiveLSLEditor, LLScriptEdContainer);
+
     LLLiveLSLEditor(const LLSD& key);
 
     static void processScriptRunningReply(LLMessageSystem* msg, void**);

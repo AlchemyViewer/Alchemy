@@ -60,6 +60,8 @@ public:
 class LLMenuItemGL: public LLUICtrl, public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemGL, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<std::string>   shortcut;
@@ -90,6 +92,7 @@ protected:
     LLMenuItemGL(const Params&);
     friend class LLUICtrlFactory;
 public:
+
     // LLView overrides
     /*virtual*/ void onVisibilityChange(bool new_visibility);
     /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
@@ -183,6 +186,35 @@ public:
     void setDrawTextDisabled(bool disabled) { mDrawTextDisabled = disabled; }
     bool getDrawTextDisabled() const { return mDrawTextDisabled; }
 
+    // Context menu building. A context menu object outlives the build, and a
+    // multi-selection gives each selected item its own pass at it, so an entry
+    // one pass showed has to survive a later pass that does not name it: a
+    // pass that shows an entry claims it, and an entry left unclaimed is
+    // hidden.
+    //
+    // The claim is stamped with the build that made it rather than cleared
+    // between builds, because the entries a build reaches and the entries its
+    // reset pass reaches are not the same set -- a reset walks a menu's own
+    // children while the passes descend into submenus. A claim left in a
+    // submenu by an earlier build would otherwise keep that entry on screen
+    // for the rest of the session.
+    //
+    // The two static forms take an LLView so a caller walking a menu's child
+    // list does not have to cast; anything that is not a menu entry is never
+    // claimed.
+    static void beginContextBuild()
+    {
+        // Never 0: that is what a menu item is constructed holding, so a
+        // generation of 0 would read every entry ever built as claimed and
+        // hide none of them.
+        if (++sContextBuild == 0)
+        {
+            ++sContextBuild;
+        }
+    }
+    static void claimContextEntry(LLView* view);
+    static bool contextEntryClaimed(const LLView* view);
+
 protected:
     void setHover(bool hover) { mGotHover = hover; }
 
@@ -237,6 +269,12 @@ private:
     const LLFontGL* mFont;
     bool mDrawTextDisabled;
 
+    // Which context menu build last claimed this entry; see beginContextBuild.
+    // Unsigned because it is only ever compared for equality and must be
+    // allowed to wrap; a lap costs one entry shown once too often.
+    U32 mContextBuild;
+    static U32 sContextBuild;
+
     KEY mJumpKey;
 };
 
@@ -248,6 +286,8 @@ private:
 class LLMenuItemSeparatorGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemSeparatorGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<EnableCallbackParam > on_visible;
@@ -255,6 +295,7 @@ public:
     };
 
     LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
+
 
     /*virtual*/ void draw( void );
     /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
@@ -279,6 +320,8 @@ private:
 class LLMenuItemCallGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemCallGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<EnableCallbackParam > on_enable;
@@ -334,10 +377,12 @@ private:
 // EFFICIENT because it may need to be checked a lot.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuItemCheckGL
+class LLMenuItemCheckGL final
 :   public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemCheckGL, LLMenuItemCallGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemCallGL::Params>
     {
         Optional<EnableCallbackParam > on_check;
@@ -392,6 +437,8 @@ class LLMenuGL
 :   public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLMenuGL, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<KEY>                   jump_key;
@@ -454,6 +501,7 @@ protected:
     friend class LLMenuItemBranchGL;
 public:
     virtual ~LLMenuGL( void );
+
 
     // LLView Functionality
     /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
@@ -546,8 +594,8 @@ public:
     // Whether to drop shadow menu bar
     void setDropShadowed( const bool shadowed );
 
-    void setParentMenuItem( LLMenuItemGL* parent_menu_item ) { mParentMenuItem = parent_menu_item->getHandle(); }
-    LLMenuItemGL* getParentMenuItem() const { return dynamic_cast<LLMenuItemGL*>(mParentMenuItem.get()); }
+    void setParentMenuItem( LLMenuItemGL* parent_menu_item ) { mParentMenuItem = parent_menu_item->getDerivedHandle<LLMenuItemGL>(); }
+    LLMenuItemGL* getParentMenuItem() const { return mParentMenuItem.get(); }
 
     void setTornOff(bool torn_off);
     bool getTornOff() { return mTornOff; }
@@ -623,7 +671,7 @@ private:
 
     LLUIColor       mBackgroundColor;
     bool            mBgVisible;
-    LLHandle<LLView> mParentMenuItem;
+    LLHandle<LLMenuItemGL> mParentMenuItem;
     LLUIString      mLabel;
     bool mDropShadowed;     //  Whether to drop shadow
     bool            mHasSelection;
@@ -651,6 +699,8 @@ private:
 class LLMenuItemBranchGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemBranchGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<LLMenuGL*> branch;
@@ -714,10 +764,12 @@ private:
 // A context menu
 //-----------------------------------------------------------------------------
 
-class LLContextMenu
+class LLContextMenu final
 : public LLMenuGL
 {
 public:
+    AL_VIEW_TYPE(LLContextMenu, LLMenuGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuGL::Params>
     {
         Params()
@@ -732,6 +784,7 @@ protected:
 
 public:
     virtual ~LLContextMenu() {}
+
 
     // LLView Functionality
     // can't set visibility directly, must call show or hide
@@ -764,9 +817,11 @@ protected:
 // class LLContextMenuBranch
 // A branch to another context menu
 //-----------------------------------------------------------------------------
-class LLContextMenuBranch : public LLMenuItemGL
+class LLContextMenuBranch final : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLContextMenuBranch, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Mandatory<LLContextMenu*> branch;
@@ -798,13 +853,16 @@ protected:
 // A menu bar displays menus horizontally.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuBarGL : public LLMenuGL
+class LLMenuBarGL final : public LLMenuGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuBarGL, LLMenuGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuGL::Params>
     {};
     LLMenuBarGL( const Params& p );
     virtual ~LLMenuBarGL();
+
 
     /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask);
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
@@ -847,6 +905,8 @@ private:
 class LLMenuHolderGL : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLMenuHolderGL, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {};
     LLMenuHolderGL(const Params& p);
@@ -866,7 +926,7 @@ public:
 
     virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
     virtual const LLRect getMenuRect() const { return getLocalRect(); }
-    LLView*const getVisibleMenu() const;
+    LLMenuGL* getVisibleMenu() const;
     virtual bool hasVisibleMenu() const {return getVisibleMenu() != NULL;}
 
     static void setActivatedItem(LLMenuItemGL* item);
@@ -888,9 +948,11 @@ private:
 // Floater that hosts a menu
 // https://wiki.lindenlab.com/mediawiki/index.php?title=LLTearOffMenu&oldid=81344
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLTearOffMenu : public LLFloater
+class LLTearOffMenu final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLTearOffMenu, LLFloater);
+
     static LLTearOffMenu* create(LLMenuGL* menup);
     virtual ~LLTearOffMenu();
 
@@ -920,9 +982,11 @@ private:
 // This class represents a separator.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuItemTearOffGL : public LLMenuItemGL
+class LLMenuItemTearOffGL final : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemTearOffGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {};
 

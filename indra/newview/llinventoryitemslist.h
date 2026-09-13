@@ -37,6 +37,8 @@ class LLViewerInventoryItem;
 class LLInventoryItemsList : public LLFlatListViewEx
 {
 public:
+    AL_VIEW_TYPE(LLInventoryItemsList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Params();

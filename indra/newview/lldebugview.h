@@ -39,9 +39,11 @@ class LLConsole;
 class LLTextureView;
 class LLFloaterStats;
 
-class LLDebugView : public LLView
+class LLDebugView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLDebugView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()

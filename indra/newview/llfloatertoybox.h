@@ -34,9 +34,11 @@ class LLButton;
 class LLToolBar;
 
 
-class LLFloaterToybox : public LLFloater
+class LLFloaterToybox final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterToybox, LLFloater);
+
     LLFloaterToybox(const LLSD& key);
     virtual ~LLFloaterToybox();
 

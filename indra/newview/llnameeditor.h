@@ -36,10 +36,12 @@
 #include "lllineeditor.h"
 
 
-class LLNameEditor
+class LLNameEditor final
 :   public LLLineEditor
 {
 public:
+    AL_VIEW_TYPE(LLNameEditor, LLLineEditor);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Optional<bool>      is_group;

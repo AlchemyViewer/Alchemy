@@ -108,10 +108,11 @@ public:
     virtual void changed() { LLFloaterLand::refreshAll(); }
 };
 
-class LLPanelLandExperiences
+class LLPanelLandExperiences final
     :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandExperiences, LLPanel);
     LLPanelLandExperiences(LLSafeHandle<LLParcelSelection>& parcelp);
     virtual bool postBuild();
     void refresh();
@@ -130,10 +131,11 @@ protected:
 };
 
 
-class LLPanelLandEnvironment
+class LLPanelLandEnvironment final
     : public LLPanelEnvironmentInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandEnvironment, LLPanelEnvironmentInfo);
                         LLPanelLandEnvironment(LLSafeHandle<LLParcelSelection>& parcelp);
 
     virtual bool        isRegion() const override { return false; }

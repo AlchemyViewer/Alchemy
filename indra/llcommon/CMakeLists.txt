@@ -97,7 +97,6 @@ target_sources(llcommon
     llsdserialize_xml.cpp
     llsdutil.cpp
     llsingleton.cpp
-    llstacktrace.cpp
     llstreamtools.cpp
     llstring.cpp
     llstringtable.cpp
@@ -224,7 +223,6 @@ target_sources(llcommon
     llsdutil.h
     llsimplehash.h
     llsingleton.h
-    llstacktrace.h
     llstl.h
     llstreamtools.h
     llstrider.h

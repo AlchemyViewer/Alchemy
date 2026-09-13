@@ -39,6 +39,8 @@ class LLPanelGroup;
 class ALFloaterGroupProfile final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterGroupProfile, LLFloater);
+
     ALFloaterGroupProfile(LLSD const& key);
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

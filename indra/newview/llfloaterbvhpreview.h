@@ -67,9 +67,11 @@ protected:
     LLPointer<LLVOAvatar>           mDummyAvatar;
 };
 
-class LLFloaterBvhPreview : public LLFloaterNameDesc
+class LLFloaterBvhPreview final : public LLFloaterNameDesc
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBvhPreview, LLFloaterNameDesc);
+
     LLFloaterBvhPreview(const LLSD& args);
     virtual ~LLFloaterBvhPreview();
 

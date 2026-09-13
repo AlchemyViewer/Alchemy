@@ -611,7 +611,7 @@ void LLScreenChannel::showToastsBottom()
 
     updateRect();
 
-    LLDockableFloater* floater = dynamic_cast<LLDockableFloater*>(LLDockableFloater::getInstanceHandle().get());
+    LLDockableFloater* floater = ALViewType::as<LLDockableFloater>(LLDockableFloater::getInstanceHandle().get());
 
     // Use a local variable instead of mToastList.
     // mToastList can be modified during recursive calls and then all iteratos will be invalidated.
@@ -759,7 +759,7 @@ void LLScreenChannel::showToastsTop()
 
     updateRect();
 
-    LLDockableFloater* floater = dynamic_cast<LLDockableFloater*>(LLDockableFloater::getInstanceHandle().get());
+    LLDockableFloater* floater = ALViewType::as<LLDockableFloater>(LLDockableFloater::getInstanceHandle().get());
 
     // Use a local variable instead of mToastList.
     // mToastList can be modified during recursive calls and then all iteratos will be invalidated.
@@ -1111,7 +1111,7 @@ void LLScreenChannel::onToastHover(LLToast* toast, bool mouse_enter)
 //--------------------------------------------------------------------------
 void LLScreenChannel::updateShowToastsState()
 {
-    LLDockableFloater* floater = dynamic_cast<LLDockableFloater*>(LLDockableFloater::getInstanceHandle().get());
+    LLDockableFloater* floater = ALViewType::as<LLDockableFloater>(LLDockableFloater::getInstanceHandle().get());
 
     if(!floater)
     {

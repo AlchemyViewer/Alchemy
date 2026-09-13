@@ -50,11 +50,12 @@ class LLAvatarName;
 // Avatar Inspector, a small information window used when clicking
 // on avatar names in the 2D UI and in the ambient inspector widget for
 // the 3D world.
-class LLFloaterVoiceVolume : public LLInspect, LLTransientFloater
+class LLFloaterVoiceVolume final : public LLInspect, LLTransientFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterVoiceVolume, LLInspect);
     // avatar_id - Avatar ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLFloaterVoiceVolume(const LLSD& avatar_id);

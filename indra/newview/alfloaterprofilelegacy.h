@@ -40,6 +40,8 @@ class ALPanelProfileLegacyTab;
 class ALFloaterProfileLegacy final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterProfileLegacy, LLFloater);
+
     ALFloaterProfileLegacy(LLSD const& key);
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

@@ -170,7 +170,7 @@ bool LLBadge::addToView(LLView * view)
 
         LLView * parent = mOwner.get();
 
-        while ((parent != NULL) && ((mParentScroller = dynamic_cast<LLScrollContainer *>(parent)) == NULL))
+        while ((parent != NULL) && ((mParentScroller = parent->as<LLScrollContainer>()) == NULL))
         {
             parent = parent->getParent();
         }

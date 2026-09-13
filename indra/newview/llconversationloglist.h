@@ -39,10 +39,11 @@ class LLConversationLogListItem;
  * it's always in actual state.
  */
 
-class LLConversationLogList: public LLFlatListViewEx, public LLConversationLogObserver, public LLMuteListObserver
+class LLConversationLogList final: public LLFlatListViewEx, public LLConversationLogObserver, public LLMuteListObserver
 {
     LOG_CLASS(LLConversationLogList);
 public:
+    AL_VIEW_TYPE(LLConversationLogList, LLFlatListViewEx);
 
     typedef enum e_sort_oder{
         E_SORT_BY_NAME = 0,

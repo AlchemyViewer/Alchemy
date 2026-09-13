@@ -176,6 +176,8 @@ if (BUILD_TESTING)
   if (TARGET INTEGRATION_TEST_llfonttextcache)
     target_compile_definitions(INTEGRATION_TEST_llfonttextcache PRIVATE ${gl_test_compile_defs})
   endif()
+
+  LL_ADD_INTEGRATION_TEST(lluiimage "" "${gl_test_libs}" "${test_project}")
   if (TARGET INTEGRATION_TEST_alfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)

@@ -46,6 +46,8 @@ class LLPanelEnvironmentInfo : public LLPanel
 {
     friend class LLSettingsDropTarget;
 public:
+    AL_VIEW_TYPE(LLPanelEnvironmentInfo, LLPanel);
+
                                 LLPanelEnvironmentInfo();
     virtual                     ~LLPanelEnvironmentInfo();
 
@@ -229,9 +231,11 @@ private:
 
 };
 
-class LLSettingsDropTarget : public LLView
+class LLSettingsDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLSettingsDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()

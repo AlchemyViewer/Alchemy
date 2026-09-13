@@ -34,9 +34,11 @@ class LLCheckBoxCtrl;
 class LLNameListCtrl;
 class LLTextBox;
 
-class LLFloaterPerformance : public LLFloater
+class LLFloaterPerformance final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPerformance, LLFloater);
+
     LLFloaterPerformance(const LLSD& key);
     virtual ~LLFloaterPerformance();
 

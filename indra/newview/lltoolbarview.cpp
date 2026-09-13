@@ -48,6 +48,99 @@
 #include "llviewercontrol.h"  // HACK for destinations guide on startup
 #include "llinventorymodel.h" // HACK to disable starter avatars button for NUX
 
+#include "llviewerparcelmgr.h"
+#include "llvoiceclient.h"
+#include "rlvhandler.h"
+
+namespace
+{
+    // Everything a toolbar button's availability or pressed state is derived
+    // from, watched in one place.
+    //
+    // A button's state comes from a predicate named in commands.xml and looked
+    // up in the enable-callback registry, so a toolbar cannot know what any of
+    // them reads. This is where that is written down instead. Reading the
+    // eleven predicates the shipped commands use, they bottom out in six
+    // things:
+    //
+    //   floater visibility -- Floater.IsOpen, Floater.CanShow,
+    //     Avatar.IsMyProfileOpen, and half of Build.EnabledOrActive.
+    //     Watched by LLFloater::setVisible itself, not here.
+    //   voice -- Agent.IsMicrophoneOn is the push-to-talk state, which already
+    //     had a signal of its own; the channel and connection state behind
+    //     Agent.IsActionAllowed comes through the status observer.
+    //   the parcel -- allowAgentBuild for Build.EnabledOrActive, allowAgentVoice
+    //     for Agent.IsActionAllowed.
+    //   RLV -- RLV.EnableIfNot, RlvActions::canBuild, and the attachment locks
+    //     that gate View.EnableHUDAttachments.
+    //   LLPipeline::sShowHUDAttachments -- View.CheckHUDAttachments, toggled by
+    //     the one action that owns it.
+    //   the marketplace status -- Marketplace.Enabled.
+    //
+    // A command whose predicate reads something not on that list gets a button
+    // that never changes, so extending this is part of adding one.
+    class ALToolBarStateWatcher final
+    :   public LLParcelObserver
+    ,   public LLVoiceClientStatusObserver
+    {
+    public:
+        ALToolBarStateWatcher()
+        {
+            LLViewerParcelMgr::getInstance()->addObserver(this);
+
+            attachVoice();
+
+            // Connected whether or not RLV is on: gRlvHandler is a plain global,
+            // the signal simply never fires while it is off, and it can be
+            // turned on after this -- asking isEnabled here would answer for
+            // the moment the toolbars were built and never again.
+            mRlvBehaviour = gRlvHandler.setBehaviourToggleCallback(
+                [](ERlvBehaviour, ERlvParamType) { LLToolBar::requestRefresh(); });
+        }
+
+        ~ALToolBarStateWatcher() override
+        {
+            LLViewerParcelMgr::getInstance()->removeObserver(this);
+            if (mVoiceAttached && LLVoiceClient::instanceExists())
+            {
+                LLVoiceClient::getInstance()->removeObserver(this);
+            }
+        }
+
+        // Parcel changes are the one signal here that does not depend on voice,
+        // so they are also where a voice client that was not there when the
+        // toolbars were built gets picked up. Without this, missing it once
+        // meant the microphone and voice-permission buttons had no refresh
+        // source for the rest of the session.
+        void changed() override { attachVoice(); LLToolBar::requestRefresh(); }
+        void onChange(EStatusType, const LLSD&, bool) override { LLToolBar::requestRefresh(); }
+
+    private:
+        // Voice is a parameterised singleton, so asking for it before it has
+        // been given its pump is an error rather than a construction. It is
+        // made in LLAppViewer::init and the toolbars are built at
+        // STATE_WORLD_INIT, so it is normally already there -- asked rather
+        // than assumed, and retried rather than given up on.
+        void attachVoice()
+        {
+            if (mVoiceAttached || !LLVoiceClient::instanceExists())
+            {
+                return;
+            }
+            mVoiceAttached = true;
+            LLVoiceClient::getInstance()->addObserver(this);
+            mMicrophone = LLVoiceClient::getInstance()->MicroChangedCallback(
+                []() { LLToolBar::requestRefresh(); });
+        }
+
+        boost::signals2::scoped_connection mMicrophone;
+        boost::signals2::scoped_connection mRlvBehaviour;
+        bool mVoiceAttached = false;
+    };
+
+    std::unique_ptr<ALToolBarStateWatcher> sStateWatcher;
+}
+
 LLToolBarView* gToolBarView = NULL;
 
 static LLDefaultChildRegistry::Register<LLToolBarView> r("toolbar_view");
@@ -133,26 +226,30 @@ void LLToolBarView::initFromParams(const LLToolBarView::Params& p)
 
 LLToolBarView::~LLToolBarView()
 {
+    sStateWatcher.reset();
     saveToolbars();
 }
 
 bool LLToolBarView::postBuild()
 {
+    // Made once the toolbars exist to be refreshed, and let go of with them.
+    sStateWatcher = std::make_unique<ALToolBarStateWatcher>();
+
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT] = getChild<LLToolBar>("toolbar_left");
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_LEFT);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT] = getChild<LLToolBar>("toolbar_right");
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_RIGHT);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_RIGHT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_RIGHT].panel = mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM] = getChild<LLToolBar>("toolbar_bottom");
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_BOTTOM);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_BOTTOM].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_BOTTOM].panel = mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_TOP] = getChild<LLToolBar>("toolbar_top");
     mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_TOP);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_TOP].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_TOP].panel = mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getParentAs<LLLayoutPanel>();
 
     mBottomToolbarPanel = getChild<LLView>("bottom_toolbar_panel");
 
@@ -565,7 +662,7 @@ void LLToolBarView::onToolBarButtonAdded(LLView* button)
 
         if (incoming_floater && incoming_floater->isShown())
         {
-            LLCallDialog* incoming = dynamic_cast<LLCallDialog *>(incoming_floater);
+            LLCallDialog* incoming = incoming_floater->as<LLCallDialog>();
             llassert(incoming);
 
             LLDockControl* dock_control = incoming->getDockControl();
@@ -577,7 +674,7 @@ void LLToolBarView::onToolBarButtonAdded(LLView* button)
 
         if (outgoing_floater && outgoing_floater->isShown())
         {
-            LLCallDialog* outgoing = dynamic_cast<LLCallDialog *>(outgoing_floater);
+            LLCallDialog* outgoing = outgoing_floater->as<LLCallDialog>();
             llassert(outgoing);
 
             LLDockControl* dock_control = outgoing->getDockControl();
@@ -610,7 +707,7 @@ void LLToolBarView::onToolBarButtonRemoved(LLView* button)
 
         if (incoming_floater && incoming_floater->isShown())
         {
-            LLDockableFloater* incoming = dynamic_cast<LLDockableFloater *>(incoming_floater);
+            LLDockableFloater* incoming = incoming_floater->as<LLDockableFloater>();
             llassert(incoming);
 
             LLDockControl* dock_control = incoming->getDockControl();
@@ -619,7 +716,7 @@ void LLToolBarView::onToolBarButtonRemoved(LLView* button)
 
         if (outgoing_floater && outgoing_floater->isShown())
         {
-            LLDockableFloater* outgoing = dynamic_cast<LLDockableFloater *>(outgoing_floater);
+            LLDockableFloater* outgoing = outgoing_floater->as<LLDockableFloater>();
             llassert(outgoing);
 
             LLDockControl* dock_control = outgoing->getDockControl();

@@ -48,11 +48,13 @@ class LLFloaterGestureInventoryObserver;
 class LLMultiGesture;
 class LLMenuGL;
 
-class LLFloaterGesture
+class LLFloaterGesture final
 :   public LLFloater, LLInventoryFetchDescendentsObserver
 {
     LOG_CLASS(LLFloaterGesture);
 public:
+    AL_VIEW_TYPE(LLFloaterGesture, LLFloater);
+
     LLFloaterGesture(const LLSD& key);
     virtual ~LLFloaterGesture();
 

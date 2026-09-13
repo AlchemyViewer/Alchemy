@@ -47,6 +47,8 @@ class LLFloaterFixedEnvironment : public LLFloaterEditEnvironmentBase
 {
     LOG_CLASS(LLFloaterFixedEnvironment);
 public:
+    AL_VIEW_TYPE(LLFloaterFixedEnvironment, LLFloaterEditEnvironmentBase);
+
                             LLFloaterFixedEnvironment(const LLSD &key);
                             ~LLFloaterFixedEnvironment();
 
@@ -94,11 +96,13 @@ private:
     void                    onPickerCommitSetting(LLUUID item_id);
 };
 
-class LLFloaterFixedEnvironmentWater : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentWater final : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentWater);
 
 public:
+    AL_VIEW_TYPE(LLFloaterFixedEnvironmentWater, LLFloaterFixedEnvironment);
+
     LLFloaterFixedEnvironmentWater(const LLSD &key);
 
     bool                    postBuild()                 override;
@@ -114,11 +118,13 @@ protected:
 private:
 };
 
-class LLFloaterFixedEnvironmentSky : public LLFloaterFixedEnvironment
+class LLFloaterFixedEnvironmentSky final : public LLFloaterFixedEnvironment
 {
     LOG_CLASS(LLFloaterFixedEnvironmentSky);
 
 public:
+    AL_VIEW_TYPE(LLFloaterFixedEnvironmentSky, LLFloaterFixedEnvironment);
+
     LLFloaterFixedEnvironmentSky(const LLSD &key);
 
     bool                    postBuild()                 override;

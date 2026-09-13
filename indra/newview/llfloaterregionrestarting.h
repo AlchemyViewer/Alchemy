@@ -31,11 +31,13 @@
 #include "lltextbox.h"
 #include "lleventtimer.h"
 
-class LLFloaterRegionRestarting : public LLFloater,  public LLEventTimer
+class LLFloaterRegionRestarting final : public LLFloater,  public LLEventTimer
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterRegionRestarting, LLFloater);
+
     static void close();
     static void updateTime(S32 time);
 

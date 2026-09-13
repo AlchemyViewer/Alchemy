@@ -37,11 +37,13 @@ class LLMediaCtrl;
 /**
  * Base class for web-based Home side tray
  */
-class LLPanelHome :
+class LLPanelHome final :
     public LLPanel,
     public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelHome, LLPanel);
+
     LLPanelHome();
 
     /*virtual*/ bool postBuild();

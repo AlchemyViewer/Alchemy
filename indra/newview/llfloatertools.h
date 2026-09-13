@@ -55,6 +55,8 @@ class LLFloaterTools final
 : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTools, LLFloater);
+
     virtual bool    postBuild();
     static  void*   createPanelPermissions(void*    vdata);
     static  void*   createPanelObject(void* vdata);

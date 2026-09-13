@@ -185,7 +185,7 @@ public:
 
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const
     {
-        LLTextEditor* editor = dynamic_cast<LLTextEditor*>(&target);
+        LLTextEditor* editor = target.as<LLTextEditor>();
         llassert(editor);
         if (!editor)
             return nullptr;

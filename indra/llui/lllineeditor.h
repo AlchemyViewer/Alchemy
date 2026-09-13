@@ -59,6 +59,8 @@ class LLLineEditor
 : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor, public LLSpellCheckMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLLineEditor, LLUICtrl);
+    LLView* asView() override { return this; }
 
     typedef std::function<void (LLLineEditor* caller)> keystroke_callback_t;
 
@@ -125,6 +127,7 @@ protected:
 
 public:
     virtual ~LLLineEditor();
+
 
     // mousehandler overrides
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -204,9 +207,16 @@ public:
     const std::string&  getLabel()  { return mLabel.getString(); }
 
     void            setDefaultText() { setText(mDefaultText); }
-    void            setText(const LLStringExplicit &new_text);
+    void            setText(ALStringViewExplicit new_text);
 
     const std::string& getText() const override { return mText.getString(); }
+
+    // Bumped whenever getText() could have moved. Anything outside this class
+    // caching work derived from the field's text -- a measured width, shaped
+    // glyphs -- names the field and this counter as its source, rather than
+    // keeping a copy of the text to compare against.
+    U32             getTextGeneration() const { return mText.getGeneration(); }
+
     std::string getConvertedText() const; // trimmed text with paragraphs converted to newlines
 
     // Named for its unit. Every offset this class takes and hands back --
@@ -354,7 +364,7 @@ public:
     /*virtual*/ S32     getPreeditFontSize() const override;
     /*virtual*/ const std::string& getPreeditStringUtf8() const override { return getText(); }
 
-    void            setText(const LLStringExplicit &new_text, bool use_size_limit);
+    void            setText(ALStringViewExplicit new_text, bool use_size_limit);
 
     void            setContextMenu(LLContextMenu* new_context_menu);
 

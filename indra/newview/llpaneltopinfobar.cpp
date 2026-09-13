@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <fmt/format.h>
+
 #include "llpaneltopinfobar.h"
 
 #include "llagent.h"
@@ -34,11 +36,11 @@
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "lllandmarkactions.h"
+#include "lliconctrl.h"
 #include "lllocationinputctrl.h"
 #include "llnotificationsutil.h"
 #include "llparcel.h"
 #include "llslurl.h"
-#include "llstatusbar.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
@@ -59,7 +61,10 @@ private:
     {
         if (mTopInfoBar)
         {
-            mTopInfoBar->updateParcelIcons();
+            // The whole readout, not just the icons. The parcel's name is half
+            // of what the location text says, and a rename used to reach it
+            // only because the text was rebuilt on every frame anyway.
+            mTopInfoBar->update();
         }
     }
 
@@ -93,35 +98,24 @@ LLPanelTopInfoBar::~LLPanelTopInfoBar()
     {
         mShowCoordsCtrlConnection.disconnect();
     }
+
+    mRegionInfoConnection.disconnect();
+    mHealthConnection.disconnect();
 }
 
 void LLPanelTopInfoBar::initParcelIcons()
 {
-    mParcelIcon[VOICE_ICON] = getChild<LLIconCtrl>("voice_icon");
-    mParcelIcon[FLY_ICON] = getChild<LLIconCtrl>("fly_icon");
-    mParcelIcon[PUSH_ICON] = getChild<LLIconCtrl>("push_icon");
-    mParcelIcon[BUILD_ICON] = getChild<LLIconCtrl>("build_icon");
-    mParcelIcon[SCRIPTS_ICON] = getChild<LLIconCtrl>("scripts_icon");
-    mParcelIcon[DAMAGE_ICON] = getChild<LLIconCtrl>("damage_icon");
-    mParcelIcon[SEE_AVATARS_ICON] = getChild<LLIconCtrl>("see_avatars_icon");
-
-    mParcelIcon[VOICE_ICON]->setToolTip(LLTrans::getString("LocationCtrlVoiceTooltip"));
-    mParcelIcon[FLY_ICON]->setToolTip(LLTrans::getString("LocationCtrlFlyTooltip"));
-    mParcelIcon[PUSH_ICON]->setToolTip(LLTrans::getString("LocationCtrlPushTooltip"));
-    mParcelIcon[BUILD_ICON]->setToolTip(LLTrans::getString("LocationCtrlBuildTooltip"));
-    mParcelIcon[SCRIPTS_ICON]->setToolTip(LLTrans::getString("LocationCtrlScriptsTooltip"));
-    mParcelIcon[DAMAGE_ICON]->setToolTip(LLTrans::getString("LocationCtrlDamageTooltip"));
-    mParcelIcon[SEE_AVATARS_ICON]->setToolTip(LLTrans::getString("LocationCtrlSeeAVsTooltip"));
-
-    mParcelIcon[VOICE_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, VOICE_ICON));
-    mParcelIcon[FLY_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, FLY_ICON));
-    mParcelIcon[PUSH_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, PUSH_ICON));
-    mParcelIcon[BUILD_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, BUILD_ICON));
-    mParcelIcon[SCRIPTS_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, SCRIPTS_ICON));
-    mParcelIcon[DAMAGE_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, DAMAGE_ICON));
-    mParcelIcon[SEE_AVATARS_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, SEE_AVATARS_ICON));
-
-    mDamageText->setText(LLStringExplicit("100%"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_VOICE,       getChild<LLIconCtrl>("voice_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_FLY,         getChild<LLIconCtrl>("fly_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_PUSH,        getChild<LLIconCtrl>("push_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_BUILD,       getChild<LLIconCtrl>("build_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_SCRIPTS,     getChild<LLIconCtrl>("scripts_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_DAMAGE,      getChild<LLIconCtrl>("damage_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_SEE_AVATARS, getChild<LLIconCtrl>("see_avatars_icon"));
+    // The pathfinding pair belongs to the navigation bar; this panel has no
+    // controls for them and leaves those two slots empty.
+    mParcelIcons.setDamageText(getChild<LLTextBox>("damage_text"));
+    mParcelIcons.initIcons();
 }
 
 void LLPanelTopInfoBar::handleLoginComplete()
@@ -150,7 +144,6 @@ bool LLPanelTopInfoBar::postBuild()
 
     mParcelInfoText = getChild<LLTextBox>("parcel_info_text");
     mParcelInfoText->setClickedCallback(boost::bind(&LLPanelTopInfoBar::onParcelInfoTextClicked, this));
-    mDamageText = getChild<LLTextBox>("damage_text");
 
     initParcelIcons();
 
@@ -174,6 +167,15 @@ bool LLPanelTopInfoBar::postBuild()
     mParcelMgrConnection = gAgent.addParcelChangedCallback(
             boost::bind(&LLPanelTopInfoBar::onAgentParcelChange, this));
 
+    // An estate manager changing the region's maturity rating, or renaming it,
+    // arrives on a handshake and moves neither the parcel nor the region we
+    // are standing in -- so no other callback here sees it.
+    mRegionInfoConnection = LLViewerRegion::setRegionInfoChangedCallback(
+        boost::bind(&LLPanelTopInfoBar::onRegionInfoChanged, this, _1));
+
+    mHealthConnection = gAgent.addHealthChangedCallback(
+        [this](S32 health) { mParcelIcons.setHealth(health); });
+
     setVisibleCallback(boost::bind(&LLPanelTopInfoBar::onVisibilityChanged, this, _2));
 
     return true;
@@ -181,12 +183,7 @@ bool LLPanelTopInfoBar::postBuild()
 
 void LLPanelTopInfoBar::onNavBarShowParcelPropertiesCtrlChanged()
 {
-    std::string new_text;
-
-    // don't need to have separate show_coords variable; if user requested the coords to be shown
-    // they will be added during the next call to the draw() method.
-    buildLocationString(new_text, false);
-    setParcelInfoText(new_text);
+    refreshParcelInfoText();
 }
 
 // when panel is shown, all minimized floaters should be shifted downwards to prevent overlapping of
@@ -217,26 +214,74 @@ boost::signals2::connection LLPanelTopInfoBar::setResizeCallback( const resize_s
 
 void LLPanelTopInfoBar::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     updateParcelInfoText();
-    updateHealth();
 
     LLPanel::draw();
 }
 
-void LLPanelTopInfoBar::buildLocationString(std::string& loc_str, bool show_coords)
+void LLPanelTopInfoBar::refreshParcelInfoText()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+
+    static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     LLAgentUI::ELocationFormat format =
         (show_coords ? LLAgentUI::LOCATION_FORMAT_FULL : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
-    if (!LLAgentUI::buildLocationString(loc_str, format))
+    if (!LLAgentUI::buildLocationString(mLocationScratch, format))
     {
-        loc_str = "???";
+        // Between a region crossing and the parcel properties that follow it
+        // there is no parcel to name. Keep the last good string rather than
+        // flashing a placeholder at every crossing: a refresh follows when the
+        // parcel arrives, and the placeholder is only right before the first
+        // one ever does.
+        //
+        // The position is deliberately not recorded here. What draw() compares
+        // it against is the position the text on screen was built from, and
+        // the text on screen is now older than this one -- recording it would
+        // tell draw() the readout was current and stop it coming back.
+        if (!mParcelInfoText->getText().empty())
+        {
+            return;
+        }
+        mLocationScratch = "???";
     }
+
+    // Recorded whether or not the text turns out to have moved, because from
+    // here on the string is the one this position produces: draw() reads this
+    // to decide whether to come back, and not recording it would put the
+    // readout straight back onto the per-frame path.
+    mDisplayPosX = pos_x;
+    mDisplayPosY = pos_y;
+    mDisplayPosZ = pos_z;
+
+    // The text box is asked rather than a copy of it being kept: it hands back
+    // a reference to what it is already holding.
+    //
+    // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
+    // flight: the integers draw() compared can move without the text moving.
+    const bool text_moved = mLocationScratch != mParcelInfoText->getText();
+
+    // The mean of any span of this plot is the fraction of rebuilds that were
+    // worth making -- the number the gate in draw() is sized against.
+    LL_PROFILE_PLOT("topinfo location changed", (int64_t)text_moved);
+
+    if (!text_moved)
+    {
+        return;
+    }
+
+    setParcelInfoText(mLocationScratch);
 }
 
 void LLPanelTopInfoBar::setParcelInfoText(const std::string& new_text)
 {
-    LLRect old_rect = getRect();
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     const LLFontGL* font = mParcelInfoText->getFont();
     S32 new_text_width = font->getWidth(new_text);
 
@@ -247,137 +292,93 @@ void LLPanelTopInfoBar::setParcelInfoText(const std::string& new_text)
 
     mParcelInfoText->reshape(rect.getWidth(), rect.getHeight(), true);
     mParcelInfoText->setRect(rect);
-    layoutParcelIcons();
 
-    if (old_rect != getRect())
-    {
-        mResizeSignal();
-    }
+    // Nothing above this line touches the panel's own rect -- only the text
+    // box's, which is a child. layoutParcelIcons is where the panel is
+    // resized, and it is the one place that announces it. Comparing the rect
+    // here as well meant one text change fired the resize signal twice, and
+    // the listener on it ends in a full reshape of the chiclet bar.
+    layoutParcelIcons();
 }
 
 void LLPanelTopInfoBar::update()
 {
-    std::string new_text;
-
-    // don't need to have separate show_coords variable; if user requested the coords to be shown
-    // they will be added during the next call to the draw() method.
-    buildLocationString(new_text, false);
-    setParcelInfoText(new_text);
+    refreshParcelInfoText();
 
     updateParcelIcons();
+
+    // Health has a signal now, but nothing replays the last value to a panel
+    // that was not listening when it arrived. This is the sync for that.
+    mParcelIcons.setHealth(gAgent.getHealth());
 }
 
 void LLPanelTopInfoBar::updateParcelInfoText()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
-
-    if (show_coords)
+    if (!show_coords)
     {
-        std::string new_text;
-
-        buildLocationString(new_text, show_coords);
-        setParcelInfoText(new_text);
+        // Without coordinates in it the readout has no time-varying input at
+        // all: every other thing it names arrives on a callback.
+        return;
     }
+
+    // The one input to this readout with no callback behind it is the agent's
+    // own position, and the readout prints it rounded -- to 2 m at a walk, 4 m
+    // in flight. Three integers answer whether the text can have moved.
+    // Building the text to find out costs a format, five allocations, a
+    // shaping pass and a segment rebuild of the text box, and for all but a
+    // couple of frames a second the answer is no.
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+    if (pos_x == mDisplayPosX && pos_y == mDisplayPosY && pos_z == mDisplayPosZ)
+    {
+        return;
+    }
+
+    refreshParcelInfoText();
 }
 
 void LLPanelTopInfoBar::updateParcelIcons()
 {
-    LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
-
-    LLViewerRegion* agent_region = gAgent.getRegion();
-    LLParcel* agent_parcel = vpm->getAgentParcel();
-    if (!agent_region || !agent_parcel)
-        return;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-    if (show_icons)
-    {
-        LLParcel* current_parcel;
-        LLViewerRegion* selection_region = vpm->getSelectionRegion();
-        LLParcel* selected_parcel = vpm->getParcelSelection()->getParcel();
-
-        // If agent is in selected parcel we use its properties because
-        // they are updated more often by LLViewerParcelMgr than agent parcel properties.
-        // See LLViewerParcelMgr::processParcelProperties().
-        // This is needed to reflect parcel restrictions changes without having to leave
-        // the parcel and then enter it again. See EXT-2987
-        if (selected_parcel && selected_parcel->getLocalID() == agent_parcel->getLocalID()
-                && selection_region == agent_region)
-        {
-            current_parcel = selected_parcel;
-        }
-        else
-        {
-            current_parcel = agent_parcel;
-        }
-
-        bool allow_voice    = vpm->allowAgentVoice(agent_region, current_parcel);
-        bool allow_fly      = vpm->allowAgentFly(agent_region, current_parcel);
-        bool allow_push     = vpm->allowAgentPush(agent_region, current_parcel);
-        bool allow_build    = vpm->allowAgentBuild(current_parcel); // true when anyone is allowed to build. See EXT-4610.
-        bool allow_scripts  = vpm->allowAgentScripts(agent_region, current_parcel);
-        bool allow_damage   = vpm->allowAgentDamage(agent_region, current_parcel);
-        bool see_avs        = current_parcel->getSeeAVs();
-
-        // Most icons are "block this ability"
-        mParcelIcon[VOICE_ICON]->setVisible(   !allow_voice );
-        mParcelIcon[FLY_ICON]->setVisible(     !allow_fly );
-        mParcelIcon[PUSH_ICON]->setVisible(    !allow_push );
-        mParcelIcon[BUILD_ICON]->setVisible(   !allow_build );
-        mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
-        mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
-        mDamageText->setVisible(allow_damage);
-        mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
-
-        layoutParcelIcons();
-    }
-    else
-    {
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            mParcelIcon[i]->setVisible(false);
-        }
-        mDamageText->setVisible(false);
-    }
+    mParcelIcons.update(show_icons);
+    layoutParcelIcons();
 }
 
-void LLPanelTopInfoBar::updateHealth()
-{
-    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
 
-    // *FIXME: Status bar owns health information, should be in agent
-    if (show_icons && gStatusBar)
+void LLPanelTopInfoBar::onRegionInfoChanged(LLViewerRegion* regionp)
+{
+    // Fires for every region that hands us a handshake, including neighbours
+    // coming into view. Only the one being displayed matters.
+    if (regionp != gAgent.getRegion())
     {
-        static S32 last_health = -1;
-        S32 health = gStatusBar->getHealth();
-        if (health != last_health)
-        {
-            std::string text = llformat("%d%%", health);
-            mDamageText->setText(text);
-            last_health = health;
-        }
+        return;
     }
+
+    refreshParcelInfoText();
 }
 
 void LLPanelTopInfoBar::layoutParcelIcons()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect old_rect = getRect();
 
     // TODO: remove hard-coded values and read them as xml parameters
     static const int FIRST_ICON_HPAD = 32;
     static const int LAST_ICON_HPAD = 11;
+    static const int ICON_HPAD = 2;
 
-    S32 left = mParcelInfoText->getRect().mRight + FIRST_ICON_HPAD;
-
-    left = layoutWidget(mDamageText, left);
-
-    for (int i = ICON_COUNT - 1; i >= 0; --i)
-    {
-        left = layoutWidget(mParcelIcon[i], left);
-    }
+    const S32 right = mParcelIcons.layout(mParcelInfoText->getRect().mRight + FIRST_ICON_HPAD,
+                                          ALParcelIconStrip::LAYOUT_RIGHTWARD,
+                                          ICON_HPAD);
 
     LLRect rect = getRect();
-    rect.set(rect.mLeft, rect.mTop, left + LAST_ICON_HPAD, rect.mBottom);
+    rect.set(rect.mLeft, rect.mTop, right + LAST_ICON_HPAD, rect.mBottom);
     setRect(rect);
 
     if (old_rect != getRect())
@@ -386,68 +387,7 @@ void LLPanelTopInfoBar::layoutParcelIcons()
     }
 }
 
-S32 LLPanelTopInfoBar::layoutWidget(LLUICtrl* ctrl, S32 left)
-{
-    // TODO: remove hard-coded values and read them as xml parameters
-    static const int ICON_HPAD = 2;
 
-    if (ctrl->getVisible())
-    {
-        LLRect rect = ctrl->getRect();
-        rect.mRight = left + rect.getWidth();
-        rect.mLeft = left;
-
-        ctrl->setRect(rect);
-        left += rect.getWidth() + ICON_HPAD;
-    }
-
-    return left;
-}
-
-void LLPanelTopInfoBar::onParcelIconClick(EParcelIcon icon)
-{
-    switch (icon)
-    {
-    case VOICE_ICON:
-        LLNotificationsUtil::add("NoVoice");
-        break;
-    case FLY_ICON:
-        LLNotificationsUtil::add("NoFly");
-        break;
-    case PUSH_ICON:
-        LLNotificationsUtil::add("PushRestricted");
-        break;
-    case BUILD_ICON:
-        LLNotificationsUtil::add("NoBuild");
-        break;
-    case SCRIPTS_ICON:
-    {
-        LLViewerRegion* region = gAgent.getRegion();
-        if(region && region->getRegionFlag(REGION_FLAGS_ESTATE_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsStopped");
-        }
-        else if(region && region->getRegionFlag(REGION_FLAGS_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsNotRunning");
-        }
-        else
-        {
-            LLNotificationsUtil::add("NoOutsideScripts");
-        }
-        break;
-    }
-    case DAMAGE_ICON:
-        LLNotificationsUtil::add("NotSafe");
-        break;
-    case SEE_AVATARS_ICON:
-        LLNotificationsUtil::add("SeeAvatars");
-        break;
-    case ICON_COUNT:
-        break;
-    // no default to get compiler warning when a new icon gets added
-    }
-}
 
 void LLPanelTopInfoBar::onAgentParcelChange()
 {

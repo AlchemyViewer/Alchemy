@@ -65,12 +65,14 @@ bool LLFloaterCamera::sFreeCamera = false;
 bool LLFloaterCamera::sAppearanceEditing = false;
 
 // Zoom the camera in and out
-class LLPanelCameraZoom
+class LLPanelCameraZoom final
 :   public LLPanel
 {
     LOG_CLASS(LLPanelCameraZoom);
 
 public:
+    AL_VIEW_TYPE(LLPanelCameraZoom, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params> {};
 
     LLPanelCameraZoom() { onCreate(); }
@@ -271,9 +273,10 @@ void activate_camera_tool()
     LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
 };
 
-class LLCameraInfoPanel : public LLPanel
+class LLCameraInfoPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCameraInfoPanel, LLPanel);
     typedef std::function<LLVector3()> get_vector_t;
 
     LLCameraInfoPanel(
@@ -543,7 +546,7 @@ void LLFloaterCamera::fillFlatlistFromPanel (LLFlatListView* list, LLPanel* pane
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanel* item = dynamic_cast<LLPanel*>(view);
+        LLPanel* item = view->as<LLPanel>();
         if (panel)
             list->addItem(item);
     }

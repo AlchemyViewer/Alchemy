@@ -69,9 +69,11 @@ static LLPanelInjector<LLPanelGroupNotices> t_panel_group_notices("panel_group_n
 // view. It handles drop events, always setting itself to the size of
 // its parent.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLGroupDropTarget : public LLView
+class LLGroupDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLGroupDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         // *NOTE: These parameters logically Mandatory, but are not

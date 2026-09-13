@@ -50,6 +50,8 @@ class LLNotificationForm;
 class LLToastNotifyPanel: public LLCheckBoxToastPanel, public LLInstanceTracker<LLToastNotifyPanel, LLUUID, LLInstanceTrackerReplaceOnCollision>
 {
 public:
+    AL_VIEW_TYPE(LLToastNotifyPanel, LLCheckBoxToastPanel);
+
     /**
      * Constructor for LLToastNotifyPanel.
      *
@@ -140,9 +142,10 @@ protected:
     static const std::string sFontScript;
 };
 
-class LLIMToastNotifyPanel : public LLToastNotifyPanel
+class LLIMToastNotifyPanel final : public LLToastNotifyPanel
 {
 public:
+    AL_VIEW_TYPE(LLIMToastNotifyPanel, LLToastNotifyPanel);
 
     LLIMToastNotifyPanel(LLNotificationPtr& pNotification,
                         const LLUUID& session_id,

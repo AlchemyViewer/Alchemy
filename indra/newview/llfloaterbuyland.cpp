@@ -66,10 +66,12 @@
 // NOTE: This is duplicated in lldatamoney.cpp ...
 const F32 GROUP_LAND_BONUS_FACTOR = 1.1f;
 
-class LLFloaterBuyLandUI
+class LLFloaterBuyLandUI final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBuyLandUI, LLFloater);
+
     LLFloaterBuyLandUI(const LLSD& key);
     virtual ~LLFloaterBuyLandUI();
 

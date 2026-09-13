@@ -33,9 +33,11 @@ class LLScrollListCtrl;
 class LLLineEditor;
 
 
-class LLPanelExperiencePicker : public LLPanel
+class LLPanelExperiencePicker final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperiencePicker, LLPanel);
+
     friend class LLExperienceSearchResponder;
     friend class LLFloaterExperiencePicker;
 

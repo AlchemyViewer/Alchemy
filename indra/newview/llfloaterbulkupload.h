@@ -32,9 +32,11 @@
 
 class LLTextBox;
 
-class LLFloaterBulkUpload : public LLModalDialog
+class LLFloaterBulkUpload final : public LLModalDialog
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBulkUpload, LLModalDialog);
+
     LLFloaterBulkUpload(const LLSD& key);
     ~LLFloaterBulkUpload();
 

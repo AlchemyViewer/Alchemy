@@ -34,6 +34,9 @@ class LLScrollListCtrl;
 
 class ALFloaterRegionTracker final : public LLFloater, public LLEventTimer
 {
+public:
+    AL_VIEW_TYPE(ALFloaterRegionTracker, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     ALFloaterRegionTracker(const LLSD& key);

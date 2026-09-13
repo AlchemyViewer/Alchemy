@@ -32,9 +32,11 @@
 class LLTextEditor;
 class LLUUID;
 
-class LLFloaterScriptDebug : public LLMultiFloater
+class LLFloaterScriptDebug final : public LLMultiFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptDebug, LLMultiFloater);
+
     LLFloaterScriptDebug(const LLSD& key);
     virtual ~LLFloaterScriptDebug();
     virtual bool postBuild();
@@ -51,9 +53,11 @@ protected:
     static LLFloaterScriptDebug*    sInstance;
 };
 
-class LLFloaterScriptDebugOutput : public LLFloater
+class LLFloaterScriptDebugOutput final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptDebugOutput, LLFloater);
+
     LLFloaterScriptDebugOutput(const LLSD& object_id);
     ~LLFloaterScriptDebugOutput();
 

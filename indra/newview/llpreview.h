@@ -44,9 +44,11 @@ class LLPreview;
 class LLEventTimer;
 // [/SL:KB]
 
-class LLMultiPreview : public LLMultiFloater
+class LLMultiPreview final : public LLMultiFloater
 {
 public:
+    AL_VIEW_TYPE(LLMultiPreview, LLMultiFloater);
+
     LLMultiPreview();
 
     /*virtual*/void onOpen(const LLSD& key);
@@ -60,6 +62,8 @@ public:
 class LLPreview : public LLFloater, LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLPreview, LLFloater);
+
     typedef enum e_asset_status
     {
         PREVIEW_ASSET_ERROR,

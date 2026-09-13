@@ -132,7 +132,7 @@ void LLExpandableTextBox::LLTextBoxEx::reshape(S32 width, S32 height, bool calle
     LLTextEditor::reshape(width, height, called_from_parent);
 }
 
-void LLExpandableTextBox::LLTextBoxEx::setText(const LLStringExplicit& text,const LLStyle::Params& input_params)
+void LLExpandableTextBox::LLTextBoxEx::setText(ALStringViewExplicit text,const LLStyle::Params& input_params)
 {
     // LLTextBox::setText will obliterate the expander segment, so make sure
     // we generate it again by clearing mExpanderVisible

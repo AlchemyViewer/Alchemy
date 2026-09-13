@@ -650,7 +650,7 @@ bool LLPanelStandStopFlying::handleToolTip(S32 x, S32 y, MASK mask)
 
 void LLPanelStandStopFlying::reparent(LLFloaterMove* move_view)
 {
-    LLPanel* parent = dynamic_cast<LLPanel*>(getParent());
+    LLPanel* parent = getParentAs<LLPanel>();
     if (!parent)
     {
         LL_WARNS() << "Stand/stop flying panel parent is unset, already attached?: " << mAttached << ", new parent: " << (move_view == NULL ? "NULL" : "Move Floater") << LL_ENDL;

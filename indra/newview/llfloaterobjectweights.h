@@ -50,9 +50,11 @@ private:
 };
 
 
-class LLFloaterObjectWeights : public LLFloater, LLAccountingCostObserver
+class LLFloaterObjectWeights final : public LLFloater, LLAccountingCostObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterObjectWeights, LLFloater);
+
     LOG_CLASS(LLFloaterObjectWeights);
 
     LLFloaterObjectWeights(const LLSD& key);

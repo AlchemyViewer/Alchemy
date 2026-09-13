@@ -38,6 +38,8 @@
 class LLMultiFloater : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLMultiFloater, LLFloater);
+
     LLMultiFloater(const LLSD& key, const Params& params = getDefaultParams());
     virtual ~LLMultiFloater() {};
 

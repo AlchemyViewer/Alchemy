@@ -49,12 +49,13 @@
 /**
  * Sends postcard via email.
  */
-class LLPanelSnapshotPostcard
+class LLPanelSnapshotPostcard final
 :   public LLPanelSnapshot
 {
     LOG_CLASS(LLPanelSnapshotPostcard);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotPostcard, LLPanelSnapshot);
     LLPanelSnapshotPostcard();
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

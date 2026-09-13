@@ -436,7 +436,7 @@ void LLAvatarActions::showPick(const LLUUID& avatar_id, const LLUUID& pick_id)
         {
             const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id), TAKE_FOCUS_YES);
-            auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+            auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
             if(tab)
             {
                 // *TODO: Finish
@@ -491,7 +491,7 @@ bool LLAvatarActions::isPickTabSelected(const LLUUID& avatar_id)
             const ALFloaterProfileLegacy* profile = LLFloaterReg::findTypedInstance<ALFloaterProfileLegacy>(
                 "legacy_profile", LLSD().with("avatar_id", avatar_id));
             if (profile == nullptr) { return false; }
-            return dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->getExpandedTab()) != nullptr;
+            return ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->getExpandedTab()) != nullptr;
         }
         else
         {
@@ -545,7 +545,7 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
         else
         {
             LLFloaterProfile* profilefloater =
-                dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
+                LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
             if (profilefloater)
             {
                 profilefloater->showClassified(classified_id, edit);
@@ -561,14 +561,14 @@ void LLAvatarActions::createClassified()
     {
         const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
         tab->createNewClassified();
 
     }
     else
     {
         LLFloaterProfile* profilefloater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (profilefloater)
         {
             profilefloater->createClassified();
@@ -602,13 +602,13 @@ void LLAvatarActions::createPick(const LLPickData& data)
     {
         const ALFloaterProfileLegacy* profile = LLFloaterReg::showTypedInstance<ALFloaterProfileLegacy>(
             "legacy_profile", LLSD().with("avatar_id", gAgent.getID()));
-        auto* tab = dynamic_cast<ALPanelProfileLegacy::ALPanelProfilePicks*>(profile->expandTab("avatar_picks_tab"));
+        auto* tab = ALViewType::as<ALPanelProfileLegacy::ALPanelProfilePicks>(profile->expandTab("avatar_picks_tab"));
         tab->createNewPick();
     }
     else
     {
         LLFloaterProfile* floater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (floater)
         {
             floater->createPick(data);
@@ -883,7 +883,7 @@ namespace action_give_inventory
      */
     static LLInventoryPanel* get_outfit_editor_inventory_panel()
     {
-        LLPanelOutfitEdit* panel_outfit_edit = dynamic_cast<LLPanelOutfitEdit*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfit_edit"));
+        LLPanelOutfitEdit* panel_outfit_edit = LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         if (NULL == panel_outfit_edit) return NULL;
 
         LLInventoryPanel* inventory_panel = panel_outfit_edit->findChild<LLInventoryPanel>("folder_view");
@@ -1271,7 +1271,7 @@ void LLAvatarActions::shareWithAvatars(LLView * panel)
     using namespace action_give_inventory;
 
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);
-    LLInventoryPanel* inv_panel = dynamic_cast<LLInventoryPanel*>(panel);
+    LLInventoryPanel* inv_panel = ALViewType::as<LLInventoryPanel>(panel);
     LLFloaterAvatarPicker* picker =
         LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), true, false, false, root_floater->getName());
     if (!picker)

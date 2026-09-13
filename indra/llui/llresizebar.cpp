@@ -358,7 +358,7 @@ void LLResizeBar::setImagePanel(LLPanel * panelp)
     const LLView::child_list_t * children = getChildList();
     if (getChildCount() == 2)
     {
-        LLPanel * image_panelp = dynamic_cast<LLPanel*>(children->back());
+        LLPanel * image_panelp = children->back()->as<LLPanel>();
         if (image_panelp)
         {
             removeChild(image_panelp);

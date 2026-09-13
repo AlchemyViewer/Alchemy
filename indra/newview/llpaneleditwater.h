@@ -44,6 +44,8 @@ class LLPanelSettingsWater : public LLSettingsEditPanel
     LOG_CLASS(LLPanelSettingsWater);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsWater, LLSettingsEditPanel);
+
                             LLPanelSettingsWater();
 
     virtual void            setSettings(const LLSettingsBase::ptr_t &settings) override   { setWater(std::static_pointer_cast<LLSettingsWater>(settings)); }
@@ -58,11 +60,13 @@ protected:
 // *RIDER* In this case this split is unecessary since there is only a single
 // tab page for water settings at this point.  However more may be added in the
 // future and I want to reinforce the pattern used for sky/atmosphere tabs.
-class LLPanelSettingsWaterMainTab : public LLPanelSettingsWater
+class LLPanelSettingsWaterMainTab final : public LLPanelSettingsWater
 {
     LOG_CLASS(LLPanelSettingsWaterMainTab);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsWaterMainTab, LLPanelSettingsWater);
+
                             LLPanelSettingsWaterMainTab();
 
     virtual bool            postBuild() override;

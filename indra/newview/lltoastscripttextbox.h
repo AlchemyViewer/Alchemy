@@ -33,10 +33,12 @@
 /**
  * Toast panel for scripted llTextbox notifications.
  */
-class LLToastScriptTextbox
+class LLToastScriptTextbox final
 :   public LLToastPanel
 {
 public:
+    AL_VIEW_TYPE(LLToastScriptTextbox, LLToastPanel);
+
     void close();
 
     // Non-transient messages.  You can specify non-default button

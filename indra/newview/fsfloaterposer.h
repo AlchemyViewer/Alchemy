@@ -76,11 +76,14 @@ typedef enum E_Columns
 /// A class containing the UI fiddling for the Poser Floater.
 /// Please don't do LLJoint stuff here, fsposingmotion (the LLMotion derivative) is the class for that.
 /// </summary>
-class FSFloaterPoser : public LLFloater, public LLEditMenuHandler
+class FSFloaterPoser final : public LLFloater, public LLEditMenuHandler
 {
     friend class LLFloaterReg;
     FSFloaterPoser(const LLSD &key);
 public:
+    AL_VIEW_TYPE(FSFloaterPoser, LLFloater);
+    LLView* asView() override { return this; }
+
     void updatePosedBones(const std::string& jointName, const LLQuaternion& rotation, const LLVector3& position, const LLVector3& scale);
     LLQuaternion getManipGimbalRotation(const std::string& jointName);
     void selectJointByName(const std::string& jointName);

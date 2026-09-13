@@ -3461,7 +3461,7 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
         LLAllDescendentsPassedFilter f;
         for (std::set<LLFolderViewItem*>::iterator it = selected_items.begin(); (it != selected_items.end()) && (f.allDescendentsPassedFilter()); ++it)
         {
-            if (LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(*it))
+            if (LLFolderViewFolder* folder = (*it)->as<LLFolderViewFolder>())
             {
                 folder->applyFunctorRecursively(f);
             }

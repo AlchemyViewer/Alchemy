@@ -42,9 +42,11 @@ class LLTextEditor;
 typedef std::map<std::string,std::string> icon_map_t;
 
 
-class LLPanelGroupRoles : public LLPanelGroupTab
+class LLPanelGroupRoles final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupRoles, LLPanelGroupTab);
+
     LLPanelGroupRoles();
     virtual ~LLPanelGroupRoles();
 
@@ -94,6 +96,8 @@ protected:
 class LLPanelGroupSubTab : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupSubTab, LLPanelGroupTab);
+
     LLPanelGroupSubTab();
     virtual ~LLPanelGroupSubTab();
 
@@ -151,9 +155,11 @@ protected:
 };
 
 
-class LLPanelGroupMembersSubTab : public LLPanelGroupSubTab
+class LLPanelGroupMembersSubTab final : public LLPanelGroupSubTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupMembersSubTab, LLPanelGroupSubTab);
+
     LLPanelGroupMembersSubTab();
     virtual ~LLPanelGroupMembersSubTab();
 
@@ -238,9 +244,11 @@ protected:
 };
 
 
-class LLPanelGroupRolesSubTab : public LLPanelGroupSubTab
+class LLPanelGroupRolesSubTab final : public LLPanelGroupSubTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupRolesSubTab, LLPanelGroupSubTab);
+
     LLPanelGroupRolesSubTab();
     virtual ~LLPanelGroupRolesSubTab();
 
@@ -312,9 +320,11 @@ protected:
 };
 
 
-class LLPanelGroupActionsSubTab : public LLPanelGroupSubTab
+class LLPanelGroupActionsSubTab final : public LLPanelGroupSubTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupActionsSubTab, LLPanelGroupSubTab);
+
     LLPanelGroupActionsSubTab();
     virtual ~LLPanelGroupActionsSubTab();
 
@@ -340,9 +350,11 @@ protected:
 };
 
 
-class LLPanelGroupBanListSubTab : public LLPanelGroupSubTab
+class LLPanelGroupBanListSubTab final : public LLPanelGroupSubTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupBanListSubTab, LLPanelGroupSubTab);
+
     LLPanelGroupBanListSubTab();
     virtual ~LLPanelGroupBanListSubTab() {}
 

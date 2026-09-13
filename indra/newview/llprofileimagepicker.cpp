@@ -91,7 +91,7 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
     {
     case PROFILE_IMAGE_SL:
         {
-            if(LLPanelProfileSecondLife* panel = dynamic_cast<LLPanelProfileSecondLife*>(mHandle.get()))
+            if(LLPanelProfileSecondLife* panel = ALViewType::as<LLPanelProfileSecondLife>(mHandle.get()))
             {
                 panel->setProfileImageUploading(true);
             }
@@ -99,7 +99,7 @@ void LLProfileImagePicker::notify(const std::vector<std::string>& filenames)
         break;
     case PROFILE_IMAGE_FL:
         {
-            if(LLPanelProfileFirstLife* panel = dynamic_cast<LLPanelProfileFirstLife*>(mHandle.get()))
+            if(LLPanelProfileFirstLife* panel = ALViewType::as<LLPanelProfileFirstLife>(mHandle.get()))
             {
                 panel->setProfileImageUploading(true);
             }
@@ -219,14 +219,14 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
         {
             case PROFILE_IMAGE_SL:
             {
-                if (ALPanelProfileLegacy* panel = dynamic_cast<ALPanelProfileLegacy*>(handle.get()))
+                if (ALPanelProfileLegacy* panel = ALViewType::as<ALPanelProfileLegacy>(handle.get()))
                 {
                     if (result.notNull())
                     {
                         panel->setProfileImageUploaded(result, PROFILE_IMAGE_SL);
                     }
                 }
-                else if (LLPanelProfileSecondLife* panel = dynamic_cast<LLPanelProfileSecondLife*>(handle.get()))
+                else if (LLPanelProfileSecondLife* panel = ALViewType::as<LLPanelProfileSecondLife>(handle.get()))
                 {
                     if (result.notNull())
                     {
@@ -242,14 +242,14 @@ void post_profile_image_coro(std::string cap_url, EProfileImageType type, std::s
             }
             case PROFILE_IMAGE_FL:
             {
-                if (ALPanelProfileLegacy* panel = dynamic_cast<ALPanelProfileLegacy*>(handle.get()))
+                if (ALPanelProfileLegacy* panel = ALViewType::as<ALPanelProfileLegacy>(handle.get()))
                 {
                     if (result.notNull())
                     {
                         panel->setProfileImageUploaded(result, PROFILE_IMAGE_FL);
                     }
                 }
-                else if (LLPanelProfileFirstLife* panel = dynamic_cast<LLPanelProfileFirstLife*>(handle.get()))
+                else if (LLPanelProfileFirstLife* panel = ALViewType::as<LLPanelProfileFirstLife>(handle.get()))
                 {
                     if (result.notNull())
                     {

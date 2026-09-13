@@ -53,6 +53,8 @@ class LLFloaterTopObjects final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterTopObjects, LLFloater);
+
     // Opens the floater on screen.
 //  static void show();
 

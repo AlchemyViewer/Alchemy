@@ -32,10 +32,12 @@
 
 class LLVector3d;
 
-class LLHUDView
+class LLHUDView final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLHUDView, LLPanel);
+
     LLHUDView(const LLRect& rect);
     virtual ~LLHUDView();
 

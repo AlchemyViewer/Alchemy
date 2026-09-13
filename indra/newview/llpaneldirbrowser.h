@@ -38,6 +38,8 @@ class LLLineEditor;
 class LLPanelDirBrowser: public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirBrowser, LLPanel);
+
     LLPanelDirBrowser();
     virtual ~LLPanelDirBrowser();
 

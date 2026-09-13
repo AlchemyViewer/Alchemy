@@ -41,9 +41,10 @@ class LLPanelClothingListItem;
 class LLPanelBodyPartsListItem;
 class LLPanelDeletableWearableListItem;
 
-class LLCOFWearables : public LLPanel
+class LLCOFWearables final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCOFWearables, LLPanel);
 
     /**
      * Represents a collection of callbacks assigned to inventory panel item's buttons

@@ -39,10 +39,11 @@
 class LLScrollContainer;
 class LLTextureCtrl;
 
-class LLPanelClassifiedInfo : public LLPanel, public LLAvatarPropertiesObserver
+class LLPanelClassifiedInfo final : public LLPanel, public LLAvatarPropertiesObserver
 {
     LOG_CLASS(LLPanelClassifiedInfo);
 public:
+    AL_VIEW_TYPE(LLPanelClassifiedInfo, LLPanel);
 
     LLPanelClassifiedInfo();
     virtual ~LLPanelClassifiedInfo();

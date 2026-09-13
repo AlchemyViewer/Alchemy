@@ -23,8 +23,11 @@
 // LLFloaterAssetRecovery class
 //
 
-class LLFloaterAssetRecovery : public LLFloater
+class LLFloaterAssetRecovery final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterAssetRecovery, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterAssetRecovery(const LLSD& sdKey);

@@ -51,9 +51,11 @@ class LLScrollListCtrl;
 class LLButton;
 class LLFloaterGroupPicker;
 
-class LLFloaterGroupPicker : public LLFloater
+class LLFloaterGroupPicker final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterGroupPicker, LLFloater);
+
     LLFloaterGroupPicker(const LLSD& seed);
     ~LLFloaterGroupPicker();
 
@@ -80,9 +82,11 @@ protected:
     static instance_map_t sInstances;
 };
 
-class LLPanelGroups : public LLPanel, public LLOldEvents::LLSimpleListener
+class LLPanelGroups final : public LLPanel, public LLOldEvents::LLSimpleListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroups, LLPanel);
+
     LLPanelGroups();
     virtual ~LLPanelGroups();
 

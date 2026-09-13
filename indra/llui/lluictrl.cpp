@@ -29,7 +29,6 @@
 
 #define LLUICTRL_CPP
 #include "lluictrl.h"
-#include "llviewereventrecorder.h"
 #include "llfocusmgr.h"
 #include "llpanel.h"
 #include "lluictrlfactory.h"
@@ -103,16 +102,8 @@ LLUICtrl::LLUICtrl(const LLUICtrl::Params& p, const LLViewModelPtr& viewmodel)
     mRequestsFront(p.requests_front),
     mTabStop(false),
     mTentative(false),
-    mViewModel(viewmodel),
-    mCommitSignal(NULL),
-    mValidateSignal(NULL),
-    mMouseEnterSignal(NULL),
-    mMouseLeaveSignal(NULL),
-    mMouseDownSignal(NULL),
-    mMouseUpSignal(NULL),
-    mRightMouseDownSignal(NULL),
-    mRightMouseUpSignal(NULL),
-    mDoubleClickSignal(NULL),
+    mViewModelStorage(viewmodel),
+    mCommitSignal(nullptr),
     mTransparencyType(TT_DEFAULT)
 {
 }
@@ -245,14 +236,7 @@ LLUICtrl::~LLUICtrl()
     }
 
     delete mCommitSignal;
-    delete mValidateSignal;
-    delete mMouseEnterSignal;
-    delete mMouseLeaveSignal;
-    delete mMouseDownSignal;
-    delete mMouseUpSignal;
-    delete mRightMouseDownSignal;
-    delete mRightMouseUpSignal;
-    delete mDoubleClickSignal;
+    delete mRareSignals;
 
     // scoped_connection members disconnect from any bound control variables here
     delete mControlVariables;
@@ -323,18 +307,18 @@ LLUICtrl::enable_signal_t::slot_type LLUICtrl::initEnableCallback(const EnableCa
 // virtual
 void LLUICtrl::onMouseEnter(S32 x, S32 y, MASK mask)
 {
-    if (mMouseEnterSignal)
+    if (commit_signal_t* signal = mouseEnterSignal())
     {
-        (*mMouseEnterSignal)(this, getValue());
+        (*signal)(this, getValue());
     }
 }
 
 // virtual
 void LLUICtrl::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-    if(mMouseLeaveSignal)
+    if (commit_signal_t* signal = mouseLeaveSignal())
     {
-        (*mMouseLeaveSignal)(this, getValue());
+        (*signal)(this, getValue());
     }
 }
 
@@ -346,15 +330,12 @@ bool LLUICtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 
     bool handled  = LLView::handleMouseDown(x,y,mask);
 
-    if (mMouseDownSignal)
+    if (mouse_signal_t* signal = mouseDownSignal())
     {
-        (*mMouseDownSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     LL_DEBUGS() << "LLUICtrl::handleMousedown - handled is returning as: " << handled << "    " << LL_ENDL;
 
-    if (handled) {
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-56,-56,getPathname());
-    }
     return handled;
 }
 
@@ -365,12 +346,9 @@ bool LLUICtrl::handleMouseUp(S32 x, S32 y, MASK mask)
     LL_DEBUGS() << "LLUICtrl::handleMouseUp calling LLView)'s handleMouseUp (first initialized xui to: " << getPathname() << " )" << LL_ENDL;
 
     bool handled  = LLView::handleMouseUp(x,y,mask);
-    if (handled) {
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-56,-56,getPathname());
-    }
-    if (mMouseUpSignal)
+    if (mouse_signal_t* signal = mouseUpSignal())
     {
-        (*mMouseUpSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
 
     LL_DEBUGS() << "LLUICtrl::handleMouseUp - handled for xui " << getPathname() << "  -  is returning as: " << handled << "   " << LL_ENDL;
@@ -382,9 +360,9 @@ bool LLUICtrl::handleMouseUp(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     bool handled  = LLView::handleRightMouseDown(x,y,mask);
-    if (mRightMouseDownSignal)
+    if (mouse_signal_t* signal = rightMouseDownSignal())
     {
-        (*mRightMouseDownSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     return handled;
 }
@@ -393,9 +371,9 @@ bool LLUICtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
     bool handled  = LLView::handleRightMouseUp(x,y,mask);
-    if(mRightMouseUpSignal)
+    if (mouse_signal_t* signal = rightMouseUpSignal())
     {
-        (*mRightMouseUpSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     return handled;
 }
@@ -403,9 +381,9 @@ bool LLUICtrl::handleRightMouseUp(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     bool handled = LLView::handleDoubleClick(x, y, mask);
-    if (mDoubleClickSignal)
+    if (mouse_signal_t* signal = doubleClickSignal())
     {
-        (*mDoubleClickSignal)(this, x, y, mask);
+        (*signal)(this, x, y, mask);
     }
     return handled;
 }
@@ -421,14 +399,12 @@ void LLUICtrl::onCommit()
 {
     if (mCommitSignal)
     {
+#if !LL_RELEASE_FOR_DOWNLOAD
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling commit function " << mFunctionName << LL_ENDL;
         }
-        else
-        {
-            //LL_DEBUGS("UIUsage") << "calling commit function " << "UNKNOWN" << LL_ENDL;
-        }
+#endif
         (*mCommitSignal)(this, getValue());
     }
 }
@@ -442,29 +418,41 @@ bool LLUICtrl::isCtrl() const
 //virtual
 void LLUICtrl::setValue(const LLSD& value)
 {
-    mViewModel->setValue(value);
+    viewModel()->setValue(value);
 }
 
 //virtual
 LLSD LLUICtrl::getValue() const
 {
-    return mViewModel->getValue();
+    // A control that was never given a model was never given a value, which is
+    // the same answer a model it had never been asked to hold one would give.
+    return mViewModelStorage.isNull() ? LLSD() : mViewModelStorage->getValue();
 }
 
 /// When two widgets are displaying the same data (e.g. during a skin
 /// change), share their ViewModel.
 void    LLUICtrl::shareViewModelFrom(const LLUICtrl& other)
 {
-    // Because mViewModel is an LLViewModelPtr, this assignment will quietly
-    // dispose of the previous LLViewModel -- unless it's already shared by
-    // somebody else.
-    mViewModel = other.mViewModel;
+    // Because this is an LLViewModelPtr, the assignment will quietly dispose of
+    // the previous LLViewModel -- unless it's already shared by somebody else.
+    // Asked through the accessor, so that sharing from a control that has not
+    // needed a model yet shares one rather than leaving both to make their own.
+    mViewModelStorage = other.viewModelPtr();
 }
 
 //virtual
 LLViewModel* LLUICtrl::getViewModel() const
 {
-    return mViewModel;
+    return viewModel();
+}
+
+const LLViewModelPtr& LLUICtrl::viewModelPtr() const
+{
+    if (mViewModelStorage.isNull())
+    {
+        mViewModelStorage = new LLViewModel();
+    }
+    return mViewModelStorage;
 }
 
 //virtual
@@ -479,23 +467,49 @@ bool LLUICtrl::postBuild()
     {
         std::vector<LLUICtrl*> childrenToMoveToFront;
 
-        for (LLView::child_list_const_iter_t child_it = beginChild(); child_it != endChild(); ++child_it)
+        for (LLView* childp : *getChildList())
         {
-            LLUICtrl* uictrl = dynamic_cast<LLUICtrl*>(*child_it);
-
-            if (uictrl && uictrl->mRequestsFront)
+            // isCtrl is a virtual returning a constant where dynamic_cast
+            // walks the RTTI graph, and this asks it of every child of every
+            // panel the viewer builds.
+            if (childp->isCtrl())
             {
-                childrenToMoveToFront.push_back(uictrl);
+                LLUICtrl* uictrl = static_cast<LLUICtrl*>(childp);
+                if (uictrl->mRequestsFront)
+                {
+                    childrenToMoveToFront.push_back(uictrl);
+                }
             }
         }
 
-        for (std::vector<LLUICtrl*>::iterator it = childrenToMoveToFront.begin(); it != childrenToMoveToFront.end(); ++it)
+        for (LLUICtrl* uictrl : childrenToMoveToFront)
         {
-            sendChildToFront(*it);
+            sendChildToFront(uictrl);
         }
     }
 
     return LLView::postBuild();
+}
+
+LLUICtrl::RareSignals::~RareSignals()
+{
+    delete mValidate;
+    delete mMouseEnter;
+    delete mMouseLeave;
+    delete mMouseDown;
+    delete mMouseUp;
+    delete mRightMouseDown;
+    delete mRightMouseUp;
+    delete mDoubleClick;
+}
+
+LLUICtrl::RareSignals& LLUICtrl::rareSignals()
+{
+    if (!mRareSignals)
+    {
+        mRareSignals = new RareSignals();
+    }
+    return *mRareSignals;
 }
 
 LLUICtrl::ControlVariables& LLUICtrl::getControlVars()
@@ -524,7 +538,7 @@ void LLUICtrl::setControlVariable(LLControlVariable* control)
         //RN: this will happen in practice, should we try to avoid it?
         //LL_WARNS() << "setControlName called twice on same control!" << LL_ENDL;
         mControlVariables->mControlConnection.disconnect(); // disconnect current signal
-        mControlVariables->mControlVariable = NULL;
+        mControlVariables->mControlVariable = nullptr;
     }
 
     if (control)
@@ -541,14 +555,14 @@ void LLUICtrl::removeControlVariable()
     if (mControlVariables && mControlVariables->mControlVariable)
     {
         mControlVariables->mControlConnection.disconnect();
-        mControlVariables->mControlVariable = NULL;
+        mControlVariables->mControlVariable = nullptr;
     }
 }
 
 //virtual
 void LLUICtrl::setControlName(const std::string& control_name, LLView *context)
 {
-    if (context == NULL)
+    if (context == nullptr)
     {
         context = this;
     }
@@ -571,7 +585,7 @@ void LLUICtrl::setEnabledControlVariable(LLControlVariable* control)
     if (mControlVariables && mControlVariables->mEnabledControlVariable)
     {
         mControlVariables->mEnabledControlConnection.disconnect(); // disconnect current signal
-        mControlVariables->mEnabledControlVariable = NULL;
+        mControlVariables->mEnabledControlVariable = nullptr;
     }
     if (control)
     {
@@ -587,7 +601,7 @@ void LLUICtrl::setDisabledControlVariable(LLControlVariable* control)
     if (mControlVariables && mControlVariables->mDisabledControlVariable)
     {
         mControlVariables->mDisabledControlConnection.disconnect(); // disconnect current signal
-        mControlVariables->mDisabledControlVariable = NULL;
+        mControlVariables->mDisabledControlVariable = nullptr;
     }
     if (control)
     {
@@ -603,7 +617,7 @@ void LLUICtrl::setMakeVisibleControlVariable(LLControlVariable* control)
     if (mControlVariables && mControlVariables->mMakeVisibleControlVariable)
     {
         mControlVariables->mMakeVisibleControlConnection.disconnect(); // disconnect current signal
-        mControlVariables->mMakeVisibleControlVariable = NULL;
+        mControlVariables->mMakeVisibleControlVariable = nullptr;
     }
     if (control)
     {
@@ -619,7 +633,7 @@ void LLUICtrl::setMakeInvisibleControlVariable(LLControlVariable* control)
     if (mControlVariables && mControlVariables->mMakeInvisibleControlVariable)
     {
         mControlVariables->mMakeInvisibleControlConnection.disconnect(); // disconnect current signal
-        mControlVariables->mMakeInvisibleControlVariable = NULL;
+        mControlVariables->mMakeInvisibleControlVariable = nullptr;
     }
     if (control)
     {
@@ -628,11 +642,6 @@ void LLUICtrl::setMakeInvisibleControlVariable(LLControlVariable* control)
         vars.mMakeInvisibleControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("invisible")));
         setVisible(!(control->getValue().asBoolean()));
     }
-}
-
-void LLUICtrl::setFunctionName(const std::string& function_name)
-{
-    mFunctionName = function_name;
 }
 
 // static
@@ -685,19 +694,19 @@ bool LLUICtrl::setLabelArg( const std::string& key, const LLStringExplicit& text
 // virtual
 LLCtrlSelectionInterface* LLUICtrl::getSelectionInterface()
 {
-    return NULL;
+    return nullptr;
 }
 
 // virtual
 LLCtrlListInterface* LLUICtrl::getListInterface()
 {
-    return NULL;
+    return nullptr;
 }
 
 // virtual
 LLCtrlScrollInterface* LLUICtrl::getScrollInterface()
 {
-    return NULL;
+    return nullptr;
 }
 
 bool LLUICtrl::hasFocus() const
@@ -723,7 +732,7 @@ void LLUICtrl::setFocus(bool b)
     {
         if( gFocusMgr.childHasKeyboardFocus(this))
         {
-            gFocusMgr.setKeyboardFocus( NULL );
+            gFocusMgr.setKeyboardFocus( nullptr );
         }
     }
 }
@@ -749,13 +758,13 @@ bool LLUICtrl::acceptsTextInput() const
 //virtual
 bool LLUICtrl::isDirty() const
 {
-    return mViewModel->isDirty();
+    return !mViewModelStorage.isNull() && mViewModelStorage->isDirty();
 };
 
 //virtual
 void LLUICtrl::resetDirty()
 {
-    mViewModel->resetDirty();
+    if (!mViewModelStorage.isNull()) mViewModelStorage->resetDirty();
 }
 
 // virtual
@@ -785,7 +794,7 @@ bool LLUICtrl::getIsChrome() const
     while (parent_ctrl)
     {
         if (parent_ctrl->isCtrl())
-            return ((LLUICtrl*)parent_ctrl)->getIsChrome();
+            return static_cast<LLUICtrl*>(parent_ctrl)->getIsChrome();
 
         parent_ctrl = parent_ctrl->getParent();
     }
@@ -794,96 +803,65 @@ bool LLUICtrl::getIsChrome() const
 }
 
 
-bool LLUICtrl::focusFirstItem(bool prefer_text_fields, bool focus_flash)
+bool LLUICtrl::focusFirstItem(bool /*prefer_text_fields*/, bool focus_flash)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    // try to select default tab group child
-    LLViewQuery query = getTabOrderQuery();
-    child_list_t result = query(this);
-    if(result.size() > 0)
+    // The tab order query answers for the whole subtree, so a preference for
+    // text fields can only narrow that answer: LLTextInputFilter is a
+    // prefilter, its result is a subset of this one's, and a subset of nothing
+    // is nothing.
+    const viewList_t result = getTabOrderQuery().run(this);
+    if (result.empty())
     {
-        LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-        if(!ctrl->hasFocus())
-        {
-            ctrl->setFocus(true);
-            ctrl->onTabInto();
-            if(focus_flash)
-            {
-                gFocusMgr.triggerFocusFlash();
-            }
-        }
-        return true;
+        return false;
     }
-    // search for text field first
-    if(prefer_text_fields)
+
+    LLUICtrl* ctrl = static_cast<LLUICtrl*>(result.back());
+    if (!ctrl->hasFocus())
     {
-        LLViewQuery query = getTabOrderQuery();
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-        child_list_t result = query(this);
-        if(result.size() > 0)
+        ctrl->setFocus(true);
+        ctrl->onTabInto();
+        if (focus_flash)
         {
-            LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-            if(!ctrl->hasFocus())
-            {
-                ctrl->setFocus(true);
-                ctrl->onTabInto();
-                if(focus_flash)
-                {
-                    gFocusMgr.triggerFocusFlash();
-                }
-            }
-            return true;
+            gFocusMgr.triggerFocusFlash();
         }
     }
-    // no text field found, or we don't care about text fields
-    result = getTabOrderQuery().run(this);
-    if(result.size() > 0)
-    {
-        LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-        if(!ctrl->hasFocus())
-        {
-            ctrl->setFocus(true);
-            ctrl->onTabInto();
-            if(focus_flash)
-            {
-                gFocusMgr.triggerFocusFlash();
-            }
-        }
-        return true;
-    }
-    return false;
+    return true;
 }
 
+
+// The shared query is only copied when a filter is going to be added to the
+// copy. It holds two lists, and taking one to leave it as it was found is the
+// usual case.
+static viewList_t runTabOrderQuery(LLUICtrl* root, bool text_fields_only)
+{
+    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
+    if (text_fields_only || tab_to_text_fields_only)
+    {
+        LLViewQuery query = LLView::getTabOrderQuery();
+        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
+        return query.run(root);
+    }
+    return LLView::getTabOrderQuery().run(root);
+}
 
 bool LLUICtrl::focusNextItem(bool text_fields_only)
 {
     // this assumes that this method is called on the focus root.
-    LLViewQuery query = getTabOrderQuery();
-    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
-    if(text_fields_only || tab_to_text_fields_only)
-    {
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-    }
-    child_list_t result = query(this);
+    viewList_t result = runTabOrderQuery(this, text_fields_only);
     return focusNext(result);
 }
 
 bool LLUICtrl::focusPrevItem(bool text_fields_only)
 {
     // this assumes that this method is called on the focus root.
-    LLViewQuery query = getTabOrderQuery();
-    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
-    if(text_fields_only || tab_to_text_fields_only)
-    {
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-    }
-    child_list_t result = query(this);
+    viewList_t result = runTabOrderQuery(this, text_fields_only);
     return focusPrev(result);
 }
 
 LLUICtrl* LLUICtrl::findRootMostFocusRoot()
 {
-    LLUICtrl* focus_root = NULL;
+    LLUICtrl* focus_root = nullptr;
     LLUICtrl* next_view = this;
     while(next_view && next_view->hasTabStop())
     {
@@ -906,14 +884,14 @@ LLUICtrl* LLUICtrl::getParentUICtrl() const
     {
         if (parent->isCtrl())
         {
-            return (LLUICtrl*)(parent);
+            return static_cast<LLUICtrl*>(parent);
         }
         else
         {
             parent =  parent->getParent();
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
@@ -924,26 +902,26 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
     // or tab with a help_topic string defined
     while (ctrl)
     {
-        LLPanel *panel = dynamic_cast<LLPanel *>(ctrl);
+        LLPanel *panel = ctrl->as<LLPanel>();
 
         if (panel)
         {
 
             LLView *child;
-            LLPanel *subpanel = NULL;
+            LLPanel *subpanel = nullptr;
 
             // does the panel have a sub-panel with a help topic?
-            bfs_tree_iterator_t it = beginTreeBFS();
+            bfs_tree_iterator_t it = ctrl->beginTreeBFS();
             // skip ourselves
             ++it;
-            for (; it != endTreeBFS(); ++it)
+            for (; it != ctrl->endTreeBFS(); ++it)
             {
                 child = *it;
                 // do we have a panel with a help topic?
-                LLPanel *panel = dynamic_cast<LLPanel *>(child);
-                if (panel && panel->isInVisibleChain() && !panel->getHelpTopic().empty())
+                LLPanel *child_panel = child->as<LLPanel>();
+                if (child_panel && child_panel->isInVisibleChain() && !child_panel->getHelpTopic().empty())
                 {
-                    subpanel = panel;
+                    subpanel = child_panel;
                     break;
                 }
             }
@@ -955,28 +933,28 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
             }
 
             // does the panel have an active tab with a help topic?
-            LLPanel *tab_panel = NULL;
+            LLPanel *tab_panel = nullptr;
 
-            it = beginTreeBFS();
+            it = ctrl->beginTreeBFS();
             // skip ourselves
             ++it;
-            for (; it != endTreeBFS(); ++it)
+            for (; it != ctrl->endTreeBFS(); ++it)
             {
                 child = *it;
-                LLPanel *curTabPanel = NULL;
+                LLPanel *curTabPanel = nullptr;
 
                 // do we have a tab container?
-                LLTabContainer *tab = dynamic_cast<LLTabContainer *>(child);
+                LLTabContainer *tab = child->as<LLTabContainer>();
                 if (tab && tab->getVisible())
                 {
                     curTabPanel = tab->getCurrentPanel();
                 }
 
                 // do we have an accordion tab?
-                LLAccordionCtrlTab* accordion = dynamic_cast<LLAccordionCtrlTab *>(child);
+                LLAccordionCtrlTab* accordion = child->as<LLAccordionCtrlTab>();
                 if (accordion && accordion->getDisplayChildren())
                 {
-                    curTabPanel = dynamic_cast<LLPanel *>(accordion->getAccordionView());
+                    curTabPanel = ALViewType::as<LLPanel>(accordion->getAccordionView());
                 }
 
                 // if we found a valid tab, does it have a help topic?
@@ -1015,9 +993,10 @@ boost::signals2::connection LLUICtrl::setCommitCallback( std::function<void (LLU
 
 boost::signals2::connection LLUICtrl::setValidateBeforeCommit( std::function<bool (const LLSD& data)> cb )
 {
-    if (!mValidateSignal) mValidateSignal = new enable_signal_t();
+    enable_signal_t*& signal = rareSignals().mValidate;
+    if (!signal) signal = new enable_signal_t();
 
-    return mValidateSignal->connect(boost::bind(cb, boost::placeholders::_2));
+    return signal->connect(boost::bind(cb, boost::placeholders::_2));
 }
 
 // virtual
@@ -1086,58 +1065,66 @@ boost::signals2::connection LLUICtrl::setCommitCallback( const commit_signal_t::
 
 boost::signals2::connection LLUICtrl::setValidateCallback( const enable_signal_t::slot_type& cb )
 {
-    if (!mValidateSignal) mValidateSignal = new enable_signal_t();
+    enable_signal_t*& signal = rareSignals().mValidate;
+    if (!signal) signal = new enable_signal_t();
 
-    return mValidateSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseEnterCallback( const commit_signal_t::slot_type& cb )
 {
-    if (!mMouseEnterSignal) mMouseEnterSignal = new commit_signal_t();
+    commit_signal_t*& signal = rareSignals().mMouseEnter;
+    if (!signal) signal = new commit_signal_t();
 
-    return mMouseEnterSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseLeaveCallback( const commit_signal_t::slot_type& cb )
 {
-    if (!mMouseLeaveSignal) mMouseLeaveSignal = new commit_signal_t();
+    commit_signal_t*& signal = rareSignals().mMouseLeave;
+    if (!signal) signal = new commit_signal_t();
 
-    return mMouseLeaveSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseDownCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mMouseDownSignal) mMouseDownSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mMouseDown;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mMouseDownSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseUpCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mMouseUpSignal) mMouseUpSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mMouseUp;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mMouseUpSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setRightMouseDownCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mRightMouseDownSignal) mRightMouseDownSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mRightMouseDown;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mRightMouseDownSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setRightMouseUpCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mRightMouseUpSignal) mRightMouseUpSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mRightMouseUp;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mRightMouseUpSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setDoubleClickCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mDoubleClickSignal) mDoubleClickSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mDoubleClick;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mDoubleClickSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 void LLUICtrl::addInfo(LLSD & info)

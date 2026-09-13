@@ -132,9 +132,9 @@ bool ALPanelProfileLegacy::postBuild()
     auto popup_menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>("menu_al_profile_image.xml", gMenuHolder, child_registry_t::instance());
     if (popup_menu) { mPopupMenuHandle = popup_menu->getHandle(); }
 
-    if (dynamic_cast<LLSideTrayPanelContainer*>(getParent()) != nullptr)
+    if (getParentAs<LLSideTrayPanelContainer>() != nullptr)
         getChild<LLUICtrl>("back")->setCommitCallback(boost::bind(&ALPanelProfileLegacy::onBackBtnClick, this));
-    else if (dynamic_cast<LLFloater*>(getParent()) != nullptr)
+    else if (getParentAs<LLFloater>() != nullptr)
         getChild<LLUICtrl>("back")->setCommitCallback(boost::bind(&ALPanelProfileLegacy::closeParentFloater, this));
     else
         getChild<LLUICtrl>("back")->setEnabled(false);
@@ -860,7 +860,7 @@ void ALPanelProfileLegacy::onProfileImageChanged(const LLUUID& id, LLProfileImag
 
 void ALPanelProfileLegacy::onBackBtnClick()
 {
-    LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+    LLSideTrayPanelContainer* parent = getParentAs<LLSideTrayPanelContainer>();
     if(parent)
     {
         parent->openPreviousPanel();
@@ -941,7 +941,7 @@ void ALPanelProfileLegacy::onCommitZoomProfileImage(LLUICtrl* item, S32 x, S32 y
 
 void ALPanelProfileLegacy::closeParentFloater()
 {
-    LLFloater* floater = dynamic_cast<LLFloater*>(getParent());
+    LLFloater* floater = getParentAs<LLFloater>();
     if (floater) floater->closeFloater();
 }
 
@@ -1190,7 +1190,7 @@ ALClassifiedItem *ALPanelProfileLegacy::ALPanelProfilePicks::findClassifiedById(
     ALClassifiedItem* c_item = nullptr;
     for(LLPanel* it: items)
     {
-        ALClassifiedItem *test_item = dynamic_cast<ALClassifiedItem*>(it);
+        ALClassifiedItem *test_item = ALViewType::as<ALClassifiedItem>(it);
         if (test_item && test_item->getClassifiedId() == classified_id)
         {
             c_item = test_item;
@@ -1329,7 +1329,7 @@ void ALPanelProfileLegacy::ALPanelProfilePicks::openPickInfo()
     LLSD selected_value = mPicksList->getSelectedValue();
     if (selected_value.isUndefined()) return;
 
-    ALPickItem* pick = dynamic_cast<ALPickItem*>(mPicksList->getSelectedItem());
+    ALPickItem* pick = ALViewType::as<ALPickItem>(mPicksList->getSelectedItem());
 
     if (!mPanelPickInfo)
     {
@@ -1394,7 +1394,7 @@ ALClassifiedItem* ALPanelProfileLegacy::ALPanelProfilePicks::getSelectedClassifi
     LLPanel* selected_item = mClassifiedsList->getSelectedItem();
     if (!selected_item) return nullptr;
 
-    return dynamic_cast<ALClassifiedItem*>(selected_item);
+    return ALViewType::as<ALClassifiedItem>(selected_item);
 }
 
 ALPickItem* ALPanelProfileLegacy::ALPanelProfilePicks::getSelectedPickItem() const
@@ -1402,7 +1402,7 @@ ALPickItem* ALPanelProfileLegacy::ALPanelProfilePicks::getSelectedPickItem() con
     LLPanel* selected_item = mPicksList->getSelectedItem();
     if (!selected_item) return nullptr;
 
-    return dynamic_cast<ALPickItem*>(selected_item);
+    return ALViewType::as<ALPickItem>(selected_item);
 }
 
 void ALPanelProfileLegacy::ALPanelProfilePicks::onPanelClassifiedSave(ALPanelClassifiedEdit* panel)
@@ -1435,7 +1435,7 @@ void ALPanelProfileLegacy::ALPanelProfilePicks::onPanelClassifiedSave(ALPanelCla
     }
     else if (panel->isNewWithErrors())
     {
-        ALClassifiedItem* c_item = dynamic_cast<ALClassifiedItem*>(mClassifiedsList->getSelectedItem());
+        ALClassifiedItem* c_item = ALViewType::as<ALClassifiedItem>(mClassifiedsList->getSelectedItem());
         llassert(c_item);
         if (c_item)
         {
@@ -1463,7 +1463,7 @@ void ALPanelProfileLegacy::ALPanelProfilePicks::onPanelClassifiedClose(ALPanelCl
             LLUUID c_id = value[CLASSIFIED_ID].asUUID();
             if(panel->getClassifiedId() == c_id)
             {
-                ALClassifiedItem* c_item = dynamic_cast<ALClassifiedItem*>(mClassifiedsList->getItemByValue(value));
+                ALClassifiedItem* c_item = mClassifiedsList->getTypedItemByValue<ALClassifiedItem>(value);
                 llassert(c_item);
                 if (c_item)
                 {
@@ -1534,7 +1534,7 @@ void ALPanelProfileLegacy::ALPanelProfilePicks::onPanelClassifiedEdit()
     LLSD selected_value = mClassifiedsList->getSelectedValue();
     if (selected_value.isUndefined()) return;
 
-    ALClassifiedItem* c_item = dynamic_cast<ALClassifiedItem*>(mClassifiedsList->getSelectedItem());
+    ALClassifiedItem* c_item = ALViewType::as<ALClassifiedItem>(mClassifiedsList->getSelectedItem());
     llassert(c_item);
     if (!c_item) return;
     editClassified(c_item->getClassifiedId());
@@ -1576,7 +1576,7 @@ void ALPanelProfileLegacy::ALPanelProfilePicks::onPanelPickEdit()
     LLSD selected_value = mPicksList->getSelectedValue();
     if (selected_value.isUndefined()) return;
 
-    ALPickItem* pick = dynamic_cast<ALPickItem*>(mPicksList->getSelectedItem());
+    ALPickItem* pick = ALViewType::as<ALPickItem>(mPicksList->getSelectedItem());
 
     LLSD params;
     params["pick_id"] = pick->getPickId();

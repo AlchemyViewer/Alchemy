@@ -58,6 +58,8 @@ class LLScreenChannelBase : public LLUICtrl
 {
     friend class LLChannelManager;
 public:
+    AL_VIEW_TYPE(LLScreenChannelBase, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Mandatory<LLUUID>           id;
@@ -153,10 +155,12 @@ protected:
 /**
  * Screen channel manages toasts visibility and positioning on the screen.
  */
-class LLScreenChannel : public LLScreenChannelBase
+class LLScreenChannel final : public LLScreenChannelBase
 {
     friend class LLChannelManager;
 public:
+    AL_VIEW_TYPE(LLScreenChannel, LLScreenChannelBase);
+
     LLScreenChannel(const Params&);
     virtual ~LLScreenChannel();
 

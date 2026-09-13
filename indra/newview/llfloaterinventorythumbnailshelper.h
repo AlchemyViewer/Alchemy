@@ -34,9 +34,12 @@ class LLScrollListCtrl;
 class LLViewerInventoryItem;
 class LLUUID;
 
-class LLFloaterInventoryThumbnailsHelper:
+class LLFloaterInventoryThumbnailsHelper final:
     public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterInventoryThumbnailsHelper, LLFloater);
+private:
         friend class LLFloaterReg;
     private:
         LLFloaterInventoryThumbnailsHelper(const LLSD& key);

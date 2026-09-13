@@ -29,10 +29,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterClassified : public LLFloater
+class LLFloaterClassified final : public LLFloater
 {
     LOG_CLASS(LLFloaterClassified);
 public:
+    AL_VIEW_TYPE(LLFloaterClassified, LLFloater);
+
     LLFloaterClassified(const LLSD& key);
     virtual ~LLFloaterClassified();
 

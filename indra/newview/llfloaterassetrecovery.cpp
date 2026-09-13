@@ -96,7 +96,7 @@ void LLFloaterAssetRecovery::onBtnRecover()
     std::vector<LLScrollListItem*> items = pListCtrl->getAllData(); LLSD sdFiles;
     for (std::vector<LLScrollListItem*>::const_iterator itItem = items.begin(); itItem != items.end(); ++itItem)
     {
-        LLScrollListCheck* pCheckColumn = dynamic_cast<LLScrollListCheck*>((*itItem)->getColumn(0));
+        LLScrollListCheck* pCheckColumn = (*itItem)->getColumn<LLScrollListCheck>(0);
         if (!pCheckColumn)
             continue;
 
@@ -282,7 +282,7 @@ bool LLAssetRecoverQueue::recoverNext()
         LLInventoryPanel* pInvPanel = LLInventoryPanel::getActiveInventoryPanel(true);
         if (pInvPanel)
         {
-            LLFolderViewFolder* pFVF = dynamic_cast<LLFolderViewFolder*>(pInvPanel->getItemByID(idFNF));
+            LLFolderViewFolder* pFVF = pInvPanel->getFolderByID(idFNF);
             if (pFVF)
             {
                 pFVF->setOpenArrangeRecursively(true, LLFolderViewFolder::RECURSE_UP);

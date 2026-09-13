@@ -63,9 +63,11 @@ class LLTextBox;
  * Used for updating vertical scroll bar visibility in inventory panel.
  * See LLScrollContainer::calcVisibleSize().
  */
-class LLFolderViewScrollContainer : public LLScrollContainer
+class LLFolderViewScrollContainer final : public LLScrollContainer
 {
 public:
+    AL_VIEW_TYPE(LLFolderViewScrollContainer, LLScrollContainer);
+
     /*virtual*/ ~LLFolderViewScrollContainer() {};
     /*virtual*/ const LLRect getScrolledViewRect() const;
 
@@ -84,6 +86,9 @@ protected:
 class LLFolderView : public LLFolderViewFolder, public LLEditMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLFolderView, LLFolderViewFolder);
+    LLView* asView() override { return this; }
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewFolder::Params>
     {
         Mandatory<LLPanel*>     parent_panel;
@@ -264,6 +269,7 @@ public:
     // Note: We may eventually have to move that method up the hierarchy to LLFolderViewItem.
     LLHandle<LLFolderView>  getHandle() const { return getDerivedHandle<LLFolderView>(); }
 
+
 private:
     void updateMenuOptions(LLMenuGL* menu);
     void updateRenamerPosition();
@@ -289,7 +295,7 @@ protected:
     LLHandle<LLView>                    mPopupMenuHandle;
     std::string                     mMenuFileName;
 
-    LLHandle<LLView>                mHoveredItem;
+    LLHandle<LLFolderViewItem>      mHoveredItem;
     selected_items_t                mSelectedItems;
     bool                            mKeyboardSelection,
                                     mAllowMultiSelect,

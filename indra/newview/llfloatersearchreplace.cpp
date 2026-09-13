@@ -97,7 +97,7 @@ void LLFloaterSearchReplace::onClose(bool fQuiting)
 
 bool LLFloaterSearchReplace::hasAccelerators() const
 {
-    const LLView* pView = dynamic_cast<LLTextEditor*>(m_EditorHandle.get());
+    const LLView* pView = ALViewType::as<LLTextEditor>(m_EditorHandle.get());
     while (pView)
     {
         if (pView->hasAccelerators())
@@ -117,7 +117,7 @@ bool LLFloaterSearchReplace::handleKeyHere(KEY key, MASK mask)
         // Check if one of our children currently has keyboard focus and if so route edit accellerators to it
         if (gFocusMgr.childHasKeyboardFocus(this))
         {
-            LLView* pEditView = dynamic_cast<LLView*>(LLEditMenuHandler::gEditMenuHandler);
+            LLView* pEditView = LLEditMenuHandler::gEditMenuHandler ? LLEditMenuHandler::gEditMenuHandler->asView() : nullptr;
             if ( (pEditView) && (pEditView->hasAncestor(this)) && (gEditMenu) && (gEditMenu->handleAcceleratorKey(key, mask)) )
             {
                 return true;
@@ -146,7 +146,7 @@ LLFloaterSearchReplace* LLFloaterSearchReplace::show(LLTextEditor* pEditor)
     LLView* pView = pEditor->getParent();
     while (pView)
     {
-        pDependeeNew = dynamic_cast<LLFloater*>(pView);
+        pDependeeNew = pView->as<LLFloater>();
         if (pDependeeNew)
         {
             if (pDependeeNew != pDependeeOld)
@@ -182,7 +182,7 @@ LLFloaterSearchReplace* LLFloaterSearchReplace::findInstance()
 
 LLTextEditor* LLFloaterSearchReplace::getEditor() const
 {
-    return dynamic_cast<LLTextEditor*>(m_EditorHandle.get());
+    return ALViewType::as<LLTextEditor>(m_EditorHandle.get());
 }
 
 void LLFloaterSearchReplace::refreshHighlight()

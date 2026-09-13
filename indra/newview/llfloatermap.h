@@ -35,9 +35,11 @@ class LLTextBox;
 //
 // Classes
 //
-class LLFloaterMap : public LLFloater
+class LLFloaterMap final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMap, LLFloater);
+
     LLFloaterMap(const LLSD& key);
     static LLFloaterMap* getInstance();
     virtual ~LLFloaterMap();

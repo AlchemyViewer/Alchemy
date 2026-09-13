@@ -36,9 +36,11 @@
 
 
 
-class LLInboxInventoryPanel : public LLInventoryPanel
+class LLInboxInventoryPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInboxInventoryPanel, LLInventoryPanel);
+
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -54,9 +56,11 @@ public:
 };
 
 
-class LLInboxFolderViewFolder : public LLFolderViewFolder, public LLBadgeOwner
+class LLInboxFolderViewFolder final : public LLFolderViewFolder, public LLBadgeOwner
 {
 public:
+    AL_VIEW_TYPE(LLInboxFolderViewFolder, LLFolderViewFolder);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewFolder::Params>
     {
         Optional<LLBadge::Params>   new_badge;
@@ -86,9 +90,11 @@ protected:
 };
 
 
-class LLInboxFolderViewItem : public LLFolderViewItem, public LLBadgeOwner
+class LLInboxFolderViewItem final : public LLFolderViewItem, public LLBadgeOwner
 {
 public:
+    AL_VIEW_TYPE(LLInboxFolderViewItem, LLFolderViewItem);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
         Optional<LLBadge::Params>   new_badge;

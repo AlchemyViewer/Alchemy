@@ -313,19 +313,26 @@ namespace
     // Restore the all-visible/enabled baseline LLFolderView::updateMenuOptions
     // establishes before buildContextMenu, so the gear button path starts from
     // the same state as the right-click popup.
-    void resetMenuEntries(LLMenuGL& menu)
+    void restoreMenuEntries(LLMenuGL& menu)
     {
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
-                    resetMenuEntries(*branch->getBranch());
+                    restoreMenuEntries(*branch->getBranch());
             }
-            menu_item->setVisible(false);
-            menu_item->pushVisible(true);
+            menu_item->setVisible(true);
             menu_item->setEnabled(true);
         }
+    }
+
+    void resetMenuEntries(LLMenuGL& menu)
+    {
+        // Claims made for the previous open stop counting here, once, rather
+        // than at each level of the walk below.
+        LLMenuItemGL::beginContextBuild();
+        restoreMenuEntries(menu);
     }
 
     // Show only the listed entries (the llinventorybridge hide_context_entries
@@ -339,7 +346,7 @@ namespace
         bool prev_was_separator = true;
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
                     hideMenuEntries(*branch->getBranch(), show, disabled);
@@ -349,7 +356,7 @@ namespace
             bool found = std::find(show.begin(), show.end(), name) != show.end();
             if (found)
             {
-                const bool is_separator = dynamic_cast<LLMenuItemSeparatorGL*>(menu_item) != nullptr;
+                const bool is_separator = ALViewType::as<LLMenuItemSeparatorGL>(menu_item) != nullptr;
                 found = !(is_separator && prev_was_separator);
                 prev_was_separator = is_separator;
             }
@@ -358,14 +365,14 @@ namespace
             {
                 // Multi-selection passes call this repeatedly; don't re-hide
                 // an entry an earlier selected item explicitly showed.
-                if (!menu_item->getLastVisible())
+                if (!LLMenuItemGL::contextEntryClaimed(menu_item))
                     menu_item->setVisible(false);
                 menu_item->setEnabled(false);
             }
             else
             {
                 menu_item->setVisible(true);
-                menu_item->pushVisible(true);
+                LLMenuItemGL::claimContextEntry(menu_item);
                 menu_item->setEnabled(
                     std::find(disabled.begin(), disabled.end(), name) == disabled.end());
             }

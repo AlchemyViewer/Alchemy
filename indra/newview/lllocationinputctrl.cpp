@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <fmt/format.h>
+
 // file includes
 #include "lllocationinputctrl.h"
 
@@ -54,7 +56,6 @@
 #include "llpathfindingnavmeshstatus.h"
 #include "llteleporthistory.h"
 #include "llslurl.h"
-#include "llstatusbar.h"            // getHealth()
 #include "lltrans.h"
 #include "llviewerinventory.h"
 #include "llviewerparcelmgr.h"
@@ -169,6 +170,15 @@ private:
     {
         if (mInput)
         {
+            // The text as well as the icons. The parcel's name is half of what
+            // the location field says, and a rename used to reach the field
+            // only because the field was rebuilt on every frame anyway.
+            //
+            // Not refresh(): this fires for any parcel whose properties
+            // arrive, including one merely selected in About Land, and the
+            // landmark button that refresh() also updates depends on the
+            // parcel the agent is standing in. That has its own callback.
+            mInput->refreshLocation();
             mInput->refreshParcelIcons();
         }
     }
@@ -219,7 +229,6 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
     mInfoBtn(NULL),
     mRegionCrossingSlot(),
     mNavMeshSlot(),
-    mIsNavMeshDirty(false),
     mLandmarkImageOn(NULL),
     mLandmarkImageOff(NULL),
     mIconMaturityGeneral(NULL),
@@ -309,75 +318,43 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
 
     // Parcel property icons
     // Must be mouse-opaque so cursor stays as an arrow when hovering to
-    // see tooltip.
-    LLIconCtrl::Params voice_icon = p.voice_icon;
-    voice_icon.tool_tip = LLTrans::getString("LocationCtrlVoiceTooltip");
-    voice_icon.mouse_opaque = true;
-    mParcelIcon[VOICE_ICON] = LLUICtrlFactory::create<LLIconCtrl>(voice_icon);
-    mParcelIcon[VOICE_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, VOICE_ICON));
-    addChild(mParcelIcon[VOICE_ICON]);
+    // see tooltip. Tooltips and the click handlers that are the same in both
+    // panels come from the strip's initIcons below; the order these are added
+    // in is the order they were added in before.
+    auto make_icon = [this](const LLIconCtrl::Params& base, ALParcelIconStrip::EIcon slot)
+    {
+        LLIconCtrl::Params params = base;
+        params.mouse_opaque = true;
+        LLIconCtrl* ctrl = LLUICtrlFactory::create<LLIconCtrl>(params);
+        mParcelIcons.setIcon(slot, ctrl);
+        addChild(ctrl);
+        return ctrl;
+    };
 
-    LLIconCtrl::Params fly_icon = p.fly_icon;
-    fly_icon.tool_tip = LLTrans::getString("LocationCtrlFlyTooltip");
-    fly_icon.mouse_opaque = true;
-    mParcelIcon[FLY_ICON] = LLUICtrlFactory::create<LLIconCtrl>(fly_icon);
-    mParcelIcon[FLY_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, FLY_ICON));
-    addChild(mParcelIcon[FLY_ICON]);
+    make_icon(p.voice_icon,   ALParcelIconStrip::ICON_VOICE);
+    make_icon(p.fly_icon,     ALParcelIconStrip::ICON_FLY);
+    make_icon(p.push_icon,    ALParcelIconStrip::ICON_PUSH);
+    make_icon(p.build_icon,   ALParcelIconStrip::ICON_BUILD);
+    make_icon(p.scripts_icon, ALParcelIconStrip::ICON_SCRIPTS);
+    make_icon(p.damage_icon,  ALParcelIconStrip::ICON_DAMAGE);
 
-    LLIconCtrl::Params push_icon = p.push_icon;
-    push_icon.tool_tip = LLTrans::getString("LocationCtrlPushTooltip");
-    push_icon.mouse_opaque = true;
-    mParcelIcon[PUSH_ICON] = LLUICtrlFactory::create<LLIconCtrl>(push_icon);
-    mParcelIcon[PUSH_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PUSH_ICON));
-    addChild(mParcelIcon[PUSH_ICON]);
-
-    LLIconCtrl::Params build_icon = p.build_icon;
-    build_icon.tool_tip = LLTrans::getString("LocationCtrlBuildTooltip");
-    build_icon.mouse_opaque = true;
-    mParcelIcon[BUILD_ICON] = LLUICtrlFactory::create<LLIconCtrl>(build_icon);
-    mParcelIcon[BUILD_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, BUILD_ICON));
-    addChild(mParcelIcon[BUILD_ICON]);
-
-    LLIconCtrl::Params scripts_icon = p.scripts_icon;
-    scripts_icon.tool_tip = LLTrans::getString("LocationCtrlScriptsTooltip");
-    scripts_icon.mouse_opaque = true;
-    mParcelIcon[SCRIPTS_ICON] = LLUICtrlFactory::create<LLIconCtrl>(scripts_icon);
-    mParcelIcon[SCRIPTS_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, SCRIPTS_ICON));
-    addChild(mParcelIcon[SCRIPTS_ICON]);
-
-    LLIconCtrl::Params damage_icon = p.damage_icon;
-    damage_icon.tool_tip = LLTrans::getString("LocationCtrlDamageTooltip");
-    damage_icon.mouse_opaque = true;
-    mParcelIcon[DAMAGE_ICON] = LLUICtrlFactory::create<LLIconCtrl>(damage_icon);
-    mParcelIcon[DAMAGE_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, DAMAGE_ICON));
-    addChild(mParcelIcon[DAMAGE_ICON]);
-
-    LLIconCtrl::Params pathfinding_dirty_icon = p.pathfinding_dirty_icon;
-    pathfinding_dirty_icon.tool_tip = LLTrans::getString("LocationCtrlPathfindingDirtyTooltip");
-    pathfinding_dirty_icon.mouse_opaque = true;
-    mParcelIcon[PATHFINDING_DIRTY_ICON] = LLUICtrlFactory::create<LLIconCtrl>(pathfinding_dirty_icon);
-    mParcelIcon[PATHFINDING_DIRTY_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PATHFINDING_DIRTY_ICON));
-    addChild(mParcelIcon[PATHFINDING_DIRTY_ICON]);
-
-    LLIconCtrl::Params pathfinding_disabled_icon = p.pathfinding_disabled_icon;
-    pathfinding_disabled_icon.tool_tip = LLTrans::getString("LocationCtrlPathfindingDisabledTooltip");
-    pathfinding_disabled_icon.mouse_opaque = true;
-    mParcelIcon[PATHFINDING_DISABLED_ICON] = LLUICtrlFactory::create<LLIconCtrl>(pathfinding_disabled_icon);
-    mParcelIcon[PATHFINDING_DISABLED_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PATHFINDING_DISABLED_ICON));
-    addChild(mParcelIcon[PATHFINDING_DISABLED_ICON]);
+    make_icon(p.pathfinding_dirty_icon, ALParcelIconStrip::ICON_PATHFINDING_DIRTY)
+        ->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onPathfindingIconClick, this,
+                                           ALParcelIconStrip::ICON_PATHFINDING_DIRTY));
+    make_icon(p.pathfinding_disabled_icon, ALParcelIconStrip::ICON_PATHFINDING_DISABLED)
+        ->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onPathfindingIconClick, this,
+                                           ALParcelIconStrip::ICON_PATHFINDING_DISABLED));
 
     LLTextBox::Params damage_text = p.damage_text;
     damage_text.tool_tip = LLTrans::getString("LocationCtrlDamageTooltip");
     damage_text.mouse_opaque = true;
-    mDamageText = LLUICtrlFactory::create<LLTextBox>(damage_text);
-    addChild(mDamageText);
+    LLTextBox* damage_ctrl = LLUICtrlFactory::create<LLTextBox>(damage_text);
+    addChild(damage_ctrl);
+    mParcelIcons.setDamageText(damage_ctrl);
 
-    LLIconCtrl::Params see_avatars_icon = p.see_avatars_icon;
-    see_avatars_icon.tool_tip = LLTrans::getString("LocationCtrlSeeAVsTooltip");
-    see_avatars_icon.mouse_opaque = true;
-    mParcelIcon[SEE_AVATARS_ICON] = LLUICtrlFactory::create<LLIconCtrl>(see_avatars_icon);
-    mParcelIcon[SEE_AVATARS_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, SEE_AVATARS_ICON));
-    addChild(mParcelIcon[SEE_AVATARS_ICON]);
+    make_icon(p.see_avatars_icon, ALParcelIconStrip::ICON_SEE_AVATARS);
+
+    mParcelIcons.initIcons();
 
     // Register callbacks and load the location field context menu (NB: the order matters).
     LLUICtrl::CommitCallbackRegistry::currentRegistrar().add("Navbar.Action", boost::bind(&LLLocationInputCtrl::onLocationContextMenuItemClicked, this, _2));
@@ -423,6 +400,13 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
             boost::bind(&LLLocationInputCtrl::onLocationHistoryChanged, this,_1));
 
     mRegionCrossingSlot = gAgent.addRegionChangedCallback(boost::bind(&LLLocationInputCtrl::onRegionBoundaryCrossed, this));
+    // An estate manager changing the region's maturity rating, or renaming it,
+    // arrives on a handshake and moves neither the parcel nor the region we
+    // are standing in -- so no other callback here sees it.
+    mRegionInfoConnection = LLViewerRegion::setRegionInfoChangedCallback(
+        boost::bind(&LLLocationInputCtrl::onRegionInfoChanged, this, _1));
+    mHealthConnection = gAgent.addHealthChangedCallback(
+        [this](S32 health) { mParcelIcons.setHealth(health); });
     createNavMeshStatusListenerForCurrentRegion();
 
     mRemoveLandmarkObserver = new LLRemoveLandmarkObserver(this);
@@ -450,6 +434,8 @@ LLLocationInputCtrl::~LLLocationInputCtrl()
     delete mParcelChangeObserver;
 
     mRegionCrossingSlot.disconnect();
+    mRegionInfoConnection.disconnect();
+    mHealthConnection.disconnect();
     mNavMeshSlot.disconnect();
     mCoordinatesControlConnection.disconnect();
     mParcelPropertiesControlConnection.disconnect();
@@ -553,7 +539,7 @@ void LLLocationInputCtrl::onTextEntry(LLLineEditor* line_editor)
  *
  * This is faster than setTextEntry().
  */
-void LLLocationInputCtrl::setText(const LLStringExplicit& text)
+void LLLocationInputCtrl::setText(ALStringViewExplicit text)
 {
     if (mTextEntry)
     {
@@ -601,17 +587,25 @@ void LLLocationInputCtrl::onFocusLost()
 
 void LLLocationInputCtrl::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     if(!hasFocus() && show_coords)
     {
-        refreshLocation();
+        // The one input to this readout with no callback behind it is the
+        // agent's own position, and the readout prints it rounded -- to 2 m at
+        // a walk, 4 m in flight. Three integers answer whether the text can
+        // have moved. Building the text to find out costs a format, five
+        // allocations and a shaping pass, and for all but a couple of frames a
+        // second the answer is no.
+        S32 pos_x, pos_y, pos_z;
+        LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+        if (pos_x != mDisplayPosX || pos_y != mDisplayPosY || pos_z != mDisplayPosZ)
+        {
+            refreshLocation();
+        }
     }
 
-    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-    if (show_icons)
-    {
-        refreshHealth();
-    }
     LLComboBox::draw();
 }
 
@@ -630,7 +624,9 @@ void LLLocationInputCtrl::reshape(S32 width, S32 height, bool called_from_parent
 
     if (isHumanReadableLocationVisible)
     {
-        refreshMaturityButton();
+        // Only the placement: the region's rating has not changed, the space
+        // the text leaves for its icon has.
+        positionMaturityButton();
     }
 }
 
@@ -685,11 +681,27 @@ void LLLocationInputCtrl::onAgentParcelChange()
 void LLLocationInputCtrl::onRegionBoundaryCrossed()
 {
     createNavMeshStatusListenerForCurrentRegion();
+    // The region's name and its maturity rating are both in the readout, and
+    // both just changed. This reached the field only through the per-frame
+    // rebuild before -- crossing a region usually crosses a parcel too, and
+    // that is what happened to refresh it.
+    refresh();
+}
+
+void LLLocationInputCtrl::onRegionInfoChanged(LLViewerRegion* regionp)
+{
+    // Fires for every region that hands us a handshake, including neighbours
+    // coming into view. Only the one being displayed matters.
+    if (regionp == gAgent.getRegion())
+    {
+        updateMaturityButtonImage();
+        refreshLocation();
+    }
 }
 
 void LLLocationInputCtrl::onNavMeshStatusChange(const LLPathfindingNavMeshStatus &pNavMeshStatus)
 {
-    mIsNavMeshDirty = pNavMeshStatus.isValid() && (pNavMeshStatus.getStatus() != LLPathfindingNavMeshStatus::kComplete);
+    mParcelIcons.setNavMeshDirty(pNavMeshStatus.isValid() && (pNavMeshStatus.getStatus() != LLPathfindingNavMeshStatus::kComplete));
     refreshParcelIcons();
 }
 
@@ -787,24 +799,36 @@ void LLLocationInputCtrl::refresh()
     mInfoBtn->setEnabled(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 // [/RLVa:KB]
 
+    updateMaturityButtonImage();
     refreshLocation();          // update location string
     refreshParcelIcons();
     updateAddLandmarkButton();  // indicate whether current parcel has been landmarked
+
+    // Health has a signal now, but nothing replays the last value to a panel
+    // that was not listening when it arrived. This is the sync for that.
+    mParcelIcons.setHealth(gAgent.getHealth());
 }
 
 void LLLocationInputCtrl::refreshLocation()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Is one of our children focused?
     if (LLUICtrl::hasFocus() || mButton->hasFocus() || mList->hasFocus() ||
         (mTextEntry && mTextEntry->hasFocus()) ||
         (mAddLandmarkBtn->hasFocus()))
     {
-        LL_WARNS() << "Location input should not be refreshed when having focus" << LL_ENDL;
+        // Not a fault. Refreshes arrive on parcel, region and setting changes
+        // now, and any of them can land while the user is part-way through
+        // typing an address -- which is exactly when the field must be left
+        // alone. It gets rewritten on focus loss.
+        LL_DEBUGS("Navbar") << "Location refresh skipped: the field has focus" << LL_ENDL;
         return;
     }
 
-    // Update location field.
-    std::string location_name;
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+
     // Cached: this is reached from draw, on every frame the setting is on, and
     // looking a setting up by its name is a hash of the name and a walk of the
     // map. The draw asks the same question through LLUICachedControl to decide
@@ -815,16 +839,61 @@ void LLLocationInputCtrl::refreshLocation()
             ? LLAgentUI::LOCATION_FORMAT_FULL
             : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
-    if (!LLAgentUI::buildLocationString(location_name, format))
+    if (!LLAgentUI::buildLocationString(mLocationScratch, format))
     {
-        location_name = "???";
+        // Between a region crossing and the parcel properties that follow it
+        // there is no parcel to name. Keep the last good string rather than
+        // flashing a placeholder at every crossing: a refresh follows when the
+        // parcel arrives, and the placeholder is only right before the first
+        // one ever does.
+        //
+        // The position is deliberately not recorded here. What draw() compares
+        // it against is the position the text on screen was built from, and
+        // the text on screen is now older than this one -- recording it would
+        // tell draw() the readout was current and stop it coming back.
+        if (!mHumanReadableLocation.empty())
+        {
+            return;
+        }
+        mLocationScratch = "???";
     }
+
+    // Recorded whether or not the text turns out to have moved, because from
+    // here on the string is the one this position produces: draw() reads this
+    // to decide whether to come back, and not recording it would put the
+    // readout straight back onto the per-frame path.
+    mDisplayPosX = pos_x;
+    mDisplayPosY = pos_y;
+    mDisplayPosZ = pos_z;
+
+    // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
+    // flight: the integers draw() compared can move without the text moving.
+    //
+    // The question is asked of the field and not of mHumanReadableLocation,
+    // which is a record of what this function last built rather than of what
+    // is on screen. Two things put something else there: the SLURL the user
+    // clicks for, and whatever the user typed before giving up focus. Putting
+    // the readable text back over both is this function's other job, and a
+    // gate that compared its own last answer would skip doing it.
+    const bool text_moved = !mTextEntry || mTextEntry->getText() != mLocationScratch;
+
+    // The mean of any span of this plot is the fraction of rebuilds that
+    // produced different text -- the number draw()'s gate is sized against.
+    // The same predicate the gate uses, so the two cannot drift apart.
+    LL_PROFILE_PLOT("navbar location changed", (int64_t)text_moved);
+
+    if (!text_moved)
+    {
+        return;
+    }
+
     // store human-readable location to compare it in changeLocationPresentation()
-    mHumanReadableLocation = location_name;
-    setText(location_name);
+    mHumanReadableLocation = mLocationScratch;
+    setText(mHumanReadableLocation);
     isHumanReadableLocationVisible = true;
 
-    refreshMaturityButton();
+    // Only the placement: the text is what changed, not the region's rating.
+    positionMaturityButton();
 }
 
 // returns new right edge
@@ -843,6 +912,8 @@ static S32 layout_widget(LLUICtrl* widget, S32 right)
 
 void LLLocationInputCtrl::refreshParcelIcons()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Our "cursor" moving right to left
     S32 x = mAddLandmarkBtn->getRect().mLeft;
 
@@ -857,68 +928,14 @@ void LLLocationInputCtrl::refreshParcelIcons()
 
     x = layout_widget(mForSaleBtn, x);
 
-    if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
+    static LLCachedControl<bool> show_icons(gSavedSettings, "NavBarShowParcelProperties", false);
+    mParcelIcons.update(show_icons);
+
+    if (show_icons)
     {
-        LLParcel* current_parcel;
-        LLViewerRegion* selection_region = vpm->getSelectionRegion();
-        LLParcel* selected_parcel = vpm->getParcelSelection()->getParcel();
-
-        // If agent is in selected parcel we use its properties because
-        // they are updated more often by LLViewerParcelMgr than agent parcel properties.
-        // See LLViewerParcelMgr::processParcelProperties().
-        // This is needed to reflect parcel restrictions changes without having to leave
-        // the parcel and then enter it again. See EXT-2987
-        if (selected_parcel && selected_parcel->getLocalID() == agent_parcel->getLocalID()
-                && selection_region == agent_region)
-        {
-            current_parcel = selected_parcel;
-        }
-        else
-        {
-            current_parcel = agent_parcel;
-        }
-
-        bool allow_voice    = vpm->allowAgentVoice(agent_region, current_parcel);
-        bool allow_fly      = vpm->allowAgentFly(agent_region, current_parcel);
-        bool allow_push     = vpm->allowAgentPush(agent_region, current_parcel);
-        bool allow_build    = vpm->allowAgentBuild(current_parcel); // true when anyone is allowed to build. See EXT-4610.
-        bool allow_scripts  = vpm->allowAgentScripts(agent_region, current_parcel);
-        bool allow_damage   = vpm->allowAgentDamage(agent_region, current_parcel);
-        bool see_avs        = current_parcel->getSeeAVs();
-        bool pathfinding_dynamic_enabled = agent_region->dynamicPathfindingEnabled();
-
-        // Most icons are "block this ability"
-        mParcelIcon[VOICE_ICON]->setVisible(   !allow_voice );
-        mParcelIcon[FLY_ICON]->setVisible(     !allow_fly );
-        mParcelIcon[PUSH_ICON]->setVisible(    !allow_push );
-        mParcelIcon[BUILD_ICON]->setVisible(   !allow_build );
-        mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
-        mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
-        mParcelIcon[PATHFINDING_DIRTY_ICON]->setVisible(mIsNavMeshDirty);
-        mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled);
-
-        mDamageText->setVisible(allow_damage);
-        mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
-
         // Padding goes to left of both landmark star and for sale btn
         x -= mAddLandmarkHPad;
-
-        // Slide the parcel icons rect from right to left, adjusting rectangles
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            x = layout_widget(mParcelIcon[i], x);
-            x -= mIconHPad;
-        }
-        x = layout_widget(mDamageText, x);
-        x -= mIconHPad;
-    }
-    else
-    {
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            mParcelIcon[i]->setVisible(false);
-        }
-        mDamageText->setVisible(false);
+        x = mParcelIcons.layout(x, ALParcelIconStrip::LAYOUT_LEFTWARD, mIconHPad);
     }
 
     if (mTextEntry)
@@ -930,77 +947,69 @@ void LLLocationInputCtrl::refreshParcelIcons()
     }
 }
 
-void LLLocationInputCtrl::refreshHealth()
-{
-    // *FIXME: Status bar owns health information, should be in agent
-    if (gStatusBar)
-    {
-        static S32 last_health = -1;
-        S32 health = gStatusBar->getHealth();
-        if (health != last_health)
-        {
-            std::string text = llformat("%d%%", health);
-            mDamageText->setText(text);
-            last_health = health;
-        }
-    }
-}
 
-void LLLocationInputCtrl::refreshMaturityButton()
+void LLLocationInputCtrl::updateMaturityButtonImage()
 {
-    // Updating maturity rating icon.
     LLViewerRegion* region = gAgent.getRegion();
     if (!region)
         return;
 
     U8 sim_access = region->getSimAccess();
-
-    if (mLastSimAccess != sim_access)
+    if (mLastSimAccess == sim_access)
     {
-        mLastSimAccess = sim_access;
-
-        bool button_visible = true;
-        LLPointer<LLUIImage> rating_image = NULL;
-        std::string rating_tooltip;
-
-        switch(sim_access)
-        {
-        case SIM_ACCESS_PG:
-            rating_image = mIconMaturityGeneral;
-            rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
-            break;
-
-        case SIM_ACCESS_ADULT:
-            rating_image = mIconMaturityAdult;
-            rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
-            break;
-
-        case SIM_ACCESS_MATURE:
-            rating_image = mIconMaturityModerate;
-            rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
-            break;
-
-        default:
-            button_visible = false;
-            break;
-        }
-
-        mMaturityButton->setVisible(button_visible);
-        mMaturityButton->setToolTip(rating_tooltip);
-        if(rating_image)
-        {
-            mMaturityButton->setImageUnselected(rating_image);
-            mMaturityButton->setImagePressed(rating_image);
-        }
+        return;
     }
-    if (mMaturityButton->getVisible())
+    mLastSimAccess = sim_access;
+
+    LLPointer<LLUIImage> rating_image = NULL;
+    std::string rating_tooltip;
+
+    switch(sim_access)
     {
-        positionMaturityButton();
+    case SIM_ACCESS_PG:
+        rating_image = mIconMaturityGeneral;
+        rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
+        break;
+
+    case SIM_ACCESS_ADULT:
+        rating_image = mIconMaturityAdult;
+        rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
+        break;
+
+    case SIM_ACCESS_MATURE:
+        rating_image = mIconMaturityModerate;
+        rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
+        break;
+
+    default:
+        // No icon for this rating, so there is nothing to place either.
+        mMaturityRatingShown = false;
+        mMaturityButton->setVisible(false);
+        return;
     }
+
+    mMaturityRatingShown = true;
+    mMaturityButton->setToolTip(rating_tooltip);
+    mMaturityButton->setImageUnselected(rating_image);
+    mMaturityButton->setImagePressed(rating_image);
+
+    positionMaturityButton();
 }
 
 void LLLocationInputCtrl::positionMaturityButton()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Whether this region's rating has an icon at all, which is not the same
+    // question as whether the button is on screen: the last line of this
+    // function hides it when the text leaves no room, and reading that back as
+    // the gate is what used to keep the icon hidden after the field was made
+    // wide again.
+    if (!mMaturityRatingShown)
+    {
+        return;
+    }
+
     const LLFontGL* font = mTextEntry->getFont();
     if (!font)
         return;
@@ -1009,7 +1018,16 @@ void LLLocationInputCtrl::positionMaturityButton()
     mTextEntry->getTextPadding(&left_pad, &right_pad);
 
     // Calculate the right edge of rendered text + a whitespace.
-    left_pad = left_pad + font->getWidth(mTextEntry->getText()) + font->getWidth(" ");
+    //
+    // Through the cache, naming the field and its own version counter as the
+    // source: a reshape asks this of text that has not changed, and does so on
+    // every frame of a drag. The trailing space is left uncached -- it is one
+    // glyph, the shaping cache answers it, and a second slot keyed on a
+    // different string would break this cache's one-source rule.
+    mMaturityWidthCache.setSource(mTextEntry, mTextEntry->getTextGeneration());
+    const S32 text_width = llceil(mMaturityWidthCache.getWidthBytes(
+        font, mTextEntry->getText(), 0, S32_MAX, false));
+    left_pad = left_pad + text_width + font->getWidth(" ");
 
     LLRect rect = mMaturityButton->getRect();
     mMaturityButton->setRect(rect.setOriginAndSize(left_pad, rect.mBottom, rect.getWidth(), rect.getHeight()));
@@ -1258,65 +1276,25 @@ void LLLocationInputCtrl::callbackRebakeRegion(const LLSD& notification, const L
     }
 }
 
-void LLLocationInputCtrl::onParcelIconClick(EParcelIcon icon)
+void LLLocationInputCtrl::onPathfindingIconClick(ALParcelIconStrip::EIcon icon)
 {
-    switch (icon)
+    if (icon == ALParcelIconStrip::ICON_PATHFINDING_DISABLED)
     {
-    case VOICE_ICON:
-        LLNotificationsUtil::add("NoVoice");
-        break;
-    case FLY_ICON:
-        LLNotificationsUtil::add("NoFly");
-        break;
-    case PUSH_ICON:
-        LLNotificationsUtil::add("PushRestricted");
-        break;
-    case BUILD_ICON:
-        LLNotificationsUtil::add("NoBuild");
-        break;
-    case PATHFINDING_DIRTY_ICON:
-        if (LLPathfindingManager::getInstance() != NULL)
-        {
-            LLMenuOptionPathfindingRebakeNavmesh *rebakeInstance = LLMenuOptionPathfindingRebakeNavmesh::getInstance();
-            if (rebakeInstance && rebakeInstance->canRebakeRegion() && (rebakeInstance->getMode() == LLMenuOptionPathfindingRebakeNavmesh::kRebakeNavMesh_Available))
-            {
-                LLNotificationsUtil::add("PathfindingDirtyRebake", LLSD(), LLSD(),
-                                         boost::bind(&LLLocationInputCtrl::callbackRebakeRegion, this, _1, _2));
-                break;
-            }
-        }
-        LLNotificationsUtil::add("PathfindingDirty");
-        break;
-    case PATHFINDING_DISABLED_ICON:
         LLNotificationsUtil::add("DynamicPathfindingDisabled");
-        break;
-    case SCRIPTS_ICON:
+        return;
+    }
+
+    if (LLPathfindingManager::getInstance() != NULL)
     {
-        LLViewerRegion* region = gAgent.getRegion();
-        if(region && region->getRegionFlag(REGION_FLAGS_ESTATE_SKIP_SCRIPTS))
+        LLMenuOptionPathfindingRebakeNavmesh *rebakeInstance = LLMenuOptionPathfindingRebakeNavmesh::getInstance();
+        if (rebakeInstance && rebakeInstance->canRebakeRegion() && (rebakeInstance->getMode() == LLMenuOptionPathfindingRebakeNavmesh::kRebakeNavMesh_Available))
         {
-            LLNotificationsUtil::add("ScriptsStopped");
+            LLNotificationsUtil::add("PathfindingDirtyRebake", LLSD(), LLSD(),
+                                     boost::bind(&LLLocationInputCtrl::callbackRebakeRegion, this, _1, _2));
+            return;
         }
-        else if(region && region->getRegionFlag(REGION_FLAGS_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsNotRunning");
-        }
-        else
-        {
-            LLNotificationsUtil::add("NoOutsideScripts");
-        }
-        break;
     }
-    case DAMAGE_ICON:
-        LLNotificationsUtil::add("NotSafe");
-        break;
-    case SEE_AVATARS_ICON:
-        LLNotificationsUtil::add("SeeAvatars");
-        break;
-    case ICON_COUNT:
-        break;
-    // no default to get compiler warning when a new icon gets added
-    }
+    LLNotificationsUtil::add("PathfindingDirty");
 }
 
 void LLLocationInputCtrl::createNavMeshStatusListenerForCurrentRegion()

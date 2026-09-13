@@ -67,6 +67,8 @@ class LLButton
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLButton, LLUICtrl);
+
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -157,6 +159,7 @@ protected:
 public:
 
     ~LLButton();
+
     // For backward compatability only
     typedef std::function<void(void*)> button_callback_t;
 

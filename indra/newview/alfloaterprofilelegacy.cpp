@@ -48,7 +48,7 @@ ALFloaterProfileLegacy::~ALFloaterProfileLegacy()
 
 bool ALFloaterProfileLegacy::postBuild()
 {
-    mPanel = dynamic_cast<ALPanelProfileLegacy*>(getChild<LLPanel>("panel_profile_legacy_sidetray"));
+    mPanel = getChild<LLPanel>("panel_profile_legacy_sidetray")->as<ALPanelProfileLegacy>();
     return true;
 }
 

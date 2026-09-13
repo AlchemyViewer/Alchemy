@@ -626,8 +626,8 @@ void LLAvatarList::onItemClicked(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
 
 bool LLAvatarItemComparator::compare(const LLPanel* item1, const LLPanel* item2) const
 {
-    const LLAvatarListItem* avatar_item1 = dynamic_cast<const LLAvatarListItem*>(item1);
-    const LLAvatarListItem* avatar_item2 = dynamic_cast<const LLAvatarListItem*>(item2);
+    const LLAvatarListItem* avatar_item1 = ALViewType::as<LLAvatarListItem>(item1);
+    const LLAvatarListItem* avatar_item2 = ALViewType::as<LLAvatarListItem>(item2);
 
     if (!avatar_item1 || !avatar_item2)
     {

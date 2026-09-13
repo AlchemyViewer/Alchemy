@@ -579,8 +579,7 @@ void edit_wearable_and_customize_avatar(LLUUID item_id)
     if( gAgentCamera.cameraCustomizeAvatar() )
     {
         // If we're in appearance editing mode, the current tab may need to be refreshed
-        LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(
-            LLFloaterSidePanelContainer::getPanel("appearance"));
+        LLSidepanelAppearance *panel = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
         if (panel)
         {
             panel->showDefaultSubpart();
@@ -2397,8 +2396,7 @@ void LLAppearanceMgr::updateCOF(LLInventoryModel::item_array_t& body_items_new,
 
 void LLAppearanceMgr::updatePanelOutfitName(const std::string& name)
 {
-    LLSidepanelAppearance* panel_appearance =
-        dynamic_cast<LLSidepanelAppearance *>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance* panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     if (panel_appearance)
     {
         panel_appearance->refreshCurrentOutfitName(name);
@@ -4382,7 +4380,7 @@ void show_created_outfit(LLUUID& folder_id, bool show_panel = true)
 
     }
     LLOutfitsList *outfits_list =
-        dynamic_cast<LLOutfitsList*>(LLFloaterSidePanelContainer::getPanel("appearance", "outfitslist_tab"));
+        LLFloaterSidePanelContainer::getPanel<LLOutfitsList>("appearance", "outfitslist_tab");
     if (outfits_list)
     {
         outfits_list->setSelectedOutfitByUUID(folder_id);

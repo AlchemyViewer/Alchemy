@@ -46,10 +46,12 @@
 
 static const S32 MINIMUM_BALANCE_AMOUNT = 0;
 
-class LLFloaterBuyCurrencyUI
+class LLFloaterBuyCurrencyUI final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBuyCurrencyUI, LLFloater);
+
     LLFloaterBuyCurrencyUI(const LLSD& key);
     virtual ~LLFloaterBuyCurrencyUI();
 

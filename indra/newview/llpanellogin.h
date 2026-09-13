@@ -37,12 +37,14 @@ class LLPanelLoginListener;
 class LLSLURL;
 class LLCredential;
 
-class LLPanelLogin:
+class LLPanelLogin final:
     public LLPanel,
     public LLViewerMediaObserver
 {
     LOG_CLASS(LLPanelLogin);
 public:
+    AL_VIEW_TYPE(LLPanelLogin, LLPanel);
+
     LLPanelLogin(const LLRect &rect,
                 void (*callback)(S32 option, void* user_data),
                 void *callback_data);

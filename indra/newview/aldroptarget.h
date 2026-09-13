@@ -30,9 +30,11 @@
 
 #include "llview.h"
 
-class ALDropTarget : public LLView
+class ALDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(ALDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<LLUUID> agent_id;

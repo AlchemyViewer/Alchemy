@@ -44,9 +44,11 @@ class LLVoiceClientStatusObserver;
 
 // Implementation of conversations list session widgets
 
-class LLConversationViewSession : public LLFolderViewFolder
+class LLConversationViewSession final : public LLFolderViewFolder
 {
 public:
+    AL_VIEW_TYPE(LLConversationViewSession, LLFolderViewFolder);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
         Optional<LLFloaterIMContainer*>         container;
@@ -128,10 +130,11 @@ private:
 
 // Implementation of conversations list participant (avatar) widgets
 
-class LLConversationViewParticipant : public LLFolderViewItem
+class LLConversationViewParticipant final : public LLFolderViewItem
 {
 
 public:
+    AL_VIEW_TYPE(LLConversationViewParticipant, LLFolderViewItem);
 
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {

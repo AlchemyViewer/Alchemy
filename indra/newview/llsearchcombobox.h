@@ -35,9 +35,10 @@
  * with recent queries. Supports text auto-complete and filtering of drop down list
  * according to typed text.
  */
-class LLSearchComboBox : public LLComboBox
+class LLSearchComboBox final : public LLComboBox
 {
 public:
+    AL_VIEW_TYPE(LLSearchComboBox, LLComboBox);
 
     struct Params : public LLInitParam::Block<Params, LLComboBox::Params>
     {

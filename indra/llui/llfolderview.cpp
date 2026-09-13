@@ -125,7 +125,7 @@ const LLRect LLFolderViewScrollContainer::getScrolledViewRect() const
     LLRect rect = LLRect::null;
     if (mScrolledView)
     {
-        LLFolderView* folder_view = dynamic_cast<LLFolderView*>(mScrolledView);
+        LLFolderView* folder_view = mScrolledView->as<LLFolderView>();
         if (folder_view)
         {
             S32 height = folder_view->getRect().getHeight();
@@ -1085,7 +1085,7 @@ void LLFolderView::paste()
         for (selected_it = mSelectedItems.begin(); selected_it != mSelectedItems.end(); ++selected_it)
         {
             LLFolderViewItem* item = *selected_it;
-            LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(item);
+            LLFolderViewFolder* folder = item->as<LLFolderViewFolder>();
             if (folder == NULL)
             {
                 folder = item->getParentFolder();
@@ -1633,7 +1633,7 @@ bool LLFolderView::handleHover( S32 x, S32 y, MASK mask )
 
 LLFolderViewItem* LLFolderView::getHoveredItem() const
 {
-    return dynamic_cast<LLFolderViewItem*>(mHoveredItem.get());
+    return mHoveredItem.get();
 }
 
 void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
@@ -1641,7 +1641,7 @@ void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
     if (mHoveredItem.get() != itemp)
     {
         if (itemp)
-            mHoveredItem = itemp->getHandle();
+            mHoveredItem = itemp->getDerivedHandle<LLFolderViewItem>();
         else
             mHoveredItem.markDead();
     }
@@ -2000,14 +2000,16 @@ void LLFolderView::updateRenamerPosition()
 // Update visibility and availability (i.e. enabled/disabled) of context menu items.
 void LLFolderView::updateMenuOptions(LLMenuGL* menu)
 {
-    const LLView::child_list_t *list = menu->getChildList();
+    // Claims made for the last menu this built stop counting here.
+    LLMenuItemGL::beginContextBuild();
 
-    LLView::child_list_t::const_iterator menu_itor;
-    for (menu_itor = list->begin(); menu_itor != list->end(); ++menu_itor)
+    // Back to the all-visible, all-enabled baseline the passes below narrow.
+    // setVisible only does work where it changes something, so an entry the
+    // last build left visible costs nothing.
+    for (LLView* menu_item : *menu->getChildList())
     {
-        (*menu_itor)->setVisible(false);
-        (*menu_itor)->pushVisible(true);
-        (*menu_itor)->setEnabled(true);
+        menu_item->setVisible(true);
+        menu_item->setEnabled(true);
     }
 
     // Successively filter out invalid options
@@ -2069,8 +2071,7 @@ bool LLFolderView::isFolderSelected()
     selected_items_t::iterator item_iter;
     for (item_iter = mSelectedItems.begin(); item_iter != mSelectedItems.end(); ++item_iter)
     {
-        LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(*item_iter);
-        if (folder != NULL)
+        if ((*item_iter)->as<LLFolderViewFolder>())
         {
             return true;
         }

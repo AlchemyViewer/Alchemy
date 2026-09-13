@@ -38,7 +38,7 @@ class LLProgressBar;
 class LLViewerTexture;
 class LLTextBox;
 
-class LLProgressView :
+class LLProgressView final :
     public LLPanel,
     public LLViewerMediaObserver
 
@@ -46,6 +46,8 @@ class LLProgressView :
     LOG_CLASS(LLProgressView);
 
 public:
+    AL_VIEW_TYPE(LLProgressView, LLPanel);
+
     LLProgressView();
     virtual ~LLProgressView();
 

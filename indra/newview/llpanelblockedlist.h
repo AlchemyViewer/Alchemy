@@ -37,9 +37,11 @@ class LLMenuButton;
 class LLButton;
 
 #if 0
-class LLPanelBlockedList : public LLPanel
+class LLPanelBlockedList final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelBlockedList, LLPanel);
+
     LLPanelBlockedList();
     ~LLPanelBlockedList(){};
 
@@ -93,10 +95,12 @@ private:
 // LLFloaterGetBlockedObjectName()
 //-----------------------------------------------------------------------------
 // Class for handling mute object by name floater.
-class LLFloaterGetBlockedObjectName : public LLFloater
+class LLFloaterGetBlockedObjectName final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterGetBlockedObjectName, LLFloater);
+
     typedef std::function<void(const std::string&)> get_object_name_callback_t;
 
     bool postBuild() override;

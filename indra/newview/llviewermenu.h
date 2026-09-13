@@ -127,9 +127,11 @@ U32 render_type_from_string(std::string_view render_type);
 U32 feature_from_string(std::string_view feature);
 U64 info_display_from_string(std::string_view info_display);
 
-class LLViewerMenuHolderGL : public LLMenuHolderGL
+class LLViewerMenuHolderGL final : public LLMenuHolderGL
 {
 public:
+    AL_VIEW_TYPE(LLViewerMenuHolderGL, LLMenuHolderGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuHolderGL::Params>
     {};
 

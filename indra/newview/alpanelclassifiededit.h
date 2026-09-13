@@ -30,11 +30,13 @@
 
 #include "alpanelclassified.h"
 
-class ALPanelClassifiedEdit : public ALPanelClassifiedInfo
+class ALPanelClassifiedEdit final : public ALPanelClassifiedInfo
 {
     LOG_CLASS(ALPanelClassifiedEdit);
 
   public:
+    AL_VIEW_TYPE(ALPanelClassifiedEdit, ALPanelClassifiedInfo);
+
     static ALPanelClassifiedEdit* create();
 
     virtual ~ALPanelClassifiedEdit();

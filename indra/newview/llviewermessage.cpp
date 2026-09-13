@@ -907,7 +907,7 @@ private:
      */
     void done()
     {
-        LLInventoryPanel* active_panel = dynamic_cast<LLInventoryPanel*>(mActivePanel.get());
+        LLInventoryPanel* active_panel = ALViewType::as<LLInventoryPanel>(mActivePanel.get());
 
         // if selection is not changed since watch started lets hightlight new items.
         if (active_panel && !isSelectionChanged())
@@ -1014,7 +1014,7 @@ private:
 
 void LLViewerInventoryMoveObserver::changed(U32 mask)
 {
-    LLInventoryPanel* active_panel = dynamic_cast<LLInventoryPanel*>(mActivePanel.get());
+    LLInventoryPanel* active_panel = ALViewType::as<LLInventoryPanel>(mActivePanel.get());
 
     if (NULL == active_panel)
     {
@@ -4278,10 +4278,7 @@ void process_health_message(LLMessageSystem *mesgsys, void **user_data)
 
     mesgsys->getF32Fast(_PREHASH_HealthData, _PREHASH_Health, health);
 
-    if (gStatusBar)
-    {
-        gStatusBar->setHealth((S32)health);
-    }
+    gAgent.setHealth((S32)health);
 }
 
 
@@ -5503,7 +5500,7 @@ bool attempt_standard_notification(LLMessageSystem* msgsystem)
                 LLSD params;
                 params["NAME"] = llsdBlock["NAME"];
                 params["SECONDS"] = (LLSD::Integer)seconds;
-                LLFloaterRegionRestarting* restarting_floater = dynamic_cast<LLFloaterRegionRestarting*>(LLFloaterReg::showInstance("region_restarting", params));
+                LLFloaterRegionRestarting* restarting_floater = LLFloaterReg::showTypedInstance<LLFloaterRegionRestarting>("region_restarting", params);
                 if(restarting_floater)
                 {
                     restarting_floater->center();

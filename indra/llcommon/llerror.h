@@ -271,33 +271,6 @@ namespace LLError
     class LL_COMMON_API NoClassInfo { };
         // used to indicate no class info known for logging
 
-    //LLCallStacks keeps track of call stacks and output the call stacks to log file
-    //
-    //Note: to be simple, efficient and necessary to keep track of correct call stacks,
-    //LLCallStacks is designed not to be thread-safe.
-    //so try not to use it in multiple parallel threads at same time.
-    //Used in a single thread at a time is fine.
-    class LL_COMMON_API LLCallStacks
-    {
-    private:
-        typedef std::vector<std::string> StringVector;
-        static StringVector sBuffer ;
-
-    public:
-        static void push(const char* function, const int line) ;
-        static void insert(std::ostream& out, const char* function, const int line) ;
-        static void print() ;
-        static void clear() ;
-        static void end(const std::ostringstream& out) ;
-        static void cleanup();
-    };
-
-    // class which, when streamed, inserts the current stack trace
-    struct LL_COMMON_API LLStacktrace
-    {
-        friend std::ostream& operator<<(std::ostream& out, const LLStacktrace&);
-    };
-
     // Provides access to OS notification popup on error, since
     // not everything has access to OS's messages
     class LL_COMMON_API LLUserWarningMsg
@@ -330,23 +303,6 @@ namespace LLError
         static Handler sHandler;
     };
 }
-
-//this is cheaper than llcallstacks if no need to output other variables to call stacks.
-#define LL_PUSH_CALLSTACKS() LLError::LLCallStacks::push(__FUNCTION__, __LINE__)
-
-#define llcallstacks                                                    \
-    {                                                                   \
-        std::ostringstream _out;                                        \
-        LLError::LLCallStacks::insert(_out, __FUNCTION__, __LINE__) ;   \
-        _out
-
-#define llcallstacksendl                   \
-        LLError::End();                    \
-        LLError::LLCallStacks::end(_out) ; \
-    }
-
-#define LL_CLEAR_CALLSTACKS() LLError::LLCallStacks::clear()
-#define LL_PRINT_CALLSTACKS() LLError::LLCallStacks::print()
 
 /*
     Class type information for logging

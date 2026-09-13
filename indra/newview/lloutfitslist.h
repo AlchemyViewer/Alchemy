@@ -75,6 +75,8 @@ public:
 class LLOutfitListBase : public LLPanelAppearanceTab
 {
 public:
+    AL_VIEW_TYPE(LLOutfitListBase, LLPanelAppearanceTab);
+
     typedef std::function<void(const LLUUID&)>           selection_change_callback_t;
     typedef boost::signals2::signal<void(const LLUUID&)> selection_change_signal_t;
 
@@ -264,9 +266,11 @@ protected:
     /*virtual*/ void onUpdateItemsVisibility();
 };
 
-class LLOutfitAccordionCtrlTab : public LLAccordionCtrlTab
+class LLOutfitAccordionCtrlTab final : public LLAccordionCtrlTab
 {
 public:
+    AL_VIEW_TYPE(LLOutfitAccordionCtrlTab, LLAccordionCtrlTab);
+
     struct Params : public LLInitParam::Block<Params, LLAccordionCtrlTab::Params>
     {
         Optional<LLUUID> cat_id;
@@ -310,9 +314,10 @@ public:
  *
  * Starts fetching necessary inventory content on first opening.
  */
-class LLOutfitsList : public LLOutfitListBase
+class LLOutfitsList final : public LLOutfitListBase
 {
 public:
+    AL_VIEW_TYPE(LLOutfitsList, LLOutfitListBase);
 
     LLOutfitsList();
     virtual ~LLOutfitsList();

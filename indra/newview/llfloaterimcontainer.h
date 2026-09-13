@@ -48,11 +48,13 @@ class LLFloaterIMContainer;
 class LLSpeaker;
 class LLSpeakerMgr;
 
-class LLFloaterIMContainer
+class LLFloaterIMContainer final
     : public LLMultiFloater
     , public LLIMSessionObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterIMContainer, LLMultiFloater);
+
     LLFloaterIMContainer(const LLSD& seed, const Params& params = getDefaultParams());
     virtual ~LLFloaterIMContainer();
 

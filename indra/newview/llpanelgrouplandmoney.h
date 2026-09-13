@@ -31,9 +31,11 @@
 #include <map>
 #include "lluuid.h"
 
-class LLPanelGroupLandMoney : public LLPanelGroupTab
+class LLPanelGroupLandMoney final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupLandMoney, LLPanelGroupTab);
+
     LLPanelGroupLandMoney();
     virtual ~LLPanelGroupLandMoney();
     virtual bool postBuild();

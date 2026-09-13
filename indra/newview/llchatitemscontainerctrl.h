@@ -42,8 +42,11 @@ typedef enum e_show_item_header
     CHATITEMHEADER_SHOW_BOTH
 } EShowItemHeader;
 
-class LLFloaterIMNearbyChatToastPanel : public LLPanel
+class LLFloaterIMNearbyChatToastPanel final : public LLPanel
 {
+public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChatToastPanel, LLPanel);
+private:
 protected:
         LLFloaterIMNearbyChatToastPanel()
         :

@@ -51,13 +51,15 @@ typedef std::shared_ptr<LLSettingsBase> LLSettingsBasePtr_t;
 /**
  * Floater for creating or editing a day cycle.
  */
-class LLFloaterEditExtDayCycle : public LLFloaterEditEnvironmentBase
+class LLFloaterEditExtDayCycle final : public LLFloaterEditEnvironmentBase
 {
     LOG_CLASS(LLFloaterEditExtDayCycle);
 
     friend class LLDaySettingCopiedCallback;
 
 public:
+    AL_VIEW_TYPE(LLFloaterEditExtDayCycle, LLFloaterEditEnvironmentBase);
+
     static const std::string    KEY_EDIT_CONTEXT;
     static const std::string    KEY_DAY_LENGTH;
 

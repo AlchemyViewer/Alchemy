@@ -52,8 +52,11 @@ typedef enum e_debug_var_type
     VAR_TYPE_COUNT
 } EDebugVarType;
 
-class LLDebugVarMessageBox : public LLFloater
+class LLDebugVarMessageBox final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLDebugVarMessageBox, LLFloater);
+private:
 protected:
     LLDebugVarMessageBox(const std::string& title, EDebugVarType var_type, void *var);
     ~LLDebugVarMessageBox();

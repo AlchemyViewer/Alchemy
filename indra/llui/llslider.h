@@ -31,9 +31,11 @@
 #include "v4color.h"
 #include "lluiimage.h"
 
-class LLSlider : public LLF32UICtrl
+class LLSlider final : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSlider, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<std::string> orientation;

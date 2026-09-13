@@ -50,7 +50,7 @@ bool LLFloaterChatMentionPicker::postBuild()
     mAvatarList->setFocusOnItemClicked(false);
     mAvatarList->setItemClickedCallback([this](LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
     {
-        if (LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl))
+        if (LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl))
         {
             selectResident(item->getAvatarId());
         }

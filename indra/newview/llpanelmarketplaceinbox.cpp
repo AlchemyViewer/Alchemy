@@ -152,7 +152,7 @@ U32 LLPanelMarketplaceInbox::getFreshItemCount() const
             for (; folders_it != folders_end; ++folders_it)
             {
                 const LLFolderViewFolder * folder_view = *folders_it;
-                const LLInboxFolderViewFolder * inbox_folder_view = dynamic_cast<const LLInboxFolderViewFolder*>(folder_view);
+                const LLInboxFolderViewFolder * inbox_folder_view = ALViewType::as<LLInboxFolderViewFolder>(folder_view);
 
                 if (inbox_folder_view && inbox_folder_view->isFresh())
                 {
@@ -166,7 +166,7 @@ U32 LLPanelMarketplaceInbox::getFreshItemCount() const
             for (; items_it != items_end; ++items_it)
             {
                 const LLFolderViewItem * item_view = *items_it;
-                const LLInboxFolderViewItem * inbox_item_view = dynamic_cast<const LLInboxFolderViewItem*>(item_view);
+                const LLInboxFolderViewItem * inbox_item_view = ALViewType::as<LLInboxFolderViewItem>(item_view);
 
                 if (inbox_item_view && inbox_item_view->isFresh())
                 {

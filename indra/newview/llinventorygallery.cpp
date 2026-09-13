@@ -67,9 +67,10 @@ bool dragItemIntoFolder(LLUUID folder_id, LLInventoryItem* inv_item, bool drop, 
 void dropToMyOutfits(LLInventoryCategory* inv_cat);
 void dropToMyOutfitsSubfolder(LLInventoryCategory* inv_cat, const LLUUID& dest_id);
 
-class LLGalleryPanel: public LLPanel
+class LLGalleryPanel final: public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLGalleryPanel, LLPanel);
 
     bool canFocusChildren() const override
     {

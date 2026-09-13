@@ -34,9 +34,11 @@ class LLIconCtrl;
 class LLTextBase;
 class LLTextEditor;
 
-class LLPanelPlaceProfile : public LLPanelPlaceInfo
+class LLPanelPlaceProfile final : public LLPanelPlaceInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelPlaceProfile, LLPanelPlaceInfo);
+
     LLPanelPlaceProfile();
     /*virtual*/ ~LLPanelPlaceProfile();
 

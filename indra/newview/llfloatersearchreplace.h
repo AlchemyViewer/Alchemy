@@ -31,9 +31,11 @@ class LLTextEditor;
 // LLFloaterSearchReplace class
 //
 
-class LLFloaterSearchReplace : public LLFloater
+class LLFloaterSearchReplace final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterSearchReplace, LLFloater);
+
     LLFloaterSearchReplace(const LLSD& sdKey);
     ~LLFloaterSearchReplace();
 

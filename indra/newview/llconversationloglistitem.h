@@ -42,9 +42,11 @@ class LLConversation;
  * Also LLConversationLogListItem holds pointer to its LLConversationLog.
  */
 
-class LLConversationLogListItem : public LLPanel
+class LLConversationLogListItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLConversationLogListItem, LLPanel);
+
     LLConversationLogListItem(const LLConversation* conversation);
     virtual ~LLConversationLogListItem();
 

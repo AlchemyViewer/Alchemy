@@ -35,11 +35,12 @@
 /// Class LLFloaterSimpleSnapshot
 ///----------------------------------------------------------------------------
 
-class LLFloaterSimpleSnapshot : public LLFloaterSnapshotBase
+class LLFloaterSimpleSnapshot final : public LLFloaterSnapshotBase
 {
     LOG_CLASS(LLFloaterSimpleSnapshot);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSimpleSnapshot, LLFloaterSnapshotBase);
 
     LLFloaterSimpleSnapshot(const LLSD& key);
     ~LLFloaterSimpleSnapshot();
@@ -132,9 +133,11 @@ private:
 /// Class LLSimpleOutfitSnapshotFloaterView
 ///----------------------------------------------------------------------------
 
-class LLSimpleSnapshotFloaterView : public LLFloaterView
+class LLSimpleSnapshotFloaterView final : public LLFloaterView
 {
 public:
+    AL_VIEW_TYPE(LLSimpleSnapshotFloaterView, LLFloaterView);
+
     struct Params
         : public LLInitParam::Block<Params, LLFloaterView::Params>
     {

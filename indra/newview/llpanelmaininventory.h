@@ -59,9 +59,11 @@ class LLPanelMarketplaceInbox;
 // including all the fixin's (e.g. AllItems/RecentItems tabs, filter floaters).
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLPanelMainInventory : public LLPanel, LLInventoryObserver
+class LLPanelMainInventory final : public LLPanel, LLInventoryObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelMainInventory, LLPanel);
+
     friend class LLFloaterInventoryFinder;
 
     LLPanelMainInventory(const LLPanel::Params& p = getDefaultParams());
@@ -156,7 +158,6 @@ protected:
     static void onFoldersByName(void *user_data);
     static bool checkFoldersByName(void *user_data);
 
-    static bool incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward);
     void onFilterSelected();
 
     const std::string getFilterSubString();

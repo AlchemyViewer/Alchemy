@@ -44,6 +44,7 @@ class ALPanelClassifiedInfo : public LLPanel, public LLAvatarPropertiesObserver
 {
     LOG_CLASS(ALPanelClassifiedInfo);
 public:
+    AL_VIEW_TYPE(ALPanelClassifiedInfo, LLPanel);
 
     static ALPanelClassifiedInfo* create();
 

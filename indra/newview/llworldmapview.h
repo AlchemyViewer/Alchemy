@@ -44,9 +44,11 @@ class LLVector3;
 class LLTextBox;
 
 
-class LLWorldMapView : public LLPanel
+class LLWorldMapView final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLWorldMapView, LLPanel);
+
     static void initClass();
     static void cleanupClass();
 

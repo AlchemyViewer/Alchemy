@@ -51,9 +51,11 @@ class LLLayoutStack;
 
 typedef std::pair<LLUUID, std::string>  folder_pair_t;
 
-class LLPanelPlaces : public LLPanel
+class LLPanelPlaces final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPlaces, LLPanel);
+
     LLPanelPlaces();
     virtual ~LLPanelPlaces();
 

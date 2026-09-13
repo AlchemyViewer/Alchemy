@@ -35,9 +35,11 @@ class LLObjectSelection;
 
 const S32 MAX_SPAWNPOINTS_PER_TELEHUB = 16;
 
-class LLFloaterTelehub : public LLFloater
+class LLFloaterTelehub final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterTelehub, LLFloater);
+
     LLFloaterTelehub(const LLSD& key);
     ~LLFloaterTelehub();
 

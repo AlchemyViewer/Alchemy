@@ -384,6 +384,8 @@ private:
 class ALSceneExplorerFolder final : public LLFolderViewFolder
 {
 public:
+    AL_VIEW_TYPE(ALSceneExplorerFolder, LLFolderViewFolder);
+
     typedef LLFolderViewFolder::Params Params; // LLFolderViewFolder has no Params of its own
     ALSceneExplorerFolder(const Params& p) : LLFolderViewFolder(p) {}
     ~ALSceneExplorerFolder() override = default;
@@ -396,6 +398,8 @@ public:
 class ALSceneExplorerListItem final : public LLFolderViewItem
 {
 public:
+    AL_VIEW_TYPE(ALSceneExplorerListItem, LLFolderViewItem);
+
     typedef LLFolderViewItem::Params Params;
     ALSceneExplorerListItem(const Params& p) : LLFolderViewItem(p) {}
     ~ALSceneExplorerListItem() override = default;

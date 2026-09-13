@@ -51,6 +51,8 @@ class LLScrollListCtrl;
 class LLFloaterScriptQueue : public LLFloater/*, public LLVOInventoryListener*/
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptQueue, LLFloater);
+
     LLFloaterScriptQueue(const LLSD& key);
     virtual ~LLFloaterScriptQueue();
 
@@ -121,6 +123,7 @@ class LLFloaterCompileQueue final : public LLFloaterScriptQueue
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterCompileQueue, LLFloaterScriptQueue);
 
     void experienceIdsReceived( const LLSD& content );
     bool hasExperience(const LLUUID& id)const;
@@ -151,6 +154,9 @@ private:
 
 class LLFloaterResetQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterResetQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterResetQueue(const LLSD& key);
@@ -169,6 +175,9 @@ protected:
 
 class LLFloaterRunQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterRunQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterRunQueue(const LLSD& key);
@@ -187,6 +196,9 @@ protected:
 
 class LLFloaterNotRunQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterNotRunQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterNotRunQueue(const LLSD& key);
@@ -205,6 +217,9 @@ protected:
 
 class LLFloaterDeleteQueue final : public LLFloaterScriptQueue
 {
+public:
+    AL_VIEW_TYPE(LLFloaterDeleteQueue, LLFloaterScriptQueue);
+private:
     friend class LLFloaterReg;
 protected:
     LLFloaterDeleteQueue(const LLSD& key);

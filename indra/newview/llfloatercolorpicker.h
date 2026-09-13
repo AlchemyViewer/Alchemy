@@ -40,10 +40,12 @@ class LLCheckBoxCtrl;
 
 //////////////////////////////////////////////////////////////////////////////
 // floater class
-class LLFloaterColorPicker
+class LLFloaterColorPicker final
     : public LLFloater
 {
     public:
+    AL_VIEW_TYPE(LLFloaterColorPicker, LLFloater);
+
         LLFloaterColorPicker (LLColorSwatchCtrl* swatch, bool show_apply_immediate = false);
         virtual ~LLFloaterColorPicker ();
 

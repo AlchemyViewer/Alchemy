@@ -51,7 +51,6 @@
 #include "lluictrlfactory.h"
 #include "llhelp.h"
 #include "lldockablefloater.h"
-#include "llviewereventrecorder.h"
 
 static LLDefaultChildRegistry::Register<LLButton> r("button");
 
@@ -485,10 +484,12 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
             setFocus(true);
         }
 
+#if !LL_RELEASE_FOR_DOWNLOAD
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling mouse down function " << mFunctionName << LL_ENDL;
         }
+#endif
 
         /*
          * ATTENTION! This call fires another mouse down callback.
@@ -496,8 +497,6 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
          * by calling LLUICtrl::mMouseDownSignal(x, y, mask);
          */
         LLUICtrl::handleMouseDown(x, y, mask);
-
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
 
         if(mMouseDownSignal) (*mMouseDownSignal)(this, LLSD());
 
@@ -533,8 +532,6 @@ bool LLButton::handleMouseUp(S32 x, S32 y, MASK mask)
          * by calling LLUICtrl::mMouseUpSignal(x, y, mask);
          */
         LLUICtrl::handleMouseUp(x, y, mask);
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
-
         // Regardless of where mouseup occurs, handle callback
         if(mMouseUpSignal) (*mMouseUpSignal)(this, LLSD());
 
@@ -1324,7 +1321,7 @@ void LLButton::addImageAttributeToXML(LLXMLNodePtr node,
 void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname)
 {
     bool floater_vis = LLFloaterReg::toggleInstance(sdname.asString());
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (button)
         button->setToggleState(floater_vis);
 }
@@ -1333,7 +1330,7 @@ void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname
 // Gets called once
 void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater
@@ -1347,7 +1344,7 @@ void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 // static
 void LLButton::setDockableFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater

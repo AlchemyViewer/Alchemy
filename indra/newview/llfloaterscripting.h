@@ -31,11 +31,13 @@
 #include "lleventcoro.h"
 #include "llcoros.h"
 
-class LLFloaterScripting : public LLFloater
+class LLFloaterScripting final : public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterScripting, LLFloater);
+
     bool postBuild() override;
     void onClickClose();
     void onClickBrowse();

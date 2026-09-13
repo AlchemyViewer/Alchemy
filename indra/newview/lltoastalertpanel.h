@@ -45,11 +45,13 @@ class LLLineEditor;
  * https://wiki.lindenlab.com/mediawiki/index.php?title=LLAlertDialog&oldid=81388
  */
 
-class LLToastAlertPanel
+class LLToastAlertPanel final
     : public LLCheckBoxToastPanel
 {
     LOG_CLASS(LLToastAlertPanel);
 public:
+    AL_VIEW_TYPE(LLToastAlertPanel, LLCheckBoxToastPanel);
+
     typedef bool (*display_callback_t)(S32 modal);
 
 public:

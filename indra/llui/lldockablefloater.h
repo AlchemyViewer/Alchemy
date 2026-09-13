@@ -42,6 +42,8 @@ class LLDockableFloater : public LLFloater
 
     static void init(LLDockableFloater* thiz);
 public:
+    AL_VIEW_TYPE(LLDockableFloater, LLFloater);
+
     LOG_CLASS(LLDockableFloater);
     LLDockableFloater(LLDockControl* dockControl, const LLSD& key,
             const Params& params = getDefaultParams());

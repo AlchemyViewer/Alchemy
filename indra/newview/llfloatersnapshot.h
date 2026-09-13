@@ -41,6 +41,7 @@ class LLFloaterSnapshotBase : public LLFloater
     LOG_CLASS(LLFloaterSnapshotBase);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSnapshotBase, LLFloater);
 
     LLFloaterSnapshotBase(const LLSD& key);
     virtual ~LLFloaterSnapshotBase();
@@ -142,11 +143,13 @@ public:
     EStatus mStatus;
 };
 
-class LLFloaterSnapshot : public LLFloaterSnapshotBase
+class LLFloaterSnapshot final : public LLFloaterSnapshotBase
 {
     LOG_CLASS(LLFloaterSnapshot);
 
 public:
+    AL_VIEW_TYPE(LLFloaterSnapshot, LLFloaterSnapshotBase);
+
     LLFloaterSnapshot(const LLSD& key);
     /*virtual*/ ~LLFloaterSnapshot();
 
@@ -217,9 +220,11 @@ private:
     void setFinished(bool finished, bool ok = true, const std::string& msg = LLStringUtil::null);
 };
 
-class LLSnapshotFloaterView : public LLFloaterView
+class LLSnapshotFloaterView final : public LLFloaterView
 {
 public:
+    AL_VIEW_TYPE(LLSnapshotFloaterView, LLFloaterView);
+
     struct Params
     :   public LLInitParam::Block<Params, LLFloaterView::Params>
     {

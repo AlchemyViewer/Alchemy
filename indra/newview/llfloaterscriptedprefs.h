@@ -33,9 +33,11 @@
 class LLScriptEditor;
 class LLUICtrl;
 
-class LLFloaterScriptEdPrefs : public LLFloater
+class LLFloaterScriptEdPrefs final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptEdPrefs, LLFloater);
+
     LLFloaterScriptEdPrefs(const LLSD& key);
     bool postBuild() override;
 

@@ -35,9 +35,11 @@
 
 class LLSearchEditor;
 
-class ALPanelSearchPeople : public ALPanelSearch
+class ALPanelSearchPeople final : public ALPanelSearch
 {
 public:
+    AL_VIEW_TYPE(ALPanelSearchPeople, ALPanelSearch);
+
     ALPanelSearchPeople();
     /*virtual*/ bool postBuild() override;
 private:

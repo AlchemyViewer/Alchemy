@@ -30,8 +30,11 @@
 
 class LLFloaterReg;
 
-class LLFloaterCameraPresets : public LLFloater
+class LLFloaterCameraPresets final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterCameraPresets, LLFloater);
+private:
     friend class LLFloaterReg;
 
     virtual bool postBuild();
@@ -47,9 +50,11 @@ private:
     LLFlatListView* mPresetList;
 };
 
-class LLCameraPresetFlatItem : public LLPanel
+class LLCameraPresetFlatItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCameraPresetFlatItem, LLPanel);
+
     LLCameraPresetFlatItem(const std::string &preset_name, bool is_default);
     virtual ~LLCameraPresetFlatItem();
 

@@ -34,10 +34,12 @@ class LLTextBox;
 class LLScrollListCtrl;
 class LLButton;
 
-class LLFloaterLandHoldings
+class LLFloaterLandHoldings final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterLandHoldings, LLFloater);
+
     LLFloaterLandHoldings(const LLSD& key);
     virtual ~LLFloaterLandHoldings();
 

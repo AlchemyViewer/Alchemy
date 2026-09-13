@@ -33,10 +33,12 @@
 #include "llparcelselection.h"
 #include "lluifwd.h"    // widget pointer types
 
-class LLPanelLandMedia
+class LLPanelLandMedia final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelLandMedia, LLPanel);
+
     LLPanelLandMedia(LLSafeHandle<LLParcelSelection>& parcelp);
     /*virtual*/ ~LLPanelLandMedia();
     /*virtual*/ bool postBuild();

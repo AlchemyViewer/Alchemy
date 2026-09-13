@@ -34,9 +34,11 @@ class LLTextBox;
 class LLFloaterDirectory;
 class LLWebBrowserCtrlObserver;
 
-class LLPanelDirWeb : public LLPanel, public LLViewerMediaObserver
+class LLPanelDirWeb final : public LLPanel, public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirWeb, LLPanel);
+
     LLPanelDirWeb();
     ~LLPanelDirWeb();
 

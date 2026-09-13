@@ -187,7 +187,7 @@ void    LLNameListCtrl::mouseOverHighlightNthItem( S32 target_index )
             LLScrollListItem* item = getItemList()[cur_index];
             if (item)
             {
-                LLScrollListText* cell = dynamic_cast<LLScrollListText*>(item->getColumn(mNameColumnIndex));
+                LLScrollListText* cell = item->getColumn<LLScrollListText>(mNameColumnIndex);
                 if (cell)
                     cell->setTextWidth(cell->getTextWidth() + info_icon_size);
             }
@@ -199,7 +199,7 @@ void    LLNameListCtrl::mouseOverHighlightNthItem( S32 target_index )
         if(target_index != -1)
         {
             LLScrollListItem* item = getItemList()[target_index];
-            LLScrollListText* cell = dynamic_cast<LLScrollListText*>(item->getColumn(mNameColumnIndex));
+            LLScrollListText* cell = item->getColumn<LLScrollListText>(mNameColumnIndex);
             if (item)
             {
                 if (cell)

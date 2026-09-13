@@ -42,9 +42,11 @@ class LLViewerObject;
 class LLCheckBoxCtrl;
 class LLSpinCtrl;
 
-class LLPanelContents : public LLPanel
+class LLPanelContents final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelContents, LLPanel);
+
     virtual bool postBuild();
     LLPanelContents();
     virtual ~LLPanelContents();

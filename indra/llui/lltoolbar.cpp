@@ -29,6 +29,7 @@
 
 #include "lltoolbar.h"
 
+#include "llcallbacklist.h"
 #include "llcommandmanager.h"
 #include "llmenugl.h"
 #include "lltrans.h"
@@ -38,6 +39,10 @@
 // uncomment this and remove the one in llui.cpp when there is an external reference to this translation unit
 // thanks, MSVC!
 //static LLDefaultChildRegistry::Register<LLToolBar> r1("toolbar");
+
+// Starts ahead of every bar's own count, so each asks its buttons once before
+// it first draws rather than showing whatever the parameters left them as.
+U32 LLToolBar::sRefreshGeneration = 1;
 
 namespace LLToolBarEnums
 {
@@ -138,10 +143,18 @@ LLToolBar::LLToolBar(const LLToolBar::Params& p)
     mButtonParams[LLToolBarEnums::BTNTYPE_ICONS_ONLY] = p.button_icon;
     mButtonParams[LLToolBarEnums::BTNTYPE_ICONS_ONLY_SMALL] = p.button_icon_small;
     mButtonParams[LLToolBarEnums::BTNTYPE_TEXT_ONLY] = p.button_text;
+
+    // Whether a button's command is available or running, and where the buttons
+    // sit, are both asked here rather than in draw. Every bar registers: only
+    // the first of those is a read-only bar's business, but a bar that is never
+    // laid out never places its buttons at all.
+    gIdleCallbacks.addFunction(&LLToolBar::onIdleUpdate, this);
 }
 
 LLToolBar::~LLToolBar()
 {
+    gIdleCallbacks.deleteFunction(&LLToolBar::onIdleUpdate, this);
+
     auto menu = mPopupMenuHandle.get();
     if (menu)
     {
@@ -152,6 +165,66 @@ LLToolBar::~LLToolBar()
     delete mButtonEnterSignal;
     delete mButtonLeaveSignal;
     delete mButtonRemoveSignal;
+}
+
+// static
+void LLToolBar::onIdleUpdate(void* userdata)
+{
+    LLToolBar* toolbar = static_cast<LLToolBar*>(userdata);
+
+    // Nothing under a bar nobody can see needs settling, and this all used to
+    // be reached from draw, which is where that was decided for free.
+    if (!toolbar->isInVisibleChain())
+    {
+        return;
+    }
+
+    // States first. A button that gains or loses its pressed look resizes
+    // itself, and the pass after this is what places it.
+    //
+    // Only an editable bar has states to ask about; every bar has to be placed.
+    // This is the division draw() made before the work moved here, and losing
+    // it left the read-only bars with a layout flag nothing ever consumed.
+    if (!toolbar->mReadOnly)
+    {
+        toolbar->updateButtonStates();
+    }
+    toolbar->updateLayoutAsNeeded();
+}
+
+void LLToolBar::updateButtonStates()
+{
+    // Asking a button whether its command is available or running means running
+    // whatever predicate commands.xml named for it, and most of those look a
+    // floater up in the registry by name. Asked only when something that could
+    // have changed the answer has said so.
+    //
+    // Everything those predicates read is watched -- see the state watcher in
+    // lltoolbarview.cpp, which is where the list of what they read is written
+    // down. A command whose predicate reads something not on that list gets a
+    // button that never changes, so the list is part of adding one.
+    if (mRefreshedGeneration == sRefreshGeneration)
+    {
+        return;
+    }
+    mRefreshedGeneration = sRefreshGeneration;
+
+    for (LLToolBarButton* btn : mButtons)
+    {
+        const LLCommand* command = btn->mCommand;
+
+        if (command && btn->mIsEnabledSignal)
+        {
+            const bool button_command_enabled = (*btn->mIsEnabledSignal)(btn, command->isEnabledParameters());
+            btn->setEnabled(button_command_enabled);
+        }
+
+        if (command && btn->mIsRunningSignal)
+        {
+            const bool button_command_running = (*btn->mIsRunningSignal)(btn, command->isRunningParameters());
+            btn->setToggleState(button_command_running);
+        }
+    }
 }
 
 void LLToolBar::createContextMenu()
@@ -929,11 +1002,14 @@ void LLToolBar::updateLayoutAsNeeded()
     // re-center toolbar buttons
     mCenteringStack->updateLayout();
 
-    if (!mButtons.empty())
-    {
-        mButtonPanel->setVisible(true);
-        mButtonPanel->setMouseOpaque(true);
-    }
+    // Whether there is a panel to interact with at all follows from whether
+    // there are buttons on it, and that only changes when the buttons do --
+    // every place that changes them asks for a layout. The showing half was
+    // already here; the hiding half was being re-decided in draw, on every
+    // frame, to arrive at what it already said.
+    const bool has_buttons = !mButtons.empty();
+    mButtonPanel->setVisible(has_buttons);
+    mButtonPanel->setMouseOpaque(has_buttons);
 
     // don't clear flag until after we've resized ourselves, to avoid laying out every frame
     mNeedsLayout = false;
@@ -947,44 +1023,17 @@ bool LLToolBar::postBuild()
 
 void LLToolBar::draw()
 {
-    if (mButtons.empty())
-    {
-        mButtonPanel->setVisible(false);
-        mButtonPanel->setMouseOpaque(false);
-    }
-    else
-    {
-        mButtonPanel->setVisible(true);
-        mButtonPanel->setMouseOpaque(true);
-    }
-
-    // Update enable/disable state and highlight state for editable toolbars
-    if (!mReadOnly)
-    {
-        auto& commandManager = LLCommandManager::instance();
-        for (LLToolBarButton* btn : mButtons)
-        {
-            LLCommand* command = commandManager.getCommand(btn->mId);
-
-            if (command && btn->mIsEnabledSignal)
-            {
-                const bool button_command_enabled = (*btn->mIsEnabledSignal)(btn, command->isEnabledParameters());
-                btn->setEnabled(button_command_enabled);
-            }
-
-            if (command && btn->mIsRunningSignal)
-            {
-                const bool button_command_running = (*btn->mIsRunningSignal)(btn, command->isRunningParameters());
-                btn->setToggleState(button_command_running);
-            }
-        }
-    }
-
-    updateLayoutAsNeeded();
-    // rect may have shifted during layout
-    LLUI::popMatrix();
-    LLUI::pushMatrix();
-    LLUI::translate((F32)getRect().mLeft, (F32)getRect().mBottom);
+    // What every button shows, and where every button sits, are both settled
+    // on an idle callback now -- see onIdleUpdate. Idle runs ahead of the
+    // display for the frame, so nothing here is older than it was.
+    //
+    // Laying out moves and resizes this bar, and it used to do that from right
+    // here, after the parent had already pushed a matrix translated to where
+    // the bar was before. So the three lines that stood here popped that
+    // matrix, pushed another, and translated again with the new rectangle --
+    // correct, and balanced against the parent's own pop, but a view reaching
+    // into its caller's frame to repair a translation the caller had made in
+    // good faith. A bar that does not move while being drawn needs none of it.
 
     // Position the caret
     // Todo: This shouldn't be on draw, but, as example, on hover
@@ -1068,11 +1117,15 @@ void LLToolBar::createButtons()
     mNeedsLayout = true;
 }
 
+void LLToolBarButton::setCommandId(const LLCommandId& id)
+{
+    mId = id;
+    mCommand = LLCommandManager::instance().getCommand(id);
+}
+
 void LLToolBarButton::callIfEnabled(LLUICtrl::commit_callback_t commit, LLUICtrl* ctrl, const LLSD& param )
 {
-    LLCommand* command = LLCommandManager::instance().getCommand(mId);
-
-    if (!mIsEnabledSignal || (*mIsEnabledSignal)(this, command->isEnabledParameters()))
+    if (!mIsEnabledSignal || (mCommand && (*mIsEnabledSignal)(this, mCommand->isEnabledParameters())))
     {
         commit(ctrl, param);
     }
@@ -1344,9 +1397,7 @@ void LLToolBarButton::onMouseCaptureLost()
 
 void LLToolBarButton::onCommit()
 {
-    LLCommand* command = LLCommandManager::instance().getCommand(mId);
-
-    if (!mIsEnabledSignal || (*mIsEnabledSignal)(this, command->isEnabledParameters()))
+    if (!mIsEnabledSignal || (mCommand && (*mIsEnabledSignal)(this, mCommand->isEnabledParameters())))
     {
         LLButton::onCommit();
     }
@@ -1386,13 +1437,13 @@ void LLToolBarButton::setEnabled(bool enabled)
 // [/RLVa:KB]
 }
 
-const std::string LLToolBarButton::getToolTip() const
+std::string LLToolBarButton::getToolTip() const
 {
     std::string tooltip;
 
-    if (labelIsTruncated() || getCurrentLabel().empty())
+    if (mCommand && (labelIsTruncated() || getCurrentLabel().empty()))
     {
-        tooltip = LLTrans::getString(LLCommandManager::instance().getCommand(mId)->labelRef()) + " -- " + LLView::getToolTip();
+        tooltip = LLTrans::getString(mCommand->labelRef()) + " -- " + LLView::getToolTip();
     }
     else
     {

@@ -39,6 +39,8 @@ class LLTextBox;
 class LLDragHandle : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLDragHandle, LLView);
+
     struct Params
     :   public LLInitParam::Block<Params, LLView::Params>
     {
@@ -107,9 +109,13 @@ private:
 
 
 // Use this one for traditional top-of-window draggers
-class LLDragHandleTop
+class LLDragHandleTop final
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleTop, LLDragHandle);
+
+private:
 protected:
     LLDragHandleTop(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;
@@ -125,9 +131,13 @@ private:
 
 
 // Use this for left-side, vertical text draggers
-class LLDragHandleLeft
+class LLDragHandleLeft final
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleLeft, LLDragHandle);
+
+private:
 protected:
     LLDragHandleLeft(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;

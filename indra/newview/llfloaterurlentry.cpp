@@ -105,7 +105,7 @@ void LLFloaterURLEntry::buildURLHistory()
 
 void LLFloaterURLEntry::headerFetchComplete(S32 status, const std::string& mime_type)
 {
-    LLPanelLandMedia* panel_media = dynamic_cast<LLPanelLandMedia*>(mPanelLandMediaHandle.get());
+    LLPanelLandMedia* panel_media = ALViewType::as<LLPanelLandMedia>(mPanelLandMediaHandle.get());
     if (panel_media)
     {
         // status is ignored for now -- error = "none/none"

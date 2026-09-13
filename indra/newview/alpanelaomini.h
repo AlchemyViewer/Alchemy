@@ -40,6 +40,8 @@ class LLComboBox;
 class ALPanelAOMini final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelAOMini, LLPanel);
+
     ALPanelAOMini();
 
     bool postBuild() override;

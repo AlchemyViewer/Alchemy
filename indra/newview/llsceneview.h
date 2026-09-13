@@ -30,9 +30,11 @@
 #include "llfloater.h"
 
 
-class LLSceneView : public LLFloater
+class LLSceneView final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLSceneView, LLFloater);
+
     LLSceneView(const LLRect& rect);
 
     virtual void draw();

@@ -107,9 +107,10 @@ LLToolTip* LLInspectTextureUtil::createInventoryToolTip(LLToolTip::Params p)
 // LLTexturePreviewView helper class
 //
 
-class LLTexturePreviewView : public LLView
+class LLTexturePreviewView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLTexturePreviewView, LLView);
     LLTexturePreviewView(const LLView::Params& p);
     ~LLTexturePreviewView();
 

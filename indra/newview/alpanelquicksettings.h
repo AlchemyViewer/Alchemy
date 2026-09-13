@@ -37,6 +37,8 @@ class LLSpinCtrl;
 class ALPanelQuickSettings final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelQuickSettings, LLPanel);
+
     ALPanelQuickSettings();
     ~ALPanelQuickSettings();
 

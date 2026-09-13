@@ -33,11 +33,13 @@
 
 class LLMediaCtrl;
 
-class LLFloaterHelpBrowser :
+class LLFloaterHelpBrowser final :
     public LLFloater,
     public LLViewerMediaObserver
 {
  public:
+    AL_VIEW_TYPE(LLFloaterHelpBrowser, LLFloater);
+
     LLFloaterHelpBrowser(const LLSD& key);
 
     /*virtual*/ bool postBuild();

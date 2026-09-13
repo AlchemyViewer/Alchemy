@@ -215,6 +215,22 @@ public:
     F32             getVelocityZ() const    { return getVelocity().mV[VZ]; } // ! HACK !
 
     //--------------------------------------------------------------------
+    // Health
+    //--------------------------------------------------------------------
+public:
+    typedef boost::signals2::signal<void(S32)> health_changed_signal_t;
+
+    S32             getHealth() const { return mHealth; }
+    // Arrives in HealthMessage as a percentage. Plays the damage sound and
+    // notifies below, both only when the value actually moves.
+    void            setHealth(S32 health);
+    boost::signals2::connection addHealthChangedCallback(const health_changed_signal_t::slot_type& cb);
+
+private:
+    S32                         mHealth { 100 };
+    health_changed_signal_t     mHealthChangedSignal;
+
+    //--------------------------------------------------------------------
     // Coordinate System
     //--------------------------------------------------------------------
 public:

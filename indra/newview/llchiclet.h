@@ -38,9 +38,10 @@ class LLFloaterIMSession;
 /**
  * Class for displaying amount of messages/notifications(unread).
  */
-class LLChicletNotificationCounterCtrl : public LLTextBox
+class LLChicletNotificationCounterCtrl final : public LLTextBox
 {
 public:
+    AL_VIEW_TYPE(LLChicletNotificationCounterCtrl, LLTextBox);
 
     struct Params : public LLInitParam::Block<Params, LLTextBox::Params>
     {
@@ -99,6 +100,7 @@ private:
 class LLChicletAvatarIconCtrl : public LLAvatarIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLChicletAvatarIconCtrl, LLAvatarIconCtrl);
 
     struct Params : public LLInitParam::Block<Params, LLAvatarIconCtrl::Params>
     {
@@ -119,9 +121,10 @@ protected:
 /**
  * Class for displaying icon in inventory offer chiclet.
  */
-class LLChicletInvOfferIconCtrl : public LLChicletAvatarIconCtrl
+class LLChicletInvOfferIconCtrl final : public LLChicletAvatarIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLChicletInvOfferIconCtrl, LLChicletAvatarIconCtrl);
 
     struct Params :
         public LLInitParam::Block<Params, LLChicletAvatarIconCtrl::Params>
@@ -155,6 +158,7 @@ private:
 class LLChiclet : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLChiclet, LLUICtrl);
 
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -242,6 +246,8 @@ private:
 class LLIMChiclet : public LLChiclet
 {
 public:
+    AL_VIEW_TYPE(LLIMChiclet, LLChiclet);
+
     enum EType {
         TYPE_UNKNOWN,
         TYPE_IM,
@@ -364,9 +370,10 @@ public:
 /**
  * Chiclet for script floaters.
  */
-class LLScriptChiclet : public LLIMChiclet
+class LLScriptChiclet final : public LLIMChiclet
 {
 public:
+    AL_VIEW_TYPE(LLScriptChiclet, LLIMChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLIMChiclet::Params>
     {
@@ -409,9 +416,10 @@ private:
 /**
  * Chiclet for inventory offer script floaters.
  */
-class LLInvOfferChiclet: public LLIMChiclet
+class LLInvOfferChiclet final: public LLIMChiclet
 {
 public:
+    AL_VIEW_TYPE(LLInvOfferChiclet, LLIMChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLIMChiclet::Params>
     {
@@ -456,6 +464,7 @@ private:
 class LLSysWellChiclet : public LLChiclet
 {
 public:
+    AL_VIEW_TYPE(LLSysWellChiclet, LLChiclet);
 
     struct Params : public LLInitParam::Block<Params, LLChiclet::Params>
     {
@@ -522,12 +531,14 @@ protected:
     LLHandle<LLContextMenu> mContextMenuHandle;
 };
 
-class LLNotificationChiclet : public LLSysWellChiclet
+class LLNotificationChiclet final : public LLSysWellChiclet
 {
     LOG_CLASS(LLNotificationChiclet);
 
     friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLNotificationChiclet, LLSysWellChiclet);
+
     struct Params : public LLInitParam::Block<Params, LLSysWellChiclet::Params>{};
 
 protected:
@@ -582,9 +593,10 @@ protected:
  * Storage class for all IM chiclets. Provides mechanism to display,
  * scroll, create, remove chiclets.
  */
-class LLChicletPanel : public LLPanel
+class LLChicletPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLChicletPanel, LLPanel);
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {

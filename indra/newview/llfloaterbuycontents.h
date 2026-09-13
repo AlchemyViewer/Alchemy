@@ -40,10 +40,12 @@
 class LLViewerObject;
 class LLObjectSelection;
 
-class LLFloaterBuyContents
+class LLFloaterBuyContents final
 : public LLFloater, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBuyContents, LLFloater);
+
     static void show(const LLSaleInfo& sale_info);
 
     LLFloaterBuyContents(const LLSD& key);

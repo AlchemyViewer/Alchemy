@@ -29,6 +29,9 @@ class LLScrollListCtrl;
 
 class LLFloaterChatAlerts final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterChatAlerts, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterChatAlerts(const LLSD& sdKey);
@@ -90,6 +93,8 @@ protected:
 class LLSoundDropTarget final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLSoundDropTarget, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()

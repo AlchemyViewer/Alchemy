@@ -37,10 +37,12 @@
  * It gets icon id by group id from the LLGroupMgr.
  * If group data is not loaded yet it subscribes as LLGroupMgr observer and requests necessary data.
  */
-class LLGroupIconCtrl
+class LLGroupIconCtrl final
     : public LLIconCtrl, public LLGroupMgrObserver
 {
 public:
+    AL_VIEW_TYPE(LLGroupIconCtrl, LLIconCtrl);
+
     struct Params : public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
         Optional <LLUUID> group_id;

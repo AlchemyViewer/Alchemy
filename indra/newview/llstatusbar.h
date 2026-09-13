@@ -33,21 +33,15 @@
 extern S32 STATUS_BAR_HEIGHT;
 
 class LLButton;
-class LLLineEditor;
-class LLMessageSystem;
 class LLTextBox;
-class LLTextEditor;
-class LLUICtrl;
-class LLUUID;
 class LLFrameTimer;
-class LLStatGraph;
 class ALPanelAOPulldown;
 class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
 class LLPanelNearByMedia;
-class LLIconCtrl;
+class LLPanelPulldown;
 class LLSearchEditor;
 
 namespace ll
@@ -57,10 +51,12 @@ namespace ll
         struct SearchData;
     }
 }
-class LLStatusBar
+class LLStatusBar final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLStatusBar, LLPanel);
+
     LLStatusBar(const LLRect& rect );
     /*virtual*/ ~LLStatusBar();
 
@@ -78,8 +74,6 @@ public:
     // Reply at process_money_balance_reply()
     static void sendMoneyBalanceRequest();
 
-    void        setHealth(S32 percent);
-
     void setLandCredit(S32 credit);
     void setLandCommitted(S32 committed);
 
@@ -89,7 +83,6 @@ public:
 
     // ACCESSORS
     S32         getBalance() const;
-    S32         getHealth() const;
 
     bool isUserTiered() const;
     S32 getSquareMetersCredit() const;
@@ -107,6 +100,17 @@ private:
     void onVolumeChanged(const LLSD& newvalue);
     void onVoiceChanged(const LLSD& newvalue);
     void onObscureBalanceChanged(const LLSD& newvalue);
+
+    // Built on first hover rather than at login. Six pull-downs meant six XUI
+    // documents parsed and six widget trees built during startup, for panels
+    // that stay invisible until the pointer reaches their button -- and most
+    // of which a given session never opens at all.
+    template <typename T>
+    T* ensurePulldown(T*& slot);
+
+    // Places one under its button and shows it, hiding whichever other one was
+    // up. `centered` picks between the two alignments these six used.
+    void showPulldown(LLPanelPulldown* shown, const LLView* anchor, bool centered);
 
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
@@ -156,15 +160,17 @@ private:
     bool            mBalanceClicked;
     bool            mObscureBalance;
     LLTimer         mBalanceClickTimer;
-    S32             mHealth;
     S32             mSquareMetersCredit;
     S32             mSquareMetersCommitted;
-    LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
-    LLPanelPresetsPulldown* mPanelPresetsPulldown;
-    ALPanelAOPulldown* mPanelAOPulldown;
-    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
-    LLPanelVolumePulldown* mPanelVolumePulldown;
-    LLPanelNearByMedia* mPanelNearByMedia;
+    // Null until first hovered. getNearbyMediaPanel() below hands out the last
+    // of these and its one caller already reads null as "the user has not
+    // touched the media controls", which is exactly true of one never built.
+    LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown = nullptr;
+    LLPanelPresetsPulldown* mPanelPresetsPulldown = nullptr;
+    ALPanelAOPulldown* mPanelAOPulldown = nullptr;
+    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown = nullptr;
+    LLPanelVolumePulldown* mPanelVolumePulldown = nullptr;
+    LLPanelNearByMedia* mPanelNearByMedia = nullptr;
 };
 
 // *HACK: Status bar owns your cached money balance. JC

@@ -40,6 +40,8 @@
 class LLTransientDockableFloater : public LLDockableFloater, LLTransientFloater
 {
 public:
+    AL_VIEW_TYPE(LLTransientDockableFloater, LLDockableFloater);
+
     LOG_CLASS(LLTransientDockableFloater);
     LLTransientDockableFloater(LLDockControl* dockControl, bool uniqueDocking,
             const LLSD& key, const Params& params = getDefaultParams());

@@ -47,9 +47,11 @@ class LLLineEditor;
 class LLRadioGroup;
 class LLIconCtrl;
 
-class LLPanelEditWearable : public LLPanel
+class LLPanelEditWearable final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelEditWearable, LLPanel);
+
     LLPanelEditWearable( );
     virtual ~LLPanelEditWearable();
 

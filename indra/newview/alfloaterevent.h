@@ -34,6 +34,8 @@ class ALFloaterEvent final : public LLFloater
 
 {
 public:
+    AL_VIEW_TYPE(ALFloaterEvent, LLFloater);
+
     ALFloaterEvent(const LLSD& key);
     /*virtual*/ ~ALFloaterEvent() = default;
     bool postBuild() override;

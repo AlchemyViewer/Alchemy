@@ -77,6 +77,9 @@ extern U32 gPacketsIn;
 class LLFloaterAbout final
     : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterAbout, LLFloater);
+
     friend class LLFloaterReg;
 private:
     LLFloaterAbout(const LLSD& key);

@@ -268,7 +268,7 @@ void LLFloaterTOS::testSiteIsAliveCoro(LLHandle<LLFloater> handle, std::string u
         return;
     }
 
-    LLFloaterTOS *that = dynamic_cast<LLFloaterTOS *>(handle.get());
+    LLFloaterTOS *that = ALViewType::as<LLFloaterTOS>(handle.get());
 
     if (that)
         that->setSiteIsAlive(static_cast<bool>(status));

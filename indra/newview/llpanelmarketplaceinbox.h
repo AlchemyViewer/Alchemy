@@ -33,9 +33,10 @@ class LLButton;
 class LLInventoryPanel;
 class LLUICtrl;
 
-class LLPanelMarketplaceInbox : public LLPanel
+class LLPanelMarketplaceInbox final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMarketplaceInbox, LLPanel);
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {};

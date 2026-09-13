@@ -51,9 +51,10 @@ void LLGLTFViewModel::sort(LLFolderViewFolder* folder)
 
  /// LLGLTFNode
 // LLUICtrlFactory::create<LLGLTFNode>(params);
-class LLGLTFNode : public LLFolderViewItem
+class LLGLTFNode final : public LLFolderViewItem
 {
 public:
+    AL_VIEW_TYPE(LLGLTFNode, LLFolderViewItem);
     struct Params : public LLInitParam::Block<Params, LLFolderViewItem::Params>
     {
         Params();

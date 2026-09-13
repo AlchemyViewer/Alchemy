@@ -41,6 +41,8 @@ class LLFloaterSnapshotBase;
 class LLPanelSnapshot: public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelSnapshot, LLPanel);
+
     LLPanelSnapshot();
 
     bool postBuild() override;

@@ -45,6 +45,8 @@ class LLViewerRegion;
 class LLNetMap final : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLNetMap, LLUICtrl);
+
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {

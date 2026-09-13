@@ -37,9 +37,12 @@ class LLJoystickAgentSlide;
 //
 // Classes
 //
-class LLFloaterMove
+class LLFloaterMove final
 :   public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterMove, LLFloater);
+private:
     LOG_CLASS(LLFloaterMove);
     friend class LLFloaterReg;
 
@@ -118,10 +121,12 @@ private:
 /**
  * This class contains Stand Up and Stop Flying buttons displayed above Move button in bottom tray
  */
-class LLPanelStandStopFlying : public LLPanel
+class LLPanelStandStopFlying final : public LLPanel
 {
     LOG_CLASS(LLPanelStandStopFlying);
 public:
+    AL_VIEW_TYPE(LLPanelStandStopFlying, LLPanel);
+
     typedef enum stand_stop_flying_mode_t
     {
         SSFM_STAND,

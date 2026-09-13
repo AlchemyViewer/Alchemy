@@ -35,11 +35,13 @@
 
 class LLInventoryPanel;
 
-class LLFloaterMyEnvironment
+class LLFloaterMyEnvironment final
 :   public LLFloater, LLInventoryFetchDescendentsObserver
 {
     LOG_CLASS(LLFloaterMyEnvironment);
 public:
+    AL_VIEW_TYPE(LLFloaterMyEnvironment, LLFloater);
+
                                     LLFloaterMyEnvironment(const LLSD& key);
     virtual                         ~LLFloaterMyEnvironment();
 

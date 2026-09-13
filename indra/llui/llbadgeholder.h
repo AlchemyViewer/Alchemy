@@ -32,6 +32,7 @@
 //
 
 class LLBadge;
+class LLView;
 
 class LLBadgeHolder
 {
@@ -46,6 +47,9 @@ public:
     bool acceptsBadge() const { return mAcceptsBadge; }
 
     virtual bool addBadge(LLBadge * badge);
+
+    // The view this holder is.
+    virtual LLView* badgeHolderView() = 0;
 
 private:
 

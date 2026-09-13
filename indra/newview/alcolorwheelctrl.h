@@ -71,6 +71,8 @@ class LLTextBox;
 class ALColorWheelCtrl final : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(ALColorWheelCtrl, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<std::string> label;

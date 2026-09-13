@@ -39,6 +39,8 @@ class LLFrameTimer;
 class ALPanelAOPulldown final : public LLPanelPulldown
 {
 public:
+    AL_VIEW_TYPE(ALPanelAOPulldown, LLPanelPulldown);
+
     ALPanelAOPulldown();
 };
 

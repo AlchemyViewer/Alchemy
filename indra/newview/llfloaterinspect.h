@@ -46,6 +46,7 @@ class LLFloaterInspect final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterInspect, LLFloater);
 
 //  static void show(void* ignored = NULL);
     void onOpen(const LLSD& key);

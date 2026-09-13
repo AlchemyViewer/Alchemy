@@ -34,9 +34,11 @@
 
 #include <string>
 
-class LLSysWellItem : public LLPanel
+class LLSysWellItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSysWellItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         LLUUID          notification_id;

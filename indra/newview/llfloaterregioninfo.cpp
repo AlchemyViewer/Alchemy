@@ -181,9 +181,10 @@ void unpack_request_params(
 }
 */
 
-class LLPanelRegionEnvironment : public LLPanelEnvironmentInfo
+class LLPanelRegionEnvironment final : public LLPanelEnvironmentInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionEnvironment, LLPanelEnvironmentInfo);
                         LLPanelRegionEnvironment();
     virtual             ~LLPanelRegionEnvironment();
 
@@ -710,8 +711,7 @@ LLPanelRegionTerrainInfo* LLFloaterRegionInfo::getPanelRegionTerrain()
     }
 
     LLTabContainer* tab_container = floater->getChild<LLTabContainer>("region_panels");
-    LLPanelRegionTerrainInfo* panel =
-        dynamic_cast<LLPanelRegionTerrainInfo*>(tab_container->getChild<LLPanel>("Terrain"));
+    LLPanelRegionTerrainInfo* panel = tab_container->getChild<LLPanel>("Terrain")->as<LLPanelRegionTerrainInfo>();
     llassert(panel);
     return panel;
 }
@@ -826,7 +826,7 @@ void LLPanelRegionInfo::onChangeAnything()
 // Enables set button on change to line editor
 void LLPanelRegionInfo::onChangeText(LLLineEditor* caller, void* user_data)
 {
-    LLPanelRegionInfo* panel = dynamic_cast<LLPanelRegionInfo*>(caller->getParent());
+    LLPanelRegionInfo* panel = caller->getParentAs<LLPanelRegionInfo>();
     if(panel)
     {
         panel->enableButton("apply_btn");

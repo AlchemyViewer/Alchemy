@@ -48,6 +48,8 @@ class LLComboBox
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLComboBox, LLUICtrl);
+
     typedef enum e_preferred_position
     {
         ABOVE,
@@ -93,6 +95,7 @@ public:
 
 
     virtual ~LLComboBox();
+
     /*virtual*/ bool postBuild();
 
 protected:
@@ -268,10 +271,12 @@ private:
 };
 
 // A combo box with icons for the list of items.
-class LLIconsComboBox
+class LLIconsComboBox final
 :   public LLComboBox
 {
 public:
+    AL_VIEW_TYPE(LLIconsComboBox, LLComboBox);
+
     struct Params
     :   public LLInitParam::Block<Params, LLComboBox::Params>
     {

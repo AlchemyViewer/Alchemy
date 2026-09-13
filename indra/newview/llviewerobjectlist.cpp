@@ -465,8 +465,10 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         return;
     }
 
-    U8 compressed_dpbuffer[2048];
-    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, 2048);
+    // A variable block can be as large as the packet that carried it, and the
+    // message reader never yields a packet larger than MAX_BUFFER_SIZE.
+    U8 compressed_dpbuffer[MAX_BUFFER_SIZE];
+    LLDataPackerBinaryBuffer compressed_dp(compressed_dpbuffer, sizeof(compressed_dpbuffer));
     LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
 
     for (i = 0; i < num_objects; i++)
@@ -478,9 +480,21 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         {
             compressed_dp.reset();
 
+            // getSizeFast returns a negative sentinel for a missing block or
+            // variable, and getBinaryDataFast silently truncates at max_size.
+            // The packer's bounds checks trust the size it is handed, so a
+            // block we cannot hold whole must not be decoded at all.
             S32 uncompressed_length = mesgsys->getSizeFast(_PREHASH_ObjectData, i, _PREHASH_Data);
+            if (uncompressed_length < 0 || uncompressed_length > (S32)sizeof(compressed_dpbuffer))
+            {
+                LL_WARNS() << "Object data block " << i << " declares " << uncompressed_length
+                    << " bytes against a " << sizeof(compressed_dpbuffer) << " byte buffer"
+                    << " from " << mesgsys->getSender() << ", skipping" << LL_ENDL;
+                recorder.objectUpdateFailure();
+                continue;
+            }
             LL_DEBUGS("ObjectUpdate") << "got binary data from message to compressed_dpbuffer" << LL_ENDL;
-            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, 2048);
+            mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, compressed_dpbuffer, 0, i, (S32)sizeof(compressed_dpbuffer));
             compressed_dp.assignBuffer(compressed_dpbuffer, uncompressed_length);
 
             if (update_type != OUT_TERSE_IMPROVED) // OUT_FULL_COMPRESSED only?

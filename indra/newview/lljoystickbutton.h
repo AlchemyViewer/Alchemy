@@ -50,6 +50,8 @@ class LLJoystick
 :   public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLJoystick, LLButton);
+
     struct Params
     :   public LLInitParam::Block<Params, LLButton::Params>
     {
@@ -106,10 +108,12 @@ protected:
 
 
 // Turn agent left and right, move forward and back
-class LLJoystickAgentTurn
+class LLJoystickAgentTurn final
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickAgentTurn, LLJoystick);
+
     struct Params : public LLJoystick::Params {};
     LLJoystickAgentTurn(const Params& p) : LLJoystick(p) {}
     virtual void    onHeldDown();
@@ -117,10 +121,12 @@ public:
 
 
 // Slide left and right, move forward and back
-class LLJoystickAgentSlide
+class LLJoystickAgentSlide final
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickAgentSlide, LLJoystick);
+
     struct Params : public LLJoystick::Params {};
     LLJoystickAgentSlide(const Params& p) : LLJoystick(p) {}
 
@@ -134,6 +140,8 @@ class LLJoystickCameraRotate
 :   public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickCameraRotate, LLJoystick);
+
     struct Params
     :   public LLInitParam::Block<Params, LLJoystick::Params>
     {
@@ -171,10 +179,12 @@ protected:
 
 
 // Track the camera focus point forward/backward and side to side
-class LLJoystickCameraTrack
+class LLJoystickCameraTrack final
 :   public LLJoystickCameraRotate
 {
 public:
+    AL_VIEW_TYPE(LLJoystickCameraTrack, LLJoystickCameraRotate);
+
     struct Params
     :   public LLInitParam::Block<Params, LLJoystickCameraRotate::Params>
     {
@@ -187,10 +197,12 @@ public:
 };
 
 //
-class LLJoystickQuaternion :
+class LLJoystickQuaternion final :
     public LLJoystick
 {
 public:
+    AL_VIEW_TYPE(LLJoystickQuaternion, LLJoystick);
+
     struct Params :
         public LLInitParam::Block<Params, LLJoystick::Params>
     {

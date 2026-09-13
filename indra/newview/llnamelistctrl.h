@@ -75,10 +75,12 @@ private:
 };
 
 
-class LLNameListCtrl
+class LLNameListCtrl final
 :   public LLScrollListCtrl, public LLInstanceTracker<LLNameListCtrl>
 {
 public:
+    AL_VIEW_TYPE(LLNameListCtrl, LLScrollListCtrl);
+
     typedef boost::signals2::signal<void(bool)> namelist_complete_signal_t;
 
     typedef enum e_name_type

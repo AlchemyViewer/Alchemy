@@ -37,10 +37,12 @@ class LLLayoutPanel;
 class LLTextBox;
 class LLComboBox;
 
-class LLFloaterExperienceProfile : public LLFloater
+class LLFloaterExperienceProfile final : public LLFloater
 {
     LOG_CLASS(LLFloaterExperienceProfile);
 public:
+    AL_VIEW_TYPE(LLFloaterExperienceProfile, LLFloater);
+
     enum PostSaveAction
     {
         NOTHING,

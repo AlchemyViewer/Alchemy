@@ -38,6 +38,7 @@
 // [RLVa:KB] - Checked: 2011-05-25 (RLVa-1.4.0a)
 #include <boost/signals2.hpp>
 #include "llboost.h"
+#include "alviewtype.h"
 // [/RLVa:KB]
 
 //*******************************************************
@@ -158,19 +159,19 @@ public:
     template <class T>
     static T* findTypedInstance(std::string_view name, const LLSD& key = LLSD())
     {
-        return dynamic_cast<T*>(findInstance(name, key));
+        return ALViewType::as<T>(findInstance(name, key));
     }
 
     template <class T>
     static T* getTypedInstance(std::string_view name, const LLSD& key = LLSD())
     {
-        return dynamic_cast<T*>(getInstance(name, key));
+        return ALViewType::as<T>(getInstance(name, key));
     }
 
     template <class T>
     static T* showTypedInstance(std::string_view name, const LLSD& key = LLSD(), bool focus = false)
     {
-        return dynamic_cast<T*>(showInstance(name, key, focus));
+        return ALViewType::as<T>(showInstance(name, key, focus));
     }
 
     static void blockShowFloaters(bool value) { sBlockShowFloaters = value;}

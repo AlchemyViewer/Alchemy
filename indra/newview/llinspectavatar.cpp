@@ -77,6 +77,7 @@ class LLInspectAvatar final : public LLInspect, LLTransientFloater
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLInspectAvatar, LLInspect);
     // avatar_id - Avatar ID for which to show information
     // Inspector will be positioned relative to current mouse position
     LLInspectAvatar(const LLSD& avatar_id);

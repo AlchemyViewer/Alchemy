@@ -22,6 +22,8 @@ class ALFloaterSceneExplorerFilters final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(ALFloaterSceneExplorerFilters, LLFloater);
+
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
 

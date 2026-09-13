@@ -48,7 +48,7 @@ LLFloaterGotoLine::LLFloaterGotoLine(LLScriptEdCore* editor_core)
         LLView* viewp = (LLView*)editor_core;
         while(viewp)
         {
-                LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
+                LLFloater* floaterp = viewp->as<LLFloater>();
                 if (floaterp)
                 {
                         floaterp->addDependentFloater(this);

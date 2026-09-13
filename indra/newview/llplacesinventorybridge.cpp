@@ -91,7 +91,7 @@ void LLPlacesFolderBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     bool is_open = false;
     if (inv_panel)
     {
-        LLFolderViewFolder* folder =  dynamic_cast<LLFolderViewFolder*>(inv_panel->getItemByID(mUUID));
+        LLFolderViewFolder* folder = inv_panel->getFolderByID(mUUID);
         is_open = (NULL != folder) && folder->isOpen();
     }
 
@@ -138,7 +138,7 @@ LLFolderViewFolder* LLPlacesFolderBridge::getFolder()
     LLInventoryPanel* inv_panel = mInventoryPanel.get();
     if (inv_panel)
     {
-        folder =    dynamic_cast<LLFolderViewFolder*>(inv_panel->getItemByID(mUUID));
+        folder = inv_panel->getFolderByID(mUUID);
     }
 
     return folder;

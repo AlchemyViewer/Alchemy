@@ -90,7 +90,7 @@ void LLFloaterNewFeatureNotification::centerOnScreen()
 {
     LLVector2 window_size = LLUI::getInstance()->getWindowSize();
     centerWithin(LLRect(0, 0, ll_round(window_size.mV[VX]), ll_round(window_size.mV[VY])));
-    LLFloaterView* parent = dynamic_cast<LLFloaterView*>(getParent());
+    LLFloaterView* parent = getParentAs<LLFloaterView>();
     if (parent)
     {
         parent->bringToFront(this);

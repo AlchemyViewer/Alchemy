@@ -42,9 +42,11 @@ class LLTextBox;
 class LLNameBox;
 class LLViewerInventoryItem;
 
-class LLPanelPermissions : public LLPanel
+class LLPanelPermissions final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPermissions, LLPanel);
+
     LLPanelPermissions();
     virtual ~LLPanelPermissions();
 

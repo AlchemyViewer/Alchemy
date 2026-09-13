@@ -29,11 +29,13 @@
 
 #include "llfloater.h"
 
-class LLFloaterBanDuration : public LLFloater
+class LLFloaterBanDuration final : public LLFloater
 {
     typedef std::function<void(const uuid_vec_t&, const S32 duration)> select_callback_t;
 
 public:
+    AL_VIEW_TYPE(LLFloaterBanDuration, LLFloater);
+
     LLFloaterBanDuration(const LLSD& target);
     bool postBuild() override;
     static LLFloaterBanDuration* show(select_callback_t callback, uuid_vec_t id);

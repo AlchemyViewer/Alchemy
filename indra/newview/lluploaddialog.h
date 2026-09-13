@@ -30,9 +30,11 @@
 #include "llpanel.h"
 #include "lltextbox.h"
 
-class LLUploadDialog : public LLPanel
+class LLUploadDialog final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLUploadDialog, LLPanel);
+
     // Use this function to open a modal dialog and display it until the user presses the "close" button.
     static LLUploadDialog*  modalUploadDialog(const std::string& msg);      // Message to display
     static void             modalUploadFinished();      // Message to display

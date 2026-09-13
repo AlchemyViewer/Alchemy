@@ -34,6 +34,8 @@
 class LLInspect : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLInspect, LLFloater);
+
     LLInspect(const LLSD& key);
     virtual ~LLInspect();
 
