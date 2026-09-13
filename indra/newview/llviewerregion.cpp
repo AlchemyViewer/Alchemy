@@ -390,17 +390,27 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
 
         LL_DEBUGS("AppInit", "Capabilities", "Teleport") << "received caps for handle " << regionHandle
                                                          << " region name " << regionp->getName() << LL_ENDL;
-        regionp->setCapabilitiesReceived(true);
+        // setCapabilitiesReceived moved to postToMainCoro below
 
         break;
     }
     while (true);
 
-    if (regionp && regionp->isCapabilityAvailable("ServerReleaseNotes") &&
-            regionp->getReleaseNotesRequested())
-    {   // *HACK: we're waiting for the ServerReleaseNotes
-        regionp->showReleaseNotes();
-    }
+    LLAppViewer::instance()->postToMainCoro(
+            [regionHandle]()
+            {
+                LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+                if (!regionp)
+                {
+                    return;
+                }
+                regionp->setCapabilitiesReceived(true);
+                if (regionp->isCapabilityAvailable("ServerReleaseNotes") &&
+                        regionp->getReleaseNotesRequested())
+                {   // *HACK: we're waiting for the ServerReleaseNotes
+                    regionp->showReleaseNotes();
+                }
+            });
 }
 
 
