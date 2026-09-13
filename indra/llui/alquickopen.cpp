@@ -214,6 +214,13 @@ ALQuickOpen::ALQuickOpen(const Params& p)
                      getRect().getHeight() - FIELD_HEIGHT);
     fp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
     fp.label = mPlaceholder;
+    // A choice is Return or a double-click, never the keyboard leaving. The
+    // field's commit is the choice, and a line editor commits on losing focus
+    // by default -- so clicking a row further down, which hands the keyboard
+    // to the list before the click lands, chose the row that was selected
+    // already, and clicking away after typing chose the top match. Return
+    // still commits, through LLPanel::handleKeyHere.
+    fp.commit_on_focus_lost = false;
     mField = LLUICtrlFactory::create<LLLineEditor>(fp);
     mField->setKeystrokeCallback([this](LLLineEditor* editor, void*)
     {

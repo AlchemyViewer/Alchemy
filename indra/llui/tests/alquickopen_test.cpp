@@ -26,6 +26,13 @@
 
 #include "../alquickopen.h"
 
+#include "../llfloater.h"
+#include "../llfocusmgr.h"
+#include "../lllineeditor.h"
+#include "../lluictrlfactory.h"
+
+#include "alheadlessui_fixture.h"
+
 #include "../test/lltut.h"
 
 class LLAvatarName;
@@ -146,5 +153,57 @@ namespace tut
     {
         ensure("too long", ALQuickOpen::score("btn", "button") == 0);
         ensure("and nothing has nothing to say", ALQuickOpen::score("", "b") == 0);
+    }
+
+    // A row is chosen when it is asked for -- Return, or a double-click -- and
+    // not when the keyboard merely leaves the field. The field committed on
+    // losing focus, so clicking a row further down (the list takes the
+    // keyboard before it takes the click) or clicking away after typing chose
+    // whatever was selected already: the top row, never the one clicked.
+    //
+    // The query has to be *edited* in the field, not set, because setQuery
+    // puts its text in the way that counts as committed and only an edit
+    // leaves it pending. Typed characters would need the window's keyboard,
+    // which a headless test has none of, so the edit is a backspace.
+    template<> template<>
+    void alquickopen_object::test<6>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name = "quick";
+        p.rect = LLRect(100, 400, 400, 200);
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        gFloaterView->addChild(quick);
+        quick->setCandidates(files());
+
+        std::vector<std::string> chosen;
+        quick->onChose([&chosen](const std::string& value) { chosen.push_back(value); });
+
+        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+        ensure("the field is there", field != nullptr);
+        quick->setQuery("pann");
+        quick->takeFocus();
+        ensure("and has the keyboard", field->hasFocus());
+        ensure("end of the line", field->handleKeyHere(KEY_END, MASK_NONE));
+        ensure("one letter back", field->handleKeyHere(KEY_BACKSPACE, MASK_NONE));
+        ensure_equals("the field says what was left", field->getText(), std::string("pan"));
+
+        gFocusMgr.setKeyboardFocus(nullptr);
+        ensure_equals("the keyboard leaving chooses nothing", chosen.size(), (size_t)0);
+
+        // Return reaches the field first and climbs from there, the way the
+        // window hands a key to whatever has the keyboard.
+        quick->takeFocus();
+        ensure("return is taken", field->handleKey(KEY_RETURN, MASK_NONE, false));
+        ensure_equals("and chooses once", chosen.size(), (size_t)1);
+        ensure_equals("the best answer to what was typed", chosen.front(), std::string("panel_people.xml"));
+
+        gFocusMgr.setKeyboardFocus(nullptr);
+        quick->die();
     }
 }
