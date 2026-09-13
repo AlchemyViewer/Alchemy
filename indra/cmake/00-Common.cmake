@@ -62,10 +62,6 @@ if(WINDOWS)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>)
 endif()
 
-if(LINUX)
-  set(CMAKE_SKIP_RPATH TRUE)
-endif()
-
 #------------------------------------------------------------------------------
 # Configurations
 #------------------------------------------------------------------------------
@@ -386,8 +382,8 @@ if(DARWIN)
   # Xcode does not read -march; this is the Darwin row of AlchemyTarget.cmake
   # in the spelling it does read.
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
-  # Xcode's own signing cannot handle the embedded CEF bundles; signing is a
-  # packaging step (viewer_manifest.py). Since Xcode 14.1 all three are needed
+  # Xcode's own signing cannot handle the embedded CEF bundles; signing is an
+  # install step (ViewerCodeSign.cmake). Since Xcode 14.1 all three are needed
   # to stop it signing implicitly. https://stackoverflow.com/a/54296008
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO)

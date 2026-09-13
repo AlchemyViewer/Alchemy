@@ -19,7 +19,6 @@ target_sources(llwebrtc
     llwebrtc.h
     )
 
-set_target_properties(llwebrtc PROPERTIES PUBLIC_HEADER llwebrtc.h)
 target_link_libraries(llwebrtc PRIVATE al::flags)
 
 # WebRTC is built with RTTI disabled (-fno-rtti / /GR-). Subclasses such as

@@ -29,7 +29,7 @@ target_link_libraries(llimage_libtest
 
 if (AL_BUILD_VIEWER)
     # Ensure people working on the viewer don't break this library
-    add_dependencies(viewer llimage_libtest)
+    add_dependencies(${AL_VIEWER_BINARY_NAME} llimage_libtest)
 endif (AL_BUILD_VIEWER)
 
 endif()

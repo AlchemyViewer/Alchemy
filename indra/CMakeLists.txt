@@ -94,7 +94,6 @@ option(AL_ENABLE_CRASH_REPORTING "Send crash reports from this build" OFF)
 
 # Bugsplat setup
 if (AL_ENABLE_PROPRIETARY AND (WIN32 OR APPLE))
-    # Note that viewer_manifest.py makes decision based on AL_BUGSPLAT_DATABASE and not AL_USE_BUGSPLAT
     if (AL_BUGSPLAT_DATABASE)
         set(AL_USE_BUGSPLAT ON  CACHE BOOL "Use the BugSplat crash reporting system")
     else (AL_BUGSPLAT_DATABASE)
@@ -220,6 +219,10 @@ endif()
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# The install rules stage the viewer after every link; report only what
+# they changed.
+set(CMAKE_INSTALL_MESSAGE LAZY)
+
 if(NOT AL_USE_PRECOMPILED_HEADERS)
     set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
 endif()
@@ -324,9 +327,6 @@ endforeach()
 if (AL_BUILD_TESTS)
   include(LLAddBuildTest)
 endif ()
-
-# Third party system library copy step
-include(Copy3rdPartyLibs)
 
 # Add our cmake modules to cmake
 add_subdirectory(cmake)

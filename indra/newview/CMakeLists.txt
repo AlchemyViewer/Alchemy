@@ -4,7 +4,6 @@ list(APPEND CMAKE_MESSAGE_CONTEXT viewer)
 
 include(BuildPackagesInfo)
 include(BuildVersion)
-include(CMakeCopyIfDifferent)
 include(TemplateCheck)
 
 set(AL_VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
@@ -1656,8 +1655,7 @@ set(viewer_HEADERS
     roles_constants.h
     )
 
-#build_data.json creation moved to viewer_manifest.py MAINT-6413
-# the viewer_version.txt file created here is for passing to viewer_manifest and autobuild
+# The version as one line, for the hosted build's metadata.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
            "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
 
@@ -1848,21 +1846,15 @@ set(viewer_CHARACTER_FILES
 
 source_group("Character File" FILES ${viewer_CHARACTER_FILES})
 
-set(viewer_MISC_FILES
-    viewer_manifest.py
-    )
-
-# What the viewer loads at run time and the script that packages it, kept in
-# the IDE beside the code. None of it is compiled, so it hangs off its own
-# target and the viewer's project holds only what the compiler and linker
-# consume.
-add_custom_target(viewer_resources
+# What the viewer loads at run time, kept in the IDE beside the code. None
+# of it is compiled, so it hangs off its own target and the viewer's project
+# holds only what the compiler and linker consume.
+add_custom_target(${AL_VIEWER_BINARY_NAME}-resources
     SOURCES
     ${viewer_XUI_FILES}
     ${viewer_SHADER_FILES}
     ${viewer_APPSETTINGS_FILES}
     ${viewer_CHARACTER_FILES}
-    ${viewer_MISC_FILES}
     ${viewer_RESOURCE_FILES}
     )
 
@@ -1953,36 +1945,20 @@ if (DARWIN)
     )
 endif()
 
-# These are the generated targets that are copied for packaging that we do not directly link to
-# We special case for windows due to targets incompatible with Debug builds
-if (WINDOWS)
-  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
-  add_custom_target(copy_input_dependencies
-      DEPENDS
-      stage_third_party_libs
-      $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
-      $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
-      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
-      $<TARGET_NAME_IF_EXISTS:media_plugin_example>
-      )
-else()
-  add_custom_target(copy_input_dependencies
-      DEPENDS
-      stage_third_party_libs
-      $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
-      $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
-      $<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>
-      $<TARGET_NAME_IF_EXISTS:media_plugin_example>
-      )
-endif()
+# The media plugins are built before the viewer so the staging step after
+# the viewer's link can install them.
+add_custom_target(copy_input_dependencies
+    DEPENDS
+    $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
+    $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
+    $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
+    $<TARGET_NAME_IF_EXISTS:media_plugin_example>
+    )
 add_dependencies(${AL_VIEWER_BINARY_NAME} copy_input_dependencies)
 
-set(AL_ARTWORK_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE PATH
-    "Path to artwork files.")
-
-set(VIEWER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,/$<CONFIG>,>)
-
 if (WINDOWS)
+  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
+
     string(TOLOWER ${AL_CHANNEL} channel_lower)
     if(channel_lower MATCHES "^alchemy release")
         set(OUTPUT_BINARY_NAME "AlchemyViewer")
@@ -1997,10 +1973,7 @@ if (WINDOWS)
       ENABLE_EXPORTS OFF
       VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
       )
-
   set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
-  set(MANIFEST_DEST_DIR ${VIEWER_STAGING_DIR})
-  set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
 elseif(DARWIN)
   # These all get set with PROPERTIES. It's not that the property names are
   # magically known to CMake -- it's that these names are referenced in the
@@ -2042,13 +2015,10 @@ elseif(DARWIN)
 
   target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
 
-  set(MANIFEST_DEST_DIR $<TARGET_BUNDLE_DIR:${AL_VIEWER_BINARY_NAME}>)
-  set(MANIFEST_PACKAGE_OUT_FILE "${VIEWER_BINARY_DIR}/touched.bat")
-  if (AL_ENABLE_SIGNING)
-    set(SIGNING_SETTING "--signature=${AL_SIGNING_IDENTITY}")
-  else (AL_ENABLE_SIGNING)
-    set(SIGNING_SETTING "")
-  endif (AL_ENABLE_SIGNING)
+  # The bundle's localised strings carry the version.
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/English.lproj/InfoPlist.strings" infoplist_strings)
+  string(REPLACE "%%VERSION%%" "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}" infoplist_strings "${infoplist_strings}")
+  file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InfoPlist.strings" CONTENT "${infoplist_strings}" @ONLY)
 elseif(LINUX)
   set_target_properties(
     ${AL_VIEWER_BINARY_NAME}
@@ -2070,105 +2040,89 @@ elseif(LINUX)
 
   string(TOLOWER ${AL_CHANNEL} channel_lower)
   if(channel_lower MATCHES "^alchemy release")
-    set(OUTPUT_PRODUCT_NAME "AlchemyViewer")
+    set(OUTPUT_BINARY_NAME "AlchemyViewer")
   else()
-    set(OUTPUT_PRODUCT_NAME "${AL_CHANNEL_ONEWORD}")
+    set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
   endif()
 
-  set(product ${OUTPUT_PRODUCT_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
-  set(MANIFEST_DEST_DIR ${VIEWER_STAGING_DIR})
-  set(MANIFEST_PACKAGE_OUT_FILE ${product}.tar.xz)
+  set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
 endif()
 
-# The manifest ships the Discord runtime library from the SDK directory.
-if (AL_USE_DISCORD)
-  set(AL_DISCORD_MANIFEST_ARG "${DISCORD_SDK_RUNTIME_DIR}")
+# What ships, and where; the names the package goes by.
+include(ViewerInstall)
+
+# The files generated for the package: the contributor list the About
+# floater shows, the settings an installation is built with, and the build
+# description the crash reporter reads.
+include(ContributorNames)
+al_contributor_names("${INDRA_SOURCE_DIR}/../doc/contributions.txt" "${CMAKE_CURRENT_BINARY_DIR}/contributors.txt")
+
+set(AL_SOURCEID "$ENV{sourceid}" CACHE STRING "Referring agency recorded in settings_install.xml")
+set(settings_install "")
+if(AL_SOURCEID)
+  string(APPEND settings_install "  <key>sourceid</key>
+  <map>
+    <key>Comment</key>
+    <string>Identify referring agency to Linden web servers</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>String</string>
+    <key>Value</key>
+    <string>${AL_SOURCEID}</string>
+  </map>
+")
+endif()
+if(NOT AL_GRID MATCHES "^(|default|agni)$")
+  string(APPEND settings_install "  <key>CmdLineGridChoice</key>
+  <map>
+    <key>Comment</key>
+    <string>Default grid</string>
+    <key>Persist</key>
+    <integer>0</integer>
+    <key>Type</key>
+    <string>String</string>
+    <key>Value</key>
+    <string>${AL_GRID}</string>
+  </map>
+")
+endif()
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/settings_install.xml" CONTENT
+"<?xml version=\"1.0\" ?>
+<llsd>
+<map>
+${settings_install}</map>
+</llsd>
+" @ONLY)
+
+set(build_data_extra "")
+if (WINDOWS)
+  set(build_data_platform win)
+  string(APPEND build_data_extra ", \"Executable\": \"${OUTPUT_BINARY_NAME}.exe\", \"AppName\": \"${AL_APP_NAME}\"")
+elseif (DARWIN)
+  set(build_data_platform mac)
+  string(APPEND build_data_extra ", \"Bundle Id\": \"${MACOSX_BUNDLE_GUI_IDENTIFIER}\"")
 else ()
-  set(AL_DISCORD_MANIFEST_ARG OFF)
+  set(build_data_platform lnx)
 endif ()
+if (AL_BUGSPLAT_DATABASE)
+  string(APPEND build_data_extra ", \"BugSplat DB\": \"${AL_BUGSPLAT_DATABASE}\"")
+endif ()
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build_data.json" CONTENT
+"{\"Type\": \"viewer\", \"Version\": \"${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\", \"Channel Base\": \"Alchemy\", \"Channel\": \"${AL_CHANNEL}\", \"Platform\": \"${build_data_platform}\", \"Address Size\": ${ADDRESS_SIZE}, \"Update Service\": \"https://update.secondlife.com/update\"${build_data_extra}}
+" @ONLY)
 
-# What every viewer_manifest.py run is told; each run adds its actions, its
-# destination and the file it touches when done. The bundle id means
-# nothing off macOS and is harmless there.
-set(VIEWER_MANIFEST_ARGS
-    ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-    --arch=${ARCH}
-    --artwork=${AL_ARTWORK_DIR}
-    "--bugsplat=${AL_BUGSPLAT_DATABASE}"
-    --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
-    "--channel=${AL_CHANNEL}"
-    "--discord=${AL_DISCORD_MANIFEST_ARG}"
-    "--openal=${AL_USE_OPENAL}"
-    "--tracy=${AL_USE_TRACY}"
-    "--velopack=${AL_USE_VELOPACK}"
-    --build=${CMAKE_CURRENT_BINARY_DIR}
-    --buildtype=$<CONFIG>
-    --configuration=$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
-    "--generator=${CMAKE_GENERATOR}"
-    --grid=${AL_GRID}
-    --source=${CMAKE_CURRENT_SOURCE_DIR}
-    --versionfile=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-    --vcpkg_dir=${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}
-    )
+# The archive of the installed tree, and the Velopack step.
+include(ViewerPackage)
 
-# Viewer Manifest Copy
+# After every link, stage the tree the viewer runs from: the install rules
+# applied to the build directory the viewer already sits in.
 add_custom_command(
   TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
-  COMMAND ${Python3_EXECUTABLE}
-  ARGS
-    ${VIEWER_MANIFEST_ARGS}
-    --actions=copy
-    --dest=${MANIFEST_DEST_DIR}
-    --touch=${VIEWER_BINARY_DIR}/copy_touched.bat
-  COMMENT "Performing viewer_manifest copy"
+  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --config $<CONFIG> --prefix ${VIEWER_STAGING_DIR}
+  COMMENT "Staging the viewer into ${VIEWER_STAGING_DIR}"
+  VERBATIM
   )
-
-# Useful for remote debugging or profiling if set to target a shared drive. for example, brad sets it to "dist/secondlife" to deploy under
-# the build tree (and then I share that directory) or "f:/dist/secondlife" to deploy to a network mounted drive (although this can be slow).
-# this will also create an "unpacked" tarball at build-<platform>/newview/unpacked_<platform>_7_1_11_<build num>.tar
-set(AL_LOCAL_DIST_DIR "" CACHE PATH "Path for 'local' unpacked copy of viewer distribution to be deployed to.")
-if(IS_DIRECTORY ${AL_LOCAL_DIST_DIR})
-  add_custom_command(
-      OUTPUT  ${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
-      COMMAND ${Python3_EXECUTABLE}
-      ARGS
-      ${VIEWER_MANIFEST_ARGS}
-      "--actions=\"copy package unpacked\""
-      --dest=${AL_LOCAL_DIST_DIR}
-      --touch=${AL_LOCAL_DIST_DIR}/.${product}.copy_touched
-      ${SIGNING_SETTING}
-      DEPENDS
-      ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-      ${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-      ${AL_VIEWER_BINARY_NAME}
-      COMMENT "Performing viewer_manifest local dist copy"
-      )
-
-  add_custom_target(copy_local_dist_viewer_manifest ALL DEPENDS ${AL_LOCAL_DIST_DIR}/.${product}.copy_touched)
-elseif (NOT AL_LOCAL_DIST_DIR STREQUAL "")
-  message(FATAL_ERROR "AL_LOCAL_DIST_DIR ${AL_LOCAL_DIST_DIR} specified but is not valid target directory to copy viewer distribution into.  Please create the directory and try again")
-endif ()  # IS_DIRECTORY ${AL_LOCAL_DIST_DIR}
-
-if (AL_BUILD_PACKAGE)
-  add_custom_command(
-    OUTPUT ${MANIFEST_PACKAGE_OUT_FILE}
-    COMMAND ${Python3_EXECUTABLE}
-    ARGS
-          ${VIEWER_MANIFEST_ARGS}
-          --dest=${MANIFEST_DEST_DIR}
-          --touch=${VIEWER_BINARY_DIR}/touched.bat # Intentionally left as touched.bat
-          ${SIGNING_SETTING}
-      DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-        ${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt
-        ${AL_VIEWER_BINARY_NAME} # Prevents two copies of manifest from running at the same time
-    COMMENT "Performing viewer_manifest package"
-    )
-
-  add_custom_target(llpackage ALL DEPENDS
-          ${MANIFEST_PACKAGE_OUT_FILE}
-    )
-endif (AL_BUILD_PACKAGE)
 
 if (AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
   if (AL_USE_BUGSPLAT)
@@ -2225,12 +2179,9 @@ if (AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
       # TBD
     endif (LINUX)
 
-    add_dependencies(llpackage generate_symbols)
+    add_dependencies(package generate_symbols)
   endif (AL_USE_BUGSPLAT)
 endif ()
-
-add_custom_target(viewer)
-add_dependencies(viewer ${AL_VIEWER_BINARY_NAME})
 
 elseif(AL_BUILD_TESTS)
 

@@ -38,6 +38,8 @@ set(_al_retired_options
   USE_TRACY_GUI=AL_BUILD_TRACY_GUI
   USE_VELOPACK=AL_USE_VELOPACK
   USE_LINUX_VOLUME_CATCHER=AL_USE_LINUX_VOLUME_CATCHER
+  AL_LOCAL_DIST_DIR=
+  AL_ARTWORK_DIR=
   USE_SSE4_2=AL_ISA_TIER
   USE_AVX=AL_ISA_TIER
   USE_AVX2=AL_ISA_TIER
@@ -62,8 +64,8 @@ set(_al_retired_options
   SENTRY_DSN=AL_SENTRY_DSN
   ROOT_PROJECT_NAME=AL_PROJECT_NAME
   VIEWER_BINARY_NAME=AL_VIEWER_BINARY_NAME
-  LOCAL_DIST_DIR=AL_LOCAL_DIST_DIR
-  ARTWORK_DIR=AL_ARTWORK_DIR
+  LOCAL_DIST_DIR=
+  ARTWORK_DIR=
   FMODSTUDIO_SDK_DIR=AL_FMODSTUDIO_SDK_DIR
   TEMPLATE_VERIFIER_OPTIONS=AL_TEMPLATE_VERIFIER_OPTIONS
   TEMPLATE_VERIFIER_MASTER_URL=AL_TEMPLATE_VERIFIER_MASTER_URL
@@ -84,7 +86,7 @@ foreach(entry IN LISTS _al_retired_options)
       list(GET pair 1 new)
       list(APPEND _al_retired_found "  ${old} -> ${new}")
     else()
-      list(APPEND _al_retired_found "  ${old} -> (removed; the behaviour is unconditional now)")
+      list(APPEND _al_retired_found "  ${old} -> (removed)")
     endif()
   endif()
 endforeach()

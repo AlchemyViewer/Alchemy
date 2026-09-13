@@ -166,7 +166,6 @@ jobs:
       velopack_pack_authors:  ${{ steps.build.outputs.velopack_pack_authors }}
       velopack_pack_title:    ${{ steps.build.outputs.velopack_pack_title }}
       velopack_main_exe:      ${{ steps.build.outputs.velopack_main_exe }}
-      velopack_exclude:       ${{ steps.build.outputs.velopack_exclude }}
       velopack_icon:          ${{ steps.build.outputs.velopack_icon }}
       velopack_splash:        ${{ steps.build.outputs.velopack_splash }}
       velopack_splash_color:  ${{ steps.build.outputs.velopack_splash_color }}
@@ -418,6 +417,31 @@ jobs:
               echo "viewer_version=$viewer_version" >> "$GITHUB_OUTPUT"
           fi
 
+          # The package: the install tree on Windows, which the signing job
+          # packages with Velopack; the CPack archive elsewhere. The names
+          # the packaging steps need come from the configure.
+          if $AL_BUILD_VIEWER
+          then
+            case "$BUILD_CONFIG" in
+              release) cmake_config=Release ;;
+              relwithdebinfo) cmake_config=RelWithDebInfo ;;
+              optdebug) cmake_config=OptDebug ;;
+              *) cmake_config=Debug ;;
+            esac
+            cat "$BUILD_DIRECTORY/newview/package.env" >> "$GITHUB_OUTPUT"
+            case "$RUNNER_OS" in
+              Windows)
+                cmake --install "$BUILD_DIRECTORY" --config "$cmake_config" --prefix "$RUNNER_TEMP/app"
+                echo "viewer_app=$RUNNER_TEMP/app" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                cpack --config "$BUILD_DIRECTORY/CPackConfig.cmake" -C "$cmake_config" -B "$RUNNER_TEMP/package"
+                viewer_app="$(ls "$RUNNER_TEMP"/package/*.tar.xz "$RUNNER_TEMP"/package/*.dmg 2>/dev/null | head -n 1)"
+                echo "viewer_app=$viewer_app" >> "$GITHUB_OUTPUT"
+                ;;
+            esac
+          fi
+
       - name: Upload executable
         uses: actions/upload-artifact@v7
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
@@ -508,7 +532,6 @@ jobs:
           PACK_TITLE: ${{ needs.build.outputs.velopack_pack_title }}
           PACK_AUTHORS: ${{ needs.build.outputs.velopack_pack_authors }}
           MAIN_EXE: ${{ needs.build.outputs.velopack_main_exe }}
-          EXCLUDE: ${{ needs.build.outputs.velopack_exclude }}
           ICON: ${{ needs.build.outputs.velopack_icon }}
           SPLASH_IMAGE: ${{ needs.build.outputs.velopack_splash }}
           SPLASH_COLOR: ${{ needs.build.outputs.velopack_splash_color }}
@@ -524,7 +547,6 @@ jobs:
             --packDir .app
             --mainExe "$MAIN_EXE"
             --packTitle "$PACK_TITLE"
-            --exclude "$EXCLUDE"
             --shortcuts ''
             --splashProgressColor "$SPLASH_COLOR"
           )

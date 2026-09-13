@@ -20,7 +20,7 @@ Every platform needs a C++ toolchain plus:
 - **CMake** 3.27+
 - **Git**
 - **Python** 3.13+ — used for build-time scripts
-- **Rust** and **.NET SDK** — only required when producing installer packages (the default; disable with `-DAL_BUILD_PACKAGE=OFF` to skip)
+- **Rust** and **.NET SDK** — only for Velopack installers (`-DAL_USE_VELOPACK=ON`)
 
 Install commands are platform-specific; see below.
 
@@ -308,8 +308,9 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
-| `AL_BUILD_PACKAGE`               | ON      | Produce installer packages after the viewer build (requires Velopack) |
-| `AL_USE_VELOPACK`          | OFF     | Use Velopack for installer packaging (instead of NSIS/DMG)            |
+| `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg) |
+| `AL_USE_VELOPACK`        | OFF     | Add the `velopack` target, and the Velopack update client to the viewer |
+| `AL_SOURCEID`            | `$sourceid` | Referring agency recorded in `settings_install.xml`                |
 
 ### Audio
 
@@ -415,13 +416,23 @@ A few files under `xui/` are data rather than widget trees — `strings.xml`, `m
 
 ## Packaging
 
-Release packages are produced by [Velopack](https://velopack.io). The packaging step runs automatically after a successful build when `AL_BUILD_PACKAGE=ON` (the default). To skip it during development:
+The install rules in `indra/cmake/ViewerInstall.cmake` are the package manifest. After every link of the viewer they stage the tree it runs from into the build directory (`newview/<Config>/`, or `newview/<Config>/<Channel>.app` on macOS). The same rules write a clean tree anywhere:
 
 ```
-cmake -S indra --preset <preset> -DAL_BUILD_PACKAGE=OFF
+cmake --install build-<OS>-<preset> --config Release --prefix <dir>
 ```
 
-Velopack also requires `dotnet tool restore` to have been run so the `vpk` CLI is on PATH.
+The archive of that tree comes from CPack — a `.zip` on Windows, a `.tar.xz` on Linux, a `.dmg` on macOS — into the build directory, named `Alchemy[_<channel>]_<version>_<arch>`:
+
+```
+cpack --config build-<OS>-<preset>/CPackConfig.cmake -C Release
+```
+
+(or the `package` target). Release archives on Linux and macOS are stripped of debug information on the way. `-DAL_BUILD_PACKAGE=OFF` leaves CPack out; the install rules stay.
+
+The Windows installer and the update packages come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the installer and the update feed to `newview/velopack/<Config>/Releases`.
+
+On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_ENABLE_SIGNING=ON -DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
 
 ## Troubleshooting
 
@@ -454,7 +465,7 @@ Alchemy requires CMake 3.27+. If your distro ships something older, install a ne
 pip install --upgrade cmake ninja
 ```
 
-### `vpk` command not found (or packaging step fails)
+### `vpk` command not found (the `velopack` target fails)
 
 Velopack needs the `vpk` .NET tool. Install it once per clone:
 
@@ -462,17 +473,15 @@ Velopack needs the `vpk` .NET tool. Install it once per clone:
 dotnet tool restore
 ```
 
-If you don't intend to produce installers, disable packaging entirely with `-DAL_BUILD_PACKAGE=OFF` and skip the Rust / .NET setup.
-
 ### Rust / `cargo` missing during packaging
 
-Packaging uses Velopack, which invokes `cargo`. Install a stable Rust toolchain:
+Velopack invokes `cargo`. Install a stable Rust toolchain:
 
 ```
 rustup default stable
 ```
 
-Only required when `AL_BUILD_PACKAGE=ON` (the default).
+Only needed with `AL_USE_VELOPACK=ON`.
 
 ### Warnings fail the build
 

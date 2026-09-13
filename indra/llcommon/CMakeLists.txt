@@ -4,24 +4,9 @@ if (AL_BUILD_SHARED_LLCOMMON)
   add_library(llcommon SHARED)
 
   target_compile_definitions(llcommon PUBLIC LL_COMMON_LINK_SHARED=1)
-
-  add_custom_command(
-    TARGET llcommon POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${SHARED_LIB_STAGING_DIR}"
-    COMMAND_EXPAND_LISTS
-  )
-
-  add_custom_command(
-    TARGET llcommon POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}"
-    COMMAND_EXPAND_LISTS
-  )
-
-  add_custom_command(
-    TARGET llcommon POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
+  set_target_properties(llcommon PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${SHARED_LIB_STAGING_DIR}"
+    LIBRARY_OUTPUT_DIRECTORY "${SHARED_LIB_STAGING_DIR}")
 else()
   add_library(llcommon STATIC)
 endif()
@@ -309,8 +294,6 @@ target_link_libraries(
         ll::fastfloat
         ll::icu
     )
-
-add_dependencies(llcommon stage_third_party_libs)
 
 if (AL_BUILD_TESTS)
   # No unit tests: the harness itself links llcommon, so a test of one of its

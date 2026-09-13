@@ -81,29 +81,11 @@ LLDir_Linux::LLDir_Linux()
         }
     }
 
+    const std::string start_dir = tmp_str;
     mExecutableFilename = "";
     mExecutablePathAndName = "";
     mExecutableDir = tmp_str;
     mWorkingDir = tmp_str;
-#ifdef APP_RO_DATA_DIR
-    mAppRODataDir = APP_RO_DATA_DIR;
-#else
-    mAppRODataDir = tmp_str;
-#endif
-    std::string::size_type build_dir_pos = mExecutableDir.rfind("/build-linux-");
-    if (build_dir_pos != std::string::npos)
-    {
-        // ...we're in a dev checkout
-        mSkinBaseDir = mExecutableDir.substr(0, build_dir_pos) + "/indra/newview/skins";
-        LL_INFOS() << "Running in dev checkout with mSkinBaseDir "
-         << mSkinBaseDir << LL_ENDL;
-    }
-    else
-    {
-        // ...normal installation running
-        mSkinBaseDir = mAppRODataDir + mDirDelimiter + "skins";
-    }
-
     mOSUserDir = getCurrentUserHome(tmp_str);
     mOSUserAppDir = "";
     mLindenUserDir = "";
@@ -131,6 +113,37 @@ LLDir_Linux::LLDir_Linux()
         {
             mExecutableFilename = tmp_str;
         }
+    }
+
+    // The read-only data lives one directory up from the executable in the
+    // installed tree (<root>/bin/alchemy-bin beside <root>/skins), at the
+    // compile-time location of a system install, or, failing both, where
+    // the viewer was started from.
+    std::string install_root = mExecutableDir.substr(0, mExecutableDir.rfind('/'));
+    if (!install_root.empty() && LLFile::isdir(install_root + "/skins"))
+    {
+        mAppRODataDir = install_root;
+    }
+    else
+    {
+#ifdef APP_RO_DATA_DIR
+        mAppRODataDir = APP_RO_DATA_DIR;
+#else
+        mAppRODataDir = start_dir;
+#endif
+    }
+    std::string::size_type build_dir_pos = mExecutableDir.rfind("/build-linux-");
+    if (build_dir_pos != std::string::npos)
+    {
+        // ...we're in a dev checkout
+        mSkinBaseDir = mExecutableDir.substr(0, build_dir_pos) + "/indra/newview/skins";
+        LL_INFOS() << "Running in dev checkout with mSkinBaseDir "
+         << mSkinBaseDir << LL_ENDL;
+    }
+    else
+    {
+        // ...normal installation running
+        mSkinBaseDir = mAppRODataDir + mDirDelimiter + "skins";
     }
 
     mLLPluginDir = mExecutableDir + mDirDelimiter + "llplugin";
