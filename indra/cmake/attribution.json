@@ -1,0 +1,94 @@
+{
+  "viewer": {
+    "holder": "Copyright (C) 2013-2026 Alchemy Development Group. Portions Copyright (C) 2001-2026 Linden Research, Inc.",
+    "license": "LGPL-2.1-only",
+    "text": "../doc/LICENSE-source.txt"
+  },
+
+  "overrides": {
+    "abseil": { "holder": "Copyright 2017 The Abseil Authors" },
+    "alchemy-branding": { "license": "LicenseRef-Alchemy-Proprietary" },
+    "alchemy-fonts": { "holder": "Copyright the respective type designers; each face's licence is in licenses.txt" },
+    "alchemy-dictionaries": {
+      "holder": "Copyright the respective dictionary authors; each dictionary's own licence is in licenses.txt",
+      "license": "GPL-2.0-only AND GPL-3.0-only AND LGPL-2.1-only AND LGPL-3.0-only AND MPL-2.0 AND LicenseRef-SCOWL"
+    },
+    "apr": { "holder": "Copyright The Apache Software Foundation" },
+    "boost": { "holder": "Copyright the Boost authors" },
+    "bzip2": { "holder": "Copyright (C) 1996-2019 Julian R Seward" },
+    "cef-bin": { "holder": "Copyright (c) 2008-2020 Marshall A. Greenblatt. Portions Copyright (c) 2006-2009 Google Inc." },
+    "curl": { "holder": "Copyright (c) 1996-2017 Daniel Stenberg and many contributors" },
+    "freetype": { "holder": "Copyright 1996-2002, 2006 David Turner, Robert Wilhelm, and Werner Lemberg" },
+    "libiconv": { "holder": "Copyright (C) Free Software Foundation, Inc.; written by Bruno Haible", "license": "LGPL-2.1-or-later" },
+    "libjpeg-turbo": { "holder": "Copyright (C) 2009-2026 D. R. Commander; Copyright (C) 1991-2020 Thomas G. Lane, Guido Vollbeding" },
+    "liblzma": { "holder": "Copyright the XZ Utils authors", "license": "0BSD" },
+    "libyuv": { "license": "BSD-3-Clause" },
+    "minizip": { "holder": "Copyright (C) Nathan Moinvaziri; Copyright (C) 1998-2010 Gilles Vollant" },
+    "opengl-registry": {
+      "holder": "Copyright 2013-2020 The Khronos Group Inc.",
+      "license": "MIT"
+    },
+    "openssl": { "holder": "Copyright (c) The OpenSSL Project Authors" },
+    "opus": { "holder": "Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo, Mozilla, Amazon" },
+    "pffft": { "license": "LicenseRef-FFTPACK" },
+    "tinyexr": { "holder": "Copyright (c) 2014-2021 Syoyo Fujita and many contributors" },
+    "tinygltf": { "license": "MIT" },
+    "v-hacd": { "license": "BSD-3-Clause" },
+    "vlc-bin": { "holder": "Copyright (C) 1996-2023 VLC authors and VideoLAN" },
+    "websocketpp": { "license": "BSD-3-Clause" },
+    "zstd": { "holder": "Copyright (c) Meta Platforms, Inc. and affiliates" }
+  },
+
+  "extras": [
+    {
+      "name": "mikktspace",
+      "holder": "Copyright (C) 2011 by Morten S. Mikkelsen; Copyright (C) 2022 Blender Authors",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/blender/blender/tree/main/intern/mikktspace",
+      "text": "externals/mikktspace/LICENSE.txt"
+    },
+    {
+      "name": "three.js",
+      "holder": "Copyright (c) 2010-2021 three.js authors",
+      "license": "MIT",
+      "homepage": "https://threejs.org",
+      "text": "externals/js/THREEJS_LICENSE.txt"
+    },
+    {
+      "name": "CubemapToEquirectangular",
+      "holder": "Copyright (c) 2017 Jaume Sanchez Elias",
+      "license": "MIT",
+      "homepage": "http://www.clicktorelease.com",
+      "text": "externals/js/CUBEMAPTOEQUIRECTANGULAR_LICENSE.txt"
+    },
+    {
+      "name": "jpeg_encoder_basic",
+      "holder": "Copyright (c) 2008 Adobe Systems Incorporated; ported by Andreas Ritter",
+      "license": "BSD-3-Clause",
+      "text": "externals/js/JPEG_ENCODER_BASIC_LICENSE.txt"
+    },
+    {
+      "name": "ca-certificates",
+      "holder": "Copyright Mozilla Foundation and contributors",
+      "license": "MPL-2.0",
+      "homepage": "https://curl.se/docs/caextract.html",
+      "notice": "The certificate bundle (ca-bundle.crt) is extracted from Mozilla's root store by the mk-ca-bundle tool.\n\nThis Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, you can obtain one at https://mozilla.org/MPL/2.0/."
+    },
+    {
+      "name": "FMOD Studio",
+      "when": "AL_USE_FMODSTUDIO",
+      "holder": "Made with FMOD Studio by Firelight Technologies Pty Ltd.",
+      "license": "LicenseRef-FMOD",
+      "homepage": "https://www.fmod.com",
+      "notice": "Audio engine: FMOD Studio by Firelight Technologies Pty Ltd. Used under the FMOD End User Licence Agreement, https://www.fmod.com/legal."
+    },
+    {
+      "name": "Discord Social SDK",
+      "when": "AL_USE_DISCORD",
+      "holder": "Copyright (c) Discord Inc.",
+      "license": "LicenseRef-Discord",
+      "homepage": "https://discord.com/developers/docs/discord-social-sdk/overview",
+      "notice": "The Discord Social SDK is used under the Discord Developer Terms of Service, https://discord.com/developers/docs/policies-and-agreements/developer-terms-of-service."
+    }
+  ]
+}

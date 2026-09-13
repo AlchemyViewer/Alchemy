@@ -2,7 +2,6 @@
 
 list(APPEND CMAKE_MESSAGE_CONTEXT viewer)
 
-include(BuildPackagesInfo)
 include(BuildVersion)
 include(TemplateCheck)
 
@@ -2051,11 +2050,52 @@ endif()
 # What ships, and where; the names the package goes by.
 include(ViewerInstall)
 
-# The files generated for the package: the contributor list the About
-# floater shows, the settings an installation is built with, and the build
-# description the crash reporter reads.
+# The files generated for the package: the contributor and supporter lists
+# the About floater shows, the settings an installation is built with, and
+# the build description the crash reporter reads.
 include(ContributorNames)
 al_contributor_names("${INDRA_SOURCE_DIR}/../doc/contributions.txt" "${CMAKE_CURRENT_BINARY_DIR}/contributors.txt")
+al_contributor_names("${INDRA_SOURCE_DIR}/../doc/supporters.txt" "${CMAKE_CURRENT_BINARY_DIR}/supporters.txt")
+
+# The third-party attribution, from what vcpkg installed and the table of
+# what it cannot know. It is regenerated when the installed set, the table
+# or the generator changes, and the viewer's build waits for it.
+get_cmake_property(cache_variables CACHE_VARIABLES)
+set(al_enabled_options "")
+foreach(variable IN LISTS cache_variables)
+  if(variable MATCHES "^AL_")
+    get_property(type CACHE ${variable} PROPERTY TYPE)
+    if(type STREQUAL "BOOL" AND ${variable})
+      list(APPEND al_enabled_options ${variable})
+    endif()
+  endif()
+endforeach()
+list(JOIN al_enabled_options "," al_enabled_options)
+set(al_attribution_table "${INDRA_SOURCE_DIR}/cmake/attribution.json")
+set(al_attribution_script "${INDRA_SOURCE_DIR}/cmake/Attribution.cmake")
+add_custom_command(
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt" "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
+  COMMAND ${CMAKE_COMMAND}
+    -DVCPKG_STATUS=${VCPKG_INSTALLED_DIR}/vcpkg/status
+    -DVCPKG_SHARE=${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share
+    -DTRIPLET=${VCPKG_TARGET_TRIPLET}
+    -DTABLE=${al_attribution_table}
+    -DSOURCE_DIR=${INDRA_SOURCE_DIR}
+    -DCHANNEL=${AL_CHANNEL}
+    -DVERSION=${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}
+    -DENABLED=${al_enabled_options}
+    -DOUTPUT_INFO=${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt
+    -DOUTPUT_LICENSES=${CMAKE_CURRENT_BINARY_DIR}/licenses.txt
+    -P ${al_attribution_script}
+  DEPENDS "${VCPKG_INSTALLED_DIR}/vcpkg/status" "${al_attribution_table}" "${al_attribution_script}"
+  COMMENT "Writing packages-info.txt and licenses.txt from the installed ports"
+  VERBATIM
+  )
+add_custom_target(attribution DEPENDS
+  "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt"
+  "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
+  )
+add_dependencies(${AL_VIEWER_BINARY_NAME} attribution)
 
 set(AL_SOURCEID "$ENV{sourceid}" CACHE STRING "Referring agency recorded in settings_install.xml")
 set(settings_install "")

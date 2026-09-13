@@ -361,13 +361,18 @@ install(DIRECTORY "${al_newview_dir}/skins/"
   PATTERN "*.html"
   PATTERN "*.js")
 
-# Generated at configure time: the contributor list for the About floater,
-# the install-time settings, and the build description.
+# Generated: the contributor and supporter lists and the third-party
+# attribution for the About floater, the install-time settings, the build
+# description, and every licence text.
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/contributors.txt"
+  "${CMAKE_CURRENT_BINARY_DIR}/supporters.txt"
+  "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt"
   "${CMAKE_CURRENT_BINARY_DIR}/settings_install.xml"
   DESTINATION "${AL_INSTALL_DATADIR}/app_settings" COMPONENT viewer)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/build_data.json"
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/build_data.json"
+  "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
   DESTINATION "${AL_INSTALL_DATADIR}" COMPONENT viewer)
 
 install(FILES "${al_newview_dir}/cube.dae"
@@ -377,17 +382,12 @@ install(FILES "${INDRA_SOURCE_DIR}/externals/ca-certificates/ca-bundle.crt"
 
 if(WINDOWS)
   set(al_platform_suffix "")
-  set(al_licenses_platform win32)
 elseif(DARWIN)
   set(al_platform_suffix "_mac")
-  set(al_licenses_platform mac)
 else()
   set(al_platform_suffix "_linux")
-  set(al_licenses_platform linux)
 endif()
 install(FILES "${al_newview_dir}/featuretable${al_platform_suffix}.txt"
-  DESTINATION "${AL_INSTALL_DATADIR}" COMPONENT viewer)
-install(FILES "${al_newview_dir}/licenses-${al_licenses_platform}.txt" RENAME licenses.txt
   DESTINATION "${AL_INSTALL_DATADIR}" COMPONENT viewer)
 
 # ---------------------------------------------------------------------------

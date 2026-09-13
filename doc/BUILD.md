@@ -432,6 +432,8 @@ cpack --config build-<OS>-<preset>/CPackConfig.cmake -C Release
 
 The Windows installer and the update packages come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the installer and the update feed to `newview/velopack/<Config>/Releases`.
 
+The third-party attribution is generated, not kept by hand: `cmake/Attribution.cmake` reads every installed port's `vcpkg.spdx.json` and `copyright` and writes `app_settings/packages-info.txt` (what the About floater's Licences tab shows) and `licenses.txt` (every licence text). What vcpkg cannot know — the pieces under `indra/externals/`, the SDKs from outside vcpkg, and a holder or licence a port's files do not state — is in `cmake/attribution.json`. A newly added port whose `vcpkg.json` declares no `license` stops the build with its name; fix the port, or add an override to the table.
+
 On macOS the install step signs the bundle inside out — ad-hoc, or with `-DAL_ENABLE_SIGNING=ON -DAL_SIGNING_IDENTITY=<Developer ID>` — so the CEF helpers keep their sandbox entitlements. On Linux the binaries carry an `$ORIGIN`-relative RPATH and find the data one directory above the executable, so the tree runs from wherever it is unpacked.
 
 ## Troubleshooting
