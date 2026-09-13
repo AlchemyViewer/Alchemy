@@ -39,7 +39,7 @@ jobs:
       relnotes: ${{ steps.which-branch.outputs.relnotes }}
       release_run: ${{ steps.setvar.outputs.release_run }}
       build_type: ${{ steps.setvar.outputs.build_type }}
-      bugsplat_db: ${{ steps.setvar.outputs.bugsplat_db }}
+      sentry_dsn: ${{ steps.setvar.outputs.sentry_dsn }}
       viewer_channel: ${{ steps.setvar.outputs.viewer_channel }}
       is_private_build: ${{ steps.setvar.outputs.is_private_build }}
     env:
@@ -73,6 +73,9 @@ jobs:
         env:
           BUILD_VCS_BRANCH: ${{ steps.which-branch.outputs.branch }}
           VIEWER_CHANNEL_BASE: "Alchemy"
+          # The Sentry project crash reports go to; unset, the viewer is
+          # built without a crash reporter.
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
         run: |
           echo "release_run=$RELEASE_RUN" >> "$GITHUB_OUTPUT"
 
@@ -85,14 +88,20 @@ jobs:
           if [[ "x$GITHUB_REPOSITORY" != "xAlchemyViewer/Alchemy" || "x$GITHUB_REPOSITORY" != "xAlchemyViewer/AlchemyInternal" ]]; then
             # Non-linden viewer repository run OSS build
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
-            echo "bugsplat_db=" >> $GITHUB_OUTPUT
           elif [[ "$FROM_FORK" == "true" ]]; then
-            # PR from fork; don't build with Bugsplat, proprietary libs
+            # PR from fork; don't build with proprietary libs
             echo 'build_type=opensource' >> $GITHUB_OUTPUT
-            echo "bugsplat_db=" >> $GITHUB_OUTPUT
           else
             echo 'build_type=proprietary' >> $GITHUB_OUTPUT
-            echo "bugsplat_db=" >> $GITHUB_OUTPUT
+          fi
+
+          # Crash reports go to Sentry on every platform and build type once
+          # the repository names a project, but not from a fork's pull
+          # request: it has no token to upload the debug files with.
+          if [[ -n "$SENTRY_DSN" && "$FROM_FORK" != "true" ]]; then
+            echo "sentry_dsn=$SENTRY_DSN" >> "$GITHUB_OUTPUT"
+          else
+            echo "sentry_dsn=" >> "$GITHUB_OUTPUT"
           fi
 
           # determine the viewer channel from the branch or tag name
@@ -179,8 +188,6 @@ jobs:
     env:
       # Sets Xcode version used for build
       DEVELOPER_DIR: "/Applications/Xcode_26.6.app/Contents/Developer"
-      # Ensure that Linden viewer builds engage Bugsplat.
-      AL_BUGSPLAT_DATABASE: ${{ needs.setup.outputs.bugsplat_db }}
       # Decide if we're building tests or the viewer
       AL_BUILD_VIEWER: ${{ matrix.build_variant == 'Viewer' }}
       AL_BUILD_APPEARANCE_UTILITY: false # ${{ startsWith(matrix.runner, 'ubuntu-') && matrix.build_variant == 'Viewer' }}
@@ -189,8 +196,10 @@ jobs:
       BUILD_ARCH: ${{ matrix.arch }}
       BUILD_CONFIG: ${{ matrix.configuration }}
       BUILD_TYPE: ${{ needs.setup.outputs.build_type }}
-      # Crash Reporting - Disabled on linux
-      AL_ENABLE_CRASH_REPORTING: ${{ !startsWith(matrix.runner, 'ubuntu-') && needs.setup.outputs.build_type == 'proprietary' }}
+      # Crash reporting: Sentry, wherever the setup job found a DSN
+      AL_USE_SENTRY: ${{ needs.setup.outputs.sentry_dsn != '' }}
+      AL_SENTRY_DSN: ${{ needs.setup.outputs.sentry_dsn }}
+      AL_ENABLE_CRASH_REPORTING: ${{ needs.setup.outputs.sentry_dsn != '' }}
       # Viewer Channel
       AL_CHANNEL: ${{ needs.setup.outputs.viewer_channel }}
       VIEWER_GRID: "agni"
@@ -362,7 +371,8 @@ jobs:
             -DAL_USE_LTO:BOOL="$AL_USE_LTO" \
             -DAL_ENABLE_RELEASE_DEBUG_LOGGING:BOOL=OFF \
             -DAL_ENABLE_CRASH_REPORTING:BOOL="$AL_ENABLE_CRASH_REPORTING" \
-            -DAL_BUGSPLAT_DATABASE:STRING="${AL_BUGSPLAT_DATABASE:-}" \
+            -DAL_USE_SENTRY:BOOL="$AL_USE_SENTRY" \
+            -DAL_SENTRY_DSN:STRING="$AL_SENTRY_DSN" \
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
             -DAL_GRID:STRING="\"$VIEWER_GRID\"" \
             $template_verifier_master_url \
@@ -462,7 +472,7 @@ jobs:
       # artifact for that too.
       - name: Upload Windows symbol file
         uses: actions/upload-artifact@v7
-        if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.build_type == 'proprietary'
+        if: runner.os == 'Windows' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
         with:
           name: "${{ steps.build.outputs.artifact }}-symbols"
           if-no-files-found: error
@@ -471,12 +481,21 @@ jobs:
 
       - name: Upload macOS symbol file
         uses: actions/upload-artifact@v7
-        if: runner.os == 'macOS' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.build_type == 'proprietary'
+        if: runner.os == 'macOS' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
         with:
           name: "${{ steps.build.outputs.artifact }}-symbols"
           if-no-files-found: error
           path: |
             ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.xcarchive.zip
+
+      - name: Upload Linux symbol file
+        uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
+        with:
+          name: "${{ steps.build.outputs.artifact }}-symbols"
+          if-no-files-found: error
+          path: |
+            ${{ steps.configure.outputs.build_directory }}/symbols/Release/${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz
 
       - name: Upload metadata
         uses: actions/upload-artifact@v7
@@ -487,6 +506,59 @@ jobs:
           compression-level: 9
           path: |
             ${{ steps.configure.outputs.build_directory }}/newview/viewer_version.txt
+
+      # Sentry symbolicates a crash report with the debug files of the
+      # binaries that shipped, in pairs: PE and PDB, Mach-O and dSYM, ELF and
+      # its split .debug. The build tree still holds both halves side by side.
+      - name: Upload debug files to Sentry
+        if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
+        run: |
+          set -x
+
+          if [[ -z "$SENTRY_AUTH_TOKEN" || -z "$SENTRY_ORG" || -z "$SENTRY_PROJECT" ]]; then
+            echo "::error::SENTRY_DSN is set but SENTRY_AUTH_TOKEN, SENTRY_ORG or SENTRY_PROJECT is not; crash reports would go unsymbolicated"
+            exit 1
+          fi
+
+          pip3 install sentry-cli==3.7.0
+
+          case "$RUNNER_OS" in
+            Windows)
+              candidates=(
+                "$BUILD_DIRECTORY/newview/Release"
+                "$BUILD_DIRECTORY/symbols/Release"
+                "$BUILD_DIRECTORY/dullahan/Release"
+              )
+              ;;
+            macOS)
+              candidates=(
+                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/MacOS
+                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/Frameworks
+                "$BUILD_DIRECTORY"/newview/Release/*.app/Contents/Resources/llplugin
+                "$BUILD_DIRECTORY/symbols/Release"
+              )
+              ;;
+            Linux)
+              candidates=(
+                "$BUILD_DIRECTORY/newview/Release/bin"
+                "$BUILD_DIRECTORY/newview/Release/llplugin"
+                "$BUILD_DIRECTORY/symbols/Release"
+              )
+              ;;
+          esac
+
+          paths=()
+          for candidate in "${candidates[@]}"; do
+            [[ -e "$candidate" ]] && paths+=("$candidate")
+          done
+
+          sentry-cli debug-files upload --include-sources --wait "${paths[@]}"
 
       # - name: Upload appearance utility package
       #   uses: actions/upload-artifact@v7
@@ -656,72 +728,6 @@ jobs:
   #         note_user: ${{ steps.note-creds.outputs.note_user }}
   #         note_pass: ${{ steps.note-creds.outputs.note_pass }}
   #         note_team: ${{ steps.note-creds.outputs.note_team }}
-
-  # post-windows-symbols:
-  #   env:
-  #     BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
-  #     SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
-  #     SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
-  #   needs: [setup, build]
-  #   if: needs.setup.outputs.build_type == 'proprietary'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Download viewer exe
-  #       uses: actions/download-artifact@v8
-  #       with:
-  #         name: Windows-x64-app
-  #         path: _artifacts
-  #     - name: Download Windows Symbols
-  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-  #       uses: actions/download-artifact@v8
-  #       with:
-  #         name: Windows-x64-symbols
-  #     - name: Extract viewer pdb
-  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-  #       shell: bash
-  #       run: |
-  #         tar -xJf "${{ needs.setup.outputs.viewer_channel }}.sym.tar.xz" -C _artifacts
-  #     - name: Post Windows symbols
-  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-  #       uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
-  #       with:
-  #         clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
-  #         clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
-  #         database: "${{ env.BUGSPLAT_DATABASE }}"
-  #         application: ${{ needs.setup.outputs.viewer_channel }}
-  #         version: ${{ needs.build.outputs.viewer_version }}
-  #         directory: _artifacts
-  #         files: "**/{SecondLifeViewer.exe,llwebrtc.dll,*.pdb}"
-  #         node-version: "22"
-  #         dumpSyms: false
-
-  # post-mac-symbols:
-  #   env:
-  #     BUGSPLAT_DATABASE: "${{ secrets.BUGSPLAT_DATABASE }}"
-  #     SYMBOL_UPLOAD_CLIENT_ID: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_ID }}"
-  #     SYMBOL_UPLOAD_CLIENT_SECRET: "${{ secrets.BUGSPLAT_SYMBOL_UPLOAD_CLIENT_SECRET }}"
-  #   needs: [setup, build]
-  #   if: needs.setup.outputs.build_type == 'proprietary'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Download Mac Symbols
-  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-  #       uses: actions/download-artifact@v8
-  #       with:
-  #         name: macOS-x64-symbols
-  #     - name: Post Mac symbols
-  #       if: env.BUGSPLAT_DATABASE && env.SYMBOL_UPLOAD_CLIENT_ID
-  #       uses: BugSplat-Git/symbol-upload@2a0d2b8cf9c54c494144048f25da863d93a02ccd
-  #       with:
-  #         clientId: "${{ env.SYMBOL_UPLOAD_CLIENT_ID }}"
-  #         clientSecret: "${{ env.SYMBOL_UPLOAD_CLIENT_SECRET }}"
-  #         database: "${{ env.BUGSPLAT_DATABASE }}"
-  #         application: ${{ needs.setup.outputs.viewer_channel }}
-  #         version: ${{ needs.build.outputs.viewer_version }} (${{ needs.build.outputs.viewer_version }})
-  #         directory: .
-  #         files: "**/*.xcarchive.zip"
-  #         node-version: "22"
-  #         dumpSyms: false
 
   release:
     needs: [setup, build, sign-and-package-windows]
