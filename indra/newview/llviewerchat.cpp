@@ -51,6 +51,8 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_c
     }
     else
     {
+        if (!ALAvatarGroups::instance().getIRCChatColor(chat, r_color))
+        {
         switch(chat.mSourceType)
         {
             case CHAT_SOURCE_SYSTEM:
@@ -95,6 +97,7 @@ void LLViewerChat::getChatColor(const LLChat& chat, LLUIColor& r_color, F32& r_c
                 break;
             default:
                 r_color = LLUIColorTable::instance().getColor("White");
+        }
         }
 
         if (!chat.mPosAgent.isExactlyZero())

@@ -144,7 +144,7 @@
          help_topic="preferences_msgs_tab"
          name="msgs" />
         <panel
-		 class="panel_preference"
+		 class="panel_preference_colors"
          filename="panel_preferences_colors.xml"
          label="Colors"
          layout="topleft"

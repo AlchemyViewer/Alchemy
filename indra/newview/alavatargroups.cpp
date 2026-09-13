@@ -26,6 +26,7 @@
 // lib includes
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "llchat.h"
 #include "lluicolor.h"
 #include "lluicolortable.h"
 #include "lluuid.h"
@@ -34,6 +35,7 @@
 // viewer includes
 #include "llagent.h"
 #include "llcallingcard.h"
+#include "llinstantmessage.h" // SYSTEM_FROM
 #include "llmutelist.h"
 #include "llviewercontrol.h"
 #include "rlvactions.h"
@@ -293,4 +295,104 @@ std::string ALAvatarGroups::getAvatarColorName(const LLUUID& id, std::string_vie
     }
 
     return out_color_name;
+}
+
+bool ALAvatarGroups::getIRCChatColor(const LLChat& chat, LLUIColor& color)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyChatIRCColorsEnabled", false);
+    if (!enabled)
+    {
+        return false;
+    }
+
+    // Only override "other" speakers; self, system, objects and owner-say keep
+    // their user-configured chat colors from the existing switch.
+    if (chat.mSourceType == CHAT_SOURCE_AGENT
+        && chat.mFromID.notNull()
+        && chat.mFromID != gAgentID
+        && SYSTEM_FROM != chat.mFromName
+        // A stable per-avatar color would defeat @shownames, so skip it while
+        // restricted from seeing this speaker's name.
+        && RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat.mFromID))
+    {
+        color = deterministicAgentColor(chat.mFromID);
+        return true;
+    }
+
+    return false;
+}
+
+bool ALAvatarGroups::getIRCNameColor(const LLChat& chat, LLUIColor& color)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyChatIRCColorsEnabled", false);
+    if (!enabled)
+    {
+        return false;
+    }
+
+    // Only override names for the same other-agent messages whose chat color is
+    // overridden by getIRCChatColor.
+    if (chat.mSourceType != CHAT_SOURCE_AGENT
+        || chat.mFromID.isNull()
+        || chat.mFromID == gAgentID
+        || chat.mFromName == SYSTEM_FROM
+        || !RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat.mFromID))
+    {
+        return false;
+    }
+
+    color = nameColor(chat.mFromID);
+    return true;
+}
+
+bool ALAvatarGroups::getIRCNameTagColor(const LLUUID& id, LLColor4& color)
+{
+    static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyChatIRCColorsEnabled", false);
+    static LLCachedControl<bool> name_tags(gSavedSettings, "AlchemyChatIRCColorNameTags", false);
+    if (!enabled || !name_tags)
+    {
+        return false;
+    }
+
+    // Mirror the chat-color override: only other agents get a per-avatar color,
+    // self keeps the user-configured name tag colors. Skip while restricted from
+    // seeing this avatar's name so the color can't defeat @shownames. The name
+    // lightness applied to chat names is applied here too so tags match.
+    if (id.notNull() && id != gAgentID
+        && RlvActions::canShowName(RlvActions::SNC_DEFAULT, id))
+    {
+        color = nameColor(id);
+        return true;
+    }
+
+    return false;
+}
+
+LLColor4 ALAvatarGroups::deterministicAgentColor(const LLUUID& id)
+{
+    static LLCachedControl<F32> saturation(gSavedSettings, "AlchemyChatIRCAgentSaturation", 0.7f);
+    static LLCachedControl<F32> lightness(gSavedSettings, "AlchemyChatIRCAgentLightness", 0.9f);
+
+    LLColor4 color;
+    color.setHSL(static_cast<F32>(id.getCRC32() % 360) / 360.f, saturation(), lightness());
+    color.mV[VALPHA] = 1.f;
+
+    return color;
+}
+
+LLColor4 ALAvatarGroups::nameColor(const LLUUID& id)
+{
+    static LLCachedControl<F32> saturation(gSavedSettings, "AlchemyChatIRCAgentSaturation", 0.7f);
+    static LLCachedControl<F32> name_lightness(gSavedSettings, "AlchemyChatIRCNameLightness", 0.7f);
+
+    // Same hue and saturation as the per-agent chat color, but with the name's
+    // own independent lightness. Built from the same inputs as the chat color
+    // rather than derived from it, so the chat Lightness slider doesn't bleed
+    // into the name (a very light/dark chat color loses saturation, and hue at
+    // the extremes, when round-tripped through RGB).
+    LLColor4 result;
+    result.setHSL(static_cast<F32>(id.getCRC32() % 360) / 360.f, saturation(), name_lightness());
+    result.mV[VALPHA] = 1.f;
+
+    return result;
 }

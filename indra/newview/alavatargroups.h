@@ -24,7 +24,9 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
+class LLChat;
 class LLColor4;
+class LLUIColor;
 class LLUUID;
 
 class ALAvatarGroups final : public LLSingleton < ALAvatarGroups >
@@ -54,4 +56,16 @@ public:
 
     LLColor4 getAvatarColor(const LLUUID& id, LLColor4 default_color, EColorType color_type);
     std::string getAvatarColorName(const LLUUID& id, std::string_view color_name, EColorType color_type);
+
+    // IRC-style chat coloring: when enabled, gives every other speaker a stable
+    // deterministic color and dims the displayed name relative to its text color.
+    // Other message categories (self, system, objects, owner-say) keep their
+    // user-configured chat colors.
+    bool getIRCChatColor(const LLChat& chat, LLUIColor& color);
+    bool getIRCNameColor(const LLChat& chat, LLUIColor& color);
+    bool getIRCNameTagColor(const LLUUID& id, LLColor4& color);
+
+private:
+    LLColor4 deterministicAgentColor(const LLUUID& id);
+    LLColor4 nameColor(const LLUUID& id);
 };
