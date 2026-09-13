@@ -87,6 +87,8 @@ That is the real contract, and the distinction matters when you plan work:
 The floater's C++ provides:
 
 - `LightBox.ResetControlDefault` — per-row reset; `parameter` = setting name.
+  Dropdown, colour and vector rows call it from their reset buttons; setting
+  rows reach the same function through `setResetHandler`, set in `postBuild`.
 - `LightBox.ResetSection` — data-driven section reset; `parameter` = `sec_<id>`.
   It walks the panels named `sec_<id>` and `sec_<id>_adv`, collects every
   descendant's bound control (plus settings named by `vec3_*` spinners), and
@@ -302,11 +304,19 @@ takes the slider's attributes by the slider's names. What it does for you:
   no longer applies to it. `text_width` still wins where it is written.
 - `label_width="140"` and `can_edit_text="true"` are its defaults and need not
   be written.
+- **It says when a drag begins and ends**, by the slider's own names: child
+  elements `setting_row.mouse_down_callback` and `setting_row.mouse_up_callback`.
+  A setting that is dear to apply uses them to leave its work for the release —
+  the seven lens dirt generation rows raise and lower the pipeline's
+  slider-held flag this way, so the plate is drawn once per drag.
 
-**Old-style scalar rows** — a `slider` (`right="-32" height="16"`) followed by a
-separate reset `button` (`top_pad="-17"`, `LightBox.ResetControlDefault` with
-the setting as `parameter`) — are being converted tab by tab. They still work;
-do not add new ones.
+Every scalar row on the four tabs is a `setting_row`. The form they replaced — a
+`slider` (`right="-32" height="16"`) followed by a separate reset `button`
+(`top_pad="-17"`, `LightBox.ResetControlDefault` with the setting repeated as
+its `parameter`) — still works, but do not add one: it is two widgets to lay out
+against each other and a setting name to keep in step by hand. A slider that is
+*not* a scalar row (a vector bank's component, or one driven from C++ like the
+day cycle's time) stays a plain `slider`.
 
 **Checkbox row** (no reset glyph): `check_box` with `control_name`,
 `top_pad="10"` after a button, `top_pad="8"` after another checkbox.
@@ -1107,12 +1117,13 @@ against them. The rules below are how.
   the bottom rows and the overflow draws over the sections below (panels do
   not clip children).
 - Compute the panel height by walking the `top_pad` chain to the **last
-  widget's bottom**, then add 8. `top_pad` chains from the *previous widget*,
-  which for a slider row is its reset button (18px tall, hanging 1px below the
-  16px slider) — so slider+reset rows pitch **26px**, not 25.
-- Worked example: slider row at `top="8"` (slider 8-24, button 7-25), second
-  slider `top_pad="9"` (34-50, button 33-51), Reset All `top_pad="10"`
-  (61-79) → panel height 87, tab height 116.
+  widget's bottom**, then add 8. `top_pad` chains from the *previous widget*;
+  a setting row is 18px tall at `top_pad="8"`, so rows pitch **26px**. (The old
+  slider rows pitched 26 too — their reset button hung 1px below the 16px
+  slider, and it was the button the next row chained from. A setting row is
+  exactly that button's rect, which is why converting a row moved nothing.)
+- Worked example: setting row at `top="7"` (7-25), second row `top_pad="8"`
+  (33-51), Reset All `top_pad="10"` (61-79) → panel height 87, tab height 116.
 - **Side-by-side widgets break the chain.** A bank of three wheels all use
   `top="8"`, so the bank's bottom is *one* wheel's height, not three; the next
   row's `top_pad` chains from the last one declared. Get this wrong and the
@@ -1264,6 +1275,10 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
 - XML well-formedness before launching (any XML-capable tool).
 - Two-way binding: move the row, watch the key in Debug Settings; edit the key
   there, watch the row follow.
+- For a setting row: drag it off its default and watch its reset glyph appear;
+  drag it back and watch it go; press it and confirm the default returns as one
+  undo step called "Reset <caption>". With the row's gate off, the glyph greys
+  with the slider.
 - Gating flips live; section Reset All touches exactly the section's keys
   (including its Advanced sibling); the tab opens to full height with nothing
   clipped or drawing over the next section.
