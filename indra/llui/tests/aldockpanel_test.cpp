@@ -28,6 +28,8 @@
 
 #include "../llbutton.h"
 #include "../lllayoutstack.h"
+#include "../llpanel.h"
+#include "../lltabcontainer.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -300,5 +302,74 @@ namespace tut
                           + " in " + std::to_string(w.side->getRect().getHeight()),
                       pane->getRect(), w.side->getLocalRect());
         w.floater->die();
+    }
+
+    // A tab container's page, which is a place a pane is wanted as much as a
+    // layout panel is: everything on the page goes out and comes back, the
+    // page is filled again when it does, and the tab strip never notices --
+    // the page it holds stays the page it holds, out or in.
+    template<> template<>
+    void aldockpanel_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name = "tabbed";
+        fp.rect = LLRect(0, 300, 400, 0);
+        fp.save_rect = false;
+        fp.save_visibility = false;
+        LLFloater* floater = new LLFloater(LLSD(), fp);
+
+        LLTabContainer::Params tp(LLUICtrlFactory::getDefaultParams<LLTabContainer>());
+        tp.name = "tabs";
+        tp.rect = LLRect(0, 280, 400, 0);
+        tp.tab_position = LLTabContainer::TOP;
+        tp.follows.flags = FOLLOWS_ALL;
+        LLTabContainer* tabs = LLUICtrlFactory::create<LLTabContainer>(tp);
+        floater->addChild(tabs);
+
+        LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        pp.rect = LLRect(0, 260, 400, 0);
+        pp.name = "page_one";
+        pp.label = "One";
+        LLPanel* one = LLUICtrlFactory::create<LLPanel>(pp);
+        pp.name = "page_two";
+        pp.label = "Two";
+        LLPanel* two = LLUICtrlFactory::create<LLPanel>(pp);
+
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name = "on_the_page";
+        bp.rect = LLRect(10, 40, 90, 20);
+        LLButton* on_page = LLUICtrlFactory::create<LLButton>(bp);
+        one->addChild(on_page);
+
+        tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(one).select_tab(true));
+        tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(two));
+
+        ALDockPanel* pane = ALDockPanel::wrap(one, "One");
+        ensure_equals("what was on the page is in the pane", on_page->getParent(), (LLView*)pane);
+
+        pane->popOut();
+        ensure("it is out", pane->poppedOut());
+        ensure("in a window of its own", pane->getParentByType<ALPanelFloater>() != nullptr);
+        ensure_equals("and the strip still has both pages", tabs->getTabCount(), 2);
+        ensure("the page it left is still a page", tabs->getIndexForPanel(one) >= 0);
+
+        tabs->selectTabPanel(two);
+        ensure("the tabs still change while it is out", tabs->getCurrentPanel() == two);
+        tabs->selectTabPanel(one);
+        ensure("including back to the empty page", tabs->getCurrentPanel() == one);
+
+        pane->dock();
+        ensure("it is back", !pane->poppedOut());
+        ensure_equals("on the page it came from", pane->getParent(), (LLView*)one);
+        ensure_equals("filling it", pane->getRect(), one->getLocalRect());
+        ensure_equals("with what was on it",
+                      floater->findChild<LLButton>("on_the_page", true), on_page);
+        ensure("and its tab shows it", tabs->getCurrentPanel() == one);
+        floater->die();
     }
 }
