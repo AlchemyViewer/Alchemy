@@ -12546,12 +12546,31 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         tdim.mV[0] = half_height.dot3(left).getF32();
         tdim.mV[1] = half_height.dot3(up).getF32();
 
-        gGL.matrixMode(LLRender::MM_PROJECTION);
-        gGL.pushMatrix();
 
         F32 distance = (pos-camera.getOrigin()).length();
         F32 fov = atanf(tdim.mV[1]/distance)*2.f*RAD_TO_DEG;
         F32 aspect = tdim.mV[0]/tdim.mV[1];
+
+        // Guard against degenerate geometry: the avatar's bounding box can project
+        // to zero in one or both axes (collapsed extents, extreme distance, or a
+        // lookAt singularity when the avatar is directly above/below the camera).
+        // fov==0 or non-finite aspect both produce an unusable projection matrix
+        // and assert-crash inside glm::perspectiveRH_NO.
+        if (fov <= 0.f || !std::isfinite(aspect) || aspect <= 0.f)
+        {
+            LL_WARNS_ONCE("AvatarRenderPipeline") << "generateImpostor: degenerate fov/aspect for avatar "
+                << avatar->getID() << " (fov=" << fov << " aspect=" << aspect
+                << " distance=" << distance << " tdim=" << tdim.mV[0] << "," << tdim.mV[1]
+                << ") -- skipping impostor bake this frame" << LL_ENDL;
+            popRenderTypeMask();
+            sUseOcclusion   = occlusion;
+            sShadowRender   = saved_shadow_render;
+            sImpostorRender = saved_impostor_render;
+            return;
+        }
+
+        gGL.matrixMode(LLRender::MM_PROJECTION);
+        gGL.pushMatrix();
 
         // Clip planes bracketing the subject instead of a hardcoded 1..256.
         //
