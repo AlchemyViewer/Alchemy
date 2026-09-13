@@ -359,7 +359,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | Option           | Default     | Description                                            |
 |:-----------------|:------------|:-------------------------------------------------------|
 | `AL_USE_OPENXR`     | OFF         | OpenXR VR support (experimental)                       |
-| `AL_USE_SDL_WINDOW` | ON on Linux | SDL-based window management (Linux only; Wayland path) |
+| `AL_USE_SDL_WINDOW` | ON on Linux | SDL-based window management (Linux only; GL through EGL on Wayland and X11 alike) |
 
 ### Crash reporting
 

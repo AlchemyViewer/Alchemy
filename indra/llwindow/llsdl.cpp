@@ -86,6 +86,16 @@ void set_sdl_hints()
 
     std::initializer_list<std::tuple< char const*, char const * > > hintList =
             {
+#if LL_LINUX
+                    // The viewer's GL layer on Linux is EGL and nothing else:
+                    // the worker threads' shared contexts are surfaceless EGL
+                    // contexts and EGL_KHR_image is resolved through it. SDL
+                    // would otherwise create the main context with GLX under
+                    // its x11 driver; with this it uses EGL on X11 too, so one
+                    // code path serves both and no X11 header enters the tree.
+                    {SDL_HINT_VIDEO_FORCE_EGL,"1"},
+#endif
+
                     // Don't ask the compositor to bypass us in fullscreen —
                     // keeps screen recorders, alt-tab thumbnails, picom-style
                     // effects, etc. working. Slight latency cost in exclusive
