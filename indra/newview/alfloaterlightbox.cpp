@@ -150,14 +150,33 @@ private:
 class ALLightboxColorPopover final : public ALPopover
 {
 public:
-    static constexpr S32 WIDTH = 300;
-    static constexpr S32 PICKER_HEIGHT = 196;
+    // The picker gives its channel sliders 218px and the ring the rest of the
+    // width, up to its height. So its width is the ring plus 218: 440 by 220
+    // is a ring as tall as the picker. Narrower, and the ring is what shrinks
+    // -- at the 300 this started at, it was 74px across.
+    static constexpr S32 PICKER_WIDTH = 440;
+    static constexpr S32 PICKER_HEIGHT = 220;
+    // As small as it may be dragged: the sliders and a ring still worth
+    // aiming at.
+    static constexpr S32 MIN_PICKER_WIDTH = 330;
+    static constexpr S32 MIN_PICKER_HEIGHT = 150;
     static constexpr S32 BUTTON_HEIGHT = 20;
     static constexpr S32 BUTTON_WIDTH = 110;
     static constexpr S32 GAP = 4;
 
-    /// Laid out under the title, which is drawn across the top of the rect.
-    static S32 heightFor(S32 header) { return header + GAP + PICKER_HEIGHT + GAP + BUTTON_HEIGHT + GAP; }
+    /// The popover around a picker of @a picker_width by @a picker_height,
+    /// laid out under the title, which is drawn across the top of the rect.
+    static S32 widthFor(S32 picker_width) { return GAP + picker_width + GAP; }
+    static S32 heightFor(S32 header, S32 picker_height)
+    {
+        return header + GAP + picker_height + GAP + BUTTON_HEIGHT + GAP;
+    }
+
+    /// The size the last one was left at this session, or zero: how much of a
+    /// wheel someone wants to see is theirs to decide, and once decided it
+    /// should not have to be decided again for the next colour.
+    inline static S32 sWidth = 0;
+    inline static S32 sHeight = 0;
 
     ALLightboxColorPopover(const LLFloater::Params& p, const LLColor4& start,
                            std::function<void(const LLColor4&)> on_change,
@@ -170,7 +189,9 @@ public:
 
         ALColorPicker::Params pp(LLUICtrlFactory::getDefaultParams<ALColorPicker>());
         pp.name = "picker";
-        pp.rect = LLRect(GAP, top - GAP, width - GAP, top - GAP - PICKER_HEIGHT);
+        // Everything between the title and the button row, so a popover
+        // dragged bigger is a bigger wheel.
+        pp.rect = LLRect(GAP, top - GAP, width - GAP, GAP + BUTTON_HEIGHT + GAP);
         pp.follows.flags = FOLLOWS_ALL;
         // Every colour row here is a Color3 setting: an alpha track would be a
         // control that does nothing.
@@ -202,6 +223,13 @@ public:
             }
         });
         addChild(full);
+    }
+
+    void onClose(bool app_quitting) override
+    {
+        sWidth = getRect().getWidth();
+        sHeight = getRect().getHeight();
+        ALPopover::onClose(app_quitting);
     }
 };
 } // namespace
@@ -958,10 +986,18 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
 
     LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
     LLHandle<LLView> swatch_handle = swatch->getHandle();
+    // Resizable, and opening at the size the last one was left at: the wheel
+    // is what grows.
+    using Popover = ALLightboxColorPopover;
     const S32 header = LLFloater::getDefaultParams().header_height;
+    LLFloater::Params params = ALPopover::paramsFor(
+        Popover::sWidth > 0 ? Popover::sWidth : Popover::widthFor(Popover::PICKER_WIDTH),
+        Popover::sHeight > 0 ? Popover::sHeight : Popover::heightFor(header, Popover::PICKER_HEIGHT),
+        mDirectory.captionFor(key), /*resizable=*/true);
+    params.min_width = Popover::widthFor(Popover::MIN_PICKER_WIDTH);
+    params.min_height = Popover::heightFor(header, Popover::MIN_PICKER_HEIGHT);
     ALLightboxColorPopover* popover = new ALLightboxColorPopover(
-        ALPopover::paramsFor(ALLightboxColorPopover::WIDTH, ALLightboxColorPopover::heightFor(header),
-                             mDirectory.captionFor(key)),
+        params,
         start,
         [self](const LLColor4& color)
         {

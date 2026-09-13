@@ -1063,6 +1063,16 @@ reaches it. Its session is kept by the floater (`mColorKey`, `mColorOriginal`):
 - A pick still open when the stack is stepped is put back first, since the
   stack has not heard of it yet.
 
+**Its size is the ring's size.** `ALColorPicker` gives its channel sliders the
+first 218px of the width, and the ring whatever is left, up to the picker's
+height. So the picker's width is the ring plus 218. It opens 440 by 220, a ring
+as tall as the picker, and can be dragged down to 330 by 150. It started at 300
+wide, and the ring was 74px across. The popover is resizable, the picker grows
+with it, and the next colour opens at the size the last one was left at (for
+the session: `sWidth`/`sHeight`, the way XUI Studio's colour field keeps
+its size). Anything added to the popover must not eat into that width, or the
+ring is what pays for it.
+
 ### 4k. Tabs in windows of their own
 
 The pop-out button (after Find) takes the tab that is up out into a window of
