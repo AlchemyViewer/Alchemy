@@ -49,7 +49,10 @@
 #include <vector>
 
 class ALCurveEditorCtrl;
+class ALDockPanel;
+class ALEmptyState;
 class ALPopover;
+class LLButton;
 class LLColor4;
 class LLColorSwatchCtrl;
 class LLComboBox;
@@ -143,6 +146,31 @@ public:
     /// The inline picker closed: put the colour back if it was escaped, or
     /// record the whole pick as one undo step if it changed anything.
     void endColorSession(bool escaped);
+
+    // --- Tabs in windows of their own ---
+    //
+    // Each page is wrapped in an ALDockPanel at the end of postBuild, after
+    // the directory has found everything on it: taking a page out moves its
+    // widgets into another window, where no search from this floater would
+    // find them, and the directory's pointers are what keep working.
+
+    /// Take the current tab out into a window of its own, or put it back.
+    void togglePane();
+    /// Put one page back.
+    void dockPane(size_t page);
+    /// Put every page back: before this floater closes, since a page left in
+    /// another window would outlive the callbacks it is wired to.
+    void dockPanes();
+    /// Remember which pages are out, and where their windows are.
+    void savePanes() const;
+    /// Take the pages that were out last time out again.
+    void restorePanes();
+    /// Keep the pages' empty states, the button and the saved state in step
+    /// with which pages are out. Polled from draw(), because a torn-off
+    /// window's own close box puts its page back without telling anyone.
+    void refreshPaneRow();
+    /// The window a page is out in, or null while it is here.
+    LLFloater* paneWindow(size_t page) const;
 
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
@@ -258,6 +286,22 @@ public:
     /// The caption a jump lit, and how long ago; draw() puts it out.
     LLHandle<LLView> mLitCaption;
     LLFrameTimer mLitTimer;
+
+    /// One per page, in tab order: its pane, by handle because a pane is in
+    /// another window while it is out and that window is its parent, and what
+    /// the page says while its pane is away.
+    struct Pane
+    {
+        LLHandle<LLView> mPane;
+        ALEmptyState* mEmpty = nullptr;
+    };
+    std::vector<Pane> mPanes;
+    LLButton* mPopOutButton = nullptr;
+    /// Which pages are out and which tab is up, as last shown; -1 before the
+    /// first refresh.
+    S32 mPaneRowState = -1;
+    /// Which pages were out when the state was last saved.
+    U32 mPanesOutSaved = 0;
     /// Every section and setting, found in postBuild. After postBuild nothing
     /// here looks a widget up by name: a page taken out into a window of its
     /// own takes its widgets with it, out of reach of any search from this

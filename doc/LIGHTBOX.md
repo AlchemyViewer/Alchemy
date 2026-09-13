@@ -115,6 +115,8 @@ The floater's C++ provides:
   on first use.
 - `LightBox.Find` — the Find popover (§4j).
 - `LightBox.History` — the undo history popover (§4f).
+- `LightBox.PopOut` — the tab that is up, out into a window of its own or back
+  (§4k).
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
 
 **Asset-picker rows are a third kind of dropdown**, distinct from the enum
@@ -807,29 +809,35 @@ refresh off each of those is more places to forget than a polled compare costs.
 
 `lightbox_topbar` in `floater_lightbox_settings.xml` is an ordinary `panel` of
 ordinary widgets, and worth reading before you add to it, because it is the one
-part of this floater with a fixed width budget: **412px at `min_width`** — the
-floater's 420 less its own `left="4"`/`right="-4"`, and nothing else, because
+part of this floater with a fixed width budget: **422px at `min_width`** — the
+floater's 430 less its own `left="4"`/`right="-4"`, and nothing else, because
 the bar sits directly in the floater. A row inside an accordion section starts
-from the same 420 and loses far more (§5); the two budgets are different on
-purpose. The bar currently spends 398 of its 412.
+from the same 430 and loses far more (§5); the two budgets are different on
+purpose. **The bar spends all 422.** `min_width` was 420 until the pop-out
+button, and was raised by the ten pixels that button needed — which, as §5
+says, widens anyone who had the floater narrower, permanently. Do not do that
+again for one more icon: the next button here means taking width from the Looks
+combo, or finding it another home.
 
 Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
-then Undo / Redo / History, then Scopes, then Find. Four groups, separated by 12px where
-the adjacent buttons inside a group are separated by 4. **That gap is the only
-thing that says they are different kinds of thing** — the first group acts on
-the Look, the second on the grade's own history, the third opens another window,
-the fourth finds a place in this one — so keep it if you add another kind, and
-use 4px if you are extending a group.
+then Undo / Redo / History, then Scopes, then Find / Pop-out. Four groups,
+separated by 12px where the adjacent buttons inside a group are separated by 4.
+**That gap is the only thing that says they are different kinds of thing** —
+the first group acts on the Look, the second on the grade's own history, the
+third opens another window, the fourth acts on this one's layout — so keep it if
+you add another kind, and use 4px if you are extending a group.
 
 Everything after the combo is an **18px icon with an empty label**, and the
 tooltip carries the name. That is not decoration. Four text labels cost 192px of
-the 412; the same four icons cost 80. It also sidesteps §5's silent clipping the
+the bar; the same four icons cost 80. It also sidesteps §5's silent clipping the
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar
 of labels has no reflow and no scrollbar to save it. Take the overlays from the
 viewer's existing set (`Script_Save`, `Conv_toolbar_plus`, `TrashItem_Off`,
 `Refresh_Off`, `Script_Undo`, `Script_Redo`, `Conv_toolbar_call_log`,
-`Command_Stats_Icon`, `Command_Search_Icon`) rather than adding art; picking a glyph that already
-means the right thing elsewhere is most of the work.
+`Command_Stats_Icon`, `Command_Search_Icon`, `Conv_toolbar_arrow_ne`/`_sw`)
+rather than adding art; picking a glyph that already means the right thing
+elsewhere is most of the work. The pop-out pair is the IM window's tear-off
+icon, and swaps with the state of the tab that is up.
 
 **A button that opens another floater needs no C++ at all** — `Floater.Toggle`
 is a global commit callback in `llui.cpp`, with the floater's registered name as
@@ -1026,6 +1034,42 @@ reaches it. Its session is kept by the floater (`mColorKey`, `mColorOriginal`):
 - A pick still open when the stack is stepped is put back first, since the
   stack has not heard of it yet.
 
+### 4k. Tabs in windows of their own
+
+The pop-out button (after Find) takes the tab that is up out into a window of
+its own, so Look and Lens can be open side by side, or a tab parked on another
+monitor. Each page is wrapped in XUI Studio's `ALDockPanel` at the very end of
+`postBuild`; popping out *moves* the page's contents into an `ALPanelFloater`
+titled "Lightbox: Look", and the page left behind shows an `ALEmptyState` with a
+"Put it back" button. Closing the window puts the page back too, and so does
+the pop-out button, whose icon and tooltip follow the state of the tab that is
+up. Find reaches into a page that is out by raising its window.
+
+What this asks of the rest of the floater:
+
+- **Nothing may look a widget up by name after `postBuild`** (§4i). A search
+  from this floater's root does not reach a page that is out, and it is not an
+  error when it fails — it just finds nothing, and Reset All quietly resets
+  nothing. That was the reason for the directory.
+- **Pages go back before the floater closes.** `onClose` saves which pages are
+  out and where, then docks them all: a page left in another window would
+  outlive the callbacks it is wired to. It does so even when the viewer is
+  quitting, because windows are closed in no particular order then and
+  `onClose` is the last point at which both this floater and every torn-off
+  window are sure to be whole. The destructor docks again as a fallback, and
+  holds the panes by handle for it — a pane still out belongs to its window,
+  which may already be gone.
+- **Keys still reach the floater.** `ALPanelFloater` claims accelerators and
+  passes a key it does not handle to the floater it came from, so Ctrl+Z,
+  Ctrl+Y and Ctrl+F work from a torn-off tab.
+- **The keyboard is not taken along.** A control with focus is let go before
+  its page leaves, so no keystroke lands in a window nobody is looking at.
+- **Where they were is remembered**: `ALLightboxState["panes_out"]`, keyed by
+  page name, holds whether each page was out and its window's rect, and
+  `restorePanes` takes them out again when the Lightbox next opens.
+  `refreshPaneRow` (polled from `draw()`, since a torn-off window's close box
+  docks without telling anyone) saves whenever the set of pages out changes.
+
 ### 5. Height math (the part everyone gets wrong)
 
 - `accordion_tab` height **must be** inner panel height **+ 29**
@@ -1045,9 +1089,11 @@ reaches it. Its session is kept by the floater (`mColorKey`, `mColorOriginal`):
   row's `top_pad` chains from the last one declared. Get this wrong and the
   panel is either 350px too tall or clipped.
 - **A row of buttons has to be sized for `min_width`, not for the default.**
-  The arithmetic that matters is 420 − 28 for the chrome − 15 for the accordion
-  scrollbar − 16 for `left="8"`/`right="-8"`, which leaves **361px**. The Light
-  tab's four presets are 85 wide with 6px gaps and end at 366 of 369. Laid out
+  The arithmetic that matters is 430 − 28 for the chrome − 15 for the accordion
+  scrollbar − 16 for `left="8"`/`right="-8"`, which leaves **371px** (361
+  before `min_width` went from 420 to 430 for the top bar, §4g — the rows here
+  were all laid out to 361, and that is still the safer figure to design to).
+  The Sky tab's four presets are 85 wide with 6px gaps and end at 366. Laid out
   against the 460 default they looked fine and lost their last button the
   moment the floater was narrowed.
 - Widths never reflow. Usable inner width is the floater's width − 28, and
@@ -1226,6 +1272,9 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   Finally, confirm the presets land somewhere plausible on a region whose day
   cycle is not the default one, because a hardcoded fraction would also look
   right on a default region.
+- For anything that acts on a section or a row from C++: do it once with the
+  tab in place and once with it popped out, since a lookup by name after
+  `postBuild` fails silently only in the second case.
 - For a colour row: click the swatch, drag, and watch the render follow; press
   Escape and confirm the colour comes back with no undo step; pick again and
   click away, and confirm it is one step.

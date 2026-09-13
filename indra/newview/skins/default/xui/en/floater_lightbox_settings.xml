@@ -2,7 +2,7 @@
 <floater
  width="460"
  height="560"
- min_width="420"
+ min_width="430"
  min_height="420"
  layout="topleft"
  name="floater_lightbox_settings"
@@ -76,6 +76,33 @@
 	<floater.string
 	 name="color_full_picker_tooltip">
 		Open the viewer's color picker, with typed values and the eyedropper, starting from the color picked here
+	</floater.string>
+	<!-- A tab taken out into a window of its own: the window's title, the
+	     pop-out button's two tooltips, and what the tab says while its page
+	     is away. -->
+	<floater.string
+	 name="pane_title">
+		Lightbox: [TAB]
+	</floater.string>
+	<floater.string
+	 name="pane_take_out_tooltip">
+		Take the [TAB] tab out into a window of its own
+	</floater.string>
+	<floater.string
+	 name="pane_put_back_tooltip">
+		Put the [TAB] tab back in the Lightbox
+	</floater.string>
+	<floater.string
+	 name="pane_away_headline">
+		[TAB] is in a window of its own
+	</floater.string>
+	<floater.string
+	 name="pane_away_sentence">
+		Move that window wherever it is handy. Closing it puts the tab back here, and so does the button below.
+	</floater.string>
+	<floater.string
+	 name="pane_put_back">
+		Put it back
 	</floater.string>
 	<panel
 	 name="lightbox_topbar"
@@ -259,6 +286,26 @@
 		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
 			<button.commit_callback
 			 function="LightBox.Find" />
+		</button>
+		<!-- In Find's group: both act on this floater's layout. The icon and
+		     tooltip are set from C++ to match the tab that is up (while its
+		     page is out, the button brings it back), so the ones here are only
+		     the starting state. This button is why min_width is 430: the bar
+		     needs 422. -->
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Conv_toolbar_arrow_ne"
+		 name="lightbox_pop_out"
+		 tool_tip="Take this tab out into a window of its own">
+			<button.commit_callback
+			 function="LightBox.PopOut" />
 		</button>
 	</panel>
 	<!-- fill_width shares the strip between the four tabs instead of leaving

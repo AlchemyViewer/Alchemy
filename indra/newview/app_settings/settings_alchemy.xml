@@ -310,6 +310,17 @@
             <key>Value</key>
             <integer>3</integer>
         </map>
+        <key>ALLightboxState</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightbox: which tabs were out in windows of their own, and where those windows were, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
         <key>ALXUIStudioState</key>
         <map>
             <key>Comment</key>

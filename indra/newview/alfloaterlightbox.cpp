@@ -32,6 +32,8 @@
 #include "alfloaterlightbox.h"
 
 #include "alcolorpicker.h"
+#include "aldockpanel.h"
+#include "alemptystate.h"
 #include "alhistorylist.h"
 #include "alpopover.h"
 #include "alquickopen.h"
@@ -41,6 +43,7 @@
 #include "llcolorswatch.h"
 #include "llcombobox.h"
 #include "lleditmenuhandler.h"
+#include "llfocusmgr.h"
 #include "lltextbox.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
@@ -237,6 +240,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
     mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
     mCommitCallbackRegistrar.add("LightBox.History", std::bind(&ALFloaterLightBox::openHistory, this));
+    mCommitCallbackRegistrar.add("LightBox.PopOut", std::bind(&ALFloaterLightBox::togglePane, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
@@ -248,6 +252,11 @@ ALFloaterLightBox::~ALFloaterLightBox()
     {
         popover->die();
     }
+    // onClose has put every page back; this is for a floater that dies
+    // without closing, which would otherwise leave a page in a window of its
+    // own wired to callbacks on a floater that is gone. By handle, because a
+    // pane still out belongs to its window, and that window may be gone first.
+    dockPanes();
 
     // The handle in the pick callback already makes a late sample harmless, but
     // an armed picker outliving its floater would leave the user holding an
@@ -403,6 +412,45 @@ bool ALFloaterLightBox::postBuild()
 
     setupToneCurve();
     setupSplitToneGraph();
+
+    // Last, after everything above has found what it needs: from here a page
+    // can be taken out of the floater, and nothing may look for a widget
+    // through it again.
+    mPopOutButton = findChild<LLButton>("lightbox_pop_out");
+    for (size_t index = 0; index < mTabPages.size(); ++index)
+    {
+        LLPanel* page = mTabPages[index];
+        LLStringUtil::format_map_t args;
+        args["[TAB]"] = page->getLabel();
+
+        Pane pane;
+        if (ALDockPanel* dock = ALDockPanel::wrap(page, getString("pane_title", args)))
+        {
+            pane.mPane = dock->getHandle();
+        }
+
+        // What the page says while its pane is away: added after the wrap, so
+        // it stays on the page when the page's contents go.
+        ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+        ep.name = page->getName() + "_away";
+        ep.rect = page->getLocalRect();
+        ep.follows.flags = FOLLOWS_ALL;
+        ep.background_visible = false;
+        ep.visible = false;
+        pane.mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
+        page->addChild(pane.mEmpty);
+        pane.mEmpty->say(getString("pane_away_headline", args), getString("pane_away_sentence", args),
+                         getString("pane_put_back"));
+        pane.mEmpty->onAction([self, index]()
+        {
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->dockPane(index);
+            }
+        });
+        mPanes.push_back(pane);
+    }
+    restorePanes();
 
     return LLFloater::postBuild();
 }
@@ -760,6 +808,7 @@ void ALFloaterLightBox::draw()
     refreshReferenceRow();
     refreshHistoryButtons();
     refreshDayCycleRow();
+    refreshPaneRow();
 
     if (LLView* lit = mLitCaption.get())
     {
@@ -786,6 +835,12 @@ void ALFloaterLightBox::draw()
 void ALFloaterLightBox::onClose(bool app_quitting)
 {
     closePopover(false);
+    // Saved before they are put back, or every page would be remembered as
+    // here. And put back even when the viewer is quitting: windows are closed
+    // in no particular order then, and this is the last point at which both
+    // this floater and every torn-off window are sure to still be whole.
+    savePanes();
+    dockPanes();
     LLFloater::onClose(app_quitting);
 }
 
@@ -953,6 +1008,193 @@ void ALFloaterLightBox::endColorSession(bool escaped)
     {
         ScopedHistoryGroup group(mHistory);
         mHistory.record(key, mColorOriginal, picked, (F32)LLTimer::getElapsedSeconds().value());
+    }
+}
+
+LLFloater* ALFloaterLightBox::paneWindow(size_t page) const
+{
+    if (page >= mPanes.size())
+    {
+        return nullptr;
+    }
+    const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get());
+    return pane && pane->poppedOut() ? pane->getParentByType<LLFloater>() : nullptr;
+}
+
+void ALFloaterLightBox::togglePane()
+{
+    const S32 current = mTabs ? mTabs->getCurrentPanelIndex() : -1;
+    if (current < 0 || (size_t)current >= mPanes.size())
+    {
+        return;
+    }
+    ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[current].mPane.get());
+    if (!pane)
+    {
+        return;
+    }
+
+    if (pane->poppedOut())
+    {
+        dockPane((size_t)current);
+        return;
+    }
+
+    // The keyboard is not taken along. A focused control moving to another
+    // window, with this one still remembering it as where its focus was, is
+    // how a keystroke ends up somewhere nobody is looking.
+    if (gFocusMgr.childHasKeyboardFocus(pane))
+    {
+        gFocusMgr.setKeyboardFocus(nullptr);
+    }
+    gFocusMgr.clearLastFocusForGroup(this);
+    pane->popOut();
+    refreshPaneRow();
+}
+
+void ALFloaterLightBox::dockPane(size_t page)
+{
+    if (page >= mPanes.size())
+    {
+        return;
+    }
+    if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get()))
+    {
+        if (pane->poppedOut())
+        {
+            pane->dock();
+        }
+    }
+    refreshPaneRow();
+}
+
+void ALFloaterLightBox::dockPanes()
+{
+    for (const Pane& each : mPanes)
+    {
+        if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(each.mPane.get()))
+        {
+            if (pane->poppedOut())
+            {
+                pane->dock();
+            }
+        }
+    }
+}
+
+void ALFloaterLightBox::savePanes() const
+{
+    // By page name, so a page added or moved in the XUI keeps its own memory
+    // and a page removed takes nobody else's with it.
+    LLSD panes = LLSD::emptyMap();
+    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
+    {
+        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        if (!pane)
+        {
+            continue;
+        }
+        LLSD entry = LLSD::emptyMap();
+        entry["out"] = pane->poppedOut();
+        const LLRect rect = pane->floatingRect();
+        if (!rect.isEmpty())
+        {
+            entry["rect"] = rect.getValue();
+        }
+        panes[mTabPages[index]->getName()] = entry;
+    }
+    LLSD state = gSavedSettings.getLLSD("ALLightboxState");
+    if (!state.isMap())
+    {
+        state = LLSD::emptyMap();
+    }
+    state["panes_out"] = panes;
+    gSavedSettings.setLLSD("ALLightboxState", state);
+}
+
+void ALFloaterLightBox::restorePanes()
+{
+    const LLSD panes = gSavedSettings.getLLSD("ALLightboxState")["panes_out"];
+    if (!panes.isMap())
+    {
+        return;
+    }
+    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
+    {
+        ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        const LLSD entry = panes[mTabPages[index]->getName()];
+        if (!pane || !entry.isMap())
+        {
+            continue;
+        }
+        if (entry.has("rect"))
+        {
+            LLRect rect;
+            rect.setValue(entry["rect"]);
+            if (!rect.isEmpty())
+            {
+                pane->setFloatingRect(rect);
+            }
+        }
+        if (entry["out"].asBoolean())
+        {
+            pane->popOut();
+            // Where it was may be off a screen that has since gone.
+            if (LLFloater* window = paneWindow(index))
+            {
+                gFloaterView->adjustToFitScreen(window, false);
+            }
+        }
+    }
+}
+
+void ALFloaterLightBox::refreshPaneRow()
+{
+    if (mPanes.empty() || !mTabs)
+    {
+        return;
+    }
+
+    U32 out = 0;
+    for (size_t index = 0; index < mPanes.size(); ++index)
+    {
+        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        if (pane && pane->poppedOut())
+        {
+            out |= 1u << index;
+        }
+    }
+    const S32 current = mTabs->getCurrentPanelIndex();
+    const S32 state = (S32)(out << 4) | (current & 0xF);
+    if (state == mPaneRowState)
+    {
+        return;
+    }
+    mPaneRowState = state;
+
+    for (size_t index = 0; index < mPanes.size(); ++index)
+    {
+        if (mPanes[index].mEmpty)
+        {
+            mPanes[index].mEmpty->setVisible(((out >> index) & 1) != 0);
+        }
+    }
+
+    // The button speaks for the tab that is up: out, it brings the page
+    // back; here, it sends it out.
+    if (mPopOutButton && current >= 0)
+    {
+        const bool current_out = ((out >> current) & 1) != 0;
+        mPopOutButton->setImageOverlay(current_out ? "Conv_toolbar_arrow_sw" : "Conv_toolbar_arrow_ne");
+        LLStringUtil::format_map_t args;
+        args["[TAB]"] = pageLabel((size_t)current);
+        mPopOutButton->setToolTip(getString(current_out ? "pane_put_back_tooltip" : "pane_take_out_tooltip", args));
+    }
+
+    if (out != mPanesOutSaved)
+    {
+        mPanesOutSaved = out;
+        savePanes();
     }
 }
 
@@ -1215,7 +1457,17 @@ void ALFloaterLightBox::jumpTo(const std::string& target)
     {
         setMinimized(false);
     }
-    if (section->mPage < mTabPages.size())
+    // A page out in a window of its own is shown by raising the window; its
+    // tab here only says where it went.
+    if (LLFloater* window = paneWindow(section->mPage))
+    {
+        if (window->isMinimized())
+        {
+            window->setMinimized(false);
+        }
+        window->setFrontmost(true);
+    }
+    else if (section->mPage < mTabPages.size())
     {
         mTabs->selectTabPanel(mTabPages[section->mPage]);
     }
