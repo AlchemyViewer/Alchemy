@@ -9077,24 +9077,26 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
             }
 
             { // combine result based on alpha
+                static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
+                LLGLSLShader& combine_program = RenderDepthOfFieldNearBlur ? gDeferredDoFCombineProgram : gDeferredDoFCombineProgramNoNear;
 
                 dst->bindTarget();
                 glViewport(0, 0, dst->getWidth(), dst->getHeight());
 
-                gDeferredDoFCombineProgram.bind();
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, ALSamplers::PointMirror);
+                combine_program.bind();
+                combine_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+                combine_program.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, ALSamplers::PointMirror);
 
-                gDeferredDoFCombineProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_WIDTH, (dof_width - 1) / (F32)src->getWidth());
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_HEIGHT, (dof_height - 1) / (F32)src->getHeight());
+                combine_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+                combine_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
+                combine_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
+                combine_program.uniform1f(LLShaderMgr::DOF_WIDTH, (dof_width - 1) / (F32)src->getWidth());
+                combine_program.uniform1f(LLShaderMgr::DOF_HEIGHT, (dof_height - 1) / (F32)src->getHeight());
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-                gDeferredDoFCombineProgram.unbind();
+                combine_program.unbind();
 
                 dst->flush();
             }

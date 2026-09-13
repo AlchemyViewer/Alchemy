@@ -58,7 +58,11 @@ void main()
 
     vec4 diff = texture(lightMap, vary_fragcoord.xy);
 
-    float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #if FRONT_BLUR
+        float a = min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #else
+        float a = (diff.a > 0.5) ? 0.0 : min(abs(diff.a*2.0-1.0) * max_cof*res_scale*res_scale, 1.0);
+    #endif
 
     if (a > 0.25 && a < 0.75)
     { //help out the transition a bit
