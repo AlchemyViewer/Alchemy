@@ -50,16 +50,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Blur the scene away from the focus distance, like a camera lens. Toggling causes a brief hitch."
 				 name="dof_enable"
 				 control_name="RenderDepthOfField" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
 				 label="F-number"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="0.7"
@@ -68,32 +66,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Aperture f-number. Lower values give a shallower focus plane and stronger blur."
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraFNumber" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_fnumber_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraFNumber" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Focal length (mm)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="5"
@@ -102,22 +82,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Lens focal length in millimeters. Longer lenses compress and blur backgrounds more."
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraFocalLength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_focal_length_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraFocalLength" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -177,16 +141,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_dof_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Field of view"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="10"
@@ -195,32 +157,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Vertical field of view (degrees) the DoF model assumes for the virtual camera"
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraFieldOfView" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_fov_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraFieldOfView" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max blur (CoC)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.5"
 				 min_val="1"
@@ -229,32 +173,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Maximum circle-of-confusion size, capping how strong the blur can get"
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraMaxCoF" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_max_cof_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraMaxCoF" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Resolution scale"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.25"
@@ -263,32 +189,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Resolution the blur is computed at. 1 = full resolution (sharpest, slowest); 0.25 = quarter."
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraDoFResScale" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_res_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraDoFResScale" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Focus transition (s)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="0"
@@ -297,22 +205,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Seconds the camera takes to rack focus between distances"
 				 enabled_control="RenderDepthOfField"
 				 control_name="CameraFocusTransitionTime" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="dof_transition_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="CameraFocusTransitionTime" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -441,16 +333,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderBokehApertureBlades" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Anamorphic"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.25"
@@ -459,32 +349,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Stretches defocused highlights into ovals the way an anamorphic lens does. 1.0 is round; above 1 is taller than wide. Area preserving, so it changes the shape of the blur without changing its strength"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehAnamorphicSqueeze" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_anamorphic_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehAnamorphicSqueeze" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Highlight Gain"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -493,32 +365,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Extra weight on bright samples, making defocused highlights read as distinct discs. 0 is a plain average"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehHighlightGain" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_highlight_gain_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehHighlightGain" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Cat's Eye"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -527,22 +381,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Optical vignetting; clips bokeh into lens-shaped slivers by distance from the image circle centre, so a wide display clips at the sides well before the top and bottom"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehCatEyeAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_cat_eye_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehCatEyeAmount" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -578,16 +416,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_bokeh_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Highlight Threshold"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.1"
 				 min_val="0"
@@ -596,32 +432,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Brightness where the highlight boost starts. 0 boosts everything; raising it restricts the effect to genuine highlights"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehHighlightThreshold" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_highlight_threshold_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehHighlightThreshold" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Firefly Clamp"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="8"
 				 min_val="0"
@@ -630,32 +448,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Caps how much a single bright sample may contribute to a neighbouring disc. Lower stops glints shimmering as the camera moves; 0 disables the cap"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehHighlightClamp" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_highlight_clamp_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehHighlightClamp" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Blade Rotation"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -664,32 +464,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Rotates the aperture polygon. No effect on a circular aperture"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehApertureRotation" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_blade_rotation_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehApertureRotation" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Blade Curvature"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -698,32 +480,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Rounds the blades back toward a circle, as a rounded diaphragm does when held open. No effect on a circular aperture"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehApertureCurvature" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_blade_curvature_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehApertureCurvature" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Defocus Fringe"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -732,22 +496,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Colour cast on the rim of defocused highlights, flipping hue either side of focus. Separate from the frame-wide Chromatic Aberration section"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehFringeAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bokeh_fringe_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehFringeAmount" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -859,16 +607,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_aberration">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Spherical"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -877,32 +623,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Hollows defocused highlights into bright-rimmed bubbles, or fills them in for a creamy blur. Flips either side of focus, as real glass does"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehSphericalAberration" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aberration_spherical_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehSphericalAberration" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Field Stretch"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -911,32 +639,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Stretches defocused highlights toward the frame edges; positive swirls them around the centre, negative draws them into comet shapes"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehFieldStretch" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aberration_field_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehFieldStretch" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Field Falloff"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -945,32 +655,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="How far in from the corners field stretch reaches; higher keeps the middle of the frame clean"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehFieldFalloff" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aberration_field_falloff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehFieldFalloff" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Coma Asymmetry"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -979,22 +671,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Draws each highlight into a comet with its tail pointing away from frame centre; zero on the optical axis, strongest in the corners"
 				 enabled_control="RenderDepthOfField"
 				 control_name="RenderBokehComaAsymmetry" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aberration_coma_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBokehComaAsymmetry" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1030,16 +706,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_bloom">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1048,32 +722,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="How strongly the bloom is blended into the scene"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomStrength" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Threshold"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -1082,32 +738,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Luminance (linear light) above which pixels bloom; 1.0 is roughly brighter-than-white"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomThreshold" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_threshold_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomThreshold" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Scatter"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.5"
@@ -1116,22 +754,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Bloom spread per octave. Above about 2.5 the filter starts to alias."
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomScatter" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_scatter_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomScatter" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1167,16 +789,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_bloom_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Knee"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1185,32 +805,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Soft-knee width below the threshold; wider gives a more gradual bloom onset"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomKnee" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_knee_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomKnee" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Prim glow boost"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="0"
@@ -1219,32 +821,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Multiplier for legacy prim-glow when fed into HDR bloom, so glowing objects match legacy brightness"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomAlphaGlowBoost" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_alpha_boost_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomAlphaGlowBoost" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Mip count"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="3"
@@ -1253,22 +837,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Bloom pyramid levels; more mips = wider, softer bloom. Changing causes a brief hitch."
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomMipCount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_mips_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomMipCount" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -1338,16 +906,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="bloom_halation"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomHalation" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
 				 label="Halation strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1356,22 +922,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Photographic halation amount; 0.25 is a gentle cinematic feel"
 				 enabled_control="RenderBloomHalation"
 				 control_name="RenderBloomHalationStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="bloom_halation_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderBloomHalationStrength" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -1445,16 +995,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_crossfilter">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1463,22 +1011,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Streaks every bright point in frame into a star, the way an etched glass filter does. Rides on the bloom pyramid, so bloom strength 0 silences it"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderCrossFilterStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="crossfilter_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCrossFilterStrength" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -1540,16 +1072,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderCrossFilterPoints" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Length"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.25"
@@ -1558,22 +1088,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="How far the arms reach. 1.0 is the tuned value; the range stops where the arms would start breaking into a lattice"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderCrossFilterLength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="crossfilter_length_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCrossFilterLength" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1609,16 +1123,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_crossfilter_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Angle"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -1627,32 +1139,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Rotates the whole star, as if turning the filter in its thread"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderCrossFilterAngle" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="crossfilter_angle_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCrossFilterAngle" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Falloff"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.1"
@@ -1661,32 +1155,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="How quickly each arm fades along its length. Low gives long even spokes, high keeps the star tight. Shape only - brightness is Strength"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderCrossFilterFalloff" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="crossfilter_falloff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCrossFilterFalloff" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Dispersion"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1695,22 +1171,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Rainbow spread along the arms. A real star filter is a diffraction grating, so the tips go coloured while the core stays white"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderCrossFilterChromatic" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="crossfilter_chromatic_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCrossFilterChromatic" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1768,16 +1228,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="glow_enable"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlow" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1786,32 +1244,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Additive strength of the glow"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowStrength" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Width"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -1820,22 +1260,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Glow sample size; wider is softer but eventually pixelated"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowWidth" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_width_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowWidth" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1871,16 +1295,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_glow_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Iterations"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="1"
@@ -1889,32 +1311,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Blur passes; higher is wider and smoother but slower"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowIterations" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_iterations_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowIterations" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max extract alpha"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -1923,32 +1327,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Cap on brightness-extracted auto-glow"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowMaxExtractAlpha" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_max_alpha_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowMaxExtractAlpha" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Min luminance"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="100"
 				 min_val="0"
@@ -1957,32 +1343,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Minimum luminance for an object to auto-glow; 9999 effectively disables auto-glow"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowMinLuminance" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_min_lum_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowMinLuminance" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Resolution (pow 2)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="6"
@@ -1991,22 +1359,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Glow map resolution as a power of two (9 = 512)"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowResolutionPow" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_res_pow_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowResolutionPow" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -2019,16 +1371,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="glow_hdr"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowHDR" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
 				 label="Warmth amount"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -2037,22 +1387,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 tool_tip="Blend between luminance extraction (0) and warmth extraction (1)"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowWarmthAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_warmth_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowWarmthAmount" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -2260,16 +1594,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_flare">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -2277,22 +1609,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_strength"
 				 tool_tip="Master lens flare intensity; 0 turns the effect off entirely"
 				 control_name="RenderLensFlareStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStrength" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -2330,16 +1646,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareStreakTint" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Glow"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -2347,32 +1661,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_glow"
 				 tool_tip="Intensity of the soft central glow around the sun"
 				 control_name="RenderLensFlareGlow" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_glow_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGlow" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Starburst"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -2380,22 +1676,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_starburst"
 				 tool_tip="Intensity of the diffraction-spike starburst radiating from the sun"
 				 control_name="RenderLensFlareStarburst" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_starburst_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStarburst" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -2441,16 +1721,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_streak"
 				 value="Streak" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Length"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.01"
@@ -2458,32 +1736,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_streak_length"
 				 tool_tip="How far the anamorphic streak stretches; 1.0 crosses the full screen width"
 				 control_name="RenderLensFlareStreakLength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_streak_length_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStreakLength" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Falloff"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="0.1"
@@ -2491,32 +1751,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_streak_falloff"
 				 tool_tip="How quickly the streak fades toward its tips; lower leaves a longer tail"
 				 control_name="RenderLensFlareStreakFalloff" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_streak_falloff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStreakFalloff" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Thickness"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -2524,32 +1766,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_streak_thickness"
 				 tool_tip="Vertical thickness of the streak; low is a hairline, high a soft band"
 				 control_name="RenderLensFlareStreakThickness" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_streak_thickness_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStreakThickness" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Intensity"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -2557,32 +1781,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_streak_intensity"
 				 tool_tip="Brightness of just the streak, separate from the master strength"
 				 control_name="RenderLensFlareStreakIntensity" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_streak_intensity_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStreakIntensity" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Chromatic spread"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -2590,22 +1796,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_chromatic_spread"
 				 tool_tip="Red/blue separation along the streak; 1 gives a strong rainbow split"
 				 control_name="RenderLensFlareChromaticSpread" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_chromatic_spread_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareChromaticSpread" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -2625,16 +1815,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_glow"
 				 value="Glow" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Radius"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="3"
 				 text_width="56"
 				 increment="0.005"
@@ -2643,32 +1831,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_glow_radius"
 				 tool_tip="Size of the soft glow around the sun"
 				 control_name="RenderLensFlareGlowRadius" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_glow_radius_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGlowRadius" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Falloff"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.5"
 				 min_val="1"
@@ -2676,22 +1846,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_glow_falloff"
 				 tool_tip="Softness of the central glow; lower spreads it out, higher keeps it tight"
 				 control_name="RenderLensFlareGlowFalloff" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_glow_falloff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGlowFalloff" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -2711,16 +1865,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_ghosts"
 				 value="Ghosts" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Intensity"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -2728,32 +1880,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_ghost"
 				 tool_tip="Intensity of the lens ghost circles; 0 disables ghosts"
 				 control_name="RenderLensFlareGhost" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_ghost_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGhost" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Count"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -2761,32 +1895,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_ghost_count"
 				 tool_tip="Number of ghost circles along the sun-to-center line"
 				 control_name="RenderLensFlareGhostCount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_ghost_count_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGhostCount" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Spacing"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.1"
@@ -2794,22 +1910,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_ghost_spacing"
 				 tool_tip="Distance between consecutive ghosts"
 				 control_name="RenderLensFlareGhostSpacing" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_ghost_spacing_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareGhostSpacing" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -2829,16 +1929,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_halo"
 				 value="Halo" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Intensity"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -2846,32 +1944,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_halo"
 				 tool_tip="Intensity of the halo ring opposite the sun; 0 disables the halo"
 				 control_name="RenderLensFlareHalo" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_halo_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareHalo" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Radius"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.01"
@@ -2879,32 +1959,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_halo_radius"
 				 tool_tip="Radius of the halo ring"
 				 control_name="RenderLensFlareHaloRadius" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_halo_radius_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareHaloRadius" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Width"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="3"
 				 text_width="56"
 				 increment="0.005"
@@ -2913,22 +1975,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_halo_width"
 				 tool_tip="Thickness of the halo ring; small is a crisp hoop, large a diffuse ring"
 				 control_name="RenderLensFlareHaloWidth" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_halo_width_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareHaloWidth" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -2948,16 +1994,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_starburst"
 				 value="Starburst" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Spike Pairs"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="1"
@@ -2965,32 +2009,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_starburst_spikes"
 				 tool_tip="Draws twice this many spikes - half the blade count, or all of it if odd"
 				 control_name="RenderLensFlareStarburstSpikes" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_starburst_spikes_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStarburstSpikes" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Sharpness"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="1"
@@ -2998,32 +2024,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_starburst_sharpness"
 				 tool_tip="Low values give soft wide rays; high values give thin needle-like beams"
 				 control_name="RenderLensFlareStarburstSharpness" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_starburst_sharpness_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStarburstSharpness" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Length"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3031,22 +2039,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_starburst_length"
 				 tool_tip="Length of the starburst spikes"
 				 control_name="RenderLensFlareStarburstLength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_starburst_length_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareStarburstLength" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -3066,16 +2058,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 font="SansSerifBold"
 				 name="flare_hdr_occlusion"
 				 value="Occlusion" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Size"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.25"
@@ -3083,32 +2073,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_occlusion_scale"
 				 tool_tip="Occlusion probe as a multiple of the sun disc; larger lets objects near the sun dim the flare sooner"
 				 control_name="RenderLensFlareOcclusionScale" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_occlusion_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareOcclusionScale" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Fade"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.1"
@@ -3116,22 +2088,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="flare_fade_time"
 				 tool_tip="Seconds for the flare to fade in when the sun is revealed; it fades out faster. Longer is calmer through foliage"
 				 control_name="RenderLensFlareFadeTime" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="flare_fade_time_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareFadeTime" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -3167,16 +2123,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_lensdirt">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3184,32 +2138,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_strength"
 				 tool_tip="How strongly grime on the front element catches light. Only shows where there is already bloom or flare to catch, so a flat scene stays clean"
 				 control_name="RenderLensDirtStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtStrength" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Grime"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3217,37 +2153,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_grime"
 				 tool_tip="How much muck is on the glass. Scales every layer of dust and grit at once"
 				 control_name="RenderLensDirtGrime">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_grime_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtGrime" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Mote Size"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.5"
@@ -3255,37 +2173,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_mote_scale"
 				 tool_tip="Size of the dust specks. Above 1 they grow and thin out; below 1 they shrink into finer grime"
 				 control_name="RenderLensDirtMoteScale">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_mote_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtMoteScale" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Smudge"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3293,37 +2193,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_smudge"
 				 tool_tip="Strength of the broad wipe marks a cloth leaves behind, as opposed to the discrete specks"
 				 control_name="RenderLensDirtSmudge">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_smudge_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtSmudge" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Scratches"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -3331,27 +2213,11 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_scratches"
 				 tool_tip="How many scratches cross the glass. 0 is undamaged. They are straight and bright where dust is soft, so a few go a long way"
 				 control_name="RenderLensDirtScratches">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_scratches_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtScratches" />
-				</button>
+				</setting_row>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -3387,16 +2253,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_lensdirt_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Seed"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -3404,37 +2268,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_seed"
 				 tool_tip="Reshuffles the grime. Also moves the overall density a little, since dirt pools rather than spreading evenly and where it pools changes with the seed"
 				 control_name="RenderLensDirtSeed">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_seed_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtSeed" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Toe"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.6"
@@ -3442,37 +2288,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_toe"
 				 tool_tip="How much of the faint grime survives. Higher values crush the midtones and leave only the brightest specks, which reads clean whatever Strength is set to"
 				 control_name="RenderLensDirtToe">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_toe_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtToe" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Gain"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.5"
@@ -3480,37 +2308,19 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_gain"
 				 tool_tip="Overall brightness of the generated plate, applied after the toe. Mostly a trim for Toe"
 				 control_name="RenderLensDirtGain">
-					<slider.mouse_down_callback
+					<setting_row.mouse_down_callback
 					 function="LightBox.LensDirtSliderDown" />
-					<slider.mouse_up_callback
+					<setting_row.mouse_up_callback
 					 function="LightBox.LensDirtSliderUp" />
-				</slider>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_gain_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtGain" />
-				</button>
-				<slider
+				</setting_row>
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Bloom Response"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3518,32 +2328,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_bloom_response"
 				 tool_tip="How much bloom lights up the dirt. 0 lets bloom pass through a clean lens"
 				 control_name="RenderLensDirtBloomResponse" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_bloom_response_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtBloomResponse" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Flare Response"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3551,22 +2343,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="lensdirt_flare_response"
 				 tool_tip="How much the lens flare lights up the dirt. Flare and grime share the same front element, so this is the response that reads most like a real lens"
 				 control_name="RenderLensDirtFlareResponse" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lensdirt_flare_response_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtFlareResponse" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -3602,16 +2378,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_ca">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3619,32 +2393,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_strength"
 				 tool_tip="Color fringe intensity. 0 disables; 0.15 is a subtle cinema lens feel."
 				 control_name="RenderChromaticAberrationStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationStrength" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Falloff"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.5"
@@ -3652,32 +2408,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_falloff"
 				 tool_tip="How quickly fringing grows from center to edge; higher keeps the center clean"
 				 control_name="RenderChromaticAberrationFalloff" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_falloff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationFalloff" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Angle"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -3685,32 +2423,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_angle"
 				 tool_tip="Rotates the red/blue split direction (degrees); only matters when anisotropy is nonzero"
 				 control_name="RenderChromaticAberrationAngle" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_angle_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationAngle" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Anisotropy"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -3718,32 +2438,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_anisotropy"
 				 tool_tip="Stretches the fringe along the angle axis for an anamorphic-style directional smear"
 				 control_name="RenderChromaticAberrationAnisotropy" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_anisotropy_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationAnisotropy" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Red offset X"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -3751,32 +2453,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_offset_rx"
 				 tool_tip="Red channel horizontal shift direction"
 				 control_name="RenderChromaticAberrationOffsetRX" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_offset_rx_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationOffsetRX" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Red offset Y"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -3784,32 +2468,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_offset_ry"
 				 tool_tip="Red channel vertical shift direction"
 				 control_name="RenderChromaticAberrationOffsetRY" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_offset_ry_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationOffsetRY" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Blue offset X"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -3817,32 +2483,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_offset_bx"
 				 tool_tip="Blue channel horizontal shift direction; typically opposite the red offset"
 				 control_name="RenderChromaticAberrationOffsetBX" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_offset_bx_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationOffsetBX" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Blue offset Y"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-1"
@@ -3850,22 +2498,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="ca_offset_by"
 				 tool_tip="Blue channel vertical shift direction"
 				 control_name="RenderChromaticAberrationOffsetBY" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ca_offset_by_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderChromaticAberrationOffsetBY" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -3901,16 +2533,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_distortion">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Amount"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -3918,32 +2548,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="distortion_amount"
 				 tool_tip="Overall lens distortion strength; 0 disables. Only the world view bends - nametags, outlines and UI stay straight."
 				 control_name="RenderLensDistortionAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionAmount" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Barrel / Pincushion"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-0.5"
@@ -3952,32 +2564,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="distortion_k1"
 				 tool_tip="Negative bows straight lines outward (barrel, the wide-angle look); positive bows them inward (pincushion)"
 				 control_name="RenderLensDistortionK1" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_k1_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionK1" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Anamorphic Squeeze"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.5"
@@ -3985,22 +2579,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="distortion_squeeze"
 				 tool_tip="Horizontal desqueeze; 1.0 is a spherical lens, 2.0 matches anamorphic cinema"
 				 control_name="RenderLensDistortionSqueeze" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_squeeze_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionSqueeze" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -4036,16 +2614,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_distortion_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Secondary Bend"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="-0.25"
@@ -4054,22 +2630,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="distortion_k2"
 				 tool_tip="Shapes the bend toward the corners. Small non-zero values give the moustache distortion of real wide-angle lenses, where the bend reverses near the frame edge."
 				 control_name="RenderLensDistortionK2" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_k2_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionK2" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -4277,16 +2837,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_vignette">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Amount"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4294,32 +2852,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_amount"
 				 tool_tip="Opacity of the vignette; 0 disables"
 				 control_name="RenderVignetteAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteAmount" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Radius"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.25"
@@ -4327,32 +2867,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_radius"
 				 tool_tip="Vignette size in image-height units; 1.0 reaches the top and bottom edges"
 				 control_name="RenderVignetteRadius" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_radius_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteRadius" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Feather"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.2"
@@ -4360,22 +2882,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_feather"
 				 tool_tip="Shape of the darkening curve: below 1 spreads a gentle haze inward, above 1 concentrates darkening at the corners"
 				 control_name="RenderVignetteFeather" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_feather_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteFeather" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -4411,16 +2917,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_vignette_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Softness"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4428,32 +2932,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_soft"
 				 tool_tip="Softness of the vignette edge"
 				 control_name="RenderVignetteSoft" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_soft_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteSoft" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Shape"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4461,32 +2947,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_shape"
 				 tool_tip="0 is circular, 1 is a rounded square"
 				 control_name="RenderVignetteShape" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_shape_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteShape" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Mid point"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4494,22 +2962,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="vignette_midpoint"
 				 tool_tip="Position of the middle color in the three-color ramp; 0 disables (two-color vignette)"
 				 control_name="RenderVignetteMidPoint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_midpoint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteMidPoint" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -4710,16 +3162,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_grain">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Amount"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4727,32 +3177,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="grain_amount"
 				 tool_tip="Film grain strength; 0 disables"
 				 control_name="RenderFilmGrainAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grain_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderFilmGrainAmount" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Size"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -4760,22 +3192,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="grain_size"
 				 tool_tip="Size of the grain particles"
 				 control_name="RenderFilmGrainSize" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grain_size_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderFilmGrainSize" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -4828,16 +3244,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderFilmGrainStyle" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Luma range"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4845,22 +3259,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="grain_range"
 				 tool_tip="Luma position where grain peaks: 0 shadows only, 0.5 midtones (classic film), 1 highlights only"
 				 control_name="RenderFilmGrainRange" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grain_range_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderFilmGrainRange" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -4944,16 +3342,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 			 top="0"
 			 right="-1"
 			 name="sec_sharp">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Sharpness (CAS)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -4961,22 +3357,6 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 name="sharp_cas"
 				 tool_tip="Contrast Adaptive Sharpening strength"
 				 control_name="RenderCASSharpness" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="sharp_cas_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCASSharpness" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
