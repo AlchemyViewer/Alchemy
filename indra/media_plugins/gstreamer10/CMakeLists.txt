@@ -17,7 +17,6 @@ target_sources(
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
     media_plugin_gstreamer10.cpp
-    llmediaimplgstreamer_syms.h
 )
 
 target_link_libraries(
