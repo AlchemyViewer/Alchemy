@@ -34,18 +34,21 @@
 #define AL_FLOATERLIGHTBOX_H
 
 #include "llfloater.h"
+#include "llframetimer.h"
 
 #include "aldaycyclelandmarks.h"
 #include "algradehistory.h"
 #include "allightboxdirectory.h"
 
 #include <array>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
 class ALCurveEditorCtrl;
+class ALPopover;
 class LLComboBox;
 class LLPanel;
 class LLSettingsDay;
@@ -81,8 +84,41 @@ public:
     /// Only to notice the reference still appearing or going away, which is
     /// render state and so has no signal to hang on. See refreshReferenceRow.
     void draw() override;
+    /// A popover still up is closed as settled first: whatever it was showing
+    /// was chosen, and it must not outlive the floater its callbacks reach.
+    void onClose(bool app_quitting) override;
 
   private:
+    /// What the popover that is up, if any, is for.
+    enum class PopoverKind
+    {
+        None,
+        Find,
+    };
+    /// A key the popover gets first while it has the keyboard: the floater's
+    /// own shortcuts, which would otherwise fall to the menu bar.
+    using PopoverKeyHook = std::function<bool(KEY, MASK)>;
+
+    /// Put @a content in a popover under @a anchor, closing any other first:
+    /// the Lightbox has one popover at a time.
+    ALPopover* showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook);
+    /// Close the popover that is up, keeping what it chose or, escaping,
+    /// keeping nothing.
+    void closePopover(bool escape);
+    /// Told once per popover, as it closes.
+    void onPopoverClosed(const LLView* which, bool escaped);
+
+    /// Find a setting or section by name (Ctrl+F): every section and every
+    /// setting, ranked against what is typed, and Return goes to it.
+    void openFind();
+    /// Show a section, or a setting and the section it is in: its tab chosen,
+    /// its section opened and scrolled to, and the setting given the keyboard
+    /// and its caption lit for a moment. @a target is "s:<section panel>" or
+    /// "k:<setting key>", as findCandidates makes them.
+    void jumpTo(const std::string& target);
+    /// A tab page's label ("Look"), by index.
+    std::string pageLabel(size_t page) const;
+
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
     /// Set or clear one section's bit in LLPipeline::sGradeBypassMask, from
@@ -190,6 +226,13 @@ public:
     /// The tab strip and its pages, in tab order: Look, Lens, Scene, Sky.
     LLTabContainer* mTabs = nullptr;
     std::vector<LLPanel*> mTabPages;
+    /// What popovers hang from.
+    LLPanel* mTopBar = nullptr;
+    LLHandle<ALPopover> mPopover;
+    PopoverKind mPopoverKind = PopoverKind::None;
+    /// The caption a jump lit, and how long ago; draw() puts it out.
+    LLHandle<LLView> mLitCaption;
+    LLFrameTimer mLitTimer;
     /// Every section and setting, found in postBuild. After postBuild nothing
     /// here looks a widget up by name: a page taken out into a window of its
     /// own takes its widgets with it, out of reach of any search from this

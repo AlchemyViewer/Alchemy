@@ -31,9 +31,13 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "alpopover.h"
+#include "alquickopen.h"
+#include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "llcombobox.h"
 #include "lleditmenuhandler.h"
+#include "lltextbox.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
 #include "alcurvemodel.h"
@@ -84,6 +88,42 @@ struct ScopedTrue
 
     bool& mFlag;
 };
+
+/// How long a caption stays lit after going to its setting: long enough to
+/// find on a busy page, short enough not to be mistaken for a state.
+constexpr F32 LIT_CAPTION_SECONDS = 2.5f;
+
+/// A popover the Lightbox opens. The same placing and the same three ways out
+/// as any other, plus the floater's own shortcuts while it has the keyboard:
+/// the popover is a window of its own, so a key pressed in it never climbs
+/// to the Lightbox, and Ctrl keys would go to the menu bar instead.
+class ALLightboxPopover final : public ALPopover
+{
+public:
+    using KeyHook = std::function<bool(KEY, MASK)>;
+
+    ALLightboxPopover(const LLFloater::Params& p, KeyHook hook)
+    :   ALPopover(p),
+        mKeyHook(std::move(hook))
+    {
+    }
+
+    /// Only with a hook to offer them to; otherwise the menu bar may have
+    /// every Ctrl key as usual.
+    bool hasAccelerators() const override { return (bool)mKeyHook; }
+
+    bool handleKeyHere(KEY key, MASK mask) override
+    {
+        if (mKeyHook && mKeyHook(key, mask))
+        {
+            return true;
+        }
+        return ALPopover::handleKeyHere(key, mask);
+    }
+
+private:
+    KeyHook mKeyHook;
+};
 } // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
@@ -119,10 +159,19 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
     mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
+    mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
+    // onClose has settled any popover already; this is for a floater that
+    // dies without closing. die() and not a close, so nothing it holds calls
+    // back into a floater half torn down.
+    if (ALPopover* popover = mPopover.get())
+    {
+        popover->die();
+    }
+
     // The handle in the pick callback already makes a late sample harmless, but
     // an armed picker outliving its floater would leave the user holding an
     // eyedropper cursor that has nothing left to tell. Put the previous tool
@@ -170,6 +219,7 @@ bool ALFloaterLightBox::postBuild()
     // Every section and setting, while they are all still where the XUI put
     // them. See mDirectory.
     mDirectory.build(mTabPages);
+    mTopBar = findChild<LLPanel>("lightbox_topbar");
 
     populateLUTCombo();
 
@@ -604,7 +654,237 @@ void ALFloaterLightBox::draw()
     refreshReferenceRow();
     refreshHistoryButtons();
     refreshDayCycleRow();
+
+    if (LLView* lit = mLitCaption.get())
+    {
+        if (mLitTimer.getElapsedTimeF32() > LIT_CAPTION_SECONDS)
+        {
+            if (LLTextBox* box = ALViewType::as<LLTextBox>(lit))
+            {
+                box->setHighlighted(false);
+            }
+            mLitCaption.markDead();
+        }
+    }
+
     LLFloater::draw();
+}
+
+void ALFloaterLightBox::onClose(bool app_quitting)
+{
+    closePopover(false);
+    LLFloater::onClose(app_quitting);
+}
+
+ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook)
+{
+    if (!anchor || !content)
+    {
+        delete content;
+        return nullptr;
+    }
+    closePopover(true);
+
+    // What ALPopover::show does, with the key hook added: no title, since
+    // the content is laid out over the whole popover and a title bar would be
+    // drawn under it.
+    const LLRect wanted = content->getRect();
+    ALLightboxPopover* popover = new ALLightboxPopover(
+        ALPopover::paramsFor(wanted.getWidth(), wanted.getHeight()), std::move(hook));
+    content->setOrigin(0, 0);
+    content->setFollows(FOLLOWS_ALL);
+    popover->addChild(content);
+
+    mPopover = popover->getDerivedHandle<ALPopover>();
+    mPopoverKind = kind;
+    // Handles both ways: the popover is a top-level window and can outlive
+    // this floater by a frame, and this floater can be closed under it.
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<ALPopover> which = mPopover;
+    popover->onClosed([self, which](bool escaped)
+    {
+        if (ALFloaterLightBox* floater = self.get())
+        {
+            floater->onPopoverClosed(which.get(), escaped);
+        }
+    });
+
+    popover->openBeside(anchor);
+    return popover;
+}
+
+void ALFloaterLightBox::closePopover(bool escape)
+{
+    if (ALPopover* popover = mPopover.get())
+    {
+        if (escape)
+        {
+            popover->escape();
+        }
+        else
+        {
+            popover->settle();
+        }
+    }
+}
+
+void ALFloaterLightBox::onPopoverClosed(const LLView* which, bool escaped)
+{
+    // One that was replaced before it finished closing has nothing to say
+    // about the one up now.
+    if (!which || which != mPopover.get())
+    {
+        return;
+    }
+    mPopover.markDead();
+    mPopoverKind = PopoverKind::None;
+}
+
+std::string ALFloaterLightBox::pageLabel(size_t page) const
+{
+    return page < mTabPages.size() ? mTabPages[page]->getLabel() : std::string();
+}
+
+void ALFloaterLightBox::openFind()
+{
+    LLView* anchor = mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this);
+
+    // As wide as the bar it hangs from, so it reads as the bar opening rather
+    // than as another window.
+    constexpr S32 HEIGHT = 300;
+    const S32 width = llmax(anchor->getRect().getWidth(), 300);
+    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+    qp.name = "lightbox_find_list";
+    qp.rect = LLRect(0, HEIGHT, width, 0);
+    qp.placeholder = getString("find_placeholder");
+    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
+
+    // Sections as well as settings: the list matches what a row is called,
+    // and "bloom" should reach the Bloom section even though none of its rows
+    // says bloom. Each setting says which section it is in, which is what
+    // tells the five Strength rows apart.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    const std::vector<ALLightboxDirectory::Section>& sections = mDirectory.sections();
+    for (size_t index = 0; index < sections.size(); ++index)
+    {
+        const ALLightboxDirectory::Section& section = sections[index];
+        ALQuickOpen::Candidate here;
+        here.label = section.mTitle;
+        here.detail = pageLabel(section.mPage);
+        here.value = "s:" + section.mName;
+        candidates.push_back(std::move(here));
+        for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+        {
+            if (setting.mSection == index)
+            {
+                ALQuickOpen::Candidate row;
+                row.label = setting.mCaption;
+                row.detail = section.mTitle;
+                row.value = "k:" + setting.mKey;
+                candidates.push_back(std::move(row));
+            }
+        }
+    }
+    quick->setCandidates(std::move(candidates));
+
+    // Ctrl+F again, with the list up, goes back to what was typed.
+    LLHandle<ALQuickOpen> list = quick->getDerivedHandle<ALQuickOpen>();
+    ALPopover* popover = showPopover(PopoverKind::Find, anchor, quick, [list](KEY key, MASK mask)
+    {
+        if (key == 'F' && mask == MASK_CONTROL)
+        {
+            if (ALQuickOpen* open = list.get())
+            {
+                open->takeFocus();
+            }
+            return true;
+        }
+        return false;
+    });
+    if (!popover)
+    {
+        return;
+    }
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    quick->onChose([self](const std::string& target)
+    {
+        if (ALFloaterLightBox* floater = self.get())
+        {
+            // Closed first, so the keyboard comes back to the Lightbox and
+            // the jump can hand it on to the setting.
+            floater->closePopover(false);
+            floater->jumpTo(target);
+        }
+    });
+    quick->takeFocus();
+}
+
+void ALFloaterLightBox::jumpTo(const std::string& target)
+{
+    const ALLightboxDirectory::Section* section = nullptr;
+    const ALLightboxDirectory::Setting* setting = nullptr;
+    if (target.compare(0, 2, "s:") == 0)
+    {
+        section = mDirectory.section(target.substr(2));
+    }
+    else if (target.compare(0, 2, "k:") == 0)
+    {
+        setting = mDirectory.setting(target.substr(2));
+        if (setting)
+        {
+            section = &mDirectory.sections()[setting->mSection];
+        }
+    }
+    if (!section)
+    {
+        return;
+    }
+
+    if (isMinimized())
+    {
+        setMinimized(false);
+    }
+    if (section->mPage < mTabPages.size())
+    {
+        mTabs->selectTabPanel(mTabPages[section->mPage]);
+    }
+
+    // Only the target's own tab is opened: an Advanced section is a sibling of
+    // its essentials, not inside them. setDisplayChildren does not lay the
+    // accordion out again, and the scroll below needs it laid out.
+    if (section->mTab && !section->mTab->getDisplayChildren())
+    {
+        section->mTab->setDisplayChildren(true);
+        if (section->mAccordion)
+        {
+            section->mAccordion->arrange();
+        }
+    }
+
+    if (LLTextBox* was_lit = ALViewType::as<LLTextBox>(mLitCaption.get()))
+    {
+        was_lit->setHighlighted(false);
+    }
+    mLitCaption.markDead();
+
+    if (setting && setting->mCtrl)
+    {
+        // Scrolled to the row, not to the section: a tall section scrolled to
+        // shows its bottom, which is not where this row need be.
+        setting->mCtrl->onUpdateScrollToChild(setting->mCtrl);
+        setting->mCtrl->setFocus(true);
+        if (setting->mCaptionBox)
+        {
+            setting->mCaptionBox->setHighlighted(true);
+            mLitCaption = setting->mCaptionBox->getHandle();
+            mLitTimer.reset();
+        }
+    }
+    else if (section->mTab)
+    {
+        section->mTab->showAndFocusHeader();
+    }
 }
 
 std::shared_ptr<LLSettingsDay> ALFloaterLightBox::getScrubbableDay() const
@@ -971,6 +1251,12 @@ bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
 {
     // Both spellings of redo: Ctrl+Y is the Windows convention and
     // Ctrl+Shift+Z the one every grading application uses.
+    if (key == 'F' && mask == MASK_CONTROL)
+    {
+        openFind();
+        return true;
+    }
+
     const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
     const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
                           (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));

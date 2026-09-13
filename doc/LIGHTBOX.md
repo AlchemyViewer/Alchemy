@@ -110,6 +110,7 @@ The floater's C++ provides:
 - `LightBox.PickWhiteBalance` — arms the eyedropper.
 - `LightBox.OpenLUTFolder` — reveals the user's colour-LUT folder, creating it
   on first use.
+- `LightBox.Find` — the Find popover (§4j).
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
 
 **Asset-picker rows are a third kind of dropdown**, distinct from the enum
@@ -137,9 +138,9 @@ whitelist and no fitting to the window, and it can be put on sliders. See
 `generateLensDirt` in pipeline.cpp for the shape — gate, cached parameter set,
 allocate, draw, release when the effect goes off.
 
-The graph and picker callbacks are examples of the per-control cost: a graph
-or a tool needs something to interpret its input, so it gets one callback and
-one `setup*` call in `postBuild`. Both graphs follow the same shape — `setupX` connects to
+The graph, eyedropper and picker callbacks are examples of the per-control
+cost: a graph or a tool needs something to interpret its input, so it gets one
+callback and one `setup*` call in `postBuild`. Both graphs follow the same shape — `setupX` connects to
 the settings' signals and calls `refreshX`; `refreshX` rebuilds the plot and
 handles from the settings; `onCommitX` writes the setting and calls `refreshX`
 again behind a re-entry guard. Copy that shape rather than inventing another.
@@ -785,14 +786,15 @@ part of this floater with a fixed width budget: **412px at `min_width`** — the
 floater's 420 less its own `left="4"`/`right="-4"`, and nothing else, because
 the bar sits directly in the floater. A row inside an accordion section starts
 from the same 420 and loses far more (§5); the two budgets are different on
-purpose. The bar currently spends 342 of its 412.
+purpose. The bar currently spends 374 of its 412.
 
 Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
-then Undo / Redo, then Scopes. Three groups, separated by 12px where the
-adjacent buttons inside a group are separated by 4. **That gap is the only thing
-that says they are different kinds of thing** — the first group acts on the
-Look, the second on the grade's own history, the third opens another window — so
-keep it if you add a fourth kind, and use 4px if you are extending a group.
+then Undo / Redo, then Scopes, then Find. Four groups, separated by 12px where
+the adjacent buttons inside a group are separated by 4. **That gap is the only
+thing that says they are different kinds of thing** — the first group acts on
+the Look, the second on the grade's own history, the third opens another window,
+the fourth finds a place in this one — so keep it if you add another kind, and
+use 4px if you are extending a group.
 
 Everything after the combo is an **18px icon with an empty label**, and the
 tooltip carries the name. That is not decoration. Four text labels cost 192px of
@@ -800,9 +802,9 @@ the 412; the same four icons cost 80. It also sidesteps §5's silent clipping th
 day this floater is translated and "Save As" becomes "Speichern unter" — a bar
 of labels has no reflow and no scrollbar to save it. Take the overlays from the
 viewer's existing set (`Script_Save`, `Conv_toolbar_plus`, `TrashItem_Off`,
-`Refresh_Off`, `Script_Undo`, `Script_Redo`, `Command_Stats_Icon`) rather than
-adding art; picking a glyph that already means the right thing elsewhere is most
-of the work.
+`Refresh_Off`, `Script_Undo`, `Script_Redo`, `Command_Stats_Icon`,
+`Command_Search_Icon`) rather than adding art; picking a glyph that already
+means the right thing elsewhere is most of the work.
 
 **A button that opens another floater needs no C++ at all** — `Floater.Toggle`
 is a global commit callback in `llui.cpp`, with the floater's registered name as
@@ -941,6 +943,43 @@ itself in one of the ways it understands, in this order:
    buttons.
 
 A trailing colon is dropped, so `Radius:` reads as `Radius`.
+
+### 4j. Popovers, and finding a setting
+
+**Find** (the search button, or Ctrl+F) lists every section and every setting
+from the directory, ranked against what is typed by XUI Studio's `ALQuickOpen`,
+in a popover hanging from the top bar. A setting's second column is its
+section's title, which is what tells the five Strength rows apart; sections are
+listed as well as settings because the list matches what a row is *called*, and
+"bloom" should reach the Bloom section though none of its rows says bloom.
+Return goes to the choice: its tab is chosen, its section opened (only its own
+accordion tab, since an Advanced section is a sibling of its essentials, not
+inside them), the accordion scrolled to the row, the row given the keyboard, and
+its caption lit for a couple of seconds (`SearchableControl::setHighlighted`,
+the same highlight Preferences search uses). A section is shown by its header.
+
+Popovers are XUI Studio's `ALPopover`: a chrome-less window under an anchor
+that closes when it loses the keyboard. The floater wraps it in three rules,
+which any new popover here should go through `showPopover` to get:
+
+- **One at a time.** Opening one closes the last (`mPopover`, `mPopoverKind`),
+  and `onPopoverClosed` ignores a popover that has already been replaced.
+- **Handles, never `this`.** The popover is a top-level window and can outlive
+  the floater by a frame; its closed callback holds an `LLHandle` to the
+  floater. `onClose` settles any popover still up, and the destructor `die()`s
+  one as a fallback — `die()`, so nothing calls back into a floater half torn
+  down.
+- **The floater's shortcuts come along.** A key pressed in a popover never
+  climbs to the Lightbox, since the popover is a window of its own, so each
+  popover can carry a key hook (it then claims accelerators, for the reason in
+  §4f). Find's hook takes Ctrl+F back to the field.
+
+Two more things learned the hard way. A popover given a **title** lays its
+content over the title bar, so these have none. And a popover whose content is
+an `LLPanel` never sees Escape — the panel takes it and drops the keyboard, and
+the popover then closes as *settled*, not escaped. A popover that has to tell
+Escape apart (the colour picker, which puts the old colour back) must hold its
+controls directly rather than in a panel.
 
 ### 5. Height math (the part everyone gets wrong)
 
@@ -1142,6 +1181,9 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   Finally, confirm the presets land somewhere plausible on a region whose day
   cycle is not the default one, because a hardcoded fraction would also look
   right on a default region.
+- For a new row: Ctrl+F, type its caption, and confirm it is listed under the
+  name its row shows (not its setting key — §4i says what a row needs for that)
+  and that Return lands on it, scrolled into view with its caption lit.
 - For anything on an accordion header: click it and confirm the section does
   **not** expand or collapse, then hover it with the section expanded and
   confirm its own tooltip appears rather than the title's. Those are the two

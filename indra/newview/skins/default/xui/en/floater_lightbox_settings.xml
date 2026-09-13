@@ -24,6 +24,10 @@
 	 name="bypass_badge">
 		[COUNT]
 	</floater.string>
+	<floater.string
+	 name="find_placeholder">
+		Find a setting or section
+	</floater.string>
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
@@ -172,6 +176,24 @@
 			<button.commit_callback
 			 function="Floater.Toggle"
 			 parameter="scopes" />
+		</button>
+		<!-- A fourth kind of thing, so set apart again: this acts on the floater
+		     itself, finding a place in it. The list it opens hangs from this
+		     bar and is as wide as it. -->
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="12"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Search_Icon"
+		 name="lightbox_find"
+		 tool_tip="Find a setting or section by name, and go to it (Ctrl+F)">
+			<button.commit_callback
+			 function="LightBox.Find" />
 		</button>
 	</panel>
 	<!-- fill_width shares the strip between the four tabs instead of leaving
