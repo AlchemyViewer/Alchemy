@@ -44,10 +44,13 @@ endif()
 # INTEGRATION_TEST_<name> otherwise; the registered test names are
 # PROJECT_<project>_TEST_<name> and INTEGRATION_TEST_RUNNER_<name>.
 function(al_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 arg
+  cmake_parse_arguments(
+    PARSE_ARGV 1
+    arg
     "UNIT;PYTHON"
     "PROJECT"
-    "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT")
+    "SOURCES;LIBRARIES;INCLUDES;DEFINES;COMMAND;ENVIRONMENT"
+  )
   if(NOT arg_PROJECT)
     message(FATAL_ERROR "al_add_test(${name}): PROJECT is required")
   endif()
@@ -84,24 +87,25 @@ function(al_add_test name)
     get_property(project_includes TARGET ${arg_PROJECT} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(${target} PRIVATE ${project_includes})
   endif()
-  target_include_directories(${target} PRIVATE
-    ${arg_INCLUDES}
-    ${INDRA_SOURCE_DIR}/test
-    ${INDRA_SOURCE_DIR}/llmath
-    ${INDRA_SOURCE_DIR}/llui)
-  target_compile_definitions(${target} PRIVATE
-    "LL_TEST=${name}"
-    "LL_TEST_${name}"
-    ${arg_DEFINES})
+  target_include_directories(
+    ${target}
+    PRIVATE
+      ${arg_INCLUDES}
+      ${INDRA_SOURCE_DIR}/test
+      ${INDRA_SOURCE_DIR}/llmath
+      ${INDRA_SOURCE_DIR}/llui
+  )
+  target_compile_definitions(${target} PRIVATE "LL_TEST=${name}" "LL_TEST_${name}" ${arg_DEFINES})
   set_target_properties(${target} PROPERTIES FOLDER "Tests/${arg_PROJECT}")
 
   if(WINDOWS)
     set_target_properties(${target} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
   elseif(DARWIN)
     # A test binary is run straight from the build tree, so it is ad-hoc signed.
-    set_target_properties(${target} PROPERTIES
-      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
-      BUILD_RPATH "${SHARED_LIB_STAGING_DIR}")
+    set_target_properties(
+      ${target}
+      PROPERTIES XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-" BUILD_RPATH "${SHARED_LIB_STAGING_DIR}"
+    )
   endif()
 
   set(command ${arg_COMMAND})
@@ -113,9 +117,11 @@ function(al_add_test name)
     list(INSERT command ${executable_position} "$<TARGET_FILE:${target}>")
   endif()
   if(arg_UNIT)
-    list(APPEND command
+    list(
+      APPEND command
       "--touch=${CMAKE_CURRENT_BINARY_DIR}/${target}_ok.txt"
-      "--sourcedir=${CMAKE_CURRENT_SOURCE_DIR}")
+      "--sourcedir=${CMAKE_CURRENT_SOURCE_DIR}"
+    )
   endif()
 
   set(environment ${arg_ENVIRONMENT})
@@ -127,13 +133,14 @@ function(al_add_test name)
       set(disabled TRUE)
     endif()
   endif()
-  add_test(NAME ${test_name}
-    COMMAND ${command}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-  set_tests_properties(${test_name} PROPERTIES
-    ENVIRONMENT "${environment}"
-    ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
-    DISABLED ${disabled})
+  add_test(NAME ${test_name} COMMAND ${command} WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  set_tests_properties(
+    ${test_name}
+    PROPERTIES
+      ENVIRONMENT "${environment}"
+      ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+      DISABLED ${disabled}
+  )
 
   add_dependencies(BUILD_TESTS ${target})
 endfunction()

@@ -11,21 +11,23 @@ include(GStreamer10Plugin)
 
 add_executable(media_plugin_gstreamer10)
 
-target_sources(media_plugin_gstreamer10
-    PRIVATE
+target_sources(
+  media_plugin_gstreamer10
+  PRIVATE
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
     ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_static.cpp
     media_plugin_gstreamer10.cpp
     llmediaimplgstreamer_syms.h
-    )
+)
 
-target_link_libraries(media_plugin_gstreamer10
-        PRIVATE
-        al::flags
-        media_plugin_base
-        ll::gstreamer10
-        llplugin
-        llmessage
-        llcommon
-        ll::pluginlibraries
+target_link_libraries(
+  media_plugin_gstreamer10
+  PRIVATE
+    al::flags
+    media_plugin_base
+    ll::gstreamer10
+    llplugin
+    llmessage
+    llcommon
+    ll::pluginlibraries
 )

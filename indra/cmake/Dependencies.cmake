@@ -18,10 +18,13 @@ include_guard()
 # adds LINK and DEFINES. The target exists either way, so a consumer links it
 # without asking whether the dependency is on.
 function(al_import name)
-  cmake_parse_arguments(PARSE_ARGV 1 arg
+  cmake_parse_arguments(
+    PARSE_ARGV 1
+    arg
     "CONFIG"
     "PACKAGE;HEADER;INCLUDE;WHEN"
-    "COMPONENTS;TARGETS;LINK;DEFINES")
+    "COMPONENTS;TARGETS;LINK;DEFINES"
+  )
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "al_import(${name}): unexpected arguments: ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -67,6 +70,7 @@ function(al_import name)
 endfunction()
 
 # Ports, in link order where one is built on another.
+# gersemi: off
 al_import(ll::zlib-ng      PACKAGE ZLIB                   TARGETS ZLIB::ZLIB)
 al_import(ll::minizip      PACKAGE minizip         CONFIG TARGETS MINIZIP::minizip LINK ll::zlib-ng)
 al_import(ll::colladadom   PACKAGE unofficial-collada-dom CONFIG TARGETS unofficial::collada-dom::collada14dom LINK ll::minizip)
@@ -119,3 +123,4 @@ al_import(ll::openxr       PACKAGE OpenXR              CONFIG TARGETS OpenXR::he
 al_import(ll::velopack     PACKAGE unofficial-velopack CONFIG TARGETS unofficial::velopack::velopack DEFINES LL_VELOPACK=1 WHEN al_wants_velopack)
 al_import(ll::nsspellchecker LINK "-framework AppKit" "-framework Foundation"                       WHEN AL_USE_NSSPELLCHECKER)
 al_import(ll::winspellcheck  LINK ole32                                                            WHEN AL_USE_WINSPELLCHECK)
+# gersemi: on

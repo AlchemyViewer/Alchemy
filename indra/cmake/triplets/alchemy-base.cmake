@@ -11,9 +11,12 @@
 # which changes every triplet's hash and rebuilds the ports.
 set(ALCHEMY_TRIPLET_BASE_REVISION 1)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
-  message(FATAL_ERROR "This triplet was written against alchemy-base.cmake revision "
+  message(
+    FATAL_ERROR
+    "This triplet was written against alchemy-base.cmake revision "
     "${ALCHEMY_TRIPLET_REVISION}, which is now ${ALCHEMY_TRIPLET_BASE_REVISION}: "
-    "set ALCHEMY_TRIPLET_REVISION to ${ALCHEMY_TRIPLET_BASE_REVISION} in every triplet so their hashes change.")
+    "set ALCHEMY_TRIPLET_REVISION to ${ALCHEMY_TRIPLET_BASE_REVISION} in every triplet so their hashes change."
+  )
 endif()
 if(NOT ALCHEMY_ISA_TIER MATCHES "^(baseline|v2|v3|v4)$")
   message(FATAL_ERROR "A triplet must set ALCHEMY_ISA_TIER to baseline, v2, v3 or v4")
@@ -43,7 +46,12 @@ if(NOT DEFINED VCPKG_CMAKE_SYSTEM_NAME)
   set(VCPKG_CXX_FLAGS "${isa_flags} /std:c++20 /Zc:__cplusplus")
 else()
   set(VCPKG_CRT_LINKAGE dynamic)
-  al_isa_flags(${ALCHEMY_ISA_TIER} ${VCPKG_CMAKE_SYSTEM_NAME} ${VCPKG_TARGET_ARCHITECTURE} isa_flags)
+  al_isa_flags(
+    ${ALCHEMY_ISA_TIER}
+    ${VCPKG_CMAKE_SYSTEM_NAME}
+    ${VCPKG_TARGET_ARCHITECTURE}
+    isa_flags
+  )
   # Hidden visibility, as the viewer builds with, so a static port linked
   # into a shared library exports nothing it did not mark for export. Line
   # tables in the optimised ports, so a crash through a port frame has a

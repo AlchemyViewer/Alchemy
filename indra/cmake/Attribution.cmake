@@ -21,7 +21,18 @@
 
 cmake_minimum_required(VERSION 4.0)
 
-foreach(var VCPKG_STATUS VCPKG_SHARE TRIPLET TABLE SOURCE_DIR CHANNEL VERSION OUTPUT_INFO OUTPUT_LICENSES)
+foreach(
+  var
+  VCPKG_STATUS
+  VCPKG_SHARE
+  TRIPLET
+  TABLE
+  SOURCE_DIR
+  CHANNEL
+  VERSION
+  OUTPUT_INFO
+  OUTPUT_LICENSES
+)
   if(NOT DEFINED ${var})
     message(FATAL_ERROR "Attribution.cmake: ${var} is not set")
   endif()
@@ -42,9 +53,11 @@ string(REPLACE ";" "\\;" status "${status}")
 string(REGEX REPLACE "\n\n+" ";" stanzas "${status}")
 set(ports "")
 foreach(stanza IN LISTS stanzas)
-  if(stanza MATCHES "(^|\n)Architecture: ${TRIPLET}(\n|$)"
-     AND stanza MATCHES "(^|\n)Status: install ok installed(\n|$)"
-     AND stanza MATCHES "(^|\n)Package: ([^\n]+)")
+  if(
+    stanza MATCHES "(^|\n)Architecture: ${TRIPLET}(\n|$)"
+    AND stanza MATCHES "(^|\n)Status: install ok installed(\n|$)"
+    AND stanza MATCHES "(^|\n)Package: ([^\n]+)"
+  )
     list(APPEND ports "${CMAKE_MATCH_2}")
   endif()
 endforeach()
@@ -63,8 +76,14 @@ set(problems "")
 # al_holder_line(<copyright file> <out>): the first line that opens with a
 # copyright statement and a year, comment leaders and an SPDX tag allowed.
 function(al_holder_line copyright out)
-  file(STRINGS "${copyright}" lines ENCODING UTF-8 LIMIT_COUNT 1
-    REGEX "^[ \t/*#-]*(SPDX-FileCopyrightText:[ \t]*)?([Cc]opyright|COPYRIGHT|\\(c\\)|\\(C\\)|©)[ \t]*(\\(c\\)|\\(C\\)|©)?[ \t]*[0-9][0-9][0-9][0-9]")
+  file(
+    STRINGS "${copyright}"
+    lines
+    ENCODING UTF-8
+    LIMIT_COUNT 1
+    REGEX
+      "^[ \t/*#-]*(SPDX-FileCopyrightText:[ \t]*)?([Cc]opyright|COPYRIGHT|\\(c\\)|\\(C\\)|©)[ \t]*(\\(c\\)|\\(C\\)|©)?[ \t]*[0-9][0-9][0-9][0-9]"
+  )
   set(line "")
   if(lines)
     list(GET lines 0 line)
@@ -89,9 +108,25 @@ endfunction()
 # al_add_record(<name> <version> <holder> <license> <homepage> <text>):
 # appends one component, its fields in variables named by its identifier.
 # The text is the licence text itself.
-function(al_add_record name version holder license homepage text)
+function(
+  al_add_record
+  name
+  version
+  holder
+  license
+  homepage
+  text
+)
   string(MAKE_C_IDENTIFIER "${name}" id)
-  foreach(field name version holder license homepage text)
+  foreach(
+    field
+    name
+    version
+    holder
+    license
+    homepage
+    text
+  )
     set(AL_${id}_${field} "${${field}}" PARENT_SCOPE)
   endforeach()
   list(APPEND records "${id}")
@@ -161,7 +196,10 @@ foreach(port IN LISTS ports)
     list(APPEND problems "${name}: no copyright file at ${copyright} and no text in ${TABLE}")
   endif()
   if(NOT holder)
-    message(WARNING "${name}: no copyright holder line found in ${copyright}; add a holder to ${TABLE}")
+    message(
+      WARNING
+      "${name}: no copyright holder line found in ${copyright}; add a holder to ${TABLE}"
+    )
   endif()
   al_add_record("${name}" "${version}" "${holder}" "${license}" "${homepage}" "${text}")
 endforeach()
@@ -177,7 +215,15 @@ if(NOT error)
     if(when AND NOT when IN_LIST ENABLED)
       continue()
     endif()
-    foreach(field name version holder license homepage notice)
+    foreach(
+      field
+      name
+      version
+      holder
+      license
+      homepage
+      notice
+    )
       al_table_get("${extra}" ${field} ${field})
     endforeach()
     al_table_get("${extra}" text text_file)
@@ -213,7 +259,15 @@ list(SORT records COMPARE STRING CASE INSENSITIVE)
 set(info "${CHANNEL} ${VERSION}\n${viewer_holder}\nLicense: ${viewer_license}\n\n")
 set(licenses "==== ${CHANNEL} ${VERSION} ====\n\n${viewer_text}\n\n")
 foreach(id IN LISTS records)
-  foreach(field name version holder license homepage text)
+  foreach(
+    field
+    name
+    version
+    holder
+    license
+    homepage
+    text
+  )
     set(${field} "${AL_${id}_${field}}")
   endforeach()
   set(title "${name}")

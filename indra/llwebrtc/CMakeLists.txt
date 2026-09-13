@@ -5,77 +5,78 @@
 # tells the viewer so.
 add_library(llwebrtc SHARED)
 
-target_sources(llwebrtc
-    PRIVATE
+target_sources(
+  llwebrtc
+  PRIVATE
     alaudiodevicenotifier.cpp
     alaudioechobuffer.cpp
     llwebrtc.cpp
     alaudiodevicenotifier.h
     alaudioechobuffer.h
     llwebrtc_impl.h
-    PUBLIC
-    FILE_SET HEADERS
-    FILES
-    llwebrtc.h
-    )
+  PUBLIC FILE_SET HEADERS FILES llwebrtc.h
+)
 
 target_link_libraries(llwebrtc PRIVATE al::flags)
 
 # WebRTC is built with RTTI disabled (-fno-rtti / /GR-). Subclasses such as
 # LLWebRTCLogSink / LLCustomProcessor need matching flags or the linker looks
 # for typeinfo symbols that libwebrtc.a does not provide.
-if (WINDOWS)
-    target_compile_options(llwebrtc PRIVATE /GR-)
+if(WINDOWS)
+  target_compile_options(llwebrtc PRIVATE /GR-)
 else()
-    target_compile_options(llwebrtc PRIVATE -fno-rtti)
+  target_compile_options(llwebrtc PRIVATE -fno-rtti)
 endif()
 
 target_link_libraries(llwebrtc PRIVATE unofficial::webrtc::webrtc)
 
-if (WINDOWS)
-    set_target_properties(llwebrtc
-        PROPERTIES
-        EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
-        RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}"
-        )
+if(WINDOWS)
+  set_target_properties(
+    llwebrtc
+    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}"
+  )
 
-    target_link_options(llwebrtc PRIVATE /MANIFEST:NO)
-    target_link_libraries(llwebrtc PRIVATE
-                                       secur32
-                                       winmm
-                                       dmoguids
-                                       wmcodecdspuuid
-                                       msdmo
-                                       strmiids
-                                       iphlpapi
-                                       ole32)
+  target_link_options(llwebrtc PRIVATE /MANIFEST:NO)
+  target_link_libraries(
+    llwebrtc
+    PRIVATE secur32 winmm dmoguids wmcodecdspuuid msdmo strmiids iphlpapi ole32
+  )
 
-    if (AL_USE_BUGSPLAT)
-        set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
-    endif (AL_USE_BUGSPLAT)
+  if(AL_USE_BUGSPLAT)
+    set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
+  endif()
 elseif(DARWIN)
-    target_link_libraries(llwebrtc PRIVATE ll::oslibraries
-                                   "-framework AVFoundation"
-                                   "-framework AudioToolbox"
-                                   "-framework CoreAudio"
-                                   "-framework CoreMedia"
-                                   "-framework CoreVideo"
-                                   "-framework Foundation"
+  target_link_libraries(
+    llwebrtc
+    PRIVATE
+      ll::oslibraries
+      "-framework AVFoundation"
+      "-framework AudioToolbox"
+      "-framework CoreAudio"
+      "-framework CoreMedia"
+      "-framework CoreVideo"
+      "-framework Foundation"
+  )
+  target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
+
+  if(AL_USE_BUGSPLAT)
+    set_target_properties(
+      llwebrtc
+      PROPERTIES
+        XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
+        XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs"
     )
-    target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
-
-
-    if (AL_USE_BUGSPLAT)
-        set_target_properties(llwebrtc PROPERTIES XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-                                                  XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs")
-        if(NOT XCODE)
-            find_program(DSYMUTIL dsymutil REQUIRED)
-            add_custom_command(TARGET llwebrtc POST_BUILD
-                    COMMAND dsymutil $<TARGET_FILE:llwebrtc>
-                    COMMENT "Generating llwebrtc.dSYM")
-        endif()
-    endif (AL_USE_BUGSPLAT)
+    if(NOT XCODE)
+      find_program(DSYMUTIL dsymutil REQUIRED)
+      add_custom_command(
+        TARGET llwebrtc
+        POST_BUILD
+        COMMAND dsymutil $<TARGET_FILE:llwebrtc>
+        COMMENT "Generating llwebrtc.dSYM"
+      )
+    endif()
+  endif()
 else()
-    target_link_libraries(llwebrtc PRIVATE ${CMAKE_DL_LIBS})
-    target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
-endif (WINDOWS)
+  target_link_libraries(llwebrtc PRIVATE ${CMAKE_DL_LIBS})
+  target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
+endif()

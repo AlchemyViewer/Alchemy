@@ -10,9 +10,12 @@ include_guard(GLOBAL)
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/../vcpkg")
   if(NOT EXISTS "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
-    message(FATAL_ERROR "vcpkg is not checked out at ${VCPKG_ROOT}. It is a submodule: "
+    message(
+      FATAL_ERROR
+      "vcpkg is not checked out at ${VCPKG_ROOT}. It is a submodule: "
       "run 'git submodule update --init vcpkg' in the repository root, "
-      "or set CMAKE_TOOLCHAIN_FILE to another vcpkg's scripts/buildsystems/vcpkg.cmake.")
+      "or set CMAKE_TOOLCHAIN_FILE to another vcpkg's scripts/buildsystems/vcpkg.cmake."
+    )
   endif()
   set(ENV{VCPKG_ROOT} ${VCPKG_ROOT})
 
@@ -26,9 +29,16 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 
   if(NOT EXISTS "${VCPKG_EXECUTABLE}")
     message(STATUS "Bootstrapping vcpkg in ${VCPKG_ROOT}")
-    execute_process(COMMAND "${VCPKG_BOOTSTRAP}" WORKING_DIRECTORY "${VCPKG_ROOT}" RESULT_VARIABLE bootstrap_result)
+    execute_process(
+      COMMAND "${VCPKG_BOOTSTRAP}"
+      WORKING_DIRECTORY "${VCPKG_ROOT}"
+      RESULT_VARIABLE bootstrap_result
+    )
     if(bootstrap_result OR NOT EXISTS "${VCPKG_EXECUTABLE}")
-      message(FATAL_ERROR "Could not bootstrap vcpkg: ${VCPKG_BOOTSTRAP} failed (${bootstrap_result})")
+      message(
+        FATAL_ERROR
+        "Could not bootstrap vcpkg: ${VCPKG_BOOTSTRAP} failed (${bootstrap_result})"
+      )
     endif()
   endif()
 
@@ -81,16 +91,24 @@ endif()
 # stamp once project() has returned, which is after the install succeeded.
 # AL_VCPKG_INSTALL off leaves the ports to you; deleting the stamp file
 # forces one install.
-option(AL_VCPKG_INSTALL "Have vcpkg install the manifest's ports at configure when their inputs have changed" ON)
+option(
+  AL_VCPKG_INSTALL
+  "Have vcpkg install the manifest's ports at configure when their inputs have changed"
+  ON
+)
 set(AL_VCPKG_INSTALL_STAMP_FILE "${CMAKE_BINARY_DIR}/vcpkg-install.stamp")
 if(AL_VCPKG_INSTALL)
   file(GLOB al_vcpkg_triplet_files "${CMAKE_SOURCE_DIR}/cmake/triplets/*.cmake")
   set(al_vcpkg_install_key "")
-  foreach(input IN ITEMS
+  foreach(
+    input
+    IN
+    ITEMS
       "${CMAKE_SOURCE_DIR}/vcpkg.json"
       "${CMAKE_SOURCE_DIR}/vcpkg-configuration.json"
       "${CMAKE_CURRENT_LIST_DIR}/AlchemyTarget.cmake"
-      ${al_vcpkg_triplet_files})
+      ${al_vcpkg_triplet_files}
+  )
     file(SHA256 "${input}" input_hash)
     string(APPEND al_vcpkg_install_key "${input}=${input_hash};")
   endforeach()
@@ -112,13 +130,34 @@ if(AL_VCPKG_INSTALL)
   if(EXISTS "${AL_VCPKG_INSTALL_STAMP_FILE}")
     file(READ "${AL_VCPKG_INSTALL_STAMP_FILE}" al_vcpkg_last_key)
   endif()
-  if(al_vcpkg_last_key STREQUAL al_vcpkg_install_key AND EXISTS "${al_vcpkg_installed_dir}/vcpkg/status")
-    set(VCPKG_MANIFEST_INSTALL OFF CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+  if(
+    al_vcpkg_last_key STREQUAL al_vcpkg_install_key
+    AND EXISTS "${al_vcpkg_installed_dir}/vcpkg/status"
+  )
+    set(
+      VCPKG_MANIFEST_INSTALL
+      OFF
+      CACHE BOOL
+      "Decided by AL_VCPKG_INSTALL and the install stamp"
+      FORCE
+    )
     message(STATUS "vcpkg: nothing changed since the last install, not running it")
   else()
-    set(VCPKG_MANIFEST_INSTALL ON CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+    set(
+      VCPKG_MANIFEST_INSTALL
+      ON
+      CACHE BOOL
+      "Decided by AL_VCPKG_INSTALL and the install stamp"
+      FORCE
+    )
     set(AL_VCPKG_INSTALL_KEY "${al_vcpkg_install_key}")
   endif()
 else()
-  set(VCPKG_MANIFEST_INSTALL OFF CACHE BOOL "Decided by AL_VCPKG_INSTALL and the install stamp" FORCE)
+  set(
+    VCPKG_MANIFEST_INSTALL
+    OFF
+    CACHE BOOL
+    "Decided by AL_VCPKG_INSTALL and the install stamp"
+    FORCE
+  )
 endif()

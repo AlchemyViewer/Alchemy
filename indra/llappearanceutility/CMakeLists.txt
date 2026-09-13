@@ -1,81 +1,75 @@
 # -*- cmake -*-
 
-set(appearance_utility_SOURCES
-    appearance_utility.cpp
-    llappappearanceutility.cpp
-    llbakingavatar.cpp
-    llbakingjoint.cpp
-    llbakingjointmesh.cpp
-    llbakingprocess.cpp
-    llbakingshadermgr.cpp
-    llbakingtexlayer.cpp
-    llbakingtexture.cpp
-    llbakingwearable.cpp
-    llbakingwearablesdata.cpp
-    llbakingwindow.cpp
-    llprocessparams.cpp
-    llprocessskin.cpp
-    llprocesstexture.cpp
-    )
+set(
+  appearance_utility_SOURCES
+  appearance_utility.cpp
+  llappappearanceutility.cpp
+  llbakingavatar.cpp
+  llbakingjoint.cpp
+  llbakingjointmesh.cpp
+  llbakingprocess.cpp
+  llbakingshadermgr.cpp
+  llbakingtexlayer.cpp
+  llbakingtexture.cpp
+  llbakingwearable.cpp
+  llbakingwearablesdata.cpp
+  llbakingwindow.cpp
+  llprocessparams.cpp
+  llprocessskin.cpp
+  llprocesstexture.cpp
+)
 
-set(appearance_utility_HEADERS
-    llappappearanceutility.h
-    llbakingavatar.h
-    llbakingjoint.h
-    llbakingjointmesh.h
-    llbakingprocess.h
-    llbakingshadermgr.h
-    llbakingtexlayer.h
-    llbakingtexture.h
-    llbakingwearable.h
-    llbakingwearablesdata.h
-    llbakingwindow.h
-    llprocessparams.h
-    llprocessskin.h
-    llprocesstexture.h
-    )
+set(
+  appearance_utility_HEADERS
+  llappappearanceutility.h
+  llbakingavatar.h
+  llbakingjoint.h
+  llbakingjointmesh.h
+  llbakingprocess.h
+  llbakingshadermgr.h
+  llbakingtexlayer.h
+  llbakingtexture.h
+  llbakingwearable.h
+  llbakingwearablesdata.h
+  llbakingwindow.h
+  llprocessparams.h
+  llprocessskin.h
+  llprocesstexture.h
+)
 
 add_executable(appearance-utility-bin)
 
-target_sources(appearance-utility-bin
-    PRIVATE
-    ${appearance_utility_SOURCES}
-    ${appearance_utility_HEADERS}
-    )
+target_sources(
+  appearance-utility-bin
+  PRIVATE ${appearance_utility_SOURCES} ${appearance_utility_HEADERS}
+)
 
-target_link_libraries(appearance-utility-bin
-    PRIVATE
-    al::flags
-    llcharacter
-    llinventory
-    llappearance
-    llwindow
-    llrender
-    llxml
-    )
+target_link_libraries(
+  appearance-utility-bin
+  PRIVATE al::flags llcharacter llinventory llappearance llwindow llrender llxml
+)
 
 target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
 
-if (AL_BUILD_HEADLESS)
+if(AL_BUILD_HEADLESS)
   add_executable(appearance-utility-headless-bin)
 
-  target_sources(appearance-utility-headless-bin
-      PRIVATE
-      ${appearance_utility_SOURCES}
-      ${appearance_utility_HEADERS}
-      )
+  target_sources(
+    appearance-utility-headless-bin
+    PRIVATE ${appearance_utility_SOURCES} ${appearance_utility_HEADERS}
+  )
 
-  target_link_libraries(appearance-utility-headless-bin
+  target_link_libraries(
+    appearance-utility-headless-bin
     PRIVATE
-    al::flags
-    llcharacter
-    llinventory
-    llappearanceheadless
-    llwindowheadless
-    llrenderheadless
-    llxml
-    )
+      al::flags
+      llcharacter
+      llinventory
+      llappearanceheadless
+      llwindowheadless
+      llrenderheadless
+      llxml
+  )
 
   target_precompile_headers(appearance-utility-headless-bin REUSE_FROM llprecompiled_exe)
-endif (AL_BUILD_HEADLESS)
-
+endif()

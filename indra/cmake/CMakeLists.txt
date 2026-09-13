@@ -9,10 +9,18 @@ file(GLOB cmake_TRIPLETS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/triplets/
 source_group("Shared Rules" FILES ${cmake_MODULES})
 source_group("Triplets" FILES ${cmake_TRIPLETS})
 source_group("CMake Rules" FILES CMakeLists.txt)
-source_group("Master Rules" FILES ${CMAKE_SOURCE_DIR}/CMakeLists.txt ${CMAKE_SOURCE_DIR}/CMakePresets.json ${CMAKE_SOURCE_DIR}/vcpkg.json ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json)
+source_group(
+  "Master Rules"
+  FILES
+    ${CMAKE_SOURCE_DIR}/CMakeLists.txt
+    ${CMAKE_SOURCE_DIR}/CMakePresets.json
+    ${CMAKE_SOURCE_DIR}/vcpkg.json
+    ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json
+)
 
-add_custom_target(cmake_rules
-    SOURCES
+add_custom_target(
+  cmake_rules
+  SOURCES
     ${cmake_MODULES}
     ${cmake_TRIPLETS}
     CMakeLists.txt
@@ -20,4 +28,4 @@ add_custom_target(cmake_rules
     ${CMAKE_SOURCE_DIR}/CMakePresets.json
     ${CMAKE_SOURCE_DIR}/vcpkg.json
     ${CMAKE_SOURCE_DIR}/vcpkg-configuration.json
-    )
+)

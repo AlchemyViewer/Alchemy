@@ -1,13 +1,15 @@
 include_guard()
 add_library(ll::apr INTERFACE IMPORTED)
 
-if (WINDOWS)
+if(WINDOWS)
   find_package(apr CONFIG REQUIRED)
-  target_link_libraries(ll::apr INTERFACE
-    $<$<TARGET_EXISTS:apr::apr-1>:apr::apr-1>
-    $<$<TARGET_EXISTS:apr::aprapp-1>:apr::aprapp-1>
-    $<$<TARGET_EXISTS:apr::libapr-1>:apr::libapr-1>
-    $<$<TARGET_EXISTS:apr::libaprapp-1>:apr::libaprapp-1>
+  target_link_libraries(
+    ll::apr
+    INTERFACE
+      $<$<TARGET_EXISTS:apr::apr-1>:apr::apr-1>
+      $<$<TARGET_EXISTS:apr::aprapp-1>:apr::aprapp-1>
+      $<$<TARGET_EXISTS:apr::libapr-1>:apr::libapr-1>
+      $<$<TARGET_EXISTS:apr::libaprapp-1>:apr::libaprapp-1>
   )
 else()
   find_package(PkgConfig REQUIRED)

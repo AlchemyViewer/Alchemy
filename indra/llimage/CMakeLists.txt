@@ -1,9 +1,10 @@
 # -*- cmake -*-
 
-add_library (llimage STATIC)
+add_library(llimage STATIC)
 
-target_sources(llimage
-    PRIVATE
+target_sources(
+  llimage
+  PRIVATE
     llimagebmp.cpp
     llimage.cpp
     llimagedimensionsinfo.cpp
@@ -17,54 +18,46 @@ target_sources(llimage
     llimageavif.cpp
     llimageworker.cpp
     llpngwrapper.cpp
-    )
+)
 
-target_sources(llimage
-    PUBLIC
+target_sources(
+  llimage
+  PUBLIC
     FILE_SET HEADERS
-    FILES
-    llimage.h
-    llimagebmp.h
-    llimagedimensionsinfo.h
-    llimagedxt.h
-    llimagefilter.h
-    llimagej2c.h
-    llimagejpeg.h
-    llimagepng.h
-    llimagetga.h
-    llimagewebp.h
-    llimageavif.h
-    llimageworker.h
-    llmapimagetype.h
-    llpngwrapper.h
-    )
+      FILES
+        llimage.h
+        llimagebmp.h
+        llimagedimensionsinfo.h
+        llimagedxt.h
+        llimagefilter.h
+        llimagej2c.h
+        llimagejpeg.h
+        llimagepng.h
+        llimagetga.h
+        llimagewebp.h
+        llimageavif.h
+        llimageworker.h
+        llmapimagetype.h
+        llpngwrapper.h
+)
 
 # Libraries on which this library depends, needed for Linux builds
 # Sort by high-level to low-level
 target_link_libraries(llimage PRIVATE al::flags)
-if (AL_USE_KDU)
+if(AL_USE_KDU)
   target_link_libraries(llimage PUBLIC llkdu)
-else ()
+else()
   target_link_libraries(llimage PUBLIC llimagej2coj)
-endif ()
+endif()
 
-target_link_libraries(llimage
-    PUBLIC
-    llfilesystem
-    llmath
-    llcommon
-    ll::libwebp
-    ll::libavif
-    ll::libpng
-    ll::libjpeg
-    )
+target_link_libraries(
+  llimage
+  PUBLIC llfilesystem llmath llcommon ll::libwebp ll::libavif ll::libpng ll::libjpeg
+)
 
 target_precompile_headers(llimage REUSE_FROM llprecompiled)
 
 # Add tests
-if (AL_BUILD_TESTS)
+if(AL_BUILD_TESTS)
   al_add_test(llimageworker UNIT PROJECT llimage)
-endif ()
-
-
-
+endif()

@@ -29,8 +29,10 @@ function(al_codesign path)
     set(entitlements --entitlements "${ARGV1}")
   endif()
   execute_process(
-    COMMAND codesign --force --sign "${identity}" --options runtime ${timestamp} ${entitlements} "${path}"
-    RESULT_VARIABLE result)
+    COMMAND
+      codesign --force --sign "${identity}" --options runtime ${timestamp} ${entitlements} "${path}"
+    RESULT_VARIABLE result
+  )
   if(result)
     message(FATAL_ERROR "codesign failed (${result}) on ${path}")
   endif()
@@ -58,8 +60,14 @@ set(contents "${AL_SIGN_BUNDLE}/Contents")
 
 # 1. Loose Mach-O files anywhere in the bundle, so every enclosing bundle
 #    seals over already-signed code.
-file(GLOB_RECURSE loose LIST_DIRECTORIES false
-  "${contents}/*.dylib" "${contents}/*.so" "${contents}/*.bin" "${contents}/*.dat")
+file(
+  GLOB_RECURSE loose
+  LIST_DIRECTORIES false
+  "${contents}/*.dylib"
+  "${contents}/*.so"
+  "${contents}/*.bin"
+  "${contents}/*.dat"
+)
 foreach(path IN LISTS loose)
   al_codesign("${path}")
 endforeach()

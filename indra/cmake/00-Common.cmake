@@ -43,7 +43,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # C++20 module scanning; unused here and slow
 
-set(CMAKE_OPTIMIZE_DEPENDENCIES ON)  # static libraries do not wait on their dependencies' links
+set(CMAKE_OPTIMIZE_DEPENDENCIES ON) # static libraries do not wait on their dependencies' links
 set(CMAKE_COLOR_DIAGNOSTICS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -59,7 +59,10 @@ endif()
 if(WINDOWS)
   set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   set(CMAKE_MSVC_RUNTIME_CHECKS "$<$<CONFIG:Debug>:StackFrameErrorCheck;UninitializedVariable>")
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>)
+  set(
+    CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+    $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>
+  )
 endif()
 
 #------------------------------------------------------------------------------
@@ -93,16 +96,17 @@ if(AL_SANITIZERS AND (LINUX OR DARWIN))
   set(AL_USE_WEBRTC OFF)
   foreach(sanitizer IN LISTS AL_SANITIZERS)
     if(NOT sanitizer MATCHES "^(address|undefined|thread)$")
-      message(FATAL_ERROR "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)")
+      message(
+        FATAL_ERROR
+        "AL_SANITIZERS: unknown sanitizer '${sanitizer}' (address, undefined, thread)"
+      )
     endif()
     target_compile_options(al_flags INTERFACE -fsanitize=${sanitizer})
     target_link_options(al_flags INTERFACE -fsanitize=${sanitizer})
   endforeach()
-  target_compile_options(al_flags INTERFACE
-    -U_FORTIFY_SOURCE
-    -fno-omit-frame-pointer
-    -fno-common
-    -fsanitize-recover=all
+  target_compile_options(
+    al_flags
+    INTERFACE -U_FORTIFY_SOURCE -fno-omit-frame-pointer -fno-common -fsanitize-recover=all
   )
 endif()
 
@@ -117,30 +121,33 @@ endif()
 if(WINDOWS)
   target_compile_options(al_flags INTERFACE /W3)
 elseif(LINUX OR DARWIN)
-  target_compile_options(al_flags INTERFACE
-    -Wall
-    -Wno-sign-compare
-    -Wno-trigraphs
-    -Wno-reorder
-    -Wno-unused-but-set-variable
-    -Wno-unused-variable
+  target_compile_options(
+    al_flags
+    INTERFACE
+      -Wall
+      -Wno-sign-compare
+      -Wno-trigraphs
+      -Wno-reorder
+      -Wno-unused-but-set-variable
+      -Wno-unused-variable
   )
   if(COMPILER_IS_CLANG)
-    target_compile_options(al_flags INTERFACE
-      -Wno-unused-private-field
-      -Wno-unused-local-typedef
-      -Wno-reorder-ctor
+    target_compile_options(
+      al_flags
+      INTERFACE -Wno-unused-private-field -Wno-unused-local-typedef -Wno-reorder-ctor
     )
   elseif(COMPILER_IS_GCC)
-    target_compile_options(al_flags INTERFACE
-      -Wstrict-aliasing=2
-      -Wno-stringop-truncation
-      -Wno-stringop-overflow
-      -Wno-parentheses
-      -Wno-maybe-uninitialized
-      -Wno-unused-local-typedefs
-      -Wno-array-bounds  # false positives, including on libstdc++'s own headers
-      -Wno-switch
+    target_compile_options(
+      al_flags
+      INTERFACE
+        -Wstrict-aliasing=2
+        -Wno-stringop-truncation
+        -Wno-stringop-overflow
+        -Wno-parentheses
+        -Wno-maybe-uninitialized
+        -Wno-unused-local-typedefs
+        -Wno-array-bounds # false positives, including on libstdc++'s own headers
+        -Wno-switch
     )
     if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16)
       target_compile_options(al_flags INTERFACE -Wno-sfinae-incomplete)
@@ -157,9 +164,9 @@ endif()
 # wants a little optimisation on GCC and Clang, and RelWithDebInfo wants
 # -O3 where CMake gives -O2.
 if(LINUX OR DARWIN)
-  target_compile_options(al_flags INTERFACE
-    $<$<CONFIG:OptDebug>:-Og>
-    $<$<CONFIG:RelWithDebInfo>:-O3>
+  target_compile_options(
+    al_flags
+    INTERFACE $<$<CONFIG:OptDebug>:-Og> $<$<CONFIG:RelWithDebInfo>:-O3>
   )
 endif()
 
@@ -170,7 +177,12 @@ endif()
 if(WINDOWS)
   foreach(lang C CXX)
     foreach(config RELWITHDEBINFO RELEASE)
-      string(REGEX REPLACE "/Ob[0-9]" "/Ob3" CMAKE_${lang}_FLAGS_${config} "${CMAKE_${lang}_FLAGS_${config}}")
+      string(
+        REGEX REPLACE "/Ob[0-9]"
+        "/Ob3"
+        CMAKE_${lang}_FLAGS_${config}
+        "${CMAKE_${lang}_FLAGS_${config}}"
+      )
       if(NOT CMAKE_${lang}_FLAGS_${config} MATCHES "/Ob3")
         string(APPEND CMAKE_${lang}_FLAGS_${config} " /Ob3")
       endif()
@@ -190,13 +202,15 @@ endif()
 if(WINDOWS)
   target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:/fp:fast>)
 elseif(LINUX OR DARWIN)
-  target_compile_options(al_flags INTERFACE
-    -fno-math-errno
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-ffp-contract=fast>
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-trapping-math>
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-signed-zeros>
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fassociative-math>
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-freciprocal-math>
+  target_compile_options(
+    al_flags
+    INTERFACE
+      -fno-math-errno
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-ffp-contract=fast>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-trapping-math>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fno-signed-zeros>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-fassociative-math>
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:-freciprocal-math>
   )
 endif()
 
@@ -217,17 +231,19 @@ endif()
 
 # Toolchain conformance and miscellany.
 if(WINDOWS)
-  target_compile_options(al_flags INTERFACE
-    /utf-8            # source and execution character sets, as on the other platforms
-    /bigobj           # generated template code exceeds the default section limit
-    /Gy               # function-level linking in every configuration, not only under /O2
-    /Zc:wchar_t       # documented as the default, but without it link.exe reports corrupted
-                      # type records (LNK4020) in the PDB of objects built against the shared PCH
-    /MP
-    /permissive-
-    /Zc:preprocessor
-    /Zc:__cplusplus
-    /Zc:inline
+  target_compile_options(
+    al_flags
+    INTERFACE
+      /utf-8 # source and execution character sets, as on the other platforms
+      /bigobj # generated template code exceeds the default section limit
+      /Gy # function-level linking in every configuration, not only under /O2
+      /Zc:wchar_t # documented as the default, but without it link.exe reports corrupted
+      # type records (LNK4020) in the PDB of objects built against the shared PCH
+      /MP
+      /permissive-
+      /Zc:preprocessor
+      /Zc:__cplusplus
+      /Zc:inline
   )
 elseif(LINUX)
   target_compile_options(al_flags INTERFACE -fsigned-char)
@@ -251,8 +267,10 @@ endif()
 if(LINUX OR DARWIN)
   target_compile_options(al_flags INTERFACE $<$<CONFIG:Release>:-g>)
 elseif(WINDOWS)
-  target_link_options(al_flags INTERFACE
-    $<IF:$<AND:$<CONFIG:Release>,$<BOOL:$<TARGET_PROPERTY:AL_SKIP_RELEASE_DEBUG_INFO>>>,/DEBUG:NONE,/DEBUG:FULL>
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<IF:$<AND:$<CONFIG:Release>,$<BOOL:$<TARGET_PROPERTY:AL_SKIP_RELEASE_DEBUG_INFO>>>,/DEBUG:NONE,/DEBUG:FULL>
   )
 endif()
 
@@ -262,25 +280,29 @@ endif()
 
 # Per configuration. CMake's RelWithDebInfo and Release flags define NDEBUG
 # themselves; OptDebug inherits Debug's flags and must define it here.
-target_compile_definitions(al_flags INTERFACE
-  $<$<CONFIG:Debug>:LL_DEBUG=1>
-  $<$<CONFIG:Debug>:_DEBUG>
-  $<$<CONFIG:OptDebug>:LL_DEBUG=1>
-  $<$<CONFIG:OptDebug>:LL_OPTDEBUG=1>
-  $<$<CONFIG:OptDebug>:NDEBUG>
-  $<$<CONFIG:RelWithDebInfo>:LL_RELEASE=1>
-  $<$<CONFIG:RelWithDebInfo>:LL_RELEASE_WITH_DEBUG_INFO=1>
-  $<$<CONFIG:Release>:LL_RELEASE=1>
-  $<$<CONFIG:Release>:LL_RELEASE_FOR_DOWNLOAD=1>
+target_compile_definitions(
+  al_flags
+  INTERFACE
+    $<$<CONFIG:Debug>:LL_DEBUG=1>
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:OptDebug>:LL_DEBUG=1>
+    $<$<CONFIG:OptDebug>:LL_OPTDEBUG=1>
+    $<$<CONFIG:OptDebug>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:LL_RELEASE=1>
+    $<$<CONFIG:RelWithDebInfo>:LL_RELEASE_WITH_DEBUG_INFO=1>
+    $<$<CONFIG:Release>:LL_RELEASE=1>
+    $<$<CONFIG:Release>:LL_RELEASE_FOR_DOWNLOAD=1>
 )
 
 # Portable.
-target_compile_definitions(al_flags INTERFACE
-  ADDRESS_SIZE=${ADDRESS_SIZE}
-  BOOST_BIND_GLOBAL_PLACEHOLDERS       # Boost.Bind's _1, _2 in the global namespace, which the code relies on
-  GLM_FORCE_DEFAULT_ALIGNED_GENTYPES=1 # SIMD-aligned GLM types; https://github.com/g-truc/glm/blob/master/manual.md#section2_10
-  GLM_ENABLE_EXPERIMENTAL=1
-  SSE2NEON_SUPPRESS_WARNINGS=1         # SSE2NEON warns under optimisation for no reason
+target_compile_definitions(
+  al_flags
+  INTERFACE
+    ADDRESS_SIZE=${ADDRESS_SIZE}
+    BOOST_BIND_GLOBAL_PLACEHOLDERS # Boost.Bind's _1, _2 in the global namespace, which the code relies on
+    GLM_FORCE_DEFAULT_ALIGNED_GENTYPES=1 # SIMD-aligned GLM types; https://github.com/g-truc/glm/blob/master/manual.md#section2_10
+    GLM_ENABLE_EXPERIMENTAL=1
+    SSE2NEON_SUPPRESS_WARNINGS=1 # SSE2NEON warns under optimisation for no reason
 )
 
 if(AL_ENABLE_CRASH_REPORTING)
@@ -293,31 +315,32 @@ endif()
 
 # Per platform.
 if(WINDOWS)
-  target_compile_definitions(al_flags INTERFACE
-    LL_WINDOWS=1
-    UNICODE
-    _UNICODE
-    WINVER=0x0A00
-    _WIN32_WINNT=0x0A00
-    WIN32_LEAN_AND_MEAN
-    NOMINMAX
-    _CRT_SECURE_NO_WARNINGS          # sprintf and friends
-    _CRT_NONSTDC_NO_DEPRECATE
-    _CRT_OBSOLETE_NO_WARNINGS
-    _WINSOCK_DEPRECATED_NO_WARNINGS
+  target_compile_definitions(
+    al_flags
+    INTERFACE
+      LL_WINDOWS=1
+      UNICODE
+      _UNICODE
+      WINVER=0x0A00
+      _WIN32_WINNT=0x0A00
+      WIN32_LEAN_AND_MEAN
+      NOMINMAX
+      _CRT_SECURE_NO_WARNINGS # sprintf and friends
+      _CRT_NONSTDC_NO_DEPRECATE
+      _CRT_OBSOLETE_NO_WARNINGS
+      _WINSOCK_DEPRECATED_NO_WARNINGS
   )
 elseif(LINUX)
-  target_compile_definitions(al_flags INTERFACE
-    LL_LINUX=1
-    _REENTRANT
-    APPID=secondlife
-    LL_IGNORE_SIGCHLD  # third-party libraries install their own SIGCHLD handlers; the viewer needs none
+  target_compile_definitions(
+    al_flags
+    INTERFACE
+      LL_LINUX=1
+      _REENTRANT
+      APPID=secondlife
+      LL_IGNORE_SIGCHLD # third-party libraries install their own SIGCHLD handlers; the viewer needs none
   )
 elseif(DARWIN)
-  target_compile_definitions(al_flags INTERFACE
-    LL_DARWIN=1
-    GL_SILENCE_DEPRECATION=1
-  )
+  target_compile_definitions(al_flags INTERFACE LL_DARWIN=1 GL_SILENCE_DEPRECATION=1)
 endif()
 
 #------------------------------------------------------------------------------
@@ -325,33 +348,41 @@ endif()
 #------------------------------------------------------------------------------
 
 if(WINDOWS)
-  target_link_options(al_flags INTERFACE
-    $<$<CONFIG:Release>:/OPT:REF>
-    $<$<CONFIG:Release>:/OPT:ICF>
-    /LARGEADDRESSAWARE
-    $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:/NODEFAULTLIB:LIBCMTD>
-    $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<$<CONFIG:Release>:/OPT:REF>
+      $<$<CONFIG:Release>:/OPT:ICF>
+      /LARGEADDRESSAWARE
+      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:/NODEFAULTLIB:LIBCMTD>
+      $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>
   )
 elseif(LINUX)
-  target_link_options(al_flags INTERFACE
-    "LINKER:-z,relro"
-    "LINKER:-z,now"
-    "LINKER:--build-id"
-    "LINKER:--as-needed"
-    "LINKER:--no-undefined"
+  target_link_options(
+    al_flags
+    INTERFACE
+      "LINKER:-z,relro"
+      "LINKER:-z,now"
+      "LINKER:--build-id"
+      "LINKER:--as-needed"
+      "LINKER:--no-undefined"
   )
 elseif(DARWIN)
-  target_link_options(al_flags INTERFACE
-    $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:LINKER:-dead_strip>
-    LINKER:-dead_strip_dylibs
-    "LINKER:-headerpad_max_install_names"
-    "LINKER:-search_paths_first"
+  target_link_options(
+    al_flags
+    INTERFACE
+      $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:LINKER:-dead_strip>
+      LINKER:-dead_strip_dylibs
+      "LINKER:-headerpad_max_install_names"
+      "LINKER:-search_paths_first"
   )
   # ld64 needs somewhere to keep LTO intermediates or dsymutil finds no symbols.
   if(AL_USE_LTO AND NOT XCODE)
-    target_link_options(al_flags INTERFACE
-      "LINKER:-cache_path_lto,${CMAKE_BINARY_DIR}/LTOCache"
-      "LINKER:-object_path_lto,$<TARGET_PROPERTY:BINARY_DIR>/CMakeFiles/$<TARGET_PROPERTY:NAME>.dir/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>$<TARGET_PROPERTY:NAME>_lto.o"
+    target_link_options(
+      al_flags
+      INTERFACE
+        "LINKER:-cache_path_lto,${CMAKE_BINARY_DIR}/LTOCache"
+        "LINKER:-object_path_lto,$<TARGET_PROPERTY:BINARY_DIR>/CMakeFiles/$<TARGET_PROPERTY:NAME>.dir/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>$<TARGET_PROPERTY:NAME>_lto.o"
     )
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/LTOCache")
   endif()
@@ -414,7 +445,9 @@ function(al_check_flags_target)
   set(missing)
   foreach(target IN LISTS targets)
     get_target_property(type ${target} TYPE)
-    if(NOT type MATCHES "^(STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY|EXECUTABLE)$")
+    if(
+      NOT type MATCHES "^(STATIC_LIBRARY|SHARED_LIBRARY|MODULE_LIBRARY|OBJECT_LIBRARY|EXECUTABLE)$"
+    )
       continue()
     endif()
     get_target_property(libs ${target} LINK_LIBRARIES)

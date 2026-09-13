@@ -14,7 +14,15 @@
 
 cmake_minimum_required(VERSION 4.0)
 
-foreach(var TOOL TEMPLATE MASTER_URL MASTER_CACHE MODE STAMP)
+foreach(
+  var
+  TOOL
+  TEMPLATE
+  MASTER_URL
+  MASTER_CACHE
+  MODE
+  STAMP
+)
   if(NOT DEFINED ${var})
     message(FATAL_ERROR "VerifyTemplate.cmake: ${var} is not set")
   endif()
@@ -43,9 +51,15 @@ if(refresh)
     if(MODE STREQUAL "production")
       message(FATAL_ERROR "Cannot fetch the master message template: ${reason}")
     elseif(EXISTS "${MASTER_CACHE}")
-      message(WARNING "Cannot fetch the master message template (${reason}); comparing against the cached copy")
+      message(
+        WARNING
+        "Cannot fetch the master message template (${reason}); comparing against the cached copy"
+      )
     else()
-      message(WARNING "Cannot fetch the master message template (${reason}); checking the template's syntax only")
+      message(
+        WARNING
+        "Cannot fetch the master message template (${reason}); checking the template's syntax only"
+      )
     endif()
   endif()
 endif()
@@ -57,7 +71,8 @@ endif()
 
 execute_process(
   COMMAND "${TOOL}" --mode ${MODE} "${TEMPLATE}" ${master}
-  RESULT_VARIABLE result)
+  RESULT_VARIABLE result
+)
 if(result)
   message(FATAL_ERROR "The message template check failed (${result})")
 endif()

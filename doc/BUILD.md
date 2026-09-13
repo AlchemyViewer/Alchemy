@@ -373,6 +373,16 @@ prints a warning naming the replacement.
 
 See [`indra/CMakeLists.txt`](../indra/CMakeLists.txt) for the complete list.
 
+## CMake style
+
+The CMake files are formatted with [gersemi](https://github.com/BlankSpruce/gersemi) (`pip install gersemi`); the configuration is `.gersemirc` at the repository root, and it reads the project's own command definitions from `indra/cmake` so `al_add_test` and friends format like the built-ins. Format what you touched before committing:
+
+```
+gersemi -i indra/CMakeLists.txt indra/cmake/*.cmake indra/*/CMakeLists.txt
+```
+
+`gersemi --check` on the same paths reports what would change without changing it.
+
 ## Running tests
 
 Enable tests at configure time:

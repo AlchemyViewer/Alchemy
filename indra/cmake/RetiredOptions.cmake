@@ -6,7 +6,8 @@
 
 include_guard()
 
-set(_al_retired_options
+set(
+  _al_retired_options
   BUILD_VIEWER=AL_BUILD_VIEWER
   BUILD_APPEARANCE_UTIL=AL_BUILD_APPEARANCE_UTILITY
   BUILD_HEADLESS=AL_BUILD_HEADLESS
@@ -94,7 +95,10 @@ endforeach()
 
 if(_al_retired_found)
   list(JOIN _al_retired_found "\n" _al_retired_text)
-  message(WARNING "Retired option names were found in the cache or on the command line and are ignored:\n${_al_retired_text}\nSet the replacement, and clear the old entry with -U<name> or by editing CMakeCache.txt.")
+  message(
+    WARNING
+    "Retired option names were found in the cache or on the command line and are ignored:\n${_al_retired_text}\nSet the replacement, and clear the old entry with -U<name> or by editing CMakeCache.txt."
+  )
 endif()
 
 unset(_al_retired_options)

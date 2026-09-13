@@ -25,9 +25,12 @@ if(APPLE)
     al_strip_file("${path}")
   endforeach()
 else()
-  file(GLOB_RECURSE candidates LIST_DIRECTORIES false
+  file(
+    GLOB_RECURSE candidates
+    LIST_DIRECTORIES false
     "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/bin/*"
-    "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/lib/*")
+    "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/lib/*"
+  )
   foreach(path IN LISTS candidates)
     if(IS_SYMLINK "${path}")
       continue()

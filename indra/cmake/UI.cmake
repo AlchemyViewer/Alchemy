@@ -5,55 +5,53 @@ include(DBUS)
 
 add_library(ll::uilibraries INTERFACE IMPORTED)
 
-if (LINUX)
+if(LINUX)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(WAYLAND_CLIENT wayland-client)
 
   if(WAYLAND_CLIENT_FOUND)
-      target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
-      target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
+    target_include_directories(ll::uilibraries SYSTEM INTERFACE ${WAYLAND_CLIENT_INCLUDE_DIRS})
+    target_compile_definitions(ll::uilibraries INTERFACE LL_WAYLAND=1)
   else()
-      message(WARNING "pkg-config could not find wayland-client; building without full Wayland support")
+    message(
+      WARNING
+      "pkg-config could not find wayland-client; building without full Wayland support"
+    )
   endif()
 
   find_package(X11)
   if(X11_FOUND)
-      target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
+    target_compile_definitions(ll::uilibraries INTERFACE LL_X11=1)
   else()
-      message(WARNING "Could not find X11; building without full X11 support")
+    message(WARNING "Could not find X11; building without full X11 support")
   endif()
 
-
-  target_link_libraries(ll::uilibraries INTERFACE
-          ll::fontconfig
-          ll::freetype
-          ll::dbus
-  )
+  target_link_libraries(ll::uilibraries INTERFACE ll::fontconfig ll::freetype ll::dbus)
 elseif(DARWIN)
-  target_link_libraries(ll::uilibraries INTERFACE
-          ${CARBON_LIBRARY}
-          )
+  target_link_libraries(ll::uilibraries INTERFACE ${CARBON_LIBRARY})
 elseif(WINDOWS)
-  target_link_libraries(ll::uilibraries INTERFACE
-          UxTheme
-          Dwmapi
-          Shcore
-          comdlg32 # Common Dialogs for ChooseColor
-          ole32
-          dxgi
-          d3d9
-          dinput8
-          dxguid
-          opengl32
-          kernel32
-          odbc32
-          odbccp32
-          oleaut32
-          shell32
-          shlwapi
-          Vfw32
-          wer
-          winspool
-          imm32
-          )
+  target_link_libraries(
+    ll::uilibraries
+    INTERFACE
+      UxTheme
+      Dwmapi
+      Shcore
+      comdlg32 # Common Dialogs for ChooseColor
+      ole32
+      dxgi
+      d3d9
+      dinput8
+      dxguid
+      opengl32
+      kernel32
+      odbc32
+      odbccp32
+      oleaut32
+      shell32
+      shlwapi
+      Vfw32
+      wer
+      winspool
+      imm32
+  )
 endif()

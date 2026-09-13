@@ -8,16 +8,60 @@ include_guard()
 
 set(icu_root "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
 find_path(ICU_INCLUDE_DIR unicode/uversion.h PATHS "${icu_root}/include" NO_DEFAULT_PATH REQUIRED)
-find_library(ICU_I18N_LIBRARY_RELEASE NAMES icui18n icuin NAMES_PER_DIR PATHS "${icu_root}/lib" NO_DEFAULT_PATH REQUIRED)
-find_library(ICU_I18N_LIBRARY_DEBUG NAMES icui18nd icuind icui18n icuin NAMES_PER_DIR PATHS "${icu_root}/debug/lib" NO_DEFAULT_PATH)
-find_library(ICU_UC_LIBRARY_RELEASE NAMES icuuc NAMES_PER_DIR PATHS "${icu_root}/lib" NO_DEFAULT_PATH REQUIRED)
-find_library(ICU_UC_LIBRARY_DEBUG NAMES icuucd icuuc NAMES_PER_DIR PATHS "${icu_root}/debug/lib" NO_DEFAULT_PATH)
-find_library(ICU_DATA_LIBRARY_RELEASE NAMES icudata icudt NAMES_PER_DIR PATHS "${icu_root}/lib" NO_DEFAULT_PATH REQUIRED)
-find_library(ICU_DATA_LIBRARY_DEBUG NAMES icudatad icudtd icudata icudt NAMES_PER_DIR PATHS "${icu_root}/debug/lib" NO_DEFAULT_PATH)
-mark_as_advanced(ICU_INCLUDE_DIR
-  ICU_I18N_LIBRARY_RELEASE ICU_I18N_LIBRARY_DEBUG
-  ICU_UC_LIBRARY_RELEASE ICU_UC_LIBRARY_DEBUG
-  ICU_DATA_LIBRARY_RELEASE ICU_DATA_LIBRARY_DEBUG)
+find_library(
+  ICU_I18N_LIBRARY_RELEASE
+  NAMES icui18n icuin
+  NAMES_PER_DIR
+  PATHS "${icu_root}/lib"
+  NO_DEFAULT_PATH
+  REQUIRED
+)
+find_library(
+  ICU_I18N_LIBRARY_DEBUG
+  NAMES icui18nd icuind icui18n icuin
+  NAMES_PER_DIR
+  PATHS "${icu_root}/debug/lib"
+  NO_DEFAULT_PATH
+)
+find_library(
+  ICU_UC_LIBRARY_RELEASE
+  NAMES icuuc
+  NAMES_PER_DIR
+  PATHS "${icu_root}/lib"
+  NO_DEFAULT_PATH
+  REQUIRED
+)
+find_library(
+  ICU_UC_LIBRARY_DEBUG
+  NAMES icuucd icuuc
+  NAMES_PER_DIR
+  PATHS "${icu_root}/debug/lib"
+  NO_DEFAULT_PATH
+)
+find_library(
+  ICU_DATA_LIBRARY_RELEASE
+  NAMES icudata icudt
+  NAMES_PER_DIR
+  PATHS "${icu_root}/lib"
+  NO_DEFAULT_PATH
+  REQUIRED
+)
+find_library(
+  ICU_DATA_LIBRARY_DEBUG
+  NAMES icudatad icudtd icudata icudt
+  NAMES_PER_DIR
+  PATHS "${icu_root}/debug/lib"
+  NO_DEFAULT_PATH
+)
+mark_as_advanced(
+  ICU_INCLUDE_DIR
+  ICU_I18N_LIBRARY_RELEASE
+  ICU_I18N_LIBRARY_DEBUG
+  ICU_UC_LIBRARY_RELEASE
+  ICU_UC_LIBRARY_DEBUG
+  ICU_DATA_LIBRARY_RELEASE
+  ICU_DATA_LIBRARY_DEBUG
+)
 
 add_library(ll::icu INTERFACE IMPORTED)
 target_include_directories(ll::icu SYSTEM INTERFACE ${ICU_INCLUDE_DIR})
@@ -27,9 +71,12 @@ target_include_directories(ll::icu SYSTEM INTERFACE ${ICU_INCLUDE_DIR})
 # every configuration, as every other port does there.
 foreach(component I18N UC DATA)
   if(ICU_${component}_LIBRARY_DEBUG)
-    target_link_libraries(ll::icu INTERFACE
-      optimized ${ICU_${component}_LIBRARY_RELEASE}
-      debug ${ICU_${component}_LIBRARY_DEBUG})
+    target_link_libraries(
+      ll::icu
+      INTERFACE
+        optimized ${ICU_${component}_LIBRARY_RELEASE}
+        debug ${ICU_${component}_LIBRARY_DEBUG}
+    )
   else()
     target_link_libraries(ll::icu INTERFACE ${ICU_${component}_LIBRARY_RELEASE})
   endif()

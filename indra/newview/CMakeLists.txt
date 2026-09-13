@@ -5,91 +5,140 @@ list(APPEND CMAKE_MESSAGE_CONTEXT viewer)
 include(BuildVersion)
 include(TemplateCheck)
 
-set(AL_VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
-    "The name of the viewer executable to create.")
+set(AL_VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING "The name of the viewer executable to create.")
 
 # Generate version vars header
 configure_file(llversioninfovars.h.in llversioninfovars.h @ONLY)
 
-if (AL_BUILD_VIEWER)
+if(AL_BUILD_VIEWER)
+  # Javascript files for 3D snapshot functionality
+  configure_file(
+    "${INDRA_SOURCE_DIR}/externals/js/CubemapToEquirectangular.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/CubemapToEquirectangular.js"
+    COPYONLY
+  )
+  configure_file(
+    "${INDRA_SOURCE_DIR}/externals/js/jpeg_encoder_basic.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/jpeg_encoder_basic.js"
+    COPYONLY
+  )
+  configure_file(
+    "${INDRA_SOURCE_DIR}/externals/js/three.min.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/three.min.js"
+    COPYONLY
+  )
+  configure_file(
+    "${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/OrbitControls.js"
+    COPYONLY
+  )
 
-# Javascript files for 3D snapshot functionality
-configure_file("${INDRA_SOURCE_DIR}/externals/js/CubemapToEquirectangular.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/CubemapToEquirectangular.js" COPYONLY)
-configure_file("${INDRA_SOURCE_DIR}/externals/js/jpeg_encoder_basic.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/jpeg_encoder_basic.js" COPYONLY)
-configure_file("${INDRA_SOURCE_DIR}/externals/js/three.min.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/three.min.js" COPYONLY)
-configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/OrbitControls.js" COPYONLY)
+  # LSL Definitions
+  find_package(unofficial-lsl-definitions CONFIG REQUIRED)
+  configure_file(
+    "${LSL_DEFINITIONS_DIR}/lsl_keywords.xml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml"
+    COPYONLY
+  )
+  configure_file(
+    "${LSL_DEFINITIONS_DIR}/lua_keywords.xml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml"
+    COPYONLY
+  )
 
-# LSL Definitions
-find_package(unofficial-lsl-definitions CONFIG REQUIRED)
-configure_file("${LSL_DEFINITIONS_DIR}/lsl_keywords.xml"
-               "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml" COPYONLY)
-configure_file("${LSL_DEFINITIONS_DIR}/lua_keywords.xml"
-               "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
+  find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
+  message(VERBOSE "Copying fonts from ${ALCHEMY_FONTS_DIR}")
+  file(GLOB FONT_FILE_GLOB_LIST "${ALCHEMY_FONTS_DIR}/*")
+  file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts")
 
-find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
-message(VERBOSE "Copying fonts from ${ALCHEMY_FONTS_DIR}")
-file(GLOB FONT_FILE_GLOB_LIST
-  "${ALCHEMY_FONTS_DIR}/*"
-)
-file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts")
+  # Copy over the Emoji/shortcodes mapping XML files (and create dependency
+  # if they are changed, CMake will run again and copy over new versions)
+  find_package(unofficial-emoji-shortcodes CONFIG REQUIRED)
+  message(VERBOSE "Copying emoji shortcode mappings from ${EMOJI_SHORTCODES_XUI_DIR}")
+  set(emoji_mapping_src_folder ${EMOJI_SHORTCODES_XUI_DIR})
+  set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
 
-# Copy over the Emoji/shortcodes mapping XML files (and create dependency
-# if they are changed, CMake will run again and copy over new versions)
-find_package(unofficial-emoji-shortcodes CONFIG REQUIRED)
-message(VERBOSE "Copying emoji shortcode mappings from ${EMOJI_SHORTCODES_XUI_DIR}")
-set(emoji_mapping_src_folder ${EMOJI_SHORTCODES_XUI_DIR})
-set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
+  # Turkish (tr) is in the generator's ALLOWED_FOLDERS but not yet shipped
+  # in the emojibase data we consume; add it here once the upstream port
+  # starts producing tr/emoji_characters.xml.
+  set(country_codes "da;de;en;es;fr;it;ja;pl;pt;ru;zh")
+  foreach(elem ${country_codes})
+    set(emoji_mapping_src_file "${emoji_mapping_src_folder}/${elem}/emoji_characters.xml")
+    set(emoji_mapping_dst_file "${emoji_mapping_dst_folder}/${elem}/emoji_characters.xml")
+    configure_file(${emoji_mapping_src_file} ${emoji_mapping_dst_file} COPYONLY)
+  endforeach()
 
-# Turkish (tr) is in the generator's ALLOWED_FOLDERS but not yet shipped
-# in the emojibase data we consume; add it here once the upstream port
-# starts producing tr/emoji_characters.xml.
-set(country_codes "da;de;en;es;fr;it;ja;pl;pt;ru;zh")
-foreach(elem ${country_codes})
-   set(emoji_mapping_src_file
-      "${emoji_mapping_src_folder}/${elem}/emoji_characters.xml")
-   set(emoji_mapping_dst_file
-      "${emoji_mapping_dst_folder}/${elem}/emoji_characters.xml")
-   configure_file(${emoji_mapping_src_file} ${emoji_mapping_dst_file} COPYONLY)
-endforeach()
-
-# Copy Icons
-# Replace the icons with the appropriate ones for the channel
-# ('test' is the default)
-set(ICON_PATH "test")
-set(VIEWER_MACOSX_PHASE "d")
-string(TOLOWER ${AL_CHANNEL} channel_lower)
-if(channel_lower MATCHES "^alchemy release")
+  # Copy Icons
+  # Replace the icons with the appropriate ones for the channel
+  # ('test' is the default)
+  set(ICON_PATH "test")
+  set(VIEWER_MACOSX_PHASE "d")
+  string(TOLOWER ${AL_CHANNEL} channel_lower)
+  if(channel_lower MATCHES "^alchemy release")
     set(ICON_PATH "release")
     set(VIEWER_MACOSX_PHASE "f")
-elseif(channel_lower MATCHES "^alchemy beta")
+  elseif(channel_lower MATCHES "^alchemy beta")
     set(ICON_PATH "beta")
     set(VIEWER_MACOSX_PHASE "b")
-elseif(channel_lower MATCHES "^alchemy project")
+  elseif(channel_lower MATCHES "^alchemy project")
     set(ICON_PATH "project")
     set(VIEWER_MACOSX_PHASE "a")
-endif()
-message(VERBOSE "Copying icons for ${ICON_PATH}")
+  endif()
+  message(VERBOSE "Copying icons for ${ICON_PATH}")
 
-find_package(unofficial-alchemy-branding CONFIG REQUIRED)
-set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")
-if (WINDOWS)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico" "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico" ONLY_IF_DIFFERENT)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP" ONLY_IF_DIFFERENT)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP" ONLY_IF_DIFFERENT)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico" "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico" ONLY_IF_DIFFERENT)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif" "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif" ONLY_IF_DIFFERENT)
-elseif(DARWIN)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns" "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns" ONLY_IF_DIFFERENT)
-elseif(LINUX)
-  file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP" "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP" ONLY_IF_DIFFERENT)
-endif ()
+  find_package(unofficial-alchemy-branding CONFIG REQUIRED)
+  set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")
+  if(WINDOWS)
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
+      ONLY_IF_DIFFERENT
+    )
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
+      ONLY_IF_DIFFERENT
+    )
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+      ONLY_IF_DIFFERENT
+    )
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/installer/icons/install_icon.ico"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_icon.ico"
+      ONLY_IF_DIFFERENT
+    )
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
+      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
+      ONLY_IF_DIFFERENT
+    )
+  elseif(DARWIN)
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
+      "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns"
+      ONLY_IF_DIFFERENT
+    )
+  elseif(LINUX)
+    file(
+      COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
+      ONLY_IF_DIFFERENT
+    )
+  endif()
 
-# Branded splash icon for the SDL splash screen (LLSplashScreenSDL loads this
-# PNG at runtime from app_settings). Staged on all platforms so the SDL build
-# finds it regardless of which backend the package ends up using.
-file(COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png" "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png" ONLY_IF_DIFFERENT)
+  # Branded splash icon for the SDL splash screen (LLSplashScreenSDL loads this
+  # PNG at runtime from app_settings). Staged on all platforms so the SDL build
+  # finds it regardless of which backend the package ends up using.
+  file(
+    COPY_FILE "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
+    ONLY_IF_DIFFERENT
+  )
 
-set(viewer_SOURCES
+  set(
+    viewer_SOURCES
     ao.cpp
     aoengine.cpp
     aoset.cpp
@@ -288,7 +337,7 @@ set(viewer_SOURCES
     llfloaterauction.cpp
     llfloaterautoreplacesettings.cpp
     llfloateravatarpicker.cpp
-#   llfloateravatarrendersettings.cpp
+    #   llfloateravatarrendersettings.cpp
     llfloateravatartextures.cpp
     llfloaterbanduration.cpp
     llfloaterbeacons.cpp
@@ -764,7 +813,7 @@ set(viewer_SOURCES
     llurllineeditorctrl.cpp
     llurlwhitelist.cpp
     llversioninfo.cpp
-#    llvvmquery.cpp
+    #    llvvmquery.cpp
     llviewchildren.cpp
     llviewerassetstats.cpp
     llviewerassetstorage.cpp
@@ -822,7 +871,7 @@ set(viewer_SOURCES
     llviewerwearable.cpp
     llviewerwindow.cpp
     llviewerwindowlistener.cpp
-	llvisualeffect.cpp
+    llvisualeffect.cpp
     llvlcomposition.cpp
     llvlmanager.cpp
     llvoavatar.cpp
@@ -870,9 +919,10 @@ set(viewer_SOURCES
     rlvinventory.cpp
     rlvlocks.cpp
     rlvui.cpp
-    )
+  )
 
-set(viewer_HEADERS
+  set(
+    viewer_HEADERS
     ao.h
     aoengine.h
     aoset.h
@@ -1074,7 +1124,7 @@ set(viewer_HEADERS
     llfloaterauction.h
     llfloaterautoreplacesettings.h
     llfloateravatarpicker.h
-#   llfloateravatarrendersettings.h
+    #   llfloateravatarrendersettings.h
     llfloateravatartextures.h
     llfloaterbanduration.h
     llfloaterbeacons.h
@@ -1544,7 +1594,7 @@ set(viewer_HEADERS
     llurllineeditorctrl.h
     llurlwhitelist.h
     llversioninfo.h
-#    llvvmquery.h
+    #    llvvmquery.h
     llviewchildren.h
     llviewerassetstats.h
     llviewerassetstorage.h
@@ -1602,7 +1652,7 @@ set(viewer_HEADERS
     llviewerwearable.h
     llviewerwindow.h
     llviewerwindowlistener.h
-	llvisualeffect.h
+    llvisualeffect.h
     llvlcomposition.h
     llvlmanager.h
     llvoavatar.h
@@ -1652,160 +1702,165 @@ set(viewer_HEADERS
     rlvmodifiers.h
     rlvui.h
     roles_constants.h
+  )
+
+  # The version as one line, for the hosted build's metadata.
+  file(
+    WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
+    "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n"
+  )
+
+  if(DARWIN)
+    list(APPEND viewer_SOURCES llvelopack.cpp)
+    list(APPEND viewer_HEADERS llvelopack.h)
+
+    # Crash-metadata helpers shared by both the legacy Cocoa and SDL backends.
+    list(APPEND viewer_SOURCES llbugsplat_mac.cpp)
+    list(APPEND viewer_HEADERS llbugsplat_mac.h)
+
+    # Add resource files to the project.
+    set(
+      viewer_RESOURCE_FILES
+      alchemy.icns
+      # CMake doesn't seem to support Xcode language variants well just yet
+      English.lproj/InfoPlist.strings
+      English.lproj/language.txt
+      German.lproj/language.txt
+      Japanese.lproj/language.txt
+      Korean.lproj/language.txt
     )
 
-# The version as one line, for the hosted build's metadata.
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
-           "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n")
-
-if (DARWIN)
-  list(APPEND viewer_SOURCES llvelopack.cpp)
-  list(APPEND viewer_HEADERS llvelopack.h)
-
-  # Crash-metadata helpers shared by both the legacy Cocoa and SDL backends.
-  list(APPEND viewer_SOURCES llbugsplat_mac.cpp)
-  list(APPEND viewer_HEADERS llbugsplat_mac.h)
-
-  # Add resource files to the project.
-  set(viewer_RESOURCE_FILES
-    alchemy.icns
-    # CMake doesn't seem to support Xcode language variants well just yet
-    English.lproj/InfoPlist.strings
-    English.lproj/language.txt
-    German.lproj/language.txt
-    Japanese.lproj/language.txt
-    Korean.lproj/language.txt
-    )
-
-  list(APPEND viewer_SOURCES llappviewersdl.cpp)
-  list(APPEND viewer_HEADERS llappviewersdl.h)
-  list(APPEND viewer_RESOURCE_FILES
-    Info-AlchemySDL.plist
-    )
-
-  set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
-
-  # Preserved for possible build option to fall back to native macos filepicker
-  # list(APPEND viewer_SOURCES llfilepicker_mac.mm)
-  # list(APPEND viewer_HEADERS llfilepicker_mac.h)
-
-  # set_source_files_properties(
-  #   llfilepicker_mac.mm
-  #   PROPERTIES
-  #   SKIP_PRECOMPILE_HEADERS TRUE
-  # )
-
-  source_group("Resources" FILES ${viewer_RESOURCE_FILES})
-endif (DARWIN)
-
-if (LINUX)
     list(APPEND viewer_SOURCES llappviewersdl.cpp)
     list(APPEND viewer_HEADERS llappviewersdl.h)
-endif (LINUX)
+    list(APPEND viewer_RESOURCE_FILES Info-AlchemySDL.plist)
 
-if (WINDOWS)
-    list(APPEND viewer_SOURCES
-         llappviewerwin32.cpp
-         llvelopack.cpp
-         llwindebug.cpp
-         )
+    set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
 
-    list(APPEND viewer_HEADERS
-         llappviewerwin32.h
-         llvelopack.h
-         llwindebug.h
-         )
+    # Preserved for possible build option to fall back to native macos filepicker
+    # list(APPEND viewer_SOURCES llfilepicker_mac.mm)
+    # list(APPEND viewer_HEADERS llfilepicker_mac.h)
 
-    if (AL_USE_SDL_WINDOW)
-        # Unified SDL main-callbacks entry point shared with Linux/macOS.
-        # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
-        # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
-        # platform overrides.
-        list(APPEND viewer_SOURCES llappviewersdl.cpp)
-        list(APPEND viewer_HEADERS llappviewersdl.h)
-    endif ()
+    # set_source_files_properties(
+    #   llfilepicker_mac.mm
+    #   PROPERTIES
+    #   SKIP_PRECOMPILE_HEADERS TRUE
+    # )
+
+    source_group("Resources" FILES ${viewer_RESOURCE_FILES})
+  endif()
+
+  if(LINUX)
+    list(APPEND viewer_SOURCES llappviewersdl.cpp)
+    list(APPEND viewer_HEADERS llappviewersdl.h)
+  endif()
+
+  if(WINDOWS)
+    list(APPEND viewer_SOURCES llappviewerwin32.cpp llvelopack.cpp llwindebug.cpp)
+
+    list(APPEND viewer_HEADERS llappviewerwin32.h llvelopack.h llwindebug.h)
+
+    if(AL_USE_SDL_WINDOW)
+      # Unified SDL main-callbacks entry point shared with Linux/macOS.
+      # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
+      # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
+      # platform overrides.
+      list(APPEND viewer_SOURCES llappviewersdl.cpp)
+      list(APPEND viewer_HEADERS llappviewersdl.h)
+    endif()
 
     # What viewerRes.rc reads. Listed for the IDE; the .rc itself is the
     # build input.
-    set(viewer_RESOURCE_FILES
-        res/arrow.cur
-        res/arrowcop.cur
-        res/arrowcopmulti.cur
-        res/arrowdrag.cur
-        res/circleandline.cur
-        res/icon1.ico
-        res/llarrow.cur
-        res/llarrowdrag.cur
-        res/llarrowdragmulti.cur
-        res/llarrowlocked.cur
-        res/llgrablocked.cur
-        res/llno.cur
-        res/llnolocked.cur
-        res/lltoolcamera.cur
-        res/lltoolcreate.cur
-        res/lltoolfocus.cur
-        res/lltoolgrab.cur
-        res/lltoolland.cur
-        res/lltoolpan.cur
-        res/lltoolpathfinding.cur
-        res/lltoolpathfindingpathend.cur
-        res/lltoolpathfindingpathendadd.cur
-        res/lltoolpathfindingpathstart.cur
-        res/lltoolpathfindingpathstartadd.cur
-        res/lltoolpipette.cur
-        res/lltoolrotate.cur
-        res/lltoolscale.cur
-        res/lltooltranslate.cur
-        res/lltoolzoomin.cur
-        res/lltoolzoomout.cur
-        res-sdl/ll_icon.BMP
-        res/ll_icon.BMP
-        res/ll_icon.ico
-        res/resource.h
-        res/toolpickobject.cur
-        res/toolpickobject2.cur
-        res/toolpickobject3.cur
-        res/toolpipette.cur
-        res/toolbuy.cur
-        res/toolopen.cur
-        res/toolsit.cur
-        )
+    set(
+      viewer_RESOURCE_FILES
+      res/arrow.cur
+      res/arrowcop.cur
+      res/arrowcopmulti.cur
+      res/arrowdrag.cur
+      res/circleandline.cur
+      res/icon1.ico
+      res/llarrow.cur
+      res/llarrowdrag.cur
+      res/llarrowdragmulti.cur
+      res/llarrowlocked.cur
+      res/llgrablocked.cur
+      res/llno.cur
+      res/llnolocked.cur
+      res/lltoolcamera.cur
+      res/lltoolcreate.cur
+      res/lltoolfocus.cur
+      res/lltoolgrab.cur
+      res/lltoolland.cur
+      res/lltoolpan.cur
+      res/lltoolpathfinding.cur
+      res/lltoolpathfindingpathend.cur
+      res/lltoolpathfindingpathendadd.cur
+      res/lltoolpathfindingpathstart.cur
+      res/lltoolpathfindingpathstartadd.cur
+      res/lltoolpipette.cur
+      res/lltoolrotate.cur
+      res/lltoolscale.cur
+      res/lltooltranslate.cur
+      res/lltoolzoomin.cur
+      res/lltoolzoomout.cur
+      res-sdl/ll_icon.BMP
+      res/ll_icon.BMP
+      res/ll_icon.ico
+      res/resource.h
+      res/toolpickobject.cur
+      res/toolpickobject2.cur
+      res/toolpickobject3.cur
+      res/toolpipette.cur
+      res/toolbuy.cur
+      res/toolopen.cur
+      res/toolsit.cur
+    )
 
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
-                   ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
-                   )
-    set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
+    configure_file(
+      ${CMAKE_CURRENT_SOURCE_DIR}/res/viewerRes.rc
+      ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
+    )
+    set_source_files_properties(
+      ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc
       PROPERTIES COMPILE_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}/res"
-      )
+    )
     list(APPEND viewer_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc)
 
-    source_group("Resource Files" FILES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc ${viewer_RESOURCE_FILES})
+    source_group(
+      "Resource Files"
+      FILES ${CMAKE_CURRENT_BINARY_DIR}/viewerRes.rc ${viewer_RESOURCE_FILES}
+    )
 
-    if (ADDRESS_SIZE EQUAL 64)
-        # We deliberately omit this from the 32bit build because it declares that
-        # the viewer is compatible with Windows 10; we need that to properly detect
-        # the Windows version, but doing so causes systems with certain HD video
-        # cards to fail because Windows 10 does not support them.  Leaving this out
-        # causes those systems to run in a Windows 8 compatibility mode, which works.
-        list(APPEND viewer_SOURCES windows.manifest)
-    endif (ADDRESS_SIZE EQUAL 64)
+    if(ADDRESS_SIZE EQUAL 64)
+      # We deliberately omit this from the 32bit build because it declares that
+      # the viewer is compatible with Windows 10; we need that to properly detect
+      # the Windows version, but doing so causes systems with certain HD video
+      # cards to fail because Windows 10 does not support them.  Leaving this out
+      # causes those systems to run in a Windows 8 compatibility mode, which works.
+      list(APPEND viewer_SOURCES windows.manifest)
+    endif()
+  endif()
 
-endif (WINDOWS)
+  # Add the xui files. This is handy for searching for xui elements
+  # from within the IDE.
+  file(GLOB_RECURSE viewer_XUI_FILES LIST_DIRECTORIES FALSE ${CMAKE_CURRENT_SOURCE_DIR}/skins/*.xml)
+  source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/skins PREFIX "XUI Files" FILES ${viewer_XUI_FILES})
 
-# Add the xui files. This is handy for searching for xui elements
-# from within the IDE.
-file(GLOB_RECURSE viewer_XUI_FILES LIST_DIRECTORIES FALSE
-    ${CMAKE_CURRENT_SOURCE_DIR}/skins/*.xml)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/skins PREFIX "XUI Files" FILES ${viewer_XUI_FILES})
+  # Add the shader sources
+  file(
+    GLOB_RECURSE viewer_SHADER_FILES
+    LIST_DIRECTORIES FALSE
+    ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders/*.glsl
+  )
+  source_group(
+    TREE ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders
+    PREFIX "Shaders"
+    FILES ${viewer_SHADER_FILES}
+  )
 
-# Add the shader sources
-file(GLOB_RECURSE viewer_SHADER_FILES LIST_DIRECTORIES FALSE
-    ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders/*.glsl)
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders PREFIX "Shaders" FILES ${viewer_SHADER_FILES})
-
-# note that the scripts which publish these files are sensitive to the file
-# extensions. Be cautious about adding new file types here.
-set(viewer_APPSETTINGS_FILES
+  # note that the scripts which publish these files are sensitive to the file
+  # extensions. Be cautious about adding new file types here.
+  set(
+    viewer_APPSETTINGS_FILES
     app_settings/anim.ini
     app_settings/autoreplace.xml
     app_settings/cmd_line.xml
@@ -1831,276 +1886,315 @@ set(viewer_APPSETTINGS_FILES
     featuretable.txt
     featuretable_mac.txt
     featuretable_linux.txt
-    )
+  )
 
-source_group("App Settings" FILES ${viewer_APPSETTINGS_FILES})
+  source_group("App Settings" FILES ${viewer_APPSETTINGS_FILES})
 
-set(viewer_CHARACTER_FILES
+  set(
+    viewer_CHARACTER_FILES
     character/attentions.xml
     character/attentionsN.xml
     character/avatar_lad.xml
     character/avatar_skeleton.xml
     character/genepool.xml
-    )
+  )
 
-source_group("Character File" FILES ${viewer_CHARACTER_FILES})
+  source_group("Character File" FILES ${viewer_CHARACTER_FILES})
 
-# What the viewer loads at run time, kept in the IDE beside the code. None
-# of it is compiled, so it hangs off its own target and the viewer's project
-# holds only what the compiler and linker consume.
-add_custom_target(${AL_VIEWER_BINARY_NAME}-resources
+  # What the viewer loads at run time, kept in the IDE beside the code. None
+  # of it is compiled, so it hangs off its own target and the viewer's project
+  # holds only what the compiler and linker consume.
+  add_custom_target(
+    ${AL_VIEWER_BINARY_NAME}-resources
     SOURCES
-    ${viewer_XUI_FILES}
-    ${viewer_SHADER_FILES}
-    ${viewer_APPSETTINGS_FILES}
-    ${viewer_CHARACTER_FILES}
-    ${viewer_RESOURCE_FILES}
-    )
+      ${viewer_XUI_FILES}
+      ${viewer_SHADER_FILES}
+      ${viewer_APPSETTINGS_FILES}
+      ${viewer_CHARACTER_FILES}
+      ${viewer_RESOURCE_FILES}
+  )
 
-add_executable(${AL_VIEWER_BINARY_NAME} WIN32 MACOSX_BUNDLE)
+  add_executable(${AL_VIEWER_BINARY_NAME} WIN32 MACOSX_BUNDLE)
 
-target_sources(${AL_VIEWER_BINARY_NAME}
+  target_sources(${AL_VIEWER_BINARY_NAME} PRIVATE ${viewer_SOURCES} ${viewer_HEADERS})
+
+  check_message_template(${AL_VIEWER_BINARY_NAME})
+
+  target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+  target_precompile_headers(${AL_VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheaders.h)
+
+  # *NOTE: - this list is very sensitive to ordering, test carefully on all
+  # platforms if you change the relative order of the entries here.
+  # In particular, cmake 2.6.4 (when building with linux/makefile generators)
+  # appears to sometimes de-duplicate redundantly listed dependencies improperly.
+  # To work around this, higher level modules should be listed before the modules
+  # that they depend upon. -brad
+  #
+  # *NOTE:  On mixing system shared libraries and updated static archives.
+  # We use a number of libraries that have an existence as system libraries,
+  # internal-use libraries and applications libraries.  The most-referenced
+  # one of these being libz where you can find four or more versions in play
+  # at once.  On Linux, libz can be found at link and run time via a number
+  # of paths:
+  #
+  #      => -lfreetype
+  #        => libz.so.1 (on install machine, not build)
+  #      => -lSDL
+  #        => libz.so.1 (on install machine, not build)
+  #      => -lgdk-x11-2.0
+  #        => libz.so.1
+  #      => -lz
+  #
+  # We generally want the newest version of the library to provide all symbol
+  # resolution.  To that end, when using static archives, the *_PRELOAD_ARCHIVES
+  # variables, PNG_PRELOAD_ARCHIVES and ZLIBNG_PRELOAD_ARCHIVES, get the archives
+  # dumped into the target binary and runtime lookup will find the most
+  # modern version.
+
+  target_link_libraries(
+    ${AL_VIEWER_BINARY_NAME}
     PRIVATE
-    ${viewer_SOURCES}
-    ${viewer_HEADERS}
-    )
+      al::flags
+      llaudio
+      llcharacter
+      llimage
+      llinventory
+      llmessage
+      llplugin
+      llprimitive
+      llrender
+      llui
+      llfilesystem
+      llwindow
+      llxml
+      llmath
+      llcorehttp
+      llcommon
+      lllogin
+      llprimitive
+      llappearance
+      ll::bugsplat
+      ll::ndof
+      ll::tracy
+      ll::openxr
+      ll::discord_sdk
+      ll::nvapi
+      ll::tinygltf
+      ll::tinyexr
+      ll::minizip
+      ll::pugixml
+  )
 
-check_message_template(${AL_VIEWER_BINARY_NAME})
+  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack ll::webrtc)
 
-target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-
-target_precompile_headers(${AL_VIEWER_BINARY_NAME} PRIVATE llviewerprecompiledheaders.h)
-
-# *NOTE: - this list is very sensitive to ordering, test carefully on all
-# platforms if you change the relative order of the entries here.
-# In particular, cmake 2.6.4 (when building with linux/makefile generators)
-# appears to sometimes de-duplicate redundantly listed dependencies improperly.
-# To work around this, higher level modules should be listed before the modules
-# that they depend upon. -brad
-#
-# *NOTE:  On mixing system shared libraries and updated static archives.
-# We use a number of libraries that have an existence as system libraries,
-# internal-use libraries and applications libraries.  The most-referenced
-# one of these being libz where you can find four or more versions in play
-# at once.  On Linux, libz can be found at link and run time via a number
-# of paths:
-#
-#      => -lfreetype
-#        => libz.so.1 (on install machine, not build)
-#      => -lSDL
-#        => libz.so.1 (on install machine, not build)
-#      => -lgdk-x11-2.0
-#        => libz.so.1
-#      => -lz
-#
-# We generally want the newest version of the library to provide all symbol
-# resolution.  To that end, when using static archives, the *_PRELOAD_ARCHIVES
-# variables, PNG_PRELOAD_ARCHIVES and ZLIBNG_PRELOAD_ARCHIVES, get the archives
-# dumped into the target binary and runtime lookup will find the most
-# modern version.
-
-target_link_libraries(${AL_VIEWER_BINARY_NAME}
-        PRIVATE
-        al::flags
-        llaudio
-        llcharacter
-        llimage
-        llinventory
-        llmessage
-        llplugin
-        llprimitive
-        llrender
-        llui
-        llfilesystem
-        llwindow
-        llxml
-        llmath
-        llcorehttp
-        llcommon
-        lllogin
-        llprimitive
-        llappearance
-        ll::bugsplat
-        ll::ndof
-        ll::tracy
-        ll::openxr
-        ll::discord_sdk
-        ll::nvapi
-        ll::tinygltf
-        ll::tinyexr
-        ll::minizip
-        ll::pugixml
-        )
-
-target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE ll::velopack ll::webrtc)
-
-if (DARWIN)
+  if(DARWIN)
     find_library(IOSURFACE_FRAMEWORK IOSurface)
     find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
-    target_link_libraries(${AL_VIEWER_BINARY_NAME}
-      PRIVATE
-      ${IOSURFACE_FRAMEWORK}
-      ${COREGRAPHICS_FRAMEWORK}
+    target_link_libraries(
+      ${AL_VIEWER_BINARY_NAME}
+      PRIVATE ${IOSURFACE_FRAMEWORK} ${COREGRAPHICS_FRAMEWORK}
     )
-endif()
+  endif()
 
-# The media plugins are built before the viewer so the staging step after
-# the viewer's link can install them.
-add_custom_target(copy_input_dependencies
+  # The media plugins are built before the viewer so the staging step after
+  # the viewer's link can install them.
+  add_custom_target(
+    copy_input_dependencies
     DEPENDS
-    $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
-    $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
-    $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
-    $<TARGET_NAME_IF_EXISTS:media_plugin_example>
-    )
-add_dependencies(${AL_VIEWER_BINARY_NAME} copy_input_dependencies)
+      $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
+      $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
+      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
+      $<TARGET_NAME_IF_EXISTS:media_plugin_example>
+  )
+  add_dependencies(${AL_VIEWER_BINARY_NAME} copy_input_dependencies)
 
-if (WINDOWS)
-  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
+  if(WINDOWS)
+    target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE d3d11 dxgi)
 
     string(TOLOWER ${AL_CHANNEL} channel_lower)
     if(channel_lower MATCHES "^alchemy release")
-        set(OUTPUT_BINARY_NAME "AlchemyViewer")
+      set(OUTPUT_BINARY_NAME "AlchemyViewer")
     else()
-        set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
+      set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
     endif()
 
-  set_target_properties(${AL_VIEWER_BINARY_NAME}
+    set_target_properties(
+      ${AL_VIEWER_BINARY_NAME}
       PROPERTIES
-      OUTPUT_NAME "${OUTPUT_BINARY_NAME}"
-      RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-      ENABLE_EXPORTS OFF
-      VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
-      )
-  set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
-elseif(DARWIN)
-  # These all get set with PROPERTIES. It's not that the property names are
-  # magically known to CMake -- it's that these names are referenced in the
-  # Info-Alchemy.plist file in the configure_file() directive below.
-  set(product "${AL_CHANNEL}")
-  set(MACOSX_EXECUTABLE_NAME "${AL_CHANNEL}")
-  set(MACOSX_BUNDLE_INFO_STRING "${AL_CHANNEL}")
-  set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
-  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
-  set(MACOSX_BUNDLE_LONG_VERSION_STRING "${AL_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
-  set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
-  set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
-  set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
-  set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
-  set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
+        OUTPUT_NAME "${OUTPUT_BINARY_NAME}"
+        RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
+        ENABLE_EXPORTS OFF
+        VS_DEBUGGER_WORKING_DIRECTORY
+          "${CMAKE_CURRENT_SOURCE_DIR}" # Sets VS debugger working directory
+    )
+    set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
+  elseif(DARWIN)
+    # These all get set with PROPERTIES. It's not that the property names are
+    # magically known to CMake -- it's that these names are referenced in the
+    # Info-Alchemy.plist file in the configure_file() directive below.
+    set(product "${AL_CHANNEL}")
+    set(MACOSX_EXECUTABLE_NAME "${AL_CHANNEL}")
+    set(MACOSX_BUNDLE_INFO_STRING "${AL_CHANNEL}")
+    set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
+    set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
+    set(
+      MACOSX_BUNDLE_LONG_VERSION_STRING
+      "${AL_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}"
+    )
+    set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
+    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
+    set(
+      MACOSX_BUNDLE_BUNDLE_VERSION
+      "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}"
+    )
+    set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
+    set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
-  set_target_properties(
-    ${AL_VIEWER_BINARY_NAME}
-    PROPERTIES
-    OUTPUT_NAME "${product}"
-    RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-    # From Contents/MacOS/Alchemy, look in Contents/Frameworks
-    BUILD_WITH_INSTALL_RPATH 1
-    INSTALL_RPATH "@executable_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-AlchemySDL.plist"
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
+    set_target_properties(
+      ${AL_VIEWER_BINARY_NAME}
+      PROPERTIES
+        OUTPUT_NAME "${product}"
+        RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
+        # From Contents/MacOS/Alchemy, look in Contents/Frameworks
+        BUILD_WITH_INSTALL_RPATH 1
+        INSTALL_RPATH "@executable_path/../Frameworks"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-AlchemySDL.plist"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
-  # Support generating dsym for non-xcode generators
-  if(NOT XCODE)
+    # Support generating dsym for non-xcode generators
+    if(NOT XCODE)
+      if(AL_USE_BUGSPLAT)
+        set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
+        find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
+        add_custom_command(
+          TARGET ${AL_VIEWER_BINARY_NAME}
+          POST_BUILD
+          COMMAND
+            ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>
+          COMMENT "Generating Alchemy.dSYM"
+        )
+      endif()
+    endif()
+
+    target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
+
+    # The bundle's localised strings carry the version.
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/English.lproj/InfoPlist.strings" infoplist_strings)
+    string(
+      REPLACE "%%VERSION%%"
+      "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}"
+      infoplist_strings
+      "${infoplist_strings}"
+    )
+    file(
+      CONFIGURE
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InfoPlist.strings"
+      CONTENT "${infoplist_strings}"
+      @ONLY
+    )
+  elseif(LINUX)
+    set_target_properties(
+      ${AL_VIEWER_BINARY_NAME}
+      PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}/bin/
+    )
+
     if(AL_USE_BUGSPLAT)
-      set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
-      find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
-      add_custom_command(TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
-            COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>
-            COMMENT "Generating Alchemy.dSYM")
+      find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
+      set(DEBUG_BINARY_TARGET $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>)
+      set(
+        DEBUG_FILE_NAME
+        "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug"
+      )
+      add_custom_command(
+        TARGET ${AL_VIEWER_BINARY_NAME}
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${SYMBOLS_STAGING_DIR}
+        COMMAND
+          ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib ${DEBUG_BINARY_TARGET}
+          ${DEBUG_FILE_NAME}
+        COMMAND ${OBJCOPY_PROGRAM} --strip-debug --strip-unneeded ${DEBUG_BINARY_TARGET}
+        COMMAND ${OBJCOPY_PROGRAM} --add-gnu-debuglink=${DEBUG_FILE_NAME} ${DEBUG_BINARY_TARGET}
+        COMMENT "Generating ${DEBUG_FILE_NAME}"
+      )
     endif()
-  endif()
 
-  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE llphysicsextensionsos)
-
-  # The bundle's localised strings carry the version.
-  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/English.lproj/InfoPlist.strings" infoplist_strings)
-  string(REPLACE "%%VERSION%%" "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}" infoplist_strings "${infoplist_strings}")
-  file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/InfoPlist.strings" CONTENT "${infoplist_strings}" @ONLY)
-elseif(LINUX)
-  set_target_properties(
-    ${AL_VIEWER_BINARY_NAME}
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}/bin/
-    )
-
-  if(AL_USE_BUGSPLAT)
-    find_program(OBJCOPY_PROGRAM objcopy REQUIRED)
-    set(DEBUG_BINARY_TARGET $<TARGET_FILE:${AL_VIEWER_BINARY_NAME}>)
-    set(DEBUG_FILE_NAME "${SYMBOLS_STAGING_DIR}/$<TARGET_FILE_NAME:${AL_VIEWER_BINARY_NAME}>.debug")
-    add_custom_command(TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E make_directory ${SYMBOLS_STAGING_DIR}
-          COMMAND ${OBJCOPY_PROGRAM} --only-keep-debug --compress-debug-sections=zlib ${DEBUG_BINARY_TARGET} ${DEBUG_FILE_NAME}
-          COMMAND ${OBJCOPY_PROGRAM} --strip-debug --strip-unneeded ${DEBUG_BINARY_TARGET}
-          COMMAND ${OBJCOPY_PROGRAM} --add-gnu-debuglink=${DEBUG_FILE_NAME} ${DEBUG_BINARY_TARGET}
-          COMMENT "Generating ${DEBUG_FILE_NAME}")
-  endif()
-
-  string(TOLOWER ${AL_CHANNEL} channel_lower)
-  if(channel_lower MATCHES "^alchemy release")
-    set(OUTPUT_BINARY_NAME "AlchemyViewer")
-  else()
-    set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
-  endif()
-
-  set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
-endif()
-
-# What ships, and where; the names the package goes by.
-include(ViewerInstall)
-
-# The files generated for the package: the contributor and supporter lists
-# the About floater shows, the settings an installation is built with, and
-# the build description the crash reporter reads.
-include(ContributorNames)
-al_contributor_names("${INDRA_SOURCE_DIR}/../doc/contributions.txt" "${CMAKE_CURRENT_BINARY_DIR}/contributors.txt")
-al_contributor_names("${INDRA_SOURCE_DIR}/../doc/supporters.txt" "${CMAKE_CURRENT_BINARY_DIR}/supporters.txt")
-
-# The third-party attribution, from what vcpkg installed and the table of
-# what it cannot know. It is regenerated when the installed set, the table
-# or the generator changes, and the viewer's build waits for it.
-get_cmake_property(cache_variables CACHE_VARIABLES)
-set(al_enabled_options "")
-foreach(variable IN LISTS cache_variables)
-  if(variable MATCHES "^AL_")
-    get_property(type CACHE ${variable} PROPERTY TYPE)
-    if(type STREQUAL "BOOL" AND ${variable})
-      list(APPEND al_enabled_options ${variable})
+    string(TOLOWER ${AL_CHANNEL} channel_lower)
+    if(channel_lower MATCHES "^alchemy release")
+      set(OUTPUT_BINARY_NAME "AlchemyViewer")
+    else()
+      set(OUTPUT_BINARY_NAME "${AL_CHANNEL_ONEWORD}")
     endif()
-  endif()
-endforeach()
-list(JOIN al_enabled_options "," al_enabled_options)
-set(al_attribution_table "${INDRA_SOURCE_DIR}/cmake/attribution.json")
-set(al_attribution_script "${INDRA_SOURCE_DIR}/cmake/Attribution.cmake")
-add_custom_command(
-  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt" "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
-  COMMAND ${CMAKE_COMMAND}
-    -DVCPKG_STATUS=${VCPKG_INSTALLED_DIR}/vcpkg/status
-    -DVCPKG_SHARE=${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share
-    -DTRIPLET=${VCPKG_TARGET_TRIPLET}
-    -DTABLE=${al_attribution_table}
-    -DSOURCE_DIR=${INDRA_SOURCE_DIR}
-    -DCHANNEL=${AL_CHANNEL}
-    -DVERSION=${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}
-    -DENABLED=${al_enabled_options}
-    -DOUTPUT_INFO=${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt
-    -DOUTPUT_LICENSES=${CMAKE_CURRENT_BINARY_DIR}/licenses.txt
-    -P ${al_attribution_script}
-  DEPENDS "${VCPKG_INSTALLED_DIR}/vcpkg/status" "${al_attribution_table}" "${al_attribution_script}"
-  COMMENT "Writing packages-info.txt and licenses.txt from the installed ports"
-  VERBATIM
-  )
-add_custom_target(attribution DEPENDS
-  "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt"
-  "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
-  )
-add_dependencies(${AL_VIEWER_BINARY_NAME} attribution)
 
-set(AL_SOURCEID "$ENV{sourceid}" CACHE STRING "Referring agency recorded in settings_install.xml")
-set(settings_install "")
-if(AL_SOURCEID)
-  string(APPEND settings_install "  <key>sourceid</key>
+    set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
+  endif()
+
+  # What ships, and where; the names the package goes by.
+  include(ViewerInstall)
+
+  # The files generated for the package: the contributor and supporter lists
+  # the About floater shows, the settings an installation is built with, and
+  # the build description the crash reporter reads.
+  include(ContributorNames)
+  al_contributor_names(
+    "${INDRA_SOURCE_DIR}/../doc/contributions.txt"
+    "${CMAKE_CURRENT_BINARY_DIR}/contributors.txt"
+  )
+  al_contributor_names(
+    "${INDRA_SOURCE_DIR}/../doc/supporters.txt"
+    "${CMAKE_CURRENT_BINARY_DIR}/supporters.txt"
+  )
+
+  # The third-party attribution, from what vcpkg installed and the table of
+  # what it cannot know. It is regenerated when the installed set, the table
+  # or the generator changes, and the viewer's build waits for it.
+  get_cmake_property(cache_variables CACHE_VARIABLES)
+  set(al_enabled_options "")
+  foreach(variable IN LISTS cache_variables)
+    if(variable MATCHES "^AL_")
+      get_property(type CACHE ${variable} PROPERTY TYPE)
+      if(type STREQUAL "BOOL" AND ${variable})
+        list(APPEND al_enabled_options ${variable})
+      endif()
+    endif()
+  endforeach()
+  list(JOIN al_enabled_options "," al_enabled_options)
+  set(al_attribution_table "${INDRA_SOURCE_DIR}/cmake/attribution.json")
+  set(al_attribution_script "${INDRA_SOURCE_DIR}/cmake/Attribution.cmake")
+  add_custom_command(
+    OUTPUT
+      "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt"
+      "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
+    COMMAND
+      ${CMAKE_COMMAND} -DVCPKG_STATUS=${VCPKG_INSTALLED_DIR}/vcpkg/status
+      -DVCPKG_SHARE=${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share
+      -DTRIPLET=${VCPKG_TARGET_TRIPLET} -DTABLE=${al_attribution_table}
+      -DSOURCE_DIR=${INDRA_SOURCE_DIR} -DCHANNEL=${AL_CHANNEL}
+      -DVERSION=${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION} -DENABLED=${al_enabled_options}
+      -DOUTPUT_INFO=${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt
+      -DOUTPUT_LICENSES=${CMAKE_CURRENT_BINARY_DIR}/licenses.txt -P ${al_attribution_script}
+    DEPENDS
+      "${VCPKG_INSTALLED_DIR}/vcpkg/status"
+      "${al_attribution_table}"
+      "${al_attribution_script}"
+    COMMENT "Writing packages-info.txt and licenses.txt from the installed ports"
+    VERBATIM
+  )
+  add_custom_target(
+    attribution
+    DEPENDS
+      "${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt"
+      "${CMAKE_CURRENT_BINARY_DIR}/licenses.txt"
+  )
+  add_dependencies(${AL_VIEWER_BINARY_NAME} attribution)
+
+  set(AL_SOURCEID "$ENV{sourceid}" CACHE STRING "Referring agency recorded in settings_install.xml")
+  set(settings_install "")
+  if(AL_SOURCEID)
+    string(
+      APPEND settings_install
+      "  <key>sourceid</key>
   <map>
     <key>Comment</key>
     <string>Identify referring agency to Linden web servers</string>
@@ -2111,10 +2205,13 @@ if(AL_SOURCEID)
     <key>Value</key>
     <string>${AL_SOURCEID}</string>
   </map>
-")
-endif()
-if(NOT AL_GRID MATCHES "^(|default|agni)$")
-  string(APPEND settings_install "  <key>CmdLineGridChoice</key>
+"
+    )
+  endif()
+  if(NOT AL_GRID MATCHES "^(|default|agni)$")
+    string(
+      APPEND settings_install
+      "  <key>CmdLineGridChoice</key>
   <map>
     <key>Comment</key>
     <string>Default grid</string>
@@ -2125,115 +2222,127 @@ if(NOT AL_GRID MATCHES "^(|default|agni)$")
     <key>Value</key>
     <string>${AL_GRID}</string>
   </map>
-")
-endif()
-file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/settings_install.xml" CONTENT
-"<?xml version=\"1.0\" ?>
+"
+    )
+  endif()
+  file(
+    CONFIGURE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/settings_install.xml"
+    CONTENT
+      "<?xml version=\"1.0\" ?>
 <llsd>
 <map>
 ${settings_install}</map>
 </llsd>
-" @ONLY)
-
-set(build_data_extra "")
-if (WINDOWS)
-  set(build_data_platform win)
-  string(APPEND build_data_extra ", \"Executable\": \"${OUTPUT_BINARY_NAME}.exe\", \"AppName\": \"${AL_APP_NAME}\"")
-elseif (DARWIN)
-  set(build_data_platform mac)
-  string(APPEND build_data_extra ", \"Bundle Id\": \"${MACOSX_BUNDLE_GUI_IDENTIFIER}\"")
-else ()
-  set(build_data_platform lnx)
-endif ()
-if (AL_BUGSPLAT_DATABASE)
-  string(APPEND build_data_extra ", \"BugSplat DB\": \"${AL_BUGSPLAT_DATABASE}\"")
-endif ()
-file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build_data.json" CONTENT
-"{\"Type\": \"viewer\", \"Version\": \"${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\", \"Channel Base\": \"Alchemy\", \"Channel\": \"${AL_CHANNEL}\", \"Platform\": \"${build_data_platform}\", \"Address Size\": ${ADDRESS_SIZE}, \"Update Service\": \"https://update.secondlife.com/update\"${build_data_extra}}
-" @ONLY)
-
-# The archive of the installed tree, and the Velopack step.
-include(ViewerPackage)
-
-# After every link, stage the tree the viewer runs from: the install rules
-# applied to the build directory the viewer already sits in.
-add_custom_command(
-  TARGET ${AL_VIEWER_BINARY_NAME} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --config $<CONFIG> --prefix ${VIEWER_STAGING_DIR}
-  COMMENT "Staging the viewer into ${VIEWER_STAGING_DIR}"
-  VERBATIM
+"
+    @ONLY
   )
 
-if (AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
-  if (AL_USE_BUGSPLAT)
-    # BugSplat symbol-file generation
-    if (WINDOWS)
-      # Redirect symbols to staging directory for upload to BugSplat.
-      set_target_properties(${AL_VIEWER_BINARY_NAME}
-          PROPERTIES
-          PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
-          )
+  set(build_data_extra "")
+  if(WINDOWS)
+    set(build_data_platform win)
+    string(
+      APPEND build_data_extra
+      ", \"Executable\": \"${OUTPUT_BINARY_NAME}.exe\", \"AppName\": \"${AL_APP_NAME}\""
+    )
+  elseif(DARWIN)
+    set(build_data_platform mac)
+    string(APPEND build_data_extra ", \"Bundle Id\": \"${MACOSX_BUNDLE_GUI_IDENTIFIER}\"")
+  else()
+    set(build_data_platform lnx)
+  endif()
+  if(AL_BUGSPLAT_DATABASE)
+    string(APPEND build_data_extra ", \"BugSplat DB\": \"${AL_BUGSPLAT_DATABASE}\"")
+  endif()
+  file(
+    CONFIGURE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/build_data.json"
+    CONTENT
+      "{\"Type\": \"viewer\", \"Version\": \"${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\", \"Channel Base\": \"Alchemy\", \"Channel\": \"${AL_CHANNEL}\", \"Platform\": \"${build_data_platform}\", \"Address Size\": ${ADDRESS_SIZE}, \"Update Service\": \"https://update.secondlife.com/update\"${build_data_extra}}
+"
+    @ONLY
+  )
 
-      set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
+  # The archive of the installed tree, and the Velopack step.
+  include(ViewerPackage)
 
-      # Just pack up a tarball containing only the .pdb files for the
-      # executables.
-      add_custom_command(OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
-        COMMAND "tar"
-        ARGS
-          "cJf"
-          "${AL_CHANNEL}.sym.tar.xz"
-          "${AL_CHANNEL}"
-        DEPENDS "${AL_VIEWER_BINARY_NAME}"
-        WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
-        COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
+  # After every link, stage the tree the viewer runs from: the install rules
+  # applied to the build directory the viewer already sits in.
+  add_custom_command(
+    TARGET ${AL_VIEWER_BINARY_NAME}
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --config $<CONFIG> --prefix
+      ${VIEWER_STAGING_DIR}
+    COMMENT "Staging the viewer into ${VIEWER_STAGING_DIR}"
+    VERBATIM
+  )
+
+  if(AL_BUILD_PACKAGE AND AL_ENABLE_CRASH_REPORTING)
+    if(AL_USE_BUGSPLAT)
+      # BugSplat symbol-file generation
+      if(WINDOWS)
+        # Redirect symbols to staging directory for upload to BugSplat.
+        set_target_properties(
+          ${AL_VIEWER_BINARY_NAME}
+          PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}"
         )
-      add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
-      add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
 
-    endif (WINDOWS)
-    if (DARWIN)
-      set(VIEWER_APP_XCARCHIVE "${SYMBOLS_STAGING_DIR}.xcarchive.zip")
+        set(VIEWER_APP_SYMBOLS_ARCHIVE "${SYMBOLS_STAGING_DIR}.sym.tar.xz")
 
-      # we only need an xcarchive with dSYMs (including the application)
-      set_target_properties(${AL_VIEWER_BINARY_NAME}
-            PROPERTIES
+        # Just pack up a tarball containing only the .pdb files for the
+        # executables.
+        add_custom_command(
+          OUTPUT "${VIEWER_APP_SYMBOLS_ARCHIVE}"
+          COMMAND "tar"
+          ARGS "cJf" "${AL_CHANNEL}.sym.tar.xz" "${AL_CHANNEL}"
+          DEPENDS "${AL_VIEWER_BINARY_NAME}"
+          WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
+          COMMENT "Packing viewer PDBs into ${VIEWER_APP_SYMBOLS_ARCHIVE}"
+        )
+        add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_SYMBOLS_ARCHIVE}")
+        add_dependencies(generate_symbols ${AL_VIEWER_BINARY_NAME})
+      endif()
+      if(DARWIN)
+        set(VIEWER_APP_XCARCHIVE "${SYMBOLS_STAGING_DIR}.xcarchive.zip")
+
+        # we only need an xcarchive with dSYMs (including the application)
+        set_target_properties(
+          ${AL_VIEWER_BINARY_NAME}
+          PROPERTIES
             XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-            XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs")
+            XCODE_ATTRIBUTE_DWARF_DSYM_FOLDER_PATH "${SYMBOLS_STAGING_DIR}/dSYMs"
+        )
 
-      add_custom_command(OUTPUT "${VIEWER_APP_XCARCHIVE}"
-        COMMAND "zip"
-        ARGS
-          "-r"
-          "${VIEWER_APP_XCARCHIVE}"
-            "${AL_CHANNEL}"
+        add_custom_command(
+          OUTPUT "${VIEWER_APP_XCARCHIVE}"
+          COMMAND "zip"
+          ARGS "-r" "${VIEWER_APP_XCARCHIVE}" "${AL_CHANNEL}"
           WORKING_DIRECTORY "${SYMBOLS_STAGING_DIR}/.."
           DEPENDS "${AL_VIEWER_BINARY_NAME}"
           COMMENT "Generating ${VIEWER_APP_XCARCHIVE} for upload to BugSplat"
         )
-      add_custom_target(generate_symbols DEPENDS
-        "${VIEWER_APP_XCARCHIVE}"
-        )
-    endif (DARWIN)
-    if (LINUX)
-      # TBD
-    endif (LINUX)
+        add_custom_target(generate_symbols DEPENDS "${VIEWER_APP_XCARCHIVE}")
+      endif()
+      if(LINUX)
+        # TBD
+      endif()
 
-    add_dependencies(package generate_symbols)
-  endif (AL_USE_BUGSPLAT)
-endif ()
+      add_dependencies(package generate_symbols)
+    endif()
+  endif()
 
 elseif(AL_BUILD_TESTS)
 
-# Create a dummy executable for test projects to generate against when viewer build is disabled
-add_executable(${AL_VIEWER_BINARY_NAME} cmake_dummy.cpp)
-target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE al::flags)
-target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+  # Create a dummy executable for test projects to generate against when viewer build is disabled
+  add_executable(${AL_VIEWER_BINARY_NAME} cmake_dummy.cpp)
+  target_link_libraries(${AL_VIEWER_BINARY_NAME} PRIVATE al::flags)
+  target_include_directories(${AL_VIEWER_BINARY_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
-endif(AL_BUILD_VIEWER)
-
-if (AL_BUILD_TESTS)
-  set(test_libs
+if(AL_BUILD_TESTS)
+  set(
+    test_libs
     llfilesystem
     llmath
     llcommon
@@ -2248,51 +2357,109 @@ if (AL_BUILD_TESTS)
 
   # A unit test compiles one viewer source file on its own. Each line is one
   # such file and its test under tests/.
-  foreach(test
-      alagentlocationformat alcolorwheelmodel alcurvemodel aldaycyclelandmarks
-      algradehistory alsceneexplorerpredicate alwhitebalancesolver
-      llagentaccess lldateutil llviewerhelputil llversioninfo llvocache
-      lutcube)
+  foreach(
+    test
+    alagentlocationformat
+    alcolorwheelmodel
+    alcurvemodel
+    aldaycyclelandmarks
+    algradehistory
+    alsceneexplorerpredicate
+    alwhitebalancesolver
+    llagentaccess
+    lldateutil
+    llviewerhelputil
+    llversioninfo
+    llvocache
+    lutcube
+  )
     al_add_test(${test} UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
   endforeach()
   # The vectorscope bins on the colour wheels' own chroma plane, so the scope
   # data test links the model that defines it rather than keeping a second copy
   # of the basis that could drift from it.
-  al_add_test(alscopedata UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES alcolorwheelmodel.cpp)
-  al_add_test(lllogininstance UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llversioninfo.cpp)
-  al_add_test(llworldmap UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES tests/llviewertexture_stub.cpp)
-  al_add_test(llworldmipmap UNIT PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES tests/llviewertexture_stub.cpp)
+  al_add_test(
+    alscopedata
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES alcolorwheelmodel.cpp
+  )
+  al_add_test(
+    lllogininstance
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llversioninfo.cpp
+  )
+  al_add_test(
+    llworldmap
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES tests/llviewertexture_stub.cpp
+  )
+  al_add_test(
+    llworldmipmap
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES tests/llviewertexture_stub.cpp
+  )
 
   al_add_test(cppfeatures PROJECT ${test_project} LIBRARIES ${test_libs})
   al_add_test(altexturetable PROJECT ${test_project} LIBRARIES ${test_libs})
-  al_add_test(llsechandler_basic PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llsechandler_basic.cpp)
-  al_add_test(llsecapi PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llsecapi.cpp)
-  al_add_test(llslurl PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llslurl.cpp llviewernetwork.cpp)
-  al_add_test(llviewercontrollistener PROJECT ${test_project} LIBRARIES ${test_libs}
+  al_add_test(
+    llsechandler_basic
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llsechandler_basic.cpp
+  )
+  al_add_test(llsecapi PROJECT ${test_project} LIBRARIES ${test_libs} SOURCES llsecapi.cpp)
+  al_add_test(
+    llslurl
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llslurl.cpp llviewernetwork.cpp
+  )
+  al_add_test(
+    llviewercontrollistener
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
     SOURCES
-    llviewercontrollistener.cpp
-    ../llxml/llcontrol.cpp
-    ../llxml/llxmltree.cpp
-    ../llxml/alxmldocument.cpp
-    ../llcommon/commoncontrol.cpp)
-  al_add_test(llviewernetwork PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llviewernetwork.cpp)
-  al_add_test(llviewerassetstats PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llviewerassetstats.cpp)
-  al_add_test(llhttpretrypolicy PROJECT ${test_project} LIBRARIES ${test_libs}
-    SOURCES llhttpretrypolicy.cpp)
-  al_add_test(lltextureinfo PROJECT ${test_project} LIBRARIES ${test_libs}
+      llviewercontrollistener.cpp
+      ../llxml/llcontrol.cpp
+      ../llxml/llxmltree.cpp
+      ../llxml/alxmldocument.cpp
+      ../llcommon/commoncontrol.cpp
+  )
+  al_add_test(
+    llviewernetwork
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llviewernetwork.cpp
+  )
+  al_add_test(
+    llviewerassetstats
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llviewerassetstats.cpp
+  )
+  al_add_test(
+    llhttpretrypolicy
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
+    SOURCES llhttpretrypolicy.cpp
+  )
+  al_add_test(
+    lltextureinfo
+    PROJECT ${test_project}
+    LIBRARIES ${test_libs}
     SOURCES
-    lltextureinfo.cpp
-    ../llxml/llcontrol.cpp
-    ../llxml/llxmltree.cpp
-    ../llxml/alxmldocument.cpp
-    ../llcommon/commoncontrol.cpp)
-endif ()
+      lltextureinfo.cpp
+      ../llxml/llcontrol.cpp
+      ../llxml/llxmltree.cpp
+      ../llxml/alxmldocument.cpp
+      ../llcommon/commoncontrol.cpp
+  )
+endif()

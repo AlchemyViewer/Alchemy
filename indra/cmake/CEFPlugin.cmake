@@ -9,6 +9,6 @@ add_library(ll::cef INTERFACE IMPORTED)
 target_link_libraries(ll::cef INTERFACE unofficial::cef::cef)
 
 if(DARWIN)
-    find_library(APPKIT_LIBRARY AppKit REQUIRED)
-    target_link_libraries(ll::cef INTERFACE ${APPKIT_LIBRARY})
+  find_library(APPKIT_LIBRARY AppKit REQUIRED)
+  target_link_libraries(ll::cef INTERFACE ${APPKIT_LIBRARY})
 endif()

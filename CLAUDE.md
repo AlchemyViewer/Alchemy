@@ -16,6 +16,8 @@ CMake with vcpkg for dependency management. The source root for CMake is `indra/
 - Rust and the .NET SDK (`dotnet tool restore`) only for Velopack installers
 - Python 3 with `llsd` (`pip install -r requirements.txt`) only for the four tests that spawn a Python peer; without it they are registered disabled
 
+CMake files are formatted with gersemi (`.gersemirc` at the repo root): run `gersemi -i <files>` on any CMake file you edit.
+
 ### Configure (first time or after CMake changes)
 
 ```

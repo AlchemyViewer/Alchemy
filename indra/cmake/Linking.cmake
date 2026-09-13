@@ -3,22 +3,46 @@
 include_guard()
 include(Variables)
 
-set(SYMBOLS_STAGING_DIR ${INDRA_BINARY_DIR}/symbols/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>${AL_CHANNEL})
+set(
+  SYMBOLS_STAGING_DIR
+  ${INDRA_BINARY_DIR}/symbols/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>/,>${AL_CHANNEL}
+)
 
-if (WINDOWS OR DARWIN)
-  set(SHARED_LIB_STAGING_DIR ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>)
+if(WINDOWS OR DARWIN)
+  set(
+    SHARED_LIB_STAGING_DIR
+    ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
+  )
 
   if(DARWIN)
     set(SHARED_LIB_STAGING_DIR ${SHARED_LIB_STAGING_DIR}/Frameworks)
-    set(VIEWER_STAGING_DIR ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>)
+    set(
+      VIEWER_STAGING_DIR
+      ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
+    )
   else()
-    set(VIEWER_STAGING_DIR ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,packaged>)
+    set(
+      VIEWER_STAGING_DIR
+      ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,packaged>
+    )
   endif()
-  set(EXE_STAGING_DIR ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>)
+  set(
+    EXE_STAGING_DIR
+    ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>
+  )
 elseif(LINUX)
-  set(SHARED_LIB_STAGING_DIR ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/lib)
-  set(EXE_STAGING_DIR ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/bin)
-  set(VIEWER_STAGING_DIR ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,packaged>)
+  set(
+    SHARED_LIB_STAGING_DIR
+    ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/lib
+  )
+  set(
+    EXE_STAGING_DIR
+    ${INDRA_BINARY_DIR}/sharedlibs/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,>/bin
+  )
+  set(
+    VIEWER_STAGING_DIR
+    ${INDRA_BINARY_DIR}/newview/$<IF:$<BOOL:${LL_GENERATOR_IS_MULTI_CONFIG}>,$<CONFIG>,packaged>
+  )
 endif()
 
 # Setup threading options
@@ -28,28 +52,27 @@ find_package(Threads REQUIRED)
 add_library(ll::oslibraries INTERFACE IMPORTED)
 
 if(LINUX)
-  target_link_libraries(ll::oslibraries INTERFACE
-          ${CMAKE_DL_LIBS}
-          Threads::Threads
-          rt)
-elseif (WINDOWS)
-  target_link_libraries(ll::oslibraries INTERFACE
-          advapi32
-          shlwapi
-          shell32
-          wbemuuid
-          ws2_32
-          mswsock
-          psapi
-          winmm
-          Iphlpapi
-          gdi32
-          user32
-          ole32
-          dbghelp
-          rpcrt4.lib
-          Threads::Threads
-          )
+  target_link_libraries(ll::oslibraries INTERFACE ${CMAKE_DL_LIBS} Threads::Threads rt)
+elseif(WINDOWS)
+  target_link_libraries(
+    ll::oslibraries
+    INTERFACE
+      advapi32
+      shlwapi
+      shell32
+      wbemuuid
+      ws2_32
+      mswsock
+      psapi
+      winmm
+      Iphlpapi
+      gdi32
+      user32
+      ole32
+      dbghelp
+      rpcrt4.lib
+      Threads::Threads
+  )
 else()
   find_library(COREFOUNDATION_LIBRARY CoreFoundation)
   find_library(CARBON_LIBRARY Carbon)
@@ -62,19 +85,18 @@ else()
   find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
   find_library(UNIFORMTYPEIDENTIFIERS_LIBRARY UniformTypeIdentifiers)
 
-  target_link_libraries( ll::oslibraries INTERFACE
-          ${COCOA_LIBRARY}
-          ${IOKIT_LIBRARY}
-          ${COREFOUNDATION_LIBRARY}
-          ${CARBON_LIBRARY}
-          ${APPKIT_LIBRARY}
-          ${COREAUDIO_LIBRARY}
-          ${AUDIOTOOLBOX_LIBRARY}
-          ${COREGRAPHICS_LIBRARY}
-          ${UNIFORMTYPEIDENTIFIERS_LIBRARY}
-          Threads::Threads
-          )
+  target_link_libraries(
+    ll::oslibraries
+    INTERFACE
+      ${COCOA_LIBRARY}
+      ${IOKIT_LIBRARY}
+      ${COREFOUNDATION_LIBRARY}
+      ${CARBON_LIBRARY}
+      ${APPKIT_LIBRARY}
+      ${COREAUDIO_LIBRARY}
+      ${AUDIOTOOLBOX_LIBRARY}
+      ${COREGRAPHICS_LIBRARY}
+      ${UNIFORMTYPEIDENTIFIERS_LIBRARY}
+      Threads::Threads
+  )
 endif()
-
-
-
