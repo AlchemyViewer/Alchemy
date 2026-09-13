@@ -147,6 +147,13 @@ public:
     /// record the whole pick as one undo step if it changed anything.
     void endColorSession(bool escaped);
 
+    /// Size every section to what is in it: its lowest row's bottom plus a
+    /// margin, and its accordion tab to that plus the header. The heights the
+    /// XUI declares then only matter for the first layout and for XUI
+    /// Studio's preview, and a row added or moved can no longer leave a
+    /// section clipped or padded because nobody redid the sum.
+    void fitSections();
+
     // --- Tabs in windows of their own ---
     //
     // Each page is wrapped in an ALDockPanel at the end of postBuild, after

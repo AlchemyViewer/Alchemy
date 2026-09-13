@@ -413,6 +413,8 @@ bool ALFloaterLightBox::postBuild()
     setupToneCurve();
     setupSplitToneGraph();
 
+    fitSections();
+
     // Last, after everything above has found what it needs: from here a page
     // can be taken out of the floater, and nothing may look for a widget
     // through it again.
@@ -1008,6 +1010,37 @@ void ALFloaterLightBox::endColorSession(bool escaped)
     {
         ScopedHistoryGroup group(mHistory);
         mHistory.record(key, mColorOriginal, picked, (F32)LLTimer::getElapsedSeconds().value());
+    }
+}
+
+void ALFloaterLightBox::fitSections()
+{
+    // The margin under a section's last row, which is also what every
+    // section's hand-kept height used to add.
+    constexpr S32 BOTTOM_MARGIN = 8;
+
+    for (const ALLightboxDirectory::Section& section : mDirectory.sections())
+    {
+        LLPanel* panel = section.mPanel;
+        if (!panel)
+        {
+            continue;
+        }
+        // Every row follows the panel's top, so how far the lowest one reaches
+        // down from it is the height the panel needs, whatever it was given.
+        const S32 height = panel->getRect().getHeight();
+        S32 lowest = height;
+        for (const LLView* child : *panel->getChildList())
+        {
+            lowest = llmin(lowest, child->getRect().mBottom);
+        }
+        // Said to the tab the way everything that grows inside an accordion
+        // says it: the tab takes the height plus its header and padding (or
+        // remembers it, while it is shut) and asks the accordion to lay out
+        // again. Sent whether or not it differs, so a tab declared at the
+        // wrong height is put right as well.
+        panel->notifyParent(LLSD().with("action", "size_changes")
+                                  .with("height", height - lowest + BOTTOM_MARGIN));
     }
 }
 

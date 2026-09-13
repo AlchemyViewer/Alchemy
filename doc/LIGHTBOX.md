@@ -1072,6 +1072,16 @@ What this asks of the rest of the floater:
 
 ### 5. Height math (the part everyone gets wrong)
 
+**The floater now does this sum itself.** `fitSections()` runs in `postBuild`
+and sizes every `sec_*` panel to its lowest row's bottom + 8, and its
+accordion tab to that + 29, by the same `size_changes` notification anything
+that grows inside an accordion sends (the tab takes the new height if it is
+open, or remembers it for when it opens; `llaccordionctrltab_test` pins that).
+So a section whose declared heights are wrong is no longer clipped or padded in
+the viewer. **Keep the declared heights right anyway**: they are what the first
+layout pass and XUI Studio's preview use, and XUI Studio's lint measures
+against them. The rules below are how.
+
 - `accordion_tab` height **must be** inner panel height **+ 29**
   (25px header + 2+2 padding). The tab's rect *is* its expand height and
   `fit_panel` squeezes the panel into what remains; an undersized tab clips

@@ -147,4 +147,57 @@ namespace tut
 
         tab->die();
     }
+
+    // A fitted panel saying how tall it wants to be is how a tab learns its
+    // height without anyone writing it down: the tab takes the height plus
+    // its header and padding, the panel is squeezed to exactly the height it
+    // asked for, what follows the panel's top stays where it was against it,
+    // and a tab that is shut opens to the new height when it next opens.
+    // The Lightbox sizes every one of its sections this way.
+    template<> template<>
+    void llaccordionctrltab_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+        tp.name = "tab";
+        tp.title = "Tab";
+        tp.display_children = true;
+        tp.fit_panel = true;
+        tp.rect = LLRect(0, 109, 300, 0);
+        LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+
+        LLPanel::Params pp;
+        pp.name = "rows";
+        pp.rect = LLRect(0, 80, 300, 0);
+        LLPanel* rows = LLUICtrlFactory::create<LLPanel>(pp);
+        LLPanel::Params cp;
+        cp.name = "row";
+        cp.rect = LLRect(8, 72, 100, 56);
+        cp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP;
+        LLPanel* row = LLUICtrlFactory::create<LLPanel>(cp);
+        rows->addChild(row);
+        tab->setAccordionView(rows);
+
+        const S32 chrome = tab->getHeaderHeight() + tab->getPaddingTop() + tab->getPaddingBottom();
+        const S32 below_top = rows->getRect().getHeight() - row->getRect().mTop;
+
+        rows->notifyParent(LLSD().with("action", "size_changes").with("height", 120));
+        ensure_equals("the tab is the height asked for and its chrome", tab->getRect().getHeight(), 120 + chrome);
+        ensure_equals("the panel is the height it asked for", rows->getRect().getHeight(), 120);
+        ensure_equals("and the row is as far below its top as it was",
+                      rows->getRect().getHeight() - row->getRect().mTop, below_top);
+
+        tab->setDisplayChildren(false);
+        rows->notifyParent(LLSD().with("action", "size_changes").with("height", 150));
+        ensure("shut, the tab stays shut", tab->getRect().getHeight() < 150);
+        tab->setDisplayChildren(true);
+        ensure_equals("and opens to the height asked for while it was shut",
+                      tab->getRect().getHeight(), 150 + chrome);
+
+        tab->die();
+    }
 }
