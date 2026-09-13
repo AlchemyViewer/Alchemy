@@ -26,6 +26,7 @@ statics), so edits preview live with no glue code.
 | Sky tab (environment + client-side sky effects) | `.../panel_lightbox_sky.xml` |
 | Day cycle landmark search | `indra/newview/aldaycyclelandmarks.{h,cpp}` |
 | The C++ (callbacks, Vec3 binder, section reset, Looks bar) | `indra/newview/alfloaterlightbox.{h,cpp}` |
+| Where every section and setting is, found once | `indra/newview/allightboxdirectory.{h,cpp}` |
 | Looks preset system + whitelist | `indra/newview/llpresetsmanager.{h,cpp}` |
 | Bundled starter Looks | `indra/newview/app_settings/looks/` |
 | Colour wheel widget + its maths | `indra/newview/alcolorwheel{ctrl,model}.{h,cpp}` |
@@ -887,6 +888,45 @@ It takes a sampler rather than a day cycle, the same shape `curve_editor` uses,
 which is what lets `aldaycyclelandmarks_test` exercise it with a sine wave and
 no viewer around it. Sampling costs ninety-six blends, so it is cached against
 the day it was computed from and never runs on the frame path.
+
+### 4i. Finding widgets: the directory
+
+**After `postBuild`, nothing in the floater looks a widget up by name.**
+`ALLightboxDirectory` walks the four pages once, at the top of `postBuild`, and
+from then on everything the floater needs is held by pointer: each section
+(`sec_<id>`, its accordion tab, its accordion, the page it is on) and each bound
+setting (the control, and what its row calls it). Reset All finds its panels
+there, the tonemapper rows and the Looks bar buttons are cached beside it, and
+the only `getChild`/`findChild` calls left are in `postBuild` and the `setup*`
+functions it calls — `grep -nE "getChild|findChild" alfloaterlightbox.cpp` is
+the check.
+
+The reason is that a page can leave the floater. A tab taken out into a window
+of its own takes its widgets with it, and a search from the floater's root no
+longer reaches them; a pointer keeps working wherever the widget goes. So a new
+callback that needs a widget should take it from the directory, or cache it in
+`postBuild`, never search for it when it runs.
+
+The directory also reads each setting's **caption**, which is what finding a
+setting by name and naming an undo step both show, so a new row should caption
+itself in one of the ways it understands, in this order:
+
+1. The control's own label — a slider's `label`, a checkbox's `label`, a colour
+   wheel's `label` (a text box the control holds and names `...label`).
+2. Otherwise a `text` on the same line to its left: the row's middle falls
+   within the text's height and the text ends at the control's left edge. This
+   is how dropdown, colour and vector rows are captioned already. A vector
+   row's spinners are captioned this way even though they have labels, because
+   their labels are channel letters.
+3. Otherwise, for a switch on a section header, the section's title.
+4. Otherwise the setting's key made into words — the `Render`/`Alchemy` prefix
+   dropped and the words split, so `RenderReferenceWipeMode` reads "Reference
+   wipe mode". Serviceable, but a sign the row should caption itself properly.
+   Of the 170 settings on the four tabs, only the reference still's mode
+   dropdown ends up here, because it shares its line with the Grab and Clear
+   buttons.
+
+A trailing colon is dropped, so `Radius:` reads as `Radius`.
 
 ### 5. Height math (the part everyone gets wrong)
 

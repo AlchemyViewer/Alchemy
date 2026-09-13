@@ -37,6 +37,7 @@
 
 #include "aldaycyclelandmarks.h"
 #include "algradehistory.h"
+#include "allightboxdirectory.h"
 
 #include <array>
 #include <map>
@@ -189,6 +190,21 @@ public:
     /// The tab strip and its pages, in tab order: Look, Lens, Scene, Sky.
     LLTabContainer* mTabs = nullptr;
     std::vector<LLPanel*> mTabPages;
+    /// Every section and setting, found in postBuild. After postBuild nothing
+    /// here looks a widget up by name: a page taken out into a window of its
+    /// own takes its widgets with it, out of reach of any search from this
+    /// floater, and the pointers held here are what keep working.
+    ALLightboxDirectory mDirectory;
+
+    /// One per tonemapper parameter row: the operator it belongs to, and the
+    /// row's control and reset button, which updateTonemapperRows greys.
+    struct TonemapperRow
+    {
+        S32 mType = 0;
+        LLUICtrl* mCtrl = nullptr;
+        LLUICtrl* mReset = nullptr;
+    };
+    std::vector<TonemapperRow> mTonemapperRows;
 
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a
@@ -203,6 +219,9 @@ public:
     boost::signals2::scoped_connection mLooksListConnection;
     boost::signals2::scoped_connection mLooksActiveConnection;
     LLComboBox* mLooksCombo = nullptr;
+    LLUICtrl* mLookSave = nullptr;
+    LLUICtrl* mLookDelete = nullptr;
+    LLUICtrl* mLookRevert = nullptr;
     bool mVec3Updating = false;
 
     // Tone curve graph. Optional: the floater builds without it. The four

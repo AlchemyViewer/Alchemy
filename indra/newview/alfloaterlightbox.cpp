@@ -84,85 +84,6 @@ struct ScopedTrue
 
     bool& mFlag;
 };
-
-// Vector-valued rows follow the widget naming contract "vec3_<Setting>_<0|1|2>";
-// setting names never contain '_', so the parse is unambiguous.
-bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& component)
-{
-    static const std::string prefix = "vec3_";
-    if (name.size() <= prefix.size() || name.compare(0, prefix.size(), prefix) != 0)
-    {
-        return false;
-    }
-    size_t sep = name.rfind('_');
-    if (sep <= prefix.size() || sep + 2 != name.size())
-    {
-        return false;
-    }
-    S32 comp = name[sep + 1] - '0';
-    if (comp < 0 || comp > 2)
-    {
-        return false;
-    }
-    setting = name.substr(prefix.size(), sep - prefix.size());
-    component = comp;
-    return true;
-}
-
-// Any LLUICtrl will do; the name is the whole contract. Descending into
-// composites is safe because their internal children are named for their role
-// ("Slider", "value") and cannot parse as vec3_<Setting>_<n>.
-void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLUICtrl*, 3>>& rows)
-{
-    for (LLView* childp : *viewp->getChildList())
-    {
-        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
-        {
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
-            {
-                rows[setting][component] = ctrlp;
-            }
-        }
-        collectVec3Spinners(childp, rows);
-    }
-}
-
-void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
-{
-    for (LLView* childp : *viewp->getChildList())
-    {
-        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
-        {
-            if (LLControlVariable* controlp = ctrlp->getControlVariable())
-            {
-                // Only reset controls owned by gSavedSettings; enabled/visibility
-                // bindings live in separate slots and are not touched here.
-                if (gSavedSettings.getControl(controlp->getName()) == controlp)
-                {
-                    keys.insert(controlp->getName());
-                }
-            }
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
-            {
-                keys.insert(setting);
-            }
-            // A graph that edits settings not bound through control_name (an
-            // LLSD point list cannot be) names them in XUI; enrol those too.
-            if (auto* graphp = dynamic_cast<ALCurveEditorCtrl*>(ctrlp))
-            {
-                for (const std::string& name : graphp->getEditedSettingNames())
-                {
-                    keys.insert(name);
-                }
-            }
-        }
-        collectBoundControls(childp, keys);
-    }
-}
 } // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
@@ -246,12 +167,33 @@ bool ALFloaterLightBox::postBuild()
     // assume it.
     refreshBypassBadge();
 
+    // Every section and setting, while they are all still where the XUI put
+    // them. See mDirectory.
+    mDirectory.build(mTabPages);
+
     populateLUTCombo();
 
+    // Khronos Neutral (0), ACES (1) and GT (5) take no parameters, so their
+    // selection leaves every one of these rows greyed.
+    static const std::pair<const char*, S32> tonemapper_rows[] = {
+        { "tone_aces_white", 2 },
+        { "tone_reinhard_white", 3 },
+        { "tone_filmic_white", 4 },
+        { "tone_agx_contrast", 6 },
+        { "tone_agx_white", 6 },
+    };
+    for (const auto& row : tonemapper_rows)
+    {
+        mTonemapperRows.push_back({ row.second, findChild<LLUICtrl>(row.first),
+                                    findChild<LLUICtrl>(std::string(row.first) + "_rst") });
+    }
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
     updateTonemapperRows();
 
+    mLookSave = findChild<LLUICtrl>("look_save");
+    mLookDelete = findChild<LLUICtrl>("look_delete");
+    mLookRevert = findChild<LLUICtrl>("look_revert");
     mLooksCombo = getChild<LLComboBox>("looks_combo");
     mLooksListConnection = LLPresetsManager::instance().setPresetListChangeLooksCallback(
         std::bind(&ALFloaterLightBox::refreshLooksBar, this));
@@ -297,7 +239,7 @@ bool ALFloaterLightBox::postBuild()
             { onGradeSettingChanged(setting, old_value, new_value); }));
     }
 
-    collectVec3Spinners(this, mVec3Rows);
+    ALLightboxDirectory::collectVec3Controls(this, mVec3Rows);
     for (const auto& row : mVec3Rows)
     {
         const std::string& setting = row.first;
@@ -463,14 +405,18 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
         return;
     }
 
+    // From the directory, not by name: the section may be on a page that has
+    // been taken out into a window of its own, out of reach of a search from
+    // this floater.
     std::set<std::string> keys;
-    if (LLPanel* panelp = findChild<LLPanel>(section))
+    const ALLightboxDirectory::Section* mainp = mDirectory.section(section);
+    if (mainp)
     {
-        collectBoundControls(panelp, keys);
+        ALLightboxDirectory::collectBoundKeys(mainp->mPanel, keys);
     }
-    if (LLPanel* advp = findChild<LLPanel>(section + "_adv"))
+    if (const ALLightboxDirectory::Section* advp = mDirectory.section(section + "_adv"))
     {
-        collectBoundControls(advp, keys);
+        ALLightboxDirectory::collectBoundKeys(advp->mPanel, keys);
     }
 
     // A section's own header can carry a bound checkbox -- Color Grading's
@@ -478,11 +424,11 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
     // drawn. It is not in the panel, so nothing above would find it. Walk the
     // control rather than reading it directly: LLCheckBoxCtrl hands
     // control_name down to its button, so the binding is on the child.
-    if (auto* tabp = findChild<LLAccordionCtrlTab>("atab_" + section))
+    if (mainp && mainp->mTab)
     {
-        if (LLCheckBoxCtrl* checkp = tabp->getHeaderCheckBox())
+        if (LLCheckBoxCtrl* checkp = mainp->mTab->getHeaderCheckBox())
         {
-            collectBoundControls(checkp, keys);
+            ALLightboxDirectory::collectBoundKeys(checkp, keys);
         }
     }
 
@@ -1066,7 +1012,7 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
 
     std::string setting;
     S32 component = 0;
-    if (!parseVec3WidgetName(ctrl->getName(), setting, component))
+    if (!ALLightboxDirectory::parseVec3Name(ctrl->getName(), setting, component))
     {
         return;
     }
@@ -1674,28 +1620,34 @@ void ALFloaterLightBox::refreshLooksBar()
         args["[NAME]"] = last;
         mLooksCombo->setLabel(getString("look_name_modified", args));
     }
-    getChild<LLUICtrl>("look_save")->setEnabled(!active.empty() || !last.empty());
-    getChild<LLUICtrl>("look_delete")->setEnabled(mLooksCombo->getItemCount() > 0);
-    getChild<LLUICtrl>("look_revert")->setEnabled(modified);
+    if (mLookSave)
+    {
+        mLookSave->setEnabled(!active.empty() || !last.empty());
+    }
+    if (mLookDelete)
+    {
+        mLookDelete->setEnabled(mLooksCombo->getItemCount() > 0);
+    }
+    if (mLookRevert)
+    {
+        mLookRevert->setEnabled(modified);
+    }
 }
 
 void ALFloaterLightBox::updateTonemapperRows()
 {
-    // Khronos Neutral (0), ACES (1), and GT (5) take no parameters, so their
-    // selection leaves every per-operator row disabled.
     const S32 type = gSavedSettings.getS32("AlchemyRenderTonemapType");
-    static const std::pair<const char*, S32> param_rows[] = {
-        { "tone_aces_white", 2 },
-        { "tone_reinhard_white", 3 },
-        { "tone_filmic_white", 4 },
-        { "tone_agx_contrast", 6 },
-        { "tone_agx_white", 6 },
-    };
-    for (const auto& row : param_rows)
+    for (const TonemapperRow& row : mTonemapperRows)
     {
-        const bool active = (type == row.second);
-        getChild<LLUICtrl>(row.first)->setEnabled(active);
-        getChild<LLUICtrl>(std::string(row.first) + "_rst")->setEnabled(active);
+        const bool active = (type == row.mType);
+        if (row.mCtrl)
+        {
+            row.mCtrl->setEnabled(active);
+        }
+        if (row.mReset)
+        {
+            row.mReset->setEnabled(active);
+        }
     }
 }
 
