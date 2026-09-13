@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldeferredrebuild.h"
 #include "alparamtype.h"
 #include "llpanel.h"
 
@@ -352,4 +353,10 @@ private:
     S32                         mRemoveWidth;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
+    // A rebuild deletes every row, so one asked for from inside a row's own
+    // callback -- a caller answering a commit by filling the grid again,
+    // which is what XUI Studio does after any edit it cannot apply in place
+    // -- is held until the callback is over, instead of deleting the editor
+    // that is still on the stack mid-commit.
+    ALDeferredRebuild           mRebuild;
 };

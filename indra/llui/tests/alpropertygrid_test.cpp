@@ -36,6 +36,7 @@
 #include "../llspinctrl.h"
 #include "../lltextbox.h"
 #include "../lluictrlfactory.h"
+#include "llcallbacklist.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -985,6 +986,51 @@ namespace tut
                position->findChild<LLPanel>("stray_row", true) != nullptr);
         ensure("and one before the first is under the first",
                identity->findChild<LLPanel>("below_row", true) != nullptr);
+        grid->die();
+    }
+
+    // A caller answering a commit by filling the grid again -- XUI Studio
+    // does, after any edit it cannot apply in place -- must not delete the
+    // editor that is still committing. It did: Return in a row, the row's
+    // editor committing, the grid rebuilt from inside the commit, and the
+    // editor's own onCommit carried on into freed memory. The rebuild is held
+    // until the commit is over, and done once it is.
+    template<> template<>
+    void alpropertygrid_object::test<22>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("label", 0));
+        fields.back().value = "Before";
+        grid->setFields(fields);
+
+        LLLineEditor* editor = grid->getChild<LLLineEditor>("label", true);
+        bool outlived = false;
+        grid->onFieldCommit([grid, editor, &outlived](const std::string& name, const std::string& value)
+        {
+            std::vector<ALPropertyGrid::Field> refilled;
+            refilled.push_back(alpropertygrid_data::field(name, 0));
+            refilled.back().value = value;
+            grid->setFields(refilled);
+            // Still the grid's own editor, not a new one in its place and not
+            // a pointer to nothing.
+            outlived = grid->findChild<LLLineEditor>("label", true) == editor;
+        });
+
+        editor->setText(std::string("After"));
+        editor->onCommit();
+        ensure("the editor that committed outlives its commit", outlived);
+
+        // And once the commit is over, the grid is what it was asked to be.
+        gIdleCallbacks.callFunctions();
+        LLLineEditor* now = grid->findChild<LLLineEditor>("label", true);
+        ensure("filled again", now != nullptr);
+        ensure_equals("with what was committed", now->getText(), std::string("After"));
         grid->die();
     }
 }

@@ -258,7 +258,8 @@ ALPropertyGrid::ALPropertyGrid(const Params& p)
     mRemoveLabel(p.remove_label),
     // As wide as its word, and never narrower than the letter it was.
     mRemoveWidth(llmax(REMOVE_WIDTH,
-                       LLFontGL::getFontSansSerifSmall()->getWidth(p.remove_label()) + 10))
+                       LLFontGL::getFontSansSerifSmall()->getWidth(p.remove_label()) + 10)),
+    mRebuild([this]() { rebuild(); })
 {
     LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
     ap.name = "sections";
@@ -321,7 +322,7 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
         mAccordion->addCollapsibleCtrl(tab);
         mSections.push_back({ tab, rows });
     }
-    rebuild();
+    mRebuild.request();
 }
 
 void ALPropertyGrid::setFields(std::vector<Field> fields)
@@ -369,13 +370,13 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
                                          { return field.group == (S32)group && field.authored; });
         mSections[group].tab->setDisplayChildren(!folds || written);
     }
-    rebuild();
+    mRebuild.request();
 }
 
 void ALPropertyGrid::clearFields()
 {
     mFields.clear();
-    rebuild();
+    mRebuild.request();
 }
 
 // The mark is a child of the row, named for the field it marks: a caller
@@ -390,7 +391,7 @@ void ALPropertyGrid::setAuthoredOnly(bool only)
     if (mAuthoredOnly != only)
     {
         mAuthoredOnly = only;
-        rebuild();
+        mRebuild.request();
     }
 }
 
@@ -399,7 +400,7 @@ void ALPropertyGrid::setNested(bool nested)
     if (mNested != nested)
     {
         mNested = nested;
-        rebuild();
+        mRebuild.request();
     }
 }
 
@@ -408,7 +409,7 @@ void ALPropertyGrid::setNotices(Notice nothing_selected, Notice nothing_written,
     mNothingSelected = std::move(nothing_selected);
     mNothingWritten = std::move(nothing_written);
     mNoMatch = std::move(no_match);
-    rebuild();
+    mRebuild.request();
 }
 
 boost::signals2::connection ALPropertyGrid::onNoticeAction(const notice_signal_t::slot_type& cb)
@@ -419,13 +420,13 @@ boost::signals2::connection ALPropertyGrid::onNoticeAction(const notice_signal_t
 void ALPropertyGrid::setTips(Tips tips)
 {
     mTips = std::move(tips);
-    rebuild();
+    mRebuild.request();
 }
 
 void ALPropertyGrid::setEdgeTips(std::vector<std::string> tips)
 {
     mEdgeTips = std::move(tips);
-    rebuild();
+    mRebuild.request();
 }
 
 void ALPropertyGrid::setFilter(const std::string& text)
@@ -433,7 +434,7 @@ void ALPropertyGrid::setFilter(const std::string& text)
     if (mFilter != text)
     {
         mFilter = text;
-        rebuild();
+        mRebuild.request();
     }
 }
 
@@ -725,7 +726,7 @@ void ALPropertyGrid::makeComponents(const Field& field, const LLRect& box, LLPan
                 joined += joined.empty() ? "" : " ";
                 joined += numberText((F32)one->getValue().asReal(), whole);
             }
-            mFieldCommit(name, joined);
+            mRebuild.around([&]() { mFieldCommit(name, joined); });
         });
     }
 }
@@ -800,7 +801,7 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         font->setStyle(valueOf(name + ".style"));
         font->onPartCommit([this, name](const std::string& part, const std::string& value)
         {
-            mFieldCommit(part.empty() ? name : name + "." + part, value);
+            mRebuild.around([&]() { mFieldCommit(part.empty() ? name : name + "." + part, value); });
         });
         editor = font;
     }
@@ -893,7 +894,9 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
                 text = ctrl->getValue().asString();
                 break;
             }
-            mFieldCommit(name, text);
+            // Held: the caller may fill the grid again in answer, and the
+            // editor this came from is still inside its own commit.
+            mRebuild.around([&]() { mFieldCommit(name, text); });
         });
     }
     // The row's own words, on the editor as well: a pointer resting on a
@@ -1053,7 +1056,10 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
         Mark* mark = new Mark(p);
         mark->initFromParams(p);
         const std::string marked = field.name;
-        mark->setCommitCallback([this, marked](LLUICtrl*, const LLSD&) { mFieldGutter(marked); });
+        mark->setCommitCallback([this, marked](LLUICtrl*, const LLSD&)
+        {
+            mRebuild.around([&]() { mFieldGutter(marked); });
+        });
         row->addChild(mark);
     }
 }
@@ -1080,13 +1086,16 @@ void ALPropertyGrid::addRemove(LLPanel* row, const Field& field, const Field* pa
     {
         // Read as the fields stand when pressed, since either half may have
         // been written or taken out since the row was made.
-        for (const std::string& name : { removed, other })
+        mRebuild.around([&]()
         {
-            if (const Field* f = fieldNamed(name); f && f->authored && !f->ignored)
+            for (const std::string& name : { removed, other })
             {
-                mFieldRemove(name);
+                if (const Field* f = fieldNamed(name); f && f->authored && !f->ignored)
+                {
+                    mFieldRemove(name);
+                }
             }
-        }
+        });
     });
     row->addChild(remove);
 }
@@ -1128,7 +1137,7 @@ void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const s
     // showing only what the file writes has a row fewer or a row more.
     if (mAuthoredOnly)
     {
-        rebuild();
+        mRebuild.request();
         return;
     }
 
