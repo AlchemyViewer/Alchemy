@@ -5,6 +5,23 @@
     "text": "../doc/LICENSE-source.txt"
   },
 
+  "skip": {
+    "pkgconf": "a build tool",
+    "boost-uninstall": "a build tool",
+    "pthread": "an empty port; an alias of pthreads",
+    "alsa": "an empty port; the system library is used",
+    "dbus": "an empty port; the system library is used",
+    "pulseaudio": "an empty port; the system library is used",
+    "dirent": { "platform": "!windows", "reason": "an empty port; the C library has <dirent.h>" },
+    "libiconv": { "platform": "!windows", "reason": "an empty port; the C library has iconv" },
+    "pthreads": { "platform": "!windows", "reason": "an empty port; the C library has pthreads" },
+    "libsystemd": "built for the empty dbus port's systemd feature; nothing links it",
+    "libcap": "built for libsystemd; nothing links it",
+    "libmount": "built for libsystemd; nothing links it",
+    "libxcrypt": "built for libsystemd; nothing links it",
+    "lz4": "built for libsystemd; nothing links it"
+  },
+
   "overrides": {
     "abseil": { "holder": "Copyright 2017 The Abseil Authors" },
     "alchemy-branding": { "license": "LicenseRef-Alchemy-Proprietary" },
