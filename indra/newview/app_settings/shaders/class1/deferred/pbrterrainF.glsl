@@ -201,11 +201,11 @@ vec3 terrain_geometric_normal()
 }
 
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-// from mikktspace.com
-vec3 mikktspace(vec3 vNt, vec3 vT, float sign)
+// from mikktspace.com. The geometric normal comes in as an argument rather
+// than being read from geom_normal: Mesa checks initialization in source
+// order, and this is defined above the main() that assigns it.
+vec3 mikktspace(vec3 vN, vec3 vNt, vec3 vT, float sign)
 {
-    vec3 vN = geom_normal;
-
     vec3 vB = sign * cross(vN, vT);
     vec3 tnorm = normalize( vNt.x * vT + vNt.y * vB + vNt.z * vN );
 
@@ -324,7 +324,7 @@ void main()
 #endif
         );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(mix2.vNt, vary_tangents[0], vary_signs[0]);
+        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[0], vary_signs[0]);
 #endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.x);
         break;
@@ -371,7 +371,7 @@ void main()
 #endif
         );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(mix2.vNt, vary_tangents[1], vary_signs[1]);
+        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[1], vary_signs[1]);
 #endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.y);
         break;
@@ -418,7 +418,7 @@ void main()
 #endif
         );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(mix2.vNt, vary_tangents[2], vary_signs[2]);
+        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[2], vary_signs[2]);
 #endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.z);
         break;
@@ -465,7 +465,7 @@ void main()
 #endif
         );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(mix2.vNt, vary_tangents[3], vary_signs[3]);
+        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[3], vary_signs[3]);
 #endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.w);
         break;

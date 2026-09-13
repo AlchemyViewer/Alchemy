@@ -2769,7 +2769,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 gFXAAProgram[i].mShaderFiles.push_back(make_pair("deferred/fxaaF.glsl", GL_FRAGMENT_SHADER));
 
                 gFXAAProgram[i].clearPermutations();
-                gFXAAProgram[i].addPermutation("FXAA_QUALITY__PRESET", quality_pair.first);
+                gFXAAProgram[i].addPermutation("FXAA_QUALITY_PRESET", quality_pair.first);
                 if (gGLManager.mGLVersion > 3.9)
                 {
                     gFXAAProgram[i].addPermutation("FXAA_GLSL_400", "1");
