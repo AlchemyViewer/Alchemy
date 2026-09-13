@@ -2,12 +2,18 @@
 <!--
 Lightbox "Lens" tab: optical / film effects.
 Row and height conventions are documented in panel_lightbox_look.xml. The
-bloom/glow pair is the HDR fork: Bloom rows grey out unless RenderHDREnabled is
-on; Legacy Glow rows grey out while it is on, so both modes stay discoverable
-without layout holes. (RenderBloomHDR is currently unwired renderer-side, so
-the fork gates on RenderHDREnabled — which is deliberately NOT offered as a
-toggle here; it cascades probe resets, buffer reallocation, and a shader
-rebuild. Revisit if RenderBloomHDR gets wired.)
+bloom/glow pair is the HDR fork, and the floater shows only the side the
+renderer is running: the two Bloom (HDR) sections, and the two Cross Filter
+sections that are seeded from the same bloom, while RenderHDREnabled is on, the
+two Glow (Legacy) sections while it is off
+(ALFloaterLightBox::refreshBloomSections, live as the setting changes). The
+rows also grey out on the same setting (enabled_control on Bloom and Cross
+Filter, disabled_control on Glow), which is all a build of this panel without the
+floater gets. (RenderBloomHDR is currently unwired renderer-side, so the fork
+gates on RenderHDREnabled — which is deliberately NOT offered as a toggle
+here; it cascades probe resets, buffer reallocation, and a shader rebuild. It
+follows "HDR and Emissive" in Preferences. Revisit if RenderBloomHDR gets
+wired.)
 -->
 <panel
  name="panel_lightbox_lens"

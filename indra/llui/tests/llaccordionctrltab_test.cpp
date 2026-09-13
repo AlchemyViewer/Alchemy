@@ -26,6 +26,7 @@
 
 #include "../llaccordionctrltab.h"
 
+#include "../llaccordionctrl.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 #include "../llxuiparser.h"
@@ -199,5 +200,62 @@ namespace tut
                       tab->getRect().getHeight(), 150 + chrome);
 
         tab->die();
+    }
+
+    // A hidden tab takes no room. Once its accordion is arranged, the tab
+    // below closes up under the one above, and showing it and arranging again
+    // puts it back between them. It is the arrange that moves them, not the
+    // hiding, so a caller that hides a tab arranges afterwards. The Lightbox
+    // hides whichever of its bloom and legacy glow sections the renderer is
+    // not running this way.
+    template<> template<>
+    void llaccordionctrltab_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLAccordionCtrl::Params ap(LLUICtrlFactory::getDefaultParams<LLAccordionCtrl>());
+        ap.name = "accordion";
+        ap.rect = LLRect(0, 400, 300, 0);
+        ap.single_expansion = false;
+        LLAccordionCtrl* accordion = LLUICtrlFactory::create<LLAccordionCtrl>(ap);
+
+        // Open, and as tall as their rects say: 180 of the 400, so the
+        // accordion has no scrollbar to move them by.
+        const auto add_tab = [accordion](const std::string& name, S32 height)
+        {
+            LLAccordionCtrlTab::Params tp(LLUICtrlFactory::getDefaultParams<LLAccordionCtrlTab>());
+            tp.name = name;
+            tp.title = name;
+            tp.display_children = true;
+            tp.fit_panel = false;
+            tp.rect = LLRect(0, height, 300, 0);
+            LLAccordionCtrlTab* tab = LLUICtrlFactory::create<LLAccordionCtrlTab>(tp);
+            LLPanel::Params pp;
+            pp.name = name + "_rows";
+            pp.rect = LLRect(0, 10, 300, 0);
+            tab->setAccordionView(LLUICtrlFactory::create<LLPanel>(pp));
+            accordion->addCollapsibleCtrl(tab);
+            return tab;
+        };
+        LLAccordionCtrlTab* above = add_tab("above", 50);
+        LLAccordionCtrlTab* middle = add_tab("middle", 60);
+        LLAccordionCtrlTab* below = add_tab("below", 70);
+        accordion->arrange();
+        ensure_equals("the middle tab is under the first", middle->getRect().mTop, above->getRect().mBottom);
+        ensure_equals("and the last under it", below->getRect().mTop, middle->getRect().mBottom);
+
+        middle->setVisible(false);
+        accordion->arrange();
+        ensure_equals("hidden, it leaves no gap", below->getRect().mTop, above->getRect().mBottom);
+
+        middle->setVisible(true);
+        accordion->arrange();
+        ensure_equals("shown, it is back under the first", middle->getRect().mTop, above->getRect().mBottom);
+        ensure_equals("and the last is under it again", below->getRect().mTop, middle->getRect().mBottom);
+
+        accordion->die();
     }
 }

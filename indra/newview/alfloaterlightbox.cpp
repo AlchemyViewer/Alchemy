@@ -45,6 +45,7 @@
 #include "llcombobox.h"
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
+#include "llgl.h"
 #include "lltextbox.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
@@ -355,6 +356,13 @@ bool ALFloaterLightBox::postBuild()
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
     updateTonemapperRows();
+
+    // Bloom (HDR) or Glow (Legacy), whichever the renderer is running. HDR is
+    // switched from Preferences ("HDR and Emissive", which sets
+    // RenderHDREnabled), and possibly with this floater open.
+    mHDRConnection = gSavedSettings.getControl("RenderHDREnabled")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshBloomSections(); });
+    refreshBloomSections();
 
     mLookSave = findChild<LLUICtrl>("look_save");
     mLookDelete = findChild<LLUICtrl>("look_delete");
@@ -1465,6 +1473,12 @@ void ALFloaterLightBox::openFind()
     for (size_t index = 0; index < sections.size(); ++index)
     {
         const ALLightboxDirectory::Section& section = sections[index];
+        // A section hidden for the renderer's mode is nowhere to go, and
+        // neither is anything in it.
+        if (section.mTab && !section.mTab->getVisible())
+        {
+            continue;
+        }
         ALQuickOpen::Candidate here;
         here.label = section.mTitle;
         here.detail = pageLabel(section.mPage);
@@ -1533,7 +1547,8 @@ void ALFloaterLightBox::jumpTo(const std::string& target)
             section = &mDirectory.sections()[setting->mSection];
         }
     }
-    if (!section)
+    // Nor a section hidden since the list was made: HDR switched with Find up.
+    if (!section || (section->mTab && !section->mTab->getVisible()))
     {
         return;
     }
@@ -2663,6 +2678,54 @@ void ALFloaterLightBox::updateTonemapperRows()
         {
             row.mCtrl->setEnabled(type == row.mType);
         }
+    }
+}
+
+void ALFloaterLightBox::refreshBloomSections()
+{
+    // The renderer's own test (LLPipeline::createGLBuffers, renderFinalize):
+    // HDR bloom runs with RenderHDREnabled on GL above 4.05, and the legacy
+    // glow runs whenever it does not. Keep the two in step. The cross filter
+    // is on the HDR side with the bloom it is seeded from: it streaks what
+    // the bloom pyramid's top holds, and without the pyramid it draws nothing.
+    const bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
+    static const std::pair<const char*, bool> bloom_sections[] = {
+        { "sec_bloom", true },
+        { "sec_bloom_adv", true },
+        { "sec_crossfilter", true },
+        { "sec_crossfilter_adv", true },
+        { "sec_glow", false },
+        { "sec_glow_adv", false },
+    };
+    std::set<LLAccordionCtrl*> changed;
+    for (const auto& [name, for_hdr] : bloom_sections)
+    {
+        const ALLightboxDirectory::Section* section = mDirectory.section(name);
+        if (!section || !section->mTab)
+        {
+            continue;
+        }
+        const bool shown = (for_hdr == hdr);
+        if (section->mTab->getVisible() == shown)
+        {
+            continue;
+        }
+        // The keyboard does not stay in a section that is going.
+        if (!shown && gFocusMgr.childHasKeyboardFocus(section->mTab))
+        {
+            gFocusMgr.setKeyboardFocus(nullptr);
+        }
+        section->mTab->setVisible(shown);
+        if (section->mAccordion)
+        {
+            changed.insert(section->mAccordion);
+        }
+    }
+    // A tab's visibility does not lay its accordion out again; the gap it
+    // leaves, or the room it needs, only appears on the next arrange.
+    for (LLAccordionCtrl* accordion : changed)
+    {
+        accordion->arrange();
     }
 }
 

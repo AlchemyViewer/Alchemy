@@ -1212,9 +1212,23 @@ against them. The rules below are how.
 widget greys it live (they connect to the control's signal). Boolean controls
 only; apply per row, not on the parent panel. Reference patterns:
 
-- HDR fork: bloom rows `enabled_control="RenderHDREnabled"`, legacy glow rows
-  `disabled_control="RenderHDREnabled"` — greying, not visibility, so the
-  layout never gets holes and both modes stay discoverable.
+- **HDR fork: only the side the renderer runs is shown.** Bloom (HDR) and its
+  Advanced section apply while `RenderHDREnabled` is on (on GL above 4.05, the
+  pipeline's own test), and so do Cross Filter and its Advanced section, which
+  streak what the bloom pyramid holds; Glow (Legacy) and its Advanced section
+  apply while it is off. An effect that only runs on one side of the fork
+  belongs in the table in `refreshBloomSections()`, not just behind an
+  `enabled_control`. `refreshBloomSections()` hides the other side's accordion tabs
+  and re-arranges the accordion, live on the setting's signal. A tab's
+  visibility alone does not re-lay an accordion out; `arrange()` does. Find
+  leaves hidden sections out. The rows still grey on the same setting
+  (`enabled_control` on bloom and the cross filter, `disabled_control` on glow), which is all that
+  anything building the panel without the floater gets. This used to be
+  greying alone, to keep both modes discoverable. The cost of hiding is that
+  the other mode's sections are out of sight, and `RenderHDREnabled` is
+  deliberately not switchable from the Lightbox (it resets probes,
+  reallocates buffers and rebuilds shaders). It follows "HDR and Emissive"
+  (`RenderDisableVintageMode`) in Preferences > Graphics > Advanced.
 - **`RenderColorGrade` is the master switch for the entire grading suite**
   (LUT *and* Basic, White Balance, Split Toning, Lift/Gamma/Gain, Tone Curve).
   Any new grading control must gate on it or it will look inert. It lives on
