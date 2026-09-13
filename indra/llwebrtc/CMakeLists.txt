@@ -3,7 +3,7 @@
 # The one wrapper of the vendor library. libwebrtc ships no Debug build on
 # Windows, so this target is not built for that configuration; ll::webrtc
 # tells the viewer so.
-add_library(llwebrtc SHARED)
+add_library(llwebrtc STATIC)
 
 target_sources(
   llwebrtc
