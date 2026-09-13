@@ -437,7 +437,15 @@ The archive of that tree comes from CPack — a `.zip` on Windows, a `.tar.xz` o
 cpack --config build-<OS>-<preset>/CPackConfig.cmake -C Release
 ```
 
-(or the `package` target). Release archives on Linux and macOS are stripped of debug information on the way. `-DAL_BUILD_PACKAGE=OFF` leaves CPack out; the install rules stay.
+(or the `package` target). Release archives on Linux and macOS are stripped of debug information on the way. Every package is written with its SHA-256 beside it (`<package>.sha256`, in `sha256sum` form). `-DAL_BUILD_PACKAGE=OFF` leaves CPack out; the install rules stay.
+
+The source package is the committed tree of the repository and its submodules at the checked-out commit — what `git ls-files --recurse-submodules` names, nothing the build wrote into the source tree — as `Alchemy_<version>_src.tar.xz`, every entry stamped with the commit's time:
+
+```
+cpack --config build-<OS>-<preset>/CPackSourceConfig.cmake
+```
+
+(or the `package_source` target under Ninja). Uncommitted changes are not in it, and cpack says so.
 
 The Windows installer and the update packages come from [Velopack](https://velopack.io): configure with `-DAL_USE_VELOPACK=ON`, run `dotnet tool restore` once so the `vpk` tool is available, and build the `velopack` target. It installs into `newview/velopack/<Config>/app` and writes the installer and the update feed to `newview/velopack/<Config>/Releases`.
 

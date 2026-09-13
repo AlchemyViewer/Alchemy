@@ -1,10 +1,13 @@
 # -*- cmake -*-
 #
-# The archive of the installed tree, and the Velopack packaging step. CPack
-# reads the install rules in ViewerInstall.cmake; `cpack -C <cfg>` in the
-# build directory, or the `package` target, writes
-# <build>/<AL_PACKAGE_NAME>.{zip,tar.xz,dmg}. The `velopack` target installs
-# into <build>/newview/velopack/<cfg>/app and runs vpk over it.
+# The archive of the installed tree, the source package, and the Velopack
+# packaging step. CPack reads the install rules in ViewerInstall.cmake;
+# `cpack -C <cfg>` in the build directory, or the `package` target, writes
+# <build>/<AL_PACKAGE_NAME>.{zip,tar.xz,dmg}; `cpack --config
+# CPackSourceConfig.cmake`, or the `package_source` target where the
+# generator has one, writes <build>/Alchemy_<version>_src.tar.xz from what
+# git tracks. Each comes with its SHA-256 beside it. The `velopack` target
+# installs into <build>/newview/velopack/<cfg>/app and runs vpk over it.
 #
 # Included from newview/CMakeLists.txt after ViewerInstall.cmake.
 include_guard()
@@ -49,11 +52,13 @@ velopack_installer_base=${AL_PACKAGE_NAME}
 else()
   set(al_package_env "")
 endif()
+set(AL_SOURCE_PACKAGE_NAME "Alchemy_${al_package_version}_src")
 file(
   CONFIGURE
   OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/package.env"
   CONTENT
     "imagename=${AL_PACKAGE_NAME}
+sourcename=${AL_SOURCE_PACKAGE_NAME}
 ${al_package_env}"
   @ONLY
 )
@@ -70,9 +75,23 @@ set(CPACK_PACKAGE_VERSION_MAJOR "${VIEWER_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${VIEWER_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${VIEWER_VERSION_PATCH}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Alchemy Viewer, a client for Second Life")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://www.alchemyviewer.org")
+set(CPACK_PACKAGE_CHECKSUM SHA256)
 set(CPACK_VERBATIM_VARIABLES ON)
-set(CPACK_SOURCE_GENERATOR "")
 set(CPACK_ARCHIVE_THREADS 0)
+
+# The source package: the committed tree of the repository and its
+# submodules. ViewerSource.cmake fills the staging directory from git
+# archive, so CPack has no directory to copy and nothing to ignore.
+find_package(Git QUIET)
+get_filename_component(al_repository_dir "${INDRA_SOURCE_DIR}/.." ABSOLUTE)
+set(CPACK_SOURCE_GENERATOR TXZ)
+set(CPACK_SOURCE_PACKAGE_FILE_NAME "${AL_SOURCE_PACKAGE_NAME}")
+set(CPACK_SOURCE_INSTALLED_DIRECTORIES "")
+set(CPACK_SOURCE_IGNORE_FILES "")
+set(CPACK_INSTALL_SCRIPTS "${CMAKE_CURRENT_LIST_DIR}/ViewerSource.cmake")
+set(CPACK_AL_GIT "${GIT_EXECUTABLE}")
+set(CPACK_AL_REPOSITORY "${al_repository_dir}")
 
 if(WINDOWS)
   set(CPACK_GENERATOR ZIP)

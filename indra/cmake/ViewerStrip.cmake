@@ -9,6 +9,10 @@
 if(NOT CPACK_BUILD_CONFIG STREQUAL "Release")
   return()
 endif()
+# The source package has nothing to strip.
+if(CPACK_PACKAGE_FILE_NAME STREQUAL CPACK_SOURCE_PACKAGE_FILE_NAME)
+  return()
+endif()
 
 find_program(al_strip strip REQUIRED)
 
