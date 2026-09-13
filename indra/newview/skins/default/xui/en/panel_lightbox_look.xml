@@ -3,7 +3,8 @@
 Lightbox "Look" tab: color science / tone.
 Full guide for adding sections: doc/LIGHTBOX.md. Quick reference:
 Row conventions:
-  scalar  = <slider label=... can_edit_text="true" control_name=.../> + 18px reset button
+  scalar  = <setting_row label=... control_name=.../> (18px tall, reset glyph built in); older
+            rows are a <slider can_edit_text="true" .../> + an 18px reset button, being converted
   vector  = <text> label + three <spinner name="vec3_<Setting>_<0|1|2>"> with LightBox.CommitVec3;
             a spinner with a channel label also takes scrub="true" (drag the letter to change it)
   color   = <color_swatch control_name=.../> (0-1 tints only)
@@ -47,16 +48,14 @@ Row conventions:
 			 top="0"
 			 right="-1"
 			 name="sec_tone">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Exposure"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.5"
@@ -64,22 +63,6 @@ Row conventions:
 				 name="tone_exposure"
 				 tool_tip="Overall image brightness applied by the tonemapper"
 				 control_name="RenderExposure" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_exposure_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderExposure" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -144,16 +127,14 @@ Row conventions:
 					 function="LightBox.ResetControlDefault"
 					 parameter="AlchemyRenderTonemapType" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Tonemap mix"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -161,22 +142,6 @@ Row conventions:
 				 name="tone_mix"
 				 tool_tip="Blend between linear (0) and tonemapped (1) color. Classic/legacy skies force this to 0."
 				 control_name="RenderTonemapMix" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_mix_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapMix" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -212,16 +177,14 @@ Row conventions:
 			 top="0"
 			 right="-1"
 			 name="sec_tone_adv">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="ACES white point"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -229,32 +192,14 @@ Row conventions:
 				 name="tone_aces_white"
 				 tool_tip="White point for the ACES Boosted operator (no effect on other operators)"
 				 control_name="RenderTonemapACESWhite" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_aces_white_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapACESWhite" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Reinhard white point"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -262,32 +207,14 @@ Row conventions:
 				 name="tone_reinhard_white"
 				 tool_tip="White point for the Reinhard operator (no effect on other operators)"
 				 control_name="RenderTonemapReinhardWhite" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_reinhard_white_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapReinhardWhite" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Filmic white point"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -295,32 +222,14 @@ Row conventions:
 				 name="tone_filmic_white"
 				 tool_tip="White point for the Filmic operator (no effect on other operators)"
 				 control_name="RenderTonemapFilmicWhite" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_filmic_white_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapFilmicWhite" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="AgX contrast"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.5"
@@ -328,32 +237,14 @@ Row conventions:
 				 name="tone_agx_contrast"
 				 tool_tip="Contrast for the AgX operator (no effect on other operators)"
 				 control_name="RenderTonemapAgxContrast" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_agx_contrast_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapAgxContrast" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="AgX white point"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="1"
@@ -361,22 +252,6 @@ Row conventions:
 				 name="tone_agx_white"
 				 tool_tip="White point for the AgX operator (no effect on other operators)"
 				 control_name="RenderTonemapAgxWhite" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_agx_white_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTonemapAgxWhite" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -389,16 +264,14 @@ Row conventions:
 				 name="tone_autoexposure"
 				 enabled_control="RenderHDREnabled"
 				 control_name="RenderDynamicExposureEnabled" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
 				 label="Auto-exposure strength"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.05"
@@ -407,32 +280,14 @@ Row conventions:
 				 tool_tip="How strongly automatic exposure reacts to scene luminance"
 				 enabled_control="RenderDynamicExposureEnabled"
 				 control_name="RenderDynamicExposureCoefficient" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_autoexp_coeff_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderDynamicExposureCoefficient" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Adapt speed (far)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.01"
@@ -441,32 +296,14 @@ Row conventions:
 				 tool_tip="How quickly exposure adapts while far from its target"
 				 enabled_control="RenderDynamicExposureEnabled"
 				 control_name="RenderDynamicExposureSpeedError" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_autoexp_speed_error_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderDynamicExposureSpeedError" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Adapt speed (near)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="1"
 				 increment="0.1"
 				 min_val="0.1"
@@ -475,22 +312,6 @@ Row conventions:
 				 tool_tip="How quickly exposure settles once near its target"
 				 enabled_control="RenderDynamicExposureEnabled"
 				 control_name="RenderDynamicExposureSpeedTarget" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="tone_autoexp_speed_target_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderDynamicExposureSpeedTarget" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"

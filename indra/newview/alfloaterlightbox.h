@@ -316,12 +316,12 @@ public:
     ALLightboxDirectory mDirectory;
 
     /// One per tonemapper parameter row: the operator it belongs to, and the
-    /// row's control and reset button, which updateTonemapperRows greys.
+    /// row, which updateTonemapperRows greys -- reset button and all, since
+    /// the rows are setting rows.
     struct TonemapperRow
     {
         S32 mType = 0;
         LLUICtrl* mCtrl = nullptr;
-        LLUICtrl* mReset = nullptr;
     };
     std::vector<TonemapperRow> mTonemapperRows;
 

@@ -37,6 +37,7 @@
 #include "alhistorylist.h"
 #include "alpopover.h"
 #include "alquickopen.h"
+#include "alsettingrow.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
 #include "llbutton.h"
@@ -320,8 +321,8 @@ bool ALFloaterLightBox::postBuild()
     };
     for (const auto& row : tonemapper_rows)
     {
-        mTonemapperRows.push_back({ row.second, findChild<LLUICtrl>(row.first),
-                                    findChild<LLUICtrl>(std::string(row.first) + "_rst") });
+        // Setting rows, which grey their own reset buttons along with them.
+        mTonemapperRows.push_back({ row.second, findChild<LLUICtrl>(row.first) });
     }
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
@@ -377,20 +378,35 @@ bool ALFloaterLightBox::postBuild()
         mRecordedKeys.insert(setting);
     }
 
-    // Colour rows pick inline. Only Color3 swatches: the inline picker has no
-    // alpha, and a Color4 row would lose its fourth number to it.
     LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
     for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
     {
+        const std::string key = setting.mKey;
+
+        // Colour rows pick inline. Only Color3 swatches: the inline picker has
+        // no alpha, and a Color4 row would lose its fourth number to it.
         LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(setting.mCtrl);
-        LLControlVariable* controlp = gSavedSettings.getControl(setting.mKey);
+        LLControlVariable* controlp = gSavedSettings.getControl(key);
         if (swatch && controlp && controlp->type() == TYPE_COL3)
         {
-            const std::string key = setting.mKey;
             swatch->setPickerOverride([self, key](LLColorSwatchCtrl* from)
             {
                 ALFloaterLightBox* floater = self.get();
                 return floater && floater->openColorPopover(from, key);
+            });
+        }
+
+        // A setting row's reset comes through here, the same as a reset
+        // button's: a named undo step of its own rather than a bare write
+        // that folds into a drag just before it.
+        if (ALSettingRow* row = ALViewType::as<ALSettingRow>(setting.mCtrl))
+        {
+            row->setResetHandler([self, key](ALSettingRow*)
+            {
+                if (ALFloaterLightBox* floater = self.get())
+                {
+                    floater->onClickResetControlDefault(LLSD(key));
+                }
             });
         }
     }
@@ -2599,14 +2615,9 @@ void ALFloaterLightBox::updateTonemapperRows()
     const S32 type = gSavedSettings.getS32("AlchemyRenderTonemapType");
     for (const TonemapperRow& row : mTonemapperRows)
     {
-        const bool active = (type == row.mType);
         if (row.mCtrl)
         {
-            row.mCtrl->setEnabled(active);
-        }
-        if (row.mReset)
-        {
-            row.mReset->setEnabled(active);
+            row.mCtrl->setEnabled(type == row.mType);
         }
     }
 }

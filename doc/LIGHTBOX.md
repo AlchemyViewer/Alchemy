@@ -56,6 +56,7 @@ the viewer's widget set was touched.
 
 | Thing | Written as | Where |
 |---|---|---|
+| One setting on one line, with its reset | `<setting_row>` | §4 |
 | Colour wheel | `<color_wheel>` | §4b |
 | Curve / band graph | `<curve_editor>` | §4b |
 | Checkbox on an accordion header | `<accordion_tab.header_check_box>` | §3b |
@@ -270,24 +271,42 @@ worth knowing before you use it elsewhere:
 
 ### 4. Rows
 
-First row uses `top="8"`; later rows chain with `top_pad`. Every value row gets
-an 18px reset glyph. Copy these verbatim and edit names/keys/ranges:
+First row uses `top="8"` (`top="7"` for a setting row, which is two pixels
+taller than a slider); later rows chain with `top_pad`. Every value row gets an
+18px reset glyph. Copy these verbatim and edit names/keys/ranges:
 
-**Scalar (slider) row** — `top_pad="9"` between slider rows:
+**Scalar row** — one `setting_row`, `top_pad="8"` between setting rows:
 
 ```xml
-<slider
- follows="left|top|right" layout="topleft" left="8" top_pad="9" right="-32"
- height="16" label="Strength" label_width="140" can_edit_text="true"
- decimal_digits="2" increment="0.01" min_val="0" max_val="1"
- name="myfx_strength" tool_tip="..." control_name="RenderMyFxStrength" />
-<button
- follows="top|right" layout="topleft" height="18" width="18" right="-8"
- top_pad="-17" scale_image="true" image_overlay="Refresh_Off"
- image_overlay_alignment="center" name="myfx_strength_rst" tool_tip="Reset to default">
-    <button.commit_callback function="LightBox.ResetControlDefault" parameter="RenderMyFxStrength" />
-</button>
+<setting_row
+ follows="left|top|right" layout="topleft" left="8" top_pad="8" right="-8"
+ height="18" label="Strength" decimal_digits="2" increment="0.01" min_val="0"
+ max_val="1" name="myfx_strength" tool_tip="..." control_name="RenderMyFxStrength" />
 ```
+
+`setting_row` (`indra/llui/alsettingrow.{h,cpp}`, tested by
+`alsettingrow_test`) is the slider and its reset glyph as one widget, and it
+takes the slider's attributes by the slider's names. What it does for you:
+
+- **The reset glyph is built in** and shows only while the setting differs from
+  its default *as shown* — rounded to the row's `decimal_digits`, so a drag that
+  comes back to 0.7 and lands on 0.69999999 leaves nothing lit. Its slot is kept
+  while it is hidden, so nothing moves when it appears. In the Lightbox its reset
+  comes through `onClickResetControlDefault` (the floater takes it with
+  `setResetHandler` in `postBuild`), so it is a named undo step like any other.
+- **Only the row is bound.** Reset All's walk finds one key per row, a commit is
+  one write, and `enabled_control` / `disabled_control` grey the slider, its
+  label and value *and* the reset glyph together.
+- **The value box sizes itself** where a slider's would cut the number short —
+  `max_val` under 1, at or below 0, or a `min_val` wider than `max_val` — so §7
+  no longer applies to it. `text_width` still wins where it is written.
+- `label_width="140"` and `can_edit_text="true"` are its defaults and need not
+  be written.
+
+**Old-style scalar rows** — a `slider` (`right="-32" height="16"`) followed by a
+separate reset `button` (`top_pad="-17"`, `LightBox.ResetControlDefault` with
+the setting as `parameter`) — are being converted tab by tab. They still work;
+do not add new ones.
 
 **Checkbox row** (no reset glyph): `check_box` with `control_name`,
 `top_pad="10"` after a button, `top_pad="8"` after another checkbox.
@@ -1178,9 +1197,11 @@ Two things that only show up on screen, both of which did:
 
 ### 7. Slider text width
 
-Any slider with `max_val` below 1.0 (or ≤ 0) **must** set an explicit
+Any plain `slider` with `max_val` below 1.0 (or ≤ 0) **must** set an explicit
 `text_width` (56 fits a signed 4-decimal value). Without it `LLSliderCtrl`
-auto-sizes the value box from `log10(max_value)` and truncates the number.
+auto-sizes the value box from `log10(max_value)` and truncates the number. A
+`setting_row` works the width out itself in exactly those cases (§4), so this
+is only for sliders that are not rows — vector-bank sliders, for instance.
 
 ### 8. Cadence and tooltips
 
