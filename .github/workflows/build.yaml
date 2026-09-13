@@ -330,7 +330,7 @@ jobs:
             Windows)
               cmake_preset_name="vs2026$cmake_preset_postfix"
               build_directory="build-Windows-$cmake_preset_name"
-              vcpkg_triplet="x64-windows-alchemy-release"
+              vcpkg_triplet="x64-windows-alchemy-avx2-release"
               ;;
             macOS)
               cmake_preset_name="ninja$cmake_preset_postfix-$BUILD_ARCH"
@@ -340,7 +340,7 @@ jobs:
             Linux)
               cmake_preset_name="ninja$cmake_preset_postfix"
               build_directory="build-Linux-$cmake_preset_name"
-              vcpkg_triplet="x64-linux-alchemy-release"
+              vcpkg_triplet="x64-linux-alchemy-avx2-release"
               ;;
           esac
 

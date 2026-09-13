@@ -133,8 +133,10 @@ set(AL_SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, 
 # Warn about any option name from before the AL_ scheme.
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/RetiredOptions.cmake)
 
-# macOS deploy target(must be set BEFORE first project call)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value.")
+# The oldest macOS the viewer runs on, shared with the triplets; must be set
+# before the first project() call.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AlchemyTarget.cmake)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "${AL_MACOS_DEPLOYMENT_TARGET}" CACHE STRING "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value.")
 
 if (APPLE)
   # Disable app-local dependencies on macOS, since we use a custom bundle structure and don't want vcpkg to copy dependencies into the bundle.

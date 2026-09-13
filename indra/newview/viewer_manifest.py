@@ -1274,6 +1274,13 @@ class Linux_x86_64_Manifest(LinuxManifest):
     def construct(self):
         super(Linux_x86_64_Manifest, self).construct()
 
+        # The LGPL ports link dynamically on every platform; the wrapper
+        # script puts lib/ on the loader's path.
+        with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib'), dst="lib"):
+            self.path("libhunspell*.so*")
+            if self.args['openal'] == 'ON':
+                self.path("libopenal*.so*")
+
         # The Discord Social SDK comes from outside vcpkg; the argument is
         # the directory its runtime library sits in.
         if self.args['discord'] != 'OFF':

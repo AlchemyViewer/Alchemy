@@ -204,30 +204,12 @@ elseif(LINUX OR DARWIN)
   )
 endif()
 
-# Instruction set. AL_ISA_TIER names an x86-64 microarchitecture level
-# (baseline, v2, v3, v4) and selects the matching vcpkg triplet tier in
-# BootstrapVcpkg.cmake. macOS ignores it: x86_64 is pinned to SSE4.2 because
-# Rosetta 2 on the deployment target does not translate AVX, and Apple
-# silicon's baseline is the baseline.
-if(DARWIN)
-  if(BUILD_TARGET_IS_X86_64)
-    target_compile_options(al_flags INTERFACE -msse4.2)
-  endif()
-elseif(WINDOWS)
-  if(AL_ISA_TIER STREQUAL "v4")
-    target_compile_options(al_flags INTERFACE /arch:AVX512)
-  elseif(AL_ISA_TIER STREQUAL "v3")
-    target_compile_options(al_flags INTERFACE /arch:AVX2)
-  elseif(AL_ISA_TIER STREQUAL "v2")
-    target_compile_options(al_flags INTERFACE /arch:SSE4.2)
-  endif()
-elseif(LINUX)
-  if(AL_ISA_TIER STREQUAL "baseline")
-    target_compile_options(al_flags INTERFACE -march=x86-64)
-  else()
-    target_compile_options(al_flags INTERFACE -march=x86-64-${AL_ISA_TIER})
-  endif()
-endif()
+# Instruction set: the same table the triplets read, so the viewer and its
+# ports are built for one machine. AlchemyTarget.cmake says what each tier
+# means and why macOS x86_64 ignores it.
+include(AlchemyTarget)
+al_isa_flags(${AL_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_compile_flags)
+target_compile_options(al_flags INTERFACE ${al_isa_compile_flags})
 
 # Hardening.
 if(LINUX)
@@ -401,6 +383,8 @@ if(DARWIN)
   set(CMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS YES)
   set(CMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf") # dSYMs only where a target asks
   set(CMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH NO)
+  # Xcode does not read -march; this is the Darwin row of AlchemyTarget.cmake
+  # in the spelling it does read.
   set(CMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS sse4.2)
   # Xcode's own signing cannot handle the embedded CEF bundles; signing is a
   # packaging step (viewer_manifest.py). Since Xcode 14.1 all three are needed

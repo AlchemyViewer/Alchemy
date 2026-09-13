@@ -225,7 +225,8 @@ The first configure run downloads and builds every vcpkg dependency from source.
 #### Platform notes
 
 - **macOS** — `xcode-os` and `ninja-os` (no arch suffix) pick the host architecture. Use the explicit `-arm64` / `-x64` preset to cross-build (e.g. an arm64 bundle from an Intel Mac).
-- **Linux with Clang** (faster builds): append `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_LINKER_TYPE=LLD` to the configure command.
+- **Linux with Clang** (faster builds): append `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_LINKER_TYPE=LLD` to the configure command. The hidden `lld` and `mold` presets set `CMAKE_LINKER_TYPE` for a preset of your own in `CMakeUserPresets.json`, for example `{"name": "mine", "inherits": ["ninja-os", "mold"]}`.
+- **vcpkg triplet** — chosen from the generator, the architecture and `AL_ISA_TIER`: `<arch>-<os>-alchemy[-avx2|-avx512][-release]`, where `-release` means a single-configuration tree that is not Debug and skips the debug ports. Pass `-DVCPKG_TARGET_TRIPLET=<name>` to choose one yourself; CI does, to take release-only ports under a multi-config generator.
 
 ### Workflow presets (one-shot configure + build)
 
@@ -279,7 +280,7 @@ The viewer executable lands under `build-<OS>-<preset>/newview/<Config>/`:
 
 ## Configuration types
 
-Ninja and Xcode presets are multi-config; Visual Studio presets always are. Pick a configuration at build time with `--config <Config>`, or use a build preset that bakes it in.
+Ninja and Xcode presets are multi-config; Visual Studio presets always are. Every configure preset has a build preset per configuration, named `<preset>-<config>` in lower case: `ninja-os-debug`, `ninja-os-optdebug`, `ninja-os-relwithdebinfo`, `ninja-os-release`, and likewise for the others. `--config <Config>` on the command line overrides the preset's configuration.
 
 | Configuration    | Libraries | Asserts | Notes                                                 |
 |:-----------------|:----------|:--------|:------------------------------------------------------|

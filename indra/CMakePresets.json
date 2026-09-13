@@ -2,17 +2,17 @@
   "version": 6,
   "configurePresets": [
     {
-      "name": "common",
+      "name": "base",
       "hidden": true,
       "binaryDir": "${sourceParentDir}/build-${hostSystemName}-${presetName}"
     },
     {
-      "name": "linux",
+      "name": "windows",
       "hidden": true,
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
-        "rhs": "Linux"
+        "rhs": "Windows"
       }
     },
     {
@@ -39,43 +39,31 @@
       }
     },
     {
-      "name": "windows",
-      "hidden": true,
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
-      "name": "nonfree",
+      "name": "proprietary",
       "hidden": true,
       "cacheVariables": {
         "AL_ENABLE_PROPRIETARY": true
       }
     },
     {
-      "name": "ninja-os",
-      "displayName": "Ninja Multi-Config",
-      "generator": "Ninja Multi-Config",
-      "inherits": "common",
+      "name": "lld",
+      "hidden": true,
       "cacheVariables": {
-        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
+        "CMAKE_LINKER_TYPE": "LLD"
       }
     },
     {
-      "name": "ninja",
-      "displayName": "Ninja Multi-Config Proprietary",
-      "inherits": [
-        "ninja-os",
-        "nonfree"
-      ]
+      "name": "mold",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_LINKER_TYPE": "MOLD"
+      }
     },
     {
       "name": "vs2026-os",
       "displayName": "Visual Studio 2026",
       "inherits": [
-        "common",
+        "base",
         "windows"
       ],
       "generator": "Visual Studio 18 2026"
@@ -85,7 +73,7 @@
       "displayName": "Visual Studio 2026 Proprietary",
       "inherits": [
         "vs2026-os",
-        "nonfree"
+        "proprietary"
       ]
     },
     {
@@ -99,8 +87,27 @@
       }
     },
     {
+      "name": "ninja-os",
+      "displayName": "Ninja Multi-Config",
+      "inherits": [
+        "base"
+      ],
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": {
+        "CMAKE_DEFAULT_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "ninja",
+      "displayName": "Ninja Multi-Config Proprietary",
+      "inherits": [
+        "ninja-os",
+        "proprietary"
+      ]
+    },
+    {
       "name": "ninja-os-arm64",
-      "displayName": "Ninja Multi-Config(arm64)",
+      "displayName": "Ninja Multi-Config (arm64)",
       "inherits": [
         "ninja-os",
         "macos",
@@ -109,7 +116,7 @@
     },
     {
       "name": "ninja-os-x64",
-      "displayName": "Ninja Multi-Config(x86_64)",
+      "displayName": "Ninja Multi-Config (x86_64)",
       "inherits": [
         "ninja-os",
         "macos",
@@ -118,7 +125,7 @@
     },
     {
       "name": "ninja-arm64",
-      "displayName": "Ninja Multi-Config(arm64)",
+      "displayName": "Ninja Multi-Config Proprietary (arm64)",
       "inherits": [
         "ninja",
         "macos",
@@ -127,7 +134,7 @@
     },
     {
       "name": "ninja-x64",
-      "displayName": "Ninja Multi-Config(x86_64)",
+      "displayName": "Ninja Multi-Config Proprietary (x86_64)",
       "inherits": [
         "ninja",
         "macos",
@@ -136,16 +143,24 @@
     },
     {
       "name": "xcode-os",
-      "displayName": "Xcode OS",
+      "displayName": "Xcode",
       "inherits": [
-        "common",
+        "base",
         "macos"
       ],
       "generator": "Xcode"
     },
     {
+      "name": "xcode",
+      "displayName": "Xcode Proprietary",
+      "inherits": [
+        "xcode-os",
+        "proprietary"
+      ]
+    },
+    {
       "name": "xcode-os-arm64",
-      "displayName": "Xcode OS(arm64)",
+      "displayName": "Xcode (arm64)",
       "inherits": [
         "xcode-os",
         "macos-arm64"
@@ -153,45 +168,37 @@
     },
     {
       "name": "xcode-os-x64",
-      "displayName": "Xcode OS(x86_64)",
+      "displayName": "Xcode (x86_64)",
       "inherits": [
         "xcode-os",
         "macos-x64"
       ]
     },
     {
-      "name": "xcode",
-      "displayName": "Xcode Proprietary",
-      "inherits": [
-        "xcode-os",
-        "nonfree"
-      ]
-    },
-    {
       "name": "xcode-arm64",
-      "displayName": "Xcode Proprietary(arm64)",
+      "displayName": "Xcode Proprietary (arm64)",
       "inherits": [
-        "xcode-os-arm64",
-        "nonfree"
+        "xcode",
+        "macos-arm64"
       ]
     },
     {
       "name": "xcode-x64",
-      "displayName": "Xcode Proprietary(x86_64)",
+      "displayName": "Xcode Proprietary (x86_64)",
       "inherits": [
-        "xcode-os-x64",
-        "nonfree"
+        "xcode",
+        "macos-x64"
       ]
     }
   ],
   "buildPresets": [
     {
-      "name": "linux",
+      "name": "windows",
       "hidden": true,
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
-        "rhs": "Linux"
+        "rhs": "Windows"
       }
     },
     {
@@ -204,191 +211,509 @@
       }
     },
     {
-      "name": "windows",
+      "name": "debug",
       "hidden": true,
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
-      "name": "ninja-debug",
-      "configurePreset": "ninja",
       "configuration": "Debug"
     },
     {
-      "name": "ninja-optdebug",
-      "configurePreset": "ninja",
+      "name": "optdebug",
+      "hidden": true,
       "configuration": "OptDebug"
     },
     {
-      "name": "ninja-relwithdebinfo",
-      "configurePreset": "ninja",
+      "name": "relwithdebinfo",
+      "hidden": true,
       "configuration": "RelWithDebInfo"
     },
     {
-      "name": "ninja-release",
-      "configurePreset": "ninja",
+      "name": "release",
+      "hidden": true,
       "configuration": "Release"
     },
     {
-      "name": "ninja-os-debug",
-      "configurePreset": "ninja-os",
-      "configuration": "Debug"
-    },
-    {
-      "name": "ninja-os-optdebug",
-      "configurePreset": "ninja-os",
-      "configuration": "OptDebug"
-    },
-    {
-      "name": "ninja-os-relwithdebinfo",
-      "configurePreset": "ninja-os",
-      "configuration": "RelWithDebInfo"
-    },
-    {
-      "name": "ninja-os-release",
-      "configurePreset": "ninja-os",
-      "configuration": "Release"
-    },
-    {
-      "name": "vs2026-release",
-      "configurePreset": "vs2026",
-      "configuration": "Release",
+      "name": "vs2026-os-debug",
+      "configurePreset": "vs2026-os",
       "inherits": [
-        "windows"
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-optdebug",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-os-relwithdebinfo",
+      "configurePreset": "vs2026-os",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "vs2026-os-release",
       "configurePreset": "vs2026-os",
-      "configuration": "Release",
       "inherits": [
-        "windows"
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-debug",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-optdebug",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "vs2026-relwithdebinfo",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "vs2026-release",
+      "configurePreset": "vs2026",
+      "inherits": [
+        "windows",
+        "release"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-debug",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "debug"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-optdebug",
+      "configurePreset": "vs2026-os-sdl",
+      "inherits": [
+        "windows",
+        "optdebug"
       ]
     },
     {
       "name": "vs2026-os-sdl-relwithdebinfo",
       "configurePreset": "vs2026-os-sdl",
-      "configuration": "RelWithDebInfo",
       "inherits": [
-        "windows"
+        "windows",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "vs2026-os-sdl-release",
       "configurePreset": "vs2026-os-sdl",
-      "configuration": "Release",
       "inherits": [
-        "windows"
+        "windows",
+        "release"
       ]
     },
     {
-      "name": "ninja-arm64-release",
-      "configurePreset": "ninja-arm64",
-      "configuration": "Release",
+      "name": "ninja-os-debug",
+      "configurePreset": "ninja-os",
       "inherits": [
-        "macos"
+        "debug"
       ]
     },
     {
-      "name": "ninja-x64-release",
-      "configurePreset": "ninja-x64",
-      "configuration": "Release",
+      "name": "ninja-os-optdebug",
+      "configurePreset": "ninja-os",
       "inherits": [
-        "macos"
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-relwithdebinfo",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-os-release",
+      "configurePreset": "ninja-os",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-debug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-optdebug",
+      "configurePreset": "ninja",
+      "inherits": [
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-relwithdebinfo",
+      "configurePreset": "ninja",
+      "inherits": [
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-release",
+      "configurePreset": "ninja",
+      "inherits": [
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-debug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-optdebug",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-arm64-relwithdebinfo",
+      "configurePreset": "ninja-os-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "ninja-os-arm64-release",
       "configurePreset": "ninja-os-arm64",
-      "configuration": "Release",
       "inherits": [
-        "macos"
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-debug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-optdebug",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-os-x64-relwithdebinfo",
+      "configurePreset": "ninja-os-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "ninja-os-x64-release",
       "configurePreset": "ninja-os-x64",
-      "configuration": "Release",
       "inherits": [
-        "macos"
+        "macos",
+        "release"
       ]
     },
     {
-      "name": "xcode-release",
-      "configurePreset": "xcode",
-      "configuration": "Release",
+      "name": "ninja-arm64-debug",
+      "configurePreset": "ninja-arm64",
       "inherits": [
-        "macos"
+        "macos",
+        "debug"
       ]
     },
     {
-      "name": "xcode-arm64-release",
-      "configurePreset": "xcode-arm64",
-      "configuration": "Release",
+      "name": "ninja-arm64-optdebug",
+      "configurePreset": "ninja-arm64",
       "inherits": [
-        "macos"
+        "macos",
+        "optdebug"
       ]
     },
     {
-      "name": "xcode-x64-release",
-      "configurePreset": "xcode-x64",
-      "configuration": "Release",
+      "name": "ninja-arm64-relwithdebinfo",
+      "configurePreset": "ninja-arm64",
       "inherits": [
-        "macos"
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-arm64-release",
+      "configurePreset": "ninja-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "ninja-x64-debug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "ninja-x64-optdebug",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "ninja-x64-relwithdebinfo",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "ninja-x64-release",
+      "configurePreset": "ninja-x64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-os-debug",
+      "configurePreset": "xcode-os",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-os-optdebug",
+      "configurePreset": "xcode-os",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-os-relwithdebinfo",
+      "configurePreset": "xcode-os",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "xcode-os-release",
       "configurePreset": "xcode-os",
-      "configuration": "Release",
       "inherits": [
-        "macos"
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-debug",
+      "configurePreset": "xcode",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-optdebug",
+      "configurePreset": "xcode",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-relwithdebinfo",
+      "configurePreset": "xcode",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "xcode-release",
+      "configurePreset": "xcode",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-os-arm64-debug",
+      "configurePreset": "xcode-os-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-os-arm64-optdebug",
+      "configurePreset": "xcode-os-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-os-arm64-relwithdebinfo",
+      "configurePreset": "xcode-os-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "xcode-os-arm64-release",
       "configurePreset": "xcode-os-arm64",
-      "configuration": "Release",
       "inherits": [
-        "macos"
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-os-x64-debug",
+      "configurePreset": "xcode-os-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-os-x64-optdebug",
+      "configurePreset": "xcode-os-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-os-x64-relwithdebinfo",
+      "configurePreset": "xcode-os-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
       ]
     },
     {
       "name": "xcode-os-x64-release",
       "configurePreset": "xcode-os-x64",
-      "configuration": "Release",
       "inherits": [
-        "macos"
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-arm64-debug",
+      "configurePreset": "xcode-arm64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-arm64-optdebug",
+      "configurePreset": "xcode-arm64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-arm64-relwithdebinfo",
+      "configurePreset": "xcode-arm64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "xcode-arm64-release",
+      "configurePreset": "xcode-arm64",
+      "inherits": [
+        "macos",
+        "release"
+      ]
+    },
+    {
+      "name": "xcode-x64-debug",
+      "configurePreset": "xcode-x64",
+      "inherits": [
+        "macos",
+        "debug"
+      ]
+    },
+    {
+      "name": "xcode-x64-optdebug",
+      "configurePreset": "xcode-x64",
+      "inherits": [
+        "macos",
+        "optdebug"
+      ]
+    },
+    {
+      "name": "xcode-x64-relwithdebinfo",
+      "configurePreset": "xcode-x64",
+      "inherits": [
+        "macos",
+        "relwithdebinfo"
+      ]
+    },
+    {
+      "name": "xcode-x64-release",
+      "configurePreset": "xcode-x64",
+      "inherits": [
+        "macos",
+        "release"
       ]
     }
   ],
   "workflowPresets": [
     {
-      "name": "ninja-release",
+      "name": "vs2026-os-release",
       "steps": [
         {
           "type": "configure",
-          "name": "ninja"
+          "name": "vs2026-os"
         },
         {
           "type": "build",
-          "name": "ninja-release"
-        }
-      ]
-    },
-    {
-      "name": "ninja-os-release",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "ninja-os"
-        },
-        {
-          "type": "build",
-          "name": "ninja-os-release"
+          "name": "vs2026-os-release"
         }
       ]
     },
@@ -406,28 +731,28 @@
       ]
     },
     {
-      "name": "vs2026-os-release",
+      "name": "ninja-os-release",
       "steps": [
         {
           "type": "configure",
-          "name": "vs2026-os"
+          "name": "ninja-os"
         },
         {
           "type": "build",
-          "name": "vs2026-os-release"
+          "name": "ninja-os-release"
         }
       ]
     },
     {
-      "name": "xcode-release",
+      "name": "ninja-release",
       "steps": [
         {
           "type": "configure",
-          "name": "xcode"
+          "name": "ninja"
         },
         {
           "type": "build",
-          "name": "xcode-release"
+          "name": "ninja-release"
         }
       ]
     },
@@ -441,6 +766,19 @@
         {
           "type": "build",
           "name": "xcode-os-release"
+        }
+      ]
+    },
+    {
+      "name": "xcode-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "xcode"
+        },
+        {
+          "type": "build",
+          "name": "xcode-release"
         }
       ]
     }
