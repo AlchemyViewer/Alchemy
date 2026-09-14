@@ -753,14 +753,17 @@ void LLWebRTCImpl::workerStartRecording()
 // must be run in the worker thread.  Selects the configured playout device and
 // starts playout.  Playout only runs while there's a connection to render
 // (running the output device with no engine data is heard as a buzz), so this
-// is a no-op when there are no connections or when already playing.  Device
-// changes go through workerDeployDevices(), which stops playout first.
+// is a no-op when there are no connections or when already playing on the
+// configured device.  Playing on any other device -- the engine starts playout
+// itself when a receive stream comes up, on whatever the module last had --
+// is stopped and re-selected.  Device changes go through
+// workerDeployDevices(), which stops playout first.
 void LLWebRTCImpl::workerStartPlayout()
 {
     // Only run playout while voice is enabled and there is something to render:
     // either a connection, or the device preview echoing capture back.  Running
     // the output device with neither is heard as a buzz.
-    if (!mDeviceModule || !mVoiceEnabled || mDeviceModule->Playing() || (!mTuningMode && mPeerConnections.empty()))
+    if (!mDeviceModule || !mVoiceEnabled || (!mTuningMode && mPeerConnections.empty()))
     {
         return;
     }
@@ -782,6 +785,16 @@ void LLWebRTCImpl::workerStartPlayout()
                 break;
             }
         }
+    }
+
+    if (mDeviceModule->Playing())
+    {
+        if (mDeviceModule->GetPlayoutDevice() == (int32_t)playoutDevice)
+        {
+            return;
+        }
+
+        mDeviceModule->StopPlayout();
     }
 
 #if WEBRTC_WIN

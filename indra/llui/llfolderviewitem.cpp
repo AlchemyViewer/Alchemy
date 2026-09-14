@@ -267,7 +267,11 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 // Destroys the object
 LLFolderViewItem::~LLFolderViewItem()
 {
-    mViewModelItem = NULL;
+    if (mViewModelItem)
+    {
+        mViewModelItem->setFolderViewItem(nullptr);
+        mViewModelItem = nullptr;
+    }
     gFocusMgr.removeKeyboardFocusWithoutCallback(this);
 }
 
@@ -389,7 +393,12 @@ bool LLFolderViewItem::isPotentiallyVisible(S32 filter_generation)
 
 void LLFolderViewItem::refresh()
 {
-    LLFolderViewModelItem& vmi = *getViewModelItem();
+    LLFolderViewModelItem* vmi_ptr = getViewModelItem();
+    if (!vmi_ptr)
+    {
+        return;
+    }
+    LLFolderViewModelItem& vmi = *vmi_ptr;
 
     // A refresh is asked for whenever anything about the item might have
     // moved, and usually nothing has: the name comes back the same string it
@@ -425,6 +434,10 @@ void LLFolderViewItem::refresh()
 void LLFolderViewItem::refreshSuffix()
 {
     LLFolderViewModelItem const* vmi = getViewModelItem();
+    if (!vmi)
+    {
+        return;
+    }
 
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()

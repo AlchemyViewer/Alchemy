@@ -61,7 +61,8 @@
 			<text name="LabelItemExperienceTitle">
 				Deneyim:
 			</text>
-			<text_editor name="LabelItemDesc" tool_tip="Görüntüleyici ayarlarında 'İpuçlarını Tüm Nesnelerin Üzerine Getir' seçildiğinde, fare imlecinin altındaki herhangi bir nesneye ait nesne açıklaması açılır penceresi görülür. Prim (temel öğe) açıklaması 127 bayt ile sınırlıdır ve bundan daha uzun her dize kesilir."/>
+			<line_editor name="LabelItemDescSingleLine" tool_tip="Görüntüleyici ayarlarında 'İpuçlarını Tüm Nesnelerin Üzerine Getir' seçildiğinde, fare imlecinin altındaki herhangi bir nesneye ait nesne açıklaması açılır penceresi görülür. Prim (temel öğe) açıklaması 127 bayt ile sınırlıdır ve bundan daha uzun her dize kesilir."/>
+			<text_editor name="LabelItemDescMultiLine" tool_tip="Görüntüleyici ayarlarında 'İpuçlarını Tüm Nesnelerin Üzerine Getir' seçildiğinde, fare imlecinin altındaki herhangi bir nesneye ait nesne açıklaması açılır penceresi görülür. Prim (temel öğe) açıklaması 127 bayt ile sınırlıdır ve bundan daha uzun her dize kesilir."/>
 			<text name="LabelItemDescTitle">
 				Açıklama:
 			</text>

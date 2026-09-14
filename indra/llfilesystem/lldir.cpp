@@ -98,14 +98,28 @@ std::vector<std::string> LLDir::getFilesInDir(const std::string &dirname)
     if (std::filesystem::is_directory(dir_path, ec))
     {
         std::filesystem::directory_iterator end_iter;
-        for (std::filesystem::directory_iterator dir_itr(dir_path);
-             dir_itr != end_iter;
-             ++dir_itr)
+        try
         {
-            if (std::filesystem::is_regular_file(dir_itr->status()))
+            for (std::filesystem::directory_iterator dir_itr(dir_path);
+                 dir_itr != end_iter;
+                 ++dir_itr)
             {
-                v.push_back(ll_convert<std::string>(dir_itr->path().filename().u8string()));
+                try
+                {
+                    if (std::filesystem::is_regular_file(dir_itr->status()))
+                    {
+                        v.push_back(ll_convert<std::string>(dir_itr->path().filename().u8string()));
+                    }
+                }
+                catch (const std::system_error& e)
+                {
+                    LL_WARNS() << "Exception accessing directory entry: " << e.what() << LL_ENDL;
+                }
             }
+        }
+        catch (const std::system_error& e)
+        {
+            LL_WARNS() << "Exception iterating directory: " << e.what() << LL_ENDL;
         }
     }
     return v;

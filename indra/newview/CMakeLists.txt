@@ -391,6 +391,7 @@ if(AL_BUILD_VIEWER)
     llfloaterlocalassets.cpp
     llfloatermarketplacelistings.cpp
     llfloatermap.cpp
+    llfloatermaturitydialog.cpp
     llfloatermediasettings.cpp
     llfloatermemleak.cpp
     llfloatermessagebuilder.cpp
@@ -1184,6 +1185,7 @@ if(AL_BUILD_VIEWER)
     llfloatermap.h
     llfloatermarketplace.h
     llfloatermarketplacelistings.h
+    llfloatermaturitydialog.h
     llfloatermediasettings.h
     llfloatermemleak.h
     llfloatermessagebuilder.h

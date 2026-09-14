@@ -61,7 +61,8 @@
 			<text name="LabelItemExperienceTitle">
 				Expérience :
 			</text>
-			<text_editor name="LabelItemDesc" tool_tip="Lorsque les utilisateurs sélectionnent 'Conseils de survol sur tous les objets' dans les paramètres de la visionneuse, la description contextuelle de chaque objet apparaît sous le pointeur de la souris. La description de la prim est limitée à 127 octets, toute chaîne supérieure à cette limite sera tronquée."/>
+			<line_editor name="LabelItemDescSingleLine" tool_tip="Lorsque les utilisateurs sélectionnent 'Conseils de survol sur tous les objets' dans les paramètres de la visionneuse, la description contextuelle de chaque objet apparaît sous le pointeur de la souris. La description de la prim est limitée à 127 octets, toute chaîne supérieure à cette limite sera tronquée."/>
+			<text_editor name="LabelItemDescMultiLine" tool_tip="Lorsque les utilisateurs sélectionnent 'Conseils de survol sur tous les objets' dans les paramètres de la visionneuse, la description contextuelle de chaque objet apparaît sous le pointeur de la souris. La description de la prim est limitée à 127 octets, toute chaîne supérieure à cette limite sera tronquée."/>
 			<text name="LabelItemDescTitle">
 				Description :
 			</text>

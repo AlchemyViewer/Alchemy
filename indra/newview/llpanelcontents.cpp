@@ -134,6 +134,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 {
     if( !objectp )
     {
+        mLastScriptObjectID.setNull();
         getChildView("button new script")->setEnabled(false);
         getChildView("button new notecard")->setEnabled(false);
         mPublishButton->setEnabled(false);
@@ -198,10 +199,18 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     // Edit script button - ok if object is editable and there's an unambiguous destination for the object.
     getChildView("button new script")->setEnabled(new_button_enabled);
 
-    // Enable the Lua script option only when the region supports it.
+    // Enable the Lua script option only when the region supports it, and
+    // default a freshly selected object's new script to the region's language.
     LLViewerRegion* region = objectp->getRegion();
     bool lua_enabled = isLuaEnabledForObjectRegion(objectp);
-    getChild<LLComboBox>("button new script")->setEnabledByValue("lua", lua_enabled);
+    LLComboBox* new_script = getChild<LLComboBox>("button new script");
+    new_script->setEnabledByValue("lua", lua_enabled);
+    if (mLastScriptObjectID != objectp->getID() || mLastLuaRegion != lua_enabled)
+    {
+        new_script->setValue(lua_enabled ? "lua" : "lsl");
+    }
+    mLastScriptObjectID = objectp->getID();
+    mLastLuaRegion = lua_enabled;
 
     getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());

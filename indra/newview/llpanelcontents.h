@@ -84,6 +84,8 @@ protected:
     void onFilterEdit();
 
     bool mDirtyFilter { false };
+    LLUUID mLastScriptObjectID;
+    bool mLastLuaRegion { false };
 
 private:
     bool isLuaEnabledForObjectRegion(LLViewerObject *objectp);
