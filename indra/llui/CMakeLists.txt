@@ -430,6 +430,7 @@ if(AL_BUILD_TESTS)
     alxuisourcemap
     alxuitreemodel
     alcolorsheet
+    lluicolortable
   )
     al_add_test(
       ${test}

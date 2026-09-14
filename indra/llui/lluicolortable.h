@@ -27,49 +27,30 @@
 #ifndef LL_LLUICOLORTABLE_H_
 #define LL_LLUICOLORTABLE_H_
 
+#include <span>
+#include <utility>
+
 #include <boost/unordered_map.hpp>
 
-#include "llinitparam.h"
+#include "alcolorsheet.h"
 #include "llsingleton.h"
+#include "lluicolor.h"
+#include "llxmlnode.h"
 
 #include "v4color.h"
-
-class LLUIColor;
 
 class LLUIColorTable : public LLSingleton<LLUIColorTable>
 {
     LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
     LOG_CLASS(LLUIColorTable);
 
-    // consider using sorted vector, can be much faster
+    // Node based on purpose: getColor() hands out pointers into these, so an
+    // entry, once made, keeps its address and is never erased.
     typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
-    struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
-    {
-        Alternative<LLColor4>    value;
-        Alternative<std::string> reference;
-
-        ColorParams();
-    };
-
-    struct ColorEntryParams : LLInitParam::Block<ColorEntryParams>
-    {
-        Mandatory<std::string> name;
-        Mandatory<ColorParams> color;
-
-        ColorEntryParams();
-    };
-
-    struct Params : LLInitParam::Block<Params>
-    {
-        Multiple<ColorEntryParams> color_entries;
-
-        Params();
-    };
-
-    // define colors by passing in a param block that can be generated via XUI file or manually
-    void insertFromParams(const Params& p);
+    // A parsed colors.xml and the name diagnostics know it by.
+    typedef std::pair<LLXMLNodePtr, std::string> document_t;
 
     // reset all colors to default magenta color
     void clear();
@@ -87,25 +68,39 @@ public:
 
     void resetToDefault(std::string_view color_name);
 
-    // loads colors from settings files
+    // The skins' colors.xml in override order -- default, current, and the
+    // user's copies of each -- merged by name, then the user's own on top.
     bool loadFromSettings();
+
+    // The same from documents already parsed: what loadFromSettings does
+    // once it has found the files. A loaded name the documents no longer
+    // declare goes magenta; a user colour set since the last load stays.
+    bool load(std::span<const document_t> skin_documents, const LLXMLNodePtr& user_document, std::string_view user_filename);
 
     // saves colors specified by the user to the users skin directory
     void saveUserSettings(const bool scrub = false) const;
 
-    const auto& getLoadedColors() { return mLoadedColors; }
-    const auto& getUserColors() { return mUserSetColors; }
+    // What saveUserSettings writes: every user colour that differs from the
+    // loaded one, or with scrub only the palette entries.
+    LLXMLNodePtr userSettingsDocument(bool scrub = false) const;
+
+    const auto& getLoadedColors() const { return mLoadedColors; }
+    const auto& getUserColors() const { return mUserSetColors; }
+
+    // Where each loaded colour was declared, and what the last load had to
+    // say about the files.
+    const ALColorSheet& getLoadedSheet() const { return mLoadedSheet; }
+    const ALColorSheet& getUserSheet() const { return mUserSheet; }
 
 private:
-    bool loadFromFilename(const std::string& filename, string_color_map_t& table);
-
-    void insertFromParams(const Params& p, string_color_map_t& table);
-
+    void install(const ALColorSheet& sheet, string_color_map_t& table, bool drop_missing);
     void clearTable(string_color_map_t& table);
     void setColor(std::string_view name, const LLColor4& color, string_color_map_t& table);
 
     string_color_map_t mLoadedColors;
     string_color_map_t mUserSetColors;
+    ALColorSheet       mLoadedSheet;
+    ALColorSheet       mUserSheet;
 };
 
 #endif // LL_LLUICOLORTABLE_H

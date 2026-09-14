@@ -26,154 +26,17 @@
 
 #include "linden_common.h"
 
-#include <queue>
+#include "lluicolortable.h"
 
 #include "lldir.h"
 #include "llui.h"
-#include "lluicolortable.h"
-#include "lluictrlfactory.h"
-
-LLUIColorTable::ColorParams::ColorParams()
-:   value("value"),
-    reference("reference")
-{
-}
-
-LLUIColorTable::ColorEntryParams::ColorEntryParams()
-:   name("name"),
-    color("")
-{
-}
-
-LLUIColorTable::Params::Params()
-:   color_entries("color")
-{
-}
-
-void LLUIColorTable::insertFromParams(const Params& p, string_color_map_t& table)
-{
-    // this map will contain all color references after the following loop
-    typedef std::map<std::string, std::string> string_string_map_t;
-    string_string_map_t unresolved_refs;
-
-    for(LLInitParam::ParamIterator<ColorEntryParams>::const_iterator it = p.color_entries.begin();
-        it != p.color_entries.end();
-        ++it)
-    {
-        ColorEntryParams color_entry = *it;
-        if(color_entry.color.value.isChosen())
-        {
-            setColor(color_entry.name(), color_entry.color.value, table);
-        }
-        else
-        {
-            unresolved_refs.insert(string_string_map_t::value_type(color_entry.name, color_entry.color.reference));
-        }
-    }
-
-    // maintain an in order queue of visited references for better debugging of cycles
-    typedef std::queue<std::string> string_queue_t;
-    string_queue_t ref_chain;
-
-    // maintain a map of the previously visited references in the reference chain for detecting cycles
-    typedef std::map<std::string, string_string_map_t::iterator> string_color_ref_iter_map_t;
-    string_color_ref_iter_map_t visited_refs;
-
-    // loop through the unresolved color references until there are none left
-    while(!unresolved_refs.empty())
-    {
-        // we haven't visited any references yet
-        visited_refs.clear();
-
-        string_string_map_t::iterator current = unresolved_refs.begin();
-        string_string_map_t::iterator previous;
-
-        while(true)
-        {
-            if(current != unresolved_refs.end())
-            {
-                // locate the current reference in the previously visited references...
-                string_color_ref_iter_map_t::iterator visited = visited_refs.lower_bound(current->first);
-                if(visited != visited_refs.end()
-                && !(visited_refs.key_comp()(current->first, visited->first)))
-                {
-                    // ...if we find the current reference in the previously visited references
-                    // we know that there is a cycle
-                    std::string ending_ref = current->first;
-                    std::string warning("The following colors form a cycle: ");
-
-                    // warn about the references in the chain and remove them from
-                    // the unresolved references map because they cannot be resolved
-                    for(string_color_ref_iter_map_t::iterator iter = visited_refs.begin();
-                        iter != visited_refs.end();
-                        ++iter)
-                    {
-                        if(!ref_chain.empty())
-                        {
-                            warning += ref_chain.front() + "->";
-                            ref_chain.pop();
-                        }
-                        unresolved_refs.erase(iter->second);
-                    }
-
-                    LL_WARNS() << warning + ending_ref << LL_ENDL;
-
-                    break;
-                }
-                else
-                {
-                    // ...continue along the reference chain
-                    ref_chain.push(current->first);
-                    visited_refs.insert(visited, string_color_ref_iter_map_t::value_type(current->first, current));
-                }
-            }
-            else
-            {
-                // since this reference does not refer to another reference it must refer to an
-                // actual color, lets find it...
-                string_color_map_t::iterator color_value = mLoadedColors.find(previous->second);
-
-                if(color_value != mLoadedColors.end())
-                {
-                    // ...we found the color, and we now add every reference in the reference chain
-                    // to the color map
-                    for(string_color_ref_iter_map_t::iterator iter = visited_refs.begin();
-                        iter != visited_refs.end();
-                        ++iter)
-                    {
-                        setColor(iter->first, color_value->second, mLoadedColors);
-                        unresolved_refs.erase(iter->second);
-                    }
-
-                    break;
-                }
-                else
-                {
-                    // ... we did not find the color which imples that the current reference
-                    // references a non-existant color
-                    for(string_color_ref_iter_map_t::iterator iter = visited_refs.begin();
-                        iter != visited_refs.end();
-                        ++iter)
-                    {
-                        LL_WARNS() << iter->first << " references a non-existent color" << LL_ENDL;
-                        unresolved_refs.erase(iter->second);
-                    }
-
-                    break;
-                }
-            }
-
-            // find the next color reference in the reference chain
-            previous = current;
-            current = unresolved_refs.find(current->second);
-        }
-    }
-}
 
 void LLUIColorTable::clear()
 {
     clearTable(mLoadedColors);
     clearTable(mUserSetColors);
+    mLoadedSheet.clear();
+    mUserSheet.clear();
 }
 
 LLUIColor LLUIColorTable::getColor(std::string_view name, const LLColor4& default_color) const
@@ -208,6 +71,9 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color)
         string_color_map_t::iterator base_iter = mLoadedColors.find(name);
         if (base_iter != mLoadedColors.end())
         {
+            // The node itself moves to the user table, so every handle
+            // taken on the loaded colour now reads the user's; a fresh node
+            // keeps the loaded value for isDefault and resetToDefault.
             LLColor4 original_color = base_iter->second.get();
             auto color_handle = mLoadedColors.extract(base_iter);
             auto new_color_pair = mUserSetColors.insert(std::move(color_handle));
@@ -257,25 +123,94 @@ void LLUIColorTable::resetToDefault(std::string_view name)
 
 bool LLUIColorTable::loadFromSettings()
 {
-    bool result = false;
-
-    // pass constraint=LLDir::ALL_SKINS because we want colors.xml from every
-    // skin dir
+    // ALL_SKINS: the default skin's colors.xml, the current skin's, and the
+    // user's copies of each, in that order, so each overrides the last.
+    std::vector<document_t> skin_documents;
     for (const std::string& colors_path :
                   gDirUtilp->findSkinnedFilenames(LLDir::SKINBASE, "colors.xml", LLDir::ALL_SKINS))
     {
-        result |= loadFromFilename(colors_path, mLoadedColors);
+        LLXMLNodePtr root;
+        if (!LLXMLNode::parseFile(colors_path, root, nullptr))
+        {
+            LL_WARNS("UIColorTable") << "Unable to parse color file " << colors_path << LL_ENDL;
+            continue;
+        }
+        skin_documents.emplace_back(std::move(root), colors_path);
     }
 
-    std::string user_filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colors.xml");
-    loadFromFilename(user_filename, mUserSetColors);
+    const std::string user_filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colors.xml");
+    LLXMLNodePtr user_root;
+    if (gDirUtilp->fileExists(user_filename) && !LLXMLNode::parseFile(user_filename, user_root, nullptr))
+    {
+        LL_WARNS("UIColorTable") << "Unable to parse color file " << user_filename << LL_ENDL;
+    }
+
+    return load(skin_documents, user_root, user_filename);
+}
+
+bool LLUIColorTable::load(std::span<const document_t> skin_documents, const LLXMLNodePtr& user_document, std::string_view user_filename)
+{
+    bool result = false;
+
+    mLoadedSheet.clear();
+    for (const document_t& document : skin_documents)
+    {
+        if (mLoadedSheet.read(document.first, document.second))
+        {
+            result = true;
+        }
+        else
+        {
+            LL_WARNS("UIColorTable") << document.second << " is not a valid color definition file" << LL_ENDL;
+        }
+    }
+    mLoadedSheet.resolve();
+    install(mLoadedSheet, mLoadedColors, true);
+
+    mUserSheet.clear();
+    if (user_document.notNull() && !mUserSheet.read(user_document, user_filename))
+    {
+        LL_WARNS("UIColorTable") << user_filename << " is not a valid color definition file" << LL_ENDL;
+    }
+    mUserSheet.resolve(&mLoadedSheet);
+    install(mUserSheet, mUserSetColors, false);
+
+    for (const ALColorSheet* sheet : { &mLoadedSheet, &mUserSheet })
+    {
+        for (const ALColorSheet::Diagnostic& diagnostic : sheet->diagnostics())
+        {
+            LL_WARNS("UIColorTable") << diagnostic.message << LL_ENDL;
+        }
+    }
 
     return result;
 }
 
-void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
+// Every resolved colour into its node, or a new one. With drop_missing, a
+// name the sheet did not resolve is painted magenta rather than left at
+// what an earlier load gave it: a handle to it stays valid and shows the
+// hole.
+void LLUIColorTable::install(const ALColorSheet& sheet, string_color_map_t& table, bool drop_missing)
 {
-    Params params;
+    if (drop_missing)
+    {
+        for (auto& [name, color] : table)
+        {
+            if (!sheet.find(name))
+            {
+                color = LLColor4::magenta;
+            }
+        }
+    }
+    sheet.forEachResolved([&](std::string_view name, const LLColor4& color)
+    {
+        setColor(name, color, table);
+    });
+}
+
+LLXMLNodePtr LLUIColorTable::userSettingsDocument(bool scrub) const
+{
+    LLXMLNodePtr output_node = new LLXMLNode("colors", false);
 
     for (const auto& color_pair : mUserSetColors)
     {
@@ -286,30 +221,28 @@ void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
 
         if (!scrub || color_pair.first.find("ColorPaletteEntry") != std::string::npos)
         {
-            ColorEntryParams color_entry;
-            color_entry.name = color_pair.first;
-            color_entry.color.value = color_pair.second;
-
-            params.color_entries.add(color_entry);
+            LLXMLNodePtr color_node = output_node->createChild("color", false);
+            color_node->createChild("name", true)->setStringValue(color_pair.first);
+            color_node->createChild("value", true)->setFloatValue(4, color_pair.second.get().mV);
         }
     }
 
-    LLXMLNodePtr output_node = new LLXMLNode("colors", false);
-    LLXUIParser parser;
-    parser.writeXUI(output_node, params);
+    return output_node;
+}
 
-    if(!output_node->isNull())
+void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
+{
+    LLXMLNodePtr output_node = userSettingsDocument(scrub);
+
+    const std::string& filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colors.xml");
+    LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
+
+    if(fp != NULL)
     {
-        const std::string& filename = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colors.xml");
-        LLFILE *fp = LLFile::fopen(filename, LLFILE_MODE("w"));
+        LLXMLNode::writeHeaderToFile(fp);
+        output_node->writeToFile(fp);
 
-        if(fp != NULL)
-        {
-            LLXMLNode::writeHeaderToFile(fp);
-            output_node->writeToFile(fp);
-
-            fclose(fp);
-        }
+        fclose(fp);
     }
 }
 
@@ -344,43 +277,4 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color, stri
     }
 }
 
-bool LLUIColorTable::loadFromFilename(const std::string& filename, string_color_map_t& table)
-{
-    LLXMLNodePtr root;
-
-    if(!LLXMLNode::parseFile(filename, root, NULL))
-    {
-        LL_WARNS() << "Unable to parse color file " << filename << LL_ENDL;
-        return false;
-    }
-
-    if(!root->hasName("colors"))
-    {
-        LL_WARNS() << filename << " is not a valid color definition file" << LL_ENDL;
-        return false;
-    }
-
-    Params params;
-    LLXUIParser parser;
-    parser.readXUI(root, params, filename);
-
-    if(params.validateBlock())
-    {
-        insertFromParams(params, table);
-    }
-    else
-    {
-        LL_WARNS() << filename << " failed to load" << LL_ENDL;
-        return false;
-    }
-
-    return true;
-}
-
-void LLUIColorTable::insertFromParams(const Params& p)
-{
-    insertFromParams(p, mUserSetColors);
-}
-
 // EOF
-
