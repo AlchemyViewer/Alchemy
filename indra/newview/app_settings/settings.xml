@@ -2850,7 +2850,7 @@
     <key>HeadlessClient</key>
     <map>
       <key>Comment</key>
-      <string>Run in headless mode by disabling GL rendering, keyboard, etc</string>
+      <string>Run with no desktop: render on a window that is never shown, with no splash, keyboard or mouse</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

@@ -2007,50 +2007,6 @@ void LLViewerWindow::handleMenuSelect(LLWindow *window,  S32 menu_item)
 }
 
 
-bool LLViewerWindow::handlePaint(LLWindow *window,  S32 x,  S32 y, S32 width,  S32 height)
-{
-    // *TODO: Enable similar information output for other platforms?  DK 2011-02-18
-#if LL_WINDOWS
-    if (gHeadlessClient)
-    {
-        HWND window_handle = (HWND)window->getPlatformWindow();
-        PAINTSTRUCT ps;
-        HDC hdc;
-
-        RECT wnd_rect;
-        wnd_rect.left = 0;
-        wnd_rect.top = 0;
-        wnd_rect.bottom = 200;
-        wnd_rect.right = 500;
-
-        hdc = BeginPaint(window_handle, &ps);
-        //SetBKColor(hdc, RGB(255, 255, 255));
-        FillRect(hdc, &wnd_rect, CreateSolidBrush(RGB(255, 255, 255)));
-
-        std::string temp_str;
-        LLTrace::Recording& recording = LLViewerStats::instance().getRecording();
-        temp_str = llformat( "FPS %3.1f Phy FPS %2.1f Time Dil %1.3f",      /* Flawfinder: ignore */
-                recording.getPerSec(LLStatViewer::FPS), //mFPSStat.getMeanPerSec(),
-                recording.getLastValue(LLStatViewer::SIM_PHYSICS_FPS),
-                recording.getLastValue(LLStatViewer::SIM_TIME_DILATION));
-        int len = static_cast<int>(temp_str.length());
-        TextOutA(hdc, 0, 0, temp_str.c_str(), len);
-
-
-        LLVector3d pos_global = gAgent.getPositionGlobal();
-        temp_str = llformat( "Avatar pos %6.1lf %6.1lf %6.1lf", pos_global.mdV[0], pos_global.mdV[1], pos_global.mdV[2]);
-        len = static_cast<S32>(temp_str.length());
-        TextOutA(hdc, 0, 25, temp_str.c_str(), len);
-
-        TextOutA(hdc, 0, 50, "Set \"HeadlessClient FALSE\" in settings.ini file to reenable", 61);
-        EndPaint(window_handle, &ps);
-        return true;
-    }
-#endif
-    return false;
-}
-
-
 void LLViewerWindow::handleScrollWheel(LLWindow *window,  LLScrollDelta delta)
 {
     handleScrollWheel( delta );
@@ -2251,7 +2207,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         p.fullscreen,
         gHeadlessClient,
         gSavedSettings.getBOOL("RenderVSyncEnable"),
-        gHeadlessClient ? ALWindowBackend::None : ALWindowBackend::Native,
+        gHeadlessClient ? ALWindowBackend::Hidden : ALWindowBackend::Native,
         p.ignore_pixel_depth,
         0,
         max_core_count,

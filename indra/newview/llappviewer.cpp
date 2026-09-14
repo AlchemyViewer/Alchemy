@@ -1585,8 +1585,7 @@ bool LLAppViewer::doFrame()
             }
 
             // Render scene.
-            // *TODO: Should we run display() even during gHeadlessClient?  DK 2011-02-18
-            if (!LLApp::isExiting() && !gHeadlessClient && gViewerWindow)
+            if (!LLApp::isExiting() && gViewerWindow)
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df Display");
                 pingMainloopTimeout("Main:Display");
@@ -3242,9 +3241,13 @@ bool LLAppViewer::initConfiguration()
         }
     }
 
+    // The window backend is decided here, ahead of the splash: a headless
+    // viewer renders on a window that is never shown and puts up no splash.
+    gHeadlessClient = gSavedSettings.getBOOL("HeadlessClient");
+
     // Display splash screen.  Must be after above check for previous
     // crash as this dialog is always frontmost.
-    if (!gGPUBenchmarkMode)
+    if (!gGPUBenchmarkMode && !gHeadlessClient)
     {
         std::string splash_msg;
         LLStringUtil::format_map_t args;
@@ -3507,9 +3510,6 @@ bool LLAppViewer::initWindow()
 {
     LL_PROFILE_ZONE_SCOPED;
     LL_INFOS("AppInit") << "Initializing window..." << LL_ENDL;
-
-    // store setting in a global for easy access and modification
-    gHeadlessClient = gSavedSettings.getBOOL("HeadlessClient");
 
     // always start windowed
     bool ignorePixelDepth = gSavedSettings.getBOOL("IgnorePixelDepth");
