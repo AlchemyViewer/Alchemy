@@ -32,6 +32,7 @@
 #include "../llquaternion2.h"
 #include "../v3math.h"
 
+#include <cmath>
 #include <random>
 #include <string>
 #include <vector>
@@ -465,5 +466,56 @@ namespace tut
             ensure_approximately_equals_range("and it is the one slerp gives",
                                               fabsf(dot(got, expected)), 1.f, 1e-3f);
         }
+    }
+
+    template<> template<>
+    void llquaternion2_object::test<14>()
+    {
+        // Quantizing to eight or sixteen bits keeps a rotation a rotation,
+        // within the step the bits allow.
+        for (const LLQuaternion& q : mRotations)
+        {
+            LLQuaternion2 q8(q);
+            q8.quantize8();
+            ensure("quantize8 is a rotation", q8.isOkRotation());
+            LLQuaternion got8;
+            q8.store(got8);
+            ensure_approximately_equals_range("quantize8 is the rotation it was given, to eight bits", fabsf(dot(got8, q)), 1.f, 1e-4f);
+            for (S32 i = 0; i < 4; ++i)
+            {
+                ensure("quantize8 component within a step", fabsf(got8.mQ[i] - q.mQ[i]) <= 2.f / 255.f);
+            }
+
+            LLQuaternion2 q16(q);
+            q16.quantize16();
+            ensure("quantize16 is a rotation", q16.isOkRotation());
+            ensure_same_rotation("quantize16 is the rotation it was given", q16, q);
+            LLQuaternion got16;
+            q16.store(got16);
+            for (S32 i = 0; i < 4; ++i)
+            {
+                ensure("quantize16 component within a step", fabsf(got16.mQ[i] - q.mQ[i]) <= 2.f / 65535.f);
+            }
+        }
+    }
+
+    template<> template<>
+    void llquaternion2_object::test<15>()
+    {
+        // The conjugate flips the vector part alone, and the identity is
+        // its own conjugate.
+        const LLQuaternion q(0.7f, LLVector3(0.577f, 0.577f, 0.577f));
+        LLQuaternion2 conj;
+        conj.setConjugate(LLQuaternion2(q));
+        LLQuaternion got;
+        conj.store(got);
+        ensure_equals("conjugate x", got.mQ[VX], -q.mQ[VX]);
+        ensure_equals("conjugate y", got.mQ[VY], -q.mQ[VY]);
+        ensure_equals("conjugate z", got.mQ[VZ], -q.mQ[VZ]);
+        ensure_equals("conjugate w", got.mQ[VW], q.mQ[VW]);
+
+        LLQuaternion2 ident;
+        ident.setConjugate(LLQuaternion2::identity());
+        ensure("the identity is its own conjugate", ident.equals(LLQuaternion2::identity()));
     }
 }

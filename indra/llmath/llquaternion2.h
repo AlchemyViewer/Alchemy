@@ -27,17 +27,8 @@
 #ifndef LL_QUATERNION2_H
 #define LL_QUATERNION2_H
 
-/////////////////////////////
-// LLQuaternion2
-/////////////////////////////
-// This class stores a quaternion x*i + y*j + z*k + w in <x, y, z, w> order
-// (i.e., w in high order element of vector)
-/////////////////////////////
-/////////////////////////////
-// These classes are intentionally minimal right now. If you need additional
-// functionality, please contact someone with SSE experience (e.g., Falcon or
-// Huseby).
-/////////////////////////////
+// A quaternion x*i + y*j + z*k + w in one register, in <x, y, z, w> order:
+// w is the high lane.
 #include "llquaternion.h"
 
 class alignas(16) LLQuaternion2
@@ -141,6 +132,7 @@ protected:
 
 };
 
-static_assert(std::is_trivial<LLQuaternion2>::value, "LLQuaternion2 must be a trivial type");
+static_assert(std::is_trivially_copyable<LLQuaternion2>::value && std::is_standard_layout<LLQuaternion2>::value, "LLQuaternion2 is plain data");
+static_assert(sizeof(LLQuaternion2) == 16 && alignof(LLQuaternion2) == 16, "LLQuaternion2 is one register");
 
 #endif

@@ -44,7 +44,7 @@ inline const LLQuaternion2& LLQuaternion2::identity()
 
 inline void LLQuaternion2::store( LLQuaternion& dst ) const
 {
-    _mm_storeu_ps( dst.mQ, (LLQuad)mQ );
+    alsimd::storeu( dst.mQ, mQ );
 }
 
 // Return the internal LLVector4a representation of the quaternion
@@ -65,9 +65,8 @@ inline LLVector4a& LLQuaternion2::getVector4aRw()
 // Set this quaternion to the conjugate of src
 inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
 {
-    // XOR the sign bit (bit pattern 0x80000000 == -0.f) into x/y/z; leave w.
-    const __m128 signMask = _mm_set_ps(0.f, -0.f, -0.f, -0.f);
-    mQ = _mm_xor_ps(src.mQ, signMask);
+    // flip the sign of x, y and z; leave w
+    mQ = alsimd::xor_(src.mQ, alsimd::set(-0.f, -0.f, -0.f, 0.f));
 }
 
 // Set this quaternion to the inverse of src
@@ -95,23 +94,20 @@ inline void LLQuaternion2::setMul(const LLQuaternion2& a, const LLQuaternion2& b
     //
     // The last column of the second and third terms is the odd one out --
     // subtracted where the others are added -- so it is folded in by flipping
-    // the sign bit of w rather than by a separate operation.
-    const LLQuad p = (LLQuad)b.mQ;
-    const LLQuad q = (LLQuad)a.mQ;
+    // the sign bit of w on one factor rather than by a separate operation,
+    // and each term after the first is a fused multiply-add onto the sum.
+    const LLQuad p = b.mQ;
+    const LLQuad q = a.mQ;
 
-    const LLQuad negate_w = _mm_castsi128_ps(_mm_setr_epi32(0, 0, 0, (int)0x80000000u));
+    const LLQuad negate_w = alsimd::set(0.f, 0.f, 0.f, -0.f);
 
-    const LLQuad term_scalar = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(3, 3, 3, 3)), q);
-    const LLQuad term_b = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(0, 2, 1, 0)),
-                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(0, 3, 3, 3)));
-    const LLQuad term_c = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(1, 0, 2, 1)),
-                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(1, 1, 0, 2)));
-    const LLQuad term_d = _mm_mul_ps(_mm_shuffle_ps(p, p, _MM_SHUFFLE(2, 1, 0, 2)),
-                                     _mm_shuffle_ps(q, q, _MM_SHUFFLE(2, 0, 2, 1)));
+    const LLQuad q_wwwx = alsimd::xor_(alsimd::shuffle<3, 3, 3, 0>(q), negate_w);
+    const LLQuad q_zxyy = alsimd::xor_(alsimd::shuffle<2, 0, 1, 1>(q), negate_w);
 
-    LLQuad r = _mm_add_ps(term_scalar, _mm_xor_ps(term_b, negate_w));
-    r = _mm_add_ps(r, _mm_xor_ps(term_c, negate_w));
-    mQ = _mm_sub_ps(r, term_d);
+    LLQuad r = alsimd::mul(alsimd::splat<3>(p), q);
+    r = alsimd::fmadd(alsimd::shuffle<0, 1, 2, 0>(p), q_wwwx, r);
+    r = alsimd::fmadd(alsimd::shuffle<1, 2, 0, 1>(p), q_zxyy, r);
+    mQ = alsimd::fnmadd(alsimd::shuffle<2, 0, 1, 2>(p), alsimd::shuffle<1, 2, 0, 2>(q), r);
 }
 
 // Set this to the normalized lerp from a to b over the shorter way round
@@ -121,14 +117,12 @@ inline void LLQuaternion2::setLerp(const LLQuaternion2& a, const LLQuaternion2& 
     // more than half a turn away is brought round to the near side first --
     // otherwise the interpolation takes the long way and passes through
     // rotations neither end asked for.
-    const LLQuad sign_bit = _mm_castsi128_ps(_mm_set1_epi32((int)0x80000000u));
-
     LLVector4a cos_half_angle;
     cos_half_angle.setAllDot4(a.mQ, b.mQ);
-    const LLQuad flip = _mm_and_ps(_mm_cmplt_ps((LLQuad)cos_half_angle, _mm_setzero_ps()), sign_bit);
 
     LLVector4a near_b;
-    near_b = _mm_xor_ps((LLQuad)b.mQ, flip);
+    near_b.setNeg(b.mQ);
+    near_b.setSelectWithMask(cos_half_angle.lessThan(LLVector4a::getZero()), near_b, b.mQ);
 
     mQ.setLerp(a.mQ, near_b, u);
     mQ.normalize4();
@@ -146,14 +140,12 @@ inline void LLQuaternion2::setSlerp(const LLQuaternion2& a, const LLQuaternion2&
     // it nothing can see it, and most pairs are short of it.
     constexpr F32 SLERP_WORTH_IT = 0.9f;
 
-    const LLQuad sign_bit = _mm_castsi128_ps(_mm_set1_epi32((int)0x80000000u));
-
     LLVector4a cos_half_angle;
     cos_half_angle.setAllDot4(a.mQ, b.mQ);
-    const LLQuad flip = _mm_and_ps(_mm_cmplt_ps((LLQuad)cos_half_angle, _mm_setzero_ps()), sign_bit);
 
     LLVector4a near_b;
-    near_b = _mm_xor_ps((LLQuad)b.mQ, flip);
+    near_b.setNeg(b.mQ);
+    near_b.setSelectWithMask(cos_half_angle.lessThan(LLVector4a::getZero()), near_b, b.mQ);
 
     const F32 cos_t = fabsf(cos_half_angle.getScalarAt<0>().getF32());
     if (cos_t >= SLERP_WORTH_IT)
@@ -184,14 +176,14 @@ inline void LLQuaternion2::normalize()
 // Quantize this quaternion to 8 bit precision
 inline void LLQuaternion2::quantize8()
 {
-    mQ.quantize8(_mm_set_ps1(-1.f), _mm_set_ps1(1.f));
+    mQ.quantize8(LLVector4a(-1.f), LLVector4a(1.f));
     normalize();
 }
 
 // Quantize this quaternion to 16 bit precision
 inline void LLQuaternion2::quantize16()
 {
-    mQ.quantize16(_mm_set_ps1(-1.f), _mm_set_ps1(1.f));
+    mQ.quantize16(LLVector4a(-1.f), LLVector4a(1.f));
     normalize();
 }
 
@@ -208,7 +200,7 @@ inline void LLQuaternion2::rotate(const LLVector4a& v, LLVector4a& result) const
     // quaternion of unit length, and this is what LLVector3's operator* does
     // for whatever it is handed -- a rotation that has drifted off unit
     // scales the vector, and callers rely on getting the same answer.
-    const LLVector4Logical scalar_lane = _mm_castsi128_ps(_mm_setr_epi32(0, 0, 0, -1));
+    const LLVector4Logical scalar_lane = alsimd::mask_lane<3>();
 
     LLQuaternion2 vector_as_quaternion;
     vector_as_quaternion.mQ.setSelectWithMask(scalar_lane, LLVector4a::getZero(), v);
