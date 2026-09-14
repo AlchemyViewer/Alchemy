@@ -538,18 +538,6 @@ std::ostream& operator<<(std::ostream &s, const LLQuaternion &a)
 
 
 // Does NOT renormalize the result
-LLQuaternion    operator*(const LLQuaternion &a, const LLQuaternion &b)
-{
-//  LLQuaternion::mMultCount++;
-
-    LLQuaternion q(
-        b.mQ[3] * a.mQ[0] + b.mQ[0] * a.mQ[3] + b.mQ[1] * a.mQ[2] - b.mQ[2] * a.mQ[1],
-        b.mQ[3] * a.mQ[1] + b.mQ[1] * a.mQ[3] + b.mQ[2] * a.mQ[0] - b.mQ[0] * a.mQ[2],
-        b.mQ[3] * a.mQ[2] + b.mQ[2] * a.mQ[3] + b.mQ[0] * a.mQ[1] - b.mQ[1] * a.mQ[0],
-        b.mQ[3] * a.mQ[3] - b.mQ[0] * a.mQ[0] - b.mQ[1] * a.mQ[1] - b.mQ[2] * a.mQ[2]
-    );
-    return q;
-}
 
 /*
 LLMatrix4   operator*(const LLMatrix4 &m, const LLQuaternion &q)
@@ -603,13 +591,6 @@ LLVector3d      operator*(const LLVector3d &a, const LLQuaternion &rot)
     return LLVector3d(nx, ny, nz);
 }
 
-F32 dot(const LLQuaternion &a, const LLQuaternion &b)
-{
-    return a.mQ[VX] * b.mQ[VX] +
-           a.mQ[VY] * b.mQ[VY] +
-           a.mQ[VZ] * b.mQ[VZ] +
-           a.mQ[VW] * b.mQ[VW];
-}
 
 // DEMO HACK: This lerp is probably inocrrect now due intermediate normalization
 // it should look more like the lerp below

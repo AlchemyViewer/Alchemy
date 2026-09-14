@@ -329,4 +329,75 @@ namespace tut
     }
 
     /* TBD: Need to add test cases for getEulerAngles() and setRot() functions */
+
+    // The field-only operations of both matrices evaluate at compile time.
+    template<> template<>
+    void m3math_test_object_t::test<14>()
+    {
+        constexpr LLMatrix3 product = []() constexpr
+        {
+            const F32 a[9] = { 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 10.f };
+            const F32 b[9] = { 2.f, 0.f, 1.f, 1.f, 3.f, 0.f, 0.f, 1.f, 4.f };
+            return LLMatrix3(a) * LLMatrix3(b);
+        }();
+        static_assert(product.mMatrix[0][0] == 4.f && product.mMatrix[0][1] == 9.f && product.mMatrix[0][2] == 13.f);
+        static_assert(product.mMatrix[1][0] == 13.f && product.mMatrix[1][1] == 21.f && product.mMatrix[1][2] == 28.f);
+        static_assert(product.mMatrix[2][0] == 22.f && product.mMatrix[2][1] == 34.f && product.mMatrix[2][2] == 47.f);
+
+        constexpr F32 det = []() constexpr
+        {
+            const F32 a[9] = { 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 10.f };
+            return LLMatrix3(a).determinant();
+        }();
+        static_assert(det == -3.f);
+
+        constexpr LLMatrix3 transposed = []() constexpr
+        {
+            const F32 a[9] = { 1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 10.f };
+            LLMatrix3 m(a);
+            m.transpose();
+            m *= 2.f;
+            return m;
+        }();
+        static_assert(transposed.mMatrix[0][1] == 8.f && transposed.mMatrix[1][0] == 4.f);
+        static_assert(transposed != product && transposed == transposed);
+
+        constexpr LLMatrix4 frame = []() constexpr
+        {
+            LLMatrix4 m;
+            m.setTranslation(1.f, 2.f, 3.f);
+            m.setFwdRow(LLVector3(0.f, 1.f, 0.f));
+            m.setLeftRow(LLVector3(-1.f, 0.f, 0.f));
+            return m;
+        }();
+        static_assert(frame.getTranslation() == LLVector3(1.f, 2.f, 3.f));
+        static_assert((LLVector3(1.f, 0.f, 0.f) * frame) == LLVector3(1.f, 3.f, 3.f));
+        static_assert(rotate_vector(LLVector3(1.f, 0.f, 0.f), frame) == LLVector3(0.f, 1.f, 0.f));
+        static_assert(frame.determinant() == 1.f);
+        static_assert(!frame.isIdentity() && frame != LLMatrix4());
+
+        constexpr LLMatrix4 inverse = []() constexpr
+        {
+            LLMatrix4 m;
+            m.setTranslation(LLVector3(1.f, 2.f, 3.f));
+            m.invert();
+            return m;
+        }();
+        static_assert(inverse.getTranslation() == LLVector3(-1.f, -2.f, -3.f));
+
+        constexpr LLMatrix4 sum = []() constexpr
+        {
+            LLMatrix4 m, n;
+            m.setZero();
+            m += n;
+            m -= n;
+            m += n;
+            m *= 3.f;
+            m *= n;
+            return m;
+        }();
+        static_assert(sum.mMatrix[0][0] == 3.f && sum.mMatrix[0][1] == 0.f && sum.mMatrix[3][3] == 3.f);
+
+        ensure("compile-time matrices agree at run time", product.mMatrix[2][2] == 47.f && inverse.getTranslation().mV[2] == -3.f);
+    }
 }

@@ -673,4 +673,16 @@ namespace tut
             is_approx_equal(1.000f, llquat.mQ[3]));
     }
 
+    // The product and the dot evaluate at compile time.
+    template<> template<>
+    void llquat_test_object_t::test<23>()
+    {
+        constexpr LLQuaternion half_turn(0.f, 0.f, 1.f, 0.f);
+        constexpr LLQuaternion full_turn = half_turn * half_turn;
+        static_assert(full_turn == LLQuaternion(0.f, 0.f, 0.f, -1.f));
+        static_assert(dot(half_turn, half_turn) == 1.f);
+        static_assert(dot(half_turn, full_turn) == 0.f);
+        ensure("compile-time quaternion agrees at run time", full_turn.mQ[VW] == -1.f);
+    }
+
 }

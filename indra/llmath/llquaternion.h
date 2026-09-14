@@ -128,7 +128,7 @@ public:
     friend constexpr LLQuaternion operator-(const LLQuaternion &a) noexcept;                        // Negation
     friend constexpr LLQuaternion operator*(F32 a, const LLQuaternion &q) noexcept;                 // Scale
     friend constexpr LLQuaternion operator*(const LLQuaternion &q, F32 b) noexcept;                 // Scale
-    friend LLQuaternion operator*(const LLQuaternion &a, const LLQuaternion &b);    // Returns a * b
+    friend constexpr LLQuaternion operator*(const LLQuaternion &a, const LLQuaternion &b) noexcept;   // Returns a * b
     friend constexpr LLQuaternion operator~(const LLQuaternion &a) noexcept;                        // Returns a* (Conjugate of a)
     constexpr bool operator==(const LLQuaternion &b) const noexcept;           // Returns a == b
     constexpr bool operator!=(const LLQuaternion &b) const noexcept;           // Returns a != b
@@ -141,7 +141,7 @@ public:
     friend LLVector3d operator*(const LLVector3d &a, const LLQuaternion &rot);      // Rotates a by rot
 
     // Non-standard operators
-    friend F32 dot(const LLQuaternion &a, const LLQuaternion &b);
+    friend constexpr F32 dot(const LLQuaternion &a, const LLQuaternion &b) noexcept;
     friend LLQuaternion lerp(F32 t, const LLQuaternion &p, const LLQuaternion &q);      // linear interpolation (t = 0 to 1) from p to q
     friend LLQuaternion lerp(F32 t, const LLQuaternion &q);                             // linear interpolation (t = 0 to 1) from identity to q
     friend LLQuaternion slerp(F32 t, const LLQuaternion &p, const LLQuaternion &q);     // spherical linear interpolation from p to q
@@ -460,6 +460,25 @@ inline constexpr LLQuaternion operator*(const LLQuaternion &q, F32 a) noexcept
         a * q.mQ[VY],
         a * q.mQ[VZ],
         a * q.mQ[VW] );
+}
+
+inline constexpr LLQuaternion operator*(const LLQuaternion &a, const LLQuaternion &b) noexcept
+{
+    LLQuaternion q(
+        b.mQ[3] * a.mQ[0] + b.mQ[0] * a.mQ[3] + b.mQ[1] * a.mQ[2] - b.mQ[2] * a.mQ[1],
+        b.mQ[3] * a.mQ[1] + b.mQ[1] * a.mQ[3] + b.mQ[2] * a.mQ[0] - b.mQ[0] * a.mQ[2],
+        b.mQ[3] * a.mQ[2] + b.mQ[2] * a.mQ[3] + b.mQ[0] * a.mQ[1] - b.mQ[1] * a.mQ[0],
+        b.mQ[3] * a.mQ[3] - b.mQ[0] * a.mQ[0] - b.mQ[1] * a.mQ[1] - b.mQ[2] * a.mQ[2]
+    );
+    return q;
+}
+
+inline constexpr F32 dot(const LLQuaternion &a, const LLQuaternion &b) noexcept
+{
+    return a.mQ[VX] * b.mQ[VX] +
+           a.mQ[VY] * b.mQ[VY] +
+           a.mQ[VZ] * b.mQ[VZ] +
+           a.mQ[VW] * b.mQ[VW];
 }
 
 inline constexpr LLQuaternion operator~(const LLQuaternion &a) noexcept
