@@ -104,23 +104,3 @@ if(WINDOWS)
     PUBLIC FILE_SET HEADERS FILES llwindowwin32.h llkeyboardwin32.h lldragdropwin32.h
   )
 endif()
-
-if(AL_BUILD_HEADLESS)
-  include(Mesa)
-  add_library(llwindowheadless STATIC)
-
-  target_sources(
-    llwindowheadless
-    PRIVATE ${llwindow_BASE_SOURCES} llwindowmesaheadless.cpp
-    PUBLIC FILE_SET HEADERS FILES ${llwindow_BASE_HEADERS} llwindowmesaheadless.h
-  )
-
-  target_compile_definitions(llwindowheadless PUBLIC LL_MESA_HEADLESS=1)
-
-  target_link_libraries(
-    llwindowheadless
-    PRIVATE al::flags
-    PUBLIC llrenderheadless ${llwindow_BASE_LINK_LIBRARIES} ll::osmesa
-  )
-  target_precompile_headers(llwindowheadless REUSE_FROM llprecompiled)
-endif()

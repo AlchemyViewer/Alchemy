@@ -23,7 +23,6 @@ set(
   AL_ENABLE_GL_TESTS
   AL_BUILD_DOCS
   AL_VCPKG_INSTALL
-  AL_BUILD_HEADLESS
   AL_BUILD_DULLAHAN_EXAMPLE
   AL_BUILD_EXAMPLE_PLUGIN
   AL_BUILD_CEF_PLUGIN
@@ -300,7 +299,6 @@ function(al_configuration_report)
   _al_report_list(extras_text "none" ${extras})
   _al_report_row("Extras" "${extras_text}")
 
-  _al_report_row("Headless" "${AL_BUILD_HEADLESS}")
   _al_report_row("Proprietary" "${AL_ENABLE_PROPRIETARY}")
   _al_report_row("Grid" "${AL_GRID}")
 

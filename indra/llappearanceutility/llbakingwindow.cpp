@@ -35,7 +35,7 @@
 #include "llgltexture.h"
 #include "llvertexbuffer.h"
 
-LLBakingWindow::LLBakingWindow(S32 width, S32 height)
+LLBakingWindow::LLBakingWindow(S32 width, S32 height, ALWindowBackend backend)
 {
     const S32 WINDOW_ORIGIN_X = 0;
     const S32 WINDOW_ORIGIN_Y = 0;
@@ -52,7 +52,7 @@ LLBakingWindow::LLBakingWindow(S32 width, S32 height)
         NO_FULLSCREEN,
         NO_CLEAR_BG,
         NO_DISABLE_VSYNC, //gSavedSettings.getBOOL("DisableVerticalSync"),
-        ALWindowBackend::Native,
+        backend,
         NO_IGNORE_PIXEL_DEPTH); //gIgnorePixelDepth = false
 
     if (nullptr == mWindow)

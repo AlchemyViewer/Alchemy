@@ -196,18 +196,6 @@
         "kdu"
       ]
     },
-    "offscreen": {
-      "description": "Build with support for Mesa3D Software OSR backend",
-      "dependencies": [
-        {
-          "name": "mesa",
-          "features": [
-            "offscreen"
-          ],
-          "platform": "windows"
-        }
-      ]
-    },
     "openal": {
       "description": "Build with support for the OpenAL Soft audio engine",
       "dependencies": [

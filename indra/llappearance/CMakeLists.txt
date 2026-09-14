@@ -1,7 +1,5 @@
 # -*- cmake -*-
 
-# llappearance and, when AL_BUILD_HEADLESS is on, llappearanceheadless are the
-# same sources against different render libraries.
 set(
   llappearance_SOURCES
   llavatarappearance.cpp
@@ -68,31 +66,3 @@ target_link_libraries(
     llcommon
 )
 target_precompile_headers(llappearance REUSE_FROM llprecompiled)
-
-if(AL_BUILD_HEADLESS)
-  add_library(llappearanceheadless STATIC)
-
-  target_sources(
-    llappearanceheadless
-    PRIVATE ${llappearance_SOURCES}
-    PUBLIC FILE_SET HEADERS FILES ${llappearance_HEADERS}
-  )
-
-  target_link_libraries(
-    llappearanceheadless
-    PRIVATE al::flags
-    PUBLIC
-      llcharacter
-      llinventory
-      llimage
-      llrenderheadless
-      llfilesystem
-      llmath
-      llxml
-      llmessage
-      llcorehttp
-      llcommon
-  )
-
-  target_precompile_headers(llappearanceheadless REUSE_FROM llprecompiled)
-endif()

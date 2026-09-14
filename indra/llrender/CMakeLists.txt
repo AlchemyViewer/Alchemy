@@ -70,34 +70,6 @@ set(
   llglcommonfunc.h
 )
 
-if(AL_BUILD_HEADLESS)
-  add_library(llrenderheadless STATIC)
-  target_sources(
-    llrenderheadless
-    PRIVATE ${llrender_SOURCES}
-    PUBLIC FILE_SET HEADERS FILES ${llrender_HEADERS}
-  )
-
-  target_link_libraries(
-    llrenderheadless
-    PRIVATE al::flags
-    PUBLIC
-      llcommon
-      llimage
-      llmath
-      llxml
-      llfilesystem
-      llwindowheadless
-      ll::freetype
-      ll::harfbuzz
-      ll::plutosvg
-      ll::glext
-      ll::opengl
-  )
-
-  target_precompile_headers(llrenderheadless REUSE_FROM llprecompiled)
-endif()
-
 add_library(llrender STATIC)
 target_sources(
   llrender

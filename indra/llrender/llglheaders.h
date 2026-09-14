@@ -35,23 +35,13 @@
 // quotes so we get libraries/.../GL/ version
 #include <GL/glcorearb.h>
 
-#if LL_MESA_HEADLESS
-#ifndef __gl_h_
-#define __gl_h_ 1
-#endif
-#ifndef __GL_H_
-#define __GL_H_ 1
-#endif
-#include <GL/osmesa.h>
-#endif
-
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 #include <GL/wglext.h>
 #endif
 
 // Linux GL is EGL on Wayland and X11 alike (SDL creates the context with
 // EGL on both), so there is no GLX and no X11 header anywhere in the tree.
-#if LL_LINUX && !LL_MESA_HEADLESS
+#if LL_LINUX
 #define EGL_EGL_PROTOTYPES 0
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -249,7 +239,7 @@ GLAPI void APIENTRY glImportSemaphoreWin32NameEXT(GLuint semaphore, GLenum handl
 
 #if LL_GL_FUNC_POINTER
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // WGL_AMD_gpu_association
 extern PFNWGLGETGPUIDSAMDPROC                          wglGetGPUIDsAMD;
 extern PFNWGLGETGPUINFOAMDPROC                         wglGetGPUInfoAMD;
@@ -283,7 +273,7 @@ extern PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV;
 
 #endif // LL_WINDOWS
 
-#if LL_LINUX && !LL_MESA_HEADLESS
+#if LL_LINUX
 // EGL_VERSION_1_0
 extern PFNEGLQUERYSTRINGPROC eglQueryString;
 

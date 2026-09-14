@@ -121,7 +121,7 @@ public:
         *position = mCursorPos;
         return true;
     }
-#if (LL_WINDOWS || LL_SDL_WINDOW) && !LL_MESA_HEADLESS
+#if LL_WINDOWS || LL_SDL_WINDOW
     /*virtual*/ bool getCursorDelta(LLCoordCommon* delta) override
     {
         if (!delta) return false;

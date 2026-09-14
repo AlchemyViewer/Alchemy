@@ -47,7 +47,6 @@ cmake_dependent_option(
   "AL_BUILD_TESTS"
   OFF
 )
-option(AL_BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
 option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)
 
@@ -293,10 +292,6 @@ if(AL_USE_SENTRY)
   list(APPEND VCPKG_MANIFEST_FEATURES "sentry")
 endif()
 
-if(AL_BUILD_HEADLESS)
-  list(APPEND VCPKG_MANIFEST_FEATURES "offscreen")
-endif()
-
 if(AL_USE_FAUDIO)
   list(APPEND VCPKG_MANIFEST_FEATURES "faudio")
 endif()
@@ -397,7 +392,6 @@ set(
   Hunspell
   ICU
   LLKDU
-  Mesa
   NDOF
   SDL3
   Sentry

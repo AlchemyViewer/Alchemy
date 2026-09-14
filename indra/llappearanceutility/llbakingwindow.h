@@ -33,7 +33,7 @@
 class LLBakingWindow : public LLWindowCallbacks
 {
 public:
-    LLBakingWindow(S32 width, S32 height);
+    LLBakingWindow(S32 width, S32 height, ALWindowBackend backend);
     ~LLBakingWindow();
 
     void swapBuffers();

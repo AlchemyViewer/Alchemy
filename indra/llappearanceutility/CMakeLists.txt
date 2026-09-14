@@ -50,26 +50,3 @@ target_link_libraries(
 )
 
 target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
-
-if(AL_BUILD_HEADLESS)
-  add_executable(appearance-utility-headless-bin)
-
-  target_sources(
-    appearance-utility-headless-bin
-    PRIVATE ${appearance_utility_SOURCES} ${appearance_utility_HEADERS}
-  )
-
-  target_link_libraries(
-    appearance-utility-headless-bin
-    PRIVATE
-      al::flags
-      llcharacter
-      llinventory
-      llappearanceheadless
-      llwindowheadless
-      llrenderheadless
-      llxml
-  )
-
-  target_precompile_headers(appearance-utility-headless-bin REUSE_FROM llprecompiled_exe)
-endif()

@@ -99,7 +99,7 @@ public:
 
     virtual bool setCursorPosition(LLCoordWindow position) = 0;
     virtual bool getCursorPosition(LLCoordWindow *position) = 0;
-#if (LL_WINDOWS || LL_SDL_WINDOW) && !LL_MESA_HEADLESS
+#if LL_WINDOWS || LL_SDL_WINDOW
     // Return the cumulative mouse motion delta in PIXELS since the previous
     // call, then reset the accumulator to zero. Backends should accumulate
     // event-level relative motion (Win32 raw input, SDL3 event.motion.xrel/yrel)

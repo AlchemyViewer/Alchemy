@@ -28,9 +28,7 @@
 #include "llwindowheadless.h"
 #include "alwindowsdlheadless.h"
 
-#if LL_MESA_HEADLESS
-#include "llwindowmesaheadless.h"
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
 #include "llwindowwin32.h"
 #else
 #include "llwindowsdl.h"
@@ -77,9 +75,7 @@ S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
     {
         return OSBTN_OK;
     }
-#if LL_MESA_HEADLESS // !!! *FIX: (?)
-    return OSBTN_OK;
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
     result = OSMessageBoxWin32(text, caption, type);
 #else
     result = OSMessageBoxSDL(text, caption, type);
@@ -253,9 +249,7 @@ bool LLWindow::copyTextToPrimary(const std::string &src)
 // static
 std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 {
-#if LL_MESA_HEADLESS
-    return std::vector<std::string>();
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
     return LLWindowWin32::getDynamicFallbackFontList();
 #else
     return LLWindowSDL::getDynamicFallbackFontList();
@@ -265,9 +259,7 @@ std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 // static
 LLFontFallbackMatch LLWindow::findFallbackFontForChar(llwchar wch)
 {
-#if LL_MESA_HEADLESS
-    return LLFontFallbackMatch();
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
     return LLWindowWin32::findFallbackFontForChar(wch);
 #else
     return LLWindowSDL::findFallbackFontForChar(wch);
@@ -277,9 +269,7 @@ LLFontFallbackMatch LLWindow::findFallbackFontForChar(llwchar wch)
 // static
 std::vector<std::string> LLWindow::getDisplaysResolutionList()
 {
-#if LL_MESA_HEADLESS
-    return std::vector<std::string>();
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
     return LLWindowWin32::getDisplaysResolutionList();
 #else
     return LLWindowSDL::getDisplaysResolutionList();
@@ -350,9 +340,7 @@ LLSplashScreen *LLSplashScreen::create()
     {
         return nullptr;
     }
-#if LL_MESA_HEADLESS
-    return nullptr;
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
     return new LLSplashScreenWin32;
 #else
     return new LLSplashScreenSDL;
@@ -408,7 +396,7 @@ ALWindowBackend LLWindowManager::sBackend = ALWindowBackend::Native;
 // without GL behind it; the hidden window needs it on every build.
 static bool backend_uses_sdl(ALWindowBackend backend)
 {
-#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
+#if LL_SDL_WINDOW
     return true;
 #else
     return backend == ALWindowBackend::Hidden;
@@ -439,11 +427,7 @@ LLWindow* LLWindowManager::createWindow(
     switch (backend)
     {
     case ALWindowBackend::Native:
-#if LL_MESA_HEADLESS
-        new_window = new LLWindowMesaHeadless(callbacks,
-            title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, true, ignore_pixel_depth);
-#elif LL_WINDOWS && !LL_SDL_WINDOW
+#if LL_WINDOWS && !LL_SDL_WINDOW
         new_window = new LLWindowWin32(callbacks,
             title, name, x, y, width, height, flags,
             fullscreen, clearBg, enable_vsync, true, ignore_pixel_depth, fsaa_samples, max_cores, max_gl_version);

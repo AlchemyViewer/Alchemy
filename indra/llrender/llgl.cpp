@@ -52,9 +52,7 @@
 #include <glm/gtc/matrix_access.hpp>
 #include "glm/gtc/type_ptr.hpp"
 
-#if LL_MESA_HEADLESS
-#  define LL_GET_PROC_ADDRESS(func) OSMesaGetProcAddress(func)
-#elif LL_SDL_WINDOW
+#if LL_SDL_WINDOW
 #  include "llwindowsdl.h"
 #  include "SDL3/SDL.h"
 #  define LL_GET_PROC_ADDRESS(func) SDL_GL_GetProcAddress(func)
@@ -672,7 +670,7 @@ std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
 #if LL_GL_FUNC_POINTER
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
 // WGL_ARB_pixel_format
 PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB = nullptr;
 PFNWGLGETPIXELFORMATATTRIBFVARBPROC wglGetPixelFormatAttribfvARB = nullptr;
@@ -705,7 +703,7 @@ PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV = nullptr;
 PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV = nullptr;
 #endif
 
-#if LL_LINUX && !LL_MESA_HEADLESS
+#if LL_LINUX
 // EGL_VERSION_1_0
 PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
 
@@ -1465,7 +1463,7 @@ LLGLManager::LLGLManager() :
 //---------------------------------------------------------------------
 void LLGLManager::initWGL()
 {
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     reloadExtensionsString();
 
     if (mGLExtensions.contains("WGL_ARB_pixel_format"))
@@ -1533,7 +1531,7 @@ void LLGLManager::initWGL()
 
 void LLGLManager::initEGL()
 {
-#if LL_LINUX && !LL_MESA_HEADLESS
+#if LL_LINUX
     reloadExtensionsString();
 
     // EGL_VERSION_1_0
@@ -1726,7 +1724,7 @@ bool LLGLManager::initGL()
     U32 old_vram = mVRAM;
     mVRAM = 0;
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     if (mHasAMDAssociations)
     {
         GLuint gl_gpus_count = wglGetGPUIDsAMD(0, 0);
@@ -1833,12 +1831,10 @@ void LLGLManager::getGLInfo(LLSD& info)
         info["GLInfo"]["GLVersion"] = ll_safe_string((const char *)glGetString(GL_VERSION));
     }
 
-#if !LL_MESA_HEADLESS
     for (const auto& ext : mGLExtensions)
     {
         info["GLInfo"]["GLExtensions"].append(ext);
     }
-#endif
 }
 
 std::string LLGLManager::getGLInfoString()
@@ -1858,7 +1854,6 @@ std::string LLGLManager::getGLInfoString()
         info_str += std::string("GL_VERSION     ") + ll_safe_string((const char *)glGetString(GL_VERSION)) + std::string("\n");
     }
 
-#if !LL_MESA_HEADLESS
     std::string all_exts;
     for (const auto& ext : mGLExtensions)
     {
@@ -1866,7 +1861,6 @@ std::string LLGLManager::getGLInfoString()
         all_exts += '\n';
     }
     info_str += std::string("GL_EXTENSIONS:\n") + all_exts + std::string("\n");
-#endif
 
     return info_str;
 }
@@ -1886,7 +1880,6 @@ void LLGLManager::printGLInfoString()
         LL_INFOS("RenderInit") << "GL_VERSION:    " << ll_safe_string((const char *)glGetString(GL_VERSION)) << LL_ENDL;
     }
 
-#if !LL_MESA_HEADLESS
     std::string all_exts;
     for (const auto& ext : mGLExtensions)
     {
@@ -1894,7 +1887,6 @@ void LLGLManager::printGLInfoString()
         all_exts += '\n';
     }
     LL_INFOS("RenderInit") << "GL_EXTENSIONS:\n" << all_exts << LL_ENDL;
-#endif
 }
 
 std::string LLGLManager::getRawGLString()
@@ -1987,7 +1979,7 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_WINDOWS
     {
         PFNWGLGETEXTENSIONSSTRINGARBPROC wglGetExtensionsStringARB = (PFNWGLGETEXTENSIONSSTRINGARBPROC)LL_GET_PROC_ADDRESS("wglGetExtensionsStringARB");
         if (wglGetExtensionsStringARB)
@@ -2003,7 +1995,7 @@ void LLGLManager::reloadExtensionsString()
     }
 #endif
 
-#if LL_SDL_WINDOW && LL_LINUX && !LL_MESA_HEADLESS
+#if LL_SDL_WINDOW && LL_LINUX
     {
         SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
         if (egl_display)

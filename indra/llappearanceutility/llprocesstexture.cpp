@@ -182,7 +182,7 @@ void LLProcessTexture::init()
         }
     }
 
-    mWindow = new LLBakingWindow(mBakeSize, mBakeSize);
+    mWindow = new LLBakingWindow(mBakeSize, mBakeSize, mApp->windowBackend());
 
     for (iter = mInputData["textures"].beginArray(); iter != mInputData["textures"].endArray(); ++iter)
     {

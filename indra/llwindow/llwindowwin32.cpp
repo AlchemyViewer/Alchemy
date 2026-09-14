@@ -26,8 +26,6 @@
 
 #include "linden_common.h"
 
-#if LL_WINDOWS && !LL_MESA_HEADLESS
-
 #include "llwindowwin32.h"
 
 // LLWindow library includes
@@ -5376,7 +5374,6 @@ LLFontFallbackMatch LLWindowWin32::findFallbackFontForChar(llwchar wch)
     // Not implemented on Windows; would use DirectWrite (IDWriteFontFallback::MapCharacters).
     return LLFontFallbackMatch();
 }
-#endif // LL_WINDOWS
 
 inline LLWindowWin32::LLWindowWin32Thread::LLWindowWin32Thread()
     : LL::ThreadPool("Window Thread", 1, MAX_QUEUE_SIZE, false)
