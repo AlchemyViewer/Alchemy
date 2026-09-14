@@ -274,7 +274,6 @@ target_link_libraries(
     ll::boost
     ll::oslibraries
     ll::tracy
-    ll::sse2neon
     ll::xxhash
     ll::simdjson
     ll::simdutf
@@ -394,6 +393,15 @@ if(AL_BUILD_TESTS)
       ${INDRA_SOURCE_DIR}/cmake/AlSimdAsmCheck.cmake
   )
   add_dependencies(BUILD_TESTS alsimd_asm_probe)
+
+  # No source outside the ops layer and the kernels names an intrinsic, so
+  # nothing compiles on one architecture only.
+  add_test(
+    NAME alsimd_intrinsic_check
+    COMMAND
+      ${CMAKE_COMMAND} -DSOURCE_DIR=${INDRA_SOURCE_DIR} -P
+      ${INDRA_SOURCE_DIR}/cmake/AlIntrinsicCheck.cmake
+  )
 
   # Skip precompiled header for tests that need special handling
   set_source_files_properties(tests/llsd_test.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)

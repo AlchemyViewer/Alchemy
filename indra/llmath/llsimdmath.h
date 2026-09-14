@@ -31,13 +31,6 @@
 #include "alsimd.h"
 #include "llmemory.h"
 
-// The vector types are written on alsimd.h. A few of their callers still
-// hold x86 intrinsics of their own; on arm64 those compile through this
-// translation until the batch kernels replace them.
-#if AL_SIMD_NEON
-    #include "sse2neon/sse2neon.h"
-#endif
-
 #include "llsimdtypes.h"
 #include "llsimdtypes.inl"
 

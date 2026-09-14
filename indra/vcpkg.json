@@ -140,10 +140,6 @@
     "secondlife-emoji-shortcodes",
     "simdjson",
     "simdutf",
-    {
-      "name": "sse2neon",
-      "platform": "arm64"
-    },
     "tinyexr",
     "tinygltf",
     "v-hacd",

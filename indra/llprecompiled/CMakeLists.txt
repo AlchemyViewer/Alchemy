@@ -30,7 +30,6 @@ set(
   ll::boost
   ll::oslibraries
   ll::tracy
-  ll::sse2neon
   Threads::Threads
 )
 
