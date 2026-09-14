@@ -138,7 +138,7 @@
 
 #if AL_SIMD_X86
     #include <immintrin.h>
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && !defined(__clang__)
     #include <intrin.h>
     #include <arm64_neon.h>
 #else
@@ -172,7 +172,7 @@ using i32x4 = int32x4_t;
 // Which of the three are distinct C++ types is the compiler's: on x86 the
 // mask is the float type, and MSVC for arm64 declares all three as one
 // union. An overload that tells them apart exists only where it can.
-#if AL_SIMD_NEON && defined(_MSC_VER)
+#if AL_SIMD_NEON && defined(_MSC_VER) && !defined(__clang__)
     #define AL_SIMD_DISTINCT_INT 0
     #define AL_SIMD_DISTINCT_MASK 0
 #elif AL_SIMD_NEON
@@ -331,6 +331,19 @@ AL_SIMD_INLINE float lane(f32x4 v)
     }
 #else
     return vgetq_lane_f32(v, N);
+#endif
+}
+
+// Lane i of v, for an i known only at run time: the register goes through
+// memory. Prefer lane<N>.
+AL_SIMD_INLINE float lane(f32x4 v, int i)
+{
+#if AL_SIMD_VEXT
+    return v[i];
+#else
+    alignas(16) float lanes[4];
+    store(lanes, v);
+    return lanes[i];
 #endif
 }
 
