@@ -116,6 +116,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         alparamtype.h
+        alsimd.h
         always_return.h
         apply.h
         chrono.h
@@ -347,6 +348,52 @@ if(AL_BUILD_TESTS)
   ## every build. It's to help a developer make implementation choices about
   ## throwing and catching exceptions.
   ##al_add_test(llexception PROJECT llcommon LIBRARIES llcommon)
+
+  # The SIMD ops layer, at the tree's tier and, where the tiers differ, at
+  # each of them; a variant the host cannot run skips.
+  al_add_test(alsimd PROJECT llcommon LIBRARIES llcommon)
+  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
+    foreach(tier baseline v2 v3 v4)
+      al_add_test(alsimd PROJECT llcommon LIBRARIES llcommon ISA_TIER ${tier})
+    endforeach()
+  endif()
+
+  # The ops layer's assembly, one function per op, compiled with the tree's
+  # flags and read by AlSimdAsmCheck.cmake for a table lookup, a call or a
+  # function past its ceiling. Never under link-time optimisation, which
+  # leaves the compiler nothing to list.
+  add_library(alsimd_asm_probe OBJECT tests/alsimd_asm_probe.cpp)
+  target_link_libraries(alsimd_asm_probe PRIVATE al::flags)
+  set_target_properties(
+    alsimd_asm_probe
+    PROPERTIES
+      FOLDER "Tests/llcommon"
+      INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO OFF
+      INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
+  )
+  if(COMPILER_IS_MSVC)
+    target_compile_options(alsimd_asm_probe PRIVATE /FAs)
+    set(alsimd_asm_syntax masm)
+  elseif(COMPILER_IS_CLANG_CL)
+    target_compile_options(alsimd_asm_probe PRIVATE /clang:-save-temps=obj)
+    set(alsimd_asm_syntax gnu)
+  else()
+    target_compile_options(alsimd_asm_probe PRIVATE -save-temps=obj)
+    set(alsimd_asm_syntax gnu)
+  endif()
+  if(BUILD_TARGET_IS_ARM64)
+    set(alsimd_asm_arch arm64)
+  else()
+    set(alsimd_asm_arch x86)
+  endif()
+  add_test(
+    NAME alsimd_asm_probe
+    COMMAND
+      ${CMAKE_COMMAND} -DOBJECT=$<TARGET_OBJECTS:alsimd_asm_probe> -DSYNTAX=${alsimd_asm_syntax}
+      -DARCH=${alsimd_asm_arch} -DCOMPILER=${CMAKE_CXX_COMPILER_ID} -P
+      ${INDRA_SOURCE_DIR}/cmake/AlSimdAsmCheck.cmake
+  )
+  add_dependencies(BUILD_TESTS alsimd_asm_probe)
 
   # Skip precompiled header for tests that need special handling
   set_source_files_properties(tests/llsd_test.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
