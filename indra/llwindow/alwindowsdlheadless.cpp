@@ -129,6 +129,9 @@ ALWindowSDLHeadless::ALWindowSDLHeadless(LLWindowCallbacks* callbacks,
         return;
     }
 
+    // As LLWindowSDL: the WGL entry points first, since the worker threads'
+    // shared contexts are made through them, then the rest of GL.
+    gGLManager.initWGL();
     if (!gGLManager.initGL())
     {
         LL_WARNS("Window") << "GL initialisation failed on the hidden window" << LL_ENDL;

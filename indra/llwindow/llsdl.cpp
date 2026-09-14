@@ -344,6 +344,10 @@ void* sdl_create_shared_context()
             LL_WARNS() << "wglCreateContextAttribsARB (shared) failed" << LL_ENDL;
         }
     }
+    else
+    {
+        LL_WARNS() << "No current WGL context, or wglCreateContextAttribsARB not loaded (initWGL), for shared context" << LL_ENDL;
+    }
 #elif LL_DARWIN
     CGLContextObj share = CGLGetCurrentContext();
     if (share)

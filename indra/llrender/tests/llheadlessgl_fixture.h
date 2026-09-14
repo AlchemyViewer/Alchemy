@@ -398,6 +398,8 @@ namespace ll_test
             mWindow->swapBuffers();
         }
 
+        LLWindow* window() const { return mWindow; }
+
         // Clear the framebuffer to opaque black so a fresh readFramebufferRGBA
         // reflects only what the test rendered this turn.
         void clearFramebuffer()

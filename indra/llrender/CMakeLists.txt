@@ -157,4 +157,6 @@ if(AL_BUILD_TESTS)
     al_add_test(${test} GL PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
   endforeach()
   al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
+  # The hidden window itself, and a worker thread's shared context on it.
+  al_add_test(alwindowsdlheadless GL PROJECT llrender LIBRARIES llrender)
 endif()
