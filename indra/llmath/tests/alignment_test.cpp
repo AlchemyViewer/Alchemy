@@ -34,6 +34,7 @@
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
 #include "../llmatrix4a.h"
+#include "../llvolume.h"
 
 #include <vector>
 
@@ -160,6 +161,37 @@ void alignment_test_object_t::test<4>()
     {
         ensure("LLMatrix4a in a vector unaligned", is_aligned(&m,16));
     }
+}
+
+// A face vertex holds its position and normal in the object itself: a
+// vector of them is one allocation, every vector in it placed.
+template<> template<>
+void alignment_test_object_t::test<5>()
+{
+    ensure_equals("VertexData size", sizeof(LLVolumeFace::VertexData), size_t(48));
+    ensure_equals("VertexData alignment", alignof(LLVolumeFace::VertexData), size_t(16));
+    ensure("VertexData trivially copyable", std::is_trivially_copyable<LLVolumeFace::VertexData>::value);
+
+    std::vector<LLVolumeFace::VertexData> verts(17);
+    for (size_t i = 0; i < verts.size(); ++i)
+    {
+        ensure("VertexData position in a vector unaligned", is_aligned(&verts[i].getPosition(),16));
+        ensure("VertexData normal in a vector unaligned", is_aligned(&verts[i].getNormal(),16));
+        verts[i].setPosition(LLVector4a(F32(i), 1.f, 2.f));
+        verts[i].setNormal(LLVector4a(0.f, 0.f, 1.f));
+        verts[i].mTexCoord.set(F32(i) * 0.5f, 0.25f);
+    }
+
+    std::vector<LLVolumeFace::VertexData> copy = verts;
+    for (size_t i = 0; i < copy.size(); ++i)
+    {
+        ensure("copied position", copy[i].getPosition().equals3(LLVector4a(F32(i), 1.f, 2.f)));
+        ensure("copied normal", copy[i].getNormal().equals3(LLVector4a(0.f, 0.f, 1.f)));
+        ensure_equals("copied texcoord", copy[i].mTexCoord.mV[0], F32(i) * 0.5f);
+        ensure("copy equals source", copy[i] == verts[i]);
+    }
+    ensure("ordering", copy[0] < copy[1]);
+    ensure("ordering", !(copy[1] < copy[0]));
 }
 
 }

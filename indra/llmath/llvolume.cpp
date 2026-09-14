@@ -2155,74 +2155,6 @@ bool LLVolume::generate()
     return false;
 }
 
-void LLVolumeFace::VertexData::init()
-{
-    if (!mData)
-    {
-        mData = (LLVector4a*) ll_aligned_malloc_16(sizeof(LLVector4a)*2);
-    }
-}
-
-LLVolumeFace::VertexData::VertexData()
-{
-    mData = NULL;
-    init();
-}
-
-LLVolumeFace::VertexData::VertexData(const VertexData& rhs)
-{
-    mData = NULL;
-    *this = rhs;
-}
-
-const LLVolumeFace::VertexData& LLVolumeFace::VertexData::operator=(const LLVolumeFace::VertexData& rhs)
-{
-    if (this != &rhs)
-    {
-        init();
-        LLVector4a::memcpyNonAliased16((F32*) mData, (F32*) rhs.mData, 2*sizeof(LLVector4a));
-        mTexCoord = rhs.mTexCoord;
-    }
-    return *this;
-}
-
-LLVolumeFace::VertexData::~VertexData()
-{
-    ll_aligned_free_16(mData);
-    mData = NULL;
-}
-
-LLVector4a& LLVolumeFace::VertexData::getPosition()
-{
-    return mData[POSITION];
-}
-
-LLVector4a& LLVolumeFace::VertexData::getNormal()
-{
-    return mData[NORMAL];
-}
-
-const LLVector4a& LLVolumeFace::VertexData::getPosition() const
-{
-    return mData[POSITION];
-}
-
-const LLVector4a& LLVolumeFace::VertexData::getNormal() const
-{
-    return mData[NORMAL];
-}
-
-
-void LLVolumeFace::VertexData::setPosition(const LLVector4a& pos)
-{
-    mData[POSITION] = pos;
-}
-
-void LLVolumeFace::VertexData::setNormal(const LLVector4a& norm)
-{
-    mData[NORMAL] = norm;
-}
-
 bool LLVolumeFace::VertexData::operator<(const LLVolumeFace::VertexData& rhs)const
 {
     const F32* lp = this->getPosition().getF32ptr();
@@ -2271,8 +2203,8 @@ bool LLVolumeFace::VertexData::operator<(const LLVolumeFace::VertexData& rhs)con
 
 bool LLVolumeFace::VertexData::operator==(const LLVolumeFace::VertexData& rhs)const
 {
-    return mData[POSITION].equals3(rhs.getPosition()) &&
-            mData[NORMAL].equals3(rhs.getNormal()) &&
+    return mPosition.equals3(rhs.mPosition) &&
+            mNormal.equals3(rhs.mNormal) &&
             mTexCoord == rhs.mTexCoord;
 }
 
@@ -2282,17 +2214,17 @@ bool LLVolumeFace::VertexData::compareNormal(const LLVolumeFace::VertexData& rhs
 
     const F32 epsilon = 0.00001f;
 
-    if (rhs.mData[POSITION].equals3(mData[POSITION], epsilon) &&
+    if (rhs.mPosition.equals3(mPosition, epsilon) &&
         fabs(rhs.mTexCoord[0]-mTexCoord[0]) < epsilon &&
         fabs(rhs.mTexCoord[1]-mTexCoord[1]) < epsilon)
     {
         if (angle_cutoff > 1.f)
         {
-            retval = (mData[NORMAL].equals3(rhs.mData[NORMAL], epsilon));
+            retval = (mNormal.equals3(rhs.mNormal, epsilon));
         }
         else
         {
-            F32 cur_angle = rhs.mData[NORMAL].dot3(mData[NORMAL]).getF32();
+            F32 cur_angle = rhs.mNormal.dot3(mNormal).getF32();
             retval = cur_angle > angle_cutoff;
         }
     }
@@ -6878,7 +6810,9 @@ void LLVolumeFace::resizeVertices(S32 num_verts)
 
     if (num_verts)
     {
-        //pad texture coordinate block end to allow for QWORD reads
+        // the texture coordinate block is a whole number of 16-byte vectors:
+        // the copies move it that way and the texcoord kernel reads it two
+        // coordinates at a time, the last vector included
         S32 tc_size = ((num_verts*sizeof(LLVector2)) + 0xF) & ~0xF;
 
         mPositions = (LLVector4a*) ll_aligned_malloc<64>(sizeof(LLVector4a)*2*num_verts+tc_size);
@@ -6999,7 +6933,8 @@ void LLVolumeFace::resizeIndices(S32 num_indices)
 
     if (num_indices)
     {
-        //pad index block end to allow for QWORD reads
+        // the index block is a whole number of 16-byte vectors, which is
+        // how the copies move it
         S32 size = ((num_indices*sizeof(U16)) + 0xF) & ~0xF;
 
         mIndices = (U16*) ll_aligned_malloc_16(size);

@@ -1060,9 +1060,16 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                 }
             }
 
-            // Generates a vertex remap table with no gaps in the resulting sequence
+            // Generates a vertex remap table with no gaps in the resulting
+            // sequence; vertices equal in position, normal and texture
+            // coordinate map to one
             std::vector<U32> remap(faceVertices.size());
-            size_t vertex_count = meshopt_generateVertexRemap(&remap[0], &indices_32[0], indices_32.size(), &faceVertices[0], faceVertices.size(), sizeof(LLVolumeFace::VertexData));
+            const meshopt_Stream streams[] = {
+                { faceVertices[0].getPosition().getF32ptr(), 3 * sizeof(F32), sizeof(LLVolumeFace::VertexData) },
+                { faceVertices[0].getNormal().getF32ptr(), 3 * sizeof(F32), sizeof(LLVolumeFace::VertexData) },
+                { faceVertices[0].mTexCoord.mV, sizeof(LLVector2), sizeof(LLVolumeFace::VertexData) },
+            };
+            size_t vertex_count = meshopt_generateVertexRemapMulti(&remap[0], &indices_32[0], indices_32.size(), faceVertices.size(), streams, 3);
 
             // Manually remap vertices
             std::vector<LLVolumeFace::VertexData> optimized_vertices(vertex_count);
