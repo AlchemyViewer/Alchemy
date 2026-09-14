@@ -4279,6 +4279,13 @@ bool LLAppViewer::markerIsSameVersion(const std::string& marker_name) const
     if (marker_file)
     {
         marker_version_length = marker_file.read(marker_data, sizeof(marker_data), ec);
+        if (ec || marker_version_length <= 0)
+        {
+            // A running instance holds the marker locked, and the read is
+            // refused: not a version match, and not a crash.
+            LL_DEBUGS("MarkerFile") << "Cannot read marker '" << marker_name << "': " << ec.message() << LL_ENDL;
+            return false;
+        }
         std::string marker_string(marker_data, marker_version_length);
         size_t pos = marker_string.find('\n');
         if (pos != std::string::npos)
@@ -4358,6 +4365,11 @@ bool LLAppViewer::getMarkerData(const std::string& marker_name, std::string& dat
     {
         marker_version_length = marker_file.read(marker_data, sizeof(marker_data), ec);
         marker_file.close();
+        if (ec || marker_version_length <= 0)
+        {
+            LL_DEBUGS("MarkerFile") << "Cannot read marker '" << marker_name << "': " << ec.message() << LL_ENDL;
+            return false;
+        }
         std::string marker_string(marker_data, marker_version_length);
         size_t pos = marker_string.find('\n');
         if (pos != std::string::npos)
@@ -4421,7 +4433,9 @@ void LLAppViewer::processMarkerFiles()
         // now test to see if this file is locked by a running process (try to open for write)
         marker_log_stream << "Checking exec marker file for lock...";
         std::error_code ec;
-        mMarkerFile.open(mMarkerFileName, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        // Not truncated on open: a running instance's marker keeps what it
+        // says, and only the winner of the lock rewrites it.
+        mMarkerFile.open(mMarkerFileName, LLFile::out|LLFile::binary, ec);
         if (!mMarkerFile)
         {
             marker_log_stream << "Exec marker file open failed - assume it is locked.";
@@ -4429,9 +4443,10 @@ void LLAppViewer::processMarkerFiles()
         }
         else
         {
-            // We were able to open it, now try to lock it ourselves...
+            // We were able to open it, now try to lock it ourselves. Without
+            // noblock the lock would wait for the running instance to exit.
             std::error_code ec;
-            if (0 != mMarkerFile.lock(LLFile::exclusive, ec) || ec)
+            if (0 != mMarkerFile.lock(LLFile::exclusive|LLFile::noblock, ec) || ec)
             {
                 marker_log_stream << "Locking exec marker failed.";
                 mSecondInstance = true; // lost a race? be conservative
@@ -4439,6 +4454,11 @@ void LLAppViewer::processMarkerFiles()
             else
             {
                 // No other instances; we've locked this file now, so record our version; delete on quit.
+                // The stale contents go through a second handle: the lock guards
+                // reads and writes, not the length.
+                LLFile stale;
+                stale.open(mMarkerFileName, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+                stale.close();
                 recordMarkerVersion(mMarkerFile);
                 marker_log_stream << "Exec marker file existed but was not locked; rewritten.";
             }
@@ -4476,7 +4496,7 @@ void LLAppViewer::processMarkerFiles()
         {
             LL_DEBUGS("MarkerFile") << "Exec marker file '"<< mMarkerFileName << "' created." << LL_ENDL;
             std::error_code ec;
-            if (0 == mMarkerFile.lock(LLFile::exclusive, ec))
+            if (0 == mMarkerFile.lock(LLFile::exclusive|LLFile::noblock, ec))
             {
                 recordMarkerVersion(mMarkerFile);
                 LL_DEBUGS("MarkerFile") << "Exec marker file locked." << LL_ENDL;
