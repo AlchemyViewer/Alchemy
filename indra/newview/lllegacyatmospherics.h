@@ -142,7 +142,7 @@ public:
 
     inline static F32 calcFalloff(const F32 h)
     {
-        return (h <= 0) ? 1.0f : (F32)LL_FAST_EXP(-ATM_EXP_FALLOFF * h);
+        return (h <= 0) ? 1.0f : (F32)ll_fast_exp(-ATM_EXP_FALLOFF * h);
     }
 
     inline LLColor3 calcSigSca(const F32 h) const

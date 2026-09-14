@@ -98,7 +98,7 @@ public:
 
     F32 pow( F32 x, F32 y )
     {
-        return (F32)LL_FAST_EXP(y * ln(x));
+        return (F32)ll_fast_exp(y * ln(x));
     }
 
 

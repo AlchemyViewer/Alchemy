@@ -35,6 +35,52 @@
 #include "llvolumemgr.h"
 #include "llmeshrepository.h"
 
+// Drops the samples more than k interquartile ranges outside the
+// quartiles of a sorted series.
+template <class VEC_TYPE>
+static void ll_remove_outliers(std::vector<VEC_TYPE>& data, F32 k)
+{
+    if (data.size() < 100)
+    { //not enough samples
+        return;
+    }
+
+    VEC_TYPE Q1 = data[data.size()/4];
+    VEC_TYPE Q3 = data[data.size()-data.size()/4-1];
+
+    if ((F32)(Q3-Q1) < 1.f)
+    {
+        // not enough variation to detect outliers
+        return;
+    }
+
+
+    VEC_TYPE min = (VEC_TYPE) ((F32) Q1-k * (F32) (Q3-Q1));
+    VEC_TYPE max = (VEC_TYPE) ((F32) Q3+k * (F32) (Q3-Q1));
+
+    U32 i = 0;
+    while (i < data.size() && data[i] < min)
+    {
+        i++;
+    }
+
+    size_t j = data.size()-1;
+    while (j > 0 && data[j] > max)
+    {
+        j--;
+    }
+
+    if (j < data.size()-1)
+    {
+        data.erase(data.begin()+j, data.end());
+    }
+
+    if (i > 0)
+    {
+        data.erase(data.begin(), data.begin()+i);
+    }
+}
+
 LLSceneView* gSceneView = NULL;
 
 LLSceneView::LLSceneView(const LLRect& rect)

@@ -33,25 +33,17 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <vector>
 #include <limits>
 #include "lldefs.h"
-//#include "llstl.h" // *TODO: Remove when LLString is gone
-//#include "llstring.h" // *TODO: Remove when LLString is gone
 // lltut.h uses is_approx_equal_fraction(). This was moved to its own header
 // file in llcommon so we can use lltut.h for llcommon tests without making
 // llcommon depend on llmath.
 #include "is_approx_equal_fraction.h"
 
-#define llisnan(val)  std::isnan(val)
-#define llfinite(val) std::isfinite(val)
-
-// Single Precision Floating Point Routines
-// (There used to be more defined here, but they appeared to be redundant and
-// were breaking some other includes. Removed by Falcon, reviewed by Andrew, 11/25/09)
-/*#ifndef tanf
-#define tanf(x)     ((F32)tan((F64)(x)))
-#endif*/
+inline bool llisnan(F32 val) noexcept { return std::isnan(val); }
+inline bool llisnan(F64 val) noexcept { return std::isnan(val); }
+inline bool llfinite(F32 val) noexcept { return std::isfinite(val); }
+inline bool llfinite(F64 val) noexcept { return std::isfinite(val); }
 
 constexpr F32   GRAVITY         = -9.8f;
 
@@ -167,21 +159,7 @@ inline S32 lltrunc(F64 f)
 
 inline S32 llfloor(F32 f)
 {
-#if LL_WINDOWS && !defined( __INTEL_COMPILER ) && (ADDRESS_SIZE == 32)
-        // Avoids changing the floating point control word.
-        // Accurate (unlike Stereopsis version) for all values between S32_MIN and S32_MAX and slightly faster than Stereopsis version.
-        // Add -(0.5 - epsilon) and then round
-        const U32 zpfp = 0xBEFFFFFF;
-        S32 result;
-        __asm {
-            fld     f
-            fadd    dword ptr [zpfp]
-            fistp   result
-        }
-        return result;
-#else
-        return (S32)floor(f);
-#endif
+    return (S32)std::floor(f);
 }
 
 inline S32 llceil( F32 f )
@@ -237,23 +215,6 @@ constexpr F32 fastMagnitude(F32 a, F32 b)
 
 
 ////////////////////
-//
-// Fast F32/S32 conversions
-//
-// Culled from www.stereopsis.com/FPU.html
-
-constexpr F64 LL_DOUBLE_TO_FIX_MAGIC    = 68719476736.0*1.5;     //2^36 * 1.5,  (52-_shiftamt=36) uses limited precisicion to floor
-constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed point representation,
-
-// Endian dependent code
-#ifdef LL_LITTLE_ENDIAN
-    #define LL_EXP_INDEX                1
-    #define LL_MAN_INDEX                0
-#else
-    #define LL_EXP_INDEX                0
-    #define LL_MAN_INDEX                1
-#endif
-
 ////////////////////////////////////////////////
 //
 // Fast exp and log
@@ -270,8 +231,8 @@ constexpr S32 LL_SHIFT_AMOUNT           = 16;                    //16.16 fixed p
 // gcc/clang, and (2) the static union is shared by every caller in the TU,
 // so concurrent calls from multiple threads race on LLECO.n.i. Use std::bit_cast
 // (well-defined since C++20) over a stack-local U64 to fix both.
-#define LL_EXP_A (1048576 * OO_LN2) // use 1512775 for integer
-#define LL_EXP_C (60801)            // this value of C good for -4 < y < 4
+constexpr F64 LL_EXP_A = 1048576 * OO_LN2; // use 1512775 for integer
+constexpr S32 LL_EXP_C = 60801;            // this value of C good for -4 < y < 4
 
 inline double ll_fast_exp(double y) noexcept
 {
@@ -279,10 +240,6 @@ inline double ll_fast_exp(double y) noexcept
     const U64 bits = static_cast<U64>(static_cast<U32>(i)) << 32;
     return std::bit_cast<double>(bits);
 }
-
-// Preserved as a macro for the existing call sites; the implementation is
-// thread-safe and free of UB. Callers cast the result to F32 explicitly.
-#define LL_FAST_EXP(y) ll_fast_exp(y)
 
 inline F32 llfastpow(const F32 x, const F32 y)
 {
@@ -432,51 +389,6 @@ constexpr U32 get_next_power_two(U32 val, U32 max_power_two)
 inline F32 llgaussian(F32 x, F32 o)
 {
     return 1.f/(F_SQRT_TWO_PI*o)*powf(F_E, -(x*x)/(2.f*o*o));
-}
-
-//helper function for removing outliers
-template <class VEC_TYPE>
-inline void ll_remove_outliers(std::vector<VEC_TYPE>& data, F32 k)
-{
-    if (data.size() < 100)
-    { //not enough samples
-        return;
-    }
-
-    VEC_TYPE Q1 = data[data.size()/4];
-    VEC_TYPE Q3 = data[data.size()-data.size()/4-1];
-
-    if ((F32)(Q3-Q1) < 1.f)
-    {
-        // not enough variation to detect outliers
-        return;
-    }
-
-
-    VEC_TYPE min = (VEC_TYPE) ((F32) Q1-k * (F32) (Q3-Q1));
-    VEC_TYPE max = (VEC_TYPE) ((F32) Q3+k * (F32) (Q3-Q1));
-
-    U32 i = 0;
-    while (i < data.size() && data[i] < min)
-    {
-        i++;
-    }
-
-    size_t j = data.size()-1;
-    while (j > 0 && data[j] > max)
-    {
-        j--;
-    }
-
-    if (j < data.size()-1)
-    {
-        data.erase(data.begin()+j, data.end());
-    }
-
-    if (i > 0)
-    {
-        data.erase(data.begin(), data.begin()+i);
-    }
 }
 
 // Converts given value from a linear RGB floating point value (0..1) to a gamma corrected (sRGB) value.
