@@ -2765,7 +2765,7 @@ void LLViewerObject::interpolateLinearMotion(const F64SecondsImplicit& frame_tim
         F32 min_height;
         if (isAvatar())
         {   // Make a better guess about AVs not going underground
-            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global);
+            min_height = LLWorld::getInstance()->resolveLandHeightGlobal(new_pos_global, mRegionp);
             min_height += (0.5f * getScale().mV[VZ]);
         }
         else

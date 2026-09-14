@@ -103,7 +103,10 @@ public:
     // All of these should be in the agent coordinate frame
     LLViewerRegion*         resolveRegionGlobal(LLVector3 &localpos, const LLVector3d &position);
     LLViewerRegion*         resolveRegionAgent(LLVector3 &localpos, const LLVector3 &position);
-    F32                     resolveLandHeightGlobal(const LLVector3d &position);
+    // regionp, when given, is where the caller expects the position to be -- usually the region of
+    // the object asking. It is checked first, so the region list is only searched when it misses;
+    // the answer is the same either way.
+    F32                     resolveLandHeightGlobal(const LLVector3d &position, LLViewerRegion* regionp = nullptr);
     F32                     resolveLandHeightAgent(const LLVector3 &position);
 
     // Return the lowest allowed Z point to prevent objects from being moved

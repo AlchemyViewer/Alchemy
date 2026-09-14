@@ -482,7 +482,7 @@ bool LLWorld::positionRegionValidGlobal(const LLVector3d &pos_global)
 // Allow objects to go up to their radius underground.
 F32 LLWorld::getMinAllowedZ(LLViewerObject* object, const LLVector3d &global_pos)
 {
-    F32 land_height = resolveLandHeightGlobal(global_pos);
+    F32 land_height = resolveLandHeightGlobal(global_pos, object->getRegion());
     F32 radius = 0.5f * object->getScale().length();
     return land_height - radius;
 }
@@ -525,9 +525,14 @@ F32 LLWorld::resolveLandHeightAgent(const LLVector3 &pos_agent)
 }
 
 
-F32 LLWorld::resolveLandHeightGlobal(const LLVector3d &pos_global)
+F32 LLWorld::resolveLandHeightGlobal(const LLVector3d &pos_global, LLViewerRegion* regionp)
 {
-    LLViewerRegion *regionp = getRegionFromPosGlobal(pos_global);
+    // Every moving object asks this every frame about the ground under its next position, which is
+    // nearly always in the region it is already in. Try that one before walking the region list.
+    if (!regionp || !regionp->pointInRegionGlobal(pos_global))
+    {
+        regionp = getRegionFromPosGlobal(pos_global);
+    }
     if (regionp)
     {
         return regionp->getLand().resolveHeightGlobal(pos_global);

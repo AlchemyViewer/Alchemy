@@ -672,7 +672,7 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
             */
 
             // Don't let object centers go underground.
-            F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global);
+            F32 land_height = LLWorld::getInstance()->resolveLandHeightGlobal(grab_point_global, objectp->getRegion());
 
             if (grab_point_global.mdV[VZ] < land_height)
             {

@@ -743,7 +743,7 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
                     // Grass is always drawn on the ground, so clamp its position to the ground
                     if (object->getPCode() == LL_PCODE_LEGACY_GRASS)
                     {
-                        new_position_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(new_position_global) + 1.f;
+                        new_position_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(new_position_global, object->getRegion()) + 1.f;
                     }
 
                     if (object->isRootEdit())
