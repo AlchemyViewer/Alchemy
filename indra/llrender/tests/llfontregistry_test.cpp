@@ -8,12 +8,11 @@
  * nameToSize/getMatchingFontDesc/getClosestFontTemplate, getAvailableFamilies.
  * FreeType-backed integration is covered by alfontcolrv1_test.cpp.
  *
- * When the binary is built against llrenderheadless (BUILD_HEADLESS=ON,
- * which sets LL_MESA_HEADLESS=1), the trailing block at the bottom of
- * this file adds GL-requiring tests: createFont allocating an atlas,
- * getFont caching the LLFontGL pointer, destroyGL releasing textures.
- * Without LL_MESA_HEADLESS those tests compile out and the binary stays
- * pure-CPU.
+ * Where the GL tests are on (CMake defines LL_TEST_GL), the trailing
+ * block at the bottom of this file adds GL-requiring tests: createFont
+ * allocating an atlas, getFont caching the LLFontGL pointer, destroyGL
+ * releasing textures. Without LL_TEST_GL those tests compile out and the
+ * binary stays pure-CPU.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -47,7 +46,7 @@
 
 #include <cstring>
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
 #  include "../llfontfreetype.h"
 #  include "../llfontbitmapcache.h"
 #  include "../llimagegl.h"
@@ -3126,15 +3125,15 @@ namespace tut
                       em[0].name, std::string("Public"));
     }
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
     // ===================================================================
-    // Group 7: GL-requiring paths (LL_MESA_HEADLESS only)
+    // Group 7: GL-requiring paths (LL_TEST_GL only)
     //
     // Companion fixture that owns a local LLFontRegistry with
-    // create_gl_textures=true and shares the OSMesa GL context across
+    // create_gl_textures=true and shares the GL context across
     // all tests via llheadlessgl_fixture.h. Pure-CPU tests above keep
     // their own create_gl_textures=false fixture so they don't pay for
-    // GL setup when building under BUILD_HEADLESS.
+    // GL setup where the GL tests are on.
     // ===================================================================
 
     namespace
@@ -3832,5 +3831,5 @@ namespace tut
                !cache->isSheetReleased(post_b.first,
                                        static_cast<U32>(post_b.second)));
     }
-#endif // LL_MESA_HEADLESS
+#endif // LL_TEST_GL
 }

@@ -1,13 +1,13 @@
 /**
  * @file llfontgl_test.cpp
- * @brief Smoke test for the OSMesa-backed headless GL harness.
+ * @brief Smoke test for the headless GL harness.
  *
- * Brings up a real GL context via LLWindowMesaHeadless, runs
+ * Brings up a real GL context on LLWindowManager's hidden window, runs
  * LLFontGL::initClass through the explicit-fonts.xml-path overload,
  * and verifies the GL-backed atlas pipeline produces a live texture.
  *
  * The single fixture instance shared across test methods (see
- * llheadlessgl_fixture.h) keeps the OSMesa context creation cost
+ * llheadlessgl_fixture.h) keeps the context creation cost
  * out of every test — but each test method still gets a fresh
  * sFontRegistry, so font-state mutations don't leak.
  *
@@ -72,7 +72,7 @@ namespace
 
 namespace tut
 {
-    // Shared OSMesa fixture. TUT spins fixtures per-test method, but
+    // Shared GL fixture. TUT spins fixtures per-test method, but
     // per-fixture HeadlessGL recreation poisons LLFontGL's per-getter
     // static fontp caches after ~10 cycles (the per-test new GL
     // context invalidates LLImageGL textures the fontps reference).
@@ -984,7 +984,7 @@ namespace tut
 
     // ===================================================================
     // Render-output group: fixture brings up gUIProgram (needs_render=true)
-    // so LLFontGL::render() completes end-to-end against the OSMesa
+    // so LLFontGL::render() completes end-to-end against the
     // framebuffer; tests verify pixel-level invariants via glReadPixels.
     // Shared static HeadlessGL — per-test recreation poisons LLFontGL's
     // static fontp cache after a few cycles (see vertexbuffer fixture).

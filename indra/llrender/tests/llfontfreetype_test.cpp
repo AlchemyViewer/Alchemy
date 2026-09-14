@@ -6,12 +6,11 @@
  *        cmap cache, and refcount semantics.
  *
  * Most tests are pure-CPU. The trailing block under
- * #if LL_MESA_HEADLESS exercises the rasterizer paths
+ * #if LL_TEST_GL exercises the rasterizer paths
  * (getGlyphInfo, addGlyph, collectGarbage) that route into
  * LLFontBitmapCache::nextOpenPos and gGL.bind. Same single-file
- * pattern as llfontregistry_test.cpp / alfontshaping_test.cpp —
- * library swap via registry_test_libs in CMake flips
- * LL_MESA_HEADLESS in headless builds.
+ * pattern as llfontregistry_test.cpp / alfontshaping_test.cpp;
+ * CMake defines LL_TEST_GL where the GL tests are on.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -42,7 +41,7 @@
 
 #include "../test/lltut.h"
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
 #  include "../llfontbitmapcache.h"
 #  include "llheadlessgl_fixture.h"
 #endif
@@ -81,7 +80,7 @@ namespace
     // path in LLFontFreetype::loadFace pre-warms the notdef glyph, which
     // calls into the rasterizer + atlas + gGL.bind — fatal in pure-CPU
     // tests. Tests that need a real head face force is_fallback=false
-    // and live under #if LL_MESA_HEADLESS.
+    // and live under #if LL_TEST_GL.
     LLPointer<LLFontFreetype> loadFt(const std::string& filename,
                                      bool is_fallback = true,
                                      F32 point_size = 14.f,
@@ -819,10 +818,10 @@ namespace tut
         ensure("set ital with matching values is equal", a == b);
     }
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
     // -------------------------------------------------------------
     // GL-backed group: rasterizer-touching paths. The HeadlessGl
-    // singleton supplies the OSMesa context so addGlyph's
+    // singleton supplies the GL context so addGlyph's
     // gGL.bind(image_gl) call lands on a live GL state.
     // -------------------------------------------------------------
 
@@ -900,32 +899,45 @@ namespace tut
     }
 
     // LLFontManager::collectGarbage drops face cache entries with
-    // refcount==1 (only the cache holds them). After we drop our
-    // own LLPointer, the orphaned face should be evictable.
+    // refcount==1 (only the cache holds them), and keeps the rest. The
+    // evidence is the face's own glyph cache: a face that has rasterized
+    // 'A' holds an entry for it, and a face loaded fresh holds none. The
+    // address of the evicted face is no evidence -- the allocator may hand
+    // the same block straight back to the reload.
     template<> template<>
     void llfontfreetype_render_object::test<3>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
-        ALFontFace* raw = nullptr;
-        {
-            LLPointer<ALFontFace> face =
-                gFontManagerp->getOrCreateFace(makeKey(path, 9.f));
-            ensure("face loaded", face.notNull() && face->isValid());
-            raw = face.get();
-            // face goes out of scope at end of block; only the cache
-            // holds it now.
-        }
-        // Sanity: the face is still alive (cache holds the ref).
-        // collectGarbage with refcount==1 should evict it.
+
+        // A head over the face rasterizes 'A' into the face's glyph cache;
+        // loadFtHead's parameters are makeKey's, so the manager hands the
+        // head and this lookup the same face.
+        LLPointer<LLFontFreetype> ft = loadFtHead(path);
+        ensure("DejaVuSans loaded as head", ft.notNull());
+        (void)ft->getGlyphInfo(L'A', EFontGlyphType::Grayscale);
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face loaded", face.notNull() && face->isValid());
+        const U32 glyph_a = face->getCharGlyphIndex(L'A');
+        ensure("the head rasterized into this face",
+               face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
+
+        // Held by the head and by us: survives a sweep, glyph and all.
         gFontManagerp->collectGarbage();
-        // Re-fetching produces a NEW face (different pointer) since
-        // the cache entry was evicted.
-        LLPointer<ALFontFace> reloaded =
-            gFontManagerp->getOrCreateFace(makeKey(path, 9.f));
-        ensure("re-fetched face is distinct after GC",
-               reloaded.get() != raw);
+        ensure("a held face keeps its glyphs across GC",
+               face->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) != nullptr);
+        ensure_equals("a held face is still the cached one",
+                      gFontManagerp->getOrCreateFace(makeKey(path)).get(), face.get());
+
+        // Held by the cache alone: swept, so the reload is a fresh face.
+        ft = nullptr;
+        face = nullptr;
+        gFontManagerp->collectGarbage();
+        LLPointer<ALFontFace> reloaded = gFontManagerp->getOrCreateFace(makeKey(path));
+        ensure("face reloaded", reloaded.notNull() && reloaded->isValid());
+        ensure("the reloaded face has no glyphs: the cached one was evicted",
+               reloaded->findGlyphInfo(glyph_a, EFontGlyphType::Grayscale) == nullptr);
     }
 
     // After two getGlyphInfo calls in a row, both glyphs end up in
@@ -1203,5 +1215,5 @@ namespace tut
                !ft->getBitmapCache()->isSheetReleased(
                    post.first, static_cast<U32>(post.second)));
     }
-#endif // LL_MESA_HEADLESS
+#endif // LL_TEST_GL
 }

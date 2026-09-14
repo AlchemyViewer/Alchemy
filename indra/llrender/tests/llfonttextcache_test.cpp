@@ -5,7 +5,7 @@
  * The deeper cache-invalidation invariants (geometry vs color
  * regen, mLastFontCacheGen, mLastUsesColorAtlas) are private to
  * LLFontTextCache, and the public render() entry point dives into
- * gGL.pushUIMatrix and drawGlyph — code paths that the OSMesa
+ * gGL.pushUIMatrix and drawGlyph — code paths that the
  * headless harness doesn't have populated (no UI matrix stack,
  * no shader bindings to draw with). A test for the recolor fast
  * path proper would need a full viewer-scale GL bring-up that the
@@ -75,7 +75,7 @@ namespace
 
 namespace tut
 {
-    // Shared OSMesa context + LLFontGL bring-up. One per binary. TUT
+    // Shared GL context + LLFontGL bring-up. One per binary. TUT
     // creates a fresh fixture per test method; per-fixture HeadlessGL
     // creation poisons LLFontGL's process-static fontp cache, since
     // each test's GL context destroys the LLImageGL textures the
@@ -428,7 +428,7 @@ namespace tut
     // Render-path tests — exercise LLFontTextCache::render() through
     // a real compiled gUIProgram. The fixture ctor binds the stub UI
     // shader so beginList → flush → drawArrays completes against the
-    // OSMesa framebuffer.
+    // framebuffer.
     // ===================================================================
 
     struct llfonttextcache_render_data

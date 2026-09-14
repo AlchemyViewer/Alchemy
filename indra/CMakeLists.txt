@@ -40,6 +40,13 @@ option(
   OFF
 )
 option(AL_BUILD_DOCS "Add the doc target that generates the API documentation with Doxygen" OFF)
+cmake_dependent_option(
+  AL_ENABLE_GL_TESTS
+  "Run the tests that stand up a GL context on a hidden window; off, they are built and registered disabled"
+  ON
+  "AL_BUILD_TESTS"
+  OFF
+)
 option(AL_BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
 option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)

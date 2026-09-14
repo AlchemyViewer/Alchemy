@@ -135,16 +135,6 @@ if(AL_BUILD_TESTS)
   # llwindow + ll::freetype / ll::harfbuzz / ll::plutosvg / ll::glext via
   # its own target_link_libraries; transitive linking propagates them to
   # consumers, so listing llrender alone is enough.
-  #
-  # When AL_BUILD_HEADLESS=ON, the font tests are re-pointed at
-  # llrenderheadless (with LL_MESA_HEADLESS=1) so the GL-gated groups at the
-  # bottom of those files activate over an OSMesa context. lluitransform and
-  # the pure-table tests need no GL either way.
-  if(AL_BUILD_HEADLESS)
-    set(registry_test_libs llrenderheadless)
-  else()
-    set(registry_test_libs llrender)
-  endif()
 
   # The bundled faces ship in the alchemy-fonts package; newview stages a
   # copy into its source tree only when the viewer itself is configured,
@@ -160,79 +150,39 @@ if(AL_BUILD_TESTS)
   # real font file (Noto-COLRv1.ttf, InterVariable.woff2) locate it relative
   # to this dir; absent files cause the affected tests to skip rather than
   # fail, so a partial font set still runs the rest of the suite.
-  set(font_data_define "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   set(
-    font_app_defines
+    font_defines
     "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
-    "${font_data_define}"
+    "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\""
     "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\""
   )
 
-  # Headless GL tests link llrenderheadless (which transitively pulls
-  # llwindowheadless + ll::osmesa) so they can stand up an OSMesa GL context.
-  # LL_MESA_HEADLESS=1 matches the lib's compile-time configuration; the
-  # LLFONT_TEST_* defines feed the package font paths to the tests.
-  if(AL_BUILD_HEADLESS)
-    set(headless_defines LL_MESA_HEADLESS=1 ${font_app_defines})
-  else()
-    set(headless_defines)
-  endif()
-
   # Arithmetic only: where a local coordinate lands under the UI transform.
-  al_add_test(lluitransform PROJECT llrender LIBRARIES ${registry_test_libs})
-  al_add_test(
-    alfontcolrv1
-    PROJECT llrender
-    LIBRARIES ${registry_test_libs}
-    DEFINES "${font_data_define}" ${headless_defines}
-  )
-  al_add_test(
-    llfontregistry
-    PROJECT llrender
-    LIBRARIES ${registry_test_libs}
-    DEFINES ${headless_defines}
-  )
-  al_add_test(
-    llfontbitmapcache
-    PROJECT llrender
-    LIBRARIES ${registry_test_libs}
-    DEFINES ${headless_defines}
-  )
+  al_add_test(lluitransform PROJECT llrender LIBRARIES llrender)
+
+  # The font suites are tables and shaping for the most part, each with a
+  # group at the end that renders through a GL context; that group compiles
+  # in under AL_GL_TEST_DEFINE and out where the GL tests are off.
+  foreach(test alfontcolrv1 llfontregistry llfontbitmapcache llfontfreetype)
+    al_add_test(
+      ${test}
+      PROJECT llrender
+      LIBRARIES llrender
+      DEFINES ${font_defines} ${AL_GL_TEST_DEFINE}
+    )
+  endforeach()
   # Both Unicode tables in one place, so the test can hold them against each
   # other. llrender itself has no need of ICU.
   al_add_test(
     alfontshaping
     PROJECT llrender
-    LIBRARIES ${registry_test_libs} ll::icu
-    DEFINES "${font_data_define}" ${headless_defines}
-  )
-  al_add_test(
-    llfontfreetype
-    PROJECT llrender
-    LIBRARIES ${registry_test_libs}
-    DEFINES "${font_data_define}" ${headless_defines}
+    LIBRARIES llrender ll::icu
+    DEFINES ${font_defines} ${AL_GL_TEST_DEFINE}
   )
 
-  # Wholly GL-backed suites. The context comes from SDL on a window that is
-  # never shown -- the same GL the viewer runs on -- so these want plain
-  # llrender and none of the headless library set, and they run everywhere
-  # rather than only where OSMesa happens to be installed.
-  set(gl_test_libs llrender ll::SDL3core)
-  al_add_test(
-    llfontgl
-    PROJECT llrender
-    LIBRARIES ${gl_test_libs}
-    DEFINES LL_TEST_GL=1 ${font_app_defines}
-  )
-  al_add_test(
-    llfonttextcache
-    PROJECT llrender
-    LIBRARIES ${gl_test_libs}
-    DEFINES LL_TEST_GL=1 ${font_app_defines}
-  )
-  al_add_test(lluiimage PROJECT llrender LIBRARIES ${gl_test_libs})
-
-  if(AL_BUILD_HEADLESS)
-    al_add_test(llimagegl PROJECT llrender LIBRARIES llrenderheadless DEFINES ${headless_defines})
-  endif()
+  # Wholly GL-backed suites, on LLWindowManager's hidden window.
+  foreach(test llfontgl llfonttextcache llimagegl)
+    al_add_test(${test} GL PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
+  endforeach()
+  al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
 endif()

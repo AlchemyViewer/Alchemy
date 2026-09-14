@@ -35,7 +35,7 @@
 #include <hb.h>
 #include <hb-ft.h>
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
 #  include "../llfontbitmapcache.h"
 #  include "../llfontgl.h"      // sForceMonochromeEmoji static for force-mono test
 #  include "../llimagegl.h"
@@ -808,12 +808,12 @@ namespace tut
         }
     }
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
     // -------------------------------------------------------------
     // GL-backed group: COLRv1 painter integrated with the LLFontFreetype
-    // / LLFontBitmapCache / LLImageGL pipeline. Each fixture builds a
-    // fresh OSMesa context so the addGlyph path's gGL.bind plus the
-    // setSubImageBGRA → LLImageGL upload land on a live GL state.
+    // / LLFontBitmapCache / LLImageGL pipeline. The shared HeadlessGL
+    // context is what the addGlyph path's gGL.bind plus the
+    // setSubImageBGRA → LLImageGL upload land on.
     // -------------------------------------------------------------
 
     struct alfontcolrv1_render_data
@@ -1051,5 +1051,5 @@ namespace tut
 
         LLFontGL::sForceMonochromeEmoji = saved;
     }
-#endif // LL_MESA_HEADLESS
+#endif // LL_TEST_GL
 }

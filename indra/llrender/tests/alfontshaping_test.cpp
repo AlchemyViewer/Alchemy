@@ -6,9 +6,9 @@
  * The bulk of the tests are pure-CPU: HB shaping itself doesn't touch
  * the atlas. The GL-backed kerning test at the bottom exercises
  * renderAndCreateGlyph → LLFontBitmapCache::nextOpenPos → gGL.bind,
- * so it's wrapped in #if LL_MESA_HEADLESS and only compiles in when
- * CMake links the test binary against llrenderheadless. Same
- * single-file pattern as llfontregistry_test.cpp's GL-gated block.
+ * so it's wrapped in #if LL_TEST_GL and compiles in where the GL tests
+ * are on. Same single-file pattern as llfontregistry_test.cpp's
+ * GL-gated block.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -42,7 +42,7 @@
 #include <hb.h>
 #include <unicode/uchar.h>
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
 #  include "llheadlessgl_fixture.h"
 #endif
 
@@ -1668,11 +1668,11 @@ namespace tut
                       combining_diffs, 0);
     }
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
     // GL-backed group: monospace shaping ends up rendering glyphs through
     // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
     // the test 3 (kerning) path. Wrapped in a separate fixture that
-    // pulls in the headless OSMesa context so the rasterizer can
+    // pulls in the headless GL context so the rasterizer can
     // satisfy the bind.
     struct alfontshaping_gl_data
     {
@@ -1819,5 +1819,5 @@ namespace tut
         ensure("at least one Latin kern pair fired through HB GPOS",
                found_kerned);
     }
-#endif // LL_MESA_HEADLESS
+#endif // LL_TEST_GL
 }

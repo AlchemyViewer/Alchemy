@@ -20,6 +20,7 @@ set(
   AL_BUILD_VIEWER
   AL_BUILD_APPEARANCE_UTILITY
   AL_BUILD_TESTS
+  AL_ENABLE_GL_TESTS
   AL_BUILD_DOCS
   AL_VCPKG_INSTALL
   AL_BUILD_HEADLESS
@@ -333,7 +334,11 @@ function(al_configuration_report)
 
   if(AL_BUILD_TESTS)
     _al_count_tests("${INDRA_SOURCE_DIR}" test_count)
-    _al_report_row("Tests" "on, ${test_count} registered")
+    if(AL_ENABLE_GL_TESTS)
+      _al_report_row("Tests" "on, ${test_count} registered")
+    else()
+      _al_report_row("Tests" "on, ${test_count} registered; the GL suites disabled")
+    endif()
   else()
     _al_report_row("Tests" "off")
   endif()

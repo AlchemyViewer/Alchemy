@@ -4,11 +4,11 @@
  *        packing, generation counter, sheet release/eviction.
  *
  * Pure-CPU tests cover the bookkeeping surface (construction, generation
- * counter, init/reset). The trailing block under #if LL_MESA_HEADLESS
+ * counter, init/reset). The trailing block under #if LL_TEST_GL
  * exercises nextOpenPos and releaseSheet, which call into gGL and
  * LLImageGL::destroyGLTexture and so need a real GL context. CMake
- * supplies the headless library + LL_MESA_HEADLESS=1 when BUILD_HEADLESS=ON;
- * without it those test groups compile out and the binary stays pure-CPU.
+ * defines LL_TEST_GL where the GL tests are on; without it those test
+ * groups compile out and the binary stays pure-CPU.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -36,7 +36,7 @@
 
 #include "../test/lltut.h"
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
 #  include "../llimagegl.h"
 #  include "llimage.h"
 #  include "llheadlessgl_fixture.h"
@@ -128,9 +128,9 @@ namespace tut
                !c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 
-#if LL_MESA_HEADLESS
+#if LL_TEST_GL
     // GL-backed fixture: shares the binary's HeadlessGL singleton so
-    // every test below has a live OSMesa context available for the
+    // every test below has a live GL context available for the
     // gGL.bind call inside nextOpenPos and the destroyGLTexture call
     // inside releaseSheet.
     struct llfontbitmapcache_gl_data
@@ -557,5 +557,5 @@ namespace tut
         ensure_equals("post-reset first posX",  px2, 4);
         ensure_equals("post-reset first posY",  py2, 4);
     }
-#endif // LL_MESA_HEADLESS
+#endif // LL_TEST_GL
 }

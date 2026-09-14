@@ -2,9 +2,8 @@
  * @file llimagegl_test.cpp
  * @brief LLImageGL tests that require a real GL context.
  *
- * Built only when BUILD_HEADLESS=ON (LL_MESA_HEADLESS=1). The
- * shared OSMesa fixture (llheadlessgl_fixture.h) provides the
- * GL context plus LLImageGL/LLFontManager init. Tests cover the
+ * A GL test: the shared fixture (llheadlessgl_fixture.h) provides
+ * the GL context plus LLImageGL/LLFontManager init. Tests cover the
  * core texture lifecycle, the setSubImage bind-preservation
  * invariant, and the deprecated-format resolution path.
  *
