@@ -2602,7 +2602,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                     U16 v[3];
                     std::memcpy(v, v_bytes + j * sizeof(v), sizeof(v));
                     pos_out->set((F32) v[0], (F32) v[1], (F32) v[2]);
-                    pos_out->div(65535.f);
+                    pos_out->div(LLVector4a(65535.f));
                     pos_out->mul(pos_range);
                     pos_out->add(min_pos);
                     pos_out++;
@@ -2620,9 +2620,9 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                         U16 n[3];
                         std::memcpy(n, n_bytes + j * sizeof(n), sizeof(n));
                         norm_out->set((F32) n[0], (F32) n[1], (F32) n[2]);
-                        norm_out->div(65535.f);
+                        norm_out->div(LLVector4a(65535.f));
                         norm_out->mul(2.f);
-                        norm_out->sub(1.f);
+                        norm_out->sub(LLVector4a(1.f));
                         norm_out++;
                     }
                 }
@@ -2693,7 +2693,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                             t_offset += sizeof(U16) * 2;
                         }
 
-                        tc4.div(65535.f);
+                        tc4.div(LLVector4a(65535.f));
                         tc4.mul(tc_range);
                         tc4.add(min_tc4);
 
@@ -7357,28 +7357,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         a.setSub(b, v1);
         b.sub(v2);
 
-
-        LLQuad& vector1 = *((LLQuad*) &v1);
-        LLQuad& vector2 = *((LLQuad*) &v2);
-
-        LLQuad& amQ = *((LLQuad*) &a);
-        LLQuad& bmQ = *((LLQuad*) &b);
-
-        //v1.setCross3(t,v0);
-        //setCross3(const LLVector4a& a, const LLVector4a& b)
-        // Vectors are stored in memory in w, z, y, x order from high to low
-        // Set vector1 = { a[W], a[X], a[Z], a[Y] }
-        vector1 = _mm_shuffle_ps( amQ, amQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-        // Set vector2 = { b[W], b[Y], b[X], b[Z] }
-        vector2 = _mm_shuffle_ps( bmQ, bmQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-        // mQ = { a[W]*b[W], a[X]*b[Y], a[Z]*b[X], a[Y]*b[Z] }
-        vector2 = _mm_mul_ps( vector1, vector2 );
-        // vector3 = { a[W], a[Y], a[X], a[Z] }
-        amQ = _mm_shuffle_ps( amQ, amQ, _MM_SHUFFLE( 3, 1, 0, 2 ));
-        // vector4 = { b[W], b[X], b[Z], b[Y] }
-        bmQ = _mm_shuffle_ps( bmQ, bmQ, _MM_SHUFFLE( 3, 0, 2, 1 ));
-        // mQ = { 0, a[X]*b[Y] - a[Y]*b[X], a[Z]*b[X] - a[X]*b[Z], a[Y]*b[Z] - a[Z]*b[Y] }
-        vector1 = _mm_sub_ps( vector2, _mm_mul_ps( amQ, bmQ ));
+        v1.setCross3(a, b);
 
         llassert(v1.isFinite3());
 

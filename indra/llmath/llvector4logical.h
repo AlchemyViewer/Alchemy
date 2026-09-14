@@ -27,18 +27,12 @@
 #ifndef LL_VECTOR4LOGICAL_H
 #define LL_VECTOR4LOGICAL_H
 
-#include "llmemory.h"
+#include "stdtypes.h"
+#include "alsimd.h"
 
-////////////////////////////
-// LLVector4Logical
-////////////////////////////
-// This class is incomplete. If you need additional functionality,
-// for example setting/unsetting particular elements or performing
-// other boolean operations, feel free to implement. If you need
-// assistance in determining the most optimal implementation,
-// contact someone with SSE experience (Falcon, Richard, Davep, e.g.)
-////////////////////////////
-
+// The result of comparing two LLVector4a lane by lane: every bit of a lane
+// set where the comparison held, none where it did not. It selects between
+// vectors and answers which lanes held; it is not a vector of numbers.
 class LLVector4Logical
 {
 public:
@@ -52,74 +46,82 @@ public:
         MASK_XYZW = MASK_XYZ | MASK_W
     };
 
-    // Empty default ctor
     LLVector4Logical() = default;
 
-    LLVector4Logical( const LLQuad& quad )
-    {
-        mQ = quad;
-    }
+    LLVector4Logical(alsimd::mask4 mask) : mQ(mask) {}
 
-    // Create and return a mask consisting of the lowest order bit of each element
+    // One bit per lane, x lowest, set where the lane is
     inline U32 getGatheredBits() const
     {
-        return _mm_movemask_ps(mQ);
-    };
+        return alsimd::bits(mQ);
+    }
 
-    // Invert this mask
     inline LLVector4Logical& invert()
     {
-        const __m128 allOnes = _mm_castsi128_ps(_mm_set1_epi32(-1));
-        mQ = _mm_andnot_ps(mQ, allOnes);
+        mQ = alsimd::mask_not(mQ);
         return *this;
     }
 
-    inline LLBool32 areAllSet( U32 mask ) const
+    // Whether every lane named by the MASK_ bits is set
+    inline bool areAllSet(U32 mask) const
     {
-        return ( getGatheredBits() & mask) == mask;
+        if (mask == MASK_XYZW)
+        {
+            return alsimd::all(mQ);
+        }
+        if (mask == MASK_XYZ)
+        {
+            return alsimd::all3(mQ);
+        }
+        return (getGatheredBits() & mask) == mask;
     }
 
-    inline LLBool32 areAllSet() const
+    inline bool areAllSet() const
     {
-        return areAllSet( MASK_XYZW );
+        return alsimd::all(mQ);
     }
 
-    inline LLBool32 areAnySet( U32 mask ) const
+    // Whether any lane named by the MASK_ bits is set
+    inline bool areAnySet(U32 mask) const
     {
-        return getGatheredBits() & mask;
+        if (mask == MASK_XYZW)
+        {
+            return alsimd::any(mQ);
+        }
+        if (mask == MASK_XYZ)
+        {
+            return alsimd::any3(mQ);
+        }
+        return (getGatheredBits() & mask) != 0;
     }
 
-    inline LLBool32 areAnySet() const
+    inline bool areAnySet() const
     {
-        return areAnySet( MASK_XYZW );
+        return alsimd::any(mQ);
     }
 
-    inline operator LLQuad() const
+    inline operator alsimd::mask4() const
     {
         return mQ;
     }
 
     inline void clear()
     {
-        mQ = _mm_setzero_ps();
+        mQ = alsimd::mask_none();
     }
 
     template<int N> void setElement()
     {
         static_assert(N >= 0 && N < 4, "setElement<N>: lane out of range");
-        const __m128 mask = _mm_castsi128_ps(_mm_set_epi32(
-            (N == 3) ? -1 : 0,
-            (N == 2) ? -1 : 0,
-            (N == 1) ? -1 : 0,
-            (N == 0) ? -1 : 0));
-        mQ = _mm_or_ps(mQ, mask);
+        mQ = alsimd::or_(mQ, alsimd::mask_lane<N>());
     }
 
 private:
 
-    LLQuad mQ;
+    alsimd::mask4 mQ;
 };
 
-static_assert(std::is_trivial<LLVector4Logical>::value, "LLVector4Logical must be a standard layout type");
+static_assert(std::is_trivially_copyable<LLVector4Logical>::value && std::is_standard_layout<LLVector4Logical>::value, "LLVector4Logical is plain data");
+static_assert(sizeof(LLVector4Logical) == 16 && alignof(LLVector4Logical) == 16, "LLVector4Logical is one register");
 
 #endif //LL_VECTOR4ALOGICAL_H

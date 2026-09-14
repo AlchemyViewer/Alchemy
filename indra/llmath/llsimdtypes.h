@@ -30,62 +30,37 @@
 #include "llmath.h"
 #include "alsimd.h"
 
-// The register every vector type here wraps: alsimd's, which is the same
-// __m128 on x86-64 and, through the translation the umbrella header
-// includes, on arm64 too.
+// The register every vector type here wraps.
 typedef alsimd::f32x4 LLQuad;
 
-class LLBool32
-{
-public:
-    inline LLBool32() = default;
-    inline LLBool32(int rhs) : m_bool(rhs) {}
-    inline LLBool32(unsigned int rhs) : m_bool(rhs) {}
-    inline LLBool32(bool rhs) { m_bool = static_cast<const int>(rhs); }
-    inline LLBool32& operator= (bool rhs) { m_bool = (int)rhs; return *this; }
-    inline bool operator== (bool rhs) const { return static_cast<const bool&>(m_bool) == rhs; }
-    inline bool operator!= (bool rhs) const { return !operator==(rhs); }
-    inline operator bool() const { return static_cast<const bool&>(m_bool); }
-
-private:
-    int m_bool;
-};
-
-static_assert(std::is_trivial<LLBool32>::value, "LLBool32 must be a standard layout type");
-
+// A scalar kept in a vector register, for a value that came out of vector
+// math and is going back into it: a dot product, a length, a lane. The
+// value is lane 0; the other three lanes are unspecified. The comparisons
+// are the scalar ones, with whatever the build's floating-point mode makes
+// of a NaN.
 class LLSimdScalar
 {
 public:
-    inline LLSimdScalar() = default;
-    inline LLSimdScalar(LLQuad q)
-    {
-        mQ = q;
-    }
+    LLSimdScalar() = default;
 
-    inline LLSimdScalar(F32 f)
-    {
-        mQ = _mm_set_ss(f);
-    }
+    LLSimdScalar(LLQuad q) : mQ(q) {}
 
-    static inline const LLSimdScalar& getZero()
+    LLSimdScalar(F32 f) : mQ(alsimd::set1(f)) {}
+
+    static inline LLSimdScalar getZero()
     {
-        // Construct via the LLQuad ctor (value-copies the __m128 into mQ)
-        // rather than reinterpret_cast<const LLSimdScalar&>(LLQuad), which
-        // is strict-aliasing UB.
-        extern const LLQuad F_ZERO_4A;
-        static const LLSimdScalar zero(F_ZERO_4A);
-        return zero;
+        return LLSimdScalar(alsimd::zero());
     }
 
     inline F32 getF32() const;
 
-    inline LLBool32 isApproximatelyEqual(const LLSimdScalar& rhs, F32 tolerance = F_APPROXIMATELY_ZERO) const;
+    inline bool isApproximatelyEqual(const LLSimdScalar& rhs, F32 tolerance = F_APPROXIMATELY_ZERO) const;
 
     inline LLSimdScalar getAbs() const;
 
-    inline void setMax( const LLSimdScalar& a, const LLSimdScalar& b );
+    inline void setMax(const LLSimdScalar& a, const LLSimdScalar& b);
 
-    inline void setMin( const LLSimdScalar& a, const LLSimdScalar& b );
+    inline void setMin(const LLSimdScalar& a, const LLSimdScalar& b);
 
     inline LLSimdScalar& operator=(F32 rhs);
 
@@ -111,6 +86,7 @@ private:
     LLQuad mQ;
 };
 
-static_assert(std::is_trivial<LLSimdScalar>::value, "LLSimdScalar must be a standard layout type");
+static_assert(std::is_trivially_copyable<LLSimdScalar>::value && std::is_standard_layout<LLSimdScalar>::value, "LLSimdScalar is plain data");
+static_assert(sizeof(LLSimdScalar) == 16 && alignof(LLSimdScalar) == 16, "LLSimdScalar is one register");
 
 #endif //LL_SIMD_TYPES_H

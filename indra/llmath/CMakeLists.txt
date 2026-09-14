@@ -122,6 +122,7 @@ if(AL_BUILD_TESTS)
     mathmisc
     m3math
     llmatrix4a
+    llvector4a
   )
     al_add_test(${test} PROJECT llmath LIBRARIES llmath llcommon)
   endforeach()

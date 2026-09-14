@@ -223,16 +223,15 @@ public:
     {
         const LLVector4a& pos = data->getPositionGroup();
 
-        LLVector4Logical gt = pos.greaterThan(center);
-
-        LLVector4a up;
-        up = _mm_and_ps(size, gt);
+        const LLVector4Logical gt = pos.greaterThan(center);
 
         LLVector4a down;
-        down = _mm_andnot_ps(gt, size);
+        down.setNeg(size);
 
-        center.add(up);
-        center.sub(down);
+        LLVector4a step;
+        step.setSelectWithMask(gt, size, down);
+
+        center.add(step);
     }
 
     void accept(oct_traveler* visitor)              { visitor->visit(this); }

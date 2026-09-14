@@ -37,19 +37,10 @@ class LLRotation;
 #include "glm/vec4.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-///////////////////////////////////
-// FIRST TIME USERS PLEASE READ
-//////////////////////////////////
-// This is just the beginning of LLVector4a. There are many more useful functions
-// yet to be implemented. For example, setNeg to negate a vector, rotate() to apply
-// a matrix rotation, various functions to manipulate only the X, Y, and Z elements
-// and many others (including a whole variety of accessors). So if you don't see a
-// function here that you need, please contact Falcon or someone else with SSE
-// experience (Richard, I think, has some and davep has a little as of the time
-// of this writing, July 08, 2010) about getting it implemented before you resort to
-// LLVector3/LLVector4.
-/////////////////////////////////
-
+// A four-lane float vector in one register: x, y, z and w, w usually
+// carried along rather than meant. Every operation is a lane-wise
+// instruction or a short fixed sequence of them; there is nothing here that
+// loops or branches on the data.
 class alignas(16) LLVector4a
 {
 public:
@@ -79,7 +70,7 @@ public:
     // Copy 16 bytes from src to dst. Source and destination must be 16-byte aligned
     static inline void copy4a(F32* dst, const F32* src)
     {
-        _mm_store_ps(dst, _mm_load_ps(src));
+        alsimd::store(dst, alsimd::load(src));
     }
 
     // Copy words 16-byte blocks from src to dst. Source and destination must not overlap.
@@ -98,7 +89,9 @@ public:
         set(x,y,z,w);
     }
 
-    LLVector4a(F32 x)
+    // Every lane x. Explicit, so that a float never becomes a vector by
+    // itself: writing `v = 1.f` is almost never meant as a splat.
+    explicit LLVector4a(F32 x)
     {
         splat(x);
     }
@@ -163,10 +156,10 @@ public:
     // Load from 16-byte aligned src array (preferred method of loading)
     inline void load4a(const F32* src);
 
-    // Load from unaligned src array (NB: Significantly slower than load4a)
+    // Load from unaligned src array
     inline void loadua(const F32* src);
 
-    // Load only three floats beginning at address 'src'. Slowest method.
+    // Load only three floats beginning at address 'src'; w is zero
     inline void load3(const F32* src);
 
     // Store to a 16-byte aligned memory address
@@ -176,20 +169,22 @@ public:
     // BASIC GET/SET
     ////////////////////////////////////
 
-    // Return a "this" as an F32 pointer.
+    // The four floats in memory. The register is stored to the object on
+    // the way, so reading them one at a time in a loop that also does
+    // vector math costs a round trip through memory each time.
     inline F32* getF32ptr();
 
-    // Return a "this" as a const F32 pointer.
-    inline const F32* const getF32ptr() const;
+    inline const F32* getF32ptr() const;
 
-    // Read-only access a single float in this vector. Do not use in proximity to any function call that manipulates
-    // the data at the whole vector level or you will incur a substantial penalty. Consider using the splat functions instead
+    // Read one lane. Prefer getScalarAt<N>() where N is known at compile
+    // time, and the vector operations where the value is going back into a
+    // register.
     inline F32 operator[](const S32 idx) const;
 
-    // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
+    // Lane idx, in a register
     inline LLSimdScalar getScalarAt(const S32 idx) const;
 
-    // Prefer this method for read-only access to a single element. Prefer the templated version if the elem is known at compile time.
+    // Lane N, in a register
     template <int N> LL_FORCE_INLINE LLSimdScalar getScalarAt() const;
 
     // Set to an x, y, z and optional w provided
@@ -232,6 +227,9 @@ public:
     // Set this to the element-wise absolute value of src
     inline void setAbs(const LLVector4a& src);
 
+    // Set this to the element-wise negation of src
+    inline void setNeg(const LLVector4a& src);
+
     // Add to each component in this vector the corresponding component in rhs
     inline void add(const LLVector4a& rhs);
 
@@ -246,6 +244,9 @@ public:
 
     // Multiply this vector by x in a scalar fashion
     inline void mul(const F32 x);
+
+    // Negate every component
+    inline void negate();
 
     // Set this to (a x b) (geometric cross-product)
     inline void setCross3(const LLVector4a& a, const LLVector4a& b);
@@ -262,7 +263,7 @@ public:
     // Return the 4D dot product of this vector and b
     inline LLSimdScalar dot4(const LLVector4a& b) const;
 
-    // Normalize this vector with respect to the x, y, and z components only. Accurate to 22 bites of precision. W component is destroyed
+    // Normalize this vector with respect to the x, y, and z components only. Accurate to 22 bits of precision. W component is destroyed
     // Note that this does not consider zero length vectors!
     inline void normalize3();
 
@@ -282,10 +283,10 @@ public:
     inline void normalize3fast_checked(LLVector4a* d = 0);
 
     // Return true if this vector is normalized with respect to x,y,z up to tolerance
-    inline LLBool32 isNormalized3( F32 tolerance = 1e-3 ) const;
+    inline bool isNormalized3( F32 tolerance = 1e-3 ) const;
 
     // Return true if this vector is normalized with respect to all components up to tolerance
-    inline LLBool32 isNormalized4( F32 tolerance = 1e-3 ) const;
+    inline bool isNormalized4( F32 tolerance = 1e-3 ) const;
 
     // Set all elements to the length of vector 'v'
     inline void setAllLength3( const LLVector4a& v );
@@ -293,21 +294,22 @@ public:
     // Get this vector's length
     inline LLSimdScalar getLength3() const;
 
-    // Set the components of this vector to the minimum of the corresponding components of lhs and rhs
+    // Set the components of this vector to the minimum of the corresponding components of lhs and rhs.
+    // A NaN in either gives whichever the machine picks; clamp() where that matters.
     inline void setMin(const LLVector4a& lhs, const LLVector4a& rhs);
 
     // Set the components of this vector to the maximum of the corresponding components of lhs and rhs
     inline void setMax(const LLVector4a& lhs, const LLVector4a& rhs);
 
-    // Clamps this vector to be within the component-wise range low to high (inclusive)
+    // Clamps this vector to be within the component-wise range low to high (inclusive). A NaN lane stays NaN.
     inline void clamp( const LLVector4a& low, const LLVector4a& high );
 
-    // Set this to  (c * lhs) + rhs * ( 1 - c)
+    // Set this to lhs + (rhs - lhs) * c
     inline void setLerp(const LLVector4a& lhs, const LLVector4a& rhs, F32 c);
 
-    // Return true (nonzero) if x, y, z (and w for Finite4) are all finite floats
-    inline LLBool32 isFinite3() const;
-    inline LLBool32 isFinite4() const;
+    // Return true if x, y, z (and w for Finite4) are all finite floats
+    inline bool isFinite3() const;
+    inline bool isFinite4() const;
 
     // Set this vector to 'vec' rotated by the LLRotation or LLQuaternion2 provided
     void setRotated( const LLRotation& rot, const LLVector4a& vec );
@@ -327,7 +329,7 @@ public:
     // The functions in this section will compare the elements in this vector
     // to those in rhs and return an LLVector4Logical with all bits set in elements
     // where the comparison was true and all bits unset in elements where the comparison
-    // was false. See llvector4logica.h
+    // was false. See llvector4logical.h
     ////////////////////////////////////
     // WARNING: Other than equals3 and equals4, these functions do NOT account
     // for floating point tolerance. You should include the appropriate tolerance
@@ -353,7 +355,6 @@ public:
     // OPERATORS
     ////////////////////////////////////
 
-    // Do NOT add aditional operators without consulting someone with SSE experience
     inline const LLVector4a& operator= ( const LLQuad& rhs );
 
     inline operator LLQuad() const;
@@ -372,7 +373,8 @@ private:
     LLQuad mQ;
 };
 
-static_assert(std::is_trivial<LLVector4a>::value, "LLVector4a must be a trivial type");
+static_assert(std::is_trivially_copyable<LLVector4a>::value && std::is_standard_layout<LLVector4a>::value, "LLVector4a is plain data");
+static_assert(sizeof(LLVector4a) == 16 && alignof(LLVector4a) == 16, "LLVector4a is one register");
 
 inline void update_min_max(LLVector4a& min, LLVector4a& max, const LLVector4a& p)
 {

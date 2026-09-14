@@ -212,10 +212,11 @@ public:
 
     inline void setMul(const LLMatrix4a& m, const F32 s)
     {
-        mMatrix[0].setMul(m.mMatrix[0], s);
-        mMatrix[1].setMul(m.mMatrix[1], s);
-        mMatrix[2].setMul(m.mMatrix[2], s);
-        mMatrix[3].setMul(m.mMatrix[3], s);
+        const LLVector4a scale(s);
+        mMatrix[0].setMul(m.mMatrix[0], scale);
+        mMatrix[1].setMul(m.mMatrix[1], scale);
+        mMatrix[2].setMul(m.mMatrix[2], scale);
+        mMatrix[3].setMul(m.mMatrix[3], scale);
     }
 
     inline void setLerp(const LLMatrix4a& a, const LLMatrix4a& b, F32 w)

@@ -2069,7 +2069,7 @@ void renderNormals(LLDrawable *drawablep)
                 {
                     LLVector4a n, p;
 
-                    n.setMul(face.mNormals[j], 1.0);
+                    n = face.mNormals[j];
                     n.mul(inv_scale);  // Pre-scale normal, so it's left with an inverse-transpose xform after MVP
                     n.normalize3fast();
                     n.mul(draw_length);
@@ -2090,7 +2090,7 @@ void renderNormals(LLDrawable *drawablep)
                     {
                         LLVector4a t, p;
 
-                        t.setMul(face.mTangents[j], 1.0f);
+                        t = face.mTangents[j];
                         t.normalize3fast();
                         t.mul(draw_length);
                         p.setAdd(face.mPositions[j], t);
