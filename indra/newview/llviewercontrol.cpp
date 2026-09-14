@@ -272,7 +272,11 @@ bool handleRenderTransparentWaterChanged(const LLSD& newvalue)
         gPipeline.createGLBuffers();
         LLViewerShaderMgr::instance()->setShaders();
     }
-    LLWorld::getInstance()->updateWaterObjects();
+    // The feature table sets this at startup, before the world exists.
+    if (LLWorld::instanceExists())
+    {
+        LLWorld::getInstance()->updateWaterObjects();
+    }
     return true;
 }
 
