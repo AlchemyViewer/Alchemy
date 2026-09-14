@@ -46,6 +46,13 @@ public:
     T* append(S32 N);
     T& operator[](int idx);
     const T& operator[](int idx) const;
+
+    T* data() { return mArray; }
+    const T* data() const { return mArray; }
+    T* begin() { return mArray; }
+    const T* begin() const { return mArray; }
+    T* end() { return mArray + mElementCount; }
+    const T* end() const { return mArray + mElementCount; }
 };
 
 template <class T, U32 alignment>
@@ -116,20 +123,14 @@ void LLAlignedArray<T, alignment>::resize(U32 size)
 template <class T, U32 alignment>
 T& LLAlignedArray<T, alignment>::operator[](int idx)
 {
-    if (idx < 0 || unsigned(idx) >= mElementCount)
-    {
-        LL_ERRS() << "Out of bounds LLAlignedArray, requested: " << (S32)idx << " size: " << mElementCount << LL_ENDL;
-    }
+    llassert(idx >= 0 && unsigned(idx) < mElementCount);
     return mArray[idx];
 }
 
 template <class T, U32 alignment>
 const T& LLAlignedArray<T, alignment>::operator[](int idx) const
 {
-    if (idx < 0 || unsigned(idx) >= mElementCount)
-    {
-        LL_ERRS() << "Out of bounds LLAlignedArray, requested: " << (S32)idx << " size: " << mElementCount << LL_ENDL;
-    }
+    llassert(idx >= 0 && unsigned(idx) < mElementCount);
     return mArray[idx];
 }
 
