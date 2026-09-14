@@ -60,15 +60,12 @@ bool LLLineSegmentBoxIntersect(const LLVector4a& start, const LLVector4a& end, c
     f.setCross3(dir, diff);
     f.setAbs(f);
 
-    LLVector4a v0, v1;
-
-    v0 = _mm_shuffle_ps(size, size,_MM_SHUFFLE(3,0,0,1));
-    v1 = _mm_shuffle_ps(fAWdU, fAWdU, _MM_SHUFFLE(3,1,2,2));
-    lhs.setMul(v0, v1);
-
-    v0 = _mm_shuffle_ps(size, size, _MM_SHUFFLE(3,1,2,2));
-    v1 = _mm_shuffle_ps(fAWdU, fAWdU, _MM_SHUFFLE(3,0,0,1));
-    rhs.setMul(v0, v1);
+    const LLVector4a size_yxx(alsimd::shuffle<1, 0, 0, 3>(size));
+    const LLVector4a size_zzy(alsimd::shuffle<2, 2, 1, 3>(size));
+    const LLVector4a awdu_zzy(alsimd::shuffle<2, 2, 1, 3>(fAWdU));
+    const LLVector4a awdu_yxx(alsimd::shuffle<1, 0, 0, 3>(fAWdU));
+    lhs.setMul(size_yxx, awdu_zzy);
+    rhs.setMul(size_zzy, awdu_yxx);
     rhs.add(lhs);
 
     grt = f.greaterThan(rhs).getGatheredBits();

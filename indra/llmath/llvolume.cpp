@@ -49,6 +49,7 @@
 #include "llsdserialize.h"
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "alsimdkernels.h"
 #include "llmeshoptimizer.h"
 #include "lltimer.h"
 #include "llvolumeoctree.h"
@@ -2585,53 +2586,36 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             tc_range.set(tc_range2[0], tc_range2[1], tc_range2[0], tc_range2[1]);
             LLVector4a min_tc4(min_tc[0], min_tc[1], min_tc[0], min_tc[1]);
 
-            LLVector4a* pos_out = face.mPositions;
-            LLVector4a* norm_out = face.mNormals;
-            // mTexCoords is LLVector2* into a 16-byte-aligned slab; write 4
-            // floats (= 2 UV pairs) per iteration via store4a through F32*,
-            // avoiding a cast to LLVector4a* of unrelated-class storage.
+            // mTexCoords is LLVector2* into a 16-byte-aligned slab holding
+            // two texture coordinates per vector
             F32* tc_out = (F32*) face.mTexCoords;
+
+            // each quantized value is its sixteen bits over 65535, times
+            // the range, plus the minimum; the range over 65535 is one
+            // multiply per lane
+            const LLVector4a u16_step(1.f / 65535.f);
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - positions");
-                // Same aliasing issue as the index loop above: pos is a
-                // std::vector<U8> with three little-endian U16s per vertex.
-                const U8* v_bytes = pos.data();
-                for (U32 j = 0; j < num_verts; ++j)
-                {
-                    U16 v[3];
-                    std::memcpy(v, v_bytes + j * sizeof(v), sizeof(v));
-                    pos_out->set((F32) v[0], (F32) v[1], (F32) v[2]);
-                    pos_out->div(LLVector4a(65535.f));
-                    pos_out->mul(pos_range);
-                    pos_out->add(min_pos);
-                    pos_out++;
-                }
-
+                LLVector4a pos_scale;
+                pos_scale.setMul(pos_range, u16_step);
+                alsimd::dequantize_u16x3(pos.data(), num_verts, pos_scale, min_pos, face.mPositions);
             }
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - normals");
                 if (!norm.empty())
                 {
-                    const U8* n_bytes = norm.data();
-                    for (U32 j = 0; j < num_verts; ++j)
-                    {
-                        U16 n[3];
-                        std::memcpy(n, n_bytes + j * sizeof(n), sizeof(n));
-                        norm_out->set((F32) n[0], (F32) n[1], (F32) n[2]);
-                        norm_out->div(LLVector4a(65535.f));
-                        norm_out->mul(2.f);
-                        norm_out->sub(LLVector4a(1.f));
-                        norm_out++;
-                    }
+                    // from sixteen bits to -1..1
+                    alsimd::dequantize_u16x3(norm.data(), num_verts, LLVector4a(2.f / 65535.f), LLVector4a(-1.f), face.mNormals);
                 }
                 else
                 {
+                    LLVector4a* norm_out = face.mNormals;
                     for (U32 j = 0; j < num_verts; ++j)
                     {
                         norm_out->clear();
-                        norm_out++; // or just norm_out[j].clear();
+                        norm_out++;
                     }
                 }
             }
@@ -2669,37 +2653,9 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - texcoords");
                 if (!tc.empty())
                 {
-                    // tc is std::vector<U8>; packs two vertices' UV pairs
-                    // into one LLVector4a, so we read four little-endian
-                    // U16s (8 bytes) per loop iteration. On odd num_verts the
-                    // final iteration only has one vertex left (4 bytes),
-                    // and copying 8 bytes would walk past the buffer end.
-                    const U8* t_bytes = tc.data();
-                    U32 t_offset = 0;
-                    for (U32 j = 0; j < num_verts; j+=2)
-                    {
-                        U16 t[4] = { 0, 0, 0, 0 };
-                        LLVector4a tc4;
-                        if (j < num_verts-1)
-                        {
-                            std::memcpy(t, t_bytes + t_offset, sizeof(t));
-                            tc4.set((F32) t[0], (F32) t[1], (F32) t[2], (F32) t[3]);
-                            t_offset += sizeof(t);
-                        }
-                        else
-                        {
-                            std::memcpy(t, t_bytes + t_offset, sizeof(U16) * 2);
-                            tc4.set((F32) t[0], (F32) t[1], 0.f, 0.f);
-                            t_offset += sizeof(U16) * 2;
-                        }
-
-                        tc4.div(LLVector4a(65535.f));
-                        tc4.mul(tc_range);
-                        tc4.add(min_tc4);
-
-                        tc4.store4a(tc_out);
-                        tc_out += 4;
-                    }
+                    LLVector4a tc_scale;
+                    tc_scale.setMul(tc_range, u16_step);
+                    alsimd::dequantize_u16x2(tc.data(), num_verts, tc_scale, min_tc4, tc_out);
                 }
                 else
                 {
@@ -2854,13 +2810,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             }
             else
             {
-                min = max = face.mPositions[0];
-
-                for (S32 i = 1; i < face.mNumVertices; ++i)
-                {
-                    min.setMin(min, face.mPositions[i]);
-                    max.setMax(max, face.mPositions[i]);
-                }
+                alsimd::extents(face.mPositions, face.mNumVertices, min, max);
 
                 if (face.mTexCoords)
                 {

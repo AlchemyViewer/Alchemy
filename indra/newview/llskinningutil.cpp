@@ -28,6 +28,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llskinningutil.h"
+#include "alsimdkernels.h"
 #include "llvoavatar.h"
 #include "llviewercontrol.h"
 #include "llmeshrepository.h"
@@ -217,56 +218,25 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
     LLMatrix4a& final_mat,
     U32 max_joints)
 {
-    bool valid_weights = true;
-    final_mat.clear();
-
-    S32 idx[4];
-
-    LLVector4 wght;
-
-    F32 scale = 0.f;
-    for (U32 k = 0; k < 4; k++)
+    if (handle_bad_scale)
     {
-        F32 w = weights[k];
-
-        // BENTO potential optimizations
-        // - Do clamping in unpackVolumeFaces() (once instead of every time)
-        // - int vs floor: if we know w is
-        // >= 0.0, we can use int instead of floorf; the latter
-        // allegedly has a lot of overhead due to ieeefp error
-        // checking which we should not need.
-        idx[k] = llclamp((S32) floorf(w), (S32)0, (S32)max_joints-1);
-
-        wght[k] = w - floorf(w);
-        scale += wght[k];
+        // unpackVolumeFaces() leaves no vertex with every weight zero, so
+        // this is the first joint alone, and a sign the data was not
+        // unpacked here
+        F32 scale = 0.f;
+        for (U32 k = 0; k < 4; k++)
+        {
+            scale += weights[k] - floorf(weights[k]);
+        }
+        if (scale <= 0.f)
+        {
+            llassert(false);
+            const S32 joint = llclamp((S32) floorf(weights[0]), (S32)0, (S32)max_joints-1);
+            final_mat = mat[joint];
+            return;
+        }
     }
-    if (handle_bad_scale && scale <= 0.f)
-    {
-        wght = LLVector4(1.0f, 0.0f, 0.0f, 0.0f);
-        valid_weights = false;
-    }
-    else
-    {
-        // This is enforced  in unpackVolumeFaces()
-        llassert(scale>0.f);
-        wght *= 1.f/scale;
-    }
-
-    for (U32 k = 0; k < 4; k++)
-    {
-        F32 w = wght[k];
-
-        LLMatrix4a src;
-        src.setMul(mat[idx[k]], w);
-
-        final_mat.add(src);
-    }
-    // SL-366 - with weight validation/cleanup code, it should no longer be
-    // possible to hit the bad scale case.
-    llassert(valid_weights);
-    // When building for Release, the above llassert() goes away. Ward off
-    // variable-set-but-unused error.
-    (void)valid_weights;
+    alsimd::skin_blend(weights, mat, max_joints, final_mat);
 }
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)

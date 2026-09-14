@@ -55,6 +55,7 @@
 #include "llhudmanager.h"
 #include "llflexibleobject.h"
 #include "llskinningutil.h"
+#include "alsimdkernels.h"
 #include "llsky.h"
 #include "lltexturefetch.h"
 #include "llvector4a.h"
@@ -5169,18 +5170,7 @@ void LLRiggedVolume::update(
                 else
             #endif
                 {
-                    for (S32 j = 0; j < dst_face.mNumVertices; ++j)
-                    {
-                        LLMatrix4a final_mat;
-                        LLSkinningUtil::getPerVertexSkinMatrix(weight[j].getF32ptr(), mat, false, final_mat, max_joints);
-
-                        LLVector4a& v = vol_face.mPositions[j];
-                        LLVector4a t;
-                        LLVector4a dst;
-                        bind_shape_matrix.affineTransform(v, t);
-                        final_mat.affineTransform(t, dst);
-                        pos[j] = dst;
-                    }
+                    alsimd::skin_points(weight, mat, max_joints, bind_shape_matrix, vol_face.mPositions, pos, dst_face.mNumVertices);
                 }
 
                 //update bounding box
@@ -5188,22 +5178,18 @@ void LLRiggedVolume::update(
                 LLVector4a& min = dst_face.mExtents[0];
                 LLVector4a& max = dst_face.mExtents[1];
 
-                min = pos[0];
-                max = pos[1];
-                if (i==0)
+                alsimd::extents(pos, dst_face.mNumVertices, min, max);
+
+                if (rigged_face_count == 1)
                 {
                     box_min = min;
                     box_max = max;
                 }
-
-                for (S32 j = 1; j < dst_face.mNumVertices; ++j)
+                else
                 {
-                    min.setMin(min, pos[j]);
-                    max.setMax(max, pos[j]);
+                    box_min.setMin(min,box_min);
+                    box_max.setMax(max,box_max);
                 }
-
-                box_min.setMin(min,box_min);
-                box_max.setMax(max,box_max);
 
                 dst_face.mCenter->setAdd(dst_face.mExtents[0], dst_face.mExtents[1]);
                 dst_face.mCenter->mul(0.5f);
