@@ -33,7 +33,6 @@
 
 class alignas(16) LLMatrix4a
 {
-    LL_ALIGN_NEW
 public:
     LLVector4a mMatrix[4];
 

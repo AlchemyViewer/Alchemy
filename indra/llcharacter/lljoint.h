@@ -88,7 +88,6 @@ inline bool operator!=(const LLVector3OverrideMap& a, const LLVector3OverrideMap
 //-----------------------------------------------------------------------------
 class alignas(16) LLJoint
 {
-    LL_ALIGN_NEW
 public:
     // priority levels, from highest to lowest
     enum JointPriority

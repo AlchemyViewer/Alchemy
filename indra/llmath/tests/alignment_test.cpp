@@ -33,6 +33,9 @@
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
+#include "../llmatrix4a.h"
+
+#include <vector>
 
 namespace tut
 {
@@ -46,32 +49,19 @@ typedef test_group<alignment_test> alignment_test_t;
 typedef alignment_test_t::object alignment_test_object_t;
 tut::alignment_test_t tut_alignment_test("LLAlignment");
 
+// The SIMD types declare their alignment and nothing else: no operator new.
+// A plain new must place them, which the language guarantees up to the
+// default new alignment and, past it, through the aligned operator new.
 class alignas(16) MyVector4a
 {
 public:
-    void* operator new(size_t size)
-    {
-        return ll_aligned_malloc_16(size);
-    }
-
-    void operator delete(void *p)
-    {
-        ll_aligned_free_16(p);
-    }
-
-    void* operator new[](size_t count)
-    {   // try to allocate count bytes for an array
-        return ll_aligned_malloc_16(count);
-    }
-
-    void operator delete[](void *p)
-    {
-        ll_aligned_free_16(p);
-    }
-
     LLQuad mQ;
 };
 
+struct alignas(64) MyCacheLine
+{
+    LLQuad mQ[4];
+};
 
 // Verify that aligned allocators perform as advertised.
 template<> template<>
@@ -104,6 +94,9 @@ void alignment_test_object_t::test<2>()
 
     MyVector4a veca[12];
     ensure("LLAlignment veca unaligned", is_aligned(veca,16));
+
+    MyCacheLine line;
+    ensure("LLAlignment line unaligned", is_aligned(&line,64));
 }
 
 // Heap allocation of objects and arrays.
@@ -116,17 +109,57 @@ void alignment_test_object_t::test<3>()
         MyVector4a *vecp = new MyVector4a;
         ensure("LLAlignment vecp unaligned", is_aligned(vecp,16));
         delete vecp;
+
+        MyCacheLine *linep = new MyCacheLine;
+        ensure("LLAlignment linep unaligned", is_aligned(linep,64));
+        delete linep;
     }
 
     MyVector4a *veca = new MyVector4a[ARR_SIZE];
-    //std::cout << "veca base is " << (S32) veca << std::endl;
     ensure("LLAligment veca base", is_aligned(veca,16));
     for(int i=0; i<ARR_SIZE; i++)
     {
-        std::cout << "veca[" << i << "]" << std::endl;
         ensure("LLAlignment veca member unaligned", is_aligned(&veca[i],16));
     }
     delete [] veca;
+
+    MyCacheLine *linea = new MyCacheLine[ARR_SIZE];
+    ensure("LLAligment linea base", is_aligned(linea,64));
+    for(int i=0; i<ARR_SIZE; i++)
+    {
+        ensure("LLAlignment linea member unaligned", is_aligned(&linea[i],64));
+    }
+    delete [] linea;
+}
+
+// The real types, on the heap and in a container.
+template<> template<>
+void alignment_test_object_t::test<4>()
+{
+    ensure_equals("LLVector4a size", sizeof(LLVector4a), size_t(16));
+    ensure_equals("LLVector4a alignment", alignof(LLVector4a), size_t(16));
+    ensure_equals("LLMatrix4a size", sizeof(LLMatrix4a), size_t(64));
+    ensure_equals("LLMatrix4a alignment", alignof(LLMatrix4a), size_t(16));
+
+    LLVector4a *vecp = new LLVector4a;
+    ensure("LLVector4a unaligned", is_aligned(vecp,16));
+    delete vecp;
+
+    LLMatrix4a *matp = new LLMatrix4a[5];
+    ensure("LLMatrix4a array unaligned", is_aligned(matp,16));
+    delete [] matp;
+
+    std::vector<LLVector4a> vecs(33);
+    for (const LLVector4a& v : vecs)
+    {
+        ensure("LLVector4a in a vector unaligned", is_aligned(&v,16));
+    }
+
+    std::vector<LLMatrix4a> mats(9);
+    for (const LLMatrix4a& m : mats)
+    {
+        ensure("LLMatrix4a in a vector unaligned", is_aligned(&m,16));
+    }
 }
 
 }

@@ -63,7 +63,6 @@ constexpr F32 MAX_FIELD_OF_VIEW = 175.f * DEG_TO_RAD;
 class alignas(16) LLCamera
 :   public LLCoordFrame
 {
-    LL_ALIGN_NEW
 public:
     LLCamera(const LLCamera& rhs)
     {

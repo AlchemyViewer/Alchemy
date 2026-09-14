@@ -48,7 +48,6 @@ void renderReflectionProbe(LLReflectionMap* probe);
 
 class alignas(16) LLReflectionMapManager
 {
-    LL_ALIGN_NEW
 public:
     enum class DetailLevel
     {

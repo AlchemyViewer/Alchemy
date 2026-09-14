@@ -42,7 +42,6 @@
 // rotation matrix.
 class alignas(16) LLMatrix3a
 {
-    LL_ALIGN_NEW
 public:
 
     // Utility function for quickly transforming an array of LLVector4a's

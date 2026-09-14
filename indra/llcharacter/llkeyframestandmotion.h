@@ -40,7 +40,6 @@
 class alignas(16) LLKeyframeStandMotion :
     public LLKeyframeMotion
 {
-    LL_ALIGN_NEW
 public:
     // Constructor
     LLKeyframeStandMotion(const LLUUID &id);

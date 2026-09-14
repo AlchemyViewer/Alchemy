@@ -62,7 +62,6 @@ const U32 SILHOUETTE_HIGHLIGHT = 0;
 class alignas(16) LLDrawable
     : public LLViewerOctreeEntryData
 {
-    LL_ALIGN_NEW;
 public:
     typedef std::vector<LLFace*> face_list_t;
 

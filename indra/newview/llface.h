@@ -56,7 +56,6 @@ const U8 FACE_DO_NOT_BATCH_TEXTURES = 255;
 
 class alignas(16) LLFace
 {
-    LL_ALIGN_NEW
 public:
     LLFace(const LLFace& rhs) = delete;
     const LLFace& operator=(const LLFace& rhs) = delete;

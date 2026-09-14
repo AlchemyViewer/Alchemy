@@ -42,7 +42,6 @@ class LLViewerJointMesh;
 class alignas(16) LLViewerJoint :
     public virtual LLAvatarJoint
 {
-    LL_ALIGN_NEW
 public:
     LLViewerJoint();
     LLViewerJoint(S32 joint_num);

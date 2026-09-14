@@ -40,7 +40,6 @@ const bool NOT_FOR_SELECTION = false;
 
 class alignas(16) LLViewerCamera : public LLCamera, public LLSimpleton<LLViewerCamera>
 {
-    LL_ALIGN_NEW
 public:
     LLViewerCamera();
 

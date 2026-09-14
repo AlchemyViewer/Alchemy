@@ -36,7 +36,6 @@
 
 class alignas(16) LLVolumeTriangle : public LLRefCount
 {
-    LL_ALIGN_NEW
 public:
     LLVolumeTriangle()
     {
@@ -73,7 +72,6 @@ public:
 
 class alignas(16) LLVolumeOctreeListener : public LLOctreeListener<LLVolumeTriangle, LLVolumeTriangle*>
 {
-    LL_ALIGN_NEW
 public:
     LLVolumeOctreeListener(LLOctreeNode<LLVolumeTriangle, LLVolumeTriangle*>* node);
     ~LLVolumeOctreeListener();

@@ -52,7 +52,6 @@ class LLRotation;
 
 class alignas(16) LLVector4a
 {
-    LL_ALIGN_NEW
 public:
 
     ///////////////////////////////////

@@ -65,7 +65,6 @@ protected:
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 class alignas(16) LLTexLayerParamAlpha : public LLTexLayerParam
 {
-    LL_ALIGN_NEW
 public:
     LLTexLayerParamAlpha( LLTexLayerInterface* layer );
     LLTexLayerParamAlpha( LLAvatarAppearance* appearance );
@@ -139,7 +138,6 @@ private:
 
 class alignas(16) LLTexLayerParamColor : public LLTexLayerParam
 {
-    LL_ALIGN_NEW
 public:
     enum EColorOperation
     {

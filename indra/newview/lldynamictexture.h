@@ -35,7 +35,6 @@
 
 class alignas(16) LLViewerDynamicTexture : public LLViewerTexture
 {
-    LL_ALIGN_NEW
 public:
 
     enum

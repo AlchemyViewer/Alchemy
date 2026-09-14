@@ -43,7 +43,6 @@ class domMesh;
 // thread and the mesh worker threads rather than mirroring it -- see mFrozen below.
 class alignas(16) LLMeshSkinInfo : public LLThreadSafeRefCount
 {
-    LL_ALIGN_NEW
 public:
     LLMeshSkinInfo();
     LLMeshSkinInfo(LLSD& data);
@@ -86,7 +85,6 @@ public:
 
 class alignas(16) LLModel : public LLVolume
 {
-    LL_ALIGN_NEW
 public:
 
     enum

@@ -42,7 +42,6 @@
 
 class alignas(16) LLQuaternion2
 {
-    LL_ALIGN_NEW
 public:
 
     //////////////////////////

@@ -86,7 +86,6 @@ public:
 template <class T, typename T_PTR>
 class alignas(16) LLOctreeNode : public LLTreeNode<T>
 {
-    LL_ALIGN_NEW
 public:
 
     typedef LLOctreeTraveler<T, T_PTR>                          oct_traveler;

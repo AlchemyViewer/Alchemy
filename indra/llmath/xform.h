@@ -134,7 +134,6 @@ public:
 
 class alignas(16) LLXformMatrix : public LLXform
 {
-    LL_ALIGN_NEW
 public:
     LLXformMatrix() : LLXform() {};
     virtual ~LLXformMatrix();

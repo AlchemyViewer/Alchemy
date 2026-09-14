@@ -62,7 +62,6 @@ public:
 class LLVOCacheEntry
 :   public LLViewerOctreeEntryData
 {
-    LL_ALIGN_NEW
 public:
     enum
     {

@@ -65,7 +65,6 @@ void pushVerts(LLFace* face);
 */
 class alignas(16) LLDrawInfo final : public LLRefCount
 {
-    LL_ALIGN_NEW;
 protected:
     ~LLDrawInfo();
 
@@ -224,7 +223,6 @@ class alignas(16) LLSpatialGroup : public LLOcclusionCullingGroup
     friend class LLSpatialPartition;
     friend class LLOctreeStateCheck;
 
-    LL_ALIGN_NEW
 public:
 
     LLSpatialGroup(const LLSpatialGroup& rhs) = delete;

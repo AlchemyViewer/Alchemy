@@ -38,7 +38,6 @@
 
 class alignas(16) LLPlane
 {
-    LL_ALIGN_NEW
 public:
 
     // Constructors
@@ -103,7 +102,7 @@ private:
     LLVector4a mV;
 };
 
-static_assert(std::is_trivial<LLPlane>::value, "LLPlane must be a trivial type");
+static_assert(std::is_trivially_copyable<LLPlane>::value && std::is_standard_layout<LLPlane>::value, "LLPlane is plain data");
 
 
 #endif // LL_LLPLANE_H

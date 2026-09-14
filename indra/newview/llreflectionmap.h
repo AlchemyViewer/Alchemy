@@ -34,7 +34,6 @@ class LLViewerObject;
 
 class alignas(16) LLReflectionMap : public LLRefCount
 {
-    LL_ALIGN_NEW
 public:
 
     enum class ProbeType

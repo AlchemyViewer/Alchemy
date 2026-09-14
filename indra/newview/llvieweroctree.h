@@ -72,7 +72,6 @@ S32 AABBSphereIntersectR2(const LLVector3& min, const LLVector3& max, const LLVe
 //defines data needed for octree of an entry
 class alignas(16) LLViewerOctreeEntry : public LLRefCount
 {
-    LL_ALIGN_NEW
     friend class LLViewerOctreeEntryData;
 
 public:
@@ -178,7 +177,6 @@ protected:
 class LLViewerOctreeGroup
 :   public OctreeListener
 {
-    LL_ALIGN_NEW
     friend class LLViewerOctreeCull;
 protected:
     virtual ~LLViewerOctreeGroup();

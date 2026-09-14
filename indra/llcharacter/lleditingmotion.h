@@ -45,7 +45,6 @@ constexpr F32 MIN_REQUIRED_PIXEL_AREA_EDITING = 500.f;
 class alignas(16) LLEditingMotion :
     public LLMotion
 {
-    LL_ALIGN_NEW
 public:
     // Constructor
     LLEditingMotion(const LLUUID &id);

@@ -31,7 +31,6 @@
 
 class alignas(16) LLBakingJoint : public virtual LLAvatarJoint
 {
-    LL_ALIGN_NEW
 public:
     LLBakingJoint();
     LLBakingJoint(S32 joint_num);
