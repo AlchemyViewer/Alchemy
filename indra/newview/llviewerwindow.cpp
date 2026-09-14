@@ -2251,7 +2251,7 @@ LLViewerWindow::LLViewerWindow(const Params& p)
         p.fullscreen,
         gHeadlessClient,
         gSavedSettings.getBOOL("RenderVSyncEnable"),
-        !gHeadlessClient,
+        gHeadlessClient ? ALWindowBackend::None : ALWindowBackend::Native,
         p.ignore_pixel_depth,
         0,
         max_core_count,

@@ -175,8 +175,25 @@ void set_sdl_hints()
 #endif
 }
 
-void init_sdl(const std::string& app_name)
+void init_sdl(const std::string& app_name, bool hidden_window)
 {
+#if LL_LINUX
+    // No X or Wayland socket -- CI, a container, WSL without one -- and the
+    // default driver has nowhere to put even a hidden window. The offscreen
+    // driver gives a context over EGL with no surface at all. With a display,
+    // the default driver's hidden window is closer to what ships, and a
+    // driver named in the environment is left alone.
+    if (hidden_window
+        && !SDL_getenv("SDL_VIDEO_DRIVER")
+        && !SDL_getenv("DISPLAY")
+        && !SDL_getenv("WAYLAND_DISPLAY"))
+    {
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+    }
+#else
+    (void)hidden_window;
+#endif
+
 #ifndef LL_SDL_WINDOW
     if (!gSDLMainHandled)
     {

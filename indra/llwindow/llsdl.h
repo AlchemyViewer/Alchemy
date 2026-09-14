@@ -39,7 +39,11 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
 // which runs once during the first video init and is never revisited. The splash
 // screen brings video up before init_sdl(), so it calls this first too. Idempotent.
 void set_sdl_hints();
-void init_sdl(const std::string& app_name);
+// Bring SDL's video up. For a window that is never shown, and where Linux
+// has no display to put one on, SDL's offscreen driver supplies a GL context
+// with no surface; that choice has to be made before the first video init,
+// so it is made here.
+void init_sdl(const std::string& app_name, bool hidden_window = false);
 void quit_sdl();
 
 // Shared GL contexts for worker threads (texture upload, VBO streaming).

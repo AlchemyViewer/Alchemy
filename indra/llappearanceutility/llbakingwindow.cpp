@@ -44,7 +44,6 @@ LLBakingWindow::LLBakingWindow(S32 width, S32 height)
     const bool NO_CLEAR_BG = false;
     const bool NO_DISABLE_VSYNC = false;
     const bool NO_IGNORE_PIXEL_DEPTH = false;
-    const bool USE_GL = true;
     mWindow = LLWindowManager::createWindow(this,
         "appearanceutility", "Appearance Utility",
         WINDOW_ORIGIN_X, WINDOW_ORIGIN_Y,
@@ -53,7 +52,7 @@ LLBakingWindow::LLBakingWindow(S32 width, S32 height)
         NO_FULLSCREEN,
         NO_CLEAR_BG,
         NO_DISABLE_VSYNC, //gSavedSettings.getBOOL("DisableVerticalSync"),
-        USE_GL, // not headless
+        ALWindowBackend::Native,
         NO_IGNORE_PIXEL_DEPTH); //gIgnorePixelDepth = false
 
     if (nullptr == mWindow)

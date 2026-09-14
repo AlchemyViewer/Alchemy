@@ -4,6 +4,7 @@ include(UI)
 
 set(
   llwindow_BASE_SOURCES
+  alwindowsdlheadless.cpp
   llcursortypes.cpp
   llkeyboard.cpp
   llkeyboardheadless.cpp
@@ -16,6 +17,7 @@ set(
 
 set(
   llwindow_BASE_HEADERS
+  alwindowsdlheadless.h
   llcursortypes.h
   llkeyboard.h
   llkeyboardheadless.h

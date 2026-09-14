@@ -340,6 +340,14 @@ constexpr S32 OSBTN_NO = 1;
 constexpr S32 OSBTN_OK = 2;
 constexpr S32 OSBTN_CANCEL = 3;
 
+// Which window LLWindowManager makes.
+enum class ALWindowBackend
+{
+    Native,     // the platform's window: LLWindowWin32 or LLWindowSDL
+    Hidden,     // ALWindowSDLHeadless: an SDL window never shown, with a GL context on it
+    None,       // LLWindowHeadless: no window and no GL
+};
+
 //
 // LLWindowManager
 // Manages window creation and error checking
@@ -354,13 +362,22 @@ public:
         bool fullscreen = false,
         bool clearBg = false,
         bool enable_vsync = false,
-        bool use_gl = true,
+        ALWindowBackend backend = ALWindowBackend::Native,
         bool ignore_pixel_depth = false,
         U32 fsaa_samples = 0,
         U32 max_cores = 0,
         F32 max_gl_version = 4.6f);
     static bool destroyWindow(LLWindow* window);
     static bool isWindowValid(LLWindow *window);
+
+    // The backend of the window most recently asked for, Native until one is.
+    // Set before that window is constructed, so what fails on the way up is
+    // already reported the way the backend wants: a hidden window gets no
+    // message box and no splash.
+    static ALWindowBackend getBackend() { return sBackend; }
+
+private:
+    static ALWindowBackend sBackend;
 };
 
 //

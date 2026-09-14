@@ -26,6 +26,7 @@
 
 #include "linden_common.h"
 #include "llwindowheadless.h"
+#include "alwindowsdlheadless.h"
 
 #if LL_MESA_HEADLESS
 #include "llwindowmesaheadless.h"
@@ -37,9 +38,7 @@
 
 #include "llerror.h"
 #include "llkeyboard.h"
-#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
 #include "llsdl.h"
-#endif
 #include "llwindowcallbacks.h"
 
 
@@ -74,6 +73,10 @@ S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
 
     S32 result = 0;
     LL_WARNS() << "OSMessageBox: " << text << LL_ENDL;
+    if (LLWindowManager::getBackend() == ALWindowBackend::Hidden)
+    {
+        return OSBTN_OK;
+    }
 #if LL_MESA_HEADLESS // !!! *FIX: (?)
     return OSBTN_OK;
 #elif LL_WINDOWS && !LL_SDL_WINDOW
@@ -343,6 +346,10 @@ bool LLSplashScreen::isVisible()
 // static
 LLSplashScreen *LLSplashScreen::create()
 {
+    if (LLWindowManager::getBackend() == ALWindowBackend::Hidden)
+    {
+        return nullptr;
+    }
 #if LL_MESA_HEADLESS
     return nullptr;
 #elif LL_WINDOWS && !LL_SDL_WINDOW
@@ -358,13 +365,7 @@ void LLSplashScreen::show()
 {
     if (!gSplashScreenp)
     {
-#if LL_MESA_HEADLESS
-        gSplashScreenp = nullptr;
-#elif LL_WINDOWS && !LL_SDL_WINDOW
-        gSplashScreenp = new LLSplashScreenWin32;
-#else
-        gSplashScreenp = new LLSplashScreenSDL;
-#endif
+        gSplashScreenp = create();
         if (gSplashScreenp)
         {
             gSplashScreenp->showImpl();
@@ -400,13 +401,27 @@ void LLSplashScreen::hide()
 // TODO: replace with std::set
 static std::set<LLWindow*> sWindowList;
 
+ALWindowBackend LLWindowManager::sBackend = ALWindowBackend::Native;
+
+// Whether SDL is brought up around a window of this backend. The SDL window
+// backend has always done so for every window it is compiled into, with or
+// without GL behind it; the hidden window needs it on every build.
+static bool backend_uses_sdl(ALWindowBackend backend)
+{
+#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
+    return true;
+#else
+    return backend == ALWindowBackend::Hidden;
+#endif
+}
+
 LLWindow* LLWindowManager::createWindow(
     LLWindowCallbacks* callbacks,
     const std::string& title, const std::string& name, S32 x, S32 y, S32 width, S32 height, U32 flags,
     bool fullscreen,
     bool clearBg,
     bool enable_vsync,
-    bool use_gl,
+    ALWindowBackend backend,
     bool ignore_pixel_depth,
     U32 fsaa_samples,
     U32 max_cores,
@@ -414,31 +429,43 @@ LLWindow* LLWindowManager::createWindow(
 {
     LLWindow* new_window;
 
-#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
-    init_sdl(name);
-#endif
+    sBackend = backend;
 
-    if (use_gl)
+    if (backend_uses_sdl(backend))
     {
+        init_sdl(name, backend == ALWindowBackend::Hidden);
+    }
+
+    switch (backend)
+    {
+    case ALWindowBackend::Native:
 #if LL_MESA_HEADLESS
         new_window = new LLWindowMesaHeadless(callbacks,
             title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth);
+            fullscreen, clearBg, enable_vsync, true, ignore_pixel_depth);
 #elif LL_WINDOWS && !LL_SDL_WINDOW
         new_window = new LLWindowWin32(callbacks,
             title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples, max_cores, max_gl_version);
+            fullscreen, clearBg, enable_vsync, true, ignore_pixel_depth, fsaa_samples, max_cores, max_gl_version);
 #else
         new_window = new LLWindowSDL(callbacks,
                                      title, name, x, y, width, height, flags,
-                                     fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples);
+                                     fullscreen, clearBg, enable_vsync, true, ignore_pixel_depth, fsaa_samples);
 #endif
-    }
-    else
-    {
+        break;
+
+    case ALWindowBackend::Hidden:
+        new_window = new ALWindowSDLHeadless(callbacks,
+            title, name, x, y, width, height, flags,
+            fullscreen, clearBg, enable_vsync, ignore_pixel_depth, fsaa_samples);
+        break;
+
+    case ALWindowBackend::None:
+    default:
         new_window = new LLWindowHeadless(callbacks,
             title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth);
+            fullscreen, clearBg, enable_vsync, false, ignore_pixel_depth);
+        break;
     }
 
     if (false == new_window->isValid())
@@ -464,9 +491,10 @@ bool LLWindowManager::destroyWindow(LLWindow* window)
     window->close();
 
     sWindowList.erase(window);
-#if LL_SDL_WINDOW && !defined(LL_MESA_HEADLESS)
-    quit_sdl();
-#endif
+    if (backend_uses_sdl(sBackend))
+    {
+        quit_sdl();
+    }
 
     delete window;
 
