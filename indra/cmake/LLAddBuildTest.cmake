@@ -182,3 +182,52 @@ function(al_add_test name)
 
   add_dependencies(BUILD_TESTS ${target})
 endfunction()
+
+# al_add_bench(<name> PROJECT <project> [SOURCES <file>...] [LIBRARIES <target>...]
+#              [INCLUDES <dir>...] [DEFINES <define>...])
+#
+# Builds tests/<name>_bench.cpp, which brings its own main, into
+# BENCH_<name> and registers it as a test labelled benchmark. The default
+# test run leaves that label out; BUILD_AND_RUN_BENCHMARKS runs it, verbose,
+# since the numbers are the output. A benchmark exits 125, which CTest reads
+# as skipped, from a build whose numbers would say nothing.
+function(al_add_bench name)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "PROJECT" "SOURCES;LIBRARIES;INCLUDES;DEFINES")
+  if(NOT arg_PROJECT)
+    message(FATAL_ERROR "al_add_bench(${name}): PROJECT is required")
+  endif()
+  if(arg_UNPARSED_ARGUMENTS)
+    message(FATAL_ERROR "al_add_bench(${name}): unexpected arguments: ${arg_UNPARSED_ARGUMENTS}")
+  endif()
+
+  set(target BENCH_${name})
+  set(VCPKG_APPLOCAL_DEPS OFF)
+  add_executable(${target} tests/${name}_bench.cpp ${arg_SOURCES})
+  target_link_libraries(${target} PRIVATE al::flags ${arg_LIBRARIES})
+  target_include_directories(${target} PRIVATE ${arg_INCLUDES} ${INDRA_SOURCE_DIR}/llmath)
+  target_compile_definitions(${target} PRIVATE "AL_BENCH=1" ${arg_DEFINES})
+  set_target_properties(${target} PROPERTIES FOLDER "Benchmarks/${arg_PROJECT}")
+  if(WINDOWS)
+    set_target_properties(${target} PROPERTIES AL_SKIP_RELEASE_DEBUG_INFO ON)
+  elseif(DARWIN)
+    set_target_properties(
+      ${target}
+      PROPERTIES XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-" BUILD_RPATH "${SHARED_LIB_STAGING_DIR}"
+    )
+  endif()
+
+  add_test(
+    NAME ${target}
+    COMMAND $<TARGET_FILE:${target}>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  )
+  set_tests_properties(
+    ${target}
+    PROPERTIES
+      ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+      LABELS benchmark
+      SKIP_RETURN_CODE 125
+  )
+
+  add_dependencies(BUILD_BENCHMARKS ${target})
+endfunction()

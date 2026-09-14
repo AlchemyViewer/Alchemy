@@ -360,8 +360,10 @@ if(AL_BUILD_TESTS)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
 
-  # Set parallel level to decrease test runtime
-  set(CMAKE_CTEST_ARGUMENTS -j${NUM_CORES} --output-on-failure)
+  # Set parallel level to decrease test runtime. Benchmarks are registered
+  # as tests under their own label and left out of the default run, since
+  # their numbers are their output and a shared parallel run would ruin them.
+  set(CMAKE_CTEST_ARGUMENTS -j${NUM_CORES} --output-on-failure -LE benchmark)
 
   # Set up our test targets
   set(CTEST_TEST_TARGET_ALIAS BUILD_AND_RUN_TESTS)
@@ -371,6 +373,17 @@ if(AL_BUILD_TESTS)
 
   add_custom_target(BUILD_TESTS)
   set_target_properties(BUILD_TESTS PROPERTIES FOLDER "CMakePredefinedTargets")
+
+  add_custom_target(BUILD_BENCHMARKS)
+  set_target_properties(BUILD_BENCHMARKS PROPERTIES FOLDER "CMakePredefinedTargets")
+  add_custom_target(
+    BUILD_AND_RUN_BENCHMARKS
+    COMMAND ${CMAKE_CTEST_COMMAND} -C $<CONFIG> -L benchmark -V
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    USES_TERMINAL
+  )
+  add_dependencies(BUILD_AND_RUN_BENCHMARKS BUILD_BENCHMARKS)
+  set_target_properties(BUILD_AND_RUN_BENCHMARKS PROPERTIES FOLDER "CMakePredefinedTargets")
 endif()
 
 # Dependency modules, in dependency order. Each is included under a message

@@ -1,0 +1,388 @@
+/**
+ * @file llsimd_bench.cpp
+ * @brief Nanoseconds per element for the SIMD math the viewer rebuilds
+ *        geometry with, and for the choices the SIMD series has to make.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+// Each row is one kernel over one array, reported as nanoseconds per
+// element: the median of five samples, each sample as many passes over the
+// array as fit in twenty milliseconds. Two array sizes: four thousand
+// elements, which sit in the first-level cache, and four million, which
+// stream from memory. A row differs from the row beside it in one thing.
+//
+// The output is a table, not a verdict; a number is read against the row
+// next to it from the same run on the same quiet machine. An unoptimised
+// build exits 125, which CTest reads as skipped, since its numbers would
+// say nothing.
+
+#include "linden_common.h"
+
+#include "llmath.h"
+#include "llsimdmath.h"
+#include "llvector4a.h"
+#include "llmatrix4a.h"
+#include "llmemory.h"
+#include "llprocessor.h"
+#include "alsimd.h"
+
+#include <algorithm>
+#include <bit>
+#include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <random>
+#include <string>
+#include <vector>
+
+namespace
+{
+    using clock = std::chrono::steady_clock;
+
+    // Everything a kernel produces feeds this, so nothing is computed for
+    // nothing.
+    volatile U32 g_sink = 0;
+
+    // The median of five samples of ns per element, each sample enough
+    // passes to fill twenty milliseconds.
+    template <class F>
+    double time_per_element(size_t count, F&& pass)
+    {
+        pass();
+        double samples[5];
+        for (double& sample : samples)
+        {
+            size_t passes = 0;
+            const auto start = clock::now();
+            clock::duration elapsed{};
+            do
+            {
+                pass();
+                ++passes;
+                elapsed = clock::now() - start;
+            } while (elapsed < std::chrono::milliseconds(20));
+            const double ns = std::chrono::duration<double, std::nano>(elapsed).count();
+            sample = ns / (double(passes) * double(count));
+        }
+        std::sort(samples, samples + 5);
+        return samples[2];
+    }
+
+    constexpr size_t CACHED = 4 * 1024;
+    constexpr size_t STREAMING = 4 * 1024 * 1024;
+
+    struct Vectors
+    {
+        std::vector<LLVector4a> a, b, c, out;
+        explicit Vectors(size_t n) : a(n), b(n), c(n), out(n)
+        {
+            std::mt19937 rng(0x5eed);
+            std::uniform_real_distribution<F32> dist(-8.f, 8.f);
+            for (size_t i = 0; i < n; ++i)
+            {
+                a[i].set(dist(rng), dist(rng), dist(rng), 1.f);
+                b[i].set(dist(rng), dist(rng), dist(rng), 1.f);
+                c[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+            }
+        }
+        U32 checksum() const
+        {
+            U32 sum = 0;
+            for (const LLVector4a& v : out)
+            {
+                sum ^= std::bit_cast<U32>(v[0]) + std::bit_cast<U32>(v[3]);
+            }
+            return sum;
+        }
+    };
+
+    // One row: the kernel run over the cached and the streaming arrays.
+    template <class Kernel>
+    void row(const char* name, Kernel&& kernel)
+    {
+        Vectors small(CACHED);
+        Vectors large(STREAMING);
+        const double cached = time_per_element(CACHED, [&] { kernel(small); g_sink = g_sink + small.checksum(); });
+        const double streaming = time_per_element(STREAMING, [&] { kernel(large); g_sink = g_sink + large.checksum(); });
+        std::printf("  %-44s %8.3f %8.3f\n", name, cached, streaming);
+        std::fflush(stdout);
+    }
+
+    void print_header(const char* section)
+    {
+        std::printf("\n%s\n  %-44s %8s %8s\n", section, "ns per element", "cached", "stream");
+    }
+}
+
+// The memcpy: the tree's aligned copy against the C runtime's, per call, at
+// the sizes the volume slabs come in.
+static void bench_memcpy()
+{
+    std::printf("\nmemcpy, ns per call                          %10s %10s\n", "aligned16", "memcpy");
+    const size_t sizes[] = {64, 256, 4096, 65536, 4 * 1024 * 1024};
+    for (size_t size : sizes)
+    {
+        char* src = (char*)ll_aligned_malloc_64(size);
+        char* dst = (char*)ll_aligned_malloc_64(size);
+        std::memset(src, 0x5a, size);
+        std::memset(dst, 0, size);
+        const double ours = time_per_element(1, [&]
+        {
+            ll_memcpy_nonaliased_aligned_16(dst, src, size);
+            g_sink = g_sink + (U32)dst[size - 1];
+        });
+        const double crt = time_per_element(1, [&]
+        {
+            std::memcpy(dst, src, size);
+            g_sink = g_sink + (U32)dst[size - 1];
+        });
+        std::printf("  %-44zu %10.1f %10.1f\n", size, ours, crt);
+        ll_aligned_free_64(src);
+        ll_aligned_free_64(dst);
+    }
+}
+
+// The dot product three ways: the class as it stands, the shuffle form and
+// the DPPS instruction, so the guard that picks between them is decided by a
+// number.
+static void bench_dot()
+{
+    print_header("dot3, all lanes");
+    row("LLVector4a::setAllDot3", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i].setAllDot3(v.a[i], v.b[i]);
+        }
+    });
+    row("alsimd::dot3", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = alsimd::dot3(v.a[i], v.b[i]);
+        }
+    });
+#if AL_SIMD_X86
+    row("_mm_dp_ps", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = _mm_dp_ps(v.a[i], v.b[i], 0x7f);
+        }
+    });
+    row("shuffle and add", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            const __m128 p = _mm_mul_ps(v.a[i], v.b[i]);
+            const __m128 xy = _mm_add_ps(p, _mm_shuffle_ps(p, p, _MM_SHUFFLE(2, 3, 0, 1)));
+            v.out[i] = _mm_add_ps(_mm_shuffle_ps(xy, xy, 0), _mm_shuffle_ps(p, p, _MM_SHUFFLE(2, 2, 2, 2)));
+        }
+    });
+#endif
+}
+
+// A multiply-add as the class does it, as the ops layer does it, and as the
+// intrinsic does it where there is one: what the fast floating-point
+// contract already fuses, and what an explicit fused form adds.
+static void bench_fma()
+{
+    print_header("a * b + c");
+    row("LLVector4a setMul then add", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            LLVector4a t;
+            t.setMul(v.a[i], v.b[i]);
+            t.add(v.c[i]);
+            v.out[i] = t;
+        }
+    });
+    row("alsimd::fmadd", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = alsimd::fmadd(v.a[i], v.b[i], v.c[i]);
+        }
+    });
+#if AL_SIMD_FMA && AL_SIMD_X86
+    row("_mm_fmadd_ps", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = _mm_fmadd_ps(v.a[i], v.b[i], v.c[i]);
+        }
+    });
+#endif
+}
+
+// The per-element operations the types are rebuilt on, each as the class
+// does it today beside the ops layer's form.
+static void bench_elementwise()
+{
+    print_header("per element");
+    row("LLVector4a::setSelectWithMask", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i].setSelectWithMask(v.a[i].greaterThan(v.b[i]), v.a[i], v.b[i]);
+        }
+    });
+    row("alsimd::select", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = alsimd::select(alsimd::cmpgt(v.a[i], v.b[i]), v.a[i], v.b[i]);
+        }
+    });
+    row("LLVector4a::normalize3", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            LLVector4a t = v.a[i];
+            t.normalize3();
+            v.out[i] = t;
+        }
+    });
+    row("alsimd rsqrt normalize", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            const alsimd::f32x4 t = v.a[i];
+            v.out[i] = alsimd::mul(t, alsimd::rsqrt(alsimd::dot3(t, t)));
+        }
+    });
+    row("LLVector4a::normalize3fast", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            LLVector4a t = v.a[i];
+            t.normalize3fast();
+            v.out[i] = t;
+        }
+    });
+    row("alsimd rsqrt_fast normalize", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            const alsimd::f32x4 t = v.a[i];
+            v.out[i] = alsimd::mul(t, alsimd::rsqrt_fast(alsimd::dot3(t, t)));
+        }
+    });
+    row("LLVector4a::isFinite3 to lane", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i].splat(v.a[i].isFinite3() ? 1.f : 0.f);
+        }
+    });
+    row("alsimd nonfinite any3 to lane", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i] = alsimd::set1(alsimd::any3(alsimd::nonfinite(v.a[i])) ? 0.f : 1.f);
+        }
+    });
+    row("LLVector4a::quantize16", [](Vectors& v)
+    {
+        const LLVector4a low(-8.f, -8.f, -8.f, -8.f);
+        const LLVector4a high(8.f, 8.f, 8.f, 8.f);
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            LLVector4a t = v.a[i];
+            t.quantize16(low, high);
+            v.out[i] = t;
+        }
+    });
+    row("LLVector4a operator[] sum to lane", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            v.out[i].splat(v.a[i][0] + v.a[i][1] + v.a[i][2]);
+        }
+    });
+    row("alsimd lane sum to lane", [](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            const alsimd::f32x4 t = v.a[i];
+            v.out[i] = alsimd::set1(alsimd::lane<0>(t) + alsimd::lane<1>(t) + alsimd::lane<2>(t));
+        }
+    });
+}
+
+// The transform the geometry rebuild spends its time in: a point through
+// an affine matrix, the matrix way and the ops way.
+static void bench_transform()
+{
+    print_header("affine transform of a point");
+    LLMatrix4a mat;
+    mat.initAll(LLVector3(1.f, 2.f, 0.5f), LLQuaternion(0.7f, LLVector3(0.f, 0.f, 1.f)), LLVector3(1.f, 2.f, 3.f));
+    row("LLMatrix4a::affineTransform", [mat](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            mat.affineTransform(v.a[i], v.out[i]);
+        }
+    });
+    row("alsimd fmadd_lane transform", [mat](Vectors& v)
+    {
+        const alsimd::f32x4 r0 = mat.getRow<0>();
+        const alsimd::f32x4 r1 = mat.getRow<1>();
+        const alsimd::f32x4 r2 = mat.getRow<2>();
+        const alsimd::f32x4 r3 = mat.getRow<3>();
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            const alsimd::f32x4 p = v.a[i];
+            alsimd::f32x4 acc = alsimd::mul(r0, alsimd::splat<0>(p));
+            acc = alsimd::fmadd_lane<1>(r1, p, acc);
+            acc = alsimd::fmadd_lane<2>(r2, p, acc);
+            v.out[i] = alsimd::add(acc, r3);
+        }
+    });
+    row("LLMatrix4a::rotate", [mat](Vectors& v)
+    {
+        for (size_t i = 0; i < v.a.size(); ++i)
+        {
+            mat.rotate(v.a[i], v.out[i]);
+        }
+    });
+}
+
+int main(int, char**)
+{
+#if !defined(LL_RELEASE)
+    std::printf("Skipped: an unoptimised build has no numbers worth reading\n");
+    return 125;
+#else
+    const char* isa = AL_SIMD_NEON ? "NEON" : AL_SIMD_AVX512 ? "AVX-512" : AL_SIMD_AVX2 ? "AVX2" : AL_SIMD_AVX ? "AVX" : AL_SIMD_SSE4 ? "SSE4.2" : "SSE2";
+    std::printf("llsimd_bench on %s\n  built for %s, level %d, %s backend, FMA %s\n",
+                LLProcessorInfo().getCPUBrandName().c_str(), isa, AL_ISA_LEVEL,
+                AL_SIMD_VEXT ? "vector-extension" : "intrinsic", AL_SIMD_FMA ? "on" : "off");
+    bench_memcpy();
+    bench_dot();
+    bench_fma();
+    bench_elementwise();
+    bench_transform();
+    std::printf("\n(checksum %u)\n", (unsigned)g_sink);
+    return 0;
+#endif
+}

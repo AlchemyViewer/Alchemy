@@ -132,4 +132,8 @@ if(AL_BUILD_TESTS)
   al_add_test(v3math PROJECT llmath SOURCES v3math.cpp LIBRARIES llmath llcommon)
   al_add_test(v4math PROJECT llmath SOURCES v4math.cpp LIBRARIES llmath llcommon)
   al_add_test(xform PROJECT llmath SOURCES xform.cpp LIBRARIES llmath llcommon)
+
+  # Nanoseconds per element for the SIMD math the geometry rebuild spends
+  # its time in, and for the choices the SIMD series makes by a number.
+  al_add_bench(llsimd PROJECT llmath LIBRARIES llmath llcommon)
 endif()

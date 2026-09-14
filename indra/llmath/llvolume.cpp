@@ -2450,6 +2450,7 @@ bool LLVolume::unpackVolumeFaces(U8* in_data, S32 size)
 
 bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
     {
         auto face_count = mdl.size();
 
@@ -2513,6 +2514,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             // char-typed object through a non-char pointer). std::memcpy is
             // defined and compiles down to a load on every supported target.
             const U8* indices_bytes = idx.data();
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - indices");
             for (U32 j = 0; j < num_indices; ++j)
             {
                 U16 idx_v;
@@ -2591,6 +2593,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             F32* tc_out = (F32*) face.mTexCoords;
 
             {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - positions");
                 // Same aliasing issue as the index loop above: pos is a
                 // std::vector<U8> with three little-endian U16s per vertex.
                 const U8* v_bytes = pos.data();
@@ -2608,6 +2611,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             }
 
             {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - normals");
                 if (!norm.empty())
                 {
                     const U8* n_bytes = norm.data();
@@ -2662,6 +2666,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 #endif
 
             {
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - texcoords");
                 if (!tc.empty())
                 {
                     // tc is std::vector<U8>; packs two vertices' UV pairs
@@ -2720,6 +2725,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
                 }
 
                 const LLSD::Binary& weights = mdl[i]["Weights"].asBinary();
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - weights");
 
                 U32 idx = 0;
 
@@ -2837,6 +2843,7 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
             //calculate bounding box
             // VFExtents change
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - extents");
             LLVector4a& min = face.mExtents[0];
             LLVector4a& max = face.mExtents[1];
 
