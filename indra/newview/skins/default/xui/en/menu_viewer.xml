@@ -3472,6 +3472,24 @@ function="World.EnvPreset"
                  function="Advanced.ForceExceptionThreadCrash" />
             </menu_item_call>
             <menu_item_call
+             label="Force Abort"
+             name="Force Abort">
+                <menu_item_call.on_click
+                 function="Advanced.ForceErrorAbort" />
+            </menu_item_call>
+            <menu_item_call
+             label="Force Stack Overflow"
+             name="Force Stack Overflow">
+                <menu_item_call.on_click
+                 function="Advanced.ForceErrorStackOverflow" />
+            </menu_item_call>
+            <menu_item_call
+             label="Force Terminate"
+             name="Force Terminate">
+                <menu_item_call.on_click
+                 function="Advanced.ForceErrorTerminate" />
+            </menu_item_call>
+            <menu_item_call
              label="Force Disconnect Viewer"
              name="Force Disconnect Viewer">
                 <menu_item_call.on_click

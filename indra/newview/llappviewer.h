@@ -196,6 +196,9 @@ public:
     virtual void forceErrorWorkQueueCrash();
     virtual void forceErrorThreadCrash();
     virtual void forceExceptionThreadCrash();
+    virtual void forceErrorAbort();
+    virtual void forceErrorStackOverflow();
+    virtual void forceErrorTerminate();
 
     // The list is found in app_settings/settings_files.xml
     // but since they are used explicitly in code,

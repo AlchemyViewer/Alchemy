@@ -6590,6 +6590,50 @@ void LLAppViewer::forceExceptionThreadCrash()
     thread->start();
 }
 
+namespace
+{
+    // Each frame holds a page the optimizer cannot drop, so the recursion
+    // is real and the stack runs out within a few thousand calls.
+    int overflow_the_stack(int depth)
+    {
+        volatile char page[4096];
+        page[0] = static_cast<char>(depth);
+        if (depth >= 0)
+        {
+            return overflow_the_stack(depth + 1) + page[0];
+        }
+        return page[0];
+    }
+
+    void throw_through_noexcept() noexcept
+    {
+        LLTHROW(LLException("User selected Force Terminate"));
+    }
+}
+
+void LLAppViewer::forceErrorAbort()
+{
+    LL_WARNS() << "Forcing a deliberate abort" << LL_ENDL;
+#if LL_WINDOWS
+    // abort() is a fast-fail here, which no in-process handler sees: only
+    // Windows Error Reporting and the module the reporter registers with it.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+    std::abort();
+}
+
+void LLAppViewer::forceErrorStackOverflow()
+{
+    LL_WARNS() << "Forcing a deliberate stack overflow" << LL_ENDL;
+    overflow_the_stack(0);
+}
+
+void LLAppViewer::forceErrorTerminate()
+{
+    LL_WARNS() << "Forcing a deliberate std::terminate" << LL_ENDL;
+    throw_through_noexcept();
+}
+
 void LLAppViewer::initMainloopTimeout(std::string_view state)
 {
     if (!mMainloopTimeout)

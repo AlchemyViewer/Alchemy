@@ -45,9 +45,36 @@
 #include "llversioninfo.h"
 #include "llviewerregion.h"
 
+#include <cstdarg>
+#include <cstdio>
+
 namespace
 {
     bool sEngaged = false;
+
+    // The SDK's own log, into ours: what it says about the handler, the
+    // Windows Error Reporting module and the transport is otherwise unseen.
+    // Its debug level is the "Sentry" tag at DEBUG; its warnings are
+    // advisory (one per thread whose stack it cannot reserve a guarantee
+    // on) and go at INFO, so only its errors are ours.
+    void sdk_log(sentry_level_t level, const char* message, va_list args, void*)
+    {
+        char line[1024];
+        vsnprintf(line, sizeof(line), message, args);
+        switch (level)
+        {
+            case SENTRY_LEVEL_DEBUG:
+                LL_DEBUGS("Sentry") << line << LL_ENDL;
+                break;
+            case SENTRY_LEVEL_INFO:
+            case SENTRY_LEVEL_WARNING:
+                LL_INFOS("Sentry") << line << LL_ENDL;
+                break;
+            default:
+                LL_WARNS("Sentry") << line << LL_ENDL;
+                break;
+        }
+    }
 
 #if LL_WINDOWS
     constexpr const char* HANDLER_NAME = "crashpad_handler.exe";
@@ -168,6 +195,9 @@ namespace
         add_attachment(options, *app->getStaticDebugFile());
         add_attachment(options, gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml"));
         sentry_options_set_on_crash(options, on_crash, nullptr);
+        sentry_options_set_debug(options, 1);
+        sentry_options_set_logger(options, sdk_log, nullptr);
+        sentry_options_set_logger_enabled_when_crashed(options, 0);
 
         if (sentry_init(options) != 0)
         {

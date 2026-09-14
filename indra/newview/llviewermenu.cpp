@@ -298,6 +298,9 @@ void force_error_coroprocedure_crash();
 void force_error_work_queue_crash();
 void force_error_thread_crash();
 void force_exception_thread_crash();
+void force_error_abort();
+void force_error_stack_overflow();
+void force_error_terminate();
 
 void handle_force_delete();
 void print_object_info();
@@ -2770,6 +2773,33 @@ class LLAdvancedForceExceptionThreadCrash : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         force_exception_thread_crash();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorAbort : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_abort();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorStackOverflow : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_stack_overflow();
+        return true;
+    }
+};
+
+class LLAdvancedForceErrorTerminate : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        force_error_terminate();
         return true;
     }
 };
@@ -9479,6 +9509,21 @@ void force_exception_thread_crash()
     LLAppViewer::instance()->forceExceptionThreadCrash();
 }
 
+void force_error_abort()
+{
+    LLAppViewer::instance()->forceErrorAbort();
+}
+
+void force_error_stack_overflow()
+{
+    LLAppViewer::instance()->forceErrorStackOverflow();
+}
+
+void force_error_terminate()
+{
+    LLAppViewer::instance()->forceErrorTerminate();
+}
+
 class LLToolsUseSelectionForGrid : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10760,6 +10805,9 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedForceErrorWorkQueueCrash(), "Advanced.ForceErrorWorkQueueCrash");
     view_listener_t::addMenu(new LLAdvancedForceErrorThreadCrash(), "Advanced.ForceErrorThreadCrash");
     view_listener_t::addMenu(new LLAdvancedForceExceptionThreadCrash(), "Advanced.ForceExceptionThreadCrash");
+    view_listener_t::addMenu(new LLAdvancedForceErrorAbort(), "Advanced.ForceErrorAbort");
+    view_listener_t::addMenu(new LLAdvancedForceErrorStackOverflow(), "Advanced.ForceErrorStackOverflow");
+    view_listener_t::addMenu(new LLAdvancedForceErrorTerminate(), "Advanced.ForceErrorTerminate");
     view_listener_t::addMenu(new LLAdvancedForceErrorDisconnectViewer(), "Advanced.ForceErrorDisconnectViewer");
 
     // Advanced (toplevel)
