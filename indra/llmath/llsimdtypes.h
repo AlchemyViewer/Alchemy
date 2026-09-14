@@ -27,11 +27,13 @@
 #ifndef LL_SIMD_TYPES_H
 #define LL_SIMD_TYPES_H
 
-#ifndef LL_SIMD_MATH_H
-#error "Please include llmath.h before this file."
-#endif
+#include "llmath.h"
+#include "alsimd.h"
 
-typedef __m128  LLQuad;
+// The register every vector type here wraps: alsimd's, which is the same
+// __m128 on x86-64 and, through the translation the umbrella header
+// includes, on arm64 too.
+typedef alsimd::f32x4 LLQuad;
 
 class LLBool32
 {

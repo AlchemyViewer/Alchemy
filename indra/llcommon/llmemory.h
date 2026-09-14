@@ -75,11 +75,7 @@ LL_COMMON_API void ll_assert_aligned_func(uintptr_t ptr,U32 alignment);
 #define ll_assert_aligned(ptr,alignment)
 #endif
 
-#if LL_ARM64
-#include "sse2neon/sse2neon.h"
-#else
-#include <xmmintrin.h>
-#endif
+#include "alsimd.h"
 
 template <typename T> T* LL_NEXT_ALIGNED_ADDRESS(T* address)
 {
@@ -356,24 +352,24 @@ inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __
 
         // Find start of 64b aligned area within block
         //
-        void* begin_64 = LL_NEXT_ALIGNED_ADDRESS_64(dst);
+        char* begin_64 = LL_NEXT_ALIGNED_ADDRESS_64(dst);
 
         //at least 64 bytes before the end of the destination, switch to 16 byte copies
-        void* end_64 = end-64;
+        char* end_64 = end-64;
 
         // Prefetch the head of the 64b area now
         //
-        _mm_prefetch((char*)begin_64, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 64, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 128, _MM_HINT_NTA);
-        _mm_prefetch((char*)begin_64 + 192, _MM_HINT_NTA);
+        alsimd::prefetch_nta(begin_64);
+        alsimd::prefetch_nta(begin_64 + 64);
+        alsimd::prefetch_nta(begin_64 + 128);
+        alsimd::prefetch_nta(begin_64 + 192);
 
         // Copy 16b chunks until we're 64b aligned
         //
         while (dst < begin_64)
         {
 
-            _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
+            alsimd::store((F32*)dst, alsimd::load((F32*)src));
             dst += 16;
             src += 16;
         }
@@ -385,12 +381,12 @@ inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __
         //
         while (dst < end_64)
         {
-            _mm_prefetch((char*)src + 512, _MM_HINT_NTA);
-            _mm_prefetch((char*)dst + 512, _MM_HINT_NTA);
-            _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
-            _mm_store_ps((F32*)(dst + 16), _mm_load_ps((F32*)(src + 16)));
-            _mm_store_ps((F32*)(dst + 32), _mm_load_ps((F32*)(src + 32)));
-            _mm_store_ps((F32*)(dst + 48), _mm_load_ps((F32*)(src + 48)));
+            alsimd::prefetch_nta(src + 512);
+            alsimd::prefetch_nta(dst + 512);
+            alsimd::store((F32*)dst, alsimd::load((F32*)src));
+            alsimd::store((F32*)(dst + 16), alsimd::load((F32*)(src + 16)));
+            alsimd::store((F32*)(dst + 32), alsimd::load((F32*)(src + 32)));
+            alsimd::store((F32*)(dst + 48), alsimd::load((F32*)(src + 48)));
             dst += 64;
             src += 64;
         }
@@ -400,7 +396,7 @@ inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __
     //
     while (dst < end)
     {
-        _mm_store_ps((F32*)dst, _mm_load_ps((F32*)src));
+        alsimd::store((F32*)dst, alsimd::load((F32*)src));
         dst += 16;
         src += 16;
     }
