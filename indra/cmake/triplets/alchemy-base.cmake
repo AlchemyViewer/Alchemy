@@ -9,7 +9,7 @@
 # file carries a revision, every triplet states the revision it was written
 # against, and the two must agree. Editing either file means bumping both,
 # which changes every triplet's hash and rebuilds the ports.
-set(ALCHEMY_TRIPLET_BASE_REVISION 2)
+set(ALCHEMY_TRIPLET_BASE_REVISION 3)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
   message(
     FATAL_ERROR

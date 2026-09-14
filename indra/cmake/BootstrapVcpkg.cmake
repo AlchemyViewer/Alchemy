@@ -74,10 +74,17 @@ if(NOT DEFINED VCPKG_TARGET_TRIPLET)
   else()
     set(triplet_system Linux)
     set(triplet_os linux)
-    set(triplet_arch x64)
+    # The host's, since this runs before project() has a target processor
+    # and nothing cross-compiles the viewer. uname spells it aarch64.
+    cmake_host_system_information(RESULT triplet_arch QUERY OS_PLATFORM)
+    if(triplet_arch MATCHES "^(arm64|aarch64)$")
+      set(triplet_arch arm64)
+    else()
+      set(triplet_arch x64)
+    endif()
   endif()
 
-  al_isa_triplet_tier("${AL_ISA_TIER}" "${triplet_system}" triplet_tier)
+  al_isa_triplet_tier("${AL_ISA_TIER}" "${triplet_system}" "${triplet_arch}" triplet_tier)
 
   set(triplet_release "")
   if(NOT LL_GENERATOR_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
