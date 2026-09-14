@@ -70,12 +70,7 @@ public:
         return !(*this == rhs);
     }
 
-    // The four LLVector4a's are contiguous (each is a single __m128) so the
-    // F32 view of mMatrix[0] covers all 16 floats. Going through LLVector4a's
-    // getF32ptr (which casts &mQ -- a may_alias __m128) avoids the
-    // -Wstrict-aliasing=2 warning that (F32*)&mMatrix produced; reading a
-    // LLVector4a array through F32* directly isn't covered by the SSE
-    // intrinsic-ABI exemption.
+    // The sixteen floats, row after row
     inline F32* getF32ptr()
     {
         return mMatrix[0].getF32ptr();
@@ -86,19 +81,13 @@ public:
         return mMatrix[0].getF32ptr();
     }
 
-    // Store the LLMatrix4a's data into an LLMatrix4 via SSE unaligned stores.
-    // This is the inverse of loadu(LLMatrix4). The previous asMatrix4()
-    // returned a reference to *this reinterpreted as LLMatrix4, which was
-    // strict-aliasing UB -- LLMatrix4a is stored as four LLVector4a (each
-    // wrapping __m128) and LLMatrix4 is stored as F32[4][4]. The SSE
-    // intrinsic-ABI exemption covers _mm_*_ps on F32 buffers, so a real
-    // store+load round-trip is well-defined where the cast wasn't.
+    // The inverse of set(LLMatrix4)
     inline void store(LLMatrix4& dst) const
     {
-        _mm_storeu_ps(dst.mMatrix[0], mMatrix[0]);
-        _mm_storeu_ps(dst.mMatrix[1], mMatrix[1]);
-        _mm_storeu_ps(dst.mMatrix[2], mMatrix[2]);
-        _mm_storeu_ps(dst.mMatrix[3], mMatrix[3]);
+        alsimd::storeu(dst.mMatrix[0], mMatrix[0]);
+        alsimd::storeu(dst.mMatrix[1], mMatrix[1]);
+        alsimd::storeu(dst.mMatrix[2], mMatrix[2]);
+        alsimd::storeu(dst.mMatrix[3], mMatrix[3]);
     }
 
     inline LLMatrix4 toMatrix4() const
@@ -153,19 +142,19 @@ public:
         const F32 zz = q.mQ[VZ] * q.mQ[VZ];
         const F32 zw = q.mQ[VZ] * q.mQ[VW];
 
-        mMatrix[0] = _mm_setr_ps((1.f - 2.f * ( yy + zz )) * sx,
+        mMatrix[0] = alsimd::set((1.f - 2.f * ( yy + zz )) * sx,
                                  (      2.f * ( xy + zw )) * sx,
                                  (      2.f * ( xz - yw )) * sx,
                                  0.f);
-        mMatrix[1] = _mm_setr_ps((      2.f * ( xy - zw )) * sy,
+        mMatrix[1] = alsimd::set((      2.f * ( xy - zw )) * sy,
                                  (1.f - 2.f * ( xx + zz )) * sy,
                                  (      2.f * ( yz + xw )) * sy,
                                  0.f);
-        mMatrix[2] = _mm_setr_ps((      2.f * ( xz + yw )) * sz,
+        mMatrix[2] = alsimd::set((      2.f * ( xz + yw )) * sz,
                                  (      2.f * ( yz - xw )) * sz,
                                  (1.f - 2.f * ( xx + yy )) * sz,
                                  0.f);
-        mMatrix[3] = _mm_setr_ps(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
+        mMatrix[3] = alsimd::set(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
     }
 
     // Conversions from the scalar matrix types. These are not unaligned
@@ -173,18 +162,18 @@ public:
     // its name; the LLMatrix3 form does not load a fourth row at all.
     inline void set(const LLMatrix4& src)
     {
-        mMatrix[0] = _mm_loadu_ps(src.mMatrix[0]);
-        mMatrix[1] = _mm_loadu_ps(src.mMatrix[1]);
-        mMatrix[2] = _mm_loadu_ps(src.mMatrix[2]);
-        mMatrix[3] = _mm_loadu_ps(src.mMatrix[3]);
+        mMatrix[0].loadua(src.mMatrix[0]);
+        mMatrix[1].loadua(src.mMatrix[1]);
+        mMatrix[2].loadua(src.mMatrix[2]);
+        mMatrix[3].loadua(src.mMatrix[3]);
     }
 
     inline void loadu(const F32* src)
     {
-        mMatrix[0] = _mm_loadu_ps(src);
-        mMatrix[1] = _mm_loadu_ps(src+4);
-        mMatrix[2] = _mm_loadu_ps(src+8);
-        mMatrix[3] = _mm_loadu_ps(src+12);
+        mMatrix[0].loadua(src);
+        mMatrix[1].loadua(src+4);
+        mMatrix[2].loadua(src+8);
+        mMatrix[3].loadua(src+12);
     }
 
     inline void set(const LLMatrix3& src)
@@ -221,58 +210,30 @@ public:
 
     inline void setLerp(const LLMatrix4a& a, const LLMatrix4a& b, F32 w)
     {
-        LLVector4a d0,d1,d2,d3;
-        d0.setSub(b.mMatrix[0], a.mMatrix[0]);
-        d1.setSub(b.mMatrix[1], a.mMatrix[1]);
-        d2.setSub(b.mMatrix[2], a.mMatrix[2]);
-        d3.setSub(b.mMatrix[3], a.mMatrix[3]);
-
-        // this = a + d*w
-
-        d0.mul(w);
-        d1.mul(w);
-        d2.mul(w);
-        d3.mul(w);
-
-        mMatrix[0].setAdd(a.mMatrix[0],d0);
-        mMatrix[1].setAdd(a.mMatrix[1],d1);
-        mMatrix[2].setAdd(a.mMatrix[2],d2);
-        mMatrix[3].setAdd(a.mMatrix[3],d3);
+        mMatrix[0].setLerp(a.mMatrix[0], b.mMatrix[0], w);
+        mMatrix[1].setLerp(a.mMatrix[1], b.mMatrix[1], w);
+        mMatrix[2].setLerp(a.mMatrix[2], b.mMatrix[2], w);
+        mMatrix[3].setLerp(a.mMatrix[3], b.mMatrix[3], w);
     }
 
+    // Transforms v as a direction: the upper 3x3 applies and the
+    // translation row does not.
     inline void rotate(const LLVector4a& v, LLVector4a& res) const
     {
-        LLVector4a y,z;
-
-        res = _mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 0));
-        y = _mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 1, 1, 1));
-        z = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 2, 2, 2));
-
-        res.mul(mMatrix[0]);
-        y.mul(mMatrix[1]);
-        z.mul(mMatrix[2]);
-
-        res.add(y);
-        res.add(z);
+        const LLQuad q = v;
+        LLQuad r = alsimd::mul(alsimd::splat<0>(q), mMatrix[0]);
+        r = alsimd::fmadd_lane<1>(mMatrix[1], q, r);
+        res = alsimd::fmadd_lane<2>(mMatrix[2], q, r);
     }
 
     // Transforms v as a point: the upper 3x3 applies, then the translation
     // row is added. Contrast rotate(), which leaves the translation out.
     inline void affineTransform(const LLVector4a& v, LLVector4a& res) const
     {
-        LLVector4a x,y,z;
-
-        x = _mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 0));
-        y = _mm_shuffle_ps(v, v, _MM_SHUFFLE(1, 1, 1, 1));
-        z = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 2, 2, 2));
-
-        x.mul(mMatrix[0]);
-        y.mul(mMatrix[1]);
-        z.mul(mMatrix[2]);
-
-        x.add(y);
-        z.add(mMatrix[3]);
-        res.setAdd(x,z);
+        const LLQuad q = v;
+        LLQuad r = alsimd::fmadd_lane<0>(mMatrix[0], q, mMatrix[3]);
+        r = alsimd::fmadd_lane<1>(mMatrix[1], q, r);
+        res = alsimd::fmadd_lane<2>(mMatrix[2], q, r);
     }
 
     template<int N> const LLVector4a& getRow() const { return mMatrix[N]; }
@@ -284,7 +245,7 @@ public:
     // row's w at 1 so the matrix stays affine.
     inline void setTranslation(const LLVector3& pos)
     {
-        mMatrix[3] = _mm_setr_ps(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
+        mMatrix[3] = alsimd::set(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
     }
 
     // this = a * b. a or b may alias this.
@@ -312,18 +273,19 @@ public:
     }
 
 private:
+    // The rows of mat weighted by the lanes of row
     static inline LLVector4a rowMul(const LLVector4a& row, const LLMatrix4a& mat)
     {
-        LLVector4a result;
-        result = _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(0, 0, 0, 0)), mat.mMatrix[0]);
-        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(1, 1, 1, 1)), mat.mMatrix[1]));
-        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(2, 2, 2, 2)), mat.mMatrix[2]));
-        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(3, 3, 3, 3)), mat.mMatrix[3]));
-        return result;
+        const LLQuad r = row;
+        LLQuad result = alsimd::mul(alsimd::splat<0>(r), mat.mMatrix[0]);
+        result = alsimd::fmadd_lane<1>(mat.mMatrix[1], r, result);
+        result = alsimd::fmadd_lane<2>(mat.mMatrix[2], r, result);
+        return alsimd::fmadd_lane<3>(mat.mMatrix[3], r, result);
     }
 };
 
-static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");
+static_assert(std::is_trivially_copyable<LLMatrix4a>::value && std::is_standard_layout<LLMatrix4a>::value, "LLMatrix4a is plain data");
+static_assert(sizeof(LLMatrix4a) == 64 && alignof(LLMatrix4a) == 16, "LLMatrix4a is four registers");
 
 inline std::ostream& operator<<(std::ostream& s, const LLMatrix4a& m)
 {

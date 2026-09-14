@@ -363,4 +363,56 @@ namespace tut
             ensure_approximately_equals_range(msg.str().c_str(), len, scale.mV[row], 1e-4f);
         }
     }
+
+    template<> template<>
+    void llmatrix4a_object::test<11>()
+    {
+        // The whole-matrix arithmetic, element by element against the
+        // scalar matrix: add, scale, lerp at its ends and in between.
+        LLMatrix4a a, b;
+        a.initAll(LLVector3(2.f, 0.5f, 3.f), ROTATIONS[1], LLVector3(1.f, 2.f, 3.f));
+        b.initAll(LLVector3(-1.f, 1.f, -2.f), ROTATIONS[4], LLVector3(-256.f, 4096.f, 0.125f));
+        const LLMatrix4 a4 = a.toMatrix4();
+        const LLMatrix4 b4 = b.toMatrix4();
+
+        LLMatrix4a sum = a;
+        sum.add(b);
+        const LLMatrix4 sum4 = sum.toMatrix4();
+
+        LLMatrix4a scaled;
+        scaled.setMul(a, -1.5f);
+        const LLMatrix4 scaled4 = scaled.toMatrix4();
+
+        LLMatrix4a at_zero, at_one, at_quarter;
+        at_zero.setLerp(a, b, 0.f);
+        at_one.setLerp(a, b, 1.f);
+        at_quarter.setLerp(a, b, 0.25f);
+        const LLMatrix4 zero4 = at_zero.toMatrix4();
+        const LLMatrix4 one4 = at_one.toMatrix4();
+        const LLMatrix4 quarter4 = at_quarter.toMatrix4();
+
+        for (S32 row = 0; row < 4; ++row)
+        {
+            for (S32 col = 0; col < 4; ++col)
+            {
+                const F32 av = a4.mMatrix[row][col];
+                const F32 bv = b4.mMatrix[row][col];
+                std::ostringstream msg;
+                msg << " at [" << row << "][" << col << "]";
+                ensure_equals("add" + msg.str(), sum4.mMatrix[row][col], av + bv);
+                ensure_equals("setMul(F32)" + msg.str(), scaled4.mMatrix[row][col], av * -1.5f);
+                ensure_equals("setLerp at 0" + msg.str(), zero4.mMatrix[row][col], av);
+                ensure_approximately_equals_range(("setLerp at 1" + msg.str()).c_str(), one4.mMatrix[row][col], bv, 1e-6f * llmax(1.f, fabsf(bv)));
+                const F32 expected = (F32)((double)av + ((double)bv - av) * 0.25);
+                ensure_approximately_equals_range(("setLerp at a quarter" + msg.str()).c_str(), quarter4.mMatrix[row][col], expected, 1e-6f * llmax(1.f, fabsf(expected)));
+            }
+        }
+
+        // the identity, both ways
+        ensure("identity equals itself", LLMatrix4a::identity() == LLMatrix4a::identity());
+        LLMatrix4a fresh;
+        fresh.setIdentity();
+        ensure("setIdentity is the identity", fresh == LLMatrix4a::identity());
+        ensure("a translation is not the identity", a != LLMatrix4a::identity());
+    }
 }
