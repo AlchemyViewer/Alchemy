@@ -111,6 +111,7 @@ target_sources(
     llxuiparser.cpp
     alcanvasview.cpp
     alcolorfield.cpp
+    alcolorsheet.cpp
     aldeferredrebuild.cpp
     aldockpanel.cpp
     alemptystate.cpp
@@ -266,6 +267,7 @@ target_sources(
         llxuiparser.h
         alcanvasview.h
         alcolorfield.h
+        alcolorsheet.h
         aldeferredrebuild.h
         aldockpanel.h
         alemptystate.h
@@ -427,6 +429,7 @@ if(AL_BUILD_TESTS)
     alxuiselection
     alxuisourcemap
     alxuitreemodel
+    alcolorsheet
   )
     al_add_test(
       ${test}
