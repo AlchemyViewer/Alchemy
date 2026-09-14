@@ -524,6 +524,57 @@ void extents_impl(const LLVector4a* src, size_t n, LLVector4a& min, LLVector4a& 
     max = alsimd::max(hi4, W::reduce_max(hi));
 }
 
+////////////////////////////////////
+// Morphs
+////////////////////////////////////
+
+// Every vertex is its own register, since the mesh vertex it lands on is
+// wherever the index says; what a kernel has over the loop it replaces is
+// the fused accumulate and no temporaries through memory.
+AL_SIMD_INLINE void morph_apply_impl(const MorphApply& apply)
+{
+    // a copy, so the pointers are locals the stores through them cannot
+    // be taken to change
+    const MorphApply m = apply;
+    const f32x4 plus_x = alsimd::set(1.f, 0.f, 0.f, 1.f);
+    const f32x4 epsilon = alsimd::set1(F_APPROXIMATELY_ZERO);
+    for (size_t i = 0; i < m.count; ++i)
+    {
+        const U32 at = m.index[i];
+        const F32 mask = m.mask ? m.mask[i] : 1.f;
+        const F32 w = m.weight * mask;
+        const f32x4 weight = alsimd::set1(w);
+        const f32x4 softened = alsimd::set1(w * m.soften);
+
+        const f32x4 coord_delta = m.coord_delta[i];
+        m.coords[at] = alsimd::fmadd(coord_delta, weight, m.coords[at]);
+        if (m.clothing_weights)
+        {
+            const f32x4 clothing = alsimd::fmadd(coord_delta, weight, m.clothing_weights[at]);
+            m.clothing_weights[at] = alsimd::select(alsimd::mask_lane<3>(), alsimd::set1(mask), clothing);
+        }
+
+        const f32x4 scaled_normal = alsimd::fmadd(m.normal_delta[i], softened, m.scaled_normals[at]);
+        m.scaled_normals[at] = scaled_normal;
+        const f32x4 normal = alsimd::mul(scaled_normal, alsimd::rsqrt_fast(alsimd::dot3(scaled_normal, scaled_normal)));
+        m.normals[at] = normal;
+
+        f32x4 binormal_delta = m.binormal_delta[i];
+        const bool finite = !alsimd::any3(alsimd::nonfinite(binormal_delta));
+        if (!finite || alsimd::lane<0>(alsimd::dot3(binormal_delta, binormal_delta)) <= alsimd::lane<0>(epsilon))
+        {
+            binormal_delta = plus_x;
+        }
+        const f32x4 scaled_binormal = alsimd::fmadd(binormal_delta, softened, m.scaled_binormals[at]);
+        m.scaled_binormals[at] = scaled_binormal;
+        const f32x4 tangent = alsimd::cross3(scaled_binormal, normal);
+        const f32x4 binormal = alsimd::cross3(normal, tangent);
+        m.binormals[at] = alsimd::mul(binormal, alsimd::rsqrt_fast(alsimd::dot3(binormal, binormal)));
+
+        m.tex_coords[at] += m.tex_delta[i] * w;
+    }
+}
+
 } // namespace kernels
 } // namespace alsimd
 

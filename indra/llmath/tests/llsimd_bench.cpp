@@ -40,6 +40,7 @@
 #include "llsimdmath.h"
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "v2math.h"
 #include "llmemory.h"
 #include "llprocessor.h"
 #include "alsimd.h"
@@ -468,6 +469,133 @@ static void bench_kernels()
     });
 }
 
+// The morph apply: for each morph vertex, an indexed accumulate into the
+// mesh's coordinates and scaled normals and binormals, then the normal
+// renormalized and the binormal rebuilt from two cross products. The
+// indirection keeps every vertex its own register; what a kernel could
+// change is the arithmetic between the loads and the stores.
+namespace
+{
+    struct Morph
+    {
+        std::vector<U32> index;
+        std::vector<LLVector4a> coord_delta, normal_delta, binormal_delta;
+        std::vector<LLVector2> tex_delta;
+        std::vector<LLVector4a> coords, scaled_normals, normals, scaled_binormals, binormals;
+        std::vector<LLVector2> tex;
+        std::vector<F32> mask;
+
+        explicit Morph(size_t n)
+            : index(n), coord_delta(n), normal_delta(n), binormal_delta(n), tex_delta(n),
+              coords(n * 4), scaled_normals(n * 4), normals(n * 4), scaled_binormals(n * 4), binormals(n * 4), tex(n * 4), mask(n)
+        {
+            std::mt19937 rng(0x5eed);
+            std::uniform_real_distribution<F32> dist(-1.f, 1.f);
+            std::uniform_int_distribution<U32> which(0, U32(n * 4) - 1);
+            for (size_t i = 0; i < n; ++i)
+            {
+                index[i] = which(rng);
+                coord_delta[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+                normal_delta[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+                binormal_delta[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+                tex_delta[i].set(dist(rng), dist(rng));
+                mask[i] = 0.5f + 0.5f * dist(rng);
+            }
+            for (size_t i = 0; i < n * 4; ++i)
+            {
+                coords[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+                scaled_normals[i].set(dist(rng) + 2.f, dist(rng), dist(rng), 0.f);
+                scaled_binormals[i].set(dist(rng), dist(rng) + 2.f, dist(rng), 0.f);
+                tex[i].set(dist(rng), dist(rng));
+            }
+        }
+
+        U32 checksum() const
+        {
+            U32 sum = 0;
+            for (size_t i = 0; i < normals.size(); i += 97)
+            {
+                sum ^= std::bit_cast<U32>(normals[i][0]) + std::bit_cast<U32>(binormals[i][1]);
+            }
+            return sum;
+        }
+    };
+
+    template <class Kernel>
+    void morph_row(const char* name, Kernel&& kernel)
+    {
+        Morph small(CACHED / 4);
+        Morph large(STREAMING / 16);
+        const double cached = time_per_element(small.index.size(), [&] { kernel(small); g_sink = g_sink + small.checksum(); });
+        const double streaming = time_per_element(large.index.size(), [&] { kernel(large); g_sink = g_sink + large.checksum(); });
+        std::printf("  %-44s %8.3f %8.3f\n", name, cached, streaming);
+        std::fflush(stdout);
+    }
+}
+
+static void bench_morph()
+{
+    print_header("morph apply, per morph vertex");
+    const F32 delta_weight = 0.125f;
+    const F32 soften = 0.65f;
+
+    morph_row("LLPolyMorphTarget::apply as written", [=](Morph& m)
+    {
+        for (size_t i = 0; i < m.index.size(); ++i)
+        {
+            const U32 at = m.index[i];
+            const F32 w = delta_weight * m.mask[i];
+
+            LLVector4a pos = m.coord_delta[i];
+            pos.mul(w);
+            m.coords[at].add(pos);
+
+            LLVector4a norm = m.normal_delta[i];
+            norm.mul(w * soften);
+            m.scaled_normals[at].add(norm);
+            norm = m.scaled_normals[at];
+            norm.normalize3fast();
+            m.normals[at] = norm;
+
+            LLVector4a binorm = m.binormal_delta[i];
+            if (!binorm.isFinite3() || (binorm.dot3(binorm).getF32() <= F_APPROXIMATELY_ZERO))
+            {
+                binorm.set(1, 0, 0, 1);
+            }
+            binorm.mul(w * soften);
+            m.scaled_binormals[at].add(binorm);
+            LLVector4a tangent;
+            tangent.setCross3(m.scaled_binormals[at], norm);
+            LLVector4a& out = m.binormals[at];
+            out.setCross3(norm, tangent);
+            out.normalize3fast();
+
+            m.tex[at] += m.tex_delta[i] * w;
+        }
+    });
+
+    morph_row("alsimd::morph_apply", [=](Morph& m)
+    {
+        alsimd::MorphApply apply;
+        apply.count = m.index.size();
+        apply.index = m.index.data();
+        apply.mask = m.mask.data();
+        apply.weight = delta_weight;
+        apply.soften = soften;
+        apply.coord_delta = m.coord_delta.data();
+        apply.normal_delta = m.normal_delta.data();
+        apply.binormal_delta = m.binormal_delta.data();
+        apply.tex_delta = m.tex_delta.data();
+        apply.coords = m.coords.data();
+        apply.scaled_normals = m.scaled_normals.data();
+        apply.normals = m.normals.data();
+        apply.scaled_binormals = m.scaled_binormals.data();
+        apply.binormals = m.binormals.data();
+        apply.tex_coords = m.tex.data();
+        alsimd::morph_apply(apply);
+    });
+}
+
 int main(int, char**)
 {
 #if !defined(LL_RELEASE)
@@ -484,6 +612,7 @@ int main(int, char**)
     bench_elementwise();
     bench_transform();
     bench_kernels();
+    bench_morph();
     std::printf("\n(checksum %u)\n", (unsigned)g_sink);
     return 0;
 #endif

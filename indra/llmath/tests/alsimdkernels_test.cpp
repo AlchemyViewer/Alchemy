@@ -48,6 +48,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <random>
 #include <string>
 #include <vector>
@@ -535,6 +536,142 @@ namespace tut
                     ensure_same_bits(std::string("extents ") + width + " max n " + std::to_string(n), hi, expected_max);
                 }
             });
+        }
+    }
+
+    // The morph apply against the loop it replaces, written on the vector
+    // type: the same mesh morphed both ways agrees to within the fused
+    // accumulate's rounding, and for the renormalized results within the
+    // fast estimate's twelve bits, since one ulp of input can cross a step
+    // of its table. With and without a mask and clothing weights, a
+    // degenerate binormal delta included.
+    template<> template<>
+    void alsimdkernels_object::test<9>()
+    {
+        constexpr size_t MORPH = 37;
+        constexpr size_t MESH = 50;
+        constexpr F32 SOFTEN = 0.65f;
+        constexpr F32 WEIGHT = 0.375f;
+
+        std::mt19937 rng(9);
+        std::uniform_real_distribution<F32> spread(-1.f, 1.f);
+        std::uniform_int_distribution<U32> which(0, MESH - 1);
+
+        std::vector<U32> index(MORPH);
+        std::vector<F32> mask(MORPH);
+        std::vector<LLVector4a> coord_delta(MORPH), normal_delta(MORPH), binormal_delta(MORPH);
+        std::vector<LLVector2> tex_delta(MORPH);
+        for (size_t i = 0; i < MORPH; ++i)
+        {
+            index[i] = which(rng);
+            mask[i] = 0.5f + 0.5f * spread(rng);
+            coord_delta[i].set(spread(rng), spread(rng), spread(rng), 0.f);
+            normal_delta[i].set(spread(rng), spread(rng), spread(rng), 0.f);
+            binormal_delta[i].set(spread(rng), spread(rng), spread(rng), 0.f);
+            tex_delta[i].set(spread(rng), spread(rng));
+        }
+        binormal_delta[3].set(0.f, 0.f, 0.f, 0.f);
+        binormal_delta[5].set(std::numeric_limits<F32>::quiet_NaN(), 1.f, 0.f, 0.f);
+
+        struct Mesh
+        {
+            std::vector<LLVector4a> coords, scaled_normals, normals, scaled_binormals, binormals, clothing;
+            std::vector<LLVector2> tex;
+            explicit Mesh(std::mt19937& rng)
+                : coords(MESH), scaled_normals(MESH), normals(MESH), scaled_binormals(MESH), binormals(MESH), clothing(MESH), tex(MESH)
+            {
+                std::uniform_real_distribution<F32> spread(-1.f, 1.f);
+                for (size_t i = 0; i < MESH; ++i)
+                {
+                    coords[i].set(spread(rng), spread(rng), spread(rng), 0.f);
+                    scaled_normals[i].set(spread(rng) + 2.f, spread(rng), spread(rng), 0.f);
+                    scaled_binormals[i].set(spread(rng), spread(rng) + 2.f, spread(rng), 0.f);
+                    normals[i].clear();
+                    binormals[i].clear();
+                    clothing[i].set(spread(rng), spread(rng), spread(rng), 0.25f);
+                    tex[i].set(spread(rng), spread(rng));
+                }
+            }
+        };
+
+        for (int variant = 0; variant < 4; ++variant)
+        {
+            const bool with_mask = variant & 1;
+            const bool with_clothing = variant & 2;
+            std::mt19937 mesh_rng(100 + variant);
+            Mesh expected(mesh_rng);
+            mesh_rng.seed(100 + variant);
+            Mesh got(mesh_rng);
+
+            // the reference: the loop as LLPolyMorphTarget::apply had it
+            for (size_t i = 0; i < MORPH; ++i)
+            {
+                const U32 at = index[i];
+                const F32 mw = with_mask ? mask[i] : 1.f;
+                LLVector4a pos = coord_delta[i];
+                pos.mul(WEIGHT * mw);
+                expected.coords[at].add(pos);
+                if (with_clothing)
+                {
+                    LLVector4a offset = coord_delta[i];
+                    offset.mul(WEIGHT * mw);
+                    expected.clothing[at].add(offset);
+                    expected.clothing[at].getF32ptr()[3] = mw;
+                }
+                LLVector4a norm = normal_delta[i];
+                norm.mul(WEIGHT * mw * SOFTEN);
+                expected.scaled_normals[at].add(norm);
+                norm = expected.scaled_normals[at];
+                norm.normalize3fast();
+                expected.normals[at] = norm;
+                LLVector4a binorm = binormal_delta[i];
+                if (!binorm.isFinite3() || binorm.dot3(binorm).getF32() <= F_APPROXIMATELY_ZERO)
+                {
+                    binorm.set(1, 0, 0, 1);
+                }
+                binorm.mul(WEIGHT * mw * SOFTEN);
+                expected.scaled_binormals[at].add(binorm);
+                LLVector4a tangent;
+                tangent.setCross3(expected.scaled_binormals[at], norm);
+                expected.binormals[at].setCross3(norm, tangent);
+                expected.binormals[at].normalize3fast();
+                expected.tex[at] += tex_delta[i] * WEIGHT * mw;
+            }
+
+            MorphApply apply;
+            apply.count = MORPH;
+            apply.index = index.data();
+            apply.mask = with_mask ? mask.data() : nullptr;
+            apply.weight = WEIGHT;
+            apply.soften = SOFTEN;
+            apply.coord_delta = coord_delta.data();
+            apply.normal_delta = normal_delta.data();
+            apply.binormal_delta = binormal_delta.data();
+            apply.tex_delta = tex_delta.data();
+            apply.coords = got.coords.data();
+            apply.scaled_normals = got.scaled_normals.data();
+            apply.normals = got.normals.data();
+            apply.scaled_binormals = got.scaled_binormals.data();
+            apply.binormals = got.binormals.data();
+            apply.clothing_weights = with_clothing ? got.clothing.data() : nullptr;
+            apply.tex_coords = got.tex.data();
+            morph_apply_impl(apply);
+
+            const std::string tag = " variant " + std::to_string(variant);
+            for (size_t v = 0; v < MESH; ++v)
+            {
+                for (int lane = 0; lane < 4; ++lane)
+                {
+                    ensure_close("coords" + tag + " at " + std::to_string(v), got.coords[v][lane], expected.coords[v][lane], 2e-6, 4.0);
+                    ensure_close("scaled normals" + tag, got.scaled_normals[v][lane], expected.scaled_normals[v][lane], 2e-6, 4.0);
+                    ensure_close("normals" + tag, got.normals[v][lane], expected.normals[v][lane], 6e-4, 1.0);
+                    ensure_close("scaled binormals" + tag, got.scaled_binormals[v][lane], expected.scaled_binormals[v][lane], 2e-6, 4.0);
+                    ensure_close("binormals" + tag, got.binormals[v][lane], expected.binormals[v][lane], 6e-4, 1.0);
+                    ensure_close("clothing" + tag, got.clothing[v][lane], expected.clothing[v][lane], 2e-6, 4.0);
+                }
+                ensure_close("tex u" + tag, got.tex[v].mV[0], expected.tex[v].mV[0], 2e-6, 4.0);
+                ensure_close("tex v" + tag, got.tex[v].mV[1], expected.tex[v].mV[1], 2e-6, 4.0);
+            }
         }
     }
 }

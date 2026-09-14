@@ -90,4 +90,9 @@ void extents(const LLVector4a* src, size_t n, LLVector4a& min, LLVector4a& max)
     kernels::extents_impl<ALSimdWide>(src, n, min, max);
 }
 
+void morph_apply(const MorphApply& m)
+{
+    kernels::morph_apply_impl(m);
+}
+
 } // namespace alsimd

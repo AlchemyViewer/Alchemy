@@ -36,6 +36,7 @@
 #include "llxmltree.h"
 #include "llendianswizzle.h"
 #include "llpolymesh.h"
+#include "alsimdkernels.h"
 #include "llfasttimer.h"
 
 //#include "../tools/imdebug/imdebug.h"
@@ -580,64 +581,24 @@ void LLPolyMorphTarget::apply( ESex avatar_sex )
         LLVector4a *clothing_weights = mMesh->getWritableClothingWeights();
         LLVector2 *tex_coords = mMesh->getWritableTexCoords();
 
-        F32 *maskWeightArray = (mVertMask) ? mVertMask->getMorphMaskWeights() : NULL;
-
-        for(U32 vert_index_morph = 0; vert_index_morph < mMorphData->mNumIndices; vert_index_morph++)
-        {
-            S32 vert_index_mesh = mMorphData->mVertexIndices[vert_index_morph];
-
-            F32 maskWeight = 1.f;
-            if (maskWeightArray)
-            {
-                maskWeight = maskWeightArray[vert_index_morph];
-            }
-
-
-            LLVector4a pos = mMorphData->mCoords[vert_index_morph];
-            pos.mul(delta_weight*maskWeight);
-            coords[vert_index_mesh].add(pos);
-
-            if (getInfo()->mIsClothingMorph && clothing_weights)
-            {
-                LLVector4a clothing_offset = mMorphData->mCoords[vert_index_morph];
-                clothing_offset.mul(delta_weight * maskWeight);
-                LLVector4a* clothing_weight = &clothing_weights[vert_index_mesh];
-                clothing_weight->add(clothing_offset);
-                clothing_weight->getF32ptr()[VW] = maskWeight;
-            }
-
-            // calculate new normals based on half angles
-            LLVector4a norm = mMorphData->mNormals[vert_index_morph];
-            norm.mul(delta_weight*maskWeight*NORMAL_SOFTEN_FACTOR);
-            scaled_normals[vert_index_mesh].add(norm);
-            norm = scaled_normals[vert_index_mesh];
-
-            // guard against degenerate input data before we create NaNs below!
-            //
-            norm.normalize3fast();
-            normals[vert_index_mesh] = norm;
-
-            // calculate new binormals
-            LLVector4a binorm = mMorphData->mBinormals[vert_index_morph];
-
-            // guard against degenerate input data before we create NaNs below!
-            //
-            if (!binorm.isFinite3() || (binorm.dot3(binorm).getF32() <= F_APPROXIMATELY_ZERO))
-            {
-                binorm.set(1,0,0,1);
-            }
-
-            binorm.mul(delta_weight*maskWeight*NORMAL_SOFTEN_FACTOR);
-            scaled_binormals[vert_index_mesh].add(binorm);
-            LLVector4a tangent;
-            tangent.setCross3(scaled_binormals[vert_index_mesh], norm);
-            LLVector4a& normalized_binormal = binormals[vert_index_mesh];
-
-            normalized_binormal.setCross3(norm, tangent);
-            normalized_binormal.normalize3fast();
-
-            tex_coords[vert_index_mesh] += mMorphData->mTexCoords[vert_index_morph] * delta_weight * maskWeight;
-        }
+        alsimd::MorphApply apply;
+        apply.count = mMorphData->mNumIndices;
+        apply.index = mMorphData->mVertexIndices;
+        apply.mask = mVertMask ? mVertMask->getMorphMaskWeights() : nullptr;
+        apply.weight = delta_weight;
+        apply.soften = NORMAL_SOFTEN_FACTOR;
+        apply.coord_delta = mMorphData->mCoords;
+        apply.normal_delta = mMorphData->mNormals;
+        apply.binormal_delta = mMorphData->mBinormals;
+        apply.tex_delta = mMorphData->mTexCoords;
+        apply.coords = coords;
+        apply.scaled_normals = scaled_normals;
+        apply.normals = normals;
+        apply.scaled_binormals = scaled_binormals;
+        apply.binormals = binormals;
+        apply.clothing_weights = getInfo()->mIsClothingMorph ? clothing_weights : nullptr;
+        apply.tex_coords = tex_coords;
+        alsimd::morph_apply(apply);
 
         // now apply volume changes
         for(LLPolyVolumeMorph& volume_morph : mVolumeMorphs)

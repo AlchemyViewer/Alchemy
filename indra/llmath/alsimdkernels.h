@@ -29,6 +29,7 @@
 
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "v2math.h"
 
 // Each kernel takes a pointer and a count, needs its vector arrays
 // sixteen-byte aligned, and walks them at the widest register the build
@@ -87,6 +88,37 @@ void skin_points(const LLVector4a* weights, const LLMatrix4a* palette, U32 max_j
 // The lane-wise minimum and maximum over n vectors, w included; n of zero
 // leaves both as they were.
 void extents(const LLVector4a* src, size_t n, LLVector4a& min, LLVector4a& max);
+
+// One morph target applied to its mesh by a change of weight: for each of
+// the target's vertices, the mesh vertex it names takes the target's
+// coordinate delta scaled by the weight and the vertex's mask, its scaled
+// normal and binormal take theirs softened, its normal is the scaled
+// normal renormalized, its binormal is rebuilt perpendicular to that
+// normal and renormalized, and its texture coordinate takes the delta
+// scaled. A clothing weight, where the mesh has them, takes the coordinate
+// delta and the mask in w. A binormal delta that is not finite or has no
+// length counts as +x.
+struct MorphApply
+{
+    size_t count = 0;
+    const U32* index = nullptr;
+    const F32* mask = nullptr;
+    F32 weight = 0.f;
+    F32 soften = 1.f;
+    const LLVector4a* coord_delta = nullptr;
+    const LLVector4a* normal_delta = nullptr;
+    const LLVector4a* binormal_delta = nullptr;
+    const LLVector2* tex_delta = nullptr;
+    LLVector4a* coords = nullptr;
+    LLVector4a* scaled_normals = nullptr;
+    LLVector4a* normals = nullptr;
+    LLVector4a* scaled_binormals = nullptr;
+    LLVector4a* binormals = nullptr;
+    LLVector4a* clothing_weights = nullptr;
+    LLVector2* tex_coords = nullptr;
+};
+
+void morph_apply(const MorphApply& m);
 
 } // namespace alsimd
 
