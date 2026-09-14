@@ -19,7 +19,6 @@ target_sources(
     llmeshoptimizer.cpp
     llmodularmath.cpp
     lloctree.cpp
-    llperlin.cpp
     llquaternion.cpp
     llrigginginfo.cpp
     llrect.cpp
@@ -65,7 +64,6 @@ target_sources(
         llmeshoptimizer.h
         llmodularmath.h
         lloctree.h
-        llperlin.h
         llplane.h
         llquantize.h
         llquaternion.h
