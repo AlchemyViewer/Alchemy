@@ -3,12 +3,10 @@
  * @brief Unit tests for ALFontShaping — HarfBuzz wrapper, ZWJ ligature
  *        retry, VS-16 strip, monospace feature plans, LRU cache contract.
  *
- * The bulk of the tests are pure-CPU: HB shaping itself doesn't touch
- * the atlas. The GL-backed kerning test at the bottom exercises
- * renderAndCreateGlyph → LLFontBitmapCache::nextOpenPos → gGL.bind,
- * so it's wrapped in #if LL_TEST_GL and compiles in where the GL tests
- * are on. Same single-file pattern as llfontregistry_test.cpp's
- * GL-gated block.
+ * The tests are pure-CPU: HB shaping itself doesn't touch the atlas. The
+ * monospace kerning path, which renders through
+ * renderAndCreateGlyph → LLFontBitmapCache::nextOpenPos → gGL.bind, is in
+ * alfontshaping_gl_test.cpp.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -37,14 +35,12 @@
 #include "../alfontface.h"
 #include "../llfontregistry.h"  // EFontHinting full definition
 
+#include "llfonttest_helpers.h"
+
 #include "../test/lltut.h"
 
 #include <hb.h>
 #include <unicode/uchar.h>
-
-#if LL_TEST_GL
-#  include "llheadlessgl_fixture.h"
-#endif
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -64,104 +60,10 @@
 // stem-darkening test below can FT_Property_Get against it.
 extern FT_Library gFTLibrary;
 
-namespace
-{
-#ifndef LLFONT_TEST_DATA_DIR
-#  define LLFONT_TEST_DATA_DIR ""
-#endif
-
-    constexpr const char* kFontDir = LLFONT_TEST_DATA_DIR;
-
-    bool fileExists(const std::string& path)
-    {
-        if (FILE* f = LLFile::fopen(path.c_str(), LLFILE_MODE("rb")))
-        {
-            std::fclose(f);
-            return true;
-        }
-        return false;
-    }
-
-    // Build a freshly-loaded LLFontFreetype for `filename` at 14pt/96dpi.
-    // is_fallback defaults to TRUE: the non-fallback path in
-    // LLFontFreetype::loadFace pre-warms the notdef glyph through
-    // addGlyphFromFont, which calls into LLFontBitmapCache::nextOpenPos
-    // and ultimately gGL.bind — fatal in a pure-CPU test binary.
-    // Shaping cares only about cmap, GSUB, and HB advance data; the
-    // is_fallback flag has no bearing on those.
-    LLPointer<LLFontFreetype> loadFt(const std::string& filename,
-                                     bool is_fallback = true)
-    {
-        LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        if (!ft->loadFace(filename,
-                          /*point_size=*/14.f,
-                          /*vert_dpi=*/96.f,
-                          /*horz_dpi=*/96.f,
-                          is_fallback,
-                          /*face_n=*/0,
-                          EFontHinting::DEFAULT,
-                          /*flags=*/0))
-        {
-            return nullptr;
-        }
-        return ft;
-    }
-
-    // Build a codepoint sequence from a parameter pack. Avoids an
-    // initializer_list dance at the call sites.
-    template <typename... Cps>
-    std::u32string wstr(Cps... cps)
-    {
-        const char32_t arr[] = { static_cast<char32_t>(cps)... };
-        return std::u32string(arr, sizeof...(Cps));
-    }
-
-    // llstring holds no UTF-32 any more, so the encode lives here.
-    std::string encode(std::u32string_view u32)
-    {
-        std::string out;
-        for (char32_t cp : u32)
-        {
-            utf8str_append_cp(out, (llwchar)cp);
-        }
-        return out;
-    }
-
-    // A test string in both representations. The sequences under test are
-    // specified in codepoints, which is how they are written below; shaping
-    // takes and reports bytes. `at` turns a codepoint index into the byte
-    // offset an expectation has to compare against, so a test can go on
-    // saying "the cluster starts at the third codepoint" and still check the
-    // value the shaper actually produces.
-    struct Text
-    {
-        std::u32string      wide;
-        std::string         utf8;
-        std::vector<size_t> offsets;   // one per codepoint, plus the end
-
-        explicit Text(std::u32string ws) : wide(std::move(ws))
-        {
-            offsets.reserve(wide.size() + 1);
-            for (size_t k = 0; k <= wide.size(); ++k)
-                offsets.push_back(encode(wide.substr(0, k)).size());
-            utf8 = encode(wide);
-        }
-
-        size_t at(size_t cp) const { return offsets[llmin(cp, offsets.size() - 1)]; }
-        size_t size() const { return utf8.size(); }
-        size_t codepoints() const { return wide.size(); }
-        operator std::string_view() const { return utf8; }
-    };
-
-    template <typename... Cps>
-    Text text(Cps... cps)
-    {
-        return Text(wstr(cps...));
-    }
-}
-
 namespace tut
 {
+    using namespace ll_test;
+
     // Per-test init/cleanup. LLFontManager is process-scoped but
     // safe to teardown here — these tests don't reach LLFontGL's
     // static fontp caches that complicate llfontgl_test's fixture.
@@ -1667,157 +1569,4 @@ namespace tut
                       " (first disagreement at U+" + llformat("%04X", first_combining) + ")",
                       combining_diffs, 0);
     }
-
-#if LL_TEST_GL
-    // GL-backed group: monospace shaping ends up rendering glyphs through
-    // getGlyphInfoByIndex → renderAndCreateGlyph → atlas → gGL.bind on
-    // the test 3 (kerning) path. Wrapped in a separate fixture that
-    // pulls in the headless GL context so the rasterizer can
-    // satisfy the bind.
-    struct alfontshaping_gl_data
-    {
-        std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
-        ll_test::FontStateScope font_scope;
-    };
-
-    typedef test_group<alfontshaping_gl_data> alfontshaping_gl_test;
-    typedef alfontshaping_gl_test::object     alfontshaping_gl_object;
-    tut::alfontshaping_gl_test alfontshaping_gl_testcase("ALFontShapingGL");
-
-    // Build an LLFontFreetype as a real head face (is_fallback=false),
-    // which the headless GL context can satisfy. The pre-warm of
-    // notdef inside loadFace runs the rasterizer to bind a fresh
-    // atlas page — fine here, gGL is alive.
-    static LLPointer<LLFontFreetype> loadFtHead(const std::string& filename)
-    {
-        LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        if (!ft->loadFace(filename, 14.f, 96.f, 96.f,
-                          /*is_fallback=*/false, /*face_n=*/0,
-                          EFontHinting::DEFAULT, /*flags=*/0))
-        {
-            return nullptr;
-        }
-        return ft;
-    }
-
-    // Strict-monospace (ligatures off): shape "AB" through DejaVuSansMono.
-    // Routes through HB with the kFixedWidthStrict feature plan
-    // (kern + liga + calt + clig + dlig + rlig all forced off). HB
-    // produces one glyph per codepoint with bit-exact FT mXAdvance and
-    // zero positioning offsets — same contract the retired bypass
-    // enforced. Pins the cell-alignment invariant.
-    template<> template<>
-    void alfontshaping_gl_object::test<1>()
-    {
-        const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
-        if (!fileExists(path))
-            skip("DejaVuSansMono.woff2 not present");
-        LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSansMono loaded", ft.notNull());
-        ensure("DejaVuSansMono is fixed-width", ft->isFixedWidth());
-        ensure("monospace ligatures default off",
-               !ft->getAllowMonospaceLigatures());
-
-        const Text s = text('A','B');
-        std::vector<ALShapedGlyph> out;
-        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        ensure_equals("AB produces 2 glyphs through HB strict-mono path",
-                      out.size(), 2u);
-        ensure("each shaped glyph has positive advance",
-               out[0].x_advance > 0.f && out[1].x_advance > 0.f);
-        ensure_equals("strict-mono: A and B advances are equal",
-                      out[0].x_advance, out[1].x_advance);
-        // HB output for monospace ASCII matches FT mXAdvance bit-exact
-        // under the strict feature plan (verified by the long-line
-        // probe in test 20).
-        ensure_equals("strict-mono glyph[0] advance == ft->getXAdvance('A')",
-                      out[0].x_advance, ft->getXAdvance(L'A'));
-        // Strict-mono path also forces zero positioning offsets, since
-        // monospace ASCII triggers no GPOS adjustments under the
-        // feature plan (kern, mark, mkmk all suppressed for ASCII).
-        ensure_equals("strict-mono glyph[0] x_offset is zero",
-                      out[0].x_offset, 0.f);
-        ensure_equals("strict-mono glyph[0] y_offset is zero",
-                      out[0].y_offset, 0.f);
-    }
-
-    // Programmer-mono opt-in via setAllowMonospaceLigatures(true).
-    // Routes through HB with the kFixedWidthLigaturesOk feature plan
-    // (kern off, ligatures allowed). Cell alignment invariant on the
-    // pre-ligation columns still holds.
-    template<> template<>
-    void alfontshaping_gl_object::test<2>()
-    {
-        const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
-        if (!fileExists(path))
-            skip("DejaVuSansMono.woff2 not present");
-        LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSansMono loaded", ft.notNull());
-        ft->setAllowMonospaceLigatures(true);
-        ensure("ligatures-on toggle applied",
-               ft->getAllowMonospaceLigatures());
-
-        const Text s = text('A','V'); // AV is a classic kerned pair
-        std::vector<ALShapedGlyph> out;
-        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
-        ensure_equals("AV produces 2 glyphs through HB", out.size(), 2u);
-        ensure("each shaped glyph has positive advance",
-               out[0].x_advance > 0.f && out[1].x_advance > 0.f);
-        ensure_equals("HB-monospace-with-ligatures: A and V advances are equal",
-                      out[0].x_advance, out[1].x_advance);
-    }
-
-    // HB GPOS plumbing: shape "AV" (classic Latin kerned pair) through
-    // proportional DejaVuSans. Modern fonts deliver kerning via GPOS
-    // (not the legacy `kern` table), so the observable signal is that
-    // the AV-as-pair advance differs from the sum of solo-A and solo-V
-    // advances. A regression that disabled GPOS unconditionally would
-    // make these equal. Skip if no Latin kern pair fires (test
-    // verifies nothing then).
-    template<> template<>
-    void alfontshaping_gl_object::test<3>()
-    {
-        const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
-        if (!fileExists(path))
-            skip("DejaVuSans.woff2 not present");
-        LLPointer<LLFontFreetype> ft = loadFtHead(path);
-        ensure("DejaVuSans loaded", ft.notNull());
-
-        // Try a handful of classic kerned pairs; pick the first that
-        // shows a measurable kern. DejaVu's GPOS coverage varies.
-        struct Pair { llwchar l, r; };
-        const Pair pairs[] = {
-            {'A','V'}, {'A','W'}, {'V','A'}, {'W','A'},
-            {'T','o'}, {'T','e'}, {'T','a'}, {'L','T'},
-            {'F','.'}, {'V','.'}, {'P','.'}, {'A','.'}
-        };
-        bool found_kerned = false;
-        for (const auto& p : pairs)
-        {
-            const Text l    = text(p.l);
-            const Text r    = text(p.r);
-            const Text lr   = text(p.l, p.r);
-            std::vector<ALShapedGlyph> lg, rg, lrg;
-            ALFontShaping::shapeRun(ft, l,  0, l.size(),  lg);
-            ALFontShaping::shapeRun(ft, r,  0, r.size(),  rg);
-            ALFontShaping::shapeRun(ft, lr, 0, lr.size(), lrg);
-            if (lg.size() != 1 || rg.size() != 1 || lrg.size() != 2)
-                continue;
-            // Pair advance equals solo[0] + solo[1] when no kern fires.
-            // Any difference signals the GPOS plumbing engaged.
-            const F32 unkerned_total = lg[0].x_advance + rg[0].x_advance;
-            const F32 kerned_total   = lrg[0].x_advance + lrg[1].x_advance;
-            if (std::abs(kerned_total - unkerned_total) > 0.01f)
-            {
-                found_kerned = true;
-                break;
-            }
-        }
-        if (!found_kerned)
-            skip("DejaVuSans lacks a measurable Latin kern pair");
-
-        ensure("at least one Latin kern pair fired through HB GPOS",
-               found_kerned);
-    }
-#endif // LL_TEST_GL
 }

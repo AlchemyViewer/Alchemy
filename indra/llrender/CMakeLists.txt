@@ -132,30 +132,35 @@ if(AL_BUILD_TESTS)
   # Arithmetic only: where a local coordinate lands under the UI transform.
   al_add_test(lluitransform PROJECT llrender LIBRARIES llrender)
 
-  # The font suites are tables and shaping for the most part, each with a
-  # group at the end that renders through a GL context; that group compiles
-  # in under AL_GL_TEST_DEFINE and out where the GL tests are off.
+  # The font suites: tables and shaping, no GL.
   foreach(test alfontcolrv1 llfontregistry llfontbitmapcache llfontfreetype)
-    al_add_test(
-      ${test}
-      PROJECT llrender
-      LIBRARIES llrender
-      DEFINES ${font_defines} ${AL_GL_TEST_DEFINE}
-    )
+    al_add_test(${test} PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
   endforeach()
   # Both Unicode tables in one place, so the test can hold them against each
   # other. llrender itself has no need of ICU.
-  al_add_test(
-    alfontshaping
-    PROJECT llrender
-    LIBRARIES llrender ll::icu
-    DEFINES ${font_defines} ${AL_GL_TEST_DEFINE}
-  )
+  al_add_test(alfontshaping PROJECT llrender LIBRARIES llrender ll::icu DEFINES ${font_defines})
 
-  # Wholly GL-backed suites, on LLWindowManager's hidden window.
-  foreach(test llfontgl llfonttextcache llimagegl)
+  # The GL-backed suites, on LLWindowManager's hidden window: the paths of
+  # the four font libraries above that rasterize, and the wholly-GL ones.
+  foreach(
+    test
+    alfontcolrv1_gl
+    llfontregistry_gl
+    llfontbitmapcache_gl
+    llfontfreetype_gl
+    llfontgl
+    llfonttextcache
+    llimagegl
+  )
     al_add_test(${test} GL PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})
   endforeach()
+  al_add_test(
+    alfontshaping_gl
+    GL
+    PROJECT llrender
+    LIBRARIES llrender ll::icu
+    DEFINES ${font_defines}
+  )
   al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
   # The hidden window itself, and a worker thread's shared context on it.
   al_add_test(alwindowsdlheadless GL PROJECT llrender LIBRARIES llrender)

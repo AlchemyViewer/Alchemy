@@ -20,14 +20,6 @@ else()
   set(AL_TEST_ENVIRONMENT "")
 endif()
 
-# The define a test's GL-backed groups compile under. Empty where the GL
-# tests are off, so those groups compile out.
-if(AL_ENABLE_GL_TESTS)
-  set(AL_GL_TEST_DEFINE LL_TEST_GL=1)
-else()
-  set(AL_GL_TEST_DEFINE)
-endif()
-
 # al_add_test(<name> PROJECT <project> [UNIT] [PYTHON] [GL]
 #             [SOURCES <file>...] [LIBRARIES <target>...] [INCLUDES <dir>...]
 #             [DEFINES <define>...] [COMMAND <arg>...] [ENVIRONMENT <VAR=value>...])
@@ -46,11 +38,9 @@ endif()
 # executable and is appended when absent. ENVIRONMENT sets variables for the
 # run, VAR=value each. A PYTHON test spawns a Python peer: PYTHON is set to
 # the interpreter for its run, and without one the test is registered
-# disabled. A GL test stands up a GL context on a hidden window for every
-# test in it: it is compiled with LL_TEST_GL=1 and labelled gl, and where
-# AL_ENABLE_GL_TESTS is off it is built and registered disabled. A test with
-# only some GL-backed groups takes ${AL_GL_TEST_DEFINE} among its DEFINES
-# instead, and compiles those groups out where the option is off.
+# disabled. A GL test stands up a GL context on a hidden window: it is
+# labelled gl, and where AL_ENABLE_GL_TESTS is off it is built and
+# registered disabled.
 #
 # Targets are PROJECT_<project>_TEST_<name> for a unit test and
 # INTEGRATION_TEST_<name> otherwise; the registered test names are
@@ -108,9 +98,6 @@ function(al_add_test name)
       ${INDRA_SOURCE_DIR}/llui
   )
   target_compile_definitions(${target} PRIVATE "LL_TEST=${name}" "LL_TEST_${name}" ${arg_DEFINES})
-  if(arg_GL)
-    target_compile_definitions(${target} PRIVATE ${AL_GL_TEST_DEFINE})
-  endif()
   set_target_properties(${target} PROPERTIES FOLDER "Tests/${arg_PROJECT}")
 
   if(WINDOWS)
