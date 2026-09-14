@@ -109,10 +109,12 @@ function(_al_count_tests dir out)
 endfunction()
 
 # Mirrors the ISA selection in 00-Common.cmake: Darwin ignores AL_ISA_TIER
-# and pins x86_64 to SSE4.2; Windows and Linux build the named tier.
+# and pins x86_64 to SSE4.2; Windows and Linux build the named tier; arm64 is
+# NEON with no tier. The level is what the source reads back as AL_ISA_LEVEL.
 function(_al_isa_description out)
+  al_isa_level(${AL_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} level)
   if(BUILD_TARGET_IS_ARM64)
-    set(isa "arm64")
+    set(isa "NEON (ARMv8-A, arm64)")
   elseif(DARWIN)
     set(isa "SSE4.2 (x86-64-v2, fixed for macOS x86_64)")
   elseif(AL_ISA_TIER STREQUAL "v4")
@@ -124,7 +126,7 @@ function(_al_isa_description out)
   else()
     set(isa "baseline (x86-64)")
   endif()
-  set(${out} "${isa}" PARENT_SCOPE)
+  set(${out} "${isa}, level ${level}" PARENT_SCOPE)
 endfunction()
 
 function(al_configuration_report)

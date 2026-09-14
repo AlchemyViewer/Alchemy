@@ -42,6 +42,7 @@
 #include "namedtempfile.h"
 #include "lltrace.h"
 #include "lltracethreadrecorder.h"
+#include "llprocessor.h"
 
 #include "llapr.h"
 #include "apr_pools.h"
@@ -322,8 +323,27 @@ static const apr_getopt_option_t TEST_CL_OPTIONS[] =
     {"wait", 'w', 0, "Wait for input before exit."},
     {"debug", 'd', 0, "Emit full debug logs."},
     {"suitename", 'x', 1, "Run tests using this suitename"},
+    {"isa-level", 'i', 1, "Exit 125, which CTest reads as skipped, unless the host runs this x86-64 level: 2 for SSE4.2, 3 for AVX2, 4 for AVX-512."},
     {0, 0, 0, 0}
 };
+
+// Whether the host can run a binary compiled for an x86-64 level. A level of
+// 0 is the baseline, which anything the viewer builds for can run.
+static bool host_runs_isa_level(int level)
+{
+    if (level <= 0)
+    {
+        return true;
+    }
+    LLProcessorInfo cpu;
+    switch (level)
+    {
+        case 2: return cpu.hasSSE42();
+        case 3: return cpu.hasAVX2();
+        case 4: return cpu.hasAVX512F();
+        default: return false;
+    }
+}
 
 void stream_usage(std::ostream& s, const char* app)
 {
@@ -462,6 +482,13 @@ int main(int argc, char **argv)
                 break;
             case 'x':
                 suite_name.assign(opt_arg);
+                break;
+            case 'i':
+                if (!host_runs_isa_level(atoi(opt_arg)))
+                {
+                    std::cout << "Skipped: this host does not run x86-64 level " << opt_arg << std::endl;
+                    return 125;
+                }
                 break;
             default:
                 stream_usage(std::cerr, argv[0]);

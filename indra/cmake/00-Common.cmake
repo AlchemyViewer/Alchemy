@@ -217,9 +217,30 @@ endif()
 # Instruction set: the same table the triplets read, so the viewer and its
 # ports are built for one machine. AlchemyTarget.cmake says what each tier
 # means and why macOS x86_64 ignores it.
+#
+# Every target carries the tree's tier in its AL_ISA_TIER property and reads
+# its compiler flag and its AL_ISA_LEVEL definition from that, so one target
+# can build at another tier from the same configure by setting the property:
+# that is how a test of the SIMD layer builds once per tier against the one
+# set of ports. Such a target must not reuse the precompiled header, which
+# was compiled at the tree's tier.
 include(AlchemyTarget)
-al_isa_flags(${AL_ISA_TIER} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_compile_flags)
-target_compile_options(al_flags INTERFACE ${al_isa_compile_flags})
+define_property(
+  TARGET
+  PROPERTY AL_ISA_TIER
+  INITIALIZE_FROM_VARIABLE AL_ISA_TIER
+  BRIEF_DOCS "The x86-64 microarchitecture level this target is compiled for"
+)
+foreach(tier baseline v2 v3 v4)
+  al_isa_flags(${tier} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_tier_flags)
+  al_isa_level(${tier} ${CMAKE_SYSTEM_NAME} ${ARCH} al_isa_tier_level)
+  set(al_isa_tier_selected "$<STREQUAL:$<TARGET_PROPERTY:AL_ISA_TIER>,${tier}>")
+  target_compile_options(al_flags INTERFACE "$<${al_isa_tier_selected}:${al_isa_tier_flags}>")
+  target_compile_definitions(
+    al_flags
+    INTERFACE "$<${al_isa_tier_selected}:AL_ISA_LEVEL=${al_isa_tier_level}>"
+  )
+endforeach()
 
 # Hardening.
 if(LINUX)
