@@ -1128,6 +1128,54 @@ AL_SIMD_INLINE void prefetch_nta(const void* p)
 #endif
 }
 
+////////////////////////////////////
+// Copies
+////////////////////////////////////
+
+// Copies bytes, a multiple of sixteen, from src to dst, both sixteen-byte
+// aligned and not overlapping: 128 bytes an iteration at the widest
+// register the build has, then 64, then 16. No prefetch: the hardware's
+// keeps up with a straight walk, and a hint on the destination evicts a
+// line about to be written.
+AL_SIMD_INLINE void copy_aligned16(char* __restrict dst, const char* __restrict src, size_t bytes)
+{
+    const char* const end = dst + bytes;
+#if AL_SIMD_AVX512
+    while (dst + 128 <= end)
+    {
+        _mm512_storeu_ps(reinterpret_cast<float*>(dst), _mm512_loadu_ps(reinterpret_cast<const float*>(src)));
+        _mm512_storeu_ps(reinterpret_cast<float*>(dst + 64), _mm512_loadu_ps(reinterpret_cast<const float*>(src + 64)));
+        dst += 128;
+        src += 128;
+    }
+#elif AL_SIMD_AVX
+    while (dst + 128 <= end)
+    {
+        _mm256_storeu_ps(reinterpret_cast<float*>(dst), _mm256_loadu_ps(reinterpret_cast<const float*>(src)));
+        _mm256_storeu_ps(reinterpret_cast<float*>(dst + 32), _mm256_loadu_ps(reinterpret_cast<const float*>(src + 32)));
+        _mm256_storeu_ps(reinterpret_cast<float*>(dst + 64), _mm256_loadu_ps(reinterpret_cast<const float*>(src + 64)));
+        _mm256_storeu_ps(reinterpret_cast<float*>(dst + 96), _mm256_loadu_ps(reinterpret_cast<const float*>(src + 96)));
+        dst += 128;
+        src += 128;
+    }
+#endif
+    while (dst + 64 <= end)
+    {
+        store(reinterpret_cast<float*>(dst), load(reinterpret_cast<const float*>(src)));
+        store(reinterpret_cast<float*>(dst + 16), load(reinterpret_cast<const float*>(src + 16)));
+        store(reinterpret_cast<float*>(dst + 32), load(reinterpret_cast<const float*>(src + 32)));
+        store(reinterpret_cast<float*>(dst + 48), load(reinterpret_cast<const float*>(src + 48)));
+        dst += 64;
+        src += 64;
+    }
+    while (dst < end)
+    {
+        store(reinterpret_cast<float*>(dst), load(reinterpret_cast<const float*>(src)));
+        dst += 16;
+        src += 16;
+    }
+}
+
 } // namespace alsimd
 
 #endif // AL_SIMD_H

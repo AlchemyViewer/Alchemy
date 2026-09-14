@@ -42,6 +42,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <vector>
 
 using namespace alsimd;
 
@@ -558,5 +559,54 @@ namespace tut
             ensure("NEON is four wide", AL_SIMD_WIDTH == 4);
         }
         ensure("the level is not above the flags", AL_ISA_LEVEL <= 2 || (AL_ISA_LEVEL == 3 && AL_SIMD_AVX2) || (AL_ISA_LEVEL == 4 && AL_SIMD_AVX512));
+    }
+
+    // The aligned copy moves every byte and no other, at every size the
+    // three loops can be entered with, both ends at every sixteen-byte
+    // offset within a line, and at the sizes the slabs come in.
+    template<> template<>
+    void alsimd_object::test<13>()
+    {
+        constexpr size_t LARGEST = 4 * 1024 * 1024;
+        constexpr size_t GUARD = 64;
+        std::vector<unsigned char> source(LARGEST + 2 * GUARD), destination(LARGEST + 2 * GUARD);
+        for (size_t i = 0; i < source.size(); ++i)
+        {
+            source[i] = static_cast<unsigned char>((i * 7919u) ^ (i >> 3));
+        }
+        auto aligned64 = [](unsigned char* p)
+        {
+            return reinterpret_cast<unsigned char*>((reinterpret_cast<uintptr_t>(p) + 63) & ~uintptr_t(63));
+        };
+        unsigned char* src_line = aligned64(source.data());
+        unsigned char* dst_line = aligned64(destination.data());
+
+        std::vector<size_t> sizes;
+        for (size_t size = 16; size <= 1024; size += 16)
+        {
+            sizes.push_back(size);
+        }
+        for (size_t size : {size_t(4096), size_t(65536), size_t(1024 * 1024), LARGEST - 64})
+        {
+            sizes.push_back(size);
+        }
+
+        for (size_t size : sizes)
+        {
+            for (size_t src_off = 0; src_off < 64; src_off += 16)
+            {
+                for (size_t dst_off = 0; dst_off < 64; dst_off += 16)
+                {
+                    unsigned char* src = src_line + src_off;
+                    unsigned char* dst = dst_line + dst_off;
+                    std::memset(dst - 16, 0xEE, size + 32);
+                    copy_aligned16(reinterpret_cast<char*>(dst), reinterpret_cast<const char*>(src), size);
+                    const std::string what = "copy of " + std::to_string(size) + " at " + std::to_string(src_off) + "/" + std::to_string(dst_off);
+                    ensure(what + " moved every byte", std::memcmp(dst, src, size) == 0);
+                    ensure(what + " left the byte before", dst[-1] == 0xEE);
+                    ensure(what + " left the byte after", dst[size] == 0xEE);
+                }
+            }
+        }
     }
 }

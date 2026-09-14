@@ -137,29 +137,52 @@ namespace
     }
 }
 
-// The memcpy: the tree's aligned copy against the C runtime's, per call, at
-// the sizes the volume slabs come in.
+// A copy at 128 bits, the width the aligned copy runs at on NEON and below
+// AVX, beside the aligned copy at the build's width and the C runtime's.
+static void copy_128(char* __restrict dst, const char* __restrict src, size_t bytes)
+{
+    const char* end = dst + bytes;
+    while (dst + 64 <= end)
+    {
+        alsimd::store((F32*)dst, alsimd::load((F32*)src));
+        alsimd::store((F32*)(dst + 16), alsimd::load((F32*)(src + 16)));
+        alsimd::store((F32*)(dst + 32), alsimd::load((F32*)(src + 32)));
+        alsimd::store((F32*)(dst + 48), alsimd::load((F32*)(src + 48)));
+        dst += 64;
+        src += 64;
+    }
+    while (dst < end)
+    {
+        alsimd::store((F32*)dst, alsimd::load((F32*)src));
+        dst += 16;
+        src += 16;
+    }
+}
+
+// The memcpy: the tree's aligned copy against a 128-bit loop and the C
+// runtime's, per call, at the sizes the volume slabs come in.
 static void bench_memcpy()
 {
-    std::printf("\nmemcpy, ns per call                          %10s %10s\n", "aligned16", "memcpy");
-    const size_t sizes[] = {64, 256, 4096, 65536, 4 * 1024 * 1024};
+    std::printf("\nmemcpy, ns per call            %10s %10s %10s\n", "aligned16", "128-bit", "memcpy");
+    const size_t sizes[] = {64, 256, 1024, 4096, 16384, 65536, 262144, 1024 * 1024, 4 * 1024 * 1024};
     for (size_t size : sizes)
     {
         char* src = (char*)ll_aligned_malloc_64(size);
         char* dst = (char*)ll_aligned_malloc_64(size);
         std::memset(src, 0x5a, size);
         std::memset(dst, 0, size);
-        const double ours = time_per_element(1, [&]
+        auto time = [&](auto&& copy)
         {
-            ll_memcpy_nonaliased_aligned_16(dst, src, size);
-            g_sink = g_sink + (U32)dst[size - 1];
-        });
-        const double crt = time_per_element(1, [&]
-        {
-            std::memcpy(dst, src, size);
-            g_sink = g_sink + (U32)dst[size - 1];
-        });
-        std::printf("  %-44zu %10.1f %10.1f\n", size, ours, crt);
+            return time_per_element(1, [&]
+            {
+                copy(dst, src, size);
+                g_sink = g_sink + (U32)dst[size - 1];
+            });
+        };
+        const double ours = time([](char* d, const char* s, size_t n) { ll_memcpy_nonaliased_aligned_16(d, s, n); });
+        const double narrow = time(copy_128);
+        const double crt = time([](char* d, const char* s, size_t n) { std::memcpy(d, s, n); });
+        std::printf("  %-30zu %10.1f %10.1f %10.1f\n", size, ours, narrow, crt);
         ll_aligned_free_64(src);
         ll_aligned_free_64(dst);
     }

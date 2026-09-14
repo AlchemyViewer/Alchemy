@@ -77,18 +77,6 @@ LL_COMMON_API void ll_assert_aligned_func(uintptr_t ptr,U32 alignment);
 
 #include "alsimd.h"
 
-template <typename T> T* LL_NEXT_ALIGNED_ADDRESS(T* address)
-{
-    return reinterpret_cast<T*>(
-        (uintptr_t(address) + 0xF) & ~0xF);
-}
-
-template <typename T> T* LL_NEXT_ALIGNED_ADDRESS_64(T* address)
-{
-    return reinterpret_cast<T*>(
-        (uintptr_t(address) + 0x3F) & ~0x3F);
-}
-
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
     // for enable buffer overrun detection predefine LL_DEBUG_BUFFER_OVERRUN in current library
@@ -310,75 +298,15 @@ LL_FORCE_INLINE void ll_aligned_free(void* ptr)
 inline void ll_memcpy_nonaliased_aligned_16(char* __restrict dst, const char* __restrict src, size_t bytes)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEMORY;
-#if defined(LL_ARM64)
-    memcpy(dst, src, bytes);
-#else
     assert(src != NULL);
     assert(dst != NULL);
     assert(bytes > 0);
-    assert((bytes % sizeof(F32))== 0);
     ll_assert_aligned(src,16);
     ll_assert_aligned(dst,16);
-
     assert((src < dst) ? ((src + bytes) <= dst) : ((dst + bytes) <= src));
     assert(bytes%16==0);
 
-    char* end = dst + bytes;
-
-    if (bytes > 64)
-    {
-
-        // Find start of 64b aligned area within block
-        //
-        char* begin_64 = LL_NEXT_ALIGNED_ADDRESS_64(dst);
-
-        //at least 64 bytes before the end of the destination, switch to 16 byte copies
-        char* end_64 = end-64;
-
-        // Prefetch the head of the 64b area now
-        //
-        alsimd::prefetch_nta(begin_64);
-        alsimd::prefetch_nta(begin_64 + 64);
-        alsimd::prefetch_nta(begin_64 + 128);
-        alsimd::prefetch_nta(begin_64 + 192);
-
-        // Copy 16b chunks until we're 64b aligned
-        //
-        while (dst < begin_64)
-        {
-
-            alsimd::store((F32*)dst, alsimd::load((F32*)src));
-            dst += 16;
-            src += 16;
-        }
-
-        // Copy 64b chunks up to your tail
-        //
-        // might be good to shmoo the 512b prefetch offset
-        // (characterize performance for various values)
-        //
-        while (dst < end_64)
-        {
-            alsimd::prefetch_nta(src + 512);
-            alsimd::prefetch_nta(dst + 512);
-            alsimd::store((F32*)dst, alsimd::load((F32*)src));
-            alsimd::store((F32*)(dst + 16), alsimd::load((F32*)(src + 16)));
-            alsimd::store((F32*)(dst + 32), alsimd::load((F32*)(src + 32)));
-            alsimd::store((F32*)(dst + 48), alsimd::load((F32*)(src + 48)));
-            dst += 64;
-            src += 64;
-        }
-    }
-
-    // Copy remainder 16b tail chunks (or ALL 16b chunks for sub-64b copies)
-    //
-    while (dst < end)
-    {
-        alsimd::store((F32*)dst, alsimd::load((F32*)src));
-        dst += 16;
-        src += 16;
-    }
-#endif
+    alsimd::copy_aligned16(dst, src, bytes);
 }
 
 #ifndef __DEBUG_PRIVATE_MEM__
