@@ -50,3 +50,19 @@ target_link_libraries(
 )
 
 target_precompile_headers(appearance-utility-bin REUSE_FROM llprecompiled_exe)
+
+# What the utility reads at run time, beside the executable as the viewer
+# has it: the avatar definitions and the baking shaders, from the viewer's
+# own source tree.
+add_custom_command(
+  TARGET appearance-utility-bin
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_directory_if_different ${INDRA_SOURCE_DIR}/newview/character
+    $<TARGET_FILE_DIR:appearance-utility-bin>/character
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_directory_if_different ${INDRA_SOURCE_DIR}/newview/app_settings/shaders
+    $<TARGET_FILE_DIR:appearance-utility-bin>/app_settings/shaders
+  COMMENT "Staging the appearance utility's data beside it"
+  VERBATIM
+)
