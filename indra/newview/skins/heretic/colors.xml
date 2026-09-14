@@ -167,10 +167,10 @@
         reference="Obsidian" />
     <color
         name="SL-Background_50"
-        value="Obsidian_50" />
+        reference="Obsidian_50" />
     <color
         name="SL-Background_66"
-        value="Obsidian_66" />
+        reference="Obsidian_66" />
     <color
         name="SL-Foreground"
         value="0.375 0.120 0.400 1" />
@@ -247,9 +247,6 @@
     <color
         name="AvatarListItemIconOnlineColor"
         reference="White" />
-    <color
-        name="AvatarListItemIconOfflineColor"
-        reference="DkGray_50" />
     <color
         name="AvatarListItemIconVoiceInvitedColor"
         reference="AvatarListItemIconOfflineColor" />
@@ -382,7 +379,7 @@
         reference="BrakBay" />
     <color
         name="ColorPaletteEntry17"
-        Reference="LibertyBlue" />
+        reference="LibertyBlue" />
     <color
         name="ColorPaletteEntry18"
         value="0.75 0.75 0.75 1" />
@@ -631,7 +628,7 @@
         reference="Ruby" />
     <color
         name="MapTrackDisabledColor"
-        reference="BrickBrown" />
+        reference="Ruby" />
     <color
         name="MapWhisperRingColor"
         value="1 1 1 0.15" />
@@ -770,11 +767,8 @@
         name="ObjectIMColor"
         value="0.81 0.70 0.38 1" />
     <color
-        name="OutfitGalleryItemSelected"
-        reference="EmphasisColor_65" />
-    <color
         name="OutfitGalleryItemUnselected"
-        value="Obsidian" />
+        reference="Obsidian" />
     <color
         name="OutfitGalleryItemWorn"
         reference="PinkBite" />
@@ -897,10 +891,10 @@
         reference="White" />
     <color
         name="TextBgReadOnlyColor"
-        value="Obsidian_25" />
+        reference="Obsidian_25" />
     <color
         name="TextBgWriteableColor"
-        value="Obsidian_50" />
+        reference="Obsidian_50" />
     <color
         name="TextBgHighlightColor"
         value="0.95 0.90 0 1" />
@@ -1055,7 +1049,7 @@
         value=".2 .5 .2 1" />
     <color
         name="SyntaxLslDeprecated"
-        value="0.9 0.0 0.66, 1" />
+        value="0.9 0.0 0.66 1" />
     <color
         name="SyntaxLslEvent"
         value="0 .43 .71 1" />
@@ -1086,17 +1080,11 @@
         name="AvatarMutedColor"
         reference="Gray" />
     <color
-        name="AvatarListItemOnlineColor"
-        reference="AlchemyText" />
-    <color
         name="ButtonGlowColor"
         reference="White" />
     <color
         name="ButtonHighlightColor"
         reference="White" />
-    <color
-        name="ChatHeaderDisplayNameColor"
-        reference="AlchemyText" />
     <color
         name="ChatHeaderTimestampColor"
         reference="EmphasisColor" />
@@ -1116,14 +1104,8 @@
         name="MapParcelOutlineColor"
         reference="Taffy" />
     <color
-        name="MapTrackColor"
-        reference="Ruby" />
-    <color
         name="MapTrackUnderColor"
         reference="LibertyBlue" />
-    <color
-        name="MapTrackDisabledColor"
-        reference="Ruby" />
     <color
         name="NetMapPhysicalObject"
         reference="Green" />
@@ -1160,7 +1142,7 @@
         reference="Obsidian_66" />
     <color
         name="ScriptDialogFg"
-        value="PinkBite" />
+        reference="PinkBite" />
     <color
         name="AccentColor"
         reference="PinkBite" />

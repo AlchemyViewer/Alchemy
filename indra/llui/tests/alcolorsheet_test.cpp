@@ -489,6 +489,38 @@ namespace tut
         ensure("and left nothing behind", other.declarations().empty() && other.files().empty());
     }
 
+    // The real thing: every colors.xml in the source tree, the default and
+    // then each skin over it, resolves; what each has to say is counted so
+    // a new fault in a shipped file fails here first.
+    template<> template<>
+    void alcolorsheet_object::test<16>()
+    {
+#ifdef LLUI_TEST_APP_DIR
+        const std::string skins = std::string(LLUI_TEST_APP_DIR) + "/skins/";
+        LLXMLNodePtr default_root;
+        if (!LLXMLNode::parseFile(skins + "default/colors.xml", default_root, nullptr))
+        {
+            skip("no source tree: LLUI_TEST_APP_DIR does not point at newview");
+        }
+        for (const char* skin : { "default", "alchemy", "gemini", "heretic", "ionic" })
+        {
+            ALColorSheet sheet;
+            ensure("the default reads", sheet.read(default_root, "default/colors.xml"));
+            if (std::string(skin) != "default")
+            {
+                LLXMLNodePtr root;
+                ensure(std::string(skin) + " parses", LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
+                ensure(std::string(skin) + " reads", sheet.read(root, std::string(skin) + "/colors.xml"));
+            }
+            sheet.resolve();
+            ensure(std::string(skin) + " has EmphasisColor", sheet.find("EmphasisColor") != nullptr);
+            ensure(std::string(skin) + " has nothing to report:\n" + all(sheet), sheet.diagnostics().empty());
+        }
+#else
+        skip("no LLUI_TEST_APP_DIR");
+#endif
+    }
+
     // Reading again after resolving: what the first resolution said about
     // a declaration the new file shadows is not said twice, and the second
     // resolution stands on its own.

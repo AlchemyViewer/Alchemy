@@ -246,7 +246,7 @@
      reference="DkGray" />
     <color
      name="ChicletFlashColor"
-     value="SchemeLightest" />
+     reference="SchemeLightest" />
     <color
      name="GroupOverTierColor"
      value="0.43 0.06 0.06 1" />
@@ -271,7 +271,7 @@
 <!-- Changed Color -->
     <color
      name="NetMapOtherOwnBelowWater"
-     value="DkGray" />
+     reference="DkGray" />
     <color
      name="NetMapYouOwnAboveWater"
      value="0 1 1 1" />
@@ -325,7 +325,7 @@
      reference="Black" />
     <color
      name="ToolTipBorderColor"
-     value="White" />
+     reference="White" />
 
   <!-- UI Definitions -->
   	<color
@@ -1152,7 +1152,7 @@
       value=".2 .5 .2 1" />
   <color
     name="SyntaxLslDeprecated"
-    value="0.9 0.0 0.66, 1" />
+    value="0.9 0.0 0.66 1" />
   <color
    name="SyntaxLslEvent"
    value="0 .43 .71 1" />
