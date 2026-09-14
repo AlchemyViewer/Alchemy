@@ -31,6 +31,7 @@
 #include "llmath.h"
 #include "llcoordframe.h"
 #include "llplane.h"
+#include "alplaneset.h"
 #include "llvector4a.h"
 
 constexpr F32 DEFAULT_FIELD_OF_VIEW = 60.f * DEG_TO_RAD;
@@ -123,6 +124,11 @@ private:
     LLPlane mRegionPlanes[AGENT_PLANE_USER_CLIP_NUM];  //frustum planes in a local region space, derived from mAgentPlanes
     LLPlane mLastAgentPlanes[AGENT_PLANE_USER_CLIP_NUM];
     U8 mPlaneMask[PLANE_MASK_NUM];         // 8 for alignment
+
+    // The planes in use, one per lane, for the box tests; rebuilt whenever
+    // a plane, its mask or the count changes.
+    ALPlaneSet mAgentPlaneSet;
+    ALPlaneSet mRegionPlaneSet;
 
     F32 mView;                  // angle between top and bottom frustum planes in radians.
     F32 mAspect;                // width/height
@@ -217,6 +223,7 @@ protected:
     void calculateFrustumPlanes();
     void calculateFrustumPlanes(F32 left, F32 right, F32 top, F32 bottom);
     void calculateFrustumPlanesFromWindow(F32 x1, F32 y1, F32 x2, F32 y2);
+    void rebuildPlaneSets();
 };
 
 

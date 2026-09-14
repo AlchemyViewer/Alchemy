@@ -5,6 +5,7 @@ add_library(llmath STATIC)
 target_sources(
   llmath
   PRIVATE
+    alplaneset.cpp
     alsimdkernels.cpp
     llbbox.cpp
     llbboxlocal.cpp
@@ -45,6 +46,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alplaneset.h
         alsimdkernels.h
         alsimdkernels.inl
         llbbox.h
@@ -121,6 +123,7 @@ if(AL_BUILD_TESTS)
   foreach(
     test
     alignment
+    alplaneset
     llsdutil_math
     mathmisc
     m3math

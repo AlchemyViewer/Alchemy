@@ -46,6 +46,7 @@ LLCamera::LLCamera() :
     {
         mPlaneMask[i] = PLANE_MASK_NONE;
     }
+    rebuildPlaneSets();
 
     calculateFrustumPlanes();
 }
@@ -61,6 +62,7 @@ LLCamera::LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_p
     {
         mPlaneMask[i] = PLANE_MASK_NONE;
     }
+    rebuildPlaneSets();
 
     mAspect = llclamp(aspect_ratio, MIN_ASPECT_RATIO, MAX_ASPECT_RATIO);
     mNearPlane = llclamp(near_plane, MIN_NEAR_PLANE, MAX_NEAR_PLANE);
@@ -105,11 +107,13 @@ void LLCamera::setUserClipPlane(LLPlane& plane)
     mPlaneCount = AGENT_PLANE_USER_CLIP_NUM;
     mAgentPlanes[AGENT_PLANE_USER_CLIP] = plane;
     mPlaneMask[AGENT_PLANE_USER_CLIP] = plane.calcPlaneMask();
+    rebuildPlaneSets();
 }
 
 void LLCamera::disableUserClipPlane()
 {
     mPlaneCount = AGENT_PLANE_NO_USER_CLIP_NUM;
+    rebuildPlaneSets();
 }
 
 void LLCamera::setView(F32 vertical_fov_rads)
@@ -209,7 +213,7 @@ S32 LLCamera::AABBInFrustum(const LLVector4a &center, const LLVector4a& radius, 
     if(!planes)
     {
         //use agent space
-        planes = mAgentPlanes;
+        return mAgentPlaneSet.aabbTest(center, radius);
     }
 
     U8 mask = 0;
@@ -247,7 +251,7 @@ S32 LLCamera::AABBInFrustum(const LLVector4a &center, const LLVector4a& radius, 
 //except uses mRegionPlanes instead of mAgentPlanes.
 S32 LLCamera::AABBInRegionFrustum(const LLVector4a& center, const LLVector4a& radius)
 {
-    return AABBInFrustum(center, radius, mRegionPlanes);
+    return mRegionPlaneSet.aabbTest(center, radius);
 }
 
 S32 LLCamera::AABBInFrustumNoFarClip(const LLVector4a& center, const LLVector4a& radius, const LLPlane* planes)
@@ -255,7 +259,7 @@ S32 LLCamera::AABBInFrustumNoFarClip(const LLVector4a& center, const LLVector4a&
     if(!planes)
     {
         //use agent space
-        planes = mAgentPlanes;
+        return mAgentPlaneSet.aabbTest(center, radius, AGENT_PLANE_FAR);
     }
 
     U8 mask = 0;
@@ -293,7 +297,7 @@ S32 LLCamera::AABBInFrustumNoFarClip(const LLVector4a& center, const LLVector4a&
 //except uses mRegionPlanes instead of mAgentPlanes.
 S32 LLCamera::AABBInRegionFrustumNoFarClip(const LLVector4a& center, const LLVector4a& radius)
 {
-    return AABBInFrustumNoFarClip(center, radius, mRegionPlanes);
+    return mRegionPlaneSet.aabbTest(center, radius, AGENT_PLANE_FAR);
 }
 
 int LLCamera::sphereInFrustumQuick(const LLVector3 &sphere_center, const F32 radius)
@@ -422,6 +426,7 @@ void LLCamera::ignoreAgentFrustumPlane(S32 idx)
 
     mPlaneMask[idx] = PLANE_MASK_NONE;
     mAgentPlanes[idx].clear();
+    rebuildPlaneSets();
 }
 
 void LLCamera::calcAgentFrustumPlanes(LLVector3* frust)
@@ -460,6 +465,24 @@ void LLCamera::calcAgentFrustumPlanes(LLVector3* frust)
     for (U32 i = 0; i < mPlaneCount; i++)
     {
         mPlaneMask[i] = mAgentPlanes[i].calcPlaneMask();
+    }
+    rebuildPlaneSets();
+}
+
+// A plane takes part in the box tests when it is within the count and its
+// mask names an octant; the region set shares the masks with the agent set.
+void LLCamera::rebuildPlaneSets()
+{
+    mAgentPlaneSet.clear();
+    mRegionPlaneSet.clear();
+    const U32 planes = llmin(mPlaneCount, (U32) AGENT_PLANE_USER_CLIP_NUM);
+    for (U32 i = 0; i < planes; i++)
+    {
+        if (mPlaneMask[i] < PLANE_MASK_NUM)
+        {
+            mAgentPlaneSet.set(i, mAgentPlanes[i], mPlaneMask[i]);
+            mRegionPlaneSet.set(i, mRegionPlanes[i], mPlaneMask[i]);
+        }
     }
 }
 
@@ -502,6 +525,7 @@ void LLCamera::calcRegionFrustumPlanes(const LLVector3& shift, F32 far_clip_dist
             mRegionPlanes[i].setVec(n, d);
         }
     }
+    rebuildPlaneSets();
 }
 
 void LLCamera::calculateFrustumPlanes(F32 left, F32 right, F32 top, F32 bottom)
