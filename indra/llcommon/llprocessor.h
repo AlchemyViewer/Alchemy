@@ -49,6 +49,12 @@ public:
     bool hasAVX() const;
     bool hasAVX2() const;
     bool hasAVX512F() const;
+    // aarch64: the advanced SIMD every ARMv8-A machine has, and the dot
+    // product, half-precision and scalable-vector extensions some carry.
+    bool hasNEON() const;
+    bool hasNEONDotProd() const;
+    bool hasNEONFP16() const;
+    bool hasSVE() const;
     bool hasAltivec() const;
     std::string getCPUFamilyName() const;
     std::string getCPUBrandName() const;

@@ -104,12 +104,9 @@ al_import(ll::tut          INCLUDE ${INDRA_SOURCE_DIR}/externals/tut/)
 
 # Per platform, and per option. The target is empty where the condition is
 # false, so the option gates sources at the consumer and nothing else.
-if(DARWIN OR BUILD_TARGET_IS_ARM64)
-  set(al_wants_sse2neon ON)
-else()
-  set(al_wants_sse2neon OFF)
-endif()
-al_import(ll::sse2neon     HEADER sse2neon/sse2neon.h                                    WHEN al_wants_sse2neon)
+# sse2neon carries the vector types still written in x86 intrinsics through
+# to arm64 until each is rewritten on alsimd.h.
+al_import(ll::sse2neon     HEADER sse2neon/sse2neon.h                                    WHEN BUILD_TARGET_IS_ARM64)
 al_import(ll::nvapi        PACKAGE unofficial-nvapi    CONFIG TARGETS unofficial::nvapi::nvapi       WHEN WINDOWS)
 al_import(ll::fontconfig   PACKAGE Fontconfig                 TARGETS Fontconfig::Fontconfig        WHEN LINUX)
 al_import(ll::faudio       PACKAGE FAudio              CONFIG TARGETS FAudio::FAudio DEFINES LL_FAUDIO=1     WHEN AL_USE_FAUDIO)

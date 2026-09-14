@@ -152,6 +152,8 @@ jobs:
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
         exclude:
+          # The x86-64 Linux runner cannot build arm64; the arm64 rows below
+          # bring their own runner.
           - runner: ubuntu-26.04
             arch: arm64
           - runner: windows-2025-vs2026
@@ -164,6 +166,17 @@ jobs:
             configuration: relwithdebinfo
           - runner: macos-26
             configuration: optdebug
+        include:
+          # Linux on arm64: NEON is a first-class target, and this is the
+          # one row where GCC compiles the SIMD layer for it.
+          - runner: ubuntu-24.04-arm
+            configuration: release
+            arch: arm64
+            build_variant: Viewer
+          - runner: ubuntu-24.04-arm
+            configuration: release
+            arch: arm64
+            build_variant: Tests
 
     runs-on: ${{ matrix.runner }}
     outputs:
@@ -360,7 +373,12 @@ jobs:
             Linux)
               cmake_preset_name="ninja$cmake_preset_postfix"
               build_directory="build-Linux-$cmake_preset_name"
-              vcpkg_triplet="x64-linux-alchemy-avx2-release"
+              if [[ "$BUILD_ARCH" == "arm64" ]]
+              then
+                vcpkg_triplet="arm64-linux-alchemy-release"
+              else
+                vcpkg_triplet="x64-linux-alchemy-avx2-release"
+              fi
               ;;
           esac
 
@@ -754,6 +772,10 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: "Linux-x64-app"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: "Linux-arm64-app"
 
       # forked from softprops/action-gh-release
       - name: Create GitHub release

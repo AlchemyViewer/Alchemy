@@ -4140,6 +4140,8 @@ void LLAppViewer::writeSystemInfo()
     gDebugInfo["CPUInfo"]["CPUAVX"] = gSysCPU.hasAVX();
     gDebugInfo["CPUInfo"]["CPUAVX2"] = gSysCPU.hasAVX2();
     gDebugInfo["CPUInfo"]["CPUAVX512F"] = gSysCPU.hasAVX512F();
+    gDebugInfo["CPUInfo"]["CPUNEON"] = gSysCPU.hasNEON();
+    gDebugInfo["CPUInfo"]["CPUSVE"] = gSysCPU.hasSVE();
 
 
     gDebugInfo["RAMInfo"]["Physical"] = LLSD::Integer(gSysMemory.getPhysicalMemoryKB().value());

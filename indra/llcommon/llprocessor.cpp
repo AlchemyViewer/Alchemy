@@ -126,6 +126,10 @@ namespace
         eAVX_Features = 41,
         eAVX2_Features = 42,
         eAVX512F_Features = 43,
+        eNEON_Features = 44,
+        eNEON_DotProd_Features = 45,
+        eNEON_FP16_Features = 46,
+        eSVE_Features = 47,
     };
 
     const char* cpu_feature_names[] =
@@ -176,6 +180,10 @@ namespace
         "AVX Instructions",   // 41
         "AVX2 Instructions",  // 42
         "AVX-512F Instructions", // 43
+        "NEON Instructions", // 44
+        "NEON Dot Product", // 45
+        "NEON FP16", // 46
+        "SVE Instructions", // 47
     };
 
     std::string intel_CPUFamilyName(int composed_family)
@@ -302,6 +310,26 @@ public:
     bool hasAVX512F() const
     {
         return hasExtension(cpu_feature_names[eAVX512F_Features]);
+    }
+
+    bool hasNEON() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_Features]);
+    }
+
+    bool hasNEONDotProd() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_DotProd_Features]);
+    }
+
+    bool hasNEONFP16() const
+    {
+        return hasExtension(cpu_feature_names[eNEON_FP16_Features]);
+    }
+
+    bool hasSVE() const
+    {
+        return hasExtension(cpu_feature_names[eSVE_Features]);
     }
 
     bool hasAltivec() const
@@ -749,13 +777,39 @@ private:
         cpu_brand_string[0x3f] = 0;
         setInfo(eBrandName, cpu_brand_string);
 
+#if LL_ARM64
+        // Apple silicon: the brand string is the part's name, and the
+        // instruction set is reported as hw.optional keys, each one when
+        // present and nonzero. AdvSIMD is every ARMv8-A machine's; the rest
+        // are the extensions the ops layer may one day take a path for.
+        setInfo(eVendor, "Apple");
+        setInfo(eFamilyName, cpu_brand_string[0] != '\0' ? cpu_brand_string : "Apple silicon");
+        setInfo(eType, 0);
+        setConfig(eCacheLineSize, (S32)getSysctlInt64("hw.cachelinesize"));
+        setConfig(eCacheSizeK, (S32)(getSysctlInt64("hw.l2cachesize") / 1024));
+        if (getSysctlInt("hw.optional.AdvSIMD"))
+        {
+            setExtension(cpu_feature_names[eNEON_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_DotProd"))
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_FP16"))
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (getSysctlInt("hw.optional.arm.FEAT_SVE"))
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+#else
         char cpu_vendor[0x20];
         len = sizeof(cpu_vendor);
         memset(cpu_vendor, 0, len);
         sysctlbyname("machdep.cpu.vendor", (void*)cpu_vendor, &len, NULL, 0);
         cpu_vendor[0x1f] = 0;
-        // M series CPUs don't provide this field so if empty, just fall back to Apple.
-        setInfo(eVendor, (cpu_vendor[0] != '\0') ? cpu_vendor : "Apple");
+        setInfo(eVendor, cpu_vendor);
 
         setInfo(eStepping, getSysctlInt("machdep.cpu.stepping"));
         setInfo(eModel, getSysctlInt("machdep.cpu.model"));
@@ -850,6 +904,7 @@ private:
         {
             setExtension(cpu_feature_names[eAVX512F_Features]);
         }
+#endif // LL_ARM64
     }
 };
 
@@ -1032,6 +1087,55 @@ private:
             setExtension(cpu_feature_names[eAVX512F_Features]);
         }
 
+# elif LL_ARM64
+
+        const F64 mhzFromSys = getCPUMaxMHZ();
+        if (mhzFromSys > 1.0)
+        {
+            setInfo(eFrequency, mhzFromSys);
+        }
+
+        // An arm64 cpuinfo names the part by implementer and part number,
+        // and a few kernels add a model name; the features line lists the
+        // instruction set the way an x86 flags line does.
+        if (!cpuinfo["model name"].empty())
+        {
+            setInfo(eBrandName, cpuinfo["model name"]);
+        }
+        else
+        {
+            setInfo(eBrandName, "implementer " + cpuinfo["cpu implementer"] + " part " + cpuinfo["cpu part"]);
+        }
+        const std::string& implementer = cpuinfo["cpu implementer"];
+        const char* vendor = implementer == "0x41" ? "Arm"
+                           : implementer == "0x51" ? "Qualcomm"
+                           : implementer == "0x61" ? "Apple"
+                           : implementer == "0x4e" ? "NVIDIA"
+                           : implementer == "0xc0" ? "Ampere"
+                           : implementer == "0x48" ? "HiSilicon"
+                           : "ARM64";
+        setInfo(eVendor, vendor);
+        setInfo(eFamilyName, std::string(vendor) + " ARMv" + cpuinfo["cpu architecture"]);
+
+        std::string features = " " + cpuinfo["features"] + " ";
+        LLStringUtil::toLower(features);
+        if (features.find(" asimd ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_Features]);
+        }
+        if (features.find(" asimddp ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_DotProd_Features]);
+        }
+        if (features.find(" asimdhp ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eNEON_FP16_Features]);
+        }
+        if (features.find(" sve ") != std::string::npos)
+        {
+            setExtension(cpu_feature_names[eSVE_Features]);
+        }
+
 # endif // LL_X86
     }
 
@@ -1099,6 +1203,10 @@ bool LLProcessorInfo::hasSSE4a() const { return mImpl->hasSSE4a(); }
 bool LLProcessorInfo::hasAVX() const { return mImpl->hasAVX(); }
 bool LLProcessorInfo::hasAVX2() const { return mImpl->hasAVX2(); }
 bool LLProcessorInfo::hasAVX512F() const { return mImpl->hasAVX512F(); }
+bool LLProcessorInfo::hasNEON() const { return mImpl->hasNEON(); }
+bool LLProcessorInfo::hasNEONDotProd() const { return mImpl->hasNEONDotProd(); }
+bool LLProcessorInfo::hasNEONFP16() const { return mImpl->hasNEONFP16(); }
+bool LLProcessorInfo::hasSVE() const { return mImpl->hasSVE(); }
 bool LLProcessorInfo::hasAltivec() const { return mImpl->hasAltivec(); }
 std::string LLProcessorInfo::getCPUFamilyName() const { return mImpl->getCPUFamilyName(); }
 std::string LLProcessorInfo::getCPUBrandName() const { return mImpl->getCPUBrandName(); }

@@ -142,7 +142,7 @@
     "simdutf",
     {
       "name": "sse2neon",
-      "platform": "osx"
+      "platform": "arm64"
     },
     "tinyexr",
     "tinygltf",

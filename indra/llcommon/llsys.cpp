@@ -580,6 +580,10 @@ LLCPUInfo::LLCPUInfo()
     mHasAVX = proc.hasAVX();
     mHasAVX2 = proc.hasAVX2();
     mHasAVX512F = proc.hasAVX512F();
+    mHasNEON = proc.hasNEON();
+    mHasNEONDotProd = proc.hasNEONDotProd();
+    mHasNEONFP16 = proc.hasNEONFP16();
+    mHasSVE = proc.hasSVE();
     mHasAltivec = proc.hasAltivec();
     mCPUMHz = (F64)proc.getCPUFrequency();
     mFamily = proc.getCPUFamilyName();
@@ -632,6 +636,22 @@ LLCPUInfo::LLCPUInfo()
     if (mHasAVX512F)
     {
         mSIMDVersions.append("AVX-512F");
+    }
+    if (mHasNEON)
+    {
+        mSIMDVersions.append("NEON");
+    }
+    if (mHasNEONDotProd)
+    {
+        mSIMDVersions.append("NEON DotProd");
+    }
+    if (mHasNEONFP16)
+    {
+        mSIMDVersions.append("NEON FP16");
+    }
+    if (mHasSVE)
+    {
+        mSIMDVersions.append("SVE");
     }
 }
 
@@ -688,6 +708,26 @@ bool LLCPUInfo::hasAVX2() const
 bool LLCPUInfo::hasAVX512F() const
 {
     return mHasAVX512F;
+}
+
+bool LLCPUInfo::hasNEON() const
+{
+    return mHasNEON;
+}
+
+bool LLCPUInfo::hasNEONDotProd() const
+{
+    return mHasNEONDotProd;
+}
+
+bool LLCPUInfo::hasNEONFP16() const
+{
+    return mHasNEONFP16;
+}
+
+bool LLCPUInfo::hasSVE() const
+{
+    return mHasSVE;
 }
 
 F64 LLCPUInfo::getMHz() const
