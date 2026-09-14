@@ -11627,7 +11627,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 // updateFrustumPlanes, which unprojects with the same convention).
                 glm::mat4 uproj = al_ortho(mn.mV[0], mx.mV[0], mn.mV[1], mx.mV[1], -mx.mV[2] - zpad, -mn.mV[2] + zpad);
 
-                ucam.setOriginAndLookAt(ueye, up, ucenter);
+                ucam.lookAt(ueye, ucenter, up);
                 ucam.setOrigin(0, 0, 0);
 
                 LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_SUN_SHADOW0;
@@ -11989,7 +11989,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             }
 
             //shadow_cam.setFar(128.f);
-            shadow_cam.setOriginAndLookAt(eye, up, center);
+            shadow_cam.lookAt(eye, center, up);
 
             shadow_cam.setOrigin(0,0,0);
 

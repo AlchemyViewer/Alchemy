@@ -279,10 +279,10 @@ bool LLVisualParamHint::render()
     gGL.flush();
 
     LLViewerCamera::getInstance()->setAspect((F32)mFullWidth / (F32)mFullHeight);
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         camera_pos,         // camera
-        LLVector3::z_axis,  // up
-        target_pos );       // point of interest
+        target_pos,         // point of interest
+        LLVector3::z_axis); // up
 
     LLViewerCamera::getInstance()->setPerspective(false, mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight, false);
 

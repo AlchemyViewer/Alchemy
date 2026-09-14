@@ -815,10 +815,10 @@ bool LLImagePreviewAvatar::render()
         LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
     LLQuaternion av_rot = avatarp->mPelvisp->getWorldRotation() * camera_rot;
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),     // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos + (mCameraOffset  * av_rot) );                                           // point of interest
+        target_pos + (mCameraOffset  * av_rot),                                             // point of interest
+        LLVector3::z_axis);                                                                 // up
 
     stop_glerror();
 
@@ -1018,10 +1018,10 @@ bool LLImagePreviewSculpted::render()
         LLQuaternion(mCameraYaw, LLVector3::z_axis);
 
     LLQuaternion av_rot = camera_rot;
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         target_pos + ((LLVector3(mCameraDistance, 0.f, 0.f) + mCameraOffset) * av_rot),     // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos + (mCameraOffset  * av_rot) );                                           // point of interest
+        target_pos + (mCameraOffset  * av_rot),                                             // point of interest
+        LLVector3::z_axis);                                                                 // up
 
     stop_glerror();
 

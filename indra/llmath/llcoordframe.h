@@ -154,12 +154,6 @@ public:
     void lookAt(const LLVector3 &origin, const LLVector3 &point_of_interest, const LLVector3 &up);
     void lookAt(const LLVector3 &origin, const LLVector3 &point_of_interest); // up = 0,0,1
 
-    // deprecated
-    void setOriginAndLookAt(const LLVector3 &origin, const LLVector3 &up, const LLVector3 &point_of_interest)
-    {
-        lookAt(origin, point_of_interest, up);
-    }
-
     friend std::ostream& operator<<(std::ostream &s, const LLCoordFrame &C);
 
     // These vectors are in absolute frame

@@ -3499,10 +3499,10 @@ bool LLModelPreview::render()
 
     LLQuaternion av_rot = camera_rot;
     F32 camera_distance = show_skin_weight ? SKIN_WEIGHT_CAMERA_DISTANCE : mCameraDistance;
-    LLViewerCamera::getInstance()->setOriginAndLookAt(
+    LLViewerCamera::getInstance()->lookAt(
         target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-        LLVector3::z_axis,                                                                  // up
-        target_pos);                                            // point of interest
+        target_pos,                                                                         // point of interest
+        LLVector3::z_axis);                                                                 // up
 
 
     z_near = llclamp(z_far * 0.001f, 0.001f, 0.1f);
@@ -3838,10 +3838,10 @@ bool LLModelPreview::render()
             getPreviewAvatar()->addPelvisFixup(mPelvisZOffset, fake_mesh_id);
             bool pelvis_recalc = false;
 
-            LLViewerCamera::getInstance()->setOriginAndLookAt(
+            LLViewerCamera::getInstance()->lookAt(
                 target_pos + ((LLVector3(camera_distance, 0.f, 0.f) + offset) * av_rot),        // camera
-                LLVector3::z_axis,                                                                  // up
-                target_pos);                                            // point of interest
+                target_pos,                                                                         // point of interest
+                LLVector3::z_axis);                                                                 // up
 
             for (LLModelLoader::scene::iterator iter = mScene[mPreviewLOD].begin(); iter != mScene[mPreviewLOD].end(); ++iter)
             {

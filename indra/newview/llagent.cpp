@@ -1445,7 +1445,7 @@ void LLAgent::resetAxes()
     mFrameAgent.resetAxes();
 }
 
-// Copied from LLCamera::setOriginAndLookAt
+// Copied from LLCoordFrame::lookAt
 // Look_at must be unit vector
 //-----------------------------------------------------------------------------
 // resetAxes()
