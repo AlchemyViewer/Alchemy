@@ -158,10 +158,12 @@ namespace alsimd
 using f32x4 = __m128;
 using mask4 = __m128;
 using i32x4 = __m128i;
+using u16x8 = __m128i;
 #else
 using f32x4 = float32x4_t;
 using mask4 = uint32x4_t;
 using i32x4 = int32x4_t;
+using u16x8 = uint16x8_t;
 #endif
 
 // A mask is all ones or all zeros per lane, as a comparison leaves it. On
@@ -306,6 +308,16 @@ AL_SIMD_INLINE f32x4 set1(float x)
     return _mm_set1_ps(x);
 #else
     return vdupq_n_f32(x);
+#endif
+}
+
+// The same 32 bits in every lane, whatever they encode.
+AL_SIMD_INLINE f32x4 set1_bits(uint32_t bits)
+{
+#if AL_SIMD_X86
+    return _mm_castsi128_ps(_mm_set1_epi32(static_cast<int>(bits)));
+#else
+    return vreinterpretq_f32_u32(vdupq_n_u32(bits));
 #endif
 }
 
@@ -1044,6 +1056,49 @@ AL_SIMD_INLINE f32x4 cross3(f32x4 a, f32x4 b)
     const f32x4 a_zxy = shuffle<2, 0, 1, 3>(a);
     const f32x4 b_yzx = shuffle<1, 2, 0, 3>(b);
     return fnmadd(a_zxy, b_yzx, mul(a_yzx, b_zxy));
+}
+
+////////////////////////////////////
+// Eight unsigned 16-bit lanes
+////////////////////////////////////
+
+AL_SIMD_INLINE u16x8 loadu_u16(const uint16_t* p)
+{
+#if AL_SIMD_X86
+    return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
+#else
+    return vld1q_u16(p);
+#endif
+}
+
+AL_SIMD_INLINE void storeu_u16(uint16_t* p, u16x8 v)
+{
+#if AL_SIMD_X86
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(p), v);
+#else
+    vst1q_u16(p, v);
+#endif
+}
+
+AL_SIMD_INLINE u16x8 set1_u16(uint16_t x)
+{
+#if AL_SIMD_X86
+    return _mm_set1_epi16(static_cast<short>(x));
+#else
+    return vdupq_n_u16(x);
+#endif
+}
+
+// Lane-wise, wrapping.
+AL_SIMD_INLINE u16x8 add_u16(u16x8 a, u16x8 b)
+{
+#if AL_SIMD_X86
+    return _mm_add_epi16(a, b);
+#elif AL_SIMD_VEXT
+    return a + b;
+#else
+    return vaddq_u16(a, b);
+#endif
 }
 
 ////////////////////////////////////
