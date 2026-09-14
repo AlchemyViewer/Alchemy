@@ -5,6 +5,7 @@ add_library(llmath STATIC)
 target_sources(
   llmath
   PRIVATE
+    alsimdkernels.cpp
     llbbox.cpp
     llbboxlocal.cpp
     llcalc.cpp
@@ -44,6 +45,8 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alsimdkernels.h
+        alsimdkernels.inl
         llbbox.h
         llbboxlocal.h
         llcalc.h
@@ -134,6 +137,15 @@ if(AL_BUILD_TESTS)
   al_add_test(v3math PROJECT llmath SOURCES v3math.cpp LIBRARIES llmath llcommon)
   al_add_test(v4math PROJECT llmath SOURCES v4math.cpp LIBRARIES llmath llcommon)
   al_add_test(xform PROJECT llmath SOURCES xform.cpp LIBRARIES llmath llcommon)
+
+  # The batch kernels at every width, at the tree's tier and, where the
+  # tiers differ, at each of them; a variant the host cannot run skips.
+  al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon)
+  if(BUILD_TARGET_IS_X86_64 AND NOT DARWIN)
+    foreach(tier baseline v2 v3 v4)
+      al_add_test(alsimdkernels PROJECT llmath LIBRARIES llmath llcommon ISA_TIER ${tier})
+    endforeach()
+  endif()
 
   # Nanoseconds per element for the SIMD math the geometry rebuild spends
   # its time in, and for the choices the SIMD series makes by a number.

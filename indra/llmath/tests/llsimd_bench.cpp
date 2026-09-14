@@ -43,6 +43,7 @@
 #include "llmemory.h"
 #include "llprocessor.h"
 #include "alsimd.h"
+#include "alsimdkernels.inl"
 
 #include <algorithm>
 #include <bit>
@@ -92,15 +93,19 @@ namespace
     struct Vectors
     {
         std::vector<LLVector4a> a, b, c, out;
-        explicit Vectors(size_t n) : a(n), b(n), c(n), out(n)
+        // four joint.weight values per vector, joints 0 to 7
+        std::vector<LLVector4a> weights;
+        explicit Vectors(size_t n) : a(n), b(n), c(n), out(n), weights(n)
         {
             std::mt19937 rng(0x5eed);
             std::uniform_real_distribution<F32> dist(-8.f, 8.f);
+            std::uniform_real_distribution<F32> joint(0.1f, 7.9f);
             for (size_t i = 0; i < n; ++i)
             {
                 a[i].set(dist(rng), dist(rng), dist(rng), 1.f);
                 b[i].set(dist(rng), dist(rng), dist(rng), 1.f);
                 c[i].set(dist(rng), dist(rng), dist(rng), 0.f);
+                weights[i].set(joint(rng), joint(rng), joint(rng), joint(rng));
             }
         }
         U32 checksum() const
@@ -367,6 +372,79 @@ static void bench_transform()
     });
 }
 
+// The batch kernels, at each width the build has, so that a wider register
+// is chosen by a number. The per-vertex kernels run over the vector arrays;
+// the index and dequantize kernels over their own byte arrays of the same
+// element counts.
+template <class W>
+static void bench_kernels_at(const char* width)
+{
+    using namespace alsimd::kernels;
+    LLMatrix4a mat;
+    mat.initAll(LLVector3(1.f, 2.f, 0.5f), LLQuaternion(0.7f, LLVector3(0.f, 0.f, 1.f)), LLVector3(1.f, 2.f, 3.f));
+    std::string name;
+
+    name = std::string("transform_points ") + width;
+    row(name.c_str(), [mat](Vectors& v)
+    {
+        transform_impl<W, true, W_LANE::SET>(mat, v.a.data(), v.out.data(), v.a.size(), 0.f);
+    });
+    name = std::string("transform_directions ") + width;
+    row(name.c_str(), [mat](Vectors& v)
+    {
+        transform_impl<W, false, W_LANE::FROM_ROWS>(mat, v.a.data(), v.out.data(), v.a.size(), 0.f);
+    });
+    name = std::string("transform_texcoords ") + width;
+    row(name.c_str(), [](Vectors& v)
+    {
+        const LLVector4a trans(-0.5f), rot0(0.8f, -0.6f, 0.8f, -0.6f), rot1(0.6f, 0.8f, 0.6f, 0.8f), scale(2.f, 2.f, 2.f, 2.f), offset(0.5f);
+        transform_texcoords_impl<W>((const F32*) v.a.data(), (F32*) v.out.data(), v.a.size(), trans, rot0, rot1, scale, offset);
+    });
+    name = std::string("extents ") + width;
+    row(name.c_str(), [](Vectors& v)
+    {
+        extents_impl<W>(v.a.data(), v.a.size(), v.out[0], v.out[1]);
+    });
+    name = std::string("offset_indices_u16 x8 ") + width;
+    row(name.c_str(), [](Vectors& v)
+    {
+        // eight indices per vector of the arrays, so the count is per vector
+        const U16* src = (const U16*) v.a.data();
+        U16* dst = (U16*) v.out.data();
+        offset_indices_u16_impl<W>(src, dst, v.a.size() * 8, 3);
+    });
+    name = std::string("dequantize_u16x3 ") + width;
+    row(name.c_str(), [](Vectors& v)
+    {
+        // six bytes per vertex read from the source array, one vector written
+        const size_t n = v.a.size() * 16 / 6 < v.out.size() ? v.a.size() * 16 / 6 : v.out.size();
+        dequantize_u16x3_impl<W>((const U8*) v.a.data(), n, LLVector4a(1.f / 65535.f), LLVector4a(-1.f), v.out.data());
+    });
+}
+
+static void bench_kernels()
+{
+    print_header("batch kernels");
+    bench_kernels_at<alsimd::ALSimd4>("128");
+#if AL_SIMD_AVX
+    bench_kernels_at<alsimd::ALSimd8>("256");
+#endif
+#if AL_SIMD_AVX512
+    bench_kernels_at<alsimd::ALSimd16>("512");
+#endif
+
+    // the skinning blend, one vertex's matrix from four of a palette
+    LLMatrix4a palette[8];
+    for (int j = 0; j < 8; ++j)
+    {
+        palette[j].initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(0.3f * j, LLVector3(0.f, 0.f, 1.f)), LLVector3(F32(j), 0.f, 0.f));
+    }
+    row("skin_points", [&palette](Vectors& v)
+    {
+        alsimd::skin_points(v.weights.data(), palette, 8, palette[0], v.a.data(), v.out.data(), v.a.size());
+    });
+}
+
 int main(int, char**)
 {
 #if !defined(LL_RELEASE)
@@ -382,6 +460,7 @@ int main(int, char**)
     bench_fma();
     bench_elementwise();
     bench_transform();
+    bench_kernels();
     std::printf("\n(checksum %u)\n", (unsigned)g_sink);
     return 0;
 #endif
