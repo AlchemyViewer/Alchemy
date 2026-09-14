@@ -417,26 +417,10 @@ private:
     LLCoordWindow mDeferredCursorWarp;
     bool mHasDeferredCursorWarp = false;
 
-    // Shared GL contexts for worker threads (texture upload, VBO streaming).
-    //
-    // Worker threads ask for a shared GL context via createSharedContext() (on
-    // the main thread), bind it via makeContextCurrent() and release it with
-    // destroySharedContext() (both on the worker thread) so they can stream GL
-    // objects without interrupting the main render thread.
-    //
-    // Rather than SDL3's "one hidden carrier SDL_Window per context" pattern
-    // (which forces a main-thread-only deferred-window-destruction dance), we
-    // create the contexts with the platform-native GL API behind SDL:
-    //   * Windows  — WGL sibling context on the main window's HDC
-    //   * macOS    — CGL context sharing the current CGLContextObj (drawable-less)
-    //   * Linux    — EGL context made current surfaceless (EGL_NO_SURFACE), on
-    //                Wayland and X11 alike: set_sdl_hints() has SDL create the
-    //                main context with EGL (SDL_HINT_VIDEO_FORCE_EGL), so there
-    //                is no GLX path and no X11 header in the viewer.
-    // Each returns an opaque heap handle (LLSDLSharedContext, defined in the
-    // .cpp). mSharedContexts tracks the live handles ONLY so destroyContext can
-    // warn about and reclaim any a worker failed to release; it is touched only
-    // under mSharedCtxMutex.
+    // Shared GL contexts for worker threads, made and bound by the
+    // sdl_*_shared_context functions in llsdl.h. mSharedContexts tracks the
+    // live handles ONLY so destroyContext can warn about and reclaim any a
+    // worker failed to release; it is touched only under mSharedCtxMutex.
     LLMutex mSharedCtxMutex;
     std::set<void*> mSharedContexts;
 
