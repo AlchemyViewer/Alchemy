@@ -221,6 +221,7 @@ LLGLSLShader            gDeferredPostProgram;
 LLGLSLShader            gDeferredPostProgramNoNear;
 LLGLSLShader            gDeferredCoFProgram;
 LLGLSLShader            gDeferredDoFCombineProgram;
+LLGLSLShader            gDeferredDoFCombineProgramNoNear;
 LLGLSLShader            gExposureProgram;
 LLGLSLShader            gExposureProgramNoFade;
 LLGLSLShader            gLuminanceProgram;
@@ -1269,6 +1270,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPostProgram.unload();
         gDeferredCoFProgram.unload();
         gDeferredDoFCombineProgram.unload();
+        gDeferredDoFCombineProgramNoNear.unload();
         gExposureProgram.unload();
         gExposureProgramNoFade.unload();
         gLuminanceProgram.unload();
@@ -2995,7 +2997,23 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
         gDeferredDoFCombineProgram.mShaderFiles.push_back(make_pair("deferred/dofCombineF.glsl", GL_FRAGMENT_SHADER));
         gDeferredDoFCombineProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredDoFCombineProgram.clearPermutations();
+        gDeferredDoFCombineProgram.addPermutation("FRONT_BLUR", "1");
         success = gDeferredDoFCombineProgram.createShader();
+        llassert(success);
+    }
+    
+    if (success)
+    {
+        gDeferredDoFCombineProgramNoNear.mName = "Deferred DoFCombine Shader No Near Blur";
+        gDeferredDoFCombineProgramNoNear.mFeatures.isDeferred = true;
+        gDeferredDoFCombineProgramNoNear.mShaderFiles.clear();
+        gDeferredDoFCombineProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gDeferredDoFCombineProgramNoNear.mShaderFiles.push_back(make_pair("deferred/dofCombineF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredDoFCombineProgramNoNear.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredDoFCombineProgramNoNear.clearPermutations();
+        gDeferredDoFCombineProgramNoNear.addPermutation("FRONT_BLUR", "0");
+        success = gDeferredDoFCombineProgramNoNear.createShader();
         llassert(success);
     }
 

@@ -652,28 +652,34 @@
     <button
      follows="right|top"
      height="22"
+     image_overlay="SidebarLeft_Off"
+     image_overlay_alignment="left"
      is_toggle="true"
      label="Navigator"
      layout="topleft"
      name="fold_navigator"
-     right="-144"
+     right="-182"
      tool_tip="The pane of files, the outline, search and the library, down the left (Control+0)"
      top="41"
-     width="72" />
+     width="91" />
     <button
      follows="right|top"
      height="22"
+     image_overlay="SidebarBottom_Off"
+     image_overlay_alignment="left"
      is_toggle="true"
      label="Tables"
      layout="topleft"
      name="fold_bottom"
-     right="-86"
+     right="-105"
      tool_tip="The band under the canvas: findings, translation, notices and channels (Control+Shift+B)"
      top="41"
-     width="56" />
+     width="75" />
     <button
      follows="right|top"
      height="22"
+     image_overlay="SidebarRight_Off"
+     image_overlay_alignment="left"
      is_toggle="true"
      label="Inspectors"
      layout="topleft"
@@ -681,7 +687,7 @@
      right="-8"
      tool_tip="The inspectors of the selected element, down the right (Control+Alt+0)"
      top="41"
-     width="76" />
+     width="95" />
 
     <layout_stack
      animate="false"
@@ -1451,7 +1457,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="L"
+                 image_overlay="AlignLeft_Off"
+                 label=""
                  layout="topleft"
                  left_pad="8"
                  name="align_left"
@@ -1461,7 +1468,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="C"
+                 image_overlay="AlignCenter_Off"
+                 label=""
                  layout="topleft"
                  left_pad="2"
                  name="align_centre"
@@ -1471,7 +1479,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="R"
+                 image_overlay="AlignRight_Off"
+                 label=""
                  layout="topleft"
                  left_pad="2"
                  name="align_right"
@@ -1481,7 +1490,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="T"
+                 image_overlay="AlignTop_Off"
+                 label=""
                  layout="topleft"
                  left_pad="2"
                  name="align_top"
@@ -1491,7 +1501,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="M"
+                 image_overlay="AlignMiddle_Off"
+                 label=""
                  layout="topleft"
                  left_pad="2"
                  name="align_middle"
@@ -1501,7 +1512,8 @@
                 <button
                  follows="left|top"
                  height="22"
-                 label="B"
+                 image_overlay="AlignBottom_Off"
+                 label=""
                  layout="topleft"
                  left_pad="2"
                  name="align_bottom"
