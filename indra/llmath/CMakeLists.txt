@@ -121,6 +121,7 @@ if(AL_BUILD_TESTS)
     llsdutil_math
     mathmisc
     m3math
+    llmatrix3a
     llmatrix4a
     llvector4a
   )

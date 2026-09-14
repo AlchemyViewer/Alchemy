@@ -54,20 +54,41 @@ inline void LLMatrix3a::setColumns(const LLVector4a& c0, const LLVector4a& c1, c
     mColumns[2] = c2;
 }
 
+// Gathers each row of src into a column. The fourth lanes come from the
+// third column, which is what the last shuffle of each row leaves there.
 inline void LLMatrix3a::setTranspose(const LLMatrix3a& src)
 {
-    const LLQuad srcCol0 = src.mColumns[0];
-    const LLQuad srcCol1 = src.mColumns[1];
-    const LLQuad unpacklo = _mm_unpacklo_ps( srcCol0, srcCol1 );
-    mColumns[0] = _mm_movelh_ps( unpacklo, src.mColumns[2] );
-    mColumns[1] = _mm_shuffle_ps( _mm_movehl_ps( srcCol0, unpacklo ), src.mColumns[2], _MM_SHUFFLE(0, 1, 1, 0) );
-    mColumns[2] = _mm_shuffle_ps( _mm_unpackhi_ps( srcCol0, srcCol1 ), src.mColumns[2], _MM_SHUFFLE(0, 2, 1, 0) );
+    const LLQuad c0 = src.mColumns[0];
+    const LLQuad c1 = src.mColumns[1];
+    const LLQuad c2 = src.mColumns[2];
+    const LLQuad xy = alsimd::unpacklo(c0, c1);   // c0.x c1.x c0.y c1.y
+    const LLQuad zw = alsimd::unpackhi(c0, c1);   // c0.z c1.z c0.w c1.w
+    mColumns[0] = alsimd::movelh(xy, c2);                 // c0.x c1.x c2.x c2.y
+    mColumns[1] = alsimd::shuffle2<2, 3, 1, 0>(xy, c2);   // c0.y c1.y c2.y c2.x
+    mColumns[2] = alsimd::shuffle2<0, 1, 2, 0>(zw, c2);   // c0.z c1.z c2.z c2.x
 }
 
 inline const LLVector4a& LLMatrix3a::getColumn(const U32 column) const
 {
     llassert( column < 3 );
     return mColumns[column];
+}
+
+// Each column of the product is the columns of lhs weighted by the lanes of
+// the matching column of rhs.
+inline void LLMatrix3a::setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs )
+{
+    const LLQuad col0 = lhs.mColumns[0];
+    const LLQuad col1 = lhs.mColumns[1];
+    const LLQuad col2 = lhs.mColumns[2];
+
+    for ( int i = 0; i < 3; i++ )
+    {
+        const LLQuad v = rhs.mColumns[i];
+        LLQuad result = alsimd::mul(alsimd::splat<0>(v), col0);
+        result = alsimd::fmadd_lane<1>(col1, v, result);
+        mColumns[i] = alsimd::fmadd_lane<2>(col2, v, result);
+    }
 }
 
 inline void LLMatrix3a::setLerp(const LLMatrix3a& a, const LLMatrix3a& b, F32 w)
@@ -77,7 +98,7 @@ inline void LLMatrix3a::setLerp(const LLMatrix3a& a, const LLMatrix3a& b, F32 w)
     mColumns[2].setLerp( a.mColumns[2], b.mColumns[2], w );
 }
 
-inline LLBool32 LLMatrix3a::isFinite() const
+inline bool LLMatrix3a::isFinite() const
 {
     return mColumns[0].isFinite3() && mColumns[1].isFinite3() && mColumns[2].isFinite3();
 }
@@ -116,4 +137,3 @@ inline bool LLRotation::isOkRotation() const
 
     return product.isApproximatelyEqual( LLMatrix3a::getIdentity() ) && (detMinusOne.getAbs() < F_APPROXIMATELY_ZERO);
 }
-
