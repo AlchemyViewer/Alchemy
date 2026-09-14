@@ -192,6 +192,12 @@ jobs:
       AL_BUILD_VIEWER: ${{ matrix.build_variant == 'Viewer' }}
       AL_BUILD_APPEARANCE_UTILITY: false # ${{ startsWith(matrix.runner, 'ubuntu-') && matrix.build_variant == 'Viewer' }}
       BUILD_TESTS: ${{ matrix.build_variant == 'Tests' }}
+      # The tests that render on a hidden window need a GL 4.1 context. The
+      # Linux runner gets one from Mesa's llvmpipe through SDL's offscreen
+      # driver; the Windows runner has no GPU driver, and macOS is unproven,
+      # so they build those suites and register them disabled.
+      AL_ENABLE_GL_TESTS: ${{ runner.os == 'Linux' }}
+      LIBGL_ALWAYS_SOFTWARE: 1
       # Build Config
       BUILD_ARCH: ${{ matrix.arch }}
       BUILD_CONFIG: ${{ matrix.configuration }}
@@ -223,9 +229,9 @@ jobs:
           sudo apt install -y \
             autoconf autoconf-archive automake bison build-essential cmake curl flex gettext \
             libasound2-dev libaudio-dev libdbus-1-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
-            libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+            libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgl1-mesa-dri libgles2-mesa-dev \
             libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev libltdl-dev \
-            libosmesa6-dev libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
+            libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
             libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
             libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
             libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev mono-complete \
@@ -366,6 +372,7 @@ jobs:
             -DAL_BUILD_VIEWER:BOOL="$AL_BUILD_VIEWER" \
             -DAL_BUILD_APPEARANCE_UTILITY:BOOL="$AL_BUILD_APPEARANCE_UTILITY" \
             -DAL_BUILD_TESTS:BOOL="$BUILD_TESTS" \
+            -DAL_ENABLE_GL_TESTS:BOOL="$AL_ENABLE_GL_TESTS" \
             -DAL_BUILD_PACKAGE:BOOL=ON \
             -DAL_USE_VELOPACK:BOOL=ON \
             -DAL_USE_LTO:BOOL="$AL_USE_LTO" \

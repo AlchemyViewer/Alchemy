@@ -84,7 +84,7 @@ sudo apt install \
     libasound2-dev libaudio-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
-    libosmesa6-dev libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
+    libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
@@ -102,7 +102,7 @@ sudo apt install \
     libasound2-dev libaudio-dev libdbus-1-dev libdecor-0-dev libdrm-dev \
     libegl1-mesa-dev libfribidi-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
     libgstreamer-plugins-base1.0-dev libgstreamer1.0-dev libibus-1.0-dev libjack-dev \
-    libosmesa6-dev libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
+    libpipewire-0.3-dev libpulse-dev libsndio-dev libtext-unidecode-perl \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
@@ -119,7 +119,7 @@ sudo apt install \
 ```
 sudo dnf group install "Development Tools"
 sudo dnf install cmake fontconfig-devel git glib2-devel gstreamer1-devel \
-    gstreamer1-plugins-base-devel libX11-devel mesa-libOSMesa-devel libglvnd-devel \
+    gstreamer1-plugins-base-devel libX11-devel libglvnd-devel \
     ninja-build python3 vlc-devel wayland-devel dotnet-sdk-10.0 rustup
 ```
 
@@ -130,7 +130,7 @@ You may need to enable EPEL first: `sudo dnf install epel-release`
 ```
 sudo dnf install @development-tools @c-development cmake fontconfig-devel git glib-devel \
     gstreamer1-devel gstreamer1-plugins-base-devel libX11-devel \
-    mesa-compat-libOSMesa-devel libglvnd-devel ninja-build python3 vlc-devel \
+    libglvnd-devel ninja-build python3 vlc-devel \
     wayland-devel dotnet-sdk-10.0 rustup perl-IPC-Cmd perl-FindBin perl-Time-Piece \
     autoconf-archive perl-open libXcursor-devel wayland-protocols-devel dbus-devel \
     ibus-devel mesa-libGLU-devel libxkbcommon-devel mesa-libEGL-devel mesa-libGL-devel \
@@ -303,6 +303,7 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_BUILD_VIEWER`          | ON      | Build the viewer executable                                           |
 | `AL_BUILD_APPEARANCE_UTILITY` | OFF     | Build the appearance utility                                          |
 | `AL_BUILD_TESTS`         | OFF     | Build and run unit + integration tests                                |
+| `AL_ENABLE_GL_TESTS`     | ON      | Run the tests that render on a hidden window; off, they are built and registered disabled (needs `AL_BUILD_TESTS`) |
 | `AL_BUILD_DOCS`          | OFF     | Add the `doc` target (API documentation with Doxygen)                 |
 | `AL_VCPKG_INSTALL`       | ON      | Let configure run `vcpkg install` when the manifest, the registry configuration, the triplets or the feature list changed; off leaves the ports to you |
 | `AL_BUILD_PACKAGE`       | ON      | Add the `package` target: the CPack archive of the installed tree (zip, tar.xz, dmg) |
@@ -395,6 +396,8 @@ cmake -S indra --preset <preset> -DAL_BUILD_TESTS=ON
 ```
 
 Four tests drive a Python peer (`llleap`, `llprocess`, `llsdserialize`, `llcorehttp`); they need a Python 3 interpreter with the `llsd` package (`pip install -r requirements.txt`, in a venv if you like) and are registered disabled when configure finds none. Nothing else in the build runs Python.
+
+The `llrender` suites render on a hidden SDL window with the platform's own GL -- WGL on Windows, EGL on Linux, and where Linux has no display SDL's offscreen driver over Mesa (set `LIBGL_ALWAYS_SOFTWARE=1` for llvmpipe on a machine with no GPU). A host with no GL 4.1 to give, such as a CI runner without a graphics driver, configures with `-DAL_ENABLE_GL_TESTS=OFF`: those suites still build, and CTest reports them as not run rather than failed. They carry the label `gl`, so `ctest -LE gl` skips them for one run.
 
 Build, then run with CTest:
 
