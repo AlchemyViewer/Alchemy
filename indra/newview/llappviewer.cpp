@@ -154,6 +154,11 @@
 #include "stringize.h"
 #include "llcoros.h"
 #include "llexception.h"
+#include <boost/exception/diagnostic_information.hpp>
+#include <exception>
+#if !LL_WINDOWS
+#include <unistd.h>
+#endif
 #include "../dullahan/src/dullahan_version.h"
 #include "vlc/libvlc_version.h"
 
@@ -851,6 +856,14 @@ bool LLAppViewer::init()
 
     // The settings hold the answer on crash reports from here: it refreshes
     // the sentinel the reporter started on, and follows changes to it.
+    // The setting only reaches disk at a clean exit: a run that crashed
+    // after the answer was given left it unasked, while the sentinel kept
+    // the answer. The sentinel's yes becomes the setting's.
+    if (gSavedSettings.getS32("AlchemyCrashReportConsent") == 0
+        && ALCrashReporter::consentRecorded(ALCrashReporter::consentSentinel()))
+    {
+        gSavedSettings.setS32("AlchemyCrashReportConsent", 1);
+    }
     auto crash_reports_allowed = []()
     {
         return gSavedSettings.getS32("AlchemyCrashReportConsent") == 1 && !LLApp::isCrashloggerDisabled();
@@ -2350,6 +2363,25 @@ bool LLAppViewer::initThreads()
     return true;
 }
 
+namespace
+{
+    // std::terminate is the C++ runtime giving up: an exception nobody
+    // caught, or a throw through noexcept. Which exception is only knowable
+    // here, so it goes into the log and onto the report before the crash.
+    void on_terminate()
+    {
+        const std::string reason = boost::current_exception_diagnostic_information();
+        LL_WARNS("Terminate") << "std::terminate: " << reason << LL_ENDL;
+        ALCrashReporter::fatal("terminate", reason);
+    }
+}
+
+// static
+void LLAppViewer::installTerminateHandler()
+{
+    std::set_terminate(on_terminate);
+}
+
 // Callback for all LL_ERROR calls
 void errorCallback(LLError::ELevel level, const std::string &error_string)
 {
@@ -2454,6 +2486,9 @@ void LLAppViewer::initLoggingAndGetLastDuration()
                                 ,gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "")
                                 );
     LLError::addGenericRecorder(&errorCallback);
+    // LL_ERRS crashes its caller once the recorders have run; this makes it
+    // a crash the reporter is sure to see, with the message on the report.
+    LLError::setFatalFunction([](const std::string& message) { ALCrashReporter::fatal("ll_errs", message); });
     //LLError::setTimeFunction(getRuntime);
 
     LLError::LLUserWarningMsg::setHandler(errorHandler);
@@ -3649,7 +3684,21 @@ bool LLAppViewer::reportCrash(void* exception_pointers)
 
 bool LLAppViewer::reportFreeze(const std::string& description)
 {
-    return ALCrashReporter::reportFreeze(description);
+    if (!ALCrashReporter::reportFreeze(description))
+    {
+        return false;
+    }
+    // The report is filed and the viewer is still hung. What the reporter's
+    // own dialog used to do on its way out: the marker for the next launch,
+    // then out, since nothing here can be unwound.
+    createErrorMarker(logoutRequestSent() ? LAST_EXEC_LOGOUT_FROZE : LAST_EXEC_FROZE);
+    ALCrashReporter::shutdown();
+#if LL_WINDOWS
+    TerminateProcess(GetCurrentProcess(), 3);
+#else
+    _exit(3);
+#endif
+    return true;
 }
 
 void LLAppViewer::writeDebugInfo(bool isStatic)

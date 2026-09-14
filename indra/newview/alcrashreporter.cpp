@@ -33,10 +33,16 @@
 #include "lluuid.h"
 #include "v3math.h"
 
+#if LL_WINDOWS
+#include "llwin32headers.h"
+#include <intrin.h>
+#endif
+
 #include <fmt/format.h>
 
 #include <cerrno>
 #include <cmath>
+#include <cstdlib>
 
 std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 build)
 {
@@ -56,6 +62,21 @@ const std::string& ALCrashReporter::runId()
     static const std::string id = LLUUID::generateNewID().asString();
     return id;
 }
+
+#if !AL_SENTRY
+// Without a reporter the crash takes the usual unhandled route; on Windows
+// as an exception every filter sees, since a fast-fail only Windows Error
+// Reporting does.
+void ALCrashReporter::fatal(std::string_view, const std::string&)
+{
+#if LL_WINDOWS
+    RaiseException(FATAL_APP_EXIT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+    __fastfail(FAST_FAIL_FATAL_APP_EXIT);
+#else
+    std::abort();
+#endif
+}
+#endif
 
 std::string ALCrashReporter::consentSentinel()
 {

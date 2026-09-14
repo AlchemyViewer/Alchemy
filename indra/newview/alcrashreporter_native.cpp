@@ -259,6 +259,22 @@ void ALCrashReporter::setTag(std::string_view key, std::string_view value)
     }
 }
 
+void ALCrashReporter::setContext(std::string_view name,
+                                 std::initializer_list<std::pair<std::string_view, std::string_view>> values)
+{
+    if (!sEngaged)
+    {
+        return;
+    }
+    sentry_value_t context = sentry_value_new_object();
+    for (const auto& [key, value] : values)
+    {
+        sentry_value_set_by_key_n(context, key.data(), key.size(),
+                                  sentry_value_new_string_n(value.data(), value.size()));
+    }
+    sentry_set_context_n(name.data(), name.size(), context);
+}
+
 void ALCrashReporter::attach(const std::string& path)
 {
     if (sEngaged)
@@ -321,14 +337,17 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
 #if LL_WINDOWS
     if (report_freeze_as_minidump(description))
     {
+        LL_INFOS("CrashReporter") << "Freeze reported with a minidump of every thread" << LL_ENDL;
         return true;
     }
+    LL_WARNS("CrashReporter") << "No minidump for the freeze; reporting the watchdog's own stack" << LL_ENDL;
 #endif
     // Without a dump, the report is the watchdog's own stack and what it saw.
     sentry_value_t event = sentry_value_new_message_event(SENTRY_LEVEL_FATAL, "watchdog", description.c_str());
     set_event_tag(event, "watchdog_state", LLAppViewer::instance()->getMainloopWatchdogState());
     set_event_tag(event, "app_state", LLStartUp::getStartupStateString());
     sentry_capture_event(event);
+    LL_INFOS("CrashReporter") << "Freeze reported as an event" << LL_ENDL;
     return true;
 }
 
@@ -345,5 +364,31 @@ bool ALCrashReporter::handleException(void* exception_pointers)
     return true;
 #else
     return false;
+#endif
+}
+
+void ALCrashReporter::fatal(std::string_view kind, const std::string& message)
+{
+    setTag("fatal", kind);
+    setContext("fatal", {{"kind", kind}, {"message", message}});
+
+#if LL_WINDOWS
+    // Handed to the reporter as the exception abort() raised before
+    // fast-fail existed, with this thread's context, so the dump is a crash
+    // here; the handler does not return. Without a reporter engaged it goes
+    // the usual unhandled route, and the fast-fail is the stop behind that.
+    CONTEXT context = {};
+    RtlCaptureContext(&context);
+    EXCEPTION_RECORD record = {};
+    record.ExceptionCode = FATAL_APP_EXIT;
+    record.ExceptionFlags = EXCEPTION_NONCONTINUABLE;
+    record.ExceptionAddress = _ReturnAddress();
+    EXCEPTION_POINTERS pointers = { &record, &context };
+    handleException(&pointers);
+    RaiseException(FATAL_APP_EXIT, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+    __fastfail(FAST_FAIL_FATAL_APP_EXIT);
+#else
+    // SIGABRT is crashpad's.
+    std::abort();
 #endif
 }

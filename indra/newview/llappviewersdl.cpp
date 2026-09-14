@@ -180,7 +180,6 @@ namespace
     char **gArgV = NULL;
     // LLAppViewerWin32 on Windows (USE_SDL_WINDOW builds), LLAppViewerSDL elsewhere.
     LLAppViewer* gViewerAppPtr = NULL;
-    void (*gOldTerminateHandler)() = NULL;
 #if LL_WINDOWS
     // NvDRSSessionHandle from ll_nvapi_session_create(), torn down in SDL_AppQuit.
     void* gNvApiSession = nullptr;
@@ -418,18 +417,6 @@ finally:
 #endif // LL_LINUX
 }
 
-static void exceptionTerminateHandler()
-{
-    // reinstall default terminate() handler in case we re-terminate.
-    if (gOldTerminateHandler) std::set_terminate(gOldTerminateHandler);
-    // treat this like a regular viewer crash, with nice stacktrace etc.
-    long *null_ptr;
-    null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception for the crash reporter to catch.
-    // we've probably been killed-off before now, but...
-    gOldTerminateHandler(); // call old terminate() handler
-}
-
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
 #if LL_WINDOWS && LL_VELOPACK
@@ -484,8 +471,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
     << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
 
-    // install unexpected exception handler
-    gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
+    LLAppViewer::installTerminateHandler();
 
 #if LL_WINDOWS
     // Set a debug info flag to indicate if multiple instances are running.

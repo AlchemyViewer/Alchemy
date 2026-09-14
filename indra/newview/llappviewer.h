@@ -120,6 +120,10 @@ public:
     // so --logfile can only be read from the raw command line.
     static void setStartupCommandLine(int argc, char** argv);
 
+    // std::terminate becomes a crash report with the exception on it. Called
+    // from the entry point, before anything can throw.
+    static void installTerminateHandler();
+
     bool quitRequested() { return mQuitRequested; }
     bool logoutRequestSent() { return mLogoutRequestSent; }
     bool isSecondInstance() { return mSecondInstance; }

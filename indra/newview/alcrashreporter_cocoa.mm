@@ -268,6 +268,32 @@ void ALCrashReporter::setTag(std::string_view key, std::string_view value)
     }];
 }
 
+void ALCrashReporter::setContext(std::string_view name,
+                                 std::initializer_list<std::pair<std::string_view, std::string_view>> values)
+{
+    if (!sEngaged)
+    {
+        return;
+    }
+    NSMutableDictionary<NSString*, id>* context = [NSMutableDictionary dictionaryWithCapacity:values.size()];
+    for (const auto& [key, value] : values)
+    {
+        context[ns(std::string(key))] = ns(std::string(value));
+    }
+    NSString* ns_name = ns(std::string(name));
+    [SentryObjCSDK configureScope:^(SentryObjCScope* scope) {
+        [scope setContextValue:context forKey:ns_name];
+    }];
+}
+
+void ALCrashReporter::fatal(std::string_view kind, const std::string& message)
+{
+    setTag("fatal", kind);
+    setContext("fatal", {{"kind", kind}, {"message", message}});
+    // SIGABRT is SentryCrash's.
+    std::abort();
+}
+
 void ALCrashReporter::attach(const std::string& path)
 {
     if (!sEngaged)

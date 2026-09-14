@@ -27,8 +27,10 @@
 
 #include "stdtypes.h"
 
+#include <initializer_list>
 #include <string>
 #include <string_view>
+#include <utility>
 
 class LLSD;
 class LLUUID;
@@ -78,6 +80,14 @@ namespace ALCrashReporter
     };
     PreviousRun previousRun(const LLSD& info);
 
+    // How the viewer dies on purpose: LL_ERRS and std::terminate end here.
+    // The kind and the message ride the report as its fatal context, and
+    // the crash is one the reporter is sure to see: on Windows the
+    // exception abort() raised before fast-fail existed, handed to the
+    // reporter directly, and abort() itself elsewhere.
+    [[noreturn]] void fatal(std::string_view kind, const std::string& message);
+    inline constexpr U32 FATAL_APP_EXIT = 0x40000015; // STATUS_FATAL_APP_EXIT
+
 #if AL_SENTRY
     // Engages if the sentinel allows it.
     bool init();
@@ -88,6 +98,9 @@ namespace ALCrashReporter
     bool isEngaged();
     void setUser(const LLUUID& id, const std::string& name);
     void setTag(std::string_view key, std::string_view value);
+    // A named group of values shown together on every report from here on.
+    void setContext(std::string_view name,
+                    std::initializer_list<std::pair<std::string_view, std::string_view>> values);
     void attach(const std::string& path);
     bool reportFreeze(const std::string& description);
     bool handleException(void* exception_pointers);
@@ -98,6 +111,8 @@ namespace ALCrashReporter
     inline bool isEngaged() { return false; }
     inline void setUser(const LLUUID&, const std::string&) {}
     inline void setTag(std::string_view, std::string_view) {}
+    inline void setContext(std::string_view,
+                           std::initializer_list<std::pair<std::string_view, std::string_view>>) {}
     inline void attach(const std::string&) {}
     inline bool reportFreeze(const std::string&) { return false; }
     inline bool handleException(void*) { return false; }

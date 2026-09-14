@@ -65,25 +65,6 @@
 
 extern bool gGPUBenchmarkMode;
 
-namespace
-{
-    void (*gOldTerminateHandler)() = NULL;
-}
-
-static void exceptionTerminateHandler()
-{
-    // reinstall default terminate() handler in case we re-terminate.
-    if (gOldTerminateHandler) std::set_terminate(gOldTerminateHandler);
-    // treat this like a regular viewer crash, with nice stacktrace etc.
-    long *null_ptr;
-    null_ptr = 0;
-    *null_ptr = 0xDEADBEEF; //Force an exception for the crash reporter to catch.
-
-    // we've probably been killed-off before now, but...
-    gOldTerminateHandler(); // call old terminate() handler
-}
-
-
 // Create app mutex creates a unique global windows object.
 // If the object can be created it returns true, otherwise
 // it returns false. The false result can be used to determine
@@ -376,7 +357,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
-    gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
+    LLAppViewer::installTerminateHandler();
 
     // Set a debug info flag to indicate if multiple instances are running.
     bool found_other_instance = gGPUBenchmarkMode || !create_app_mutex();
