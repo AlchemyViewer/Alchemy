@@ -36,7 +36,6 @@
 #include "llshadermgr.h"
 #include "llglslshader.h"
 #include "llmemory.h"
-#include <glm/gtc/type_ptr.hpp>
 
 #include <boost/unordered_map.hpp>
 
@@ -639,13 +638,13 @@ void LLVertexBufferData::drawWithMatrix()
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mModelView));
+    gGL.loadMatrix(mModelView);
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mProjection));
+    gGL.loadMatrix(mProjection);
     gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(mTexture0));
+    gGL.loadMatrix(mTexture0);
 
     mVB->setBuffer();
     mVB->drawArrays(mMode, 0, mCount);

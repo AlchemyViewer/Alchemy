@@ -45,7 +45,7 @@
 #include "llgltypes.h"
 #include "llinstancetracker.h"
 
-#include "glm/mat4x4.hpp"
+#include "llmatrix4a.h"
 
 extern bool gDebugGL;
 extern bool gDebugSession;
@@ -358,13 +358,12 @@ public:
   GL_MODELVIEW_MATRIX is active whenever program execution
   leaves this class.
   Does not stack.
-  Caches inverse of projection matrix used in gGLObliqueProjectionInverse
 */
 class LLGLUserClipPlane
 {
 public:
 
-    LLGLUserClipPlane(const LLPlane& plane, const glm::mat4& modelview, const glm::mat4& projection, bool apply = true);
+    LLGLUserClipPlane(const LLPlane& plane, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply = true);
     ~LLGLUserClipPlane();
 
     void setPlane(F32 a, F32 b, F32 c, F32 d);
@@ -373,8 +372,8 @@ public:
 private:
     bool mApply;
 
-    glm::mat4 mProjection;
-    glm::mat4 mModelview;
+    LLMatrix4a mProjection;
+    LLMatrix4a mModelview;
 };
 
 /*
@@ -388,9 +387,9 @@ class LLGLSquashToFarClip
 {
 public:
     LLGLSquashToFarClip();
-    LLGLSquashToFarClip(const glm::mat4& projection, U32 layer = 0);
+    LLGLSquashToFarClip(const LLMatrix4a& projection, U32 layer = 0);
 
-    void setProjectionMatrix(glm::mat4 projection, U32 layer);
+    void setProjectionMatrix(LLMatrix4a projection, U32 layer);
 
     ~LLGLSquashToFarClip();
 };
@@ -451,7 +450,6 @@ public:
     void wait();
 };
 
-extern LLMatrix4 gGLObliqueProjectionInverse;
 
 #include "llglstates.h"
 

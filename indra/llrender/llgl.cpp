@@ -48,9 +48,6 @@
 #include "llglslshader.h"
 #include "llshadermgr.h"
 
-#include "glm/glm.hpp"
-#include <glm/gtc/matrix_access.hpp>
-#include "glm/gtc/type_ptr.hpp"
 
 #if LL_SDL_WINDOW
 #  include "llwindowsdl.h"
@@ -661,7 +658,6 @@ void ll_close_fail_log()
     gFailLog.close();
 }
 
-LLMatrix4 gGLObliqueProjectionInverse;
 
 std::list<LLGLUpdate*> LLGLUpdate::sGLQ;
 
@@ -3310,7 +3306,7 @@ void parse_glsl_version(S32& major, S32& minor)
     LLStringUtil::convertToS32(minor_str, minor);
 }
 
-LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const glm::mat4& modelview, const glm::mat4& projection, bool apply)
+LLGLUserClipPlane::LLGLUserClipPlane(const LLPlane& p, const LLMatrix4a& modelview, const LLMatrix4a& projection, bool apply)
 {
     mApply = apply;
 
@@ -3341,26 +3337,32 @@ void LLGLUserClipPlane::disable()
 // reverse-Z aware (the ZERO_TO_ONE near-plane constant differs) before use.
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
-    const glm::mat4& P = mProjection;
-    const glm::mat4& M = mModelview;
+    // the plane into clip space: through the inverse transpose of the
+    // modelview then projection
+    LLMatrix4a invtrans_MVP;
+    invtrans_MVP.setMul(mModelview, mProjection);
+    invtrans_MVP.invert();
+    invtrans_MVP.transpose();
+    LLVector4a cplane;
+    invtrans_MVP.transform4(LLVector4a(a, b, c, d), cplane);
 
-    glm::mat4 invtrans_MVP = glm::transpose(glm::inverse(P*M));
-    glm::vec4 oplane(a,b,c,d);
-    glm::vec4 cplane = invtrans_MVP * oplane;
+    cplane.mul(1.f / fabsf(cplane[2])); // normalize such that depth is not scaled
+    cplane.getF32ptr()[3] -= 1.f;
 
-    cplane /= fabs(cplane[2]); // normalize such that depth is not scaled
-    cplane[3] -= 1;
+    if (cplane[2] < 0.f)
+    {
+        cplane.negate();
+    }
 
-    if(cplane[2] < 0)
-        cplane *= -1;
-
-    glm::mat4 suffix = glm::identity<glm::mat4>();
-    suffix = glm::row(suffix, 2, cplane);
-    glm::mat4 newP = suffix * P;
+    // the projection with its depth column replaced by the plane
+    LLMatrix4a suffix;
+    suffix.setIdentity();
+    suffix.setColumn<2>(cplane);
+    LLMatrix4a newP;
+    newP.setMul(mProjection, suffix);
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(newP));
-    gGLObliqueProjectionInverse = LLMatrix4(glm::value_ptr(glm::transpose(glm::inverse(newP))));
+    gGL.loadMatrix(newP);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 }
 
@@ -3484,16 +3486,15 @@ void LLGLDepthTest::checkState()
 
 LLGLSquashToFarClip::LLGLSquashToFarClip()
 {
-    glm::mat4 proj = get_current_projection();
-    setProjectionMatrix(proj, 0);
+    setProjectionMatrix(get_current_projection(), 0);
 }
 
-LLGLSquashToFarClip::LLGLSquashToFarClip(const glm::mat4& P, U32 layer)
+LLGLSquashToFarClip::LLGLSquashToFarClip(const LLMatrix4a& P, U32 layer)
 {
     setProjectionMatrix(P, layer);
 }
 
-void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
+void LLGLSquashToFarClip::setProjectionMatrix(LLMatrix4a projection, U32 layer)
 {
     // Replacing row 2 with row 3 * depth forces ndc z = depth for every vertex regardless
     // of projection, so only the far-plane constant mirrors under reverse-Z (far = 0).
@@ -3502,14 +3503,16 @@ void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
     F32 depth = LLRender::sReverseZ ? (0.000005f + 0.00005f * layer)
                                     : (0.99999f - 0.0001f * layer);
 
-    glm::vec4 P_row_3 = glm::row(projection, 3) * depth;
-    projection = glm::row(projection, 2, P_row_3);
+    // the depth column is the w column scaled: clip z = depth * clip w
+    LLVector4a squashed = projection.getColumn<3>();
+    squashed.mul(depth);
+    projection.setColumn<2>(squashed);
 
     LLRender::eMatrixMode last_matrix_mode = gGL.getMatrixMode();
 
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
-    gGL.loadMatrix(glm::value_ptr(projection));
+    gGL.loadMatrix(projection);
 
     gGL.matrixMode(last_matrix_mode);
 }
