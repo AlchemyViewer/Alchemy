@@ -37,6 +37,10 @@ class LLVector2;
 class LLColor4U;
 class LLAgent;
 
+// The per-vertex random that dithers the composition alpha ramp, keyed on the
+// world position so neighbouring regions agree along their border.
+F32 terrain_composition_noise(F64 x_global, F64 y_global);
+
 // A patch shouldn't know about its visibility since that really depends on the
 // camera that is looking (or not looking) at it.  So, anything about a patch
 // that is specific to a camera should be in the class below.

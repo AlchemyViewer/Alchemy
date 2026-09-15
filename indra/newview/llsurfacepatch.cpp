@@ -227,19 +227,20 @@ void LLSurfacePatch::eval(const U32 x, const U32 y, const U32 stride, LLVector3 
     tex0->mV[1] = tex_pos.mV[1];
 
     tex1->mV[0] = mSurfacep->getRegion()->getCompositionXY(llfloor(mOriginRegion.mV[0])+x, llfloor(mOriginRegion.mV[1])+y);
+    tex1->mV[1] = terrain_composition_noise(mOriginGlobal.mdV[0] + x, mOriginGlobal.mdV[1] + y);
+}
 
+F32 terrain_composition_noise(F64 x_global, F64 y_global)
+{
     const F32 xyScale = 4.9215f*7.f; //0.93284f;
     const F32 xyScaleInv = (1.f / xyScale)*(0.2222222222f);
 
     F32 vec[3] = {
-                    (F32)fmod((F32)(mOriginGlobal.mdV[0] + x)*xyScaleInv, 256.f),
-                    (F32)fmod((F32)(mOriginGlobal.mdV[1] + y)*xyScaleInv, 256.f),
+                    (F32)fmod((F32)x_global*xyScaleInv, 256.f),
+                    (F32)fmod((F32)y_global*xyScaleInv, 256.f),
                     0.f
                 };
-    F32 rand_val = llclamp(noise2(vec)* 0.75f + 0.5f, 0.f, 1.f);
-    tex1->mV[1] = rand_val;
-
-
+    return llclamp(noise2(vec)* 0.75f + 0.5f, 0.f, 1.f);
 }
 
 

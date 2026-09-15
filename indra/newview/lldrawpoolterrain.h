@@ -29,6 +29,8 @@
 
 #include "lldrawpool.h"
 
+class ALTerrainSurfaceMaps;
+
 class LLDrawPoolTerrain : public LLFacePool
 {
     LLPointer<LLViewerTexture> mTexturep;
@@ -71,6 +73,7 @@ public:
 
 protected:
     void boostTerrainDetailTextures();
+    ALTerrainSurfaceMaps& surfaceMaps();
 
     void renderOwnership();
 

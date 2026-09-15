@@ -28,6 +28,7 @@
 
 #include "llsurface.h"
 
+#include "alterrainsurfacemaps.h"
 #include "llpatchvertexarray.h"
 #include "patch_dct.h"
 #include "patch_code.h"
@@ -192,6 +193,8 @@ void LLSurface::create(const S32 grids_per_edge,
 
     // Has to be done after texture initialization
     createPatchData();
+
+    mSurfaceMaps = std::make_unique<ALTerrainSurfaceMaps>(*this);
 }
 
 LLViewerTexture* LLSurface::getSTexture()
@@ -319,6 +322,7 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
 
     mNeighbors[direction] = neighborp;
     neighborp->mNeighbors[gDirOpposite[direction]] = this;
+    dirtySurfaceMaps();
 
     // Connect patches
     if (NORTHEAST == direction)
@@ -514,6 +518,9 @@ void LLSurface::disconnectNeighbor(LLSurface *surfacep)
     {
         (mPatchList + i)->disconnectNeighbor(surfacep);
     }
+
+    // The apron that read the departed surface now repeats our own edge.
+    dirtySurfaceMaps();
 }
 
 
@@ -639,6 +646,12 @@ bool LLSurface::idleUpdate(F32 max_update_time)
     // some patches changed, update region reflection probes
     mRegionp->updateReflectionProbes(did_update);
 
+    // A patch's composition regenerated; the neighbours' border column reads it.
+    if (did_update)
+    {
+        dirtySurfaceMaps();
+    }
+
     return did_update;
 }
 
@@ -706,6 +719,7 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
         // Dirty patch statistics, and flag that the patch has data.
         patchp->dirtyZ();
         patchp->setHasReceivedData();
+        dirtySurfaceMaps();
     }
 }
 
@@ -1134,6 +1148,21 @@ void LLSurface::dirtySurfacePatch(LLSurfacePatch *patchp)
 {
     // Put surface patch on dirty surface patch list
     mDirtyPatchList.insert(patchp);
+}
+
+void LLSurface::dirtySurfaceMaps()
+{
+    if (mSurfaceMaps)
+    {
+        mSurfaceMaps->markDirty();
+    }
+    for (LLSurface* neighbor : mNeighbors)
+    {
+        if (neighbor && neighbor->mSurfaceMaps)
+        {
+            neighbor->mSurfaceMaps->markDirty();
+        }
+    }
 }
 
 

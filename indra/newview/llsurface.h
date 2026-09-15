@@ -35,6 +35,8 @@
 #include "llpatchvertexarray.h"
 #include "llviewertexture.h"
 
+#include <memory>
+
 class LLTimer;
 class LLUUID;
 class LLAgent;
@@ -55,6 +57,7 @@ class LLViewerRegion;
 class LLSurfacePatch;
 class LLBitPack;
 class LLGroupHeader;
+class ALTerrainSurfaceMaps;
 
 class LLSurface
 {
@@ -129,6 +132,8 @@ public:
     void dirtySurfacePatch(LLSurfacePatch *patchp);
     LLVOWater *getWaterObj()                        { return mWaterObjp; }
 
+    ALTerrainSurfaceMaps& getSurfaceMaps()          { return *mSurfaceMaps; }
+
     static void setTextureSize(const S32 texture_size);
 
     friend class LLSurfacePatch;
@@ -179,6 +184,11 @@ private:
     LLVector3 *mNorm;
 
     std::set<LLSurfacePatch *> mDirtyPatchList;
+
+    // The GPU's copy of this surface. Its apron reads the neighbours, so a
+    // change here stales theirs too: see dirtySurfaceMaps.
+    std::unique_ptr<ALTerrainSurfaceMaps> mSurfaceMaps;
+    void dirtySurfaceMaps();
 
 
     // The textures should never be directly initialized - use the setter methods!

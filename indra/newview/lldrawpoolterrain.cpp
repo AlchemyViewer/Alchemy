@@ -28,6 +28,7 @@
 
 #include "lldrawpoolterrain.h"
 
+#include "alterrainsurfacemaps.h"
 #include "llfasttimer.h"
 
 #include "llagent.h"
@@ -195,6 +196,13 @@ void LLDrawPoolTerrain::boostTerrainDetailTextures()
     compp->boost();
 }
 
+ALTerrainSurfaceMaps& LLDrawPoolTerrain::surfaceMaps()
+{
+    // Each terrain pool draws one region; its faces all know which.
+    LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
+    return regionp->getLand().getSurfaceMaps();
+}
+
 void LLDrawPoolTerrain::beginDeferredPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
@@ -218,6 +226,7 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
     }
 
     boostTerrainDetailTextures();
+    surfaceMaps().ensureUploaded();
 
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
     // Probe and hero faces render through this pass too; only the main view counts.
@@ -270,6 +279,7 @@ void LLDrawPoolTerrain::renderShadow(S32 pass)
     {
         return;
     }
+    surfaceMaps().ensureUploaded();
     //LLGLEnable offset(GL_POLYGON_OFFSET);
     //glCullFace(GL_FRONT);
     drawLoop();
