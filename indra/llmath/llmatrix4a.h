@@ -32,6 +32,16 @@
 #include "m3math.h"
 #include "llquaternion2.h"
 
+// The bridge to glm while the render layer crosses from it: a glm::mat4
+// converts to and from an LLMatrix4a by its bytes, implicitly, so a caller
+// on either side of the crossing compiles. It goes when the last glm caller
+// does.
+#define AL_GLM_BRIDGE 1
+#if AL_GLM_BRIDGE
+#include "glm/mat4x4.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#endif
+
 // Four rows of four, a row vector on the left: v' = v * M, so a point is
 // transformed by row 0 weighted by x, row 1 by y, row 2 by z and row 3 (the
 // translation) by w, and M then N applies M first. The sixteen floats are
@@ -54,6 +64,18 @@ public:
     {
         loadu(val);
     }
+
+#if AL_GLM_BRIDGE
+    LLMatrix4a(const glm::mat4& val)
+    {
+        loadu(glm::value_ptr(val));
+    }
+
+    operator glm::mat4() const
+    {
+        return glm::make_mat4(getF32ptr());
+    }
+#endif
 
     static const LLMatrix4a& identity()
     {
@@ -293,6 +315,24 @@ public:
 
     template<int N> const LLVector4a& getRow() const { return mMatrix[N]; }
     template<int N> void setRow(const LLVector4a& row) { mMatrix[N] = row; }
+
+    // Lane N of every row, which is what a column-vector reading of the
+    // same bytes calls row N: the projection's depth and w rows live here.
+    template<int N> LLVector4a getColumn() const
+    {
+        static_assert(N >= 0 && N < 4, "getColumn<N>: N is 0 to 3");
+        return alsimd::set(mMatrix[0][N], mMatrix[1][N], mMatrix[2][N], mMatrix[3][N]);
+    }
+
+    template<int N> void setColumn(const LLVector4a& column)
+    {
+        static_assert(N >= 0 && N < 4, "setColumn<N>: N is 0 to 3");
+        const LLQuad c = column;
+        mMatrix[0] = alsimd::select(alsimd::mask_lane<N>(), alsimd::splat<0>(c), mMatrix[0]);
+        mMatrix[1] = alsimd::select(alsimd::mask_lane<N>(), alsimd::splat<1>(c), mMatrix[1]);
+        mMatrix[2] = alsimd::select(alsimd::mask_lane<N>(), alsimd::splat<2>(c), mMatrix[2]);
+        mMatrix[3] = alsimd::select(alsimd::mask_lane<N>(), alsimd::splat<3>(c), mMatrix[3]);
+    }
 
     const LLVector4a& getTranslation() const { return mMatrix[3]; }
 
