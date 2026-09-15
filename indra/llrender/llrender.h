@@ -583,14 +583,6 @@ LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& inverse, const 
 inline F32 al_window_near() { return LLRender::sReverseZ ? 1.f : 0.f; }
 inline F32 al_window_far()  { return LLRender::sReverseZ ? 0.f : 1.f; }
 
-#if AL_GLM_BRIDGE
-// The same on glm's types, for the callers still on them.
-glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
-glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
-// A point through a projective matrix, divided by w.
-glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec);
-#endif
-
 #define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
 
 #endif

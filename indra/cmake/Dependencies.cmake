@@ -77,7 +77,6 @@ al_import(ll::colladadom   PACKAGE unofficial-collada-dom CONFIG TARGETS unoffic
 al_import(ll::fastfloat    PACKAGE FastFloat       CONFIG TARGETS FastFloat::fast_float)
 al_import(ll::fmt          PACKAGE fmt             CONFIG TARGETS fmt::fmt)
 al_import(ll::freetype     PACKAGE Freetype               TARGETS Freetype::Freetype)
-al_import(ll::glm          PACKAGE glm             CONFIG TARGETS glm::glm-header-only)
 al_import(ll::libavif      PACKAGE libavif         CONFIG TARGETS avif)
 al_import(ll::libjpeg      PACKAGE JPEG                   TARGETS JPEG::JPEG)
 al_import(ll::libpng       PACKAGE PNG                    TARGETS PNG::PNG)

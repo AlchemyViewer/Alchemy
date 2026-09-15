@@ -133,7 +133,7 @@ if(AL_BUILD_TESTS)
   al_add_test(lluitransform PROJECT llrender LIBRARIES llrender)
 
   # Arithmetic only: the matrix stack, the projection helpers and the
-  # clip-plane classes against what glm computed for the same calls.
+  # clip-plane classes against the scalar matrix and the formulas.
   al_add_test(llrendermatrix PROJECT llrender LIBRARIES llrender)
 
   # The font suites: tables and shaping, no GL.

@@ -48,7 +48,6 @@
         "zlib"
       ]
     },
-    "glm",
     "harfbuzz",
     "icu",
     {

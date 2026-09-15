@@ -1761,29 +1761,3 @@ LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& inverse, const 
     return LLRender::sReverseZ ? alprojection::unproject_zo(win, inverse, viewport)
                                : alprojection::unproject(win, inverse, viewport);
 }
-
-#if AL_GLM_BRIDGE
-glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
-{
-    const S32 vp[4] = { viewport[0], viewport[1], viewport[2], viewport[3] };
-    const LLVector4a win = al_project(LLVector4a(obj.x, obj.y, obj.z, 1.f), LLMatrix4a(modelview), LLMatrix4a(proj), vp);
-    return glm::vec3(win[0], win[1], win[2]);
-}
-
-glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
-{
-    const S32 vp[4] = { viewport[0], viewport[1], viewport[2], viewport[3] };
-    const LLVector4a obj = al_unproject(LLVector4a(win.x, win.y, win.z, 1.f), LLMatrix4a(modelview), LLMatrix4a(proj), vp);
-    return glm::vec3(obj[0], obj[1], obj[2]);
-}
-
-glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec)
-{
-    const float w = vec[0] * mat[0][3] + vec[1] * mat[1][3] + vec[2] * mat[2][3] + mat[3][3];
-    return glm::vec3(
-       (vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0] + mat[3][0]) / w,
-       (vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1] + mat[3][1]) / w,
-       (vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2] + mat[3][2]) / w
-    );
-}
-#endif

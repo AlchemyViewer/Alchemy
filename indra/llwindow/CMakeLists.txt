@@ -36,7 +36,6 @@ set(
   llmath
   llfilesystem
   llxml
-  ll::glm
 )
 
 add_library(llwindow STATIC)

@@ -1,10 +1,12 @@
 # -*- cmake -*-
 #
 # Fails when a source outside the SIMD ops layer names an x86 or NEON
-# intrinsic. Everything the viewer does with a vector register goes through
-# llcommon/alsimd.h and the kernels in llmath/alsimdkernels.inl, so that a
-# body written once runs natively on x86-64 and aarch64 alike; an intrinsic
-# anywhere else is code that compiles on one architecture. Run as a test:
+# intrinsic, or when any source names glm. Everything the viewer does with a
+# vector register goes through llcommon/alsimd.h and the kernels in
+# llmath/alsimdkernels.inl, so that a body written once runs natively on
+# x86-64 and aarch64 alike; an intrinsic anywhere else is code that compiles
+# on one architecture. The math vocabulary is llmath's own; glm was retired
+# in favour of it and is not a dependency. Run as a test:
 #
 #   cmake -DSOURCE_DIR=<indra> -P AlIntrinsicCheck.cmake
 
@@ -35,6 +37,7 @@ set(
   "ld[1-4]|st[1-4]|add|sub|mul|fma|fms|mla|mls|div|min|max|abs|neg|dup|get|set|ext|zip|uzp|trn|rev|cvt|rnd|sqrt|rsqrt|recp|ceq|cgt|cge|clt|cle|and|orr|eor|bic|bsl|mvn|tbl|tbx|mov|padd|addv|maxv|minv|reinterpret|combine|shl|shr|tst|abd|pmax|pmin|cnt|clz|copy|create"
 )
 set(neon_pattern "v(${neon_mnemonics})[a-z0-9]*q?_[fsup](8|16|32|64)(x[0-9])?")
+set(glm_pattern "glm::|glm/|GLM_")
 
 file(
   GLOB_RECURSE sources
@@ -51,9 +54,16 @@ foreach(source IN LISTS sources)
   if(source MATCHES "^externals/" OR source IN_LIST allowed)
     continue()
   endif()
-  file(STRINGS "${SOURCE_DIR}/${source}" lines REGEX "${x86_pattern}|${neon_pattern}")
+  file(
+    STRINGS "${SOURCE_DIR}/${source}"
+    lines
+    REGEX "${x86_pattern}|${neon_pattern}|${glm_pattern}"
+  )
   foreach(line IN LISTS lines)
-    if(line MATCHES "(^|[^A-Za-z0-9_])(${x86_pattern}|${neon_pattern})([^A-Za-z0-9_]|$)")
+    if(
+      line MATCHES "(^|[^A-Za-z0-9_])(${x86_pattern}|${neon_pattern})([^A-Za-z0-9_]|$)"
+      OR line MATCHES "${glm_pattern}"
+    )
       string(STRIP "${line}" line)
       string(REPLACE ";" "\;" line "${line}")
       list(APPEND offences "${source}: ${line}")
@@ -66,7 +76,7 @@ if(offence_count GREATER 0)
   list(JOIN offences "\n  " report)
   message(
     FATAL_ERROR
-    "AlIntrinsicCheck: ${offence_count} line(s) name an intrinsic outside the ops layer; write them on alsimd:: instead:\n  ${report}"
+    "AlIntrinsicCheck: ${offence_count} line(s) name an intrinsic outside the ops layer or glm; write them on alsimd:: and the llmath types instead:\n  ${report}"
   )
 endif()
-message(STATUS "AlIntrinsicCheck: no intrinsic outside the ops layer")
+message(STATUS "AlIntrinsicCheck: no intrinsic outside the ops layer, no glm")

@@ -1,8 +1,7 @@
 /**
  * @file llrendermatrix_test.cpp
  * @brief The matrix stack, the projection helpers and the clip-plane
- *        classes on the native matrix, against what glm computed for the
- *        same calls.
+ *        classes, against the scalar matrix and the formulas.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -28,17 +27,14 @@
 
 #include "../llrender.h"
 #include "../llgl.h"
+#include "alprojection.h"
 #include "llplane.h"
+#include "m4math.h"
+#include "llquaternion.h"
 
 #include "../test/lltut.h"
 
-#include "glm/mat4x4.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/matrix_access.hpp"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_projection.hpp"
-
+#include <cstring>
 #include <sstream>
 
 namespace tut
@@ -74,10 +70,10 @@ namespace tut
     tut::llrendermatrix_test llrendermatrix_testgroup("llrendermatrix");
 
     // Every element within tolerance of the larger magnitude, or of one.
-    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const glm::mat4& expected, F32 tolerance)
+    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const LLMatrix4a& expected, F32 tolerance)
     {
         const F32* a = actual.getF32ptr();
-        const F32* e = glm::value_ptr(expected);
+        const F32* e = expected.getF32ptr();
         for (S32 i = 0; i < 16; ++i)
         {
             const F32 scale = llmax(1.f, fabsf(a[i]), fabsf(e[i]));
@@ -87,7 +83,7 @@ namespace tut
         }
     }
 
-    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const glm::vec3& expected, F32 tolerance)
+    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const LLVector4a& expected, F32 tolerance)
     {
         for (S32 i = 0; i < 3; ++i)
         {
@@ -98,13 +94,19 @@ namespace tut
         }
     }
 
-    // What the reverse-Z rewrite did on glm: row 2 becomes half of row 3 less row 2.
-    glm::mat4 glm_reverse_z(const glm::mat4& p)
+    bool same_bytes(const LLMatrix4a& a, const LLMatrix4a& b)
     {
-        glm::mat4 r = p;
-        for (int c = 0; c < 4; ++c)
+        return std::memcmp(a.getF32ptr(), b.getF32ptr(), sizeof(F32) * 16) == 0;
+    }
+
+    // The reverse-Z rewrite on the floats: the depth lane of every row
+    // becomes half of the w lane less the depth lane.
+    LLMatrix4a reversed_z(const LLMatrix4a& p)
+    {
+        LLMatrix4a r = p;
+        for (S32 row = 0; row < 4; ++row)
         {
-            r[c][2] = 0.5f * (p[c][3] - p[c][2]);
+            r.mMatrix[row].getF32ptr()[2] = 0.5f * (p.mMatrix[row][3] - p.mMatrix[row][2]);
         }
         return r;
     }
@@ -114,8 +116,9 @@ namespace tut
                              0.f, 0.f, 1.f, 0.f,
                              5.f, -7.f, 9.f, 1.f };
 
-    // The stack ops post-multiply as glm's translate, scale, rotate and
-    // operator*= did.
+    // The stack ops apply the new transform ahead of what the stack held,
+    // which on the scalar matrix is the product written the other way
+    // round.
     template<> template<>
     void llrendermatrix_object::test<1>()
     {
@@ -125,19 +128,29 @@ namespace tut
         gGL.rotatef(30.f, 0.f, 0.f, 1.f);
         gGL.multMatrix(M_ROWS);
 
-        glm::mat4 expected = glm::make_mat4(M_ROWS);
-        expected = glm::translate(expected, glm::vec3(1.f, 2.f, 3.f));
-        expected = glm::scale(expected, glm::vec3(2.f, 3.f, 4.f));
-        expected = glm::rotate(expected, glm::radians(30.f), glm::vec3(0.f, 0.f, 1.f));
-        expected *= glm::make_mat4(M_ROWS);
-        ensure_matrix_close("the stack after translate, scale, rotate, mult", gGL.getModelviewMatrix(), expected, 1e-5f);
+        // the scalar matrix: mult first, then the rotation, the scale, the
+        // translation, then the matrix loaded first
+        LLMatrix4 t;
+        t.setTranslation(1.f, 2.f, 3.f);
+        LLMatrix4 s;
+        s.mMatrix[0][0] = 2.f;
+        s.mMatrix[1][1] = 3.f;
+        s.mMatrix[2][2] = 4.f;
+        LLMatrix4 r;
+        r.initRotation(LLQuaternion(30.f * DEG_TO_RAD, LLVector3(0.f, 0.f, 1.f)));
+        LLMatrix4 expected(M_ROWS);
+        expected *= r;
+        expected *= s;
+        expected *= t;
+        expected *= LLMatrix4(M_ROWS);
+        ensure_matrix_close("the stack after translate, scale, rotate, mult", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
 
         // push copies, pop restores
         gGL.pushMatrix();
         gGL.loadIdentity();
         ensure("loadIdentity", gGL.getModelviewMatrix() == LLMatrix4a::identity());
         gGL.popMatrix();
-        ensure_matrix_close("popMatrix restores", gGL.getModelviewMatrix(), expected, 1e-5f);
+        ensure_matrix_close("popMatrix restores", gGL.getModelviewMatrix(), LLMatrix4a(expected), 1e-5f);
 
         // the modes are separate stacks
         gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -153,45 +166,49 @@ namespace tut
             LLRender::sReverseZ = reverse;
             const std::string when = reverse ? " under reverse-Z" : " forward";
 
-            const glm::mat4 gortho = glm::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f);
-            const glm::mat4 gpersp = glm::perspective(1.1f, 1.777f, 0.25f, 1024.f);
-            const glm::mat4 expected_ortho = reverse ? glm_reverse_z(gortho) : gortho;
-            const glm::mat4 expected_persp = reverse ? glm_reverse_z(gpersp) : gpersp;
+            const LLMatrix4a ortho = LLMatrix4a::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f);
+            const LLMatrix4a persp = LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f);
+            const LLMatrix4a expected_ortho = reverse ? reversed_z(ortho) : ortho;
+            const LLMatrix4a expected_persp = reverse ? reversed_z(persp) : persp;
 
-            ensure_matrix_close("al_ortho" + when, al_ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), expected_ortho, 2e-6f);
-            ensure_matrix_close("al_perspective" + when, al_perspective(1.1f, 1.777f, 0.25f, 1024.f), expected_persp, 2e-6f);
-            ensure_matrix_close("al_reverse_z_transform" + when, al_reverse_z_transform(LLMatrix4a(gpersp)), glm_reverse_z(gpersp), 0.f);
+            ensure("al_ortho" + when, same_bytes(al_ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), expected_ortho));
+            ensure("al_perspective" + when, same_bytes(al_perspective(1.1f, 1.777f, 0.25f, 1024.f), expected_persp));
+            ensure("al_reverse_z_transform" + when, same_bytes(al_reverse_z_transform(persp), reversed_z(persp)));
+
+            // a reversed projection puts the near plane at window 1 and the
+            // far at 0
+            LLVector4a near_clip, far_clip;
+            expected_persp.transform4(LLVector4a(0.f, 0.f, -0.25f, 1.f), near_clip);
+            expected_persp.transform4(LLVector4a(0.f, 0.f, -1024.f, 1.f), far_clip);
+            ensure_approximately_equals_range(("near plane depth" + when).c_str(), near_clip[2] / near_clip[3], reverse ? 1.f : -1.f, 1e-5f);
+            ensure_approximately_equals_range(("far plane depth" + when).c_str(), far_clip[2] / far_clip[3], reverse ? 0.f : 1.f, 1e-5f);
 
             gGL.matrixMode(LLRender::MM_PROJECTION);
             gGL.loadMatrix(M_ROWS);
             gGL.ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f);
-            ensure_matrix_close("gGL.ortho post-multiplies" + when, gGL.getProjectionMatrix(), glm::make_mat4(M_ROWS) * expected_ortho, 1e-5f);
+            LLMatrix4a expected_stack;
+            expected_stack.setMul(expected_ortho, LLMatrix4a(M_ROWS));
+            ensure_matrix_close("gGL.ortho applies ahead of the stack" + when, gGL.getProjectionMatrix(), expected_stack, 1e-5f);
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
 
             // project and unproject choose the form by the convention
             const S32 viewport[4] = { 10, 20, 1280, 720 };
-            const glm::ivec4 gviewport(10, 20, 1280, 720);
-            const glm::mat4 gmv = glm::translate(glm::identity<glm::mat4>(), glm::vec3(3.f, -2.f, -20.f));
-            const LLMatrix4a mv(gmv);
-            const LLMatrix4a persp(expected_persp);
+            const LLMatrix4a mv = LLMatrix4a::translation(3.f, -2.f, -20.f);
             const LLVector4a obj(1.f, 2.f, 3.f, 1.f);
-            const glm::vec3 gobj(1.f, 2.f, 3.f);
 
-            const LLVector4a win = al_project(obj, mv, persp, viewport);
-            const glm::vec3 gwin = reverse ? glm::projectZO(gobj, gmv, expected_persp, gviewport) : glm::project(gobj, gmv, expected_persp, gviewport);
-            ensure_vector_close("al_project" + when, win, gwin, 1e-4f);
+            const LLVector4a win = al_project(obj, mv, expected_persp, viewport);
+            const LLVector4a expected_win = reverse ? alprojection::project_zo(obj, mv, expected_persp, viewport) : alprojection::project(obj, mv, expected_persp, viewport);
+            ensure_vector_close("al_project" + when, win, expected_win, 1e-6f);
+            ensure("window depth is in [0, 1]" + when, win[2] >= 0.f && win[2] <= 1.f);
 
-            const LLVector4a back = al_unproject(win, mv, persp, viewport);
-            const glm::vec3 gback = reverse ? glm::unProjectZO(gwin, gmv, expected_persp, gviewport) : glm::unProject(gwin, gmv, expected_persp, gviewport);
-            ensure_vector_close("al_unproject" + when, back, gback, 5e-4f);
-            ensure_vector_close("al_unproject of al_project" + when, back, gobj, 5e-4f);
+            const LLVector4a back = al_unproject(win, mv, expected_persp, viewport);
+            ensure_vector_close("al_unproject of al_project" + when, back, obj, 5e-4f);
 
-            // and the glm forms give the same numbers
-            const glm::vec3 bwin = al_project(gobj, gmv, expected_persp, gviewport);
-            ensure_vector_close("al_project on glm" + when, win, bwin, 1e-6f);
-            const glm::vec3 bback = al_unproject(bwin, gmv, expected_persp, gviewport);
-            ensure_vector_close("al_unproject on glm" + when, back, bback, 1e-6f);
+            LLMatrix4a inverse;
+            inverse.setMul(mv, expected_persp);
+            inverse.invert();
+            ensure_vector_close("al_unproject through the inverse" + when, al_unproject(win, inverse, viewport), back, 1e-6f);
         }
     }
 
@@ -200,7 +217,7 @@ namespace tut
     template<> template<>
     void llrendermatrix_object::test<3>()
     {
-        const glm::mat4 gpersp = glm::perspective(1.1f, 1.777f, 0.25f, 1024.f);
+        const LLMatrix4a persp = LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f);
         for (bool reverse : { false, true })
         {
             LLRender::sReverseZ = reverse;
@@ -208,50 +225,75 @@ namespace tut
             for (U32 layer : { 0u, 1u, 3u })
             {
                 gGL.matrixMode(LLRender::MM_PROJECTION);
-                gGL.loadMatrix(LLMatrix4a(gpersp));
+                gGL.loadMatrix(persp);
                 gGL.matrixMode(LLRender::MM_MODELVIEW);
                 {
-                    LLGLSquashToFarClip squash(LLMatrix4a(gpersp), layer);
+                    LLGLSquashToFarClip squash(persp, layer);
                     const F32 depth = reverse ? (0.000005f + 0.00005f * layer) : (0.99999f - 0.0001f * layer);
-                    glm::mat4 expected = gpersp;
-                    expected = glm::row(expected, 2, glm::row(gpersp, 3) * depth);
-                    ensure_matrix_close("squashed projection" + when, gGL.getProjectionMatrix(), expected, 0.f);
+                    LLMatrix4a expected = persp;
+                    for (S32 row = 0; row < 4; ++row)
+                    {
+                        expected.mMatrix[row].getF32ptr()[2] = persp.mMatrix[row][3] * depth;
+                    }
+                    ensure("squashed projection" + when, same_bytes(gGL.getProjectionMatrix(), expected));
                     ensure("the mode is left where it was", gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
+
+                    // every point lands at that depth
+                    LLVector4a clip;
+                    gGL.getProjectionMatrix().transform4(LLVector4a(0.3f, -0.2f, -50.f, 1.f), clip);
+                    ensure_approximately_equals_range(("squashed depth" + when).c_str(), clip[2] / clip[3], depth, 1e-6f);
                 }
-                ensure_matrix_close("projection restored" + when, gGL.getProjectionMatrix(), gpersp, 0.f);
+                ensure("projection restored" + when, same_bytes(gGL.getProjectionMatrix(), persp));
             }
         }
     }
 
     // The oblique clip plane: the plane through the inverse transpose of
-    // the modelview then projection, normalized on depth, written into the
-    // projection's depth column.
+    // the modelview then projection, normalized on depth, applied after
+    // the projection as its depth.
     template<> template<>
     void llrendermatrix_object::test<4>()
     {
-        const glm::mat4 gpersp = glm::perspective(1.1f, 1.777f, 0.25f, 1024.f);
-        const glm::mat4 gmv = glm::rotate(glm::translate(glm::identity<glm::mat4>(), glm::vec3(3.f, -2.f, -20.f)), 0.4f, glm::vec3(0.f, 1.f, 0.f));
+        const LLMatrix4a persp = LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f);
+        LLMatrix4a mv;
+        mv.setMul(LLMatrix4a::rotation(0.4f, LLVector4a(0.f, 1.f, 0.f)), LLMatrix4a::translation(3.f, -2.f, -20.f));
         const LLPlane plane(LLVector3(0.f, 0.f, 1.f), -12.5f);
 
         gGL.matrixMode(LLRender::MM_PROJECTION);
-        gGL.loadMatrix(LLMatrix4a(gpersp));
+        gGL.loadMatrix(persp);
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         {
-            LLGLUserClipPlane clip(plane, LLMatrix4a(gmv), LLMatrix4a(gpersp));
+            LLGLUserClipPlane clip(plane, mv, persp);
 
-            const glm::mat4 invtrans = glm::transpose(glm::inverse(gpersp * gmv));
-            glm::vec4 cplane = invtrans * glm::vec4(-plane[0], -plane[1], -plane[2], -plane[3]);
-            cplane /= fabsf(cplane[2]);
-            cplane[3] -= 1.f;
+            LLMatrix4a invtrans;
+            invtrans.setMul(mv, persp);
+            invtrans.invert();
+            invtrans.transpose();
+            LLVector4a cplane;
+            invtrans.transform4(LLVector4a(-plane[0], -plane[1], -plane[2], -plane[3]), cplane);
+            cplane.mul(1.f / fabsf(cplane[2]));
+            cplane.getF32ptr()[3] -= 1.f;
             if (cplane[2] < 0.f)
             {
-                cplane *= -1.f;
+                cplane.negate();
             }
-            glm::mat4 suffix = glm::identity<glm::mat4>();
-            suffix = glm::row(suffix, 2, cplane);
-            const glm::mat4 expected = suffix * gpersp;
-            ensure_matrix_close("oblique projection", gGL.getProjectionMatrix(), expected, 1e-4f);
+            // the projection, then the plane written over its depth
+            LLMatrix4a suffix;
+            suffix.setIdentity();
+            suffix.setColumn<2>(cplane);
+            LLMatrix4a expected;
+            expected.setMul(persp, suffix);
+            ensure_matrix_close("oblique projection", gGL.getProjectionMatrix(), expected, 1e-5f);
+
+            // only the depth column moved
+            for (S32 column : { 0, 1, 3 })
+            {
+                for (S32 row = 0; row < 4; ++row)
+                {
+                    ensure_equals("the other columns are the projection's", gGL.getProjectionMatrix().mMatrix[row][column], persp.mMatrix[row][column]);
+                }
+            }
         }
-        ensure_matrix_close("projection restored", gGL.getProjectionMatrix(), gpersp, 0.f);
+        ensure("projection restored", same_bytes(gGL.getProjectionMatrix(), persp));
     }
 }

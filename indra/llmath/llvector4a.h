@@ -33,9 +33,6 @@ class LLRotation;
 #include <assert.h>
 #include "llpreprocessor.h"
 #include "llmemory.h"
-#include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
-#include "glm/gtc/type_ptr.hpp"
 
 // A four-lane float vector in one register: x, y, z and w, w usually
 // carried along rather than meant. Every operation is a lane-wise
@@ -358,16 +355,6 @@ public:
     inline const LLVector4a& operator= ( const LLQuad& rhs );
 
     inline operator LLQuad() const;
-
-    explicit inline operator glm::vec3() const
-    {
-        return glm::make_vec3(getF32ptr());
-    };
-
-    explicit inline operator glm::vec4() const
-    {
-        return glm::make_vec4(getF32ptr());
-    };
 
 private:
     LLQuad mQ;

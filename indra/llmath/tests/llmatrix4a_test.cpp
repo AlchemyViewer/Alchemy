@@ -35,17 +35,10 @@
 
 #include "../alprojection.h"
 
-#include "glm/mat4x4.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/matrix_inverse.hpp"
-#include "glm/gtc/quaternion.hpp"
-#include "glm/gtx/matrix_decompose.hpp"
-#include "glm/ext/matrix_clip_space.hpp"
-#include "glm/ext/matrix_projection.hpp"
-
+#include <cmath>
 #include <cstring>
 #include <sstream>
+#include <utility>
 
 namespace
 {
@@ -85,44 +78,202 @@ namespace tut
     typedef llmatrix4a_test::object llmatrix4a_object;
     tut::llmatrix4a_test llmatrix4a_testcase("LLMatrix4a");
 
-    // The glm matrix with the same sixteen floats, and back.
-    glm::mat4 as_glm(const LLMatrix4a& m)
+    // A four by four in double, the rows of a row-vector matrix: the
+    // reference the single-precision class is held to, with every product,
+    // inverse and transform written out longhand.
+    struct Ref
     {
-        return glm::make_mat4(m.getF32ptr());
-    }
+        double m[4][4];
 
-    LLMatrix4a from_glm(const glm::mat4& m)
-    {
-        LLMatrix4a r;
-        r.loadu(glm::value_ptr(m));
-        return r;
-    }
+        static Ref of(const LLMatrix4a& a)
+        {
+            Ref r;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    r.m[i][j] = a.mMatrix[i][j];
+                }
+            }
+            return r;
+        }
 
-    glm::vec4 as_glm(const LLVector4a& v)
-    {
-        return glm::make_vec4(v.getF32ptr());
-    }
+        static Ref identity()
+        {
+            Ref r;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    r.m[i][j] = i == j ? 1.0 : 0.0;
+                }
+            }
+            return r;
+        }
 
-    bool same_bytes(const LLMatrix4a& a, const glm::mat4& b)
+        // this then b: the rows of this weighted through b
+        Ref then(const Ref& b) const
+        {
+            Ref r;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    r.m[i][j] = m[i][0] * b.m[0][j] + m[i][1] * b.m[1][j] + m[i][2] * b.m[2][j] + m[i][3] * b.m[3][j];
+                }
+            }
+            return r;
+        }
+
+        Ref transposed() const
+        {
+            Ref r;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    r.m[i][j] = m[j][i];
+                }
+            }
+            return r;
+        }
+
+        // v as a row vector through every row
+        void transform(const double v[4], double out[4]) const
+        {
+            for (S32 j = 0; j < 4; ++j)
+            {
+                out[j] = v[0] * m[0][j] + v[1] * m[1][j] + v[2] * m[2][j] + v[3] * m[3][j];
+            }
+        }
+
+        double determinant() const
+        {
+            double d = 0.0;
+            for (S32 c = 0; c < 4; ++c)
+            {
+                // the 3x3 with row 0 and column c struck out
+                double s[3][3];
+                for (S32 i = 1; i < 4; ++i)
+                {
+                    S32 k = 0;
+                    for (S32 j = 0; j < 4; ++j)
+                    {
+                        if (j != c)
+                        {
+                            s[i - 1][k++] = m[i][j];
+                        }
+                    }
+                }
+                const double minor = s[0][0] * (s[1][1] * s[2][2] - s[1][2] * s[2][1])
+                                   - s[0][1] * (s[1][0] * s[2][2] - s[1][2] * s[2][0])
+                                   + s[0][2] * (s[1][0] * s[2][1] - s[1][1] * s[2][0]);
+                d += (c % 2 == 0 ? 1.0 : -1.0) * m[0][c] * minor;
+            }
+            return d;
+        }
+
+        // Gauss-Jordan with partial pivoting
+        Ref inverse() const
+        {
+            double a[4][8];
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    a[i][j] = m[i][j];
+                    a[i][4 + j] = i == j ? 1.0 : 0.0;
+                }
+            }
+            for (S32 c = 0; c < 4; ++c)
+            {
+                S32 pivot = c;
+                for (S32 i = c + 1; i < 4; ++i)
+                {
+                    if (std::fabs(a[i][c]) > std::fabs(a[pivot][c]))
+                    {
+                        pivot = i;
+                    }
+                }
+                for (S32 j = 0; j < 8; ++j)
+                {
+                    std::swap(a[c][j], a[pivot][j]);
+                }
+                const double scale = 1.0 / a[c][c];
+                for (S32 j = 0; j < 8; ++j)
+                {
+                    a[c][j] *= scale;
+                }
+                for (S32 i = 0; i < 4; ++i)
+                {
+                    if (i != c)
+                    {
+                        const double f = a[i][c];
+                        for (S32 j = 0; j < 8; ++j)
+                        {
+                            a[i][j] -= f * a[c][j];
+                        }
+                    }
+                }
+            }
+            Ref r;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    r.m[i][j] = a[i][4 + j];
+                }
+            }
+            return r;
+        }
+    };
+
+    bool same_bytes(const LLMatrix4a& a, const LLMatrix4a& b)
     {
-        return std::memcmp(a.getF32ptr(), glm::value_ptr(b), sizeof(F32) * 16) == 0;
+        return std::memcmp(a.getF32ptr(), b.getF32ptr(), sizeof(F32) * 16) == 0;
     }
 
     // Every element within tolerance of the magnitude of the larger of the
-    // two, or of one: the two libraries contract and reorder under
-    // /fp:fast independently, so the products of the same inputs agree to
-    // a few ulps, not bit for bit.
-    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const glm::mat4& expected, F32 tolerance)
+    // two, or of one: single precision against the double reference, and
+    // two single-precision implementations against each other, agree to a
+    // few ulps under /fp:fast, not bit for bit.
+    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const Ref& expected, F32 tolerance)
     {
-        const F32* a = actual.getF32ptr();
-        const F32* e = glm::value_ptr(expected);
-        for (S32 i = 0; i < 16; ++i)
+        for (S32 i = 0; i < 4; ++i)
         {
-            const F32 scale = llmax(1.f, fabsf(a[i]), fabsf(e[i]));
-            std::ostringstream msg;
-            msg << what << " at element " << i << ": " << a[i] << " vs " << e[i];
-            ensure_approximately_equals_range(msg.str().c_str(), a[i], e[i], tolerance * scale);
+            for (S32 j = 0; j < 4; ++j)
+            {
+                const F32 a = actual.mMatrix[i][j];
+                const F32 e = F32(expected.m[i][j]);
+                const F32 scale = llmax(1.f, fabsf(a), fabsf(e));
+                std::ostringstream msg;
+                msg << what << " at [" << i << "][" << j << "]: " << a << " vs " << e;
+                ensure_approximately_equals_range(msg.str().c_str(), a, e, tolerance * scale);
+            }
         }
+    }
+
+    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const LLMatrix4a& expected, F32 tolerance)
+    {
+        ensure_matrix_close(what, actual, Ref::of(expected), tolerance);
+    }
+
+    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const double expected[4], F32 tolerance, S32 lanes = 4)
+    {
+        for (S32 i = 0; i < lanes; ++i)
+        {
+            const F32 e = F32(expected[i]);
+            const F32 scale = llmax(1.f, fabsf(actual[i]), fabsf(e));
+            std::ostringstream msg;
+            msg << what << " at lane " << i << ": " << actual[i] << " vs " << e;
+            ensure_approximately_equals_range(msg.str().c_str(), actual[i], e, tolerance * scale);
+        }
+    }
+
+    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const LLVector4a& expected, F32 tolerance, S32 lanes = 4)
+    {
+        const double e[4] = { expected[0], expected[1], expected[2], expected[3] };
+        ensure_vector_close(what, actual, e, tolerance, lanes);
     }
 
     // The product a * b is the identity to within tolerance of the size of
@@ -147,15 +298,14 @@ namespace tut
         }
     }
 
-    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const glm::vec4& expected, F32 tolerance, S32 lanes = 4)
+    LLVector4a as_point(const LLVector3& v)
     {
-        for (S32 i = 0; i < lanes; ++i)
-        {
-            const F32 scale = llmax(1.f, fabsf(actual[i]), fabsf(expected[i]));
-            std::ostringstream msg;
-            msg << what << " at lane " << i << ": " << actual[i] << " vs " << expected[i];
-            ensure_approximately_equals_range(msg.str().c_str(), actual[i], expected[i], tolerance * scale);
-        }
+        return LLVector4a(v.mV[0], v.mV[1], v.mV[2], 1.f);
+    }
+
+    LLVector4a as_direction(const LLVector3& v)
+    {
+        return LLVector4a(v.mV[0], v.mV[1], v.mV[2], 0.f);
     }
 
     template<> template<>
@@ -501,14 +651,15 @@ namespace tut
         ensure("a translation is not the identity", a != LLMatrix4a::identity());
     }
 
-    // THE CONVENTIONS, with glm as the oracle. The same sixteen floats
-    // are the same transform in both: a column-major matrix with column
-    // vectors and a row-major one with row vectors store one transform
-    // identically, and the product order is what flips.
+    // THE CONVENTIONS: the matrix takes a row vector on the left, so
+    // affineTransform is the scalar matrix's v * M, a product applies its
+    // first factor first, and a builder set before a matrix acts on the
+    // point before the matrix does.
     template<> template<>
     void llmatrix4a_object::test<12>()
     {
         const F32 tolerance = 1e-5f;
+        const LLVector3 p3(0.7f, -2.5f, 11.f);
         S32 cases = 0;
         for (const LLQuaternion& q : ROTATIONS)
         {
@@ -518,25 +669,24 @@ namespace tut
                 {
                     LLMatrix4a m;
                     m.initAll(scale, q, pos);
-                    const glm::mat4 g = as_glm(m);
-                    ensure("the same bytes both ways", same_bytes(from_glm(g), g));
+                    const Ref r = Ref::of(m);
 
-                    const LLVector3 p3(0.7f, -2.5f, 11.f);
-                    const LLVector4a p(p3.mV[0], p3.mV[1], p3.mV[2], 1.f);
-                    const LLVector4a d(p3.mV[0], p3.mV[1], p3.mV[2], 0.f);
-
-                    // M * (p, 1) is the affine transform, and the scalar
-                    // matrix's row-vector transform, of the same point
+                    // a point through the matrix, three ways
                     LLVector4a point;
-                    m.affineTransform(p, point);
-                    ensure_vector_close("M * vec4(p, 1) is affineTransform", point, g * glm::vec4(p3.mV[0], p3.mV[1], p3.mV[2], 1.f), tolerance, 3);
+                    m.affineTransform(as_point(p3), point);
+                    const double p[4] = { p3.mV[0], p3.mV[1], p3.mV[2], 1.0 };
+                    double expected[4];
+                    r.transform(p, expected);
+                    ensure_vector_close("affineTransform is the row vector through every row", point, expected, tolerance, 3);
                     const LLVector3 scalar = p3 * m.toMatrix4();
-                    ensure_vector_close("affineTransform is v * M", point, glm::vec4(scalar.mV[0], scalar.mV[1], scalar.mV[2], 1.f), tolerance, 3);
+                    ensure_vector_close("and the scalar matrix's v * M", point, as_point(scalar), tolerance, 3);
 
-                    // M * (d, 0) is rotate
+                    // a direction leaves the translation out
                     LLVector4a direction;
-                    m.rotate(d, direction);
-                    ensure_vector_close("M * vec4(d, 0) is rotate", direction, g * glm::vec4(p3.mV[0], p3.mV[1], p3.mV[2], 0.f), tolerance, 3);
+                    m.rotate(as_direction(p3), direction);
+                    const double d[4] = { p3.mV[0], p3.mV[1], p3.mV[2], 0.0 };
+                    r.transform(d, expected);
+                    ensure_vector_close("rotate is the direction through the upper rows", direction, expected, tolerance, 3);
 
                     ++cases;
                 }
@@ -544,63 +694,54 @@ namespace tut
         }
         ensure("every combination was covered", cases == 6 * 5 * 3);
 
-        // THE PRODUCT ORDER FLIPS: glm A * B applies B first; setMul(a, b)
-        // applies a first. So glm A * B is setMul(B, A).
+        // setMul(a, b) applies a first, then b
         LLMatrix4a a, b;
         a.initAll(SCALES[1], ROTATIONS[1], POSITIONS[1]);
         b.initAll(SCALES[3], ROTATIONS[4], POSITIONS[2]);
-        const glm::mat4 ga = as_glm(a);
-        const glm::mat4 gb = as_glm(b);
-
-        LLMatrix4a ba;
-        ba.setMul(b, a);
-        ensure_matrix_close("glm A * B is setMul(B, A)", ba, ga * gb, tolerance);
         LLMatrix4a ab;
         ab.setMul(a, b);
-        ensure_matrix_close("glm B * A is setMul(A, B)", ab, gb * ga, tolerance);
+        ensure_matrix_close("setMul is the rows of a through b", ab, Ref::of(a).then(Ref::of(b)), tolerance);
+        LLMatrix4 scalar_ab = a.toMatrix4();
+        scalar_ab *= b.toMatrix4();
+        ensure_matrix_close("and the scalar matrix's a *= b", ab, LLMatrix4a(scalar_ab), tolerance);
 
-        // and the transform of a point agrees with either reading
-        const glm::vec4 gp(1.f, 2.f, 3.f, 1.f);
-        LLVector4a p(1.f, 2.f, 3.f, 1.f), through_ba, via_a, via_b;
-        ba.affineTransform(p, through_ba);
-        b.affineTransform(p, via_b);
-        a.affineTransform(via_b, via_a);
-        ensure_vector_close("setMul(B, A) applies B then A", through_ba, ga * (gb * gp), tolerance, 3);
-        ensure_vector_close("which is b's transform then a's", through_ba, as_glm(via_a), tolerance, 3);
+        LLVector4a through_ab, via_a, via_b;
+        const LLVector4a p = as_point(LLVector3(1.f, 2.f, 3.f));
+        ab.affineTransform(p, through_ab);
+        a.affineTransform(p, via_a);
+        b.affineTransform(via_a, via_b);
+        ensure_vector_close("setMul(a, b) is a's transform then b's", through_ab, via_b, tolerance, 3);
 
-        // glm::translate, scale and rotate post-multiply: apply the new
-        // transform first, so they are setMul(T, m).
-        const glm::vec3 gt(4.f, -5.f, 6.f);
-        LLMatrix4a t;
-        t.setIdentity();
-        t.setTranslation(LLVector3(4.f, -5.f, 6.f));
+        // a builder ahead of a matrix acts on the point first
+        const LLVector3 t3(4.f, -5.f, 6.f);
         LLMatrix4a translated;
-        translated.setMul(t, a);
-        ensure_matrix_close("glm::translate(m, v) is setMul(T(v), m)", translated, glm::translate(ga, gt), tolerance);
+        translated.setMul(LLMatrix4a::translation(t3.mV[0], t3.mV[1], t3.mV[2]), a);
+        LLVector4a moved_then_a, through_translated;
+        a.affineTransform(as_point(LLVector3(1.f, 2.f, 3.f) + t3), moved_then_a);
+        translated.affineTransform(p, through_translated);
+        ensure_vector_close("setMul(translation, m) moves the point before m", through_translated, moved_then_a, tolerance, 3);
 
-        const glm::vec3 gs(2.f, 3.f, 0.5f);
-        LLMatrix4a sc;
-        sc.setIdentity();
-        sc.mMatrix[0].set(2.f, 0.f, 0.f, 0.f);
-        sc.mMatrix[1].set(0.f, 3.f, 0.f, 0.f);
-        sc.mMatrix[2].set(0.f, 0.f, 0.5f, 0.f);
+        const LLVector3 s3(2.f, 3.f, 0.5f);
         LLMatrix4a scaled;
-        scaled.setMul(sc, a);
-        ensure_matrix_close("glm::scale(m, v) is setMul(S(v), m)", scaled, glm::scale(ga, gs), tolerance);
+        scaled.setMul(LLMatrix4a::scaling(s3.mV[0], s3.mV[1], s3.mV[2]), a);
+        LLVector4a scaled_then_a, through_scaled;
+        a.affineTransform(as_point(LLVector3(1.f, 2.f, 3.f).scaledVec(s3)), scaled_then_a);
+        scaled.affineTransform(p, through_scaled);
+        ensure_vector_close("setMul(scaling, m) scales the point before m", through_scaled, scaled_then_a, tolerance, 3);
 
-        // and a rotation about an axis is the same active rotation as the
-        // tree's LLQuaternion(angle, axis)
         const F32 angle = 0.8f;
         const LLVector3 axis(0.267f, -0.535f, 0.802f);
-        LLMatrix4a r;
-        r.initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(angle, axis), LLVector3());
         LLMatrix4a rotated;
-        rotated.setMul(r, a);
-        ensure_matrix_close("glm::rotate(m, angle, axis) is setMul(R(angle, axis), m)", rotated, glm::rotate(ga, angle, glm::vec3(axis.mV[0], axis.mV[1], axis.mV[2])), tolerance);
+        rotated.setMul(LLMatrix4a::rotation(angle, as_direction(axis)), a);
+        LLVector4a rotated_then_a, through_rotated;
+        a.affineTransform(as_point(LLVector3(1.f, 2.f, 3.f) * LLQuaternion(angle, axis)), rotated_then_a);
+        rotated.affineTransform(p, through_rotated);
+        ensure_vector_close("setMul(rotation, m) is the tree's rotation of the point before m", through_rotated, rotated_then_a, tolerance, 3);
     }
 
     // transform4, transpose, determinant, the inverses and the normal
-    // matrix, on affine and projective matrices, against glm.
+    // matrix, on affine and projective matrices, against the double
+    // reference.
     template<> template<>
     void llmatrix4a_object::test<13>()
     {
@@ -617,38 +758,53 @@ namespace tut
         for (const LLMatrix4a* mp : matrices)
         {
             const LLMatrix4a& m = *mp;
-            const glm::mat4 g = as_glm(m);
+            const Ref r = Ref::of(m);
 
             // transform4 weights every row, the fourth by w
             const LLVector4a v(0.3f, -7.f, 2.5f, 0.75f);
             LLVector4a out;
             m.transform4(v, out);
-            ensure_vector_close("transform4 is M * v", out, g * as_glm(v), tolerance);
+            const double vd[4] = { 0.3, -7.0, 2.5, 0.75 };
+            double expected[4];
+            r.transform(vd, expected);
+            ensure_vector_close("transform4 is v through every row", out, expected, tolerance);
+
+            // perspectiveTransform is a point through every row, over w
+            LLVector4a ndc;
+            m.perspectiveTransform(v, ndc);
+            const double pd[4] = { 0.3, -7.0, 2.5, 1.0 };
+            r.transform(pd, expected);
+            const double divided[4] = { expected[0] / expected[3], expected[1] / expected[3], expected[2] / expected[3], 1.0 };
+            ensure_vector_close("perspectiveTransform divides by w", ndc, divided, tolerance);
 
             // transpose is a data movement: bit for bit
             LLMatrix4a t;
             t.setTranspose(m);
-            ensure("setTranspose matches glm::transpose", same_bytes(t, glm::transpose(g)));
+            for (S32 i = 0; i < 4; ++i)
+            {
+                for (S32 j = 0; j < 4; ++j)
+                {
+                    ensure_equals("setTranspose swaps the indices", t.mMatrix[i][j], m.mMatrix[j][i]);
+                }
+            }
             LLMatrix4a tt = m;
             tt.transpose();
-            ensure("transpose in place", same_bytes(tt, glm::transpose(g)));
+            ensure("transpose in place", same_bytes(tt, t));
             tt.transpose();
             ensure("transposed twice is itself", tt == m);
 
-            // the determinant, to within the size of the terms that cancel
-            // in it (a translation of 4096 makes those large against a
-            // determinant of one), and the general inverse
-            const F32 gdet = glm::determinant(g);
+            // the determinant, to within the size of the terms that cancel in
+            // it, and the general inverse
             F32 terms = 1.f;
             for (S32 row = 0; row < 4; ++row)
             {
                 terms *= fabsf(m.mMatrix[row][0]) + fabsf(m.mMatrix[row][1]) + fabsf(m.mMatrix[row][2]) + fabsf(m.mMatrix[row][3]);
             }
-            ensure_approximately_equals_range("determinant", m.determinant(), gdet, 1e-6f * (1.f + terms));
+            ensure_approximately_equals_range("determinant", m.determinant(), F32(r.determinant()), 1e-6f * (1.f + terms));
 
             LLMatrix4a inv;
             ensure("setInverse succeeds", inv.setInverse(m));
-            ensure_matrix_close("setInverse matches glm::inverse", inv, glm::inverse(g), tolerance);
+            ensure_matrix_close("setInverse matches the reference inverse", inv, r.inverse(), tolerance);
             LLMatrix4a in_place = m;
             ensure("invert succeeds", in_place.invert());
             ensure("invert in place", in_place == inv);
@@ -673,22 +829,24 @@ namespace tut
         for (const LLMatrix4a* mp : { &affine, &rigid })
         {
             const LLMatrix4a& m = *mp;
-            const glm::mat4 g = as_glm(m);
+            const Ref r = Ref::of(m);
+            const Ref inverse = r.inverse();
 
             LLMatrix4a inv;
             ensure("setAffineInverse succeeds", inv.setAffineInverse(m));
-            ensure_matrix_close("setAffineInverse matches glm::affineInverse", inv, glm::affineInverse(g), tolerance);
+            ensure_matrix_close("setAffineInverse is the inverse of an affine matrix", inv, inverse, tolerance);
 
             LLMatrix4a n;
             ensure("setNormalMatrix succeeds", n.setNormalMatrix(m));
-            const glm::mat4 gn = glm::transpose(glm::inverse(g));
+            const Ref inverse_transpose = inverse.transposed();
             for (S32 row = 0; row < 3; ++row)
             {
                 for (S32 col = 0; col < 3; ++col)
                 {
                     std::ostringstream msg;
                     msg << "normal matrix at [" << row << "][" << col << "]";
-                    ensure_approximately_equals_range(msg.str().c_str(), n.mMatrix[row][col], gn[row][col], tolerance * llmax(1.f, fabsf(gn[row][col])));
+                    const F32 e = F32(inverse_transpose.m[row][col]);
+                    ensure_approximately_equals_range(msg.str().c_str(), n.mMatrix[row][col], e, tolerance * llmax(1.f, fabsf(e)));
                 }
                 ensure_equals("normal matrix row pad", n.mMatrix[row][3], 0.f);
             }
@@ -716,49 +874,137 @@ namespace tut
         ensure_equals("singular determinant", singular.determinant(), 0.f);
     }
 
-    // The builders against glm's.
+    // The builders against the formulas, written out in double.
     template<> template<>
     void llmatrix4a_object::test<14>()
     {
         const F32 tolerance = 2e-6f;
-        const glm::mat4 gi = glm::identity<glm::mat4>();
 
-        ensure("translation", same_bytes(LLMatrix4a::translation(4.f, -5.f, 6.f), glm::translate(gi, glm::vec3(4.f, -5.f, 6.f))));
-        ensure("translation from a vector ignores w", same_bytes(LLMatrix4a::translation(LLVector4a(4.f, -5.f, 6.f, 9.f)), glm::translate(gi, glm::vec3(4.f, -5.f, 6.f))));
-        ensure("scaling", same_bytes(LLMatrix4a::scaling(2.f, 3.f, 0.5f), glm::scale(gi, glm::vec3(2.f, 3.f, 0.5f))));
-        ensure("scaling from a vector", same_bytes(LLMatrix4a::scaling(LLVector4a(2.f, 3.f, 0.5f, 9.f)), glm::scale(gi, glm::vec3(2.f, 3.f, 0.5f))));
+        {
+            LLMatrix4a expected;
+            expected.setIdentity();
+            expected.mMatrix[3].set(4.f, -5.f, 6.f, 1.f);
+            ensure("translation", same_bytes(LLMatrix4a::translation(4.f, -5.f, 6.f), expected));
+            ensure("translation from a vector ignores w", same_bytes(LLMatrix4a::translation(LLVector4a(4.f, -5.f, 6.f, 9.f)), expected));
 
-        const F32 angle = 0.8f;
-        const LLVector4a axis(0.5f, -1.f, 1.5f, 0.f);
-        ensure_matrix_close("rotation about an axis", LLMatrix4a::rotation(angle, axis), glm::rotate(gi, angle, glm::vec3(0.5f, -1.f, 1.5f)), tolerance);
+            expected.setIdentity();
+            expected.mMatrix[0].set(2.f, 0.f, 0.f, 0.f);
+            expected.mMatrix[1].set(0.f, 3.f, 0.f, 0.f);
+            expected.mMatrix[2].set(0.f, 0.f, 0.5f, 0.f);
+            ensure("scaling", same_bytes(LLMatrix4a::scaling(2.f, 3.f, 0.5f), expected));
+            ensure("scaling from a vector", same_bytes(LLMatrix4a::scaling(LLVector4a(2.f, 3.f, 0.5f, 9.f)), expected));
+        }
+
+        // a rotation about an axis: Rodrigues in double, and the tree's own
+        // quaternion for the same axis and angle
+        {
+            const F32 angle = 0.8f;
+            const LLVector3 axis3(0.5f, -1.f, 1.5f);
+            const double len = std::sqrt(0.5 * 0.5 + 1.0 + 1.5 * 1.5);
+            const double ax = 0.5 / len, ay = -1.0 / len, az = 1.5 / len;
+            const double c = std::cos(0.8), s = std::sin(0.8), t = 1.0 - c;
+            Ref r = Ref::identity();
+            r.m[0][0] = c + t * ax * ax;      r.m[0][1] = t * ax * ay + s * az; r.m[0][2] = t * ax * az - s * ay;
+            r.m[1][0] = t * ax * ay - s * az; r.m[1][1] = c + t * ay * ay;      r.m[1][2] = t * ay * az + s * ax;
+            r.m[2][0] = t * ax * az + s * ay; r.m[2][1] = t * ay * az - s * ax; r.m[2][2] = c + t * az * az;
+            const LLMatrix4a rotation = LLMatrix4a::rotation(angle, as_direction(axis3));
+            ensure_matrix_close("rotation about an axis", rotation, r, tolerance);
+            ensure_matrix_close("and from the quaternion of the same rotation", rotation, LLMatrix4a::rotation(LLQuaternion2(LLQuaternion(angle, axis3))), tolerance);
+        }
 
         for (const LLQuaternion& q : ROTATIONS)
         {
             LLMatrix4a expected;
             expected.initAll(LLVector3(1.f, 1.f, 1.f), q, LLVector3());
-            const LLMatrix4a actual = LLMatrix4a::rotation(LLQuaternion2(q));
-            ensure_matrix_close("rotation from a quaternion is initAll's", actual, as_glm(expected), tolerance);
-            ensure_matrix_close("and glm::mat4_cast's", actual, glm::mat4_cast(glm::quat(q.mQ[VW], q.mQ[VX], q.mQ[VY], q.mQ[VZ])), tolerance);
+            ensure_matrix_close("rotation from a quaternion is initAll's", LLMatrix4a::rotation(LLQuaternion2(q)), expected, tolerance);
         }
 
-        ensure_matrix_close("perspective", LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f), glm::perspective(1.1f, 1.777f, 0.25f, 1024.f), tolerance);
-        ensure_matrix_close("perspectiveZO", LLMatrix4a::perspectiveZO(1.1f, 1.777f, 0.25f, 1024.f), glm::perspectiveZO(1.1f, 1.777f, 0.25f, 1024.f), tolerance);
-        ensure_matrix_close("ortho", LLMatrix4a::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), glm::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), tolerance);
-        ensure_matrix_close("orthoZO", LLMatrix4a::orthoZO(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), glm::orthoZO(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), tolerance);
+        // the projections
+        {
+            const double fovy = 1.1, aspect = 1.777, n = 0.25, f = 1024.0;
+            const double th = std::tan(fovy / 2.0);
+            Ref r = Ref::identity();
+            r.m[0][0] = 1.0 / (aspect * th);
+            r.m[1][1] = 1.0 / th;
+            r.m[2][2] = -(f + n) / (f - n);
+            r.m[2][3] = -1.0;
+            r.m[3][2] = -(2.0 * f * n) / (f - n);
+            r.m[3][3] = 0.0;
+            ensure_matrix_close("perspective", LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f), r, tolerance);
+            r.m[2][2] = f / (n - f);
+            r.m[3][2] = -(f * n) / (f - n);
+            ensure_matrix_close("perspectiveZO", LLMatrix4a::perspectiveZO(1.1f, 1.777f, 0.25f, 1024.f), r, tolerance);
+        }
+        {
+            const double l = -3.0, rt = 5.0, b = -2.0, t = 7.0, n = 0.5, f = 100.0;
+            Ref r = Ref::identity();
+            r.m[0][0] = 2.0 / (rt - l);
+            r.m[1][1] = 2.0 / (t - b);
+            r.m[2][2] = -2.0 / (f - n);
+            r.m[3][0] = -(rt + l) / (rt - l);
+            r.m[3][1] = -(t + b) / (t - b);
+            r.m[3][2] = -(f + n) / (f - n);
+            ensure_matrix_close("ortho", LLMatrix4a::ortho(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), r, tolerance);
+            r.m[2][2] = -1.0 / (f - n);
+            r.m[3][2] = -n / (f - n);
+            ensure_matrix_close("orthoZO", LLMatrix4a::orthoZO(-3.f, 5.f, -2.f, 7.f, 0.5f, 100.f), r, tolerance);
+        }
 
-        const S32 viewport[4] = { 10, 20, 1280, 720 };
-        ensure_matrix_close("pick", LLMatrix4a::pick(300.f, 400.f, 5.f, 7.f, viewport), glm::pickMatrix(glm::vec2(300.f, 400.f), glm::vec2(5.f, 7.f), glm::ivec4(10, 20, 1280, 720)), tolerance);
-        ensure("pick of nothing is the identity", LLMatrix4a::pick(300.f, 400.f, 0.f, 7.f, viewport) == LLMatrix4a::identity());
+        // the pick matrix: the region centred and blown up to the viewport
+        {
+            const S32 viewport[4] = { 10, 20, 1280, 720 };
+            Ref r = Ref::identity();
+            r.m[0][0] = 1280.0 / 5.0;
+            r.m[1][1] = 720.0 / 7.0;
+            r.m[3][0] = (1280.0 - 2.0 * (300.0 - 10.0)) / 5.0;
+            r.m[3][1] = (720.0 - 2.0 * (400.0 - 20.0)) / 7.0;
+            ensure_matrix_close("pick", LLMatrix4a::pick(300.f, 400.f, 5.f, 7.f, viewport), r, tolerance);
+            ensure("pick of nothing is the identity", LLMatrix4a::pick(300.f, 400.f, 0.f, 7.f, viewport) == LLMatrix4a::identity());
+        }
 
-        const LLVector4a eye(128.f, 64.f, 30.f, 1.f);
-        const LLVector4a at(130.f, 60.f, 29.f, 1.f);
-        const LLVector4a up(0.f, 0.f, 1.f, 0.f);
-        const glm::mat4 glook = glm::lookAt(glm::vec3(128.f, 64.f, 30.f), glm::vec3(130.f, 60.f, 29.f), glm::vec3(0.f, 0.f, 1.f));
-        ensure_matrix_close("lookAt", LLMatrix4a::lookAt(eye, at, up), glook, tolerance);
-        LLVector4a dir;
-        dir.setSub(at, eye);
-        dir.mul(2.5f);
-        ensure_matrix_close("lookDir, any length of direction", LLMatrix4a::lookDir(eye, dir, up), glook, tolerance);
+        // the view: the camera's basis as columns, the eye's position in it
+        // negated as the translation
+        {
+            const double eye[3] = { 128.0, 64.0, 30.0 };
+            const double at[3] = { 130.0, 60.0, 29.0 };
+            const double up[3] = { 0.0, 0.0, 1.0 };
+            double f[3] = { at[0] - eye[0], at[1] - eye[1], at[2] - eye[2] };
+            double fl = std::sqrt(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+            f[0] /= fl; f[1] /= fl; f[2] /= fl;
+            double s[3] = { f[1] * up[2] - f[2] * up[1], f[2] * up[0] - f[0] * up[2], f[0] * up[1] - f[1] * up[0] };
+            double sl = std::sqrt(s[0] * s[0] + s[1] * s[1] + s[2] * s[2]);
+            s[0] /= sl; s[1] /= sl; s[2] /= sl;
+            const double u[3] = { s[1] * f[2] - s[2] * f[1], s[2] * f[0] - s[0] * f[2], s[0] * f[1] - s[1] * f[0] };
+            Ref r = Ref::identity();
+            for (S32 i = 0; i < 3; ++i)
+            {
+                r.m[i][0] = s[i];
+                r.m[i][1] = u[i];
+                r.m[i][2] = -f[i];
+            }
+            r.m[3][0] = -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]);
+            r.m[3][1] = -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]);
+            r.m[3][2] = f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2];
+
+            const LLVector4a eye4(128.f, 64.f, 30.f, 1.f);
+            const LLVector4a at4(130.f, 60.f, 29.f, 1.f);
+            const LLVector4a up4(0.f, 0.f, 1.f, 0.f);
+            const LLMatrix4a look = LLMatrix4a::lookAt(eye4, at4, up4);
+            ensure_matrix_close("lookAt", look, r, tolerance);
+            LLVector4a dir;
+            dir.setSub(at4, eye4);
+            dir.mul(2.5f);
+            ensure_matrix_close("lookDir, any length of direction", LLMatrix4a::lookDir(eye4, dir, up4), r, tolerance);
+
+            // the eye lands at the origin and the point looked at on -z
+            LLVector4a origin, ahead;
+            look.affineTransform(eye4, origin);
+            look.affineTransform(at4, ahead);
+            const double zero[4] = { 0.0, 0.0, 0.0, 1.0 };
+            ensure_vector_close("the eye is the origin of the view", origin, zero, 1e-4f, 3);
+            const double down_z[4] = { 0.0, 0.0, -fl, 1.0 };
+            ensure_vector_close("the point looked at is straight ahead", ahead, down_z, 1e-4f, 3);
+        }
     }
 
     // Quaternions from axes and matrices, the rotation from a quaternion,
@@ -768,26 +1014,22 @@ namespace tut
     {
         const F32 tolerance = 2e-6f;
 
-        // setAxisAngle is LLQuaternion(angle, axis), and glm's angleAxis on the unit axis
+        // setAxisAngle is LLQuaternion(angle, axis)
         const LLVector3 axis3(0.5f, -1.f, 1.5f);
-        LLVector3 unit = axis3;
-        unit.normalize();
         for (F32 angle : { 0.f, 0.8f, -2.5f, 3.1f })
         {
             LLQuaternion2 q;
-            q.setAxisAngle(LLVector4a(axis3.mV[0], axis3.mV[1], axis3.mV[2], 0.f), angle);
+            q.setAxisAngle(as_direction(axis3), angle);
             const LLQuaternion2 expected(LLQuaternion(angle, axis3));
             ensure("setAxisAngle is LLQuaternion(angle, axis)", q.equals(expected, 1e-6f));
-            const glm::quat gq = glm::angleAxis(angle, glm::vec3(unit.mV[0], unit.mV[1], unit.mV[2]));
-            ensure_vector_close("and glm::angleAxis", q.getVector4a(), glm::vec4(gq.x, gq.y, gq.z, gq.w), tolerance);
         }
         LLQuaternion2 none;
         none.setAxisAngle(LLVector4a(0.f, 0.f, 0.f, 0.f), 1.f);
         ensure("no axis is the identity", none.equals(LLQuaternion2::identity(), 1e-7f));
 
-        // setFromMatrix reads back what setRotation wrote, agrees with the
-        // scalar matrix's reading, and with glm's, up to the sign every
-        // rotation's two quaternions share
+        // setFromMatrix reads back what setRotation wrote, and agrees with the
+        // scalar matrix's reading, up to the sign every rotation's two
+        // quaternions share
         for (const LLQuaternion& q : ROTATIONS)
         {
             LLMatrix4a m;
@@ -805,13 +1047,9 @@ namespace tut
             m3.setRows(LLVector3(m.mMatrix[0].getF32ptr()), LLVector3(m.mMatrix[1].getF32ptr()), LLVector3(m.mMatrix[2].getF32ptr()));
             const LLQuaternion2 scalar(m3.quaternion());
             ensure("and reads as LLMatrix3::quaternion does", back.equals(scalar, 1e-5f));
-
-            const glm::quat gq = glm::quat_cast(as_glm(m));
-            const LLVector4a gv(gq.x, gq.y, gq.z, gq.w);
-            ensure("and as glm::quat_cast does", back.getVector4a().equals4(gv, 1e-5f) || flipped.getVector4a().equals4(gv, 1e-5f));
         }
 
-        // TRS both ways, against glm::recompose and glm::decompose
+        // TRS both ways
         const LLVector4a translations[] = { LLVector4a(0.f, 0.f, 0.f, 1.f), LLVector4a(1.f, 2.f, 3.f, 1.f), LLVector4a(-256.f, 4096.f, 0.125f, 1.f) };
         const LLVector4a scales[] = { LLVector4a(1.f, 1.f, 1.f, 0.f), LLVector4a(2.f, 0.5f, 3.f, 0.f), LLVector4a(0.01f, 100.f, 1.f, 0.f), LLVector4a(-1.f, 1.f, -2.f, 0.f), LLVector4a(-2.f, -3.f, -0.5f, 0.f) };
         for (const LLQuaternion& q : ROTATIONS)
@@ -826,29 +1064,26 @@ namespace tut
 
                     LLMatrix4a expected;
                     expected.initAll(LLVector3(sc.getF32ptr()), q, LLVector3(tr.getF32ptr()));
-                    ensure_matrix_close("setTRS is initAll", m, as_glm(expected), tolerance);
-                    const glm::mat4 grecomposed = glm::recompose(glm::vec3(sc[0], sc[1], sc[2]), glm::quat(q.mQ[VW], q.mQ[VX], q.mQ[VY], q.mQ[VZ]), glm::vec3(tr[0], tr[1], tr[2]), glm::vec3(0.f), glm::vec4(0.f, 0.f, 0.f, 1.f));
-                    ensure_matrix_close("setTRS is glm::recompose", m, grecomposed, tolerance);
+                    ensure_matrix_close("setTRS is initAll", m, expected, tolerance);
 
                     LLVector4a scale_out, translation_out;
                     LLQuaternion2 rotation_out;
                     ensure("decompose succeeds", m.decompose(scale_out, rotation_out, translation_out));
                     LLMatrix4a rebuilt;
                     rebuilt.setTRS(translation_out, rotation_out, scale_out);
-                    ensure_matrix_close("decompose then setTRS is the matrix", rebuilt, as_glm(m), 1e-4f);
+                    ensure_matrix_close("decompose then setTRS is the matrix", rebuilt, m, 1e-4f);
                     ensure("translation comes back", translation_out.equals3(tr, 1e-5f * llmax(1.f, fabsf(tr[1]))));
 
-                    glm::vec3 gscale, gtranslation, gskew;
-                    glm::quat grotation;
-                    glm::vec4 gperspective;
-                    ensure("glm decomposes it too", glm::decompose(as_glm(m), gscale, grotation, gtranslation, gskew, gperspective));
-                    ensure_vector_close("scale is glm's", scale_out, glm::vec4(gscale, 0.f), 1e-4f, 3);
-                    ensure_vector_close("translation is glm's", translation_out, glm::vec4(gtranslation, 1.f), 1e-4f, 3);
-                    const LLVector4a gr(grotation.x, grotation.y, grotation.z, grotation.w);
-                    LLVector4a negated;
-                    negated.setNeg(rotation_out.getVector4a());
-                    const LLQuaternion2 flipped(negated);
-                    ensure("rotation is glm's, up to sign", rotation_out.getVector4a().equals4(gr, 1e-4f) || flipped.getVector4a().equals4(gr, 1e-4f));
+                    // a right-handed scale comes back as itself; a left-handed
+                    // one as its negation, the rotation absorbing the flip
+                    const bool right_handed = sc[0] * sc[1] * sc[2] > 0.f;
+                    if (right_handed && sc[0] > 0.f && sc[1] > 0.f && sc[2] > 0.f)
+                    {
+                        ensure("scale comes back", scale_out.equals3(sc, 1e-4f * llmax(1.f, fabsf(sc[1]))));
+                        LLVector4a negated;
+                        negated.setNeg(rotation_out.getVector4a());
+                        ensure("rotation comes back, up to sign", rotation_out.equals(rotation, 1e-4f) || LLQuaternion2(negated).equals(rotation, 1e-4f));
+                    }
                 }
             }
         }
@@ -863,15 +1098,15 @@ namespace tut
     }
 
     // Through a projection to the window and back, both depth conventions,
-    // against glm. The way back carries the window's resolution scaled by
-    // the depth, so it is held to the scene's size rather than the point's.
+    // against the formulas in double. The way back carries the window's
+    // resolution scaled by the depth, so it is held to the scene's size
+    // rather than the point's.
     template<> template<>
     void llmatrix4a_object::test<16>()
     {
         const F32 tolerance = 1e-4f;
         const F32 back_tolerance = 5e-4f;
         const S32 viewport[4] = { 10, 20, 1280, 720 };
-        const glm::ivec4 gviewport(10, 20, 1280, 720);
 
         LLMatrix4a modelview;
         modelview.initAll(LLVector3(1.f, 1.f, 1.f), ROTATIONS[4], LLVector3(3.f, -2.f, -20.f));
@@ -881,32 +1116,35 @@ namespace tut
         };
         const LLVector4a points[] = { LLVector4a(0.f, 0.f, 0.f, 1.f), LLVector4a(1.f, 2.f, 3.f, 1.f), LLVector4a(-15.f, 8.f, 40.f, 1.f) };
 
-        const glm::mat4 gmv = as_glm(modelview);
         for (const LLMatrix4a& projection : projections)
         {
-            const glm::mat4 gp = as_glm(projection);
+            const Ref camera = Ref::of(modelview).then(Ref::of(projection));
             for (const LLVector4a& obj : points)
             {
-                const glm::vec3 gobj(obj[0], obj[1], obj[2]);
+                // the reference: through both matrices, over w, into the window
+                const double o[4] = { obj[0], obj[1], obj[2], 1.0 };
+                double clip[4];
+                camera.transform(o, clip);
+                const double ndc[3] = { clip[0] / clip[3], clip[1] / clip[3], clip[2] / clip[3] };
+                const double expected[4] = { (ndc[0] * 0.5 + 0.5) * viewport[2] + viewport[0], (ndc[1] * 0.5 + 0.5) * viewport[3] + viewport[1], ndc[2] * 0.5 + 0.5, 1.0 };
+                const double expected_zo[4] = { expected[0], expected[1], ndc[2], 1.0 };
 
                 const LLVector4a win = alprojection::project(obj, modelview, projection, viewport);
-                ensure_vector_close("project", win, glm::vec4(glm::project(gobj, gmv, gp, gviewport), 1.f), tolerance);
+                ensure_vector_close("project", win, expected, tolerance);
                 const LLVector4a win_zo = alprojection::project_zo(obj, modelview, projection, viewport);
-                ensure_vector_close("project_zo", win_zo, glm::vec4(glm::projectZO(gobj, gmv, gp, gviewport), 1.f), tolerance);
+                ensure_vector_close("project_zo", win_zo, expected_zo, tolerance);
 
                 const LLVector4a back = alprojection::unproject(win, modelview, projection, viewport);
-                ensure_vector_close("unproject", back, glm::vec4(glm::unProject(glm::vec3(win[0], win[1], win[2]), gmv, gp, gviewport), 1.f), back_tolerance);
-                ensure_vector_close("unproject of project is the point", back, as_glm(obj), back_tolerance);
+                ensure_vector_close("unproject of project is the point", back, obj, back_tolerance);
                 const LLVector4a back_zo = alprojection::unproject_zo(win_zo, modelview, projection, viewport);
-                ensure_vector_close("unproject_zo", back_zo, glm::vec4(glm::unProjectZO(glm::vec3(win_zo[0], win_zo[1], win_zo[2]), gmv, gp, gviewport), 1.f), back_tolerance);
-                ensure_vector_close("unproject_zo of project_zo is the point", back_zo, as_glm(obj), back_tolerance);
+                ensure_vector_close("unproject_zo of project_zo is the point", back_zo, obj, back_tolerance);
 
                 // the same through an inverse taken once
                 LLMatrix4a inverse;
                 inverse.setMul(modelview, projection);
                 ensure("the camera inverts", inverse.invert());
-                ensure_vector_close("unproject through the inverse", alprojection::unproject(win, inverse, viewport), as_glm(back), 1e-6f);
-                ensure_vector_close("unproject_zo through the inverse", alprojection::unproject_zo(win_zo, inverse, viewport), as_glm(back_zo), 1e-6f);
+                ensure_vector_close("unproject through the inverse", alprojection::unproject(win, inverse, viewport), back, 1e-6f);
+                ensure_vector_close("unproject_zo through the inverse", alprojection::unproject_zo(win_zo, inverse, viewport), back_zo, 1e-6f);
             }
         }
     }

@@ -321,8 +321,6 @@ target_compile_definitions(
   INTERFACE
     ADDRESS_SIZE=${ADDRESS_SIZE}
     BOOST_BIND_GLOBAL_PLACEHOLDERS # Boost.Bind's _1, _2 in the global namespace, which the code relies on
-    GLM_FORCE_DEFAULT_ALIGNED_GENTYPES=1 # SIMD-aligned GLM types; https://github.com/g-truc/glm/blob/master/manual.md#section2_10
-    GLM_ENABLE_EXPERIMENTAL=1
 )
 
 if(AL_ENABLE_CRASH_REPORTING)

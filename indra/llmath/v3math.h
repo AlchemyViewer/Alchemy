@@ -32,10 +32,6 @@
 
 #include "llsd.h"
 
-#include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
 class LLVector2;
 class LLVector4;
 class LLVector4a;
@@ -71,12 +67,6 @@ class LLVector3
         explicit LLVector3(const LLVector4a& vec);              // Initializes LLVector4 to (vec[0]. vec[1], vec[2])
         explicit LLVector3(const LLSD& sd);
 
-        // GLM interop
-        explicit LLVector3(const glm::vec3& vec);   // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
-        explicit LLVector3(const glm::vec4& vec);   // Initializes LLVector3 to (vec[0]. vec[1], vec[2])
-        explicit inline operator glm::vec3() const; // Initializes glm::vec3 to (vec[0]. vec[1], vec[2])
-        explicit inline operator glm::vec4() const; // Initializes glm::vec4 to (vec[0]. vec[1], vec[2], 1)
-
         LLSD getValue() const;
 
         void setValue(const LLSD& sd);
@@ -102,8 +92,6 @@ class LLVector3
         constexpr void set(const F32 *vec) noexcept;      // Sets LLVector3 to vec
         const LLVector3& set(const LLVector4 &vec);
         const LLVector3& set(const LLVector3d &vec);// Sets LLVector3 to vec
-        inline void set(const glm::vec4& vec); // Sets LLVector3 to vec
-        inline void set(const glm::vec3& vec); // Sets LLVector3 to vec
 
         constexpr void setVec(F32 x, F32 y, F32 z) noexcept;    // deprecated
         constexpr void setVec(const LLVector3 &vec) noexcept;   // deprecated
@@ -199,20 +187,6 @@ constexpr LLVector3::LLVector3(const F32 *vec) noexcept
     mV[VZ] = vec[VZ];
 }
 
-inline LLVector3::LLVector3(const glm::vec3& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-}
-
-inline LLVector3::LLVector3(const glm::vec4& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-}
-
 /*
 inline LLVector3::LLVector3(const LLVector3 &copy)
 {
@@ -268,20 +242,6 @@ constexpr void LLVector3::set(const LLVector3& vec) noexcept
 constexpr void LLVector3::set(const F32* vec) noexcept
 {
     set(vec[VX], vec[VY], vec[VZ]);
-}
-
-inline void LLVector3::set(const glm::vec4& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
-}
-
-inline void LLVector3::set(const glm::vec3& vec)
-{
-    mV[VX] = vec.x;
-    mV[VY] = vec.y;
-    mV[VZ] = vec.z;
 }
 
 // deprecated
@@ -462,17 +422,6 @@ inline constexpr const LLVector3& operator/=(LLVector3& a, F32 k) noexcept
 inline constexpr LLVector3 operator-(const LLVector3& a) noexcept
 {
     return LLVector3(-a.mV[VX], -a.mV[VY], -a.mV[VZ]);
-}
-
-inline LLVector3::operator glm::vec3() const
-{
-    // Do not use glm::make_vec3 it can result in a buffer overrun on some platforms due to glm::vec3 being a simd vector internally
-    return glm::vec3(mV[VX], mV[VY], mV[VZ]);
-}
-
-inline LLVector3::operator glm::vec4() const
-{
-    return glm::vec4(mV[VX], mV[VY], mV[VZ], 1.f);
 }
 
 inline F32 dist_vec(const LLVector3& a, const LLVector3& b)

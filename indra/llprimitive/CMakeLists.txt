@@ -48,17 +48,7 @@ target_sources(
 target_link_libraries(
   llprimitive
   PRIVATE al::flags
-  PUBLIC
-    llcharacter
-    llrender
-    llmessage
-    llcorehttp
-    llxml
-    llcommon
-    llmath
-    ll::colladadom
-    ll::glm
-    ll::tinygltf
+  PUBLIC llcharacter llrender llmessage llcorehttp llxml llcommon llmath ll::colladadom ll::tinygltf
 )
 
 target_link_libraries(llprimitive PUBLIC llphysicsextensionsos)
