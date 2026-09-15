@@ -39,7 +39,6 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llvlcomposition.h"
-#include "llvolume.h"
 #include "llvovolume.h"
 #include "pipeline.h"
 #include "llspatialpartition.h"
@@ -986,51 +985,6 @@ LLTerrainPartition::LLTerrainPartition(LLViewerRegion* regionp)
     mPartitionType = LLViewerRegion::PARTITION_TERRAIN;
 }
 
-// Do not add vertices; honor strict vertex count specified by strider_vertex_count
-void gen_terrain_tangents(U32                    strider_vertex_count,
-                          U32                    strider_index_count,
-                          LLStrider<LLVector3>  &verticesp,
-                          LLStrider<LLVector3>  &normalsp,
-                          LLStrider<LLVector4a> &tangentsp,
-                          LLStrider<U16>        &indicesp,
-                          F32 region_width)
-{
-    LL_PROFILE_ZONE_SCOPED;
-
-    LLVector4a            *vertices = new LLVector4a[strider_vertex_count];
-    LLVector4a            *normals  = new LLVector4a[strider_vertex_count];
-    LLVector4a            *tangents = new LLVector4a[strider_vertex_count];
-    std::vector<LLVector2> texcoords(strider_vertex_count);
-    std::vector<U16>       indices(strider_index_count);
-
-    for (U32 v = 0; v < strider_vertex_count; ++v)
-    {
-        F32 *vert    = verticesp[v].mV;
-        vertices[v]  = LLVector4a(vert[0], vert[1], vert[2], 1.f);
-        F32 *n       = normalsp[v].mV;
-        normals[v]   = LLVector4a(n[0], n[1], n[2], 1.f);
-
-        // Calculate texcoords on-the-fly using the terrain positions
-        texcoords[v].mV[VX] = verticesp[v].mV[VX] / region_width;
-        texcoords[v].mV[VY] = verticesp[v].mV[VY] / region_width;
-    }
-    for (U32 i = 0; i < strider_index_count; ++i)
-    {
-        indices[i] = indicesp[i];
-    }
-
-    LLCalculateTangentArray(strider_vertex_count, vertices, normals, texcoords.data(), strider_index_count / 3, indices.data(), tangents);
-
-    for (U32 v = 0; v < strider_vertex_count; ++v)
-    {
-        tangentsp[v] = tangents[v];
-    }
-
-    delete[] vertices;
-    delete[] normals;
-    delete[] tangents;
-}
-
 void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -1038,66 +992,34 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
     LLVertexBuffer* buffer = group->mVertexBuffer;
 
     //get vertex buffer striders
-    LLStrider<LLVector3> vertices_start;
-    LLStrider<LLVector3> normals_start;
-    LLStrider<LLVector4a> tangents_start;
-    LLStrider<LLVector2> texcoords0_start; // ownership overlay
-    LLStrider<LLVector2> texcoords2_start;
-    LLStrider<U16> indices_start;
+    LLStrider<LLVector3> vertices;
+    LLStrider<LLVector3> normals;
+    LLStrider<LLVector2> texcoords0; // ownership overlay
+    LLStrider<LLVector2> texcoords2;
+    LLStrider<U16> indices;
 
-    llassert_always(buffer->getVertexStrider(vertices_start));
-    llassert_always(buffer->getNormalStrider(normals_start));
-    llassert_always(buffer->getTangentStrider(tangents_start));
-    llassert_always(buffer->getTexCoord0Strider(texcoords0_start));
-    llassert_always(buffer->getTexCoord1Strider(texcoords2_start));
-    llassert_always(buffer->getIndexStrider(indices_start));
+    llassert_always(buffer->getVertexStrider(vertices));
+    llassert_always(buffer->getNormalStrider(normals));
+    llassert_always(buffer->getTexCoord0Strider(texcoords0));
+    llassert_always(buffer->getTexCoord1Strider(texcoords2));
+    llassert_always(buffer->getIndexStrider(indices));
 
     U32 indices_index = 0;
     U32 index_offset = 0;
 
+    for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
     {
-        LLStrider<LLVector3> vertices = vertices_start;
-        LLStrider<LLVector3> normals = normals_start;
-        LLStrider<LLVector2> texcoords0 = texcoords0_start;
-        LLStrider<LLVector2> texcoords2 = texcoords2_start;
-        LLStrider<U16> indices = indices_start;
+        LLFace* facep = *i;
 
-        for (std::vector<LLFace*>::iterator i = mFaceList.begin(); i != mFaceList.end(); ++i)
-        {
-            LLFace* facep = *i;
+        facep->setIndicesIndex(indices_index);
+        facep->setGeomIndex(index_offset);
+        facep->setVertexBuffer(buffer);
 
-            facep->setIndicesIndex(indices_index);
-            facep->setGeomIndex(index_offset);
-            facep->setVertexBuffer(buffer);
+        LLVOSurfacePatch* patchp = (LLVOSurfacePatch*) facep->getViewerObject();
+        patchp->getTerrainGeometry(vertices, normals, texcoords0, texcoords2, indices);
 
-            LLVOSurfacePatch* patchp = (LLVOSurfacePatch*) facep->getViewerObject();
-            patchp->getTerrainGeometry(vertices, normals, texcoords0, texcoords2, indices);
-
-            indices_index += facep->getIndicesCount();
-            index_offset += facep->getGeomCount();
-        }
-    }
-
-    // Only the PBR terrain shader reads tangents. Generating them is a full pass over the
-    // group's geometry plus five heap allocations, on every terrain rebuild -- entirely wasted
-    // for a region painted with legacy textures, which is most of them.
-    const LLViewerRegion* regionp = mFaceList.empty() ? nullptr : mFaceList[0]->getViewerObject()->getRegion();
-    llassert(!mFaceList.empty());
-    llassert(!regionp || regionp == mFaceList.back()->getViewerObject()->getRegion()); // Assume this spatial group is confined to one region
-
-    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
-    const bool pbr_terrain = compp && compp->getMaterialType() == LLTerrainMaterials::Type::PBR;
-
-    const bool has_tangents = pbr_terrain && tangents_start.get() != nullptr;
-    if (has_tangents)
-    {
-        LLStrider<LLVector3> vertices = vertices_start;
-        LLStrider<LLVector3> normals = normals_start;
-        LLStrider<LLVector4a> tangents = tangents_start;
-        LLStrider<U16> indices = indices_start;
-
-        const F32 region_width = regionp->getWidth();
-        gen_terrain_tangents(index_offset, indices_index, vertices, normals, tangents, indices, region_width);
+        indices_index += facep->getIndicesCount();
+        index_offset += facep->getGeomCount();
     }
 
     mFaceList.clear();

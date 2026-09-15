@@ -288,52 +288,40 @@ float terrain_mix(TerrainMix tm, vec4 tms4)
            (tm.weight.w * tms4[3]);
 }
 
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+// Composes one projection's normal sample with the geometric normal, in the projection's own
+// frame: u and v along the plane, n out of it. The frame is the plane's, not a vertex tangent's.
+// A projected texture's tangent frame IS the plane, exactly, on every slope; a per-vertex
+// tangent is the gradient of one uv set, which is a different thing for each slice, and on a
+// slope it is sheared by the orthogonalisation that a non-conformal parametrisation forces.
+//
+// The sample's xy are slopes in the texture's own uv space. uv_axes takes them into the plane:
+// the material's KHR rotation and scale sign, inverted. Scale magnitude is left out on purpose
+// -- a texture tiled twice as densely is not twice as bumpy -- as the prim path leaves it out.
+//
+// g is the geometric normal, already swizzled into this frame. The sample and the terrain are
+// both heightfields over the projection plane, so their slopes add; that is the partial-
+// derivative blend, exact for this composition. Whiteout (n.xy + g.xy, n.z * g.z) drops the
+// g.z factor on the sample's slope, which steepens every bump by 1 / g.z on an incline.
+vec3 _t_normal_compose(vec3 n, mat2 uv_axes, vec3 g)
+{
+    n.xy = uv_axes * n.xy;
+    return normalize(vec3(n.xy * g.z + g.xy * n.z, n.z * g.z));
+}
+#endif
+
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 // Triplanar mapping
 
 // Pre-transformed texture coordinates for each axial uv slice (Packing: xy, yz, (-x)z, unused)
 #define TerrainCoord vec4[3]
 
-// If sign_or_zero is positive, use uv_unflippped, otherwise use uv_flipped
-vec2 _t_uv(vec2 uv_unflipped, vec2 uv_flipped, float sign_or_zero)
+// axis_sign is +1 for the unflipped slice and -1 for the flipped one. It is the same +-1 the
+// caller builds the projection's normal frame from, so the uv a fragment samples and the frame
+// its normal is placed in never disagree.
+vec2 _t_uv(vec2 uv_unflipped, vec2 uv_flipped, float axis_sign)
 {
-    return mix(uv_flipped, uv_unflipped, max(0.0, sign_or_zero));
-}
-
-vec3 _t_normal_post_1(vec3 vNt0, float sign_or_zero)
-{
-    // Assume normal is unpacked
-    vec3 vNt1 = vNt0;
-    // Get sign
-    float sign = sign_or_zero;
-    // Handle case where sign is 0
-    sign = (2.0*sign) + 1.0;
-    sign /= abs(sign);
-    // If the sign is negative, rotate normal by 180 degrees
-    vNt1.xy = (min(0, sign) * vNt1.xy) + (min(0, -sign) * -vNt1.xy);
-    return vNt1;
-}
-
-// Triplanar-specific normal texture fixes
-vec3 _t_normal_post_x(vec3 vNt0, float tangent_sign)
-{
-    vec3 vNt_x = _t_normal_post_1(vNt0, sign(vary_vertex_normal.x));
-    // *HACK: Transform normals according to orientation of the UVs
-    vNt_x.xy = vec2(-vNt_x.y, vNt_x.x);
-    vNt_x.xy *= tangent_sign;
-    return vNt_x;
-}
-vec3 _t_normal_post_y(vec3 vNt0)
-{
-    vec3 vNt_y = _t_normal_post_1(vNt0, sign(vary_vertex_normal.y));
-    // *HACK: Transform normals according to orientation of the UVs
-    vNt_y.xy = -vNt_y.xy;
-    return vNt_y;
-}
-vec3 _t_normal_post_z(vec3 vNt0)
-{
-    vec3 vNt_z = _t_normal_post_1(vNt0, sign(vary_vertex_normal.z));
-    return vNt_z;
+    return mix(uv_flipped, uv_unflipped, max(0.0, axis_sign));
 }
 
 PBRMix terrain_sample_pbr(
@@ -347,7 +335,8 @@ PBRMix terrain_sample_pbr(
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     , sampler2D tex_vNt
-    , float tangent_sign
+    , mat2 uv_axes
+    , vec3 geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
     , sampler2D tex_emissive
@@ -356,17 +345,23 @@ PBRMix terrain_sample_pbr(
 {
     PBRMix mix = init_pbr_mix();
 
-#define get_uv_x() _t_uv(terrain_coord[0].zw, terrain_coord[1].zw, sign(vary_vertex_normal.x))
-#define get_uv_y() _t_uv(terrain_coord[1].xy, terrain_coord[2].xy, sign(vary_vertex_normal.y))
-#define get_uv_z() _t_uv(terrain_coord[0].xy, vec2(0),             sign(vary_vertex_normal.z))
+    // Which side of each axis the surface faces. Decided once, as +-1, and used for both the uv
+    // slice and the normal frame below. sign() would give 0 on the axis itself; the vertex stage
+    // supplies a flipped slice for the negative side, so 0 has to land there.
+    float sx = vary_vertex_normal.x > 0.0 ? 1.0 : -1.0;
+    float sy = vary_vertex_normal.y > 0.0 ? 1.0 : -1.0;
+
+#define get_uv_x() _t_uv(terrain_coord[0].zw, terrain_coord[1].zw, sx)
+#define get_uv_y() _t_uv(terrain_coord[1].xy, terrain_coord[2].xy, sy)
+#define get_uv_z() terrain_coord[0].xy
 // The same slice selection, applied to the gradients. A uv and the gradients that size its mip
 // must come from the same projection.
-#define get_ddx_x() _t_uv(terrain_coord_ddx[0].zw, terrain_coord_ddx[1].zw, sign(vary_vertex_normal.x))
-#define get_ddx_y() _t_uv(terrain_coord_ddx[1].xy, terrain_coord_ddx[2].xy, sign(vary_vertex_normal.y))
-#define get_ddx_z() _t_uv(terrain_coord_ddx[0].xy, vec2(0),                 sign(vary_vertex_normal.z))
-#define get_ddy_x() _t_uv(terrain_coord_ddy[0].zw, terrain_coord_ddy[1].zw, sign(vary_vertex_normal.x))
-#define get_ddy_y() _t_uv(terrain_coord_ddy[1].xy, terrain_coord_ddy[2].xy, sign(vary_vertex_normal.y))
-#define get_ddy_z() _t_uv(terrain_coord_ddy[0].xy, vec2(0),                 sign(vary_vertex_normal.z))
+#define get_ddx_x() _t_uv(terrain_coord_ddx[0].zw, terrain_coord_ddx[1].zw, sx)
+#define get_ddx_y() _t_uv(terrain_coord_ddx[1].xy, terrain_coord_ddx[2].xy, sy)
+#define get_ddx_z() terrain_coord_ddx[0].xy
+#define get_ddy_x() _t_uv(terrain_coord_ddy[0].zw, terrain_coord_ddy[1].zw, sx)
+#define get_ddy_y() _t_uv(terrain_coord_ddy[1].xy, terrain_coord_ddy[2].xy, sy)
+#define get_ddy_z() terrain_coord_ddy[0].xy
     switch (tw.type & SAMPLE_X)
     {
     case SAMPLE_X:
@@ -386,8 +381,12 @@ PBRMix terrain_sample_pbr(
 #endif
             );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        // Triplanar-specific normal texture fix
-        mix_x.vNt = _t_normal_post_x(mix_x.vNt, tangent_sign);
+        {
+            // The x slices are uv = (sx*y, z): u = sx*Y, v = Z, n = sx*X.
+            vec3 g = vec3(sx * geom_normal_region.y, geom_normal_region.z, sx * geom_normal_region.x);
+            vec3 r = _t_normal_compose(mix_x.vNt, uv_axes, g);
+            mix_x.vNt = vec3(sx * r.z, sx * r.x, r.y);
+        }
 #endif
         mix = mix_pbr(mix, mix_x, tw.weight.x);
         break;
@@ -414,8 +413,12 @@ PBRMix terrain_sample_pbr(
 #endif
             );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        // Triplanar-specific normal texture fix
-        mix_y.vNt = _t_normal_post_y(mix_y.vNt);
+        {
+            // The y slices are uv = (-sy*x, z): u = -sy*X, v = Z, n = sy*Y.
+            vec3 g = vec3(-sy * geom_normal_region.x, geom_normal_region.z, sy * geom_normal_region.y);
+            vec3 r = _t_normal_compose(mix_y.vNt, uv_axes, g);
+            mix_y.vNt = vec3(-sy * r.x, sy * r.z, r.y);
+        }
 #endif
         mix = mix_pbr(mix, mix_y, tw.weight.y);
         break;
@@ -442,9 +445,9 @@ PBRMix terrain_sample_pbr(
 #endif
             );
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        // Triplanar-specific normal texture fix
-        // *NOTE: Bottom face has not been tested
-        mix_z.vNt = _t_normal_post_z(mix_z.vNt);
+        // The z slice is uv = (x, y): the frame is the region's own axes. There is no flipped
+        // slice -- a heightfield never faces down.
+        mix_z.vNt = _t_normal_compose(mix_z.vNt, uv_axes, geom_normal_region);
 #endif
         mix = mix_pbr(mix, mix_z, tw.weight.z);
         break;
@@ -452,14 +455,17 @@ PBRMix terrain_sample_pbr(
         break;
     }
 
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+    // Unit length again, so the material weights applied to this afterwards mean what they say.
+    mix.vNt = normalize(mix.vNt);
+#endif
+
     return mix;
 }
 
 #elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
 
 #define TerrainCoord vec2
-
-#define terrain_sample_pbr sample_pbr
 
 #endif
 
@@ -499,9 +505,8 @@ PBRMix terrain_sample_and_multiply_pbr(
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     , sampler2D tex_vNt
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    , float tangent_sign
-#endif
+    , mat2 uv_axes
+    , vec3 geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
     , sampler2D tex_emissive
@@ -517,27 +522,46 @@ PBRMix terrain_sample_and_multiply_pbr(
 #endif
     )
 {
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     PBRMix mix = terrain_sample_pbr(
         terrain_coord
         , terrain_coord_ddx
         , terrain_coord_ddy
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
         , _t_triplanar()
-#endif
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
         , tex_orm
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
         , tex_vNt
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        , tangent_sign
-#endif
+        , uv_axes
+        , geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
         , tex_emissive
 #endif
         );
+#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
+    PBRMix mix = sample_pbr(
+        terrain_coord
+        , terrain_coord_ddx
+        , terrain_coord_ddy
+        , tex_col
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
+        , tex_orm
+#endif
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+        , tex_vNt
+#endif
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
+        , tex_emissive
+#endif
+        );
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+    // The one slice is the z projection, uv = (x, y): the frame is the region's own axes.
+    mix.vNt = _t_normal_compose(mix.vNt, uv_axes, geom_normal_region);
+#endif
+#endif
 
     mix = multiply_factors_pbr(mix
         , factor_col

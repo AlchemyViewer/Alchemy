@@ -1508,8 +1508,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
 
     mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
+    mReservedUniforms.push_back("terrain_normal_axes");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_TEXTURE_TRANSFORMS +1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_NORMAL_AXES +1);
 
     mReservedUniforms.push_back("viewport");
 

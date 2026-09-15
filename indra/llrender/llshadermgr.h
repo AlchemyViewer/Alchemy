@@ -66,6 +66,7 @@ public:
         METALLIC_ROUGHNESS_TEXCOORD,          //  "metallic_roughness_texcoord" (GLTF)
 
         TERRAIN_TEXTURE_TRANSFORMS,           //  "terrain_texture_transforms" (GLTF)
+        TERRAIN_NORMAL_AXES,                  //  "terrain_normal_axes"
 
         VIEWPORT,                           //  "viewport"
         LIGHT_POSITION,                     //  "light_position"

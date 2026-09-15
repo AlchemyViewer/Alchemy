@@ -81,9 +81,8 @@ PBRMix terrain_sample_and_multiply_pbr(
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     , sampler2D tex_vNt
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    , float transform_sign
-#endif
+    , mat2 uv_axes
+    , vec3 geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
     , sampler2D tex_emissive
@@ -100,6 +99,10 @@ PBRMix terrain_sample_and_multiply_pbr(
     );
 
 PBRMix mix_pbr(PBRMix mix1, PBRMix mix2, float mix2_weight);
+
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 out vec4 frag_data[4];
 
@@ -142,13 +145,14 @@ uniform vec4 roughnessFactors;
 uniform vec3[4] emissiveColors;
 #endif
 uniform vec4 minimum_alphas; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+// Per material, the texture's u and v axes in the projection plane: the rotation and scale
+// sign of its terrain_texture_transforms entry, inverted. See _t_normal_compose().
+uniform mat2[4] terrain_normal_axes;
+#endif
 
 in vec3 vary_position;
 in vec3 vary_normal;
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-in vec3 vary_tangents[4];
-flat in float vary_signs[4];
-#endif
 
 // vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
@@ -200,27 +204,18 @@ vec3 terrain_geometric_normal()
 #endif
 }
 
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-// from mikktspace.com. The geometric normal comes in as an argument rather
-// than being read from geom_normal: Mesa checks initialization in source
-// order, and this is defined above the main() that assigns it.
-vec3 mikktspace(vec3 vN, vec3 vNt, vec3 vT, float sign)
-{
-    vec3 vB = sign * cross(vN, vT);
-    vec3 tnorm = normalize( vNt.x * vT + vNt.y * vB + vNt.z * vN );
-
-    // No facing flip here. main() applies one to the blended result, and it has to be applied
-    // exactly once: doing it per material as well cancels out on the back faces it exists to
-    // correct, so terrain seen from below or through a mirror got the un-flipped normal.
-    return tnorm;
-}
-#endif
-
 void main()
 {
     // Ahead of mirrorClip: a discard can leave the quad without the neighbouring lanes a
     // derivative needs, so the one derivative this shader takes is taken while all four are live.
     geom_normal = terrain_geometric_normal();
+#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
+    // The same normal in region space, where the projection planes are the axes and every
+    // material's normal is composed. The terrain's modelview is rigid, so the transpose is the
+    // inverse. Under TERRAIN_FLAT_NORMALS this is the per-triangle normal, which is what the
+    // detail must be composed with: it is what the fragment is lit against.
+    vec3 geom_normal_region = transpose(normal_matrix) * geom_normal;
+#endif
 
     // Make sure we clip the terrain if we're in a mirror.
     mirrorClip(vary_position);
@@ -306,9 +301,8 @@ void main()
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
             , detail_0_normal
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-            , vary_signs[0]
-#endif
+            , terrain_normal_axes[0]
+            , geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
             , detail_0_emissive
@@ -323,9 +317,6 @@ void main()
             , emissiveColors[0]
 #endif
         );
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[0], vary_signs[0]);
-#endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.x);
         break;
     default:
@@ -353,9 +344,8 @@ void main()
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
             , detail_1_normal
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-            , vary_signs[1]
-#endif
+            , terrain_normal_axes[1]
+            , geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
             , detail_1_emissive
@@ -370,9 +360,6 @@ void main()
             , emissiveColors[1]
 #endif
         );
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[1], vary_signs[1]);
-#endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.y);
         break;
     default:
@@ -400,9 +387,8 @@ void main()
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
             , detail_2_normal
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-            , vary_signs[2]
-#endif
+            , terrain_normal_axes[2]
+            , geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
             , detail_2_emissive
@@ -417,9 +403,6 @@ void main()
             , emissiveColors[2]
 #endif
         );
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[2], vary_signs[2]);
-#endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.z);
         break;
     default:
@@ -447,9 +430,8 @@ void main()
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
             , detail_3_normal
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-            , vary_signs[3]
-#endif
+            , terrain_normal_axes[3]
+            , geom_normal_region
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_EMISSIVE)
             , detail_3_emissive
@@ -464,9 +446,6 @@ void main()
             , emissiveColors[3]
 #endif
         );
-#if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-        mix2.vNt = mikktspace(geom_normal, mix2.vNt, vary_tangents[3], vary_signs[3]);
-#endif
         pbr_mix = mix_pbr(pbr_mix, mix2, tm.weight.w);
         break;
     default:
@@ -479,7 +458,11 @@ void main()
         discard;
     }
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
-    vec3 tnorm = normalize(pbr_mix.vNt);
+    // The materials' normals were composed and blended in region space; one transform brings
+    // the blend into view space. No facing flip before this point: the one below has to be
+    // applied exactly once, and applying it per material as well cancels out on the back faces
+    // it exists to correct.
+    vec3 tnorm = normalize(normal_matrix * pbr_mix.vNt);
 #else
     vec3 tnorm = geom_normal;
 #endif

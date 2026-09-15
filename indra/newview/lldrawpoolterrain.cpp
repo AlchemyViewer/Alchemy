@@ -446,6 +446,29 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     llassert(transform_vec4_count == 5); // If false, need to update shader
     shader->uniform4fv(LLShaderMgr::TERRAIN_TEXTURE_TRANSFORMS, transform_vec4_count, (F32*)transforms_packed);
 
+    if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
+    {
+        // The normal texture's xy are slopes in its own uv space; the shader composes them in the
+        // projection plane. Per material, the plane-space direction of the texture's u and v axes
+        // as one column-major 2x2: the transform's rotation and scale sign, inverted. Magnitude is
+        // left out -- denser tiling does not steepen a bump -- so RenderTerrainPBRScale, folded
+        // into the scale above, does not reach here.
+        F32 normal_axes[terrain_material_count][4];
+        for (U32 i = 0; i < terrain_material_count; ++i)
+        {
+            const F32 rotation = transforms_packed[i][2];
+            const F32 c = cosf(rotation);
+            const F32 s = sinf(rotation);
+            const F32 sign_u = transforms_packed[i][0] < 0.f ? -1.f : 1.f;
+            const F32 sign_v = transforms_packed[i][1] < 0.f ? -1.f : 1.f;
+            normal_axes[i][0] = sign_u * c;
+            normal_axes[i][1] = -sign_v * s;
+            normal_axes[i][2] = sign_u * s;
+            normal_axes[i][3] = sign_v * c;
+        }
+        shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_NORMAL_AXES, terrain_material_count, GL_FALSE, (F32*)normal_axes);
+    }
+
     LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
 
     //
