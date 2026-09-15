@@ -33,6 +33,11 @@
 #include "../m4math.h"
 #include "../v3math.h"
 
+#include "glm/mat4x4.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
+#include <cstring>
 #include <sstream>
 
 namespace
@@ -72,6 +77,57 @@ namespace tut
     typedef test_group<llmatrix4a_data> llmatrix4a_test;
     typedef llmatrix4a_test::object llmatrix4a_object;
     tut::llmatrix4a_test llmatrix4a_testcase("LLMatrix4a");
+
+    // The glm matrix with the same sixteen floats, and back.
+    glm::mat4 as_glm(const LLMatrix4a& m)
+    {
+        return glm::make_mat4(m.getF32ptr());
+    }
+
+    LLMatrix4a from_glm(const glm::mat4& m)
+    {
+        LLMatrix4a r;
+        r.loadu(glm::value_ptr(m));
+        return r;
+    }
+
+    glm::vec4 as_glm(const LLVector4a& v)
+    {
+        return glm::make_vec4(v.getF32ptr());
+    }
+
+    bool same_bytes(const LLMatrix4a& a, const glm::mat4& b)
+    {
+        return std::memcmp(a.getF32ptr(), glm::value_ptr(b), sizeof(F32) * 16) == 0;
+    }
+
+    // Every element within tolerance of the magnitude of the larger of the
+    // two, or of one: the two libraries contract and reorder under
+    // /fp:fast independently, so the products of the same inputs agree to
+    // a few ulps, not bit for bit.
+    void ensure_matrix_close(const std::string& what, const LLMatrix4a& actual, const glm::mat4& expected, F32 tolerance)
+    {
+        const F32* a = actual.getF32ptr();
+        const F32* e = glm::value_ptr(expected);
+        for (S32 i = 0; i < 16; ++i)
+        {
+            const F32 scale = llmax(1.f, fabsf(a[i]), fabsf(e[i]));
+            std::ostringstream msg;
+            msg << what << " at element " << i << ": " << a[i] << " vs " << e[i];
+            ensure_approximately_equals_range(msg.str().c_str(), a[i], e[i], tolerance * scale);
+        }
+    }
+
+    void ensure_vector_close(const std::string& what, const LLVector4a& actual, const glm::vec4& expected, F32 tolerance, S32 lanes = 4)
+    {
+        for (S32 i = 0; i < lanes; ++i)
+        {
+            const F32 scale = llmax(1.f, fabsf(actual[i]), fabsf(expected[i]));
+            std::ostringstream msg;
+            msg << what << " at lane " << i << ": " << actual[i] << " vs " << expected[i];
+            ensure_approximately_equals_range(msg.str().c_str(), actual[i], expected[i], tolerance * scale);
+        }
+    }
 
     template<> template<>
     void llmatrix4a_object::test<1>()
@@ -414,5 +470,103 @@ namespace tut
         fresh.setIdentity();
         ensure("setIdentity is the identity", fresh == LLMatrix4a::identity());
         ensure("a translation is not the identity", a != LLMatrix4a::identity());
+    }
+
+    // THE CONVENTIONS, with glm as the oracle. The same sixteen floats
+    // are the same transform in both: a column-major matrix with column
+    // vectors and a row-major one with row vectors store one transform
+    // identically, and the product order is what flips.
+    template<> template<>
+    void llmatrix4a_object::test<12>()
+    {
+        const F32 tolerance = 1e-5f;
+        S32 cases = 0;
+        for (const LLQuaternion& q : ROTATIONS)
+        {
+            for (const LLVector3& scale : SCALES)
+            {
+                for (const LLVector3& pos : POSITIONS)
+                {
+                    LLMatrix4a m;
+                    m.initAll(scale, q, pos);
+                    const glm::mat4 g = as_glm(m);
+                    ensure("the same bytes both ways", same_bytes(from_glm(g), g));
+
+                    const LLVector3 p3(0.7f, -2.5f, 11.f);
+                    const LLVector4a p(p3.mV[0], p3.mV[1], p3.mV[2], 1.f);
+                    const LLVector4a d(p3.mV[0], p3.mV[1], p3.mV[2], 0.f);
+
+                    // M * (p, 1) is the affine transform, and the scalar
+                    // matrix's row-vector transform, of the same point
+                    LLVector4a point;
+                    m.affineTransform(p, point);
+                    ensure_vector_close("M * vec4(p, 1) is affineTransform", point, g * glm::vec4(p3.mV[0], p3.mV[1], p3.mV[2], 1.f), tolerance, 3);
+                    const LLVector3 scalar = p3 * m.toMatrix4();
+                    ensure_vector_close("affineTransform is v * M", point, glm::vec4(scalar.mV[0], scalar.mV[1], scalar.mV[2], 1.f), tolerance, 3);
+
+                    // M * (d, 0) is rotate
+                    LLVector4a direction;
+                    m.rotate(d, direction);
+                    ensure_vector_close("M * vec4(d, 0) is rotate", direction, g * glm::vec4(p3.mV[0], p3.mV[1], p3.mV[2], 0.f), tolerance, 3);
+
+                    ++cases;
+                }
+            }
+        }
+        ensure("every combination was covered", cases == 6 * 5 * 3);
+
+        // THE PRODUCT ORDER FLIPS: glm A * B applies B first; setMul(a, b)
+        // applies a first. So glm A * B is setMul(B, A).
+        LLMatrix4a a, b;
+        a.initAll(SCALES[1], ROTATIONS[1], POSITIONS[1]);
+        b.initAll(SCALES[3], ROTATIONS[4], POSITIONS[2]);
+        const glm::mat4 ga = as_glm(a);
+        const glm::mat4 gb = as_glm(b);
+
+        LLMatrix4a ba;
+        ba.setMul(b, a);
+        ensure_matrix_close("glm A * B is setMul(B, A)", ba, ga * gb, tolerance);
+        LLMatrix4a ab;
+        ab.setMul(a, b);
+        ensure_matrix_close("glm B * A is setMul(A, B)", ab, gb * ga, tolerance);
+
+        // and the transform of a point agrees with either reading
+        const glm::vec4 gp(1.f, 2.f, 3.f, 1.f);
+        LLVector4a p(1.f, 2.f, 3.f, 1.f), through_ba, via_a, via_b;
+        ba.affineTransform(p, through_ba);
+        b.affineTransform(p, via_b);
+        a.affineTransform(via_b, via_a);
+        ensure_vector_close("setMul(B, A) applies B then A", through_ba, ga * (gb * gp), tolerance, 3);
+        ensure_vector_close("which is b's transform then a's", through_ba, as_glm(via_a), tolerance, 3);
+
+        // glm::translate, scale and rotate post-multiply: apply the new
+        // transform first, so they are setMul(T, m).
+        const glm::vec3 gt(4.f, -5.f, 6.f);
+        LLMatrix4a t;
+        t.setIdentity();
+        t.setTranslation(LLVector3(4.f, -5.f, 6.f));
+        LLMatrix4a translated;
+        translated.setMul(t, a);
+        ensure_matrix_close("glm::translate(m, v) is setMul(T(v), m)", translated, glm::translate(ga, gt), tolerance);
+
+        const glm::vec3 gs(2.f, 3.f, 0.5f);
+        LLMatrix4a sc;
+        sc.setIdentity();
+        sc.mMatrix[0].set(2.f, 0.f, 0.f, 0.f);
+        sc.mMatrix[1].set(0.f, 3.f, 0.f, 0.f);
+        sc.mMatrix[2].set(0.f, 0.f, 0.5f, 0.f);
+        LLMatrix4a scaled;
+        scaled.setMul(sc, a);
+        ensure_matrix_close("glm::scale(m, v) is setMul(S(v), m)", scaled, glm::scale(ga, gs), tolerance);
+
+        // and a rotation about an axis is the same active rotation as the
+        // tree's LLQuaternion(angle, axis)
+        const F32 angle = 0.8f;
+        const LLVector3 axis(0.267f, -0.535f, 0.802f);
+        LLMatrix4a r;
+        r.initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(angle, axis), LLVector3());
+        LLMatrix4a rotated;
+        rotated.setMul(r, a);
+        ensure_matrix_close("glm::rotate(m, angle, axis) is setMul(R(angle, axis), m)", rotated, glm::rotate(ga, angle, glm::vec3(axis.mV[0], axis.mV[1], axis.mV[2])), tolerance);
     }
 }
