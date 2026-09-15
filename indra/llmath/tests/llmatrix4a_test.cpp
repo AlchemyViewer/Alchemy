@@ -33,6 +33,8 @@
 #include "../m4math.h"
 #include "../v3math.h"
 
+#include "../alprojection.h"
+
 #include "glm/mat4x4.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -858,5 +860,54 @@ namespace tut
         LLMatrix4a flat;
         flat.setTRS(translations[1], LLQuaternion2(ROTATIONS[2]), LLVector4a(1.f, 0.f, 1.f, 0.f));
         ensure("a flattened matrix does not decompose", !flat.decompose(s, r, t));
+    }
+
+    // Through a projection to the window and back, both depth conventions,
+    // against glm. The way back carries the window's resolution scaled by
+    // the depth, so it is held to the scene's size rather than the point's.
+    template<> template<>
+    void llmatrix4a_object::test<16>()
+    {
+        const F32 tolerance = 1e-4f;
+        const F32 back_tolerance = 5e-4f;
+        const S32 viewport[4] = { 10, 20, 1280, 720 };
+        const glm::ivec4 gviewport(10, 20, 1280, 720);
+
+        LLMatrix4a modelview;
+        modelview.initAll(LLVector3(1.f, 1.f, 1.f), ROTATIONS[4], LLVector3(3.f, -2.f, -20.f));
+        const LLMatrix4a projections[] = {
+            LLMatrix4a::perspective(1.1f, 1.777f, 0.25f, 1024.f),
+            LLMatrix4a::ortho(-30.f, 50.f, -20.f, 70.f, 0.5f, 100.f),
+        };
+        const LLVector4a points[] = { LLVector4a(0.f, 0.f, 0.f, 1.f), LLVector4a(1.f, 2.f, 3.f, 1.f), LLVector4a(-15.f, 8.f, 40.f, 1.f) };
+
+        const glm::mat4 gmv = as_glm(modelview);
+        for (const LLMatrix4a& projection : projections)
+        {
+            const glm::mat4 gp = as_glm(projection);
+            for (const LLVector4a& obj : points)
+            {
+                const glm::vec3 gobj(obj[0], obj[1], obj[2]);
+
+                const LLVector4a win = alprojection::project(obj, modelview, projection, viewport);
+                ensure_vector_close("project", win, glm::vec4(glm::project(gobj, gmv, gp, gviewport), 1.f), tolerance);
+                const LLVector4a win_zo = alprojection::project_zo(obj, modelview, projection, viewport);
+                ensure_vector_close("project_zo", win_zo, glm::vec4(glm::projectZO(gobj, gmv, gp, gviewport), 1.f), tolerance);
+
+                const LLVector4a back = alprojection::unproject(win, modelview, projection, viewport);
+                ensure_vector_close("unproject", back, glm::vec4(glm::unProject(glm::vec3(win[0], win[1], win[2]), gmv, gp, gviewport), 1.f), back_tolerance);
+                ensure_vector_close("unproject of project is the point", back, as_glm(obj), back_tolerance);
+                const LLVector4a back_zo = alprojection::unproject_zo(win_zo, modelview, projection, viewport);
+                ensure_vector_close("unproject_zo", back_zo, glm::vec4(glm::unProjectZO(glm::vec3(win_zo[0], win_zo[1], win_zo[2]), gmv, gp, gviewport), 1.f), back_tolerance);
+                ensure_vector_close("unproject_zo of project_zo is the point", back_zo, as_glm(obj), back_tolerance);
+
+                // the same through an inverse taken once
+                LLMatrix4a inverse;
+                inverse.setMul(modelview, projection);
+                ensure("the camera inverts", inverse.invert());
+                ensure_vector_close("unproject through the inverse", alprojection::unproject(win, inverse, viewport), as_glm(back), 1e-6f);
+                ensure_vector_close("unproject_zo through the inverse", alprojection::unproject_zo(win_zo, inverse, viewport), as_glm(back_zo), 1e-6f);
+            }
+        }
     }
 }

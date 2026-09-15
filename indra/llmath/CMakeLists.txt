@@ -6,6 +6,7 @@ target_sources(
   llmath
   PRIVATE
     alplaneset.cpp
+    alprojection.cpp
     alsimdkernels.cpp
     llbbox.cpp
     llbboxlocal.cpp
@@ -46,6 +47,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         alplaneset.h
+        alprojection.h
         alsimdkernels.h
         alsimdkernels.inl
         llbbox.h
