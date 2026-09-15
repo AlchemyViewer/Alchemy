@@ -475,10 +475,10 @@ bool LLGLTFPreviewTexture::render()
     PreviewSphere& preview_sphere = get_preview_sphere(mGLTFMaterial, object_transform);
 
     gPipeline.setupHWLights();
-    glm::mat4 mat = get_current_modelview();
-    glm::vec4 transformed_light_dir(light_dir);
-    transformed_light_dir = mat * transformed_light_dir;
-    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir));
+    LLVector4a light_dir_in, transformed_light_dir;
+    light_dir_in.loadua(light_dir.mV);
+    get_current_modelview().transform4(light_dir_in, transformed_light_dir);
+    SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir.getF32ptr()));
     // Override lights to ensure the sun is always shining from a certain direction (low graphics)
     // See also force_sun_direction_high_graphics and fixup_shader_constants
     {

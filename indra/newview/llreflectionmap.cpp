@@ -351,22 +351,20 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
         LLVolume* volume = mViewerObject->getVolume();
         if (volume && mViewerObject->getReflectionProbeIsBox())
         {
-            glm::mat4 mv(get_current_modelview());
             LLVector3 s = mViewerObject->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
             mRadius = s.magVec();
-            glm::mat4 scale = glm::scale(glm::vec3(s));
             if (mViewerObject->mDrawable != nullptr)
             {
-                // object to agent space (no scale)
-                glm::mat4 rm(glm::make_mat4(mViewerObject->mDrawable->getWorldMatrix().getF32ptr()));
-
-                // construct object to camera space (with scale)
-                mv = mv * rm * scale;
+                // object unit cube to camera space: the scale, then the object's
+                // world matrix, then the view
+                LLMatrix4a mv;
+                mv.setMul(LLMatrix4a::scaling(s.mV[0], s.mV[1], s.mV[2]), mViewerObject->mDrawable->getWorldMatrix());
+                mv.setMul(mv, get_current_modelview());
 
                 // inverse is camera space to object unit cube
-                mv = glm::inverse(mv);
+                mv.invert();
 
-                box = LLMatrix4(glm::value_ptr(mv));
+                mv.store(box);
 
                 return true;
             }

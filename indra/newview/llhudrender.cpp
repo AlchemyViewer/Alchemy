@@ -38,8 +38,6 @@
 #include "llviewerwindow.h"
 #include "llui.h"
 
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 LLHUDTextScope::LLHUDTextScope(const LLVector3& pos_agent, bool orthographic)
 :   mPosAgent(pos_agent)
@@ -111,10 +109,10 @@ void LLHUDTextScope::draw(std::string_view utf8text,
     // Where this line sits relative to the position, in screen space.
     const LLVector3 render_pos = mPosAgent + (x_offset * mRightAxis) + (y_offset * mUpAxis);
 
-    glm::ivec4 viewport(mWorldViewRect.mLeft, mWorldViewRect.mBottom,
-                        mWorldViewRect.getWidth(), mWorldViewRect.getHeight());
-    glm::vec3 win_coord = al_project(glm::vec3(render_pos), get_current_modelview(),
-                                     get_current_projection(), viewport);
+    const S32 viewport[4] = { mWorldViewRect.mLeft, mWorldViewRect.mBottom,
+                              mWorldViewRect.getWidth(), mWorldViewRect.getHeight() };
+    const LLVector3 win_coord(al_project(LLVector4a(render_pos.mV[0], render_pos.mV[1], render_pos.mV[2], 1.f), get_current_modelview(),
+                                         get_current_projection(), viewport).getF32ptr());
 
     // Split the projected position into an integer UI-pixel matrix translate
     // (LLRender2D::translate stores into LLCoordGL via (S32) cast and
@@ -123,8 +121,8 @@ void LLHUDTextScope::draw(std::string_view utf8text,
     // horizontal stems to ~1/8 px, so the string slides smoothly through
     // fractional screen pixels as the camera moves instead of jumping a whole
     // pixel at every integer boundary the matrix snap would otherwise enforce.
-    const F32 ui_x  = (win_coord.x - (F32)mWorldViewRect.mLeft)   / LLFontGL::sScaleX;
-    const F32 ui_y  = (win_coord.y - (F32)mWorldViewRect.mBottom) / LLFontGL::sScaleY;
+    const F32 ui_x  = (win_coord.mV[VX] - (F32)mWorldViewRect.mLeft)   / LLFontGL::sScaleX;
+    const F32 ui_y  = (win_coord.mV[VY] - (F32)mWorldViewRect.mBottom) / LLFontGL::sScaleY;
     const F32 int_x = floorf(ui_x);
     const F32 int_y = floorf(ui_y);
     const F32 frac_x = ui_x - int_x;
@@ -133,10 +131,10 @@ void LLHUDTextScope::draw(std::string_view utf8text,
     LLUI::loadIdentity();
     gGL.loadIdentity();
     // Place the text at the 3D point's window depth so it occludes against the scene.
-    // The 2D ortho (gl_state_for_2d) becomes reversed-ZO under reverse-Z and win_coord.z
+    // The 2D ortho (gl_state_for_2d) becomes reversed-ZO under reverse-Z and win_coord.mV[VZ]
     // is the reversed window depth, so the required translate-z is the exact negation.
-    const F32 hud_text_z = LLRender::sReverseZ ? ((win_coord.z * 2.f) - 1.f)
-                                               : -((win_coord.z * 2.f) - 1.f);
+    const F32 hud_text_z = LLRender::sReverseZ ? ((win_coord.mV[VZ] * 2.f) - 1.f)
+                                               : -((win_coord.mV[VZ] * 2.f) - 1.f);
     LLUI::translate(int_x, int_y, hud_text_z);
 
     F32 right_x;

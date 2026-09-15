@@ -2102,36 +2102,34 @@ bool LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
         {
             // getWorldMatrix rebuilds the volume and every joint above it;
             // updateWorldMatrix alone builds from whatever the parent last had
-            glm::mat4 mat(glm::make_mat4(mCollisionVolumes[i].getWorldMatrix().getF32ptr()));
-            glm::mat4 inverse = glm::inverse(mat);
-            glm::mat4 norm_mat = glm::transpose(inverse);
+            const LLMatrix4a& mat = mCollisionVolumes[i].getWorldMatrix();
+            LLMatrix4a inverse;
+            inverse.setInverse(mat);
 
-            glm::vec3 p1(start);
-            glm::vec3 p2(end);
-
-            p1 = mul_mat4_vec3(inverse, p1);
-            p2 = mul_mat4_vec3(inverse, p2);
+            LLVector4a p1, p2;
+            inverse.affineTransform(start, p1);
+            inverse.affineTransform(end, p2);
 
             LLVector3 position;
             LLVector3 norm;
 
-            if (linesegment_sphere(LLVector3(p1), LLVector3(p2), LLVector3(0,0,0), 1.f, position, norm))
+            if (linesegment_sphere(LLVector3(p1.getF32ptr()), LLVector3(p2.getF32ptr()), LLVector3(0,0,0), 1.f, position, norm))
             {
-                glm::vec3 res_pos(position);
-                res_pos = mul_mat4_vec3(mat, res_pos);
-
-                 glm::vec3 res_norm(norm);
-                res_norm = glm::normalize(res_norm);
-                res_norm = glm::mat3(norm_mat) * res_norm;
-
                 if (intersection)
                 {
-                    intersection->load3(glm::value_ptr(res_pos));
+                    LLVector4a res_pos;
+                    mat.affineTransform(LLVector4a(position.mV[0], position.mV[1], position.mV[2], 1.f), res_pos);
+                    intersection->load3(res_pos.getF32ptr());
                 }
 
                 if (normal)
                 {
-                    normal->load3(glm::value_ptr(res_norm));
+                    LLMatrix4a norm_mat;
+                    norm_mat.setNormalMatrix(mat);
+                    LLVector4a res_norm(norm.mV[0], norm.mV[1], norm.mV[2], 0.f);
+                    res_norm.normalize3();
+                    norm_mat.rotate(res_norm, res_norm);
+                    normal->load3(res_norm.getF32ptr());
                 }
 
                 return true;
@@ -6027,21 +6025,15 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
         if (shader->hasUniform(LLShaderMgr::IMPOSTOR_NORM_ROTATION))
         {
-            const glm::mat3 main_view = glm::mat3(glm::mat4(get_current_modelview()));
-            const LLMatrix3& baked = getImpostorViewRotation();
-
-            glm::mat3 bake_view;
-            for (U32 r = 0; r < 3; ++r)
-            {
-                for (U32 c = 0; c < 3; ++c)
-                {   // LLMatrix3 is row-major, glm is column-major
-                    bake_view[c][r] = baked.mMatrix[r][c];
-                }
-            }
-
-            const glm::mat3 rebase = main_view * glm::transpose(bake_view);
-            shader->uniformMatrix3fv(LLShaderMgr::IMPOSTOR_NORM_ROTATION, 1, GL_FALSE,
-                                     glm::value_ptr(rebase));
+            // the bake's rotation out, then the main view's in
+            const LLMatrix4a& mv = get_current_modelview();
+            LLMatrix3a main_view;
+            main_view.setColumns(mv.getRow<0>(), mv.getRow<1>(), mv.getRow<2>());
+            LLMatrix3a bake_view;
+            bake_view.loadu(getImpostorViewRotation());
+            LLMatrix3a rebase;
+            rebase.setMul(main_view, bake_view);
+            shader->uniformMatrix3fv(LLShaderMgr::IMPOSTOR_NORM_ROTATION, rebase);
         }
     }
 

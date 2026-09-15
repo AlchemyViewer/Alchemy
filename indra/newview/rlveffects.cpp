@@ -314,23 +314,22 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
             posSphereOrigin.setVec((isAgentAvatarValid()) ? gAgentAvatarp->getRenderPosition() : gAgent.getPositionAgent(), 1.0f);
             break;
     }
-    glm::vec4 posSphereOriginGl(glm::make_vec4(posSphereOrigin.mV));
-    const glm::mat4 mvMatrix(get_current_modelview());
-    posSphereOriginGl = mvMatrix * posSphereOriginGl;
-    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM1, 1, glm::value_ptr(posSphereOriginGl));
+    LLVector4a posSphereOriginIn, posSphereOriginGl;
+    posSphereOriginIn.loadua(posSphereOrigin.mV);
+    get_current_modelview().transform4(posSphereOriginIn, posSphereOriginGl);
+    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM1, 1, posSphereOriginGl.getF32ptr());
 
     // Pack min/max distance and alpha together
     float nDistMin = m_nDistanceMin.get(), nDistMax = m_nDistanceMax.get();
-    const glm::vec4 sphereParams(m_nValueMin.get(), nDistMin, m_nValueMax.get(), (nDistMax >= nDistMin) ? nDistMax : nDistMin);
-    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM2, 1, glm::value_ptr(sphereParams));
+    const LLVector4 sphereParams(m_nValueMin.get(), nDistMin, m_nValueMax.get(), (nDistMax >= nDistMin) ? nDistMax : nDistMin);
+    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM2, 1, sphereParams.mV);
 
     // Pass dist extend
     int eDistExtend = (int)m_eDistExtend;
     pShader->uniform2f(LLShaderMgr::RLV_EFFECT_PARAM3, (GLfloat)(eDistExtend & (int)ESphereDistExtend::Min), (GLfloat)(eDistExtend & (int)ESphereDistExtend::Max));
 
     // Pass effect params
-    const glm::vec4 effectParams(glm::make_vec4(m_Params.get().mV));
-    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, glm::value_ptr(effectParams));
+    pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM4, 1, m_Params.get().mV);
 }
 
 void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectParams* pParams) const

@@ -2890,9 +2890,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
         LLMatrix4a mat_normal;
         if (skinned)
         {
-            glm::mat4 m = glm::make_mat4((F32*)mdl->mSkinInfo.mBindShapeMatrix.getF32ptr());
-            m = glm::transpose(glm::inverse(m));
-            mat_normal.loadu(glm::value_ptr(m));
+            mat_normal.setNormalMatrix(mdl->mSkinInfo.mBindShapeMatrix);
         }
 
         // O(1) per-vertex weight lookup for the skin-weight buffer fill below;

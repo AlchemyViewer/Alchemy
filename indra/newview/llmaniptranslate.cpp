@@ -1684,11 +1684,12 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
             normal = -normal;
         }
         F32 d = -(selection_center * normal);
-        glm::vec4 plane(normal.mV[0], normal.mV[1], normal.mV[2], d );
+        LLMatrix4a inverse;
+        inverse.setInverse(gGL.getModelviewMatrix());
+        LLVector4a plane;
+        inverse.transform4(LLVector4a(normal.mV[0], normal.mV[1], normal.mV[2], d), plane);
 
-        plane = glm::inverse(glm::mat4(gGL.getModelviewMatrix())) * plane;
-
-        gClipProgram.uniform4fv(sClipPlane, 1, plane.v);
+        gClipProgram.uniform4fv(sClipPlane, 1, plane.getF32ptr());
 
         bool particles = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES);
         bool clouds = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_CLOUDS);
