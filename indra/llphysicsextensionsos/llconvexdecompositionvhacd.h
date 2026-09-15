@@ -272,8 +272,20 @@ private:
 
     struct LLConvexMesh
     {
-        using vertex_type = glm::vec3;
-        using index_type = glm::u32vec3;
+        // Three indices at a stride of twelve bytes, which is what LLCDMeshData
+        // reads them at.
+        struct Triangle
+        {
+            Triangle(U32 i0, U32 i1, U32 i2) : mI0(i0), mI1(i1), mI2(i2) {}
+            U32 mI0;
+            U32 mI1;
+            U32 mI2;
+        };
+
+        // A vertex at a stride of sixteen bytes, which is what LLCDHull and
+        // LLCDMeshData read it at.
+        using vertex_type = LLVector4a;
+        using index_type = Triangle;
         using vertex_array_type = std::vector<vertex_type>;
         using index_array_type = std::vector<index_type>;
 
