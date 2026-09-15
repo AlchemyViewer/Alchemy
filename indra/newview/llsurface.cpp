@@ -303,6 +303,11 @@ void LLSurface::connectNeighbor(LLSurface *neighborp, U32 direction)
     S32 i;
     LLSurfacePatch *patchp, *neighbor_patchp;
 
+    // The patch walk below pairs our edge patches with the neighbour's by index, and the
+    // surface maps' apron reads the neighbour's grid as a continuation of ours: both need the
+    // same grid spacing with the neighbour's grid 0 on our last column. LLWorld connects
+    // regions only at exact handle offsets, which gives the alignment; the spacing is checked.
+    llassert(neighborp->mMetersPerGrid == mMetersPerGrid);
     mNeighbors[direction] = neighborp;
     neighborp->mNeighbors[gDirOpposite[direction]] = this;
     dirtySurfaceMaps();
@@ -1119,13 +1124,15 @@ F32 LLSurface::sampleZ(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const
 {
     const U32 dir = ALTerrainSurfaceMaps::resolve(gx, gy, mGridsPerEdge, has_neighbor);
     const LLSurface* owner = dir == MIDDLE ? this : mNeighbors[dir];
-    return owner->getZ(gx, gy);
+    // A neighbour with fewer rows than this surface is read at its edge, not past it.
+    const S32 last = owner->mGridsPerEdge - 1;
+    return owner->getZ(llclamp(gx, 0, last), llclamp(gy, 0, last));
 }
 
 // static
 bool LLSurface::isSmoothing()
 {
-    static LLCachedControl<bool> smoothing(gSavedSettings, "AlchemyRenderTerrainSmoothing", false);
+    static LLCachedControl<bool> smoothing(gSavedSettings, "AlchemyRenderTerrainSmoothing", true);
     return smoothing;
 }
 

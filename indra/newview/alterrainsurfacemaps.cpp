@@ -115,7 +115,8 @@ F32 ALTerrainSurfaceMaps::compositionAt(S32 gx, S32 gy) const
 F32 ALTerrainSurfaceMaps::noiseAt(S32 gx, S32 gy) const
 {
     const LLVector3d& origin = mSurface.getOriginGlobal();
-    return terrain_composition_noise(origin.mdV[VX] + gx, origin.mdV[VY] + gy);
+    const F32 meters_per_grid = mSurface.getMetersPerGrid();
+    return terrain_composition_noise(origin.mdV[VX] + gx * meters_per_grid, origin.mdV[VY] + gy * meters_per_grid);
 }
 
 void ALTerrainSurfaceMaps::upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data)

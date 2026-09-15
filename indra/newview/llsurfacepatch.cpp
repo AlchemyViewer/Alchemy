@@ -200,12 +200,16 @@ void LLSurfacePatch::eval(const U32 x, const U32 y, LLVector3 *vertex, LLVector2
     llassert_always(vertex && tex1);
 
     const F32 meters_per_grid = mSurfacep->getMetersPerGrid();
-    vertex->set(mOriginRegion.mV[VX] + x * meters_per_grid,
-                mOriginRegion.mV[VY] + y * meters_per_grid,
-                *(mDataZ + x + y * mSurfacep->getGridsPerEdge()));
+    const F32 x_region = mOriginRegion.mV[VX] + x * meters_per_grid;
+    const F32 y_region = mOriginRegion.mV[VY] + y * meters_per_grid;
+    vertex->set(x_region, y_region, *(mDataZ + x + y * mSurfacep->getGridsPerEdge()));
 
-    tex1->mV[0] = mSurfacep->getRegion()->getCompositionXY(llfloor(mOriginRegion.mV[0])+x, llfloor(mOriginRegion.mV[1])+y);
-    tex1->mV[1] = terrain_composition_noise(mOriginGlobal.mdV[0] + x, mOriginGlobal.mdV[1] + y);
+    // The composition is a grid, the noise is a function of world metres.
+    const S32 gx = ll_round(mOriginRegion.mV[VX] / meters_per_grid) + (S32)x;
+    const S32 gy = ll_round(mOriginRegion.mV[VY] / meters_per_grid) + (S32)y;
+    tex1->mV[0] = mSurfacep->getRegion()->getCompositionXY(gx, gy);
+    tex1->mV[1] = terrain_composition_noise(mSurfacep->getOriginGlobal().mdV[VX] + x_region,
+                                            mSurfacep->getOriginGlobal().mdV[VY] + y_region);
 }
 
 F32 terrain_composition_noise(F64 x_global, F64 y_global)
@@ -472,17 +476,7 @@ bool LLSurfacePatch::updateTexture()
 void LLSurfacePatch::updateGL()
 {
     LL_PROFILE_ZONE_SCOPED;
-    F32 meters_per_grid = getSurface()->getMetersPerGrid();
-    F32 grids_per_patch_edge = (F32)getSurface()->getGridsPerPatchEdge();
-
-    LLViewerRegion *regionp = getSurface()->getRegion();
-    LLVector3d origin_region = getOriginGlobal() - getSurface()->getOriginGlobal();
-
-    LLVLComposition* comp = regionp->getComposition();
-
     updateCompositionStats();
-    F32 tex_patch_size = meters_per_grid*grids_per_patch_edge;
-
     mSTexUpdate = false;
 }
 

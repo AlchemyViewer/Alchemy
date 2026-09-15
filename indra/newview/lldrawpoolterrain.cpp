@@ -294,9 +294,6 @@ void LLDrawPoolTerrain::beginShadowPass(S32 pass)
     gGL.getTextureSlot(0)->unbind();
     gDeferredTerrainShadowProgram.bind();
     gGL.setPatchVertices(LLVOSurfacePatch::PATCH_CORNERS);
-
-    LLEnvironment& environment = LLEnvironment::instance();
-    gDeferredTerrainShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
 }
 
 void LLDrawPoolTerrain::endShadowPass(S32 pass)
@@ -363,7 +360,7 @@ void LLDrawPoolTerrain::renderFullShader()
     {
         // Use materials
         U32 paint_type = use_local_materials ? gLocalTerrainMaterials.getPaintType() : compp->getPaintType();
-        paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT);
+        paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT - 1);
         sShader = gDeferredPBRTerrainProgram[paint_type].selectVariant();
         sShader->bind();
         bindSurface(sShader);
@@ -490,7 +487,7 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     }
 
     U32 paint_type = use_local_materials ? gLocalTerrainMaterials.getPaintType() : compp->getPaintType();
-    paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT);
+    paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT - 1);
 
     S32 detail_basecolor[terrain_material_count];
     S32 detail_normal[terrain_material_count];

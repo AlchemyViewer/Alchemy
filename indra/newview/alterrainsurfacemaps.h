@@ -75,7 +75,10 @@ public:
     // is read from: MIDDLE for this one, else the neighbour's direction, with
     // gx and gy rewritten into that surface's grid. A missing neighbour clamps
     // the axis that needed it. x resolves first and y from where x landed,
-    // the order LLSurfacePatch::calcNormal walks patches in.
+    // the order LLSurfacePatch::calcNormal walks patches in. The rewrite
+    // assumes the neighbour's grid continues this one's across the border --
+    // the same spacing, and its grid 0 on our last column -- which is what
+    // LLSurface::connectNeighbor's patch-by-patch walk assumes too.
     static U32 resolve(S32& gx, S32& gy, S32 grids_per_edge, const bool (&has_neighbor)[8]);
 
     // The tangent at the middle sample of three, limited so the cubic between
