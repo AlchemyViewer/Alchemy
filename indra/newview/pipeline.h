@@ -418,7 +418,7 @@ public:
 
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
-    void renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true);
+    void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
@@ -919,10 +919,10 @@ public:
     LLCamera                mShadowCamera[8];
     LLVector3               mShadowExtents[4][2];
     // TODO : separate Sun Shadow and Spot Shadow matrices
-    glm::mat4               mSunShadowMatrix[6];
-    glm::mat4               mShadowModelview[6];
-    glm::mat4               mShadowProjection[6];
-    glm::mat4               mReflectionModelView;
+    LLMatrix4a              mSunShadowMatrix[6];
+    LLMatrix4a              mShadowModelview[6];
+    LLMatrix4a              mShadowProjection[6];
+    LLMatrix4a              mReflectionModelView;
 
     LLPointer<LLDrawable>   mShadowSpotLight[2];
     F32                     mSpotLightFade[2];
@@ -939,8 +939,8 @@ public:
     // so those stay loose.
     //
     // shadow_matrix@0, ssao_effect_mat@384, shadow_clip@432, shadow_res@448,
-    // proj_shadow_res@456, scalars @464..492, size 496. Matrices are COLUMN-major (std140's
-    // default): glm's own storage is uploaded straight through, and ssao_effect_mat is
+    // proj_shadow_res@456, scalars @464..492, size 496. Matrices go up as they lie: an
+    // LLMatrix4a's rows are the columns std140 reads by default, and ssao_effect_mat is
     // symmetric either way. Checked against the driver at shader load by
     // validateEngineBlockLayouts() in debug builds.
     struct alignas(16) DeferredUBOData
