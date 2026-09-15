@@ -56,6 +56,10 @@
 const F32 DETAIL_SCALE = 1.f/16.f;
 int DebugDetailMap = 0;
 
+// Tessellation level = edge length * density / distance, so a 16 m patch edge
+// reaches the 64-level cap inside 16 m and one segment at 1024 m.
+constexpr F32 TESS_DENSITY = 64.f;
+
 S32 LLDrawPoolTerrain::sPBRDetailMode = 0;
 F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
 F32 LLDrawPoolTerrain::sPBRDetailScale = DETAIL_SCALE;
@@ -168,18 +172,7 @@ LLDrawPoolTerrain::~LLDrawPoolTerrain()
 
 U32 LLDrawPoolTerrain::getVertexDataMask()
 {
-    if (LLPipeline::sShadowRender)
-    {
-        return LLVertexBuffer::MAP_VERTEX;
-    }
-    else if (LLGLSLShader::sCurBoundShaderPtr)
-    {
-        return VERTEX_DATA_MASK & ~(LLVertexBuffer::MAP_TEXCOORD2 | LLVertexBuffer::MAP_TEXCOORD3);
-    }
-    else
-    {
-        return VERTEX_DATA_MASK;
-    }
+    return VERTEX_DATA_MASK;
 }
 
 void LLDrawPoolTerrain::prerender()
@@ -196,17 +189,60 @@ void LLDrawPoolTerrain::boostTerrainDetailTextures()
     compp->boost();
 }
 
-ALTerrainSurfaceMaps& LLDrawPoolTerrain::surfaceMaps()
+void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
 {
     // Each terrain pool draws one region; its faces all know which.
     LLViewerRegion *regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
-    return regionp->getLand().getSurfaceMaps();
+    LLSurface& land = regionp->getLand();
+    ALTerrainSurfaceMaps& maps = land.getSurfaceMaps();
+    maps.ensureUploaded();
+    maps.bind(shader->enableTexture(LLShaderMgr::TERRAIN_HEIGHT_MAP),
+              shader->enableTexture(LLShaderMgr::TERRAIN_COMPOSITION_MAP));
+
+    // Levels come from the distance to this camera in every pass, so the
+    // shadow pass places the same vertices the lit pass does. During a cube
+    // snapshot the singleton is the probe; that tessellates around the probe,
+    // which is what a probe wants.
+    const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
+    shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
+    // sLODFactor is RenderTerrainLODFactor squared, as it always was.
+    const F32 density = LLPipeline::sDynamicLOD ? TESS_DENSITY * LLVOSurfacePatch::sLODFactor : 0.f;
+    shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
+    shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
+    shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());
+}
+
+void LLDrawPoolTerrain::unbindSurface(LLGLSLShader* shader)
+{
+    shader->disableTexture(LLShaderMgr::TERRAIN_HEIGHT_MAP);
+    shader->disableTexture(LLShaderMgr::TERRAIN_COMPOSITION_MAP);
+    shader->disableTexture(LLShaderMgr::TERRAIN_PARCEL_OVERLAY);
+}
+
+void LLDrawPoolTerrain::bindParcelOverlay(LLGLSLShader* shader)
+{
+    static const LLCachedControl<bool> show_parcel_owners(gSavedSettings, "ShowParcelOwners");
+    LLViewerTexture* overlay = nullptr;
+    if (show_parcel_owners)
+    {
+        LLViewerRegion* regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
+        LLViewerParcelOverlay* overlayp = regionp->getParcelOverlay();
+        overlay = overlayp ? overlayp->getTexture() : nullptr;
+    }
+    if (overlay)
+    {
+        // The parcel overlay is built TAM_CLAMP + TFO_POINT; see LLViewerParcelOverlay.
+        S32 slot = shader->enableTexture(LLShaderMgr::TERRAIN_PARCEL_OVERLAY);
+        gGL.getTextureSlot(slot)->bindSampled(overlay, ALSamplers::PointClamp);
+    }
+    shader->uniform1i(LLShaderMgr::TERRAIN_SHOW_PARCEL_OWNERS, overlay ? 1 : 0);
 }
 
 void LLDrawPoolTerrain::beginDeferredPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
     LLFacePool::beginRenderPass(pass);
+    gGL.setPatchVertices(LLVOSurfacePatch::PATCH_CORNERS);
 }
 
 void LLDrawPoolTerrain::endDeferredPass(S32 pass)
@@ -226,7 +262,6 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
     }
 
     boostTerrainDetailTextures();
-    surfaceMaps().ensureUploaded();
 
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
     // Probe and hero faces render through this pass too; only the main view counts.
@@ -243,14 +278,6 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
 #else
     renderFullShader();
 #endif
-
-    // Special-case for land ownership feedback
-    static const LLCachedControl<bool> show_parcel_owners(gSavedSettings, "ShowParcelOwners");
-    if (show_parcel_owners)
-    {
-        hilightParcelOwners();
-    }
-
 }
 
 void LLDrawPoolTerrain::beginShadowPass(S32 pass)
@@ -258,17 +285,18 @@ void LLDrawPoolTerrain::beginShadowPass(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
     LLFacePool::beginRenderPass(pass);
     gGL.getTextureSlot(0)->unbind();
-    gDeferredShadowProgram.bind();
+    gDeferredTerrainShadowProgram.bind();
+    gGL.setPatchVertices(LLVOSurfacePatch::PATCH_CORNERS);
 
     LLEnvironment& environment = LLEnvironment::instance();
-    gDeferredShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
+    gDeferredTerrainShadowProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, environment.getIsSunUp() ? 1 : 0);
 }
 
 void LLDrawPoolTerrain::endShadowPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
     LLFacePool::endRenderPass(pass);
-    gDeferredShadowProgram.unbind();
+    gDeferredTerrainShadowProgram.unbind();
 }
 
 void LLDrawPoolTerrain::renderShadow(S32 pass)
@@ -279,11 +307,9 @@ void LLDrawPoolTerrain::renderShadow(S32 pass)
     {
         return;
     }
-    surfaceMaps().ensureUploaded();
-    //LLGLEnable offset(GL_POLYGON_OFFSET);
-    //glCullFace(GL_FRONT);
+    bindSurface(&gDeferredTerrainShadowProgram);
     drawLoop();
-    //glCullFace(GL_BACK);
+    unbindSurface(&gDeferredTerrainShadowProgram);
 }
 
 
@@ -299,7 +325,7 @@ void LLDrawPoolTerrain::drawLoop()
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
             LLRenderPass::applyModelMatrix(&facep->getDrawable()->getRegion()->mRenderMatrix);
 
-            facep->renderIndexed();
+            facep->renderIndexed(LLRender::PATCHES);
         }
     }
 }
@@ -322,6 +348,8 @@ void LLDrawPoolTerrain::renderFullShader()
         // Use textures
         sShader = gDeferredTerrainProgram.selectVariant();
         sShader->bind();
+        bindSurface(sShader);
+        bindParcelOverlay(sShader);
         renderFullShaderTextures();
     }
     else
@@ -331,8 +359,11 @@ void LLDrawPoolTerrain::renderFullShader()
         paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT);
         sShader = gDeferredPBRTerrainProgram[paint_type].selectVariant();
         sShader->bind();
+        bindSurface(sShader);
+        bindParcelOverlay(sShader);
         renderFullShaderPBR(use_local_materials);
     }
+    unbindSurface(sShader);
 }
 
 void LLDrawPoolTerrain::renderFullShaderTextures()
@@ -598,8 +629,6 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
         // other 3 slots.
         llassert(tex_paint_map->getComponents() == 3);
         gGL.getTextureSlot(paint_map)->bindSampled(tex_paint_map, ALSamplers::AnisoClamp);
-
-        shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());
     }
 
     //
@@ -699,72 +728,6 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
         }
     }
 }
-
-void LLDrawPoolTerrain::hilightParcelOwners()
-{
-    { //use fullbright shader for highlighting
-        // Raw pass-through writer: the overlay stripes are sampled undecoded and stored
-        // as-is, so opt out of the deferred pass's hoisted GL_FRAMEBUFFER_SRGB.
-        LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
-        LLGLSLShader* old_shader = sShader;
-        sShader->unbind();
-        sShader = &gDeferredHighlightProgram;
-        sShader->bind();
-        gGL.diffuseColor4f(1, 1, 1, 1);
-        LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-        gGL.setPolygonOffset(-1.0f, -1.0f);
-        renderOwnership();
-        sShader = old_shader;
-        sShader->bind();
-    }
-
-}
-
-//============================================================================
-
-void LLDrawPoolTerrain::renderOwnership()
-{
-    LLGLSPipelineAlpha gls_pipeline_alpha;
-
-    llassert(!mDrawFace.empty());
-
-    // Each terrain pool is associated with a single region.
-    // We need to peek back into the viewer's data to find out
-    // which ownership overlay texture to use.
-    LLFace                  *facep              = mDrawFace[0];
-    LLDrawable              *drawablep          = facep->getDrawable();
-    const LLViewerObject    *objectp                = drawablep->getVObj();
-    const LLVOSurfacePatch  *vo_surface_patchp  = (LLVOSurfacePatch *)objectp;
-    LLSurfacePatch          *surface_patchp     = vo_surface_patchp->getPatch();
-    LLSurface               *surfacep           = surface_patchp->getSurface();
-    LLViewerRegion          *regionp            = surfacep->getRegion();
-    LLViewerParcelOverlay   *overlayp           = regionp->getParcelOverlay();
-    LLViewerTexture         *texturep           = overlayp->getTexture();
-
-    // The parcel overlay is built TAM_CLAMP + TFO_POINT; see LLViewerParcelOverlay.
-    gGL.getTextureSlot(0)->bindSampled(texturep, ALSamplers::PointClamp);
-
-    // *NOTE: Because the region is 256 meters wide, but has 257 pixels, the
-    // texture coordinates for pixel 256x256 is not 1,1. This makes the
-    // ownership map not line up with the selection. We address this with
-    // a texture matrix multiply.
-    gGL.matrixMode(LLRender::MM_TEXTURE0);
-    gGL.pushMatrix();
-
-    const F32 TEXTURE_FUDGE = 257.f / 256.f;
-    gGL.scalef( TEXTURE_FUDGE, TEXTURE_FUDGE, 1.f );
-    for (std::vector<LLFace*>::iterator iter = mDrawFace.begin();
-         iter != mDrawFace.end(); iter++)
-    {
-        LLFace *facep = *iter;
-        facep->renderIndexed();
-    }
-
-    gGL.matrixMode(LLRender::MM_TEXTURE0);
-    gGL.popMatrix();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
-}
-
 
 void LLDrawPoolTerrain::dirtyTextures(const std::set<LLViewerFetchedTexture*>& textures)
 {

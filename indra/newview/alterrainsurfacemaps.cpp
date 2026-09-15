@@ -53,11 +53,13 @@ void ALTerrainSurfaceMaps::ensureUploaded()
 
 void ALTerrainSurfaceMaps::bind(S32 height_slot, S32 composition_slot)
 {
-    if (mHeight.notNull())
+    // A slot below zero is a program with no such sampler: the shadow stages
+    // never read the composition.
+    if (height_slot >= 0 && mHeight.notNull())
     {
         gGL.getTextureSlot(height_slot)->bindSampled(mHeight.get(), ALSamplers::PointClamp);
     }
-    if (mComposition.notNull())
+    if (composition_slot >= 0 && mComposition.notNull())
     {
         gGL.getTextureSlot(composition_slot)->bindSampled(mComposition.get(), ALSamplers::BilinearClamp);
     }

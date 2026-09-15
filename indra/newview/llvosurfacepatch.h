@@ -55,11 +55,9 @@ public:
     /*virtual*/ bool        updateGeometry(LLDrawable *drawable);
     /*virtual*/ bool        updateLOD();
     /*virtual*/ void        updateFaceSize(S32 idx);
-    void getTerrainGeometry(LLStrider<LLVector3> &verticesp,
-                                LLStrider<LLVector3> &normalsp,
-                                LLStrider<LLVector2> &texCoords0p,
-                                LLStrider<LLVector2> &texCoords1p,
-                                LLStrider<U16> &indicesp);
+    // Vertices and indices per patch: one four-corner GL_PATCHES primitive.
+    static constexpr S32 PATCH_CORNERS = 4;
+    void getTerrainGeometry(LLStrider<LLVector3> &verticesp, LLStrider<U16> &indicesp);
 
     /*virtual*/ void updateTextures();
     /*virtual*/ void setPixelAreaAndAngle(LLAgent &agent); // generate accurate apparent angle and area
@@ -95,39 +93,6 @@ protected:
     LLSurfacePatch  *mPatchp;
     bool            mDirtyTexture;
     bool            mDirtyTerrain;
-
-    S32             mLastNorthStride;
-    S32             mLastEastStride;
-    S32             mLastStride;
-    S32             mLastLength;
-
-    void getGeomSizesMain(const S32 stride, S32 &num_vertices, S32 &num_indices);
-    void getGeomSizesNorth(const S32 stride, const S32 north_stride,
-                                  S32 &num_vertices, S32 &num_indices);
-    void getGeomSizesEast(const S32 stride, const S32 east_stride,
-                                 S32 &num_vertices, S32 &num_indices);
-
-    void updateMainGeometry(LLFace *facep,
-                       LLStrider<LLVector3> &verticesp,
-                       LLStrider<LLVector3> &normalsp,
-                       LLStrider<LLVector2> &texCoords0p,
-                       LLStrider<LLVector2> &texCoords1p,
-                       LLStrider<U16> &indicesp,
-                       U32 &index_offset);
-    void updateNorthGeometry(LLFace *facep,
-                       LLStrider<LLVector3> &verticesp,
-                       LLStrider<LLVector3> &normalsp,
-                       LLStrider<LLVector2> &texCoords0p,
-                       LLStrider<LLVector2> &texCoords1p,
-                       LLStrider<U16> &indicesp,
-                       U32 &index_offset);
-    void updateEastGeometry(LLFace *facep,
-                       LLStrider<LLVector3> &verticesp,
-                       LLStrider<LLVector3> &normalsp,
-                       LLStrider<LLVector2> &texCoords0p,
-                       LLStrider<LLVector2> &texCoords1p,
-                       LLStrider<U16> &indicesp,
-                       U32 &index_offset);
 };
 
 #endif // LL_VOSURFACEPATCH_H

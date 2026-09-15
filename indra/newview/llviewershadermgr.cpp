@@ -196,6 +196,7 @@ LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
 LLGLSLShader            gDeferredShadowProgram;
+LLGLSLShader            gDeferredTerrainShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
 LLGLSLShader            gDeferredShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskProgram;
@@ -932,6 +933,22 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         return "windlight/atmosphericsFuncs.glsl";
     }
 
+    // The terrain's evaluation-stage objects. GLSL links per stage, so the vertex-side helpers
+    // the terrain evaluation calls are compiled a second time here, for that stage, under the
+    // same keys in the stage's own map.
+    shaders.clear();
+    shaders.push_back( make_pair( "deferred/terrainSurface.glsl",           1 ) );
+    shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
+    shaders.push_back( make_pair( "windlight/atmosphericsVarsV.glsl",       mShaderLevel[SHADER_WINDLIGHT] ) );
+    for (U32 i = 0; i < shaders.size(); i++)
+    {
+        if (loadShaderFile(shaders[i].first, shaders[i].second, GL_TESS_EVALUATION_SHADER, &attribs) == 0)
+        {
+            LL_WARNS("Shader") << "Failed to load basic tessellation evaluation shader " << i << ": " << shaders[i].first << LL_ENDL;
+            return shaders[i].first;
+        }
+    }
+
     // Load the Basic Fragment Shaders at the appropriate level.
     // (in order of shader function call depth for reference purposes, deepest level first)
 
@@ -1249,6 +1266,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
         gDeferredShadowProgram.unload();
+        gDeferredTerrainShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
         gDeferredShadowAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskProgram.unload();
@@ -1818,9 +1836,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mFeatures.hasGamma = true;
             shader->mFeatures.hasTransport = true;
             shader->mFeatures.isPBRTerrain = true;
+            shader->mFeatures.hasTessellatedTerrain = true;
 
             shader->mShaderFiles.clear();
-            shader->mShaderFiles.push_back(make_pair("deferred/pbrterrainV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/terrainPatchV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/terrainTC.glsl", GL_TESS_CONTROL_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/pbrterrainTE.glsl", GL_TESS_EVALUATION_SHADER));
             shader->mShaderFiles.push_back(make_pair("deferred/pbrterrainF.glsl", GL_FRAGMENT_SHADER));
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             shader->addPermutation("TERRAIN_PBR_DETAIL", llformat("%d", detail));
@@ -2470,6 +2491,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
+        gDeferredTerrainShadowProgram.mName = "Deferred Terrain Shadow Shader";
+        gDeferredTerrainShadowProgram.mFeatures.hasTessellatedTerrain = true;
+        gDeferredTerrainShadowProgram.mShaderFiles.clear();
+        gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/terrainPatchV.glsl", GL_VERTEX_SHADER));
+        gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/terrainTC.glsl", GL_TESS_CONTROL_SHADER));
+        gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/terrainShadowTE.glsl", GL_TESS_EVALUATION_SHADER));
+        gDeferredTerrainShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredTerrainShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gDeferredTerrainShadowProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
         gDeferredShadowCubeProgram.mName = "Deferred Shadow Cube Shader";
         gDeferredShadowCubeProgram.mFeatures.isDeferred = true;
         gDeferredShadowCubeProgram.mFeatures.hasShadows = true;
@@ -2650,8 +2685,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredTerrainProgram.mFeatures.hasAtmospherics = true;
         gDeferredTerrainProgram.mFeatures.hasGamma = true;
 
+        gDeferredTerrainProgram.mFeatures.hasTessellatedTerrain = true;
+
         gDeferredTerrainProgram.mShaderFiles.clear();
-        gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainV.glsl", GL_VERTEX_SHADER));
+        gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainPatchV.glsl", GL_VERTEX_SHADER));
+        gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainTC.glsl", GL_TESS_CONTROL_SHADER));
+        gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainTE.glsl", GL_TESS_EVALUATION_SHADER));
         gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainF.glsl", GL_FRAGMENT_SHADER));
 
         add_common_permutations(&gDeferredTerrainProgram);

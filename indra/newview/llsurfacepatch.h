@@ -122,6 +122,7 @@ public:
 
     LLVector3 getOriginAgent() const;
     const LLVector3d &getOriginGlobal() const;
+    const LLVector3 &getOriginRegion() const        { return mOriginRegion; }
     void setOriginGlobal(const LLVector3d &origin_global);
 
     // connectivity -- each LLPatch points at 5 neighbors (or NULL)

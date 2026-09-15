@@ -124,21 +124,12 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     gGL.ortho(-region_half_width, region_half_width, -region_half_width, region_half_width, region_high_near, region_low_far);
     // No need to call camera.setPerspective because we don't need the clip planes. It would be inaccurate due to the perspective rendering anyway.
 
-    // Need to get the full resolution vertices in order to get an accurate
-    // paintmap. It's not sufficient to iterate over the surface patches, as
-    // they may be at lower LODs.
-    // The functionality here is a subset of
-    // LLVOSurfacePatch::getTerrainGeometry. Unlike said function, we don't
-    // care about stride length since we're always rendering at full
-    // resolution. We also don't care about normals/tangents because those
-    // don't contribute to the paintmap.
-    // *NOTE: The actual getTerrainGeometry fits the terrain vertices snugly
-    // under the 16-bit indices limit. For the sake of simplicity, that has not
-    // been replicated here.
+    // Need the full resolution vertices in order to get an accurate paintmap:
+    // the drawn terrain is tessellated on the GPU from the region's height
+    // map, so this builds its own grid mesh at one vertex per grid point. We
+    // don't care about normals because those don't contribute to the paintmap.
     std::vector<LLPointer<LLDrawInfo>> infos;
-    // Vertex and index counts adapted from LLVOSurfacePatch::getGeomSizesMain,
-    // with additional vertices added as we are including the north and east
-    // edges here.
+    // Vertex and index counts per patch, including the north and east edges.
     const U32 patch_size = (U32)surface.getGridsPerPatchEdge();
     constexpr U32 stride = 1;
     const U32 vert_size = (patch_size / stride) + 1;

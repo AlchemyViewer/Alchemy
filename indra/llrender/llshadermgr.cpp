@@ -247,6 +247,25 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         return false;
     }
 
+    ///////////////////////////////////////////
+    // Attach Tessellation Evaluation Features
+    ///////////////////////////////////////////
+
+    if (features->hasTessellatedTerrain)
+    {
+        // GLSL resolves calls within a stage: the evaluation stage needs its own copies of the
+        // vertex-side helpers it calls. atmosphericsVarsV declares the outputs the fragment
+        // side's atmosphericsVarsF expects to find in the stage before it, which with
+        // tessellation is this one.
+        for (const char* object : { "deferred/terrainSurface.glsl", "deferred/textureUtilV.glsl", "windlight/atmosphericsVarsV.glsl" })
+        {
+            if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
+            {
+                return false;
+            }
+        }
+    }
+
     ///////////////////////////////////////
     // Attach Fragment Shader Features Next
     ///////////////////////////////////////
@@ -1779,6 +1798,14 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("alpha_ramp");
     mReservedUniforms.push_back("paint_map");
+
+    mReservedUniforms.push_back("terrain_height_map");
+    mReservedUniforms.push_back("terrain_composition_map");
+    mReservedUniforms.push_back("terrain_tess_origin");
+    mReservedUniforms.push_back("terrain_tess_density");
+    mReservedUniforms.push_back("terrain_grid_scale");
+    mReservedUniforms.push_back("parcel_overlay");
+    mReservedUniforms.push_back("show_parcel_owners");
 
     mReservedUniforms.push_back("detail_0_base_color");
     mReservedUniforms.push_back("detail_1_base_color");

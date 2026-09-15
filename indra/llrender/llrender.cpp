@@ -1628,6 +1628,16 @@ void LLRender::setPolygonOffset(F32 factor, F32 units)
     }
 }
 
+void LLRender::setPatchVertices(U32 count)
+{
+    if (mPatchVertices != count)
+    {
+        mPatchVertices = count;
+        flush();
+        glPatchParameteri(GL_PATCH_VERTICES, count);
+    }
+}
+
 void LLRender::rebasePolygonOffset()
 {
     flush();

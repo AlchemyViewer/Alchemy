@@ -29,18 +29,16 @@
 
 #include "lldrawpool.h"
 
-class ALTerrainSurfaceMaps;
+class LLGLSLShader;
 
 class LLDrawPoolTerrain : public LLFacePool
 {
     LLPointer<LLViewerTexture> mTexturep;
 public:
+    // Four corners per patch; the surface itself comes from the region's maps.
     enum
     {
-        VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX |
-                    LLVertexBuffer::MAP_NORMAL |
-                    LLVertexBuffer::MAP_TEXCOORD0 | // Ownership overlay
-                    LLVertexBuffer::MAP_TEXCOORD1
+        VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX
     };
 
     virtual U32 getVertexDataMask();
@@ -73,17 +71,16 @@ public:
 
 protected:
     void boostTerrainDetailTextures();
-    ALTerrainSurfaceMaps& surfaceMaps();
-
-    void renderOwnership();
+    // The region's surface maps and the tessellation uniforms, for the bound
+    // program; every pass that draws terrain binds the same ones.
+    void bindSurface(LLGLSLShader* shader);
+    void unbindSurface(LLGLSLShader* shader);
+    void bindParcelOverlay(LLGLSLShader* shader);
 
     void renderFullShader();
     void renderFullShaderTextures();
     void renderFullShaderPBR(bool use_local_materials = false);
     void drawLoop();
-
-private:
-    void hilightParcelOwners();
 };
 
 #endif // LL_LLDRAWPOOLSIMPLE_H

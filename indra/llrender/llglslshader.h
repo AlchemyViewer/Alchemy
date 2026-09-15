@@ -59,6 +59,7 @@ public:
     bool attachNothing = false;
     bool hasHeroProbes = false;
     bool isPBRTerrain = false;
+    bool hasTessellatedTerrain = false; // the terrain evaluation stage: terrainSurface and the vertex-side helpers it calls, compiled for that stage
     bool hasTonemap = false;
     bool hasColorGrade = false;
     bool hasPostEffects = false;

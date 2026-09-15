@@ -1,5 +1,5 @@
 /**
- * @file class1\environment\pbrterrainV.glsl
+ * @file class1\deferred\pbrterrainTE.glsl
  *
  * $LicenseInfo:firstyear=2023&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -34,22 +34,22 @@
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
-#if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
-uniform float region_scale;
-#endif
 
-in vec3 position;
-in vec3 normal;
-in vec4 diffuse_color;
-#if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-in vec2 texcoord1;
-#endif
+layout(quads, fractional_odd_spacing, ccw) in;
+
+uniform float region_scale;
+
+// terrainSurface.glsl
+vec2 terrain_patch_xy();
+vec3 terrain_surface(vec2 p_region, out vec3 n);
+vec2 terrain_composition(vec2 p_region);
 
 out vec3 vary_position;
 out vec3 vary_normal;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 out vec3 vary_vertex_normal; // Used by pbrterrainUtilF.glsl
 #endif
+out vec2 vary_region_uv;
 
 // vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
@@ -73,6 +73,10 @@ vec2 terrain_texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform)
 
 void main()
 {
+    vec2 xy = terrain_patch_xy();
+    vec3 normal;
+    vec3 position = terrain_surface(xy, normal);
+
     //transform vertex
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
@@ -81,6 +85,7 @@ void main()
     vary_vertex_normal = normal;
 #endif
     vary_normal = normalize(normal_matrix * normal);
+    vary_region_uv = xy / region_scale;
 
     // Transform and pass tex coords
     {
@@ -153,7 +158,7 @@ void main()
     }
 
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-    vec2 tc = texcoord1.xy;
+    vec2 tc = terrain_composition(xy);
     vary_texcoord0.zw = tc.xy;
     vary_texcoord1.xy = tc.xy-vec2(2.0, 0.0);
     vary_texcoord1.zw = tc.xy-vec2(1.0, 0.0);

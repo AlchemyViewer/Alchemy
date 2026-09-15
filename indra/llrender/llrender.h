@@ -377,6 +377,10 @@ public:
     // under is not. Mirrors LLGLDepthTest::rebase().
     void rebasePolygonOffset();
 
+    // Control points per PATCHES primitive, read by the tessellation control stage.
+    // Redundant sets are dropped without a flush.
+    void setPatchVertices(U32 count);
+
     ALTextureSlot* getTextureSlot(U32 index);
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
@@ -503,6 +507,7 @@ private:
     // Semantic (forward-convention) polygon offset; GL's own defaults are 0, 0.
     F32             mPolygonOffsetFactor = 0.f;
     F32             mPolygonOffsetUnits = 0.f;
+    U32             mPatchVertices = 3; // GL's initial GL_PATCH_VERTICES
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;

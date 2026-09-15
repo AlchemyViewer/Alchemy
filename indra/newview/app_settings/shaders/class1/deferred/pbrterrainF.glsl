@@ -151,8 +151,12 @@ uniform vec4 minimum_alphas; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlpha
 uniform mat2[4] terrain_normal_axes;
 #endif
 
+uniform sampler2D parcel_overlay;
+uniform int show_parcel_owners;
+
 in vec3 vary_position;
 in vec3 vary_normal;
+in vec2 vary_region_uv;
 
 // vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
@@ -172,6 +176,7 @@ vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
 vec4 packORM(vec3 orm);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+vec3 srgb_to_linear(vec3 cs);
 
 float terrain_mix(TerrainMix tm, vec4 tms4);
 
@@ -487,7 +492,16 @@ void main()
     vec3 orm_out = mix_orm;
     orm_out.g = filterSpecularRoughness(orm_out.g, tnorm);
 
-    frag_data[0] = max(vec4(pbr_mix.col.xyz, 0.0), vec4(0));                                                   // Diffuse
+    vec3 base_color = pbr_mix.col.xyz;
+    if (show_parcel_owners != 0)
+    {
+        // The overlay's texels are encoded; the blend is in the linear space
+        // the material mix above happens in.
+        vec4 overlay = texture(parcel_overlay, vary_region_uv);
+        base_color = mix(base_color, srgb_to_linear(overlay.rgb), overlay.a);
+    }
+
+    frag_data[0] = max(vec4(base_color, 0.0), vec4(0));                                                   // Diffuse
     // Alpha is zero, as every other PBR GBuffer writer leaves it. Nothing reads this channel for
     // a fragment flagged GBUFFER_FLAG_HAS_PBR -- softenLightF and the local lights take spec.a
     // as legacy glossiness, and every one of those reads sits behind a non-PBR branch.

@@ -32,14 +32,18 @@ uniform sampler2D detail_1;
 uniform sampler2D detail_2;
 uniform sampler2D detail_3;
 uniform sampler2D alpha_ramp;
+uniform sampler2D parcel_overlay;
+uniform int show_parcel_owners;
 
 in vec3 pos;
 in vec3 vary_normal;
 in vec4 vary_texcoord0;
 in vec4 vary_texcoord1;
+in vec2 vary_region_uv;
 
 void mirrorClip(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+vec3 srgb_to_linear(vec3 cs);
 
 void main()
 {
@@ -55,6 +59,14 @@ void main()
     float alpha2 = texture(alpha_ramp,vary_texcoord1.xy).a;
     float alphaFinal = texture(alpha_ramp, vary_texcoord1.zw).a;
     vec4 outColor = mix( mix(color3, color2, alpha2), mix(color1, color0, alpha1), alphaFinal );
+
+    if (show_parcel_owners != 0)
+    {
+        // The overlay's texels are encoded; the blend is in the linear space
+        // the detail blend above happens in.
+        vec4 overlay = texture(parcel_overlay, vary_region_uv);
+        outColor.rgb = mix(outColor.rgb, srgb_to_linear(overlay.rgb), overlay.a);
+    }
 
     outColor.a = 0.0; // yes, downstream atmospherics
 

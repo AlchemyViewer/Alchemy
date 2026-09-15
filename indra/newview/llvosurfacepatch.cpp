@@ -52,11 +52,7 @@ LLVOSurfacePatch::LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLView
         mBaseComp(0),
         mPatchp(NULL),
         mDirtyTexture(false),
-        mDirtyTerrain(false),
-        mLastNorthStride(0),
-        mLastEastStride(0),
-        mLastStride(0),
-        mLastLength(0)
+        mDirtyTerrain(false)
 {
     // Terrain must draw during selection passes so it can block objects behind it.
     mbCanSelect = true;
@@ -173,41 +169,6 @@ bool LLVOSurfacePatch::updateGeometry(LLDrawable *drawable)
     // Actually, should get the average composition instead of the center.
     mBaseComp = new_base_comp;
 
-    //////////////////////////
-    //
-    // Figure out the strides
-    //
-    //
-
-    U32 patch_width, render_stride, north_stride, east_stride, length;
-    render_stride = mPatchp->getRenderStride();
-    patch_width = mPatchp->getSurface()->getGridsPerPatchEdge();
-
-    length = patch_width / render_stride;
-
-    if (mPatchp->getNeighborPatch(NORTH))
-    {
-        north_stride = mPatchp->getNeighborPatch(NORTH)->getRenderStride();
-    }
-    else
-    {
-        north_stride = render_stride;
-    }
-
-    if (mPatchp->getNeighborPatch(EAST))
-    {
-        east_stride = mPatchp->getNeighborPatch(EAST)->getRenderStride();
-    }
-    else
-    {
-        east_stride = render_stride;
-    }
-
-    mLastLength = length;
-    mLastStride = render_stride;
-    mLastNorthStride = north_stride;
-    mLastEastStride = east_stride;
-
     return true;
 }
 
@@ -223,17 +184,7 @@ void LLVOSurfacePatch::updateFaceSize(S32 idx)
     LLFace* facep = mDrawable->getFace(idx);
     if (facep)
     {
-        S32 num_vertices = 0;
-        S32 num_indices = 0;
-
-        if (mLastStride)
-        {
-            getGeomSizesMain(mLastStride, num_vertices, num_indices);
-            getGeomSizesNorth(mLastStride, mLastNorthStride, num_vertices, num_indices);
-            getGeomSizesEast(mLastStride, mLastEastStride, num_vertices, num_indices);
-        }
-
-        facep->setSize(num_vertices, num_indices);
+        facep->setSize(PATCH_CORNERS, PATCH_CORNERS);
     }
 }
 
@@ -242,11 +193,11 @@ bool LLVOSurfacePatch::updateLOD()
     return true;
 }
 
-void LLVOSurfacePatch::getTerrainGeometry(LLStrider<LLVector3> &verticesp,
-                                              LLStrider<LLVector3> &normalsp,
-                                              LLStrider<LLVector2> &texCoords0p,
-                                              LLStrider<LLVector2> &texCoords1p,
-                                              LLStrider<U16> &indicesp)
+// One GL_PATCHES primitive per surface patch: its four corners, region-local,
+// z left for the evaluation stage, wound counter-clockwise from above. The
+// heights and everything derived from them come from the region's surface
+// maps; nothing here changes when the terrain does.
+void LLVOSurfacePatch::getTerrainGeometry(LLStrider<LLVector3> &verticesp, LLStrider<U16> &indicesp)
 {
     LLFace* facep = mDrawable->getFace(0);
     if (!facep)
@@ -254,505 +205,22 @@ void LLVOSurfacePatch::getTerrainGeometry(LLStrider<LLVector3> &verticesp,
         return;
     }
 
-    U32 index_offset = facep->getGeomIndex();
+    const LLSurface* surfacep = mPatchp->getSurface();
+    const F32 size = surfacep->getGridsPerPatchEdge() * surfacep->getMetersPerGrid();
+    const LLVector3& origin = mPatchp->getOriginRegion();
+    const F32 x0 = origin.mV[VX];
+    const F32 y0 = origin.mV[VY];
 
-    updateMainGeometry(facep,
-                    verticesp,
-                    normalsp,
-                    texCoords0p,
-                    texCoords1p,
-                    indicesp,
-                    index_offset);
-    updateNorthGeometry(facep,
-                        verticesp,
-                        normalsp,
-                        texCoords0p,
-                        texCoords1p,
-                        indicesp,
-                        index_offset);
-    updateEastGeometry(facep,
-                        verticesp,
-                        normalsp,
-                        texCoords0p,
-                        texCoords1p,
-                        indicesp,
-                        index_offset);
-}
+    *verticesp++ = LLVector3(x0,        y0,        0.f);
+    *verticesp++ = LLVector3(x0 + size, y0,        0.f);
+    *verticesp++ = LLVector3(x0 + size, y0 + size, 0.f);
+    *verticesp++ = LLVector3(x0,        y0 + size, 0.f);
 
-void LLVOSurfacePatch::updateMainGeometry(LLFace *facep,
-                                        LLStrider<LLVector3> &verticesp,
-                                        LLStrider<LLVector3> &normalsp,
-                                        LLStrider<LLVector2> &texCoords0p,
-                                        LLStrider<LLVector2> &texCoords1p,
-                                        LLStrider<U16> &indicesp,
-                                        U32 &index_offset)
-{
-    S32 i, j, x, y;
-
-    U32 patch_size, render_stride;
-    S32 num_vertices, num_indices;
-    U32 index;
-
-    llassert(mLastStride > 0);
-
-    render_stride = mLastStride;
-    patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-    S32 vert_size = patch_size / render_stride;
-
-    ///////////////////////////
-    //
-    // Render the main patch
-    //
-    //
-
-    num_vertices = 0;
-    num_indices = 0;
-    // First, figure out how many vertices we need...
-    getGeomSizesMain(render_stride, num_vertices, num_indices);
-
-    if (num_vertices > 0)
+    const U16 index_offset = (U16)facep->getGeomIndex();
+    for (U16 i = 0; i < PATCH_CORNERS; ++i)
     {
-        facep->mCenterAgent = mPatchp->getPointAgent(8, 8);
-
-        // Generate patch points first
-        for (j = 0; j < vert_size; j++)
-        {
-            for (i = 0; i < vert_size; i++)
-            {
-                x = i * render_stride;
-                y = j * render_stride;
-                mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-                verticesp++;
-                normalsp++;
-                texCoords0p++;
-                texCoords1p++;
-            }
-        }
-
-        for (j = 0; j < (vert_size - 1); j++)
-        {
-            if (j % 2)
-            {
-                for (i = (vert_size - 1); i > 0; i--)
-                {
-                    index = (i - 1)+ j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = i + (j+1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = (i - 1) + (j+1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = (i - 1) + j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = i + j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = i + (j+1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-                }
-            }
-            else
-            {
-                for (i = 0; i < (vert_size - 1); i++)
-                {
-                    index = i + j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = (i + 1) + (j+1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = i + (j+1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = i + j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = (i + 1) + j*vert_size;
-                    *(indicesp++) = index_offset + index;
-
-                    index = (i + 1) + (j + 1)*vert_size;
-                    *(indicesp++) = index_offset + index;
-                }
-            }
-        }
+        *indicesp++ = index_offset + i;
     }
-    index_offset += num_vertices;
-}
-
-
-void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
-                                        LLStrider<LLVector3> &verticesp,
-                                        LLStrider<LLVector3> &normalsp,
-                                        LLStrider<LLVector2> &texCoords0p,
-                                        LLStrider<LLVector2> &texCoords1p,
-                                        LLStrider<U16> &indicesp,
-                                        U32 &index_offset)
-{
-    S32 i, x, y;
-
-    S32 num_vertices;
-
-    U32 render_stride = mLastStride;
-    S32 patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-    S32 length = patch_size / render_stride;
-    S32 half_length = length / 2;
-    U32 north_stride = mLastNorthStride;
-
-    ///////////////////////////
-    //
-    // Render the north strip
-    //
-    //
-
-    // Stride lengths are the same
-    if (north_stride == render_stride)
-    {
-        num_vertices = 2 * length + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(8, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
-
-        // Main patch
-        for (i = 0; i < length; i++)
-        {
-            x = i * render_stride;
-            y = 16 - render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        // North patch
-        for (i = 0; i <= length; i++)
-        {
-            x = i * render_stride;
-            y = 16;
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-
-        for (i = 0; i < length; i++)
-        {
-            // Generate indices
-            *(indicesp++) = index_offset + i;
-            *(indicesp++) = index_offset + length + i + 1;
-            *(indicesp++) = index_offset + length + i;
-
-            if (i != length - 1)
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + i + 1;
-                *(indicesp++) = index_offset + length + i + 1;
-            }
-        }
-    }
-    else if (north_stride > render_stride)
-    {
-        // North stride is longer (has less vertices)
-        num_vertices = length + length/2 + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(7, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
-
-        // Iterate through this patch's points
-        for (i = 0; i < length; i++)
-        {
-            x = i * render_stride;
-            y = 16 - render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        // Iterate through the north patch's points
-        for (i = 0; i <= length; i+=2)
-        {
-            x = i * render_stride;
-            y = 16;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-
-        for (i = 0; i < length; i++)
-        {
-            if (!(i % 2))
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + i + 1;
-                *(indicesp++) = index_offset + length + (i/2);
-
-                *(indicesp++) = index_offset + i + 1;
-                *(indicesp++) = index_offset + length + (i/2) + 1;
-                *(indicesp++) = index_offset + length + (i/2);
-            }
-            else if (i < (length - 1))
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + i + 1;
-                *(indicesp++) = index_offset + length + (i/2) + 1;
-            }
-        }
-    }
-    else
-    {
-        // North stride is shorter (more vertices)
-        length = patch_size / north_stride;
-        half_length = length / 2;
-        num_vertices = length + half_length + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(7, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
-
-        // Iterate through this patch's points
-        for (i = 0; i < length; i+=2)
-        {
-            x = i * north_stride;
-            y = 16 - render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        // Iterate through the north patch's points
-        for (i = 0; i <= length; i++)
-        {
-            x = i * north_stride;
-            y = 16;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        for (i = 0; i < length; i++)
-        {
-            if (!(i%2))
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + i/2;
-                *(indicesp++) = index_offset + half_length + i + 1;
-            }
-            else if (i < (length - 2))
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + i/2;
-                *(indicesp++) = index_offset + i/2 + 1;
-
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + i/2 + 1;
-                *(indicesp++) = index_offset + half_length + i + 1;
-            }
-            else
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + i/2;
-                *(indicesp++) = index_offset + half_length + i + 1;
-            }
-        }
-    }
-    index_offset += num_vertices;
-}
-
-void LLVOSurfacePatch::updateEastGeometry(LLFace *facep,
-                                          LLStrider<LLVector3> &verticesp,
-                                          LLStrider<LLVector3> &normalsp,
-                                          LLStrider<LLVector2> &texCoords0p,
-                                          LLStrider<LLVector2> &texCoords1p,
-                                          LLStrider<U16> &indicesp,
-                                          U32 &index_offset)
-{
-    S32 i, x, y;
-
-    S32 num_vertices;
-
-    U32 render_stride = mLastStride;
-    S32 patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-    S32 length = patch_size / render_stride;
-    S32 half_length = length / 2;
-
-    U32 east_stride = mLastEastStride;
-
-    // Stride lengths are the same
-    if (east_stride == render_stride)
-    {
-        num_vertices = 2 * length + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(15, 8) + mPatchp->getPointAgent(16, 8))*0.5f;
-
-        // Main patch
-        for (i = 0; i < length; i++)
-        {
-            x = 16 - render_stride;
-            y = i * render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        // East patch
-        for (i = 0; i <= length; i++)
-        {
-            x = 16;
-            y = i * render_stride;
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-
-        for (i = 0; i < length; i++)
-        {
-            // Generate indices
-            *(indicesp++) = index_offset + i;
-            *(indicesp++) = index_offset + length + i;
-            *(indicesp++) = index_offset + length + i + 1;
-
-            if (i != length - 1)
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + length + i + 1;
-                *(indicesp++) = index_offset + i + 1;
-            }
-        }
-    }
-    else if (east_stride > render_stride)
-    {
-        // East stride is longer (has less vertices)
-        num_vertices = length + half_length + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(15, 7) + mPatchp->getPointAgent(16, 8))*0.5f;
-
-        // Iterate through this patch's points
-        for (i = 0; i < length; i++)
-        {
-            x = 16 - render_stride;
-            y = i * render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-        // Iterate through the east patch's points
-        for (i = 0; i <= length; i+=2)
-        {
-            x = 16;
-            y = i * render_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        for (i = 0; i < length; i++)
-        {
-            if (!(i % 2))
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + length + (i/2);
-                *(indicesp++) = index_offset + i + 1;
-
-                *(indicesp++) = index_offset + i + 1;
-                *(indicesp++) = index_offset + length + (i/2);
-                *(indicesp++) = index_offset + length + (i/2) + 1;
-            }
-            else if (i < (length - 1))
-            {
-                *(indicesp++) = index_offset + i;
-                *(indicesp++) = index_offset + length + (i/2) + 1;
-                *(indicesp++) = index_offset + i + 1;
-            }
-        }
-    }
-    else
-    {
-        // East stride is shorter (more vertices)
-        length = patch_size / east_stride;
-        half_length = length / 2;
-        num_vertices = length + length/2 + 1;
-
-        facep->mCenterAgent = (mPatchp->getPointAgent(15, 7) + mPatchp->getPointAgent(16, 8))*0.5f;
-
-        // Iterate through this patch's points
-        for (i = 0; i < length; i+=2)
-        {
-            x = 16 - render_stride;
-            y = i * east_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-        // Iterate through the east patch's points
-        for (i = 0; i <= length; i++)
-        {
-            x = 16;
-            y = i * east_stride;
-
-            mPatchp->eval(x, y, render_stride, verticesp.get(), normalsp.get(), texCoords0p.get(), texCoords1p.get());
-            verticesp++;
-            normalsp++;
-            texCoords0p++;
-            texCoords1p++;
-        }
-
-        for (i = 0; i < length; i++)
-        {
-            if (!(i%2))
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + half_length + i + 1;
-                *(indicesp++) = index_offset + i/2;
-            }
-            else if (i < (length - 2))
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + i/2 + 1;
-                *(indicesp++) = index_offset + i/2;
-
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + half_length + i + 1;
-                *(indicesp++) = index_offset + i/2 + 1;
-            }
-            else
-            {
-                *(indicesp++) = index_offset + half_length + i;
-                *(indicesp++) = index_offset + half_length + i + 1;
-                *(indicesp++) = index_offset + i/2;
-            }
-        }
-    }
-    index_offset += num_vertices;
 }
 
 void LLVOSurfacePatch::setPatch(LLSurfacePatch *patchp)
@@ -788,71 +256,6 @@ void LLVOSurfacePatch::dirtyGeom()
             facep->setVertexBuffer(NULL);
         }
         mDrawable->movePartition();
-    }
-}
-
-void LLVOSurfacePatch::getGeomSizesMain(const S32 stride, S32 &num_vertices, S32 &num_indices)
-{
-    S32 patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-
-    // First, figure out how many vertices we need...
-    S32 vert_size = patch_size / stride;
-    if (vert_size >= 2)
-    {
-        num_vertices += vert_size * vert_size;
-        num_indices += 6 * (vert_size - 1)*(vert_size - 1);
-    }
-}
-
-void LLVOSurfacePatch::getGeomSizesNorth(const S32 stride, const S32 north_stride,
-                                         S32 &num_vertices, S32 &num_indices)
-{
-    S32 patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-    S32 length = patch_size / stride;
-    // Stride lengths are the same
-    if (north_stride == stride)
-    {
-        num_vertices += 2 * length + 1;
-        num_indices += length * 6 - 3;
-    }
-    else if (north_stride > stride)
-    {
-        // North stride is longer (has less vertices)
-        num_vertices += length + (length/2) + 1;
-        num_indices += (length/2)*9 - 3;
-    }
-    else
-    {
-        // North stride is shorter (more vertices)
-        length = patch_size / north_stride;
-        num_vertices += length + (length/2) + 1;
-        num_indices += 9*(length/2) - 3;
-    }
-}
-
-void LLVOSurfacePatch::getGeomSizesEast(const S32 stride, const S32 east_stride,
-                                        S32 &num_vertices, S32 &num_indices)
-{
-    S32 patch_size = mPatchp->getSurface()->getGridsPerPatchEdge();
-    S32 length = patch_size / stride;
-    // Stride lengths are the same
-    if (east_stride == stride)
-    {
-        num_vertices += 2 * length + 1;
-        num_indices += length * 6 - 3;
-    }
-    else if (east_stride > stride)
-    {
-        // East stride is longer (has less vertices)
-        num_vertices += length + (length/2) + 1;
-        num_indices += (length/2)*9 - 3;
-    }
-    else
-    {
-        // East stride is shorter (more vertices)
-        length = patch_size / east_stride;
-        num_vertices += length + (length/2) + 1;
-        num_indices += 9*(length/2) - 3;
     }
 }
 
@@ -993,15 +396,9 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
 
     //get vertex buffer striders
     LLStrider<LLVector3> vertices;
-    LLStrider<LLVector3> normals;
-    LLStrider<LLVector2> texcoords0; // ownership overlay
-    LLStrider<LLVector2> texcoords2;
     LLStrider<U16> indices;
 
     llassert_always(buffer->getVertexStrider(vertices));
-    llassert_always(buffer->getNormalStrider(normals));
-    llassert_always(buffer->getTexCoord0Strider(texcoords0));
-    llassert_always(buffer->getTexCoord1Strider(texcoords2));
     llassert_always(buffer->getIndexStrider(indices));
 
     U32 indices_index = 0;
@@ -1016,7 +413,7 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
         facep->setVertexBuffer(buffer);
 
         LLVOSurfacePatch* patchp = (LLVOSurfacePatch*) facep->getViewerObject();
-        patchp->getTerrainGeometry(vertices, normals, texcoords0, texcoords2, indices);
+        patchp->getTerrainGeometry(vertices, indices);
 
         indices_index += facep->getIndicesCount();
         index_offset += facep->getGeomCount();

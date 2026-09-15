@@ -284,6 +284,14 @@ public:
         TERRAIN_ALPHARAMP,                  //  "alpha_ramp"
         TERRAIN_PAINTMAP,                   //  "paint_map"
 
+        TERRAIN_HEIGHT_MAP,                 //  "terrain_height_map"
+        TERRAIN_COMPOSITION_MAP,            //  "terrain_composition_map"
+        TERRAIN_TESS_ORIGIN,                //  "terrain_tess_origin"
+        TERRAIN_TESS_DENSITY,               //  "terrain_tess_density"
+        TERRAIN_GRID_SCALE,                 //  "terrain_grid_scale"
+        TERRAIN_PARCEL_OVERLAY,             //  "parcel_overlay"
+        TERRAIN_SHOW_PARCEL_OWNERS,         //  "show_parcel_owners"
+
         TERRAIN_DETAIL0_BASE_COLOR,                //  "detail_0_base_color" (GLTF)
         TERRAIN_DETAIL1_BASE_COLOR,                //  "detail_1_base_color" (GLTF)
         TERRAIN_DETAIL2_BASE_COLOR,                //  "detail_2_base_color" (GLTF)

@@ -1,5 +1,5 @@
 /**
- * @file class1\environment\terrainV.glsl
+ * @file class1\deferred\terrainTE.glsl
  *
  * $LicenseInfo:firstyear=2007&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -27,18 +27,22 @@
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
 
-in vec3 position;
-in vec3 normal;
-in vec4 diffuse_color;
-in vec2 texcoord1;
+layout(quads, fractional_odd_spacing, ccw) in;
 
 out vec3 pos;
 out vec3 vary_normal;
 out vec4 vary_texcoord0;
 out vec4 vary_texcoord1;
+out vec2 vary_region_uv;
 
 uniform vec4 object_plane_s;
 uniform vec4 object_plane_t;
+uniform float region_scale;
+
+// terrainSurface.glsl
+vec2 terrain_patch_xy();
+vec3 terrain_surface(vec2 p_region, out vec3 n);
+vec2 terrain_composition(vec2 p_region);
 
 vec2 texgen_object(vec4 vpos, mat4 mat, vec4 tp0, vec4 tp1)
 {
@@ -56,6 +60,10 @@ vec2 texgen_object(vec4 vpos, mat4 mat, vec4 tp0, vec4 tp1)
 
 void main()
 {
+    vec2 xy = terrain_patch_xy();
+    vec3 normal;
+    vec3 position = terrain_surface(xy, normal);
+
     //transform vertex
     vec4 pre_pos = vec4(position.xyz, 1.0);
     vec4 t_pos = modelview_projection_matrix * pre_pos;
@@ -66,11 +74,13 @@ void main()
     vary_normal = normalize(normal_matrix * normal);
 
     // Transform and pass tex coords
-    vary_texcoord0.xy = texgen_object(vec4(position, 1.0), texture_matrix0, object_plane_s, object_plane_t);
+    vary_texcoord0.xy = texgen_object(pre_pos, texture_matrix0, object_plane_s, object_plane_t);
 
-    vec4 t = vec4(texcoord1,0,1);
+    vec2 t = terrain_composition(xy);
 
     vary_texcoord0.zw = t.xy;
     vary_texcoord1.xy = t.xy-vec2(2.0, 0.0);
     vary_texcoord1.zw = t.xy-vec2(1.0, 0.0);
+
+    vary_region_uv = xy / region_scale;
 }

@@ -190,7 +190,7 @@ namespace tut
             gl().clearFramebuffer();
             glUseProgram(mProgram);
             bindCorners(corners);
-            glPatchParameteri(GL_PATCH_VERTICES, 4);
+            gGL.setPatchVertices(4);
             glDrawArrays(GL_PATCHES, 0, 4);
             glFinish();
             return ll_test::readFramebufferRGBA(W, H);
@@ -203,7 +203,7 @@ namespace tut
             LLGLEnable discard(GL_RASTERIZER_DISCARD);
             glUseProgram(mProgram);
             bindCorners(corners);
-            glPatchParameteri(GL_PATCH_VERTICES, 4);
+            gGL.setPatchVertices(4);
             glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, mCapture);
             glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, mQuery);
             glBeginTransformFeedback(GL_TRIANGLES);

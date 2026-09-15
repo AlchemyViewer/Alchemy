@@ -4330,9 +4330,8 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
         // pool -- each real FRAMEBUFFER_SRGB toggle costs a gGL.flush() plus a GL state
         // change, and the per-pool scopes toggled it off and on again at every pool
         // boundary. The writers that still store display-encoded values raw opt OUT
-        // locally: the WL sky family (LLDrawPoolWLSky::renderDeferred), the avatar pool's
-        // impostor/rigid passes (LLDrawPoolAvatar::renderDeferred), and the parcel-owner
-        // overlay (LLDrawPoolTerrain::hilightParcelOwners).
+        // locally: the WL sky family (LLDrawPoolWLSky::renderDeferred) and the avatar pool's
+        // impostor/rigid passes (LLDrawPoolAvatar::renderDeferred).
         LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
         for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
