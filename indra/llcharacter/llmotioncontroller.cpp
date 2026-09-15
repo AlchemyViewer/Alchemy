@@ -1304,7 +1304,7 @@ void LLMotionController::flushAllMotions()
 
     // kill current hand pose that was previously called out by
     // keyframe motion
-    mCharacter->removeAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE);
+    mCharacter->clearHandPoseRequest();
 
     // restart motions
     for (std::vector<std::pair<LLUUID,F32> >::value_type& motion_pair : active_motions)

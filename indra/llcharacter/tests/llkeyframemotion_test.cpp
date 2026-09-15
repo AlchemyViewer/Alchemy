@@ -1419,4 +1419,51 @@ namespace tut
                                           fabsf(dot(at_end, LLQuaternion(0.f, LLVector3::z_axis))),
                                           1.f, 1e-4f);
     }
+
+    template<> template<>
+    void llkeyframemotion_object::test<24>()
+    {
+        // Sampling asks the character for the hand pose the animation carries.
+        // The request has to outlive the animation: the motion can go, and the
+        // cache can let the animation go after it, before the hand motion gets
+        // to read what was asked for.
+        std::vector<U8> buffer(8192);
+        AssetAnimation anim = two_joint_animation();
+        anim.mHandPose = LLHandMotion::HAND_POSE_FIST;
+
+        {
+            LLKeyframeMotion motion(LLUUID::generateNewID());
+            ensure("the animation is read", load(motion, anim, buffer.data(), (S32)buffer.size()));
+            ensure("nothing is asked for before it is sampled", !mCharacter.hasHandPoseRequest());
+            sampleAt(motion, 0.f, "mPelvis");
+            ensure("sampling asks for a hand pose", mCharacter.hasHandPoseRequest());
+            ensure_equals("the one the animation carries",
+                          mCharacter.getHandPoseRequest(), (S32)LLHandMotion::HAND_POSE_FIST);
+            ensure_equals("at the animation's highest joint priority",
+                          mCharacter.getHandPoseRequestPriority(), (S32)LLJoint::HIGH_PRIORITY);
+        }
+        LLKeyframeDataCache::purge();
+        ensure_equals("the animation is gone", LLKeyframeDataCache::size(), 0u);
+        ensure("the request is not", mCharacter.hasHandPoseRequest());
+        ensure_equals("and still reads the pose",
+                      mCharacter.getHandPoseRequest(), (S32)LLHandMotion::HAND_POSE_FIST);
+
+        // A motion asking at a lower priority does not take the request away.
+        anim.mHandPose = LLHandMotion::HAND_POSE_POINT;
+        anim.mJoints[0].mPriority = LLJoint::MEDIUM_PRIORITY;
+        LLKeyframeMotion lower(LLUUID::generateNewID());
+        ensure("the lower priority animation is read", load(lower, anim, buffer.data(), (S32)buffer.size()));
+        sampleAt(lower, 0.f, "mPelvis");
+        ensure_equals("a lower priority motion leaves the request standing",
+                      mCharacter.getHandPoseRequest(), (S32)LLHandMotion::HAND_POSE_FIST);
+
+        // One asking at the same priority, later, does.
+        anim.mHandPose = LLHandMotion::HAND_POSE_PEACE_R;
+        anim.mJoints[0].mPriority = LLJoint::HIGH_PRIORITY;
+        LLKeyframeMotion equal(LLUUID::generateNewID());
+        ensure("the equal priority animation is read", load(equal, anim, buffer.data(), (S32)buffer.size()));
+        sampleAt(equal, 0.f, "mPelvis");
+        ensure_equals("an equal priority motion asking later takes the request",
+                      mCharacter.getHandPoseRequest(), (S32)LLHandMotion::HAND_POSE_PEACE_R);
+    }
 }

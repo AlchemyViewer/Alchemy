@@ -202,8 +202,6 @@ public:
     // the string for every motion that asked, every frame.
     enum EAnimationChannel
     {
-        ANIM_CHANNEL_HAND_POSE,             // LLHandMotion::eHandPose
-        ANIM_CHANNEL_HAND_POSE_PRIORITY,    // LLJoint::JointPriority
         ANIM_CHANNEL_LOOK_AT_POINT,         // LLVector3, agent space
         ANIM_CHANNEL_POINT_AT_POINT,        // LLVector3, agent space
         ANIM_CHANNEL_WALK_SPEED,            // F32
@@ -212,6 +210,22 @@ public:
     void  setAnimationData(EAnimationChannel channel, void* data) { mAnimationChannels[channel] = data; }
     void* getAnimationData(EAnimationChannel channel) const { return mAnimationChannels[channel]; }
     void  removeAnimationData(EAnimationChannel channel) { mAnimationChannels[channel] = nullptr; }
+
+    // The hand pose asked for since the hand motion last looked, and the
+    // priority of the motion asking. Unlike the channels above this is a copy,
+    // not a pointer: a keyframe motion asks with the pose its animation
+    // carries, and the animation cache can free that animation before the hand
+    // motion gets to read the request.
+    void requestHandPose(S32 pose, S32 priority)   // LLHandMotion::eHandPose, LLJoint::JointPriority
+    {
+        mHandPoseRequest = pose;
+        mHandPoseRequestPriority = priority;
+        mHandPoseRequested = true;
+    }
+    bool hasHandPoseRequest() const { return mHandPoseRequested; }
+    S32  getHandPoseRequest() const { return mHandPoseRequest; }
+    S32  getHandPoseRequestPriority() const { return mHandPoseRequestPriority; }
+    void clearHandPoseRequest() { mHandPoseRequested = false; }
 
     void addVisualParam(LLVisualParam *param);
     void addSharedVisualParam(LLVisualParam *param);
@@ -310,6 +324,9 @@ protected:
     LLMotionController  mMotionController;
 
     void*               mAnimationChannels[NUM_ANIM_CHANNELS] = {};
+    S32                 mHandPoseRequest = 0;
+    S32                 mHandPoseRequestPriority = 0;
+    bool                mHandPoseRequested = false;
 
     F32                 mPreferredPelvisHeight;
     ESex                mSex;

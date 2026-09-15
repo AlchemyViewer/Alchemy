@@ -425,22 +425,37 @@ namespace tut
     void llcharacter_object::test<12>()
     {
         // The values motions hand one another are slots on the character: set
-        // by whoever owns the value, empty when nobody does, and the hand pose
-        // is dropped with the motions on a flush.
+        // by whoever owns the value, empty when nobody does.
         F32 speed = 3.f;
         ensure("an unset channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
         mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED, &speed);
         ensure("a set channel reads back what was set", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == &speed);
         ensure("the other channels are untouched",
-               mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE) == nullptr
+               mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_POINT_AT_POINT) == nullptr
                && mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_LOOK_AT_POINT) == nullptr);
         mCharacter.removeAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED);
         ensure("a removed channel reads empty", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_WALK_SPEED) == nullptr);
 
-        S32 pose = 1;
-        mCharacter.setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &pose);
+        // The hand pose is not a slot but a copy, so the request stands after
+        // whatever it was read from has changed or gone, and it is dropped
+        // with the motions on a flush.
+        ensure("no hand pose is asked for to begin with", !mCharacter.hasHandPoseRequest());
+        {
+            S32 pose = 1;
+            S32 priority = 2;
+            mCharacter.requestHandPose(pose, priority);
+            pose = 5;
+            priority = 4;
+        }
+        ensure("a request stands", mCharacter.hasHandPoseRequest());
+        ensure_equals("with the pose asked for", mCharacter.getHandPoseRequest(), 1);
+        ensure_equals("at the priority asked at", mCharacter.getHandPoseRequestPriority(), 2);
+        mCharacter.clearHandPoseRequest();
+        ensure("a cleared request is gone", !mCharacter.hasHandPoseRequest());
+
+        mCharacter.requestHandPose(1, 2);
         mCharacter.flushAllMotions();
-        ensure("a flush drops the hand pose", mCharacter.getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE) == nullptr);
+        ensure("a flush drops the hand pose", !mCharacter.hasHandPoseRequest());
     }
 
     template<> template<>

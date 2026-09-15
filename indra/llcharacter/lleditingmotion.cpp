@@ -247,8 +247,7 @@ bool LLEditingMotion::onUpdate(F32 time, U8* joint_mask)
         mWristState->setRotation(LLQuaternion::DEFAULT);
     }
 
-    mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &sHandPose);
-    mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY, &sHandPosePriority);
+    mCharacter->requestHandPose(sHandPose, sHandPosePriority);
     return result;
 }
 

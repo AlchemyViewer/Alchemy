@@ -723,19 +723,12 @@ void LLKeyframeMotion::applyKeyframes(F32 time, const U8* joint_mask)
         joint_motion->update(mJointStates[i], time, mKeyCursors[i]);
     }
 
-    LLJoint::JointPriority* pose_priority = (LLJoint::JointPriority* )mCharacter->getAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY);
-    if (pose_priority)
+    // The hand pose goes to the motion asking at the highest priority, and
+    // between equals to the one that asked last.
+    if (!mCharacter->hasHandPoseRequest()
+        || mJointMotionList->mMaxPriority >= mCharacter->getHandPoseRequestPriority())
     {
-        if (mJointMotionList->mMaxPriority >= *pose_priority)
-        {
-            mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &mJointMotionList->mHandPose);
-            mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY, &mJointMotionList->mMaxPriority);
-        }
-    }
-    else
-    {
-        mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE, &mJointMotionList->mHandPose);
-        mCharacter->setAnimationData(LLCharacter::ANIM_CHANNEL_HAND_POSE_PRIORITY, &mJointMotionList->mMaxPriority);
+        mCharacter->requestHandPose(mJointMotionList->mHandPose, mJointMotionList->mMaxPriority);
     }
 }
 
