@@ -647,7 +647,7 @@ void LLPanelPrimMediaControls::updateShape()
         LLMatrix4a mat = LLMatrix4a::identity();
         if (!is_hud)
         {
-            mat.setMul(get_current_modelview(), get_current_projection());
+            mat.setMul(LLViewerCamera::getCurrent().getModelview(), LLViewerCamera::getCurrent().getProjection());
         }
         else {
             LLMatrix4a proj, modelview;

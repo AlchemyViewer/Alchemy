@@ -359,7 +359,7 @@ bool LLReflectionMap::getBox(LLMatrix4& box)
                 // world matrix, then the view
                 LLMatrix4a mv;
                 mv.setMul(LLMatrix4a::scaling(s.mV[0], s.mV[1], s.mV[2]), mViewerObject->mDrawable->getWorldMatrix());
-                mv.setMul(mv, get_current_modelview());
+                mv.setMul(mv, LLViewerCamera::getCurrent().getModelview());
 
                 // inverse is camera space to object unit cube
                 mv.invert();

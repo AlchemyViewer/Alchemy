@@ -63,9 +63,32 @@ LLTrace::CountStatHandle<> LLViewerCamera::sAngularVelocityStat("camera_angular_
 
 LLViewerCamera::eCameraID LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 
+namespace
+{
+    LLCamera& current_camera()
+    {
+        static LLCamera camera;
+        return camera;
+    }
+}
+
+//static
+const LLCamera& LLViewerCamera::getCurrent()
+{
+    return current_camera();
+}
+
+//static
+void LLViewerCamera::setCurrent(const LLCamera& camera)
+{
+    current_camera() = camera;
+}
+
 LLViewerCamera::LLViewerCamera() : LLCamera()
 {
-    calcProjection(getFar());
+    mLastModelview.setIdentity();
+    mDeltaModelview.setIdentity();
+    mInverseDeltaModelview.setIdentity();
     mCameraFOVDefault = DEFAULT_FIELD_OF_VIEW;
     mPrevCameraFOVDefault = DEFAULT_FIELD_OF_VIEW;
     mSavedFOVDefault = DEFAULT_FIELD_OF_VIEW;
@@ -166,40 +189,25 @@ bool LLViewerCamera::updateCameraLocation(const LLVector3 &center, const LLVecto
     return true;
 }
 
-const LLMatrix4 &LLViewerCamera::getProjection() const
+// Deliberately not reverse-Z, and every consumer must keep it that way: the
+// manipulators sort what they project with it nearest first, and a reversed
+// z would sort them the other way round.
+LLMatrix4a LLViewerCamera::getForwardZProjection() const
 {
-    calcProjection(getFar());
-    return mProjectionMatrix;
+    return LLMatrix4a::perspective(getView(), getAspect(), getNear(), getFar());
 }
 
-const LLMatrix4 &LLViewerCamera::getModelview() const
+void LLViewerCamera::calcDeltaModelview()
 {
-    LLMatrix4 cfr(OGL_TO_CFR_ROTATION);
-    getMatrixToLocal(mModelviewMatrix);
-    mModelviewMatrix *= cfr;
-    return mModelviewMatrix;
+    // from the last frame's eye space back to world, then into this frame's
+    mDeltaModelview.setInverse(mLastModelview);
+    mDeltaModelview.setMul(mDeltaModelview, mModelview);
+    mInverseDeltaModelview.setInverse(mDeltaModelview);
 }
 
-// CPU-side [-1,1] projection cache used by getProjection(). Deliberately NOT reverse-Z, and
-// every consumer must keep it that way: this matrix is only ever used for screen-xy
-// hit-testing and self-relative nearest-first z sorting among points it projected itself.
-// Nothing may compare its z against a GL depth-buffer sample -- that is what the reverse-Z
-// aware al_project / al_unproject are for. Leaving it forward keeps that math byte-identical.
-void LLViewerCamera::calcProjection(const F32 far_distance) const
+void LLViewerCamera::rememberModelview()
 {
-    F32 fov_y = getView();
-    F32 z_far = far_distance;
-    F32 z_near = getNear();
-    F32 aspect = getAspect();
-
-    F32 f = 1 / tan(fov_y * 0.5f);
-
-    mProjectionMatrix.setZero();
-    mProjectionMatrix.mMatrix[0][0] = f/aspect;
-    mProjectionMatrix.mMatrix[1][1] = f;
-    mProjectionMatrix.mMatrix[2][2] = (z_far + z_near)/(z_near - z_far);
-    mProjectionMatrix.mMatrix[3][2] = (2*z_far*z_near)/(z_near - z_far);
-    mProjectionMatrix.mMatrix[2][3] = -1;
+    mLastModelview = mModelview;
 }
 
 // Sets up opengl state for 3D drawing.  If for selection, also
@@ -214,7 +222,7 @@ void LLViewerCamera::updateFrustumPlanes(LLCamera& camera, bool ortho, bool zfli
 
     // the camera inverted once for the eight corners
     LLMatrix4a inverse;
-    inverse.setMul(get_current_modelview(), get_current_projection());
+    inverse.setMul(camera.getModelview(), camera.getProjection());
     inverse.invert();
 
     // Near-plane corners unproject at al_window_near() (0 forward, 1 reverse-Z), far at
@@ -363,25 +371,17 @@ void LLViewerCamera::setPerspective(bool for_selection,
         proj_mat.setMul(proj_mat, LLMatrix4a::translation(offset - (F32)pos_x * 2.f, offset - (F32)pos_y * 2.f, 0.f));
     }
 
-    calcProjection(z_far); // Update the projection matrix cache
-
     // al_perspective emits reversed-ZO under reverse-Z; pick/zoom above touch xy only, so
     // composing them ahead of the reversed z-row is correct. The perspective applies first.
     proj_mat.setMul(al_perspective(fov_y, aspect, z_near, z_far), proj_mat);
 
     gGL.loadMatrix(proj_mat);
 
-    set_current_projection(proj_mat);
+    mProjection = proj_mat;
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 
-    GLfloat         ogl_matrix[16];
-
-    getOpenGLTransform(ogl_matrix);
-
-    // the camera's transform, then into the GL frame
-    LLMatrix4a modelview;
-    modelview.setMul(LLMatrix4a(ogl_matrix), LLMatrix4a(OGL_TO_CFR_ROTATION));
+    const LLMatrix4a modelview = frameModelview();
 
     gGL.loadMatrix(modelview);
 
@@ -397,21 +397,22 @@ void LLViewerCamera::setPerspective(bool for_selection,
 
     }
 
-    // if not picking and not doing a snapshot, cache various GL matrices
+    // if not picking and not doing a snapshot, keep the modelview; the
+    // projection is kept either way, so the frustum below is the pick's
     if (!for_selection && mZoomFactor == 1.f)
     {
-        // Save GL matrices for access elsewhere in code, especially project_world_to_screen
-        set_current_modelview(modelview);
+        mModelview = modelview;
     }
 
     updateFrustumPlanes(*this);
+    setCurrent(*this);
 }
 
-// Uses the last GL matrices set in set_perspective to project a point from
-// screen coordinates to the agent's region.
+// Uses the current camera's matrices to project a point from screen
+// coordinates to the agent's region.
 void LLViewerCamera::projectScreenToPosAgent(const S32 screen_x, const S32 screen_y, LLVector3* pos_agent) const
 {
-    const LLVector4a agent_coord = al_unproject(LLVector4a((F32)screen_x, (F32)screen_y, al_window_near(), 1.f), get_current_modelview(), get_current_projection(), gGLViewport);
+    const LLVector4a agent_coord = al_unproject(LLVector4a((F32)screen_x, (F32)screen_y, al_window_near(), 1.f), getCurrent().getModelview(), getCurrent().getProjection(), gGLViewport);
     pos_agent->set(agent_coord.getF32ptr());
 }
 
@@ -439,7 +440,7 @@ bool LLViewerCamera::projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoord
 
     LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
     const S32 viewport[4] = { world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight() };
-    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), get_current_modelview(), get_current_projection(), viewport).getF32ptr());
+    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), getCurrent().getModelview(), getCurrent().getProjection(), viewport).getF32ptr());
 
     {
         // convert screen coordinates to virtual UI coordinates
@@ -533,7 +534,7 @@ bool LLViewerCamera::projectPosAgentToScreenEdge(const LLVector3 &pos_agent,
     LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
 
     const S32 viewport[4] = { world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight() };
-    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), get_current_modelview(), get_current_projection(), viewport).getF32ptr());
+    LLVector3 win_coord(al_project(LLVector4a(pos_agent.mV[0], pos_agent.mV[1], pos_agent.mV[2], 1.f), getCurrent().getModelview(), getCurrent().getProjection(), viewport).getF32ptr());
 
     {
         win_coord.mV[VX] /= gViewerWindow->getDisplayScale().mV[VX];

@@ -825,18 +825,16 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
                 LLGLState::checkStates();
 
-                const LLMatrix4a proj = get_current_projection();
-                const LLMatrix4a mod = get_current_modelview();
+                const LLCamera saved_camera = LLViewerCamera::getCurrent();
                 glViewport(0,0,512,512);
 
                 LLVOAvatar::updateImpostors();
 
-                set_current_projection(proj);
-                set_current_modelview(mod);
+                LLViewerCamera::setCurrent(saved_camera);
                 gGL.matrixMode(LLRender::MM_PROJECTION);
-                gGL.loadMatrix(proj);
+                gGL.loadMatrix(saved_camera.getProjection());
                 gGL.matrixMode(LLRender::MM_MODELVIEW);
-                gGL.loadMatrix(mod);
+                gGL.loadMatrix(saved_camera.getModelview());
                 gViewerWindow->setup3DViewport();
 
                 LLGLState::checkStates();
@@ -1280,8 +1278,7 @@ void render_hud_attachments()
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
 
-    const LLMatrix4a current_proj = get_current_projection();
-    const LLMatrix4a current_mod = get_current_modelview();
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
 
     // clamp target zoom level to reasonable values
 //  gAgentCamera.mHUDTargetZoom = llclamp(gAgentCamera.mHUDTargetZoom, 0.1f, 1.f);
@@ -1295,10 +1292,7 @@ void render_hud_attachments()
     if (LLPipeline::sShowHUDAttachments && !gDisconnected && setup_hud_matrices())
     {
         LLPipeline::sRenderingHUDs = true;
-        LLCamera hud_cam = *LLViewerCamera::getInstance();
-        hud_cam.setOrigin(-1.f, 0.f, 0.f);
-        hud_cam.setAxes(LLVector3(1.f, 0.f, 0.f), LLVector3(0.f, 1.f, 0.f), LLVector3(0.f, 0.f, 1.f));
-        LLViewerCamera::updateFrustumPlanes(hud_cam, true);
+        LLCamera hud_cam = LLViewerCamera::getCurrent();
 
         static LLCachedControl<bool> render_hud_particles(gSavedSettings, "RenderHUDParticles", false);
         bool render_particles = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES) && render_hud_particles;
@@ -1386,8 +1380,7 @@ void render_hud_attachments()
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.popMatrix();
 
-    set_current_projection(current_proj);
-    set_current_modelview(current_mod);
+    LLViewerCamera::setCurrent(saved_camera);
 }
 
 LLRect get_whole_screen_region()
@@ -1471,11 +1464,19 @@ bool setup_hud_matrices(const LLRect& screen_region)
     // set up transform to keep HUD objects in front of camera
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.loadMatrix(proj);
-    set_current_projection(proj);
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(model);
-    set_current_modelview(model);
+
+    // the HUD's camera: at the HUD's origin looking along +x, with the
+    // HUD's matrices and the frustum they give
+    LLCamera hud_cam = *LLViewerCamera::getInstance();
+    hud_cam.setOrigin(-1.f, 0.f, 0.f);
+    hud_cam.setAxes(LLVector3(1.f, 0.f, 0.f), LLVector3(0.f, 1.f, 0.f), LLVector3(0.f, 0.f, 1.f));
+    hud_cam.setProjection(proj);
+    hud_cam.setModelview(model);
+    LLViewerCamera::updateFrustumPlanes(hud_cam, true);
+    LLViewerCamera::setCurrent(hud_cam);
     return true;
 }
 
@@ -1486,13 +1487,14 @@ void render_ui(F32 zoom_factor, int subfield)
     LL_PROFILE_GPU_ZONE("ui");
     LLGLState::checkStates();
 
-    const LLMatrix4a saved_view = get_current_modelview();
+    // the world camera, as the scene just rendered with it
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
 
     if (!gSnapshot)
     {
         gGL.pushMatrix();
-        gGL.loadMatrix(gGLLastModelView);
-        set_current_modelview(gGLLastModelView);
+        gGL.loadMatrix(LLViewerCamera::getInstance()->getModelview());
+        LLViewerCamera::setCurrent(*LLViewerCamera::getInstance());
     }
 
     if(LLSceneMonitor::getInstance()->needsUpdate())
@@ -1565,7 +1567,7 @@ void render_ui(F32 zoom_factor, int subfield)
 
     if (!gSnapshot)
     {
-        set_current_modelview(saved_view);
+        LLViewerCamera::setCurrent(saved_camera);
         gGL.popMatrix();
     }
 }

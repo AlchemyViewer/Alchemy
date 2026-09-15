@@ -111,8 +111,8 @@ void LLHUDTextScope::draw(std::string_view utf8text,
 
     const S32 viewport[4] = { mWorldViewRect.mLeft, mWorldViewRect.mBottom,
                               mWorldViewRect.getWidth(), mWorldViewRect.getHeight() };
-    const LLVector3 win_coord(al_project(LLVector4a(render_pos.mV[0], render_pos.mV[1], render_pos.mV[2], 1.f), get_current_modelview(),
-                                         get_current_projection(), viewport).getF32ptr());
+    const LLVector3 win_coord(al_project(LLVector4a(render_pos.mV[0], render_pos.mV[1], render_pos.mV[2], 1.f), LLViewerCamera::getCurrent().getModelview(),
+                                         LLViewerCamera::getCurrent().getProjection(), viewport).getF32ptr());
 
     // Split the projected position into an integer UI-pixel matrix translate
     // (LLRender2D::translate stores into LLCoordGL via (S32) cast and

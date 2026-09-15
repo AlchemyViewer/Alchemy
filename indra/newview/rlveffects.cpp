@@ -316,7 +316,7 @@ void RlvSphereEffect::setShaderUniforms(LLGLSLShader* pShader)
     }
     LLVector4a posSphereOriginIn, posSphereOriginGl;
     posSphereOriginIn.loadua(posSphereOrigin.mV);
-    get_current_modelview().transform4(posSphereOriginIn, posSphereOriginGl);
+    LLViewerCamera::getCurrent().getModelview().transform4(posSphereOriginIn, posSphereOriginGl);
     pShader->uniform4fv(LLShaderMgr::RLV_EFFECT_PARAM1, 1, posSphereOriginGl.getF32ptr());
 
     // Pack min/max distance and alpha together

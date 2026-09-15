@@ -378,6 +378,7 @@ private:
 
 /*
   Modify and load projection matrix to push depth values to far clip plane.
+  The default constructor squashes the projection on the stack.
 
   Restores projection matrix on destruction.
   Saves/restores matrix mode around projection manipulation.

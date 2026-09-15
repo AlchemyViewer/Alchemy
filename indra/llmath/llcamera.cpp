@@ -47,6 +47,8 @@ LLCamera::LLCamera() :
         mPlaneMask[i] = PLANE_MASK_NONE;
     }
     rebuildPlaneSets();
+    mModelview.setIdentity();
+    mProjection.setIdentity();
 
     calculateFrustumPlanes();
 }
@@ -63,6 +65,8 @@ LLCamera::LLCamera(F32 vertical_fov_rads, F32 aspect_ratio, S32 view_height_in_p
         mPlaneMask[i] = PLANE_MASK_NONE;
     }
     rebuildPlaneSets();
+    mModelview.setIdentity();
+    mProjection.setIdentity();
 
     mAspect = llclamp(aspect_ratio, MIN_ASPECT_RATIO, MAX_ASPECT_RATIO);
     mNearPlane = llclamp(near_plane, MIN_NEAR_PLANE, MAX_NEAR_PLANE);
@@ -98,6 +102,15 @@ F32 LLCamera::getMaxView() const
 LLPlane LLCamera::getUserClipPlane()
 {
     return mAgentPlanes[AGENT_PLANE_USER_CLIP];
+}
+
+LLMatrix4a LLCamera::frameModelview() const
+{
+    F32 ogl_matrix[16];
+    getOpenGLTransform(ogl_matrix);
+    LLMatrix4a modelview;
+    modelview.setMul(LLMatrix4a(ogl_matrix), LLMatrix4a(OGL_TO_CFR_ROTATION));
+    return modelview;
 }
 
 // ---------------- LLCamera::setFoo() member functions ----------------

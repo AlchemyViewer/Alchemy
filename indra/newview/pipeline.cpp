@@ -4310,15 +4310,9 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
     }
 
     if (&camera == LLViewerCamera::getInstance())
-    {   // a bit hacky, this is the start of the main render frame, figure out delta between last modelview matrix and
-        // current modelview matrix
-        // goal is to have a matrix here that goes from the last frame's camera space to the current frame's camera space
-        LLMatrix4a m;
-        m.setInverse(get_last_modelview());     // last camera space to world space
-        m.setMul(m, get_current_modelview());   // then world space to camera space
-
-        gGLDeltaModelView = m;
-        gGLInverseDeltaModelView.setInverse(m);
+    {   // the start of the main render frame: from the last frame's camera
+        // space to this one's
+        LLViewerCamera::getInstance()->calcDeltaModelview();
     }
 
     bool occlude = LLPipeline::sUseOcclusion > 1 && do_occlusion && !LLGLSLShader::sProfileEnabled;
@@ -4382,7 +4376,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
                 llassert(!gCubeSnapshot); // never do occlusion culling on cube snapshots
                 occlude = false;
                 gGLLastMatrix = NULL;
-                gGL.loadMatrix(gGLModelView);
+                gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
                 doOcclusion(camera);
             }
 
@@ -4392,7 +4386,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
                 LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWPOOL("deferred pool render");
 
                 gGLLastMatrix = NULL;
-                gGL.loadMatrix(gGLModelView);
+                gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
                 for( S32 i = 0; i < poolp->getNumDeferredPasses(); i++ )
                 {
@@ -4432,7 +4426,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
 
         gGLLastMatrix = NULL;
         gGL.matrixMode(LLRender::MM_MODELVIEW);
-        gGL.loadMatrix(gGLModelView);
+        gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
         gGL.setColorMask(true, false);
 
@@ -4528,7 +4522,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
             LL_PROFILE_ZONE_NAMED_CATEGORY_DRAWPOOL("deferred poolrender");
 
             gGLLastMatrix = NULL;
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
             for( S32 i = 0; i < poolp->getNumPostDeferredPasses(); i++ )
             {
@@ -4571,7 +4565,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     gGLLastMatrix = NULL;
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
     // An impostor is a billboard: baking selection highlights or debug geometry into its
     // texture freezes them there for the life of the impostor and replays them into the scene
@@ -4616,7 +4610,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
             poolp->prerender() ;
 
             gGLLastMatrix = NULL;
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
             for( S32 i = 0; i < poolp->getNumShadowPasses(); i++ )
             {
@@ -4653,7 +4647,7 @@ void LLPipeline::renderGeomShadow(LLCamera& camera)
     }
 
     gGLLastMatrix = NULL;
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 }
 
 
@@ -5016,7 +5010,7 @@ void LLPipeline::renderDebug()
     }
 
     gGLLastMatrix = NULL;
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGL.setColorMask(true, false);
 
 
@@ -5751,7 +5745,7 @@ void LLPipeline::setupAvatarLights(bool for_edit)
     {
         LLColor4 diffuse(1.f, 1.f, 1.f, 0.f);
         LLVector4 light_pos_cam(-8.f, 0.25f, 10.f, 0.f);  // w==0 => directional light
-        LLMatrix4 camera_mat = LLViewerCamera::getInstance()->getModelview();
+        LLMatrix4 camera_mat = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
         LLMatrix4 camera_rot(camera_mat.getMat3());
         camera_rot.invert();
         LLVector4 light_pos = light_pos_cam * camera_rot;
@@ -7072,7 +7066,7 @@ void LLPipeline::resetVertexBuffers(LLDrawable* drawable)
 void LLPipeline::renderObjects(U32 type, bool texture, bool batch_texture, bool rigged)
 {
     assertInitialized();
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 
     if (rigged)
@@ -7084,14 +7078,14 @@ void LLPipeline::renderObjects(U32 type, bool texture, bool batch_texture, bool 
         mSimplePool->pushBatches(type, texture, batch_texture);
     }
 
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 }
 
 void LLPipeline::renderGLTFObjects(U32 type, bool texture, bool rigged)
 {
     assertInitialized();
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 
     if (rigged)
@@ -7103,7 +7097,7 @@ void LLPipeline::renderGLTFObjects(U32 type, bool texture, bool rigged)
         mSimplePool->pushGLTFBatches(type, texture);
     }
 
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 }
 
@@ -7112,7 +7106,7 @@ void LLPipeline::renderAlphaObjects(bool rigged)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     assertInitialized();
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
     S32 sun_up = LLEnvironment::instance().getIsSunUp() ? 1 : 0;
     U32 target_width = LLRenderTarget::sCurResX;
@@ -7191,7 +7185,7 @@ void LLPipeline::renderAlphaObjects(bool rigged)
         }
     }
 
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 }
 
@@ -7199,7 +7193,7 @@ void LLPipeline::renderAlphaObjects(bool rigged)
 void LLPipeline::renderMaskedObjects(U32 type, bool texture, bool batch_texture, bool rigged)
 {
     assertInitialized();
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
     if (rigged)
     {
@@ -7209,7 +7203,7 @@ void LLPipeline::renderMaskedObjects(U32 type, bool texture, bool batch_texture,
     {
         mAlphaMaskPool->pushMaskBatches(type, texture, batch_texture);
     }
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 }
 
@@ -7217,7 +7211,7 @@ void LLPipeline::renderMaskedObjects(U32 type, bool texture, bool batch_texture,
 void LLPipeline::renderFullbrightMaskedObjects(U32 type, bool texture, bool batch_texture, bool rigged)
 {
     assertInitialized();
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
     if (rigged)
     {
@@ -7227,7 +7221,7 @@ void LLPipeline::renderFullbrightMaskedObjects(U32 type, bool texture, bool batc
     {
         mFullbrightAlphaMaskPool->pushMaskBatches(type, texture, batch_texture);
     }
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
     gGLLastMatrix = NULL;
 }
 
@@ -7911,8 +7905,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 LLVector4 light_dir = sun_up ? mSunDir : mMoonDir;
 
                 LLVector4a sun_eye, sun_clip;
-                get_current_modelview().rotate(LLVector4a(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.f), sun_eye);
-                get_current_projection().transform4(sun_eye, sun_clip);
+                LLViewerCamera::getCurrent().getModelview().rotate(LLVector4a(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.f), sun_eye);
+                LLViewerCamera::getCurrent().getProjection().transform4(sun_eye, sun_clip);
 
                 F32 target_visibility = 0.f;
                 // Gate/divide on clip w, not z: w is convention-independent (reverse-Z rewrites
@@ -9731,7 +9725,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
                 cube_map->bind();
             }
 
-            const F32* m = gGLModelView.getF32ptr();
+            const F32* m = LLViewerCamera::getCurrent().getModelview().getF32ptr();
 
             F32 mat[] = { m[0], m[1], m[2],
                           m[4], m[5], m[6],
@@ -9757,15 +9751,15 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
 
-    shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, gGLDeltaModelView);
-    shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, gGLInverseDeltaModelView);
+    shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, LLViewerCamera::getInstance()->getDeltaModelview());
+    shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, LLViewerCamera::getInstance()->getInverseDeltaModelview());
 
     shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
 
     if (shader.hasUniform(LLShaderMgr::DEFERRED_NORM_MATRIX))
     {
         LLMatrix4a norm_mat;
-        norm_mat.setInverse(get_current_modelview());
+        norm_mat.setInverse(LLViewerCamera::getCurrent().getModelview());
         norm_mat.transpose();
         shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, norm_mat);
     }
@@ -9846,7 +9840,7 @@ void LLPipeline::renderDeferredLighting()
         LLGLEnable cull(GL_CULL_FACE);
         LLGLEnable blend(GL_BLEND);
 
-        const LLMatrix4a& mat = get_current_modelview();
+        const LLMatrix4a& mat = LLViewerCamera::getCurrent().getModelview();
 
         setupHWLights();  // to set mSun/MoonDir;
 
@@ -10298,10 +10292,9 @@ void LLPipeline::renderDeferredLighting()
 
     if (!gCubeSnapshot)
     {
-        // this is the end of the 3D scene render, grab a copy of the modelview and projection
-        // matrix for use in off-by-one-frame effects in the next frame
-        gGLLastModelView = gGLModelView;
-        gGLLastProjection = gGLProjection;
+        // this is the end of the 3D scene render, keep the modelview for the
+        // off-by-one-frame effects in the next frame
+        LLViewerCamera::getInstance()->rememberModelview();
     }
     gGL.setColorMask(true, true);
 }
@@ -10413,7 +10406,7 @@ void LLPipeline::doWaterHaze()
             LLGLDisable   cull(GL_CULL_FACE);
 
             gGLLastMatrix = NULL;
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
             if (mWaterPool)
             {
@@ -10491,7 +10484,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     LLMatrix4 light_mat(quat, LLVector4(origin,1.f));
 
     LLMatrix4a light_to_screen;
-    light_to_screen.setMul(LLMatrix4a(light_mat), get_current_modelview());
+    light_to_screen.setMul(LLMatrix4a(light_mat), LLViewerCamera::getCurrent().getModelview());
 
     LLMatrix4a screen_to_light;
     screen_to_light.setInverse(light_to_screen);
@@ -10666,7 +10659,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 
 void LLPipeline::setEnvMat(LLGLSLShader& shader)
 {
-    const F32* m = gGLModelView.getF32ptr();
+    const F32* m = LLViewerCamera::getCurrent().getModelview().getF32ptr();
 
     F32 mat[] = { m[0], m[1], m[2],
                     m[4], m[5], m[6],
@@ -10947,7 +10940,7 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
             LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
             LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
 
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
             gGLLastMatrix = NULL;
 
             U32 type = LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK;
@@ -10989,14 +10982,14 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
                 }
             }
 
-            gGL.loadMatrix(gGLModelView);
+            gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
             gGLLastMatrix = NULL;
         }
     }
 
     gDeferredShadowCubeProgram.bind();
     gGLLastMatrix = NULL;
-    gGL.loadMatrix(gGLModelView);
+    gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
 
     gGL.setColorMask(true, true);
 
@@ -11304,9 +11297,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         gAgentAvatarp->updateAttachmentVisibility(CAMERA_MODE_THIRD_PERSON);
     }
 
-    const LLMatrix4a last_modelview = get_last_modelview();
-    const LLMatrix4a last_projection = get_last_projection();
-
     pushRenderTypeMask();
     andRenderTypeMask(LLPipeline::RENDER_TYPE_SIMPLE,
                     LLPipeline::RENDER_TYPE_ALPHA,
@@ -11383,9 +11373,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
     //get sun view matrix
 
-    //store current projection/modelview matrix
-    const LLMatrix4a saved_proj = get_current_projection();
-    const LLMatrix4a saved_view = get_current_modelview();
+    //store the camera this pass renders for
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
+    const LLMatrix4a& saved_view = saved_camera.getModelview();
     LLMatrix4a inv_view;
     inv_view.setInverse(saved_view);
 
@@ -11535,13 +11525,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         static LLCullResult sUnionShadowResult;
         if (sShadowCullMode() == 1 && !gCubeSnapshot)
         {
-            // updateFrustumPlanes below seeds the frustum corners from the *current* GL
-            // matrices, and earlier setup in this function leaves them in a non-main-view
-            // state. Restore the saved (main-view) matrices first, as the cascade loop
-            // does each iteration, so the corner directions used below are correct.
-            set_current_modelview(saved_view);
-            set_current_projection(saved_proj);
-
             LLCamera ucam = camera;
             ucam.setFar(16.f);
             LLViewerCamera::updateFrustumPlanes(ucam, false, false, true);
@@ -11580,10 +11563,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 LLVector3 ucenter = (mn+mx)*0.5f;
 
                 // Conservative ortho light-space projection bounding the whole point
-                // cloud. updateFrustumPlanes derives the cull frustum from the *current*
-                // GL modelview/projection, so set them here. Ortho is looser than the
-                // per-cascade perspective fit, so the result is a superset of every
-                // cascade frustum -- no dropped casters.
+                // cloud, which updateFrustumPlanes derives the cull frustum from. Ortho
+                // is looser than the per-cascade perspective fit, so the result is a
+                // superset of every cascade frustum -- no dropped casters.
                 //
                 // Pad the depth range: with the sun near-overhead the light-space
                 // footprint is nearly planar (znear ~= zfar), which makes the ortho
@@ -11600,9 +11582,10 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 ucam.setOrigin(0, 0, 0);
 
                 LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_SUN_SHADOW0;
-                set_current_modelview(uview);
-                set_current_projection(uproj);
+                ucam.setModelview(uview);
+                ucam.setProjection(uproj);
                 LLViewerCamera::updateFrustumPlanes(ucam, false, false, true);
+                LLViewerCamera::setCurrent(ucam);
                 ucam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
 
                 bool saved_shadow_render = LLPipeline::sShadowRender;
@@ -11619,9 +11602,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 sUseOcclusion = saved_occlusion;
                 LLPipeline::sShadowRender = saved_shadow_render;
 
-                // restore main matrices (the cascade loop sets its own each iteration)
-                set_current_modelview(saved_view);
-                set_current_projection(saved_proj);
+                // restore the main camera (the cascade loop sets its own each iteration)
+                LLViewerCamera::setCurrent(saved_camera);
 
                 have_union_cull = true;
             }
@@ -11636,9 +11618,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             LLViewerCamera::sCurCameraID = (LLViewerCamera::eCameraID)(LLViewerCamera::CAMERA_SUN_SHADOW0+j);
 
-            //restore render matrices
-            set_current_modelview(saved_view);
-            set_current_projection(saved_proj);
+            //restore the main camera
+            LLViewerCamera::setCurrent(saved_camera);
 
             LLVector3 eye = camera.getOrigin();
             llassert(eye.isFinite());
@@ -11961,10 +11942,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             shadow_cam.setOrigin(0,0,0);
 
-            set_current_modelview(view[j]);
-            set_current_projection(proj[j]);
+            shadow_cam.setModelview(view[j]);
+            shadow_cam.setProjection(proj[j]);
 
             LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+            LLViewerCamera::setCurrent(shadow_cam);
 
             //shadow_cam.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_NEAR);
             shadow_cam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
@@ -11973,12 +11955,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             // already yields [0,1] shadow-map z, so z passes through (no 0.5*z+0.5); only
             // xy are remapped. shadow_matrix then lands the receiver in the reversed depth.
             const LLMatrix4a trans = LLRender::sReverseZ ? clip_to_texture(1.f, 0.f) : clip_to_texture(0.5f, 0.5f);
-
-            set_current_modelview(view[j]);
-            set_current_projection(proj[j]);
-
-            set_last_modelview(mShadowModelview[j]);
-            set_last_projection(mShadowProjection[j]);
 
             mShadowModelview[j] = view[j];
             mShadowProjection[j] = proj[j];
@@ -12061,8 +12037,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
         for (S32 i = 0; i < 2; i++)
         {
-            set_current_modelview(saved_view);
-            set_current_projection(saved_proj);
+            LLViewerCamera::setCurrent(saved_camera);
 
             if (mShadowSpotLight[i].isNull())
             {
@@ -12119,15 +12094,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             // xy are remapped. shadow_matrix then lands the receiver in the reversed depth.
             const LLMatrix4a trans = LLRender::sReverseZ ? clip_to_texture(1.f, 0.f) : clip_to_texture(0.5f, 0.5f);
 
-            set_current_modelview(view[i + 4]);
-            set_current_projection(proj[i + 4]);
-
             mSunShadowMatrix[i + 4].setMul(inv_view, view[i + 4]);
             mSunShadowMatrix[i + 4].setMul(mSunShadowMatrix[i + 4], proj[i + 4]);
             mSunShadowMatrix[i + 4].setMul(mSunShadowMatrix[i + 4], trans);
-
-            set_last_modelview(mShadowModelview[i + 4]);
-            set_last_projection(mShadowProjection[i + 4]);
 
             mShadowModelview[i + 4] = view[i + 4];
             mShadowProjection[i + 4] = proj[i + 4];
@@ -12137,8 +12106,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 LLCamera shadow_cam = camera;
                 shadow_cam.setFar(far_clip);
                 shadow_cam.setOrigin(origin);
+                shadow_cam.setModelview(view[i + 4]);
+                shadow_cam.setProjection(proj[i + 4]);
 
                 LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
+                LLViewerCamera::setCurrent(shadow_cam);
 
                 //
 
@@ -12168,13 +12140,14 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
     if (!CameraOffset)
     {
-        set_current_modelview(saved_view);
-        set_current_projection(saved_proj);
+        LLViewerCamera::setCurrent(saved_camera);
     }
     else
     {
-        set_current_modelview(view[1]);
-        set_current_projection(proj[1]);
+        LLCamera offset_cam = camera;
+        offset_cam.setModelview(view[1]);
+        offset_cam.setProjection(proj[1]);
+        LLViewerCamera::setCurrent(offset_cam);
         gGL.loadMatrix(view[1]);
         gGL.matrixMode(LLRender::MM_PROJECTION);
         gGL.loadMatrix(proj[1]);
@@ -12186,9 +12159,6 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     gGLViewport[1] = saved_gl_viewport[1];
     gGLViewport[2] = saved_gl_viewport[2];
     gGLViewport[3] = saved_gl_viewport[3];
-
-    set_last_modelview(last_modelview);
-    set_last_projection(last_projection);
 
     popRenderTypeMask();
 
@@ -12255,8 +12225,7 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     // generateImpostor's function-static cull result, which the next updateCull would
     // otherwise be the first thing to notice.
     LLCullResult* saved_cull = sCull;
-    const LLMatrix4a saved_modelview = get_current_modelview();
-    const LLMatrix4a saved_projection = get_current_projection();
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
 
     mRT->deferredScreen.bindTarget();
     mRT->deferredScreen.clear();
@@ -12309,8 +12278,7 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     mRT->deferredScreen.flush();
 
     sCull = saved_cull;
-    set_current_modelview(saved_modelview);
-    set_current_projection(saved_projection);
+    LLViewerCamera::setCurrent(saved_camera);
 
     // generateImpostor's clear colour is its own business everywhere else, because display()
     // sets one before each clear it cares about. Nothing does that on the way back into a UI
@@ -12542,19 +12510,16 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         const F32 far_clip  = distance + radius;
 
         const LLMatrix4a persp = al_perspective(fov * DEG_TO_RAD, aspect, near_clip, far_clip);
-        set_current_projection(persp);
+        camera.setProjection(persp);
         gGL.loadMatrix(persp);
 
         gGL.matrixMode(LLRender::MM_MODELVIEW);
         gGL.pushMatrix();
 
-        F32 ogl_mat[16];
-        camera.getOpenGLTransform(ogl_mat);
-        LLMatrix4a mat;
-        mat.setMul(LLMatrix4a(ogl_mat), LLMatrix4a(OGL_TO_CFR_ROTATION));
-
+        const LLMatrix4a mat = camera.frameModelview();
+        camera.setModelview(mat);
         gGL.loadMatrix(mat);
-        set_current_modelview(mat);
+        LLViewerCamera::setCurrent(camera);
 
         // Remember the basis the G-buffer normals about to be captured are encoded in. The
         // billboard replays them into the scene G-buffer verbatim, where the lighting pass

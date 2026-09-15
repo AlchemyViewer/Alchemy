@@ -800,8 +800,8 @@ void LLManipTranslate::highlightManipulators(S32 x, S32 y)
     }
 
     //LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
-    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getProjection();
-    LLMatrix4 modelView = LLViewerCamera::getInstance()->getModelview();
+    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getForwardZProjection().toMatrix4();
+    LLMatrix4 modelView = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
 
     LLVector3 object_position = getPivotPoint();
 

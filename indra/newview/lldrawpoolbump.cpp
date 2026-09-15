@@ -217,13 +217,14 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
     {
         if (shader )
         {
-            const LLMatrix4 mat = gGLModelView.toMatrix4();
+            const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
+            const LLMatrix4 mat = modelview.toMatrix4();
             LLVector3 vec = LLVector3(gShinyOrigin) * mat;
             LLVector4 vec4(vec, gShinyOrigin.mV[3]);
             shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);
             if (shader_level > 1)
             {
-                cube_map->setMatrix(1);
+                cube_map->setMatrix(1, modelview);
                 // Make sure that texture coord generation happens for tex unit 1, as that's the one we use for
                 // the cube map in the one pass shiny shaders
                 cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
@@ -232,7 +233,7 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
             }
             else
             {
-                cube_map->setMatrix(0);
+                cube_map->setMatrix(0, modelview);
                 cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
                 diffuse_channel = -1;
                 cube_map->enable(cube_channel);
@@ -245,7 +246,7 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
             diffuse_channel = -1;
             gGL.getTextureSlot(0)->unbind();
             cube_map->enable(0);
-            cube_map->setMatrix(0);
+            cube_map->setMatrix(0, LLViewerCamera::getCurrent().getModelview());
             gGL.getTextureSlot(0)->bind(cube_map, ALSamplers::AnisoClamp);
         }
     }
@@ -317,7 +318,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
     }
 
     {
-        const LLMatrix4 mat = gGLModelView.toMatrix4();
+        const LLMatrix4 mat = LLViewerCamera::getCurrent().getModelview().toMatrix4();
         shader->bind();
 
         LLVector3 vec = LLVector3(gShinyOrigin) * mat;

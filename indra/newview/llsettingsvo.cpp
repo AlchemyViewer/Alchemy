@@ -1083,7 +1083,7 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         }
 
         //transform water plane to eye space
-        const LLMatrix4a& mat = get_current_modelview();
+        const LLMatrix4a& mat = LLViewerCamera::getCurrent().getModelview();
         LLMatrix4a normal_mat;
         normal_mat.setNormalMatrix(mat);
 

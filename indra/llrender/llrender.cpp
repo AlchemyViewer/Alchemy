@@ -93,16 +93,6 @@ namespace
 }
 #endif // !LL_RELEASE_FOR_DOWNLOAD
 
-// Handy copies of last good GL matrices
-LLMatrix4a gGLModelView = LLMatrix4a::identity();
-LLMatrix4a gGLLastModelView = LLMatrix4a::identity();
-LLMatrix4a gGLLastProjection = LLMatrix4a::identity();
-LLMatrix4a gGLProjection = LLMatrix4a::identity();
-
-// transform from last frame's camera space to this frame's camera space (and inverse)
-LLMatrix4a gGLDeltaModelView = LLMatrix4a::identity();
-LLMatrix4a gGLInverseDeltaModelView = LLMatrix4a::identity();
-
 S32 gGLViewport[4];
 
 
@@ -1676,46 +1666,6 @@ void LLRender::debugTexUnits(void)
         }
     }
     LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
-}
-
-const LLMatrix4a& get_current_modelview()
-{
-    return gGLModelView;
-}
-
-const LLMatrix4a& get_current_projection()
-{
-    return gGLProjection;
-}
-
-const LLMatrix4a& get_last_modelview()
-{
-    return gGLLastModelView;
-}
-
-const LLMatrix4a& get_last_projection()
-{
-    return gGLLastProjection;
-}
-
-void set_current_modelview(const LLMatrix4a& mat)
-{
-    gGLModelView = mat;
-}
-
-void set_current_projection(const LLMatrix4a& mat)
-{
-    gGLProjection = mat;
-}
-
-void set_last_modelview(const LLMatrix4a& mat)
-{
-    gGLLastModelView = mat;
-}
-
-void set_last_projection(const LLMatrix4a& mat)
-{
-    gGLLastProjection = mat;
 }
 
 LLMatrix4a al_reverse_z_transform(const LLMatrix4a& p)

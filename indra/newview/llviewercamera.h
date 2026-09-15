@@ -59,17 +59,36 @@ public:
 
     static eCameraID sCurCameraID;
 
+    // The camera the draw path is rendering with, held by value: a pass sets
+    // its own and puts the one it found back after. setPerspective sets the
+    // world camera; a shadow, probe, water, HUD or impostor pass sets its
+    // own.
+    static const LLCamera& getCurrent();
+    static void setCurrent(const LLCamera& camera);
+
     bool updateCameraLocation(const LLVector3 &center,
                                 const LLVector3 &up_direction,
                                 const LLVector3 &point_of_interest);
 
+    // Derives the camera's frustum from its modelview and projection
     static void updateFrustumPlanes(LLCamera& camera, bool ortho = false, bool zflip = false, bool no_hacks = false);
     void setPerspective(bool for_selection, S32 x, S32 y_from_bot, S32 width, S32 height, bool limit_select_distance, F32 z_near = 0, F32 z_far = 0);
 
-    const LLMatrix4 &getProjection() const;
-    const LLMatrix4 &getModelview() const;
+    // A forward [-1,1] perspective of this view, aspect, near and far whatever
+    // the render convention, for screen-xy hit-testing and nearest-first
+    // sorting among points projected with it. Nothing may compare its z
+    // against a GL depth sample; al_project and al_unproject are for that.
+    LLMatrix4a getForwardZProjection() const;
 
-    // Warning!  These assume the current global matrices are correct
+    // The modelview the previous frame rendered with and the transform from
+    // that frame's eye space to this one's, for the effects that read both
+    const LLMatrix4a& getLastModelview() const          { return mLastModelview; }
+    const LLMatrix4a& getDeltaModelview() const         { return mDeltaModelview; }
+    const LLMatrix4a& getInverseDeltaModelview() const  { return mInverseDeltaModelview; }
+    void calcDeltaModelview();     // at the start of the frame's scene render
+    void rememberModelview();      // at the end of it
+
+    // Warning!  These project with the current camera's matrices
     void projectScreenToPosAgent(const S32 screen_x, const S32 screen_y, LLVector3* pos_agent ) const;
     bool projectPosAgentToScreen(const LLVector3 &pos_agent, LLCoordGL &out_point, const bool clamp = true) const;
     bool projectPosAgentToScreenEdge(const LLVector3 &pos_agent, LLCoordGL &out_point) const;
@@ -109,16 +128,15 @@ public:
     S16 getZoomSubRegion() const { return mZoomSubregion; }
 
 protected:
-    void calcProjection(const F32 far_distance) const;
-
     static LLTrace::CountStatHandle<> sVelocityStat;
     static LLTrace::CountStatHandle<> sAngularVelocityStat;
 
     LLVector3 mVelocityDir ;
     F32       mAverageSpeed ;
     F32       mAverageAngularSpeed ;
-    mutable LLMatrix4   mProjectionMatrix;  // Cache of perspective matrix
-    mutable LLMatrix4   mModelviewMatrix;
+    LLMatrix4a          mLastModelview;
+    LLMatrix4a          mDeltaModelview;
+    LLMatrix4a          mInverseDeltaModelview;
     F32                 mCameraFOVDefault;
     F32                 mPrevCameraFOVDefault;
     F32                 mSavedFOVDefault;

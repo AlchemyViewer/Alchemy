@@ -512,8 +512,8 @@ void FSManipTranslateJoint::highlightManipulators(S32 x, S32 y)
     if (!isAvatarJointSafeToUse())
         return;
 
-    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getProjection();
-    LLMatrix4 modelView = LLViewerCamera::getInstance()->getModelview();
+    LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getForwardZProjection().toMatrix4();
+    LLMatrix4 modelView = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
 
     LLVector3 object_position = mJoint->getWorldPosition();
 

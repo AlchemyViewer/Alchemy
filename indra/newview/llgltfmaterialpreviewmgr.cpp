@@ -448,6 +448,9 @@ bool LLGLTFPreviewTexture::render()
 
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms();
 
+    // setPerspective makes the preview camera current; the UI draw this
+    // returns into wants the one it was using
+    const LLCamera saved_camera = LLViewerCamera::getCurrent();
     LLViewerCamera camera;
 
     // Calculate the object distance at which the object of a given radius will
@@ -477,7 +480,7 @@ bool LLGLTFPreviewTexture::render()
     gPipeline.setupHWLights();
     LLVector4a light_dir_in, transformed_light_dir;
     light_dir_in.loadua(light_dir.mV);
-    get_current_modelview().transform4(light_dir_in, transformed_light_dir);
+    LLViewerCamera::getCurrent().getModelview().transform4(light_dir_in, transformed_light_dir);
     SetTemporarily<LLVector4> force_sun_direction_high_graphics(&gPipeline.mTransformedSunDir, LLVector4(transformed_light_dir.getF32ptr()));
     // Override lights to ensure the sun is always shining from a certain direction (low graphics)
     // See also force_sun_direction_high_graphics and fixup_shader_constants
@@ -568,6 +571,7 @@ bool LLGLTFPreviewTexture::render()
     gPipeline.setupHWLights();
     gPipeline.mReflectionMapManager.forceDefaultProbeAndUpdateUniforms(false);
     gSavedSettings.set<S32>("RenderLocalLightCount", old_local_light_count);
+    LLViewerCamera::setCurrent(saved_camera);
 
     return true;
 }

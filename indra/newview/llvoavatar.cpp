@@ -6026,7 +6026,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
         if (shader->hasUniform(LLShaderMgr::IMPOSTOR_NORM_ROTATION))
         {
             // the bake's rotation out, then the main view's in
-            const LLMatrix4a& mv = get_current_modelview();
+            const LLMatrix4a& mv = LLViewerCamera::getCurrent().getModelview();
             LLMatrix3a main_view;
             main_view.setRows(mv.getRow<0>(), mv.getRow<1>(), mv.getRow<2>());
             LLMatrix3a bake_view;

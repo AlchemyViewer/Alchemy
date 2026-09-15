@@ -534,32 +534,9 @@ private:
     std::list<LLVertexBufferData>* mBufferDataList = nullptr;
 };
 
-extern LLMatrix4a gGLModelView;
-extern LLMatrix4a gGLLastModelView;
-extern LLMatrix4a gGLLastProjection;
-extern LLMatrix4a gGLProjection;
 extern S32 gGLViewport[4];
-extern LLMatrix4a gGLDeltaModelView;
-extern LLMatrix4a gGLInverseDeltaModelView;
 
 extern thread_local LLRender gGL;
-
-// This rotation matrix moves the default OpenGL reference frame
-// (-Z at, Y up) to Cory's favorite reference frame (X at, Z up)
-const F32 OGL_TO_CFR_ROTATION[16] = {  0.f,  0.f, -1.f,  0.f,   // -Z becomes X
-                                      -1.f,  0.f,  0.f,  0.f,   // -X becomes Y
-                                       0.f,  1.f,  0.f,  0.f,   //  Y becomes Z
-                                       0.f,  0.f,  0.f,  1.f };
-
-const LLMatrix4a& get_current_modelview();
-const LLMatrix4a& get_current_projection();
-const LLMatrix4a& get_last_modelview();
-const LLMatrix4a& get_last_projection();
-
-void set_current_modelview(const LLMatrix4a& mat);
-void set_current_projection(const LLMatrix4a& mat);
-void set_last_modelview(const LLMatrix4a& mat);
-void set_last_projection(const LLMatrix4a& mat);
 
 // --- Reverse-Z projection helpers (gated on LLRender::sReverseZ) --------------
 // Rewrite a forward [-1,1] projection into reversed zero-to-one (near->1, far->0):

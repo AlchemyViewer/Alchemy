@@ -3486,7 +3486,7 @@ void LLGLDepthTest::checkState()
 
 LLGLSquashToFarClip::LLGLSquashToFarClip()
 {
-    setProjectionMatrix(get_current_projection(), 0);
+    setProjectionMatrix(gGL.getProjectionMatrix(), 0);
 }
 
 LLGLSquashToFarClip::LLGLSquashToFarClip(const LLMatrix4a& P, U32 layer)

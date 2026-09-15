@@ -148,7 +148,7 @@ LLMatrix4& LLDrawPoolAvatar::getModelView()
 
     static LLMatrix4 ret;
 
-    gGLModelView.store(ret);
+    LLViewerCamera::getCurrent().getModelview().store(ret);
 
     return ret;
 }

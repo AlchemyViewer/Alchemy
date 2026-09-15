@@ -473,8 +473,8 @@ void LLManipScale::highlightManipulators(S32 x, S32 y)
         }
         else
         {
-            LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getProjection();
-            LLMatrix4 modelView = LLViewerCamera::getInstance()->getModelview();
+            LLMatrix4 projMatrix = LLViewerCamera::getInstance()->getForwardZProjection().toMatrix4();
+            LLMatrix4 modelView = LLViewerCamera::getInstance()->frameModelview().toMatrix4();
             transform.initAll(LLVector3(1.f, 1.f, 1.f), bbox.getRotation(), bbox.getPositionAgent());
 
             transform *= modelView;

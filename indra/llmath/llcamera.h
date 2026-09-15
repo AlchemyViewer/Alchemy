@@ -33,6 +33,7 @@
 #include "llplane.h"
 #include "alplaneset.h"
 #include "llvector4a.h"
+#include "llmatrix4a.h"
 
 constexpr F32 DEFAULT_FIELD_OF_VIEW = 60.f * DEG_TO_RAD;
 constexpr F32 DEFAULT_ASPECT_RATIO  = 640.f / 480.f;
@@ -142,6 +143,12 @@ private:
     U32 mPlaneCount;  //defaults to 6, if setUserClipPlane is called, uses user supplied clip plane in
 
     LLVector3 mWorldPlanePos;       // Position of World Planes (may be offset from camera)
+
+protected:
+    // The modelview and projection this camera renders with, set by whoever
+    // aims it; the frustum is derived from them.
+    LLMatrix4a mModelview;
+    LLMatrix4a mProjection;
 public:
     LLVector3 mAgentFrustum[AGENT_FRUSTRUM_NUM];  //8 corners of 6-plane frustum
     F32 mFrustumCornerDist;     //distance to corner of frustum against far clip plane
@@ -185,6 +192,15 @@ public:
     }
 
     const LLVector3& getWorldPlanePos() const       { return mWorldPlanePos; }
+
+    const LLMatrix4a& getModelview() const          { return mModelview; }
+    const LLMatrix4a& getProjection() const         { return mProjection; }
+    void setModelview(const LLMatrix4a& modelview)   { mModelview = modelview; }
+    void setProjection(const LLMatrix4a& projection) { mProjection = projection; }
+
+    // The modelview this coordinate frame gives: into the frame, then its
+    // axes onto GL's (-Z at, Y up)
+    LLMatrix4a frameModelview() const;
 
     // Copy mView, mAspect, mNearPlane, and mFarPlane to buffer.
     // Return number of bytes copied.

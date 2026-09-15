@@ -31,6 +31,13 @@
 #include "v4math.h"
 #include "llerror.h"
 
+// This rotation matrix moves the default OpenGL reference frame
+// (-Z at, Y up) to Cory's favorite reference frame (X at, Z up)
+inline constexpr F32 OGL_TO_CFR_ROTATION[16] = {  0.f,  0.f, -1.f,  0.f,   // -Z becomes X
+                                                 -1.f,  0.f,  0.f,  0.f,   // -X becomes Y
+                                                  0.f,  1.f,  0.f,  0.f,   //  Y becomes Z
+                                                  0.f,  0.f,  0.f,  1.f };
+
 // XXX : The constructors of the LLCoordFrame class assume that all vectors
 //       and quaternion being passed as arguments are normalized, and all matrix
 //       arguments are unitary.  VERY BAD things will happen if these assumptions fail.

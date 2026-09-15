@@ -721,7 +721,7 @@ void LLRenderPass::applyModelMatrix(const LLMatrix4a* model_matrix)
     {
         gGLLastMatrix = model_matrix;
         gGL.matrixMode(LLRender::MM_MODELVIEW);
-        gGL.loadMatrix(gGLModelView);
+        gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
         if (model_matrix)
         {
             gGL.multMatrix(model_matrix->getF32ptr());
