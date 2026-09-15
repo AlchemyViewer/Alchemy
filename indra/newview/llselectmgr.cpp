@@ -6586,7 +6586,6 @@ void LLSelectMgr::processForceObjectSelect(LLMessageSystem* msg, void**)
     LLSelectMgr::getInstance()->highlightObjectAndFamily(objects);
 }
 
-extern F32  gGLModelView[16];
 
 void LLSelectMgr::updateSilhouettes()
 {

@@ -1686,7 +1686,7 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
         F32 d = -(selection_center * normal);
         glm::vec4 plane(normal.mV[0], normal.mV[1], normal.mV[2], d );
 
-        plane = glm::inverse(gGL.getModelviewMatrix()) * plane;
+        plane = glm::inverse(glm::mat4(gGL.getModelviewMatrix())) * plane;
 
         gClipProgram.uniform4fv(sClipPlane, 1, plane.v);
 

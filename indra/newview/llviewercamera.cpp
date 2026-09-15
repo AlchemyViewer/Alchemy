@@ -388,7 +388,7 @@ void LLViewerCamera::setPerspective(bool for_selection,
 
     // al_perspective emits reversed-ZO under reverse-Z; pick/zoom above touch xy only, so
     // composing them ahead of the reversed z-row is correct. Forward branch == glm::perspective.
-    proj_mat *= al_perspective(fov_y, aspect, z_near, z_far);
+    proj_mat *= glm::mat4(al_perspective(fov_y, aspect, z_near, z_far));
 
     gGL.loadMatrix(glm::value_ptr(proj_mat));
 

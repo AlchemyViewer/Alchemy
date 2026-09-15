@@ -45,7 +45,6 @@
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
 #include "altextureslot.h"
 #include "aluniformbuffer.h"
-#include "glm/mat4x4.hpp"
 
 #include <boost/unordered_map.hpp>
 
@@ -244,8 +243,8 @@ public:
     void matrixMode(eMatrixMode mode);
     eMatrixMode getMatrixMode();
 
-    const glm::mat4& getModelviewMatrix();
-    const glm::mat4& getProjectionMatrix();
+    const LLMatrix4a& getModelviewMatrix();
+    const LLMatrix4a& getProjectionMatrix();
 
     void syncMatrices();
     void syncLightState();
@@ -283,7 +282,7 @@ public:
     // matrix writes. Packed once per epoch and bound at a fixed engine point, a matrix change
     // costs one upload total and a program bind costs no matrix work at all.
     //
-    // Matrices are COLUMN-major, std140's default: glm's own storage goes up untouched.
+    // Matrices go up as they lie: LLMatrix4a's rows are the columns std140 reads by default.
     // normal is a mat3, which std140 strides at 16 bytes per column, hence float[3][4].
     struct alignas(16) MatricesUBOData
     {
@@ -463,7 +462,7 @@ private:
     eMatrixMode mMatrixMode;
     U32 mMatIdx[NUM_MATRIX_MODES];
     U32 mMatHash[NUM_MATRIX_MODES];
-    glm::mat4 mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH];
+    LLMatrix4a mMatrix[NUM_MATRIX_MODES][LL_MATRIX_STACK_DEPTH];
     U32 mCurMatHash[NUM_MATRIX_MODES];
     U32 mLightHash;
     LLColor4 mAmbientLightColor;
@@ -490,9 +489,9 @@ private:
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to
     // be able to invalidate them along with the block.
-    glm::mat4       mCachedInvMdv{ 1.f };
-    glm::mat4       mCachedInvProj{ 1.f };
-    glm::mat4       mCachedMVP{ 1.f };
+    LLMatrix4a      mCachedInvMdv;
+    LLMatrix4a      mCachedInvProj;
+    LLMatrix4a      mCachedMVP;
 
     bool            mDirty;
     U32             mCount;
@@ -535,13 +534,13 @@ private:
     std::list<LLVertexBufferData>* mBufferDataList = nullptr;
 };
 
-extern F32 gGLModelView[16];
-extern F32 gGLLastModelView[16];
-extern F32 gGLLastProjection[16];
-extern F32 gGLProjection[16];
+extern LLMatrix4a gGLModelView;
+extern LLMatrix4a gGLLastModelView;
+extern LLMatrix4a gGLLastProjection;
+extern LLMatrix4a gGLProjection;
 extern S32 gGLViewport[4];
-extern glm::mat4 gGLDeltaModelView;
-extern glm::mat4 gGLInverseDeltaModelView;
+extern LLMatrix4a gGLDeltaModelView;
+extern LLMatrix4a gGLInverseDeltaModelView;
 
 extern thread_local LLRender gGL;
 
@@ -552,38 +551,42 @@ const F32 OGL_TO_CFR_ROTATION[16] = {  0.f,  0.f, -1.f,  0.f,   // -Z becomes X
                                        0.f,  1.f,  0.f,  0.f,   //  Y becomes Z
                                        0.f,  0.f,  0.f,  1.f };
 
-glm::mat4 copy_matrix(F32* src);
-glm::mat4 get_current_modelview();
-glm::mat4 get_current_projection();
-glm::mat4 get_last_modelview();
-glm::mat4 get_last_projection();
+const LLMatrix4a& get_current_modelview();
+const LLMatrix4a& get_current_projection();
+const LLMatrix4a& get_last_modelview();
+const LLMatrix4a& get_last_projection();
 
-void copy_matrix(const glm::mat4& src, F32* dst);
-void set_current_modelview(const glm::mat4& mat);
-void set_current_projection(const glm::mat4& mat);
-void set_last_modelview(const glm::mat4& mat);
-void set_last_projection(const glm::mat4& mat);
+void set_current_modelview(const LLMatrix4a& mat);
+void set_current_projection(const LLMatrix4a& mat);
+void set_last_modelview(const LLMatrix4a& mat);
+void set_last_projection(const LLMatrix4a& mat);
 
 // --- Reverse-Z projection helpers (gated on LLRender::sReverseZ) --------------
 // Rewrite a forward [-1,1] projection into reversed zero-to-one (near->1, far->0):
-// z_ndc' = (1 - z_ndc)/2, i.e. row2' = 0.5*(row3 - row2). Unconditional math; valid
-// for any forward projection, including the hand-rolled shadow perspective whose
-// depth rides an off-diagonal clip component.
-glm::mat4 al_reverse_z_transform(const glm::mat4& forward_proj);
+// z_ndc' = (1 - z_ndc)/2, i.e. the depth column becomes 0.5*(w column - depth column).
+// Unconditional math; valid for any forward projection, including the hand-rolled
+// shadow perspective whose depth rides an off-diagonal clip component.
+LLMatrix4a al_reverse_z_transform(const LLMatrix4a& forward_proj);
 // Perspective / ortho that emit reversed-ZO when sReverseZ, else the plain forward
-// glm matrix. Drop-in replacements for glm::perspective / glm::ortho at the builders.
-glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far);
-glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far);
-// project / unproject honoring the active convention: glm::*ZO under reverse-Z, since
-// the projection already outputs [0,1] and glm must not remap the window z again.
-glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
-glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+// matrix: LLMatrix4a::perspective / ortho with the convention applied.
+LLMatrix4a al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far);
+LLMatrix4a al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far);
+// project / unproject honoring the active convention: the zero-to-one forms under
+// reverse-Z, since the projection already outputs [0,1] window z. The results carry
+// w = 1.
+LLVector4a al_project(const LLVector4a& obj, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4]);
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4]);
 // Window depth of the near / far plane under the active convention.
 inline F32 al_window_near() { return LLRender::sReverseZ ? 1.f : 0.f; }
 inline F32 al_window_far()  { return LLRender::sReverseZ ? 0.f : 1.f; }
 
-// glh compat
+#if AL_GLM_BRIDGE
+// The same on glm's types, for the callers still on them.
+glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+// A point through a projective matrix, divided by w.
 glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec);
+#endif
 
 #define LL_SHADER_LOADING_WARNS(...) LL_WARNS()
 

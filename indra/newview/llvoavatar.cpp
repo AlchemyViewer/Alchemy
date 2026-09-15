@@ -6027,7 +6027,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
         if (shader->hasUniform(LLShaderMgr::IMPOSTOR_NORM_ROTATION))
         {
-            const glm::mat3 main_view(get_current_modelview());
+            const glm::mat3 main_view = glm::mat3(glm::mat4(get_current_modelview()));
             const LLMatrix3& baked = getImpostorViewRotation();
 
             glm::mat3 bake_view;

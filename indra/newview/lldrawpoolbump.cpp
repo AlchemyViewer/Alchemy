@@ -217,11 +217,7 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
     {
         if (shader )
         {
-            LLMatrix4 mat;
-            mat.initRows(LLVector4(gGLModelView+0),
-                         LLVector4(gGLModelView+4),
-                         LLVector4(gGLModelView+8),
-                         LLVector4(gGLModelView+12));
+            const LLMatrix4 mat = gGLModelView.toMatrix4();
             LLVector3 vec = LLVector3(gShinyOrigin) * mat;
             LLVector4 vec4(vec, gShinyOrigin.mV[3]);
             shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);
@@ -321,11 +317,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
     }
 
     {
-        LLMatrix4 mat;
-        mat.initRows(LLVector4(gGLModelView+0),
-                     LLVector4(gGLModelView+4),
-                     LLVector4(gGLModelView+8),
-                     LLVector4(gGLModelView+12));
+        const LLMatrix4 mat = gGLModelView.toMatrix4();
         shader->bind();
 
         LLVector3 vec = LLVector3(gShinyOrigin) * mat;

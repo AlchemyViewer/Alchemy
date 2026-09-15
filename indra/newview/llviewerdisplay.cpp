@@ -1497,7 +1497,7 @@ void render_ui(F32 zoom_factor, int subfield)
     {
         gGL.pushMatrix();
         gGL.loadMatrix(gGLLastModelView);
-        set_current_modelview(glm::make_mat4(gGLLastModelView));
+        set_current_modelview(gGLLastModelView);
     }
 
     if(LLSceneMonitor::getInstance()->needsUpdate())

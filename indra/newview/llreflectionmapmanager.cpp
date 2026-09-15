@@ -778,8 +778,7 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = gGLModelView;
     LLVector4a oa; // scratch space for transformed origin
 
     // Occlusion is measured from the main camera, so it says nothing about what a probe capture
@@ -1383,8 +1382,7 @@ void LLReflectionMapManager::updateUniforms()
     }
 
     // load modelview matrix into matrix 4a
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = gGLModelView;
     LLVector4a oa; // scratch space for transformed origin
 
     S32 count = 0;

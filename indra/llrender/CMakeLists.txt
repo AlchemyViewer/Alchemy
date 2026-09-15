@@ -132,6 +132,10 @@ if(AL_BUILD_TESTS)
   # Arithmetic only: where a local coordinate lands under the UI transform.
   al_add_test(lluitransform PROJECT llrender LIBRARIES llrender)
 
+  # Arithmetic only: the matrix stack, the projection helpers and the
+  # clip-plane classes against what glm computed for the same calls.
+  al_add_test(llrendermatrix PROJECT llrender LIBRARIES llrender)
+
   # The font suites: tables and shaping, no GL.
   foreach(test alfontcolrv1 llfontregistry llfontbitmapcache llfontfreetype)
     al_add_test(${test} PROJECT llrender LIBRARIES llrender DEFINES ${font_defines})

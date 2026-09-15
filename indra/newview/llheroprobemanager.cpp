@@ -483,8 +483,7 @@ void LLHeroProbeManager::updateUniforms()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LL_PROFILE_GPU_ZONE("hpmu - uniforms")
 
-    LLMatrix4a modelview;
-    modelview.loadu(gGLModelView);
+    const LLMatrix4a& modelview = gGLModelView;
     LLVector4a oa; // scratch space for transformed origin
     oa.set(0, 0, 0, 0);
     mHeroData.heroProbeCount = 1;

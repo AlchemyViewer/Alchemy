@@ -250,9 +250,10 @@ void LLCubeMap::setMatrix(S32 stage)
     // No getTextureSlot(stage)->activate() here any more: it guarded a texture matrix stack
     // that MM_TEXTURE0 no longer selects through the active unit. See LLRender::eMatrixMode.
 
-    LLVector3 x(gGLModelView+0);
-    LLVector3 y(gGLModelView+4);
-    LLVector3 z(gGLModelView+8);
+    const F32* modelview = gGLModelView.getF32ptr();
+    LLVector3 x(modelview+0);
+    LLVector3 y(modelview+4);
+    LLVector3 z(modelview+8);
 
     LLMatrix3 mat3;
     mat3.setRows(x,y,z);

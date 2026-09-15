@@ -37,10 +37,7 @@
 #include "lltexture.h"
 #include "llshadermgr.h"
 #include "hbxxh.h"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_inverse.hpp" // glm::affineInverse
-#include "glm/ext/matrix_clip_space.hpp" // glm::perspective / glm::ortho
-#include "glm/ext/matrix_projection.hpp" // glm::project(ZO) / glm::unProject(ZO)
+#include "alprojection.h"
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -97,14 +94,14 @@ namespace
 #endif // !LL_RELEASE_FOR_DOWNLOAD
 
 // Handy copies of last good GL matrices
-F32 gGLModelView[16];
-F32 gGLLastModelView[16];
-F32 gGLLastProjection[16];
-F32 gGLProjection[16];
+LLMatrix4a gGLModelView = LLMatrix4a::identity();
+LLMatrix4a gGLLastModelView = LLMatrix4a::identity();
+LLMatrix4a gGLLastProjection = LLMatrix4a::identity();
+LLMatrix4a gGLProjection = LLMatrix4a::identity();
 
 // transform from last frame's camera space to this frame's camera space (and inverse)
-glm::mat4 gGLDeltaModelView;
-glm::mat4 gGLInverseDeltaModelView;
+LLMatrix4a gGLDeltaModelView = LLMatrix4a::identity();
+LLMatrix4a gGLInverseDeltaModelView = LLMatrix4a::identity();
 
 S32 gGLViewport[4];
 
@@ -243,10 +240,13 @@ void LLLightState::setPosition(const LLVector4& position)
     //always set position because modelview matrix may have changed
     ++gGL.mLightHash;
     mPosition = position;
-    //transform position by current modelview matrix
-    glm::vec4 pos(position);
-    pos = gGL.getModelviewMatrix() * pos;
-    mPosition.set(glm::value_ptr(pos));
+    //transform position by current modelview matrix; w rides along, so a
+    //directional light's zero stays zero
+    LLVector4a pos;
+    pos.loadua(position.mV);
+    LLVector4a eye;
+    gGL.getModelviewMatrix().transform4(pos, eye);
+    mPosition.set(eye.getF32ptr());
 }
 
 void LLLightState::setConstantAttenuation(const F32& atten)
@@ -300,11 +300,11 @@ void LLLightState::setSpotDirection(const LLVector3& direction)
     ++gGL.mLightHash;
 
     //transform direction by current modelview matrix
-    glm::vec3 dir(direction);
-    const glm::mat3 mat(gGL.getModelviewMatrix());
-    dir = mat * dir;
-
-    mSpotDirection.set(glm::value_ptr(dir));
+    LLVector4a dir;
+    dir.load3(direction.mV);
+    LLVector4a eye;
+    gGL.getModelviewMatrix().rotate(dir, eye);
+    mSpotDirection.set(eye.getF32ptr());
 }
 
 LLRender::LLRender()
@@ -339,12 +339,15 @@ LLRender::LLRender()
     {
         for (U32 j = 0; j < LL_MATRIX_STACK_DEPTH; ++j)
         {
-            mMatrix[i][j] = glm::identity<glm::mat4>();
+            mMatrix[i][j].setIdentity();
         }
         mMatIdx[i] = 0;
         mMatHash[i] = 0;
         mCurMatHash[i] = 0xFFFFFFFF;
     }
+    mCachedInvMdv.setIdentity();
+    mCachedInvProj.setIdentity();
+    mCachedMVP.setIdentity();
 
     mLightHash = 0;
 }
@@ -608,41 +611,41 @@ void LLRender::packMatricesUBO()
 
     static_assert(sizeof(MatricesUBOData) == 368, "MatricesUBOData must match std140 (368 bytes)");
 
-    const glm::mat4& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
-    const glm::mat4& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
-    const glm::mat4& tex  = mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]];
+    const LLMatrix4a& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
+    const LLMatrix4a& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
+    const LLMatrix4a& tex  = mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]];
 
     const bool mdv_moved  = mMatHash[MM_MODELVIEW]  != mMatricesUBOHash[MM_MODELVIEW];
     const bool proj_moved = mMatHash[MM_PROJECTION] != mMatricesUBOHash[MM_PROJECTION];
 
     if (mdv_moved)
     {
-        // The modelview is affine (view * model, no perspective), so affineInverse is exact
-        // and much cheaper than a general 4x4 inverse.
-        mCachedInvMdv = glm::affineInverse(mdv);
+        // The modelview is affine (view * model, no perspective), so the affine inverse is
+        // exact and much cheaper than a general 4x4 inverse.
+        mCachedInvMdv.setAffineInverse(mdv);
     }
     if (proj_moved)
     {
         // Projection is not affine -- general inverse required.
-        mCachedInvProj = glm::inverse(proj);
+        mCachedInvProj.setInverse(proj);
     }
     if (mdv_moved || proj_moved)
     {
-        mCachedMVP = proj * mdv;
+        // the modelview first, then the projection
+        mCachedMVP.setMul(mdv, proj);
     }
 
     MatricesUBOData d;
-    memcpy(d.modelview,            glm::value_ptr(mdv),           sizeof(d.modelview));
-    memcpy(d.projection,           glm::value_ptr(proj),          sizeof(d.projection));
-    memcpy(d.modelview_projection, glm::value_ptr(mCachedMVP),    sizeof(d.modelview_projection));
-    memcpy(d.inv_proj,             glm::value_ptr(mCachedInvProj), sizeof(d.inv_proj));
-    memcpy(d.texture0,             glm::value_ptr(tex),           sizeof(d.texture0));
+    memcpy(d.modelview,            mdv.getF32ptr(),            sizeof(d.modelview));
+    memcpy(d.projection,           proj.getF32ptr(),           sizeof(d.projection));
+    memcpy(d.modelview_projection, mCachedMVP.getF32ptr(),     sizeof(d.modelview_projection));
+    memcpy(d.inv_proj,             mCachedInvProj.getF32ptr(), sizeof(d.inv_proj));
+    memcpy(d.texture0,             tex.getF32ptr(),            sizeof(d.texture0));
 
-    // normal_matrix is the upper 3x3 of transpose(inv(modelview)). Column c of that transpose
-    // is row c of the inverse, and glm stores columns contiguously -- so element k of column c
-    // is the inverse's (row c, column k), i.e. value_ptr(inv)[4*k + c]. This reproduces exactly
-    // the nine floats the loose uniformMatrix3fv used to upload.
-    const F32* inv = glm::value_ptr(mCachedInvMdv);
+    // normal_matrix is the upper 3x3 of the inverse modelview transposed: column c of the
+    // block is lane c of the inverse's first three rows, i.e. inv[4*k + c] for k = 0..2.
+    // This reproduces exactly the nine floats the loose uniformMatrix3fv used to upload.
+    const F32* inv = mCachedInvMdv.getF32ptr();
     for (U32 c = 0; c < 3; ++c)
     {
         d.normal[c][0] = inv[0 * 4 + c];
@@ -725,7 +728,9 @@ void LLRender::translatef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::translate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
+        // the translation applies first: T then the stack's matrix
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::translation(x, y, z), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -735,7 +740,8 @@ void LLRender::scalef(const GLfloat& x, const GLfloat& y, const GLfloat& z)
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::scale(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::vec3(x, y, z));
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::scaling(x, y, z), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -747,8 +753,9 @@ void LLRender::ortho(F32 left, F32 right, F32 bottom, F32 top, F32 zNear, F32 zF
     {
         // al_ortho emits reversed-ZO under reverse-Z (mapping legacy z in [-1,1] fully
         // inside the [0,1] clip volume, so 2D/UI content at z in [-1,0) is not clipped),
-        // and plain glm::ortho otherwise. Converts all gGL.ortho() callers at once.
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= al_ortho(left, right, bottom, top, zNear, zFar);
+        // and the plain ortho otherwise. Converts all gGL.ortho() callers at once.
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(al_ortho(left, right, bottom, top, zNear, zFar), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -758,7 +765,8 @@ void LLRender::rotatef(const GLfloat& a, const GLfloat& x, const GLfloat& y, con
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::rotate(mMatrix[mMatrixMode][mMatIdx[mMatrixMode]], glm::radians(a), glm::vec3(x,y,z));
+        LLMatrix4a& m = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        m.setMul(LLMatrix4a::rotation(a * DEG_TO_RAD, LLVector4a(x, y, z)), m);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -798,30 +806,36 @@ void LLRender::popMatrix()
 
 void LLRender::loadMatrix(const GLfloat* m)
 {
-    flush();
-    {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::make_mat4((GLfloat*) m);
-        mMatHash[mMatrixMode]++;
-    }
+    LLMatrix4a loaded;
+    loaded.loadu(m);
+    loadMatrix(loaded);
 }
 
 void LLRender::loadMatrix(const LLMatrix4a& m)
 {
-    loadMatrix(m.getF32ptr());
-}
-
-void LLRender::multMatrix(const GLfloat* m)
-{
     flush();
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::make_mat4(m);
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = m;
         mMatHash[mMatrixMode]++;
     }
 }
 
+void LLRender::multMatrix(const GLfloat* m)
+{
+    LLMatrix4a factor;
+    factor.loadu(m);
+    multMatrix(factor);
+}
+
 void LLRender::multMatrix(const LLMatrix4a& m)
 {
-    multMatrix(m.getF32ptr());
+    flush();
+    {
+        // the new matrix applies first, then what the stack held
+        LLMatrix4a& top = mMatrix[mMatrixMode][mMatIdx[mMatrixMode]];
+        top.setMul(m, top);
+        mMatHash[mMatrixMode]++;
+    }
 }
 
 void LLRender::matrixMode(eMatrixMode mode)
@@ -842,17 +856,17 @@ void LLRender::loadIdentity()
     {
         llassert_always(mMatrixMode < NUM_MATRIX_MODES) ;
 
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] = glm::identity<glm::mat4>();
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]].setIdentity();
         mMatHash[mMatrixMode]++;
     }
 }
 
-const glm::mat4& LLRender::getModelviewMatrix()
+const LLMatrix4a& LLRender::getModelviewMatrix()
 {
     return mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 }
 
-const glm::mat4& LLRender::getProjectionMatrix()
+const LLMatrix4a& LLRender::getProjectionMatrix()
 {
     return mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
 }
@@ -1664,132 +1678,106 @@ void LLRender::debugTexUnits(void)
     LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;
 }
 
-glm::mat4 get_current_modelview()
+const LLMatrix4a& get_current_modelview()
 {
-    return glm::make_mat4(gGLModelView);
+    return gGLModelView;
 }
 
-glm::mat4 get_current_projection()
+const LLMatrix4a& get_current_projection()
 {
-    return glm::make_mat4(gGLProjection);
+    return gGLProjection;
 }
 
-glm::mat4 get_last_modelview()
+const LLMatrix4a& get_last_modelview()
 {
-    return glm::make_mat4(gGLLastModelView);
+    return gGLLastModelView;
 }
 
-glm::mat4 get_last_projection()
+const LLMatrix4a& get_last_projection()
 {
-    return glm::make_mat4(gGLLastProjection);
+    return gGLLastProjection;
 }
 
-void copy_matrix(const glm::mat4& src, F32* dst)
+void set_current_modelview(const LLMatrix4a& mat)
 {
-    auto matp = glm::value_ptr(src);
-    for (U32 i = 0; i < 16; i++)
-    {
-        dst[i] = matp[i];
-    }
+    gGLModelView = mat;
 }
 
-void set_current_modelview(const glm::mat4& mat)
+void set_current_projection(const LLMatrix4a& mat)
 {
-    copy_matrix(mat, gGLModelView);
+    gGLProjection = mat;
 }
 
-void set_current_projection(const glm::mat4& mat)
+void set_last_modelview(const LLMatrix4a& mat)
 {
-    copy_matrix(mat, gGLProjection);
+    gGLLastModelView = mat;
 }
 
-void set_last_modelview(const glm::mat4& mat)
+void set_last_projection(const LLMatrix4a& mat)
 {
-    copy_matrix(mat, gGLLastModelView);
+    gGLLastProjection = mat;
 }
 
-void set_last_projection(const glm::mat4& mat)
+LLMatrix4a al_reverse_z_transform(const LLMatrix4a& p)
 {
-    copy_matrix(mat, gGLLastProjection);
-}
-
-glm::mat4 al_reverse_z_transform(const glm::mat4& p)
-{
-    // z_ndc' = (1 - z_ndc)/2  =>  row2' = 0.5*(row3 - row2). glm is column-major, so
-    // row i is spread across mat[c][i]. Leaves xy and w rows untouched.
-    glm::mat4 r = p;
-    for (int c = 0; c < 4; ++c)
-    {
-        r[c][2] = 0.5f * (p[c][3] - p[c][2]);
-    }
+    // z_ndc' = (1 - z_ndc)/2: the depth column becomes 0.5 * (w column - depth column),
+    // x, y and w untouched.
+    LLVector4a depth;
+    depth.setSub(p.getColumn<3>(), p.getColumn<2>());
+    depth.mul(0.5f);
+    LLMatrix4a r = p;
+    r.setColumn<2>(depth);
     return r;
 }
 
-glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
+LLMatrix4a al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
 {
-    // Forward branch is exactly glm::perspective (byte-identical to pre-reverse-Z callers).
-    glm::mat4 p = glm::perspective(fovy_rad, aspect, z_near, z_far);
+    const LLMatrix4a p = LLMatrix4a::perspective(fovy_rad, aspect, z_near, z_far);
     return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
 }
 
-glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
+LLMatrix4a al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
 {
-    glm::mat4 p = glm::ortho(left, right, bottom, top, z_near, z_far);
+    const LLMatrix4a p = LLMatrix4a::ortho(left, right, bottom, top, z_near, z_far);
     return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
 }
 
+LLVector4a al_project(const LLVector4a& obj, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4])
+{
+    // Under reverse-Z the projection already yields [0,1] window z, so the zero-to-one
+    // form does not re-apply the [-1,1]->[0,1] remap.
+    return LLRender::sReverseZ ? alprojection::project_zo(obj, modelview, proj, viewport)
+                               : alprojection::project(obj, modelview, proj, viewport);
+}
+
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4])
+{
+    return LLRender::sReverseZ ? alprojection::unproject_zo(win, modelview, proj, viewport)
+                               : alprojection::unproject(win, modelview, proj, viewport);
+}
+
+#if AL_GLM_BRIDGE
 glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
 {
-    // Under reverse-Z the projection already yields [0,1] window z, so use the ZO variant
-    // that does not re-apply the [-1,1]->[0,1] remap.
-    return LLRender::sReverseZ ? glm::projectZO(obj, modelview, proj, viewport)
-                               : glm::project(obj, modelview, proj, viewport);
+    const S32 vp[4] = { viewport[0], viewport[1], viewport[2], viewport[3] };
+    const LLVector4a win = al_project(LLVector4a(obj.x, obj.y, obj.z, 1.f), LLMatrix4a(modelview), LLMatrix4a(proj), vp);
+    return glm::vec3(win[0], win[1], win[2]);
 }
 
 glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
 {
-    return LLRender::sReverseZ ? glm::unProjectZO(win, modelview, proj, viewport)
-                               : glm::unProject(win, modelview, proj, viewport);
+    const S32 vp[4] = { viewport[0], viewport[1], viewport[2], viewport[3] };
+    const LLVector4a obj = al_unproject(LLVector4a(win.x, win.y, win.z, 1.f), LLMatrix4a(modelview), LLMatrix4a(proj), vp);
+    return glm::vec3(obj[0], obj[1], obj[2]);
 }
 
 glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec)
 {
-#if 1 // SIMD path results in strange crashes. Fall back to scalar for now.
     const float w = vec[0] * mat[0][3] + vec[1] * mat[1][3] + vec[2] * mat[2][3] + mat[3][3];
     return glm::vec3(
        (vec[0] * mat[0][0] + vec[1] * mat[1][0] + vec[2] * mat[2][0] + mat[3][0]) / w,
        (vec[0] * mat[0][1] + vec[1] * mat[1][1] + vec[2] * mat[2][1] + mat[3][1]) / w,
        (vec[0] * mat[0][2] + vec[1] * mat[1][2] + vec[2] * mat[2][2] + mat[3][2]) / w
     );
-#else
-    LLVector4a x, y, z, s, t, p, q;
-
-    x.splat(vec.x);
-    y.splat(vec.y);
-    z.splat(vec.z);
-
-    s.splat<3>(mat[0].data);
-    t.splat<3>(mat[1].data);
-    p.splat<3>(mat[2].data);
-    q.splat<3>(mat[3].data);
-
-    s.mul(x);
-    t.mul(y);
-    p.mul(z);
-    q.add(s);
-    t.add(p);
-    q.add(t);
-
-    x.mul(mat[0].data);
-    y.mul(mat[1].data);
-    z.mul(mat[2].data);
-
-    x.add(y);
-    z.add(mat[3].data);
-    LLVector4a res;
-    res.load3(glm::value_ptr(vec));
-    res.setAdd(x, z);
-    res.div(q);
-    return glm::make_vec3(res.getF32ptr());
-#endif
 }
+#endif

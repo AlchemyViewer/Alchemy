@@ -7914,7 +7914,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 bool sun_up = environment.getIsSunUp();
                 LLVector4 light_dir = sun_up ? mSunDir : mMoonDir;
 
-                glm::vec4 sun_clip = get_current_projection() * get_current_modelview() * glm::vec4(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.0f);
+                glm::vec4 sun_clip = glm::mat4(get_current_projection()) * glm::mat4(get_current_modelview()) * glm::vec4(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.0f);
 
                 F32 target_visibility = 0.f;
                 // Gate/divide on clip w, not z: w is convention-independent (reverse-Z rewrites
@@ -9733,7 +9733,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
                 cube_map->bind();
             }
 
-            F32* m = gGLModelView;
+            const F32* m = gGLModelView.getF32ptr();
 
             F32 mat[] = { m[0], m[1], m[2],
                           m[4], m[5], m[6],
@@ -9759,14 +9759,14 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
 
-    shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLDeltaModelView));
-    shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLInverseDeltaModelView));
+    shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, gGLDeltaModelView);
+    shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, gGLInverseDeltaModelView);
 
     shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
 
     if (shader.hasUniform(LLShaderMgr::DEFERRED_NORM_MATRIX))
     {
-        glm::mat4 norm_mat = glm::transpose(glm::inverse(get_current_modelview()));
+        glm::mat4 norm_mat = glm::transpose(glm::inverse(glm::mat4(get_current_modelview())));
         shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_NORM_MATRIX, 1, false, glm::value_ptr(norm_mat));
     }
 
@@ -10299,11 +10299,8 @@ void LLPipeline::renderDeferredLighting()
     {
         // this is the end of the 3D scene render, grab a copy of the modelview and projection
         // matrix for use in off-by-one-frame effects in the next frame
-        for (U32 i = 0; i < 16; i++)
-        {
-            gGLLastModelView[i] = gGLModelView[i];
-            gGLLastProjection[i] = gGLProjection[i];
-        }
+        gGLLastModelView = gGLModelView;
+        gGLLastProjection = gGLProjection;
     }
     gGL.setColorMask(true, true);
 }
@@ -10479,7 +10476,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     LLMatrix4 light_mat(quat, LLVector4(origin,1.f));
 
     glm::mat4 light_to_agent(glm::make_mat4((F32*) light_mat.mMatrix));
-    glm::mat4 light_to_screen = get_current_modelview() * light_to_agent;
+    glm::mat4 light_to_screen = glm::mat4(get_current_modelview()) * light_to_agent;
 
     glm::mat4 screen_to_light = glm::inverse(light_to_screen);
 
@@ -10661,7 +10658,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 
 void LLPipeline::setEnvMat(LLGLSLShader& shader)
 {
-    F32* m = gGLModelView;
+    const F32* m = gGLModelView.getF32ptr();
 
     F32 mat[] = { m[0], m[1], m[2],
                     m[4], m[5], m[6],
