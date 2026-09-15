@@ -152,7 +152,9 @@ protected:
 public:
     LLVector3 mAgentFrustum[AGENT_FRUSTRUM_NUM];  //8 corners of 6-plane frustum
     F32 mFrustumCornerDist;     //distance to corner of frustum against far clip plane
-    LLPlane& getAgentPlane(U32 idx) { return mAgentPlanes[idx]; }
+    const LLPlane& getAgentPlane(U32 idx) const { return mAgentPlanes[idx]; }
+    // Replaces one plane; its octant and the plane set follow
+    void setAgentPlane(U32 idx, const LLPlane& plane);
 
 public:
     LLCamera();

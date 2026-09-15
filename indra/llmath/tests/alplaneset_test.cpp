@@ -215,4 +215,35 @@ namespace tut
         ensure_equals("a region box past the region far clip is outside",
                       mCamera.AABBInRegionFrustum(LLVector4a(FAR_X + 50.f - shift.mV[0], -shift.mV[1], -shift.mV[2], 0.f), LLVector4a(1.f, 1.f, 1.f)), 0);
     }
+
+    // A plane replaced one at a time, the way the shadow passes move the
+    // near plane back behind the casters, is what the set tests against.
+    template<> template<>
+    void alplaneset_object::test<5>()
+    {
+        // between the eye and the near plane, within the side planes
+        const Box behind = {LLVector4a(0.5f, 0.f, 0.f, 0.f), LLVector4a(0.1f, 0.1f, 0.1f, 0.f)};
+        ensure_equals("behind the near plane is outside", mCamera.AABBInFrustum(behind.center, behind.radius), 0);
+
+        // the near plane moved back to x = -50, still facing back
+        LLPlane moved(LLVector3(-50.f, 0.f, 0.f), LLVector3(-1.f, 0.f, 0.f));
+        mCamera.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, moved);
+        ensure("the plane reads back", mCamera.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).equal(moved));
+        ensure_equals("behind the old near plane is now inside", mCamera.AABBInFrustum(behind.center, behind.radius), 2);
+        ensure_equals("and the loop agrees", by_loop(behind), 2);
+        for (const Box& b : some_boxes(5, FAR_X))
+        {
+            ensure_equals("with the near plane moved", mCamera.AABBInFrustum(b.center, b.radius), by_loop(b));
+            ensure_equals("with the near plane moved, far ignored", mCamera.AABBInFrustumNoFarClip(b.center, b.radius), by_loop(b, true));
+        }
+
+        // a plane facing the other way takes its octant with it: x >= 50 is now outside
+        LLPlane flipped(LLVector3(50.f, 0.f, 0.f), LLVector3(1.f, 0.f, 0.f));
+        mCamera.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, flipped);
+        const Box straddling = {LLVector4a(50.f, 0.f, 0.f, 0.f), LLVector4a(2.f, 1.f, 1.f, 0.f)};
+        ensure_equals("a box across the flipped plane is partly in", mCamera.AABBInFrustum(straddling.center, straddling.radius), 1);
+        ensure_equals("and the loop agrees", by_loop(straddling), 1);
+        ensure_equals("beyond the flipped plane is outside", mCamera.AABBInFrustum(LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)), 0);
+        ensure_equals("and the loop agrees", by_loop({LLVector4a(70.f, 0.f, 0.f, 0.f), LLVector4a(1.f, 1.f, 1.f, 0.f)}), 0);
+    }
 }

@@ -11586,7 +11586,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 ucam.setProjection(uproj);
                 LLViewerCamera::updateFrustumPlanes(ucam, false, false, true);
                 LLViewerCamera::setCurrent(ucam);
-                ucam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
+                ucam.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, shadow_near_clip);
 
                 bool saved_shadow_render = LLPipeline::sShadowRender;
                 U32 saved_occlusion = sUseOcclusion;
@@ -11949,7 +11949,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             LLViewerCamera::setCurrent(shadow_cam);
 
             //shadow_cam.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_NEAR);
-            shadow_cam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
+            shadow_cam.setAgentPlane(LLCamera::AGENT_PLANE_NEAR, shadow_near_clip);
 
             // translate and scale from [-1,1] to [0,1]. Under reverse-Z the projection
             // already yields [0,1] shadow-map z, so z passes through (no 0.5*z+0.5); only

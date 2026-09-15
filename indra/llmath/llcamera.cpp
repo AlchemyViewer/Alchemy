@@ -123,6 +123,14 @@ void LLCamera::setUserClipPlane(LLPlane& plane)
     rebuildPlaneSets();
 }
 
+void LLCamera::setAgentPlane(U32 idx, const LLPlane& plane)
+{
+    llassert(idx < AGENT_PLANE_USER_CLIP_NUM);
+    mAgentPlanes[idx] = plane;
+    mPlaneMask[idx] = mAgentPlanes[idx].calcPlaneMask();
+    rebuildPlaneSets();
+}
+
 void LLCamera::disableUserClipPlane()
 {
     mPlaneCount = AGENT_PLANE_NO_USER_CLIP_NUM;
