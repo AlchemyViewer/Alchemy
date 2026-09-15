@@ -6017,7 +6017,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
     gGL.flush();
 
-    // Rebase the baked normals into the CURRENT view basis: main_view * inverse(bake_view).
+    // Rebase the baked normals into the CURRENT view basis: inverse(bake_view), then main_view.
     // Both are pure rotations sharing an origin, so the inverse is the transpose. Uploaded
     // per avatar because each impostor was baked aiming at its own subject, and re-derived
     // every frame because the impostor outlives the camera position that produced it.
@@ -6028,11 +6028,11 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
             // the bake's rotation out, then the main view's in
             const LLMatrix4a& mv = get_current_modelview();
             LLMatrix3a main_view;
-            main_view.setColumns(mv.getRow<0>(), mv.getRow<1>(), mv.getRow<2>());
+            main_view.setRows(mv.getRow<0>(), mv.getRow<1>(), mv.getRow<2>());
             LLMatrix3a bake_view;
             bake_view.loadu(getImpostorViewRotation());
             LLMatrix3a rebase;
-            rebase.setMul(main_view, bake_view);
+            rebase.setMul(bake_view, main_view);
             shader->uniformMatrix3fv(LLShaderMgr::IMPOSTOR_NORM_ROTATION, rebase);
         }
     }

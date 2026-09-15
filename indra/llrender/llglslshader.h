@@ -347,8 +347,8 @@ public:
     void uniformMatrix3x4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
 
-    // The native matrices, as they lie: LLMatrix4a's rows are the columns
-    // the shader reads, and LLMatrix3a's three columns are packed to nine.
+    // The native matrices, as they lie: their rows are the columns the
+    // shader reads, so the shader's M * v is the row-vector product v * M.
     void uniformMatrix4fv(U32 index, const LLMatrix4a& m);
     void uniformMatrix3fv(U32 index, const LLMatrix3a& m);
 

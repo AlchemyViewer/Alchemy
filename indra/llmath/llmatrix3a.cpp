@@ -34,12 +34,12 @@ extern const LLMatrix3a LL_M3A_IDENTITY(
     LLVector4a(0.f, 1.f, 0.f, 0.f),
     LLVector4a(0.f, 0.f, 1.f, 0.f));
 
-// The columns are the rows of the 4x4 the direction kernel weights by x, y
-// and z, so the transform is that kernel with the columns in its rows.
+// The direction kernel weights the rows of a 4x4 by x, y and z, which is
+// rotate() with a fourth row it never reads.
 /*static */void LLMatrix3a::batchTransform( const LLMatrix3a& xform, const LLVector4a* src, int numVectors, LLVector4a* dst )
 {
     LLMatrix4a rows;
-    rows.setRows(xform.getColumn(0), xform.getColumn(1), xform.getColumn(2));
+    rows.setRows(xform.getRow<0>(), xform.getRow<1>(), xform.getRow<2>());
     rows.setRow<3>(LLVector4a::getZero());
     alsimd::transform_directions(rows, src, dst, static_cast<size_t>(numVectors));
 }

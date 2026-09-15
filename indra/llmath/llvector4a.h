@@ -309,7 +309,7 @@ public:
     inline bool isFinite4() const;
 
     // Set this vector to 'vec' rotated by the LLRotation or LLQuaternion2 provided
-    void setRotated( const LLRotation& rot, const LLVector4a& vec );
+    inline void setRotated( const LLRotation& rot, const LLVector4a& vec );
     void setRotated( const class LLQuaternion2& quat, const LLVector4a& vec );
 
     // Set this vector to 'vec' rotated by the INVERSE of the LLRotation or LLQuaternion2 provided

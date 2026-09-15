@@ -44,14 +44,6 @@ extern const LLVector4a LL_V4A_EPSILON(F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZER
         ll_memcpy_nonaliased_aligned_16((char*)dst, (char*)src, bytes);
 }
 
-void LLVector4a::setRotated( const LLRotation& rot, const LLVector4a& vec )
-{
-    const LLQuad v = vec.mQ;
-    LLQuad result = alsimd::mul(alsimd::splat<0>(v), rot.getColumn(0));
-    result = alsimd::fmadd_lane<1>(rot.getColumn(1), v, result);
-    mQ = alsimd::fmadd_lane<2>(rot.getColumn(2), v, result);
-}
-
 void LLVector4a::setRotated( const LLQuaternion2& quat, const LLVector4a& vec )
 {
     const LLVector4a& quatVec = quat.getVector4a();

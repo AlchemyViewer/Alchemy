@@ -23,10 +23,10 @@
  * $/LicenseInfo$
  */
 
-// LLMatrix3a holds three columns, each a register; loadu(LLMatrix3) makes
-// row i of the scalar matrix column i, so rotating a vector by it is the
-// scalar type's v * M. The tests read the columns back through the lanes
-// and do the reference arithmetic in double.
+// LLMatrix3a holds three rows, each a register; loadu(LLMatrix3) makes
+// row i of the scalar matrix row i, so rotating a vector by it is the
+// scalar type's v * M and setMul(a, b) is a then b. The tests read the
+// rows back through the lanes and do the reference arithmetic in double.
 
 #include "linden_common.h"
 
@@ -57,34 +57,34 @@ namespace
         return buffer;
     }
 
-    // The 3x3 as doubles, m[col][row]
-    struct Cols
+    // The 3x3 as doubles, m[row][col]
+    struct Rows
     {
         double m[3][3];
     };
 
-    Cols cols_of(const LLMatrix3a& a)
+    Rows rows_of(const LLMatrix3a& a)
     {
-        Cols c;
-        for (int col = 0; col < 3; ++col)
+        Rows r;
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                c.m[col][row] = a.getColumn(col)[row];
+                r.m[row][col] = a.getRow(row)[col];
             }
         }
-        return c;
+        return r;
     }
 
-    void ensure_columns(const std::string& what, const LLMatrix3a& got, const Cols& expected, double tolerance)
+    void ensure_rows(const std::string& what, const LLMatrix3a& got, const Rows& expected, double tolerance)
     {
-        for (int col = 0; col < 3; ++col)
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                const double g = got.getColumn(col)[row];
-                const double e = expected.m[col][row];
-                ensure(what + " column " + std::to_string(col) + " row " + std::to_string(row) + ": " +
+                const double g = got.getRow(row)[col];
+                const double e = expected.m[row][col];
+                ensure(what + " row " + std::to_string(row) + " column " + std::to_string(col) + ": " +
                            precise(g) + " vs " + precise(e),
                        std::fabs(g - e) <= tolerance * llmax(1.0, std::fabs(e)));
             }
@@ -106,7 +106,7 @@ namespace
 
     bool same_bits(const LLMatrix3a& a, const LLMatrix3a& b)
     {
-        return same_bits(a.getColumn(0), b.getColumn(0)) && same_bits(a.getColumn(1), b.getColumn(1)) && same_bits(a.getColumn(2), b.getColumn(2));
+        return same_bits(a.getRow<0>(), b.getRow<0>()) && same_bits(a.getRow<1>(), b.getRow<1>()) && same_bits(a.getRow<2>(), b.getRow<2>());
     }
 
     // The 3x3 alone: an operation that computes the fourth lanes from the
@@ -114,11 +114,11 @@ namespace
     // was given.
     bool same_bits3(const LLMatrix3a& a, const LLMatrix3a& b)
     {
-        for (int col = 0; col < 3; ++col)
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                if (std::bit_cast<U32>(a.getColumn(col)[row]) != std::bit_cast<U32>(b.getColumn(col)[row]))
+                if (std::bit_cast<U32>(a.getRow(row)[col]) != std::bit_cast<U32>(b.getRow(row)[col]))
                 {
                     return false;
                 }
@@ -155,8 +155,8 @@ namespace tut
     typedef llmatrix3a_test::object llmatrix3a_object;
     tut::llmatrix3a_test llmatrix3a_testcase("LLMatrix3a");
 
-    // Plain data of three registers; the identity; set and get by column
-    // and by row.
+    // Plain data of three registers; the identity; set and get by row and
+    // by column.
     template<> template<>
     void llmatrix3a_object::test<1>()
     {
@@ -166,34 +166,35 @@ namespace tut
         ensure("trivially copyable", std::is_trivially_copyable<LLRotation>::value);
 
         const LLMatrix3a& identity = LLMatrix3a::getIdentity();
-        for (int col = 0; col < 3; ++col)
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                ensure_equals("identity", identity.getColumn(col)[row], col == row ? 1.f : 0.f);
+                ensure_equals("identity", identity.getRow(row)[col], row == col ? 1.f : 0.f);
             }
         }
 
         const LLMatrix3a m = odd_matrix();
-        ensure_equals("getColumn 1 y", m.getColumn(1)[1], 5.5f);
-        ensure_equals("getColumn 2 w", m.getColumn(2)[3], 300.f);
+        ensure_equals("getRow 1 y", m.getRow(1)[1], 5.5f);
+        ensure_equals("getRow 2 w", m.getRow(2)[3], 300.f);
+        ensure("getRow<N> is getRow(N)", same_bits(m.getRow<0>(), m.getRow(0)) && same_bits(m.getRow<1>(), m.getRow(1)) && same_bits(m.getRow<2>(), m.getRow(2)));
 
         LLMatrix3a by_rows;
-        by_rows.setRows(m.getColumn(0), m.getColumn(1), m.getColumn(2));
-        for (int col = 0; col < 3; ++col)
-        {
-            for (int row = 0; row < 3; ++row)
-            {
-                ensure_equals("setRows is the transpose of setColumns", by_rows.getColumn(col)[row], m.getColumn(row)[col]);
-            }
-        }
+        by_rows.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
+        ensure("setRows", same_bits(by_rows, m));
 
         LLMatrix3a by_columns;
-        by_columns.setColumns(m.getColumn(0), m.getColumn(1), m.getColumn(2));
-        ensure("setColumns", same_bits(by_columns, m));
+        by_columns.setColumns(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
+        for (int row = 0; row < 3; ++row)
+        {
+            for (int col = 0; col < 3; ++col)
+            {
+                ensure_equals("setColumns is the transpose of setRows", by_columns.getRow(row)[col], m.getRow(col)[row]);
+            }
+        }
     }
 
-    // loadu takes the scalar matrix row by row into the columns.
+    // loadu takes the scalar matrix row by row.
     template<> template<>
     void llmatrix3a_object::test<2>()
     {
@@ -205,9 +206,9 @@ namespace tut
         {
             for (int j = 0; j < 3; ++j)
             {
-                ensure_equals("loadu", m.getColumn(i)[j], m3.mMatrix[i][j]);
+                ensure_equals("loadu", m.getRow(i)[j], m3.mMatrix[i][j]);
             }
-            ensure_equals("loadu w is zero", m.getColumn(i)[3], 0.f);
+            ensure_equals("loadu w is zero", m.getRow(i)[3], 0.f);
         }
     }
 
@@ -219,16 +220,16 @@ namespace tut
         const LLMatrix3a m = odd_matrix();
         LLMatrix3a t;
         t.setTranspose(m);
-        for (int col = 0; col < 3; ++col)
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                ensure_equals("setTranspose", t.getColumn(col)[row], m.getColumn(row)[col]);
+                ensure_equals("setTranspose", t.getRow(row)[col], m.getRow(col)[row]);
             }
         }
-        ensure_equals("transpose column 0 w", t.getColumn(0)[3], m.getColumn(2)[1]);
-        ensure_equals("transpose column 1 w", t.getColumn(1)[3], m.getColumn(2)[0]);
-        ensure_equals("transpose column 2 w", t.getColumn(2)[3], m.getColumn(2)[0]);
+        ensure_equals("transpose row 0 w", t.getRow(0)[3], m.getRow(2)[1]);
+        ensure_equals("transpose row 1 w", t.getRow(1)[3], m.getRow(2)[0]);
+        ensure_equals("transpose row 2 w", t.getRow(2)[3], m.getRow(2)[0]);
 
         LLMatrix3a back;
         back.setTranspose(t);
@@ -240,69 +241,120 @@ namespace tut
         ensure("setTranspose in place", same_bits(self, t));
     }
 
-    // The product against double, the identity on both sides, and the
-    // property that names it: rotating by the product is rotating by the
-    // right one and then the left.
+    // rotate is the scalar type's v * M, and setRotated is rotate.
     template<> template<>
     void llmatrix3a_object::test<4>()
+    {
+        const LLMatrix3a m = odd_matrix();
+        const Rows r = rows_of(m);
+        const LLVector4a v(1.f, -2.f, 0.5f, 42.f);
+
+        LLVector4a rotated;
+        m.rotate(v, rotated);
+        for (int col = 0; col < 3; ++col)
+        {
+            const double expected = v[0] * r.m[0][col] + v[1] * r.m[1][col] + v[2] * r.m[2][col];
+            ensure("rotate lane " + std::to_string(col) + ": " + precise(rotated[col]) + " vs " + precise(expected),
+                   std::fabs(rotated[col] - expected) <= 1e-6 * llmax(1.0, std::fabs(expected)));
+        }
+
+        LLRotation rot;
+        rot.setRows(m.getRow<0>(), m.getRow<1>(), m.getRow<2>());
+        LLVector4a set_rotated;
+        set_rotated.setRotated(rot, v);
+        ensure("setRotated is rotate", same_bits(set_rotated, rotated));
+
+        // in place
+        LLVector4a self = v;
+        m.rotate(self, self);
+        ensure("rotate in place", same_bits(self, rotated));
+
+        for (const LLQuaternion& q : ROTATIONS)
+        {
+            const LLMatrix3 m3 = q.getMatrix3();
+            LLMatrix3a a;
+            a.loadu(m3);
+            const LLVector3 v3(v[0], v[1], v[2]);
+            const LLVector3 expected = v3 * m3;
+            LLVector4a got;
+            a.rotate(v, got);
+            ensure("rotate is v * LLMatrix3", got.equals3(LLVector4a(expected.mV[0], expected.mV[1], expected.mV[2]), 1e-5f));
+        }
+    }
+
+    // The product against double, the identity on both sides, and the
+    // property that names it: rotating by the product is rotating by the
+    // left one and then the right.
+    template<> template<>
+    void llmatrix3a_object::test<5>()
     {
         const LLMatrix3a a = odd_matrix();
         const LLMatrix3a b(LLVector4a(0.5f, -1.f, 2.f, 1.f),
                            LLVector4a(3.f, 0.25f, -0.5f, 2.f),
                            LLVector4a(-2.f, 1.5f, 1.f, 3.f));
 
-        const Cols ca = cols_of(a);
-        const Cols cb = cols_of(b);
-        Cols expected;
-        for (int col = 0; col < 3; ++col)
+        const Rows ra = rows_of(a);
+        const Rows rb = rows_of(b);
+        Rows expected;
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                expected.m[col][row] = ca.m[0][row] * cb.m[col][0] + ca.m[1][row] * cb.m[col][1] + ca.m[2][row] * cb.m[col][2];
+                expected.m[row][col] = ra.m[row][0] * rb.m[0][col] + ra.m[row][1] * rb.m[1][col] + ra.m[row][2] * rb.m[2][col];
             }
         }
 
         LLMatrix3a product;
         product.setMul(a, b);
-        ensure_columns("setMul", product, expected, 1e-6);
+        ensure_rows("setMul", product, expected, 1e-6);
+
+        // the scalar type agrees on the order
+        LLMatrix3 a3, b3;
+        for (int row = 0; row < 3; ++row)
+        {
+            for (int col = 0; col < 3; ++col)
+            {
+                a3.mMatrix[row][col] = a.getRow(row)[col];
+                b3.mMatrix[row][col] = b.getRow(row)[col];
+            }
+        }
+        const LLMatrix3 product3 = a3 * b3;
+        LLMatrix3a from_scalar;
+        from_scalar.loadu(product3);
+        ensure("setMul(a, b) is LLMatrix3 a * b", product.isApproximatelyEqual(from_scalar, 1e-4f));
 
         LLMatrix3a left, right;
         left.setMul(LLMatrix3a::getIdentity(), a);
         right.setMul(a, LLMatrix3a::getIdentity());
-        ensure("identity on the left", same_bits3(left, a));
-        ensure("identity on the right", same_bits(right, a));
+        ensure("identity on the left", same_bits(left, a));
+        ensure("identity on the right", same_bits3(right, a));
 
         // aliasing either operand
         LLMatrix3a alias = a;
         alias.setMul(alias, b);
-        ensure("setMul aliasing lhs", same_bits(alias, product));
+        ensure("setMul aliasing a", same_bits(alias, product));
         alias = b;
         alias.setMul(a, alias);
-        ensure("setMul aliasing rhs", same_bits(alias, product));
-
-        LLRotation ra, rb, rproduct;
-        ra.setColumns(a.getColumn(0), a.getColumn(1), a.getColumn(2));
-        rb.setColumns(b.getColumn(0), b.getColumn(1), b.getColumn(2));
-        rproduct.setColumns(product.getColumn(0), product.getColumn(1), product.getColumn(2));
+        ensure("setMul aliasing b", same_bits(alias, product));
 
         const LLVector4a v(1.f, -2.f, 0.5f, 0.f);
-        LLVector4a by_b, then_a, by_product;
-        by_b.setRotated(rb, v);
-        then_a.setRotated(ra, by_b);
-        by_product.setRotated(rproduct, v);
-        ensure("(ab)v is a(bv)", by_product.equals3(then_a, 1e-4f));
+        LLVector4a by_a, then_b, by_product;
+        a.rotate(v, by_a);
+        b.rotate(by_a, then_b);
+        product.rotate(v, by_product);
+        ensure("v * (ab) is (v * a) * b", by_product.equals3(then_b, 1e-4f));
     }
 
     // The determinant, both forms, against double.
     template<> template<>
-    void llmatrix3a_object::test<5>()
+    void llmatrix3a_object::test<6>()
     {
         const LLMatrix3a m = odd_matrix();
-        const Cols c = cols_of(m);
+        const Rows r = rows_of(m);
         const double expected =
-            c.m[0][0] * (c.m[1][1] * c.m[2][2] - c.m[1][2] * c.m[2][1]) -
-            c.m[1][0] * (c.m[0][1] * c.m[2][2] - c.m[0][2] * c.m[2][1]) +
-            c.m[2][0] * (c.m[0][1] * c.m[1][2] - c.m[0][2] * c.m[1][1]);
+            r.m[0][0] * (r.m[1][1] * r.m[2][2] - r.m[1][2] * r.m[2][1]) -
+            r.m[0][1] * (r.m[1][0] * r.m[2][2] - r.m[1][2] * r.m[2][0]) +
+            r.m[0][2] * (r.m[1][0] * r.m[2][1] - r.m[1][1] * r.m[2][0]);
 
         const F32 det = m.getDeterminant().getF32();
         ensure("getDeterminant: " + precise(det) + " vs " + precise(expected), std::fabs(det - expected) <= 1e-5 * std::fabs(expected));
@@ -319,7 +371,7 @@ namespace tut
 
     // A rotation is one; a scale, a shear and a reflection are not.
     template<> template<>
-    void llmatrix3a_object::test<6>()
+    void llmatrix3a_object::test<7>()
     {
         for (const LLQuaternion& q : ROTATIONS)
         {
@@ -330,31 +382,31 @@ namespace tut
         }
 
         LLRotation scaled;
-        scaled.setColumns(LLVector4a(2.f, 0.f, 0.f), LLVector4a(0.f, 2.f, 0.f), LLVector4a(0.f, 0.f, 2.f));
+        scaled.setRows(LLVector4a(2.f, 0.f, 0.f), LLVector4a(0.f, 2.f, 0.f), LLVector4a(0.f, 0.f, 2.f));
         ensure("a scale is not a rotation", !scaled.isOkRotation());
 
         LLRotation sheared;
-        sheared.setColumns(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.5f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
+        sheared.setRows(LLVector4a(1.f, 0.f, 0.f), LLVector4a(0.5f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
         ensure("a shear is not a rotation", !sheared.isOkRotation());
 
         LLRotation reflected;
-        reflected.setColumns(LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
+        reflected.setRows(LLVector4a(-1.f, 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
         ensure("a reflection is not a rotation", !reflected.isOkRotation());
 
         LLRotation nan;
-        nan.setColumns(LLVector4a(std::numeric_limits<F32>::quiet_NaN(), 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
+        nan.setRows(LLVector4a(std::numeric_limits<F32>::quiet_NaN(), 0.f, 0.f), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
         ensure("a NaN is not finite", !nan.isFinite());
         ensure("a NaN is not a rotation", !nan.isOkRotation());
 
         LLRotation inf_in_w;
-        inf_in_w.setColumns(LLVector4a(1.f, 0.f, 0.f, std::numeric_limits<F32>::infinity()), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
+        inf_in_w.setRows(LLVector4a(1.f, 0.f, 0.f, std::numeric_limits<F32>::infinity()), LLVector4a(0.f, 1.f, 0.f), LLVector4a(0.f, 0.f, 1.f));
         ensure("the fourth lane is not looked at", inf_in_w.isFinite());
     }
 
-    // batchTransform is setRotated over an array, every count, including
-    // the odd one the loop peels.
+    // batchTransform is rotate over an array, every count, including the
+    // odd one the loop peels.
     template<> template<>
-    void llmatrix3a_object::test<7>()
+    void llmatrix3a_object::test<8>()
     {
         LLRotation r;
         r.loadu(ROTATIONS[4].getMatrix3());
@@ -373,7 +425,7 @@ namespace tut
             for (int i = 0; i < count; ++i)
             {
                 LLVector4a one;
-                one.setRotated(r, src[i]);
+                r.rotate(src[i], one);
                 ensure("batchTransform count " + std::to_string(count) + " element " + std::to_string(i),
                        same_bits(dst[i], one));
             }
@@ -383,7 +435,7 @@ namespace tut
 
     // setLerp and the tolerance compare.
     template<> template<>
-    void llmatrix3a_object::test<8>()
+    void llmatrix3a_object::test<9>()
     {
         const LLMatrix3a a = odd_matrix();
         const LLMatrix3a b(LLVector4a(0.5f, -1.f, 2.f, 1.f),
@@ -397,22 +449,22 @@ namespace tut
         ensure("setLerp at 0", same_bits(at_zero, a));
         ensure("setLerp at 1", at_one.isApproximatelyEqual(b, 1e-6f));
 
-        const Cols ca = cols_of(a);
-        const Cols cb = cols_of(b);
-        Cols expected;
-        for (int col = 0; col < 3; ++col)
+        const Rows ra = rows_of(a);
+        const Rows rb = rows_of(b);
+        Rows expected;
+        for (int row = 0; row < 3; ++row)
         {
-            for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
             {
-                expected.m[col][row] = ca.m[col][row] + (cb.m[col][row] - ca.m[col][row]) * 0.25;
+                expected.m[row][col] = ra.m[row][col] + (rb.m[row][col] - ra.m[row][col]) * 0.25;
             }
         }
-        ensure_columns("setLerp at a quarter", at_quarter, expected, 1e-6);
+        ensure_rows("setLerp at a quarter", at_quarter, expected, 1e-6);
 
         LLMatrix3a nearby = a;
-        LLVector4a nudged = nearby.getColumn(1);
+        LLVector4a nudged = nearby.getRow<1>();
         nudged.add(LLVector4a(0.f, 1e-6f, 0.f, 50.f));
-        nearby.setColumns(nearby.getColumn(0), nudged, nearby.getColumn(2));
+        nearby.setRows(nearby.getRow<0>(), nudged, nearby.getRow<2>());
         ensure("isApproximatelyEqual within tolerance, w ignored", nearby.isApproximatelyEqual(a));
         ensure("isApproximatelyEqual outside tolerance", !nearby.isApproximatelyEqual(a, 1e-7f));
     }

@@ -2077,12 +2077,12 @@ void LLGLSLShader::uniformMatrix4fv(U32 index, const LLMatrix4a& m)
 void LLGLSLShader::uniformMatrix3fv(U32 index, const LLMatrix3a& m)
 {
     F32 packed[9];
-    const F32* c0 = m.getColumn(0).getF32ptr();
-    const F32* c1 = m.getColumn(1).getF32ptr();
-    const F32* c2 = m.getColumn(2).getF32ptr();
-    packed[0] = c0[0]; packed[1] = c0[1]; packed[2] = c0[2];
-    packed[3] = c1[0]; packed[4] = c1[1]; packed[5] = c1[2];
-    packed[6] = c2[0]; packed[7] = c2[1]; packed[8] = c2[2];
+    const F32* r0 = m.getRow<0>().getF32ptr();
+    const F32* r1 = m.getRow<1>().getF32ptr();
+    const F32* r2 = m.getRow<2>().getF32ptr();
+    packed[0] = r0[0]; packed[1] = r0[1]; packed[2] = r0[2];
+    packed[3] = r1[0]; packed[4] = r1[1]; packed[5] = r1[2];
+    packed[6] = r2[0]; packed[7] = r2[1]; packed[8] = r2[2];
     uniformMatrix3fv(index, 1, GL_FALSE, packed);
 }
 

@@ -27,99 +27,114 @@
 #include "llmatrix3a.h"
 #include "m3math.h"
 
-inline LLMatrix3a::LLMatrix3a( const LLVector4a& c0, const LLVector4a& c1, const LLVector4a& c2 )
+inline LLMatrix3a::LLMatrix3a( const LLVector4a& r0, const LLVector4a& r1, const LLVector4a& r2 )
 {
-    setColumns( c0, c1, c2 );
+    setRows( r0, r1, r2 );
 }
 
 inline void LLMatrix3a::loadu(const LLMatrix3& src)
 {
-    mColumns[0].load3(src.mMatrix[0]);
-    mColumns[1].load3(src.mMatrix[1]);
-    mColumns[2].load3(src.mMatrix[2]);
+    mRows[0].load3(src.mMatrix[0]);
+    mRows[1].load3(src.mMatrix[1]);
+    mRows[2].load3(src.mMatrix[2]);
 }
 
 inline void LLMatrix3a::setRows(const LLVector4a& r0, const LLVector4a& r1, const LLVector4a& r2)
 {
-    mColumns[0] = r0;
-    mColumns[1] = r1;
-    mColumns[2] = r2;
-    setTranspose( *this );
+    mRows[0] = r0;
+    mRows[1] = r1;
+    mRows[2] = r2;
 }
 
 inline void LLMatrix3a::setColumns(const LLVector4a& c0, const LLVector4a& c1, const LLVector4a& c2)
 {
-    mColumns[0] = c0;
-    mColumns[1] = c1;
-    mColumns[2] = c2;
+    mRows[0] = c0;
+    mRows[1] = c1;
+    mRows[2] = c2;
+    setTranspose( *this );
 }
 
-// Gathers each row of src into a column. The fourth lanes come from the
-// third column, which is what the last shuffle of each row leaves there.
+// Gathers each column of src into a row. The fourth lanes come from the
+// third row, which is what the last shuffle of each row leaves there.
 inline void LLMatrix3a::setTranspose(const LLMatrix3a& src)
 {
-    const LLQuad c0 = src.mColumns[0];
-    const LLQuad c1 = src.mColumns[1];
-    const LLQuad c2 = src.mColumns[2];
-    const LLQuad xy = alsimd::unpacklo(c0, c1);   // c0.x c1.x c0.y c1.y
-    const LLQuad zw = alsimd::unpackhi(c0, c1);   // c0.z c1.z c0.w c1.w
-    mColumns[0] = alsimd::movelh(xy, c2);                 // c0.x c1.x c2.x c2.y
-    mColumns[1] = alsimd::shuffle2<2, 3, 1, 0>(xy, c2);   // c0.y c1.y c2.y c2.x
-    mColumns[2] = alsimd::shuffle2<0, 1, 2, 0>(zw, c2);   // c0.z c1.z c2.z c2.x
+    const LLQuad r0 = src.mRows[0];
+    const LLQuad r1 = src.mRows[1];
+    const LLQuad r2 = src.mRows[2];
+    const LLQuad xy = alsimd::unpacklo(r0, r1);   // r0.x r1.x r0.y r1.y
+    const LLQuad zw = alsimd::unpackhi(r0, r1);   // r0.z r1.z r0.w r1.w
+    mRows[0] = alsimd::movelh(xy, r2);                 // r0.x r1.x r2.x r2.y
+    mRows[1] = alsimd::shuffle2<2, 3, 1, 0>(xy, r2);   // r0.y r1.y r2.y r2.x
+    mRows[2] = alsimd::shuffle2<0, 1, 2, 0>(zw, r2);   // r0.z r1.z r2.z r2.x
 }
 
-inline const LLVector4a& LLMatrix3a::getColumn(const U32 column) const
+template<int N>
+inline const LLVector4a& LLMatrix3a::getRow() const
 {
-    llassert( column < 3 );
-    return mColumns[column];
+    static_assert(N >= 0 && N < 3, "LLMatrix3a has three rows");
+    return mRows[N];
 }
 
-// Each column of the product is the columns of lhs weighted by the lanes of
-// the matching column of rhs.
-inline void LLMatrix3a::setMul( const LLMatrix3a& lhs, const LLMatrix3a& rhs )
+inline const LLVector4a& LLMatrix3a::getRow(const U32 row) const
 {
-    const LLQuad col0 = lhs.mColumns[0];
-    const LLQuad col1 = lhs.mColumns[1];
-    const LLQuad col2 = lhs.mColumns[2];
+    llassert( row < 3 );
+    return mRows[row];
+}
+
+// The rows weighted by the lanes of v
+inline void LLMatrix3a::rotate(const LLVector4a& v, LLVector4a& res) const
+{
+    const LLQuad q = v;
+    LLQuad r = alsimd::mul(alsimd::splat<0>(q), mRows[0]);
+    r = alsimd::fmadd_lane<1>(mRows[1], q, r);
+    res = alsimd::fmadd_lane<2>(mRows[2], q, r);
+}
+
+// Each row of the product is that row of a rotated by b.
+inline void LLMatrix3a::setMul( const LLMatrix3a& a, const LLMatrix3a& b )
+{
+    const LLQuad b0 = b.mRows[0];
+    const LLQuad b1 = b.mRows[1];
+    const LLQuad b2 = b.mRows[2];
 
     for ( int i = 0; i < 3; i++ )
     {
-        const LLQuad v = rhs.mColumns[i];
-        LLQuad result = alsimd::mul(alsimd::splat<0>(v), col0);
-        result = alsimd::fmadd_lane<1>(col1, v, result);
-        mColumns[i] = alsimd::fmadd_lane<2>(col2, v, result);
+        const LLQuad v = a.mRows[i];
+        LLQuad result = alsimd::mul(alsimd::splat<0>(v), b0);
+        result = alsimd::fmadd_lane<1>(b1, v, result);
+        mRows[i] = alsimd::fmadd_lane<2>(b2, v, result);
     }
 }
 
 inline void LLMatrix3a::setLerp(const LLMatrix3a& a, const LLMatrix3a& b, F32 w)
 {
-    mColumns[0].setLerp( a.mColumns[0], b.mColumns[0], w );
-    mColumns[1].setLerp( a.mColumns[1], b.mColumns[1], w );
-    mColumns[2].setLerp( a.mColumns[2], b.mColumns[2], w );
+    mRows[0].setLerp( a.mRows[0], b.mRows[0], w );
+    mRows[1].setLerp( a.mRows[1], b.mRows[1], w );
+    mRows[2].setLerp( a.mRows[2], b.mRows[2], w );
 }
 
 inline bool LLMatrix3a::isFinite() const
 {
-    return mColumns[0].isFinite3() && mColumns[1].isFinite3() && mColumns[2].isFinite3();
+    return mRows[0].isFinite3() && mRows[1].isFinite3() && mRows[2].isFinite3();
 }
 
 inline void LLMatrix3a::getDeterminant( LLVector4a& dest ) const
 {
-    LLVector4a col1xcol2; col1xcol2.setCross3( mColumns[1], mColumns[2] );
-    dest.setAllDot3( col1xcol2, mColumns[0] );
+    LLVector4a row1xrow2; row1xrow2.setCross3( mRows[1], mRows[2] );
+    dest.setAllDot3( row1xrow2, mRows[0] );
 }
 
 inline LLSimdScalar LLMatrix3a::getDeterminant() const
 {
-    LLVector4a col1xcol2; col1xcol2.setCross3( mColumns[1], mColumns[2] );
-    return col1xcol2.dot3( mColumns[0] );
+    LLVector4a row1xrow2; row1xrow2.setCross3( mRows[1], mRows[2] );
+    return row1xrow2.dot3( mRows[0] );
 }
 
 inline bool LLMatrix3a::isApproximatelyEqual( const LLMatrix3a& rhs, F32 tolerance /*= F_APPROXIMATELY_ZERO*/ ) const
 {
-    return rhs.getColumn(0).equals3(mColumns[0], tolerance)
-        && rhs.getColumn(1).equals3(mColumns[1], tolerance)
-        && rhs.getColumn(2).equals3(mColumns[2], tolerance);
+    return rhs.mRows[0].equals3(mRows[0], tolerance)
+        && rhs.mRows[1].equals3(mRows[1], tolerance)
+        && rhs.mRows[2].equals3(mRows[2], tolerance);
 }
 
 inline const LLMatrix3a& LLMatrix3a::getIdentity()
@@ -136,4 +151,9 @@ inline bool LLRotation::isOkRotation() const
     LLSimdScalar detMinusOne = getDeterminant() - 1.f;
 
     return product.isApproximatelyEqual( LLMatrix3a::getIdentity() ) && (detMinusOne.getAbs() < F_APPROXIMATELY_ZERO);
+}
+
+inline void LLVector4a::setRotated( const LLRotation& rot, const LLVector4a& vec )
+{
+    rot.rotate( vec, *this );
 }
