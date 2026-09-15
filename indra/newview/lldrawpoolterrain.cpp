@@ -208,6 +208,7 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     const F32 density = LLPipeline::sDynamicLOD ? TESS_DENSITY * sLODFactor : 0.f;
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
+    shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());
 }
 

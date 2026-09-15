@@ -709,6 +709,11 @@ F32 LLSurface::resolveHeightRegion(const F32 x, const F32 y) const
         y >= 0.f  &&
         y <= mMetersPerEdge)
     {
+        if (isSmoothing())
+        {
+            return smoothHeight(x, y, nullptr, nullptr);
+        }
+
         const S32 left   = llfloor(x * oometerspergrid);
         const S32 bottom = llfloor(y * oometerspergrid);
 
@@ -788,6 +793,16 @@ LLVector3 LLSurface::resolveNormalGlobal(const LLVector3d& pos_global) const
         pos_global.mdV[VY] >= mOriginGlobal.mdV[VY]  &&
         pos_global.mdV[VY] < mOriginGlobal.mdV[VY] + mMetersPerEdge)
     {
+        if (isSmoothing())
+        {
+            F32 dzdx, dzdy;
+            smoothHeight((F32)(pos_global.mdV[VX] - mOriginGlobal.mdV[VX]),
+                       (F32)(pos_global.mdV[VY] - mOriginGlobal.mdV[VY]), &dzdx, &dzdy);
+            normal.setVec(-dzdx, -dzdy, 1.f);
+            normal.normVec();
+            return normal;
+        }
+
         U32 i, j, k;
         F32 dx, dy;
         i = (U32) ((pos_global.mdV[VX] - mOriginGlobal.mdV[VX]) * oometerspergrid);
@@ -1088,6 +1103,45 @@ void LLSurface::dirtySurfacePatch(LLSurfacePatch *patchp)
 {
     // Put surface patch on dirty surface patch list
     mDirtyPatchList.insert(patchp);
+}
+
+F32 LLSurface::sampleZ(S32 gx, S32 gy) const
+{
+    bool has_neighbor[8];
+    for (U32 dir = 0; dir < 8; ++dir)
+    {
+        has_neighbor[dir] = mNeighbors[dir] != nullptr;
+    }
+    return sampleZ(gx, gy, has_neighbor);
+}
+
+F32 LLSurface::sampleZ(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const
+{
+    const U32 dir = ALTerrainSurfaceMaps::resolve(gx, gy, mGridsPerEdge, has_neighbor);
+    const LLSurface* owner = dir == MIDDLE ? this : mNeighbors[dir];
+    return owner->getZ(gx, gy);
+}
+
+// static
+bool LLSurface::isSmoothing()
+{
+    static LLCachedControl<bool> smoothing(gSavedSettings, "AlchemyRenderTerrainSmoothing", false);
+    return smoothing;
+}
+
+F32 LLSurface::smoothHeight(F32 x, F32 y, F32* dzdx, F32* dzdy) const
+{
+    bool has_neighbor[8];
+    for (U32 dir = 0; dir < 8; ++dir)
+    {
+        has_neighbor[dir] = mNeighbors[dir] != nullptr;
+    }
+    const F32 oometerspergrid = 1.f / mMetersPerGrid;
+    const F32 h = ALTerrainSurfaceMaps::smoothHeight(x * oometerspergrid, y * oometerspergrid,
+        [&](S32 gx, S32 gy) { return sampleZ(gx, gy, has_neighbor); }, dzdx, dzdy);
+    if (dzdx) *dzdx *= oometerspergrid;
+    if (dzdy) *dzdy *= oometerspergrid;
+    return h;
 }
 
 void LLSurface::dirtySurfaceMaps()

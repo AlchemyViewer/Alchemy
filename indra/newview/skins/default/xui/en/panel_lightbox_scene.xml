@@ -1631,14 +1631,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="246"
+		 height="271"
 		 name="atab_sec_perf_adv"
 		 title="Performance - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="217"
+			 height="242"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1790,6 +1790,17 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderTerrainLODFactor" />
 				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="9"
+				 width="300"
+				 label="Smooth terrain"
+				 tool_tip="Draw the terrain as a smooth surface through its height samples. The simulator still collides with the flat one, so feet and objects can sit a few centimetres off on rough ground."
+				 name="perf_terrain_smoothing"
+				 control_name="AlchemyRenderTerrainSmoothing" />
 				<slider
 				 follows="left|top|right"
 				 layout="topleft"

@@ -30,6 +30,7 @@
 
 #include "../alterrainsurfacemaps.h"
 
+#include <cmath>
 #include <vector>
 
 namespace tut
@@ -181,5 +182,100 @@ namespace tut
         ensure_equals("no neighbours: this surface", ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has), MIDDLE);
         ensure_equals("gx clamped to the buffer column", gx, GPE - 1);
         ensure_equals("gy clamped to 0", gy, 0);
+    }
+
+    // The smooth surface passes through every sample: at an integer grid point the
+    // value is the sample, whatever the neighbours do.
+    template<> template<>
+    void alterrainsurfacemaps_object::test<7>()
+    {
+        auto field = [](S32 gx, S32 gy) { return (F32)(gx * gx - 3 * gy + (gx * gy) % 5); };
+        for (S32 gy = 0; gy < 6; ++gy)
+        {
+            for (S32 gx = 0; gx < 6; ++gx)
+            {
+                const F32 h = ALTerrainSurfaceMaps::smoothHeight((F32)gx, (F32)gy, field, nullptr, nullptr);
+                ensure_equals("value at a sample is the sample", h, field(gx, gy));
+            }
+        }
+    }
+
+    // A step never grows a lip. A cliff -- level, then a thirty-metre drop in
+    // one cell -- keeps the level ground level right up to the edge and the
+    // drop inside the cell's range; a Catmull-Rom would put metres of bump
+    // above the crease. And a monotone run stays monotone, so a ramp is a
+    // ramp with no ripple ahead of or behind the step.
+    template<> template<>
+    void alterrainsurfacemaps_object::test<8>()
+    {
+        auto cliff = [](S32 gx, S32) { return gx <= 2 ? 30.f : 0.f; };
+        for (F32 x = 0.f; x < 2.f; x += 0.125f)
+        {
+            F32 dzdx = 1.f, dzdy = 1.f;
+            ensure_approximately_equals("level up to the edge", ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, &dzdx, &dzdy), 30.f, 12);
+            // The tangent at the crease sample is zeroed, not averaged with the drop: the
+            // level run has no slope at all, so it does not lean toward the edge.
+            ensure_approximately_equals("no slope on the level run", dzdx, 0.f, 12);
+        }
+        F32 previous = 30.f;
+        for (F32 x = 2.f; x <= 3.f; x += 0.0625f)
+        {
+            const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr);
+            ensure("inside the cell's range", h <= 30.f && h >= 0.f);
+            ensure("monotone down the face", h <= previous);
+            previous = h;
+        }
+        ensure_approximately_equals("mid-cell is the midpoint of the step", ALTerrainSurfaceMaps::smoothHeight(2.5f, 3.f, cliff, nullptr, nullptr), 15.f, 12);
+        for (F32 x = 3.f; x < 5.f; x += 0.125f)
+        {
+            ensure_approximately_equals("level past the foot", ALTerrainSurfaceMaps::smoothHeight(x, 3.f, cliff, nullptr, nullptr), 0.f, 12);
+        }
+
+        // Off the axis too: a corner of the plateau, evaluated across the
+        // cell that holds it, stays between its four corner heights.
+        auto corner = [](S32 gx, S32 gy) { return (gx <= 2 && gy <= 2) ? 30.f : 0.f; };
+        for (F32 y = 2.f; y <= 3.f; y += 0.25f)
+        {
+            for (F32 x = 2.f; x <= 3.f; x += 0.25f)
+            {
+                const F32 h = ALTerrainSurfaceMaps::smoothHeight(x, y, corner, nullptr, nullptr);
+                ensure("plateau corner within its cell's range", h >= 0.f && h <= 30.f);
+            }
+        }
+    }
+
+    // A field symmetric in x and y gives a surface symmetric in x and y.
+    template<> template<>
+    void alterrainsurfacemaps_object::test<9>()
+    {
+        auto field = [](S32 gx, S32 gy) { return (F32)(gx * gx + gy * gy) * 0.1f + (F32)((gx + gy) % 3); };
+        for (F32 v = 0.f; v < 4.f; v += 0.37f)
+        {
+            const F32 a = ALTerrainSurfaceMaps::smoothHeight(1.2f, v, field, nullptr, nullptr);
+            const F32 b = ALTerrainSurfaceMaps::smoothHeight(v, 1.2f, field, nullptr, nullptr);
+            ensure_approximately_equals("h(x, y) == h(y, x)", a, b, 5);
+        }
+    }
+
+    // The analytic gradient is the derivative of the value.
+    template<> template<>
+    void alterrainsurfacemaps_object::test<10>()
+    {
+        auto field = [](S32 gx, S32 gy) { return sinf(0.7f * gx) * 2.f + cosf(0.4f * gy) + 0.1f * gx * gy; };
+        const F32 eps = 1e-2f;
+        for (F32 y = 0.3f; y < 4.f; y += 1.1f)
+        {
+            for (F32 x = 0.6f; x < 4.f; x += 0.9f)
+            {
+                F32 dzdx, dzdy;
+                ALTerrainSurfaceMaps::smoothHeight(x, y, field, &dzdx, &dzdy);
+                const F32 fdx = (ALTerrainSurfaceMaps::smoothHeight(x + eps, y, field, nullptr, nullptr)
+                               - ALTerrainSurfaceMaps::smoothHeight(x - eps, y, field, nullptr, nullptr)) / (2.f * eps);
+                const F32 fdy = (ALTerrainSurfaceMaps::smoothHeight(x, y + eps, field, nullptr, nullptr)
+                               - ALTerrainSurfaceMaps::smoothHeight(x, y - eps, field, nullptr, nullptr)) / (2.f * eps);
+                ensure_approximately_equals("dz/dx", dzdx, fdx, 8);
+                ensure_approximately_equals("dz/dy", dzdy, fdy, 8);
+            }
+        }
     }
 }

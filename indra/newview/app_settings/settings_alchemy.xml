@@ -1327,6 +1327,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderTerrainSmoothing</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the terrain as a smooth surface through its height samples instead of the flat-triangle surface the simulator collides against. The smooth surface stays within each metre cell's corner heights, so it differs from the collision surface by less than one cell's rise. Picks, foot planting and parcel lines follow the drawn surface; the simulator does not.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>

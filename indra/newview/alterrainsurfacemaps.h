@@ -29,6 +29,7 @@
 #include "lldefs.h"
 #include "llpointer.h"
 
+#include <cmath>
 #include <functional>
 #include <vector>
 
@@ -77,11 +78,77 @@ public:
     // the order LLSurfacePatch::calcNormal walks patches in.
     static U32 resolve(S32& gx, S32& gy, S32 grids_per_edge, const bool (&has_neighbor)[8]);
 
+    // The tangent at the middle sample of three, limited so the cubic between
+    // it and either neighbour stays monotone (Fritsch-Carlson).
+    static F32 limitedSlope(F32 left, F32 mid, F32 right);
+
+    // Cubic Hermite basis at t -- value weights of the two ends, tangent
+    // weights -- and its derivative.
+    static void hermite(F32 t, F32 (&h)[4], F32 (&d)[4]);
+
+    // The monotone bicubic through the grid samples around (x, y), in grid
+    // units, and its gradient per grid: a Hermite patch per cell from the
+    // corner values and their limited x and y tangents, held to the corners'
+    // range. sample(gx, gy) supplies the heights and owns the reach past the
+    // region. The GPU's twin, terrain_height_smooth in terrainSurface.glsl,
+    // is this arithmetic in this order.
+    template <class Sample>
+    static F32 smoothHeight(F32 x, F32 y, const Sample& sample, F32* dzdx, F32* dzdy)
+    {
+        const S32 ix = (S32)floorf(x);
+        const S32 iy = (S32)floorf(y);
+        const F32 u = x - (F32)ix;
+        const F32 v = y - (F32)iy;
+
+        F32 r0[4], r1[4];
+        for (S32 k = 0; k < 4; ++k)
+        {
+            r0[k] = sample(ix + k - 1, iy);
+            r1[k] = sample(ix + k - 1, iy + 1);
+        }
+        const F32 c0m = sample(ix,     iy - 1);
+        const F32 c0p = sample(ix,     iy + 2);
+        const F32 c1m = sample(ix + 1, iy - 1);
+        const F32 c1p = sample(ix + 1, iy + 2);
+
+        const F32 f00 = r0[1], f10 = r0[2], f01 = r1[1], f11 = r1[2];
+        const F32 fx00 = limitedSlope(r0[0], f00, f10);
+        const F32 fx10 = limitedSlope(f00, f10, r0[3]);
+        const F32 fx01 = limitedSlope(r1[0], f01, f11);
+        const F32 fx11 = limitedSlope(f01, f11, r1[3]);
+        const F32 fy00 = limitedSlope(c0m, f00, f01);
+        const F32 fy01 = limitedSlope(f00, f01, c0p);
+        const F32 fy10 = limitedSlope(c1m, f10, f11);
+        const F32 fy11 = limitedSlope(f10, f11, c1p);
+
+        F32 hu[4], du[4], hv[4], dv[4];
+        hermite(u, hu, du);
+        hermite(v, hv, dv);
+
+        const F32 h   = hu[0] * (hv[0] * f00 + hv[1] * f01) + hu[1] * (hv[0] * f10 + hv[1] * f11)
+                      + hu[2] * (hv[0] * fx00 + hv[1] * fx01) + hu[3] * (hv[0] * fx10 + hv[1] * fx11)
+                      + hu[0] * (hv[2] * fy00 + hv[3] * fy01) + hu[1] * (hv[2] * fy10 + hv[3] * fy11);
+        if (dzdx)
+        {
+            *dzdx = du[0] * (hv[0] * f00 + hv[1] * f01) + du[1] * (hv[0] * f10 + hv[1] * f11)
+                  + du[2] * (hv[0] * fx00 + hv[1] * fx01) + du[3] * (hv[0] * fx10 + hv[1] * fx11)
+                  + du[0] * (hv[2] * fy00 + hv[3] * fy01) + du[1] * (hv[2] * fy10 + hv[3] * fy11);
+        }
+        if (dzdy)
+        {
+            *dzdy = hu[0] * (dv[0] * f00 + dv[1] * f01) + hu[1] * (dv[0] * f10 + dv[1] * f11)
+                  + hu[2] * (dv[0] * fx00 + dv[1] * fx01) + hu[3] * (dv[0] * fx10 + dv[1] * fx11)
+                  + hu[0] * (dv[2] * fy00 + dv[3] * fy01) + hu[1] * (dv[2] * fy10 + dv[3] * fy11);
+        }
+        const F32 lo = llmin(llmin(f00, f10), llmin(f01, f11));
+        const F32 hi = llmax(llmax(f00, f10), llmax(f01, f11));
+        return llclamp(h, lo, hi);
+    }
+
 private:
     static U32 direction(S32 dx, S32 dy);
 
     void refresh();
-    F32  heightAt(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const;
     F32  compositionAt(S32 gx, S32 gy) const;
     F32  noiseAt(S32 gx, S32 gy) const;
     void upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data);
@@ -120,6 +187,33 @@ inline U32 ALTerrainSurfaceMaps::direction(S32 dx, S32 dy)
         }
     }
     return MIDDLE;
+}
+
+inline F32 ALTerrainSurfaceMaps::limitedSlope(F32 left, F32 mid, F32 right)
+{
+    const F32 dl = mid - left;
+    const F32 dr = right - mid;
+    if (dl * dr <= 0.f)
+    {
+        return 0.f;
+    }
+    const F32 m = 0.5f * (dl + dr);
+    const F32 bound = 3.f * llmin(fabsf(dl), fabsf(dr));
+    return llclamp(m, -bound, bound);
+}
+
+inline void ALTerrainSurfaceMaps::hermite(F32 t, F32 (&h)[4], F32 (&d)[4])
+{
+    const F32 t2 = t * t;
+    const F32 t3 = t2 * t;
+    h[0] =  2.f * t3 - 3.f * t2 + 1.f;
+    h[1] = -2.f * t3 + 3.f * t2;
+    h[2] =        t3 - 2.f * t2 + t;
+    h[3] =        t3 -       t2;
+    d[0] =  6.f * t2 - 6.f * t;
+    d[1] = -6.f * t2 + 6.f * t;
+    d[2] =  3.f * t2 - 4.f * t + 1.f;
+    d[3] =  3.f * t2 - 2.f * t;
 }
 
 inline U32 ALTerrainSurfaceMaps::resolve(S32& gx, S32& gy, S32 grids_per_edge, const bool (&has_neighbor)[8])

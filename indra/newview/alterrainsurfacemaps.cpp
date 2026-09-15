@@ -78,7 +78,7 @@ void ALTerrainSurfaceMaps::refresh()
     }
     fill(mHeightStaging, grids_per_edge, 1, [&](S32 gx, S32 gy, F32* texel)
     {
-        texel[0] = heightAt(gx, gy, has_neighbor);
+        texel[0] = mSurface.sampleZ(gx, gy, has_neighbor);
     });
 
     // The noise is a function of world position alone, so it is computed once
@@ -96,13 +96,6 @@ void ALTerrainSurfaceMaps::refresh()
 
     upload(mHeight, GL_R32F, GL_RED, 1, mHeightStaging);
     upload(mComposition, GL_RG16F, GL_RG, 2, mCompositionStaging);
-}
-
-F32 ALTerrainSurfaceMaps::heightAt(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const
-{
-    const U32 dir = resolve(gx, gy, mSurface.getGridsPerEdge(), has_neighbor);
-    const LLSurface& owner = dir == MIDDLE ? mSurface : *mSurface.mNeighbors[dir];
-    return owner.getZ(gx, gy);
 }
 
 F32 ALTerrainSurfaceMaps::compositionAt(S32 gx, S32 gy) const

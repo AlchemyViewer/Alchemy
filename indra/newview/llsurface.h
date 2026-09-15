@@ -83,6 +83,23 @@ public:
     inline F32 getZ(const U32 k) const              { return mSurfaceZ[k]; }
     inline F32 getZ(const S32 i, const S32 j) const { return mSurfaceZ[i + j*mGridsPerEdge]; }
 
+    // A grid sample, reaching into the neighbouring surfaces past this one's
+    // edge the way the surface maps' apron does, and repeating the nearest own
+    // sample where there is no neighbour. The overload takes the neighbour
+    // presence precomputed, for a caller sampling many times.
+    F32 sampleZ(S32 gx, S32 gy) const;
+    F32 sampleZ(S32 gx, S32 gy, const bool (&has_neighbor)[8]) const;
+
+    // Whether the terrain is drawn, and answers height queries, as the smooth
+    // surface through its samples rather than the two-triangle surface the
+    // simulator collides against: AlchemyRenderTerrainSmoothing.
+    static bool isSmoothing();
+
+    // The smooth surface at (x, y) in region metres, with its gradient per
+    // metre. The GPU's twin is terrain_height_smooth in terrainSurface.glsl;
+    // the two must agree.
+    F32 smoothHeight(F32 x, F32 y, F32* dzdx, F32* dzdy) const;
+
     LLVector3 getOriginAgent() const;
     const LLVector3d &getOriginGlobal() const;
     F32 getMetersPerGrid() const;

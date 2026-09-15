@@ -289,6 +289,7 @@ public:
         TERRAIN_TESS_ORIGIN,                //  "terrain_tess_origin"
         TERRAIN_TESS_DENSITY,               //  "terrain_tess_density"
         TERRAIN_GRID_SCALE,                 //  "terrain_grid_scale"
+        TERRAIN_SMOOTHING,                  //  "terrain_smoothing"
         TERRAIN_PARCEL_OVERLAY,             //  "parcel_overlay"
         TERRAIN_SHOW_PARCEL_OWNERS,         //  "show_parcel_owners"
 
