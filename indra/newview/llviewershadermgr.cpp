@@ -901,6 +901,10 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
         const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", detail);
+        if (gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling"))
+        {
+            attribs["TERRAIN_HEX_TILING"] = "1";
+        }
     }
 
     LLGLSLShader::sGlobalDefines = attribs;
@@ -1796,14 +1800,18 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // shared, so pbrterrainF derives it from position derivatives instead. See
         // terrain_geometric_normal().
         const bool flat_normals = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
+        // Read by pbrterrainUtilF, a shared object, so the define that matters is the global one
+        // set above; the program's copy keeps its name and hash honest.
+        const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s",
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s%s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
                     (mapping == 1 ? "flat" : "triplanar"),
-                    (flat_normals ? "faceted" : "smooth"));
+                    (flat_normals ? "faceted" : "smooth"),
+                    (hex_tiling ? " hex" : ""));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -1822,6 +1830,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             if (flat_normals)
             {
                 shader->addPermutation("TERRAIN_FLAT_NORMALS", "1");
+            }
+            if (hex_tiling)
+            {
+                shader->addPermutation("TERRAIN_HEX_TILING", "1");
             }
 
             add_common_permutations(shader);
@@ -3002,7 +3014,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = gDeferredDoFCombineProgram.createShader();
         llassert(success);
     }
-    
+
     if (success)
     {
         gDeferredDoFCombineProgramNoNear.mName = "Deferred DoFCombine Shader No Near Blur";

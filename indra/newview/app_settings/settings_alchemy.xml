@@ -1316,6 +1316,17 @@
             <key>Value</key>
             <real>200.0</real>
         </map>
+        <key>AlchemyRenderTerrainHexTiling</key>
+        <map>
+            <key>Comment</key>
+            <string>Hex-tile PBR terrain textures: each cell of a hexagonal lattice shows the texture at its own offset and rotation, hiding the repeat. Up to three fetches per texture per projection. Change triggers a shader rebuild.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
