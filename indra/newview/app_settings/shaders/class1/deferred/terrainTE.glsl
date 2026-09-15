@@ -31,8 +31,8 @@ layout(quads, fractional_odd_spacing, ccw) in;
 
 out vec3 pos;
 out vec3 vary_normal;
-out vec4 vary_texcoord0;
-out vec4 vary_texcoord1;
+out vec2 vary_texcoord0;
+out vec2 vary_composition; // composition value, alpha-ramp noise
 out vec2 vary_region_uv;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 out vec4 vary_texcoord_side; // The yz projection's uv, then the xz projection's
@@ -77,7 +77,7 @@ void main()
     vary_normal = normalize(normal_matrix * normal);
 
     // Transform and pass tex coords
-    vary_texcoord0.xy = texgen_object(pre_pos, texture_matrix0, object_plane_s, object_plane_t);
+    vary_texcoord0 = texgen_object(pre_pos, texture_matrix0, object_plane_s, object_plane_t);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     // The side projections tile at the plane's scale and keep the origin phase of the axis
     // they share with it, so they meet across region borders as the top one does. Height
@@ -88,11 +88,6 @@ void main()
     vary_texcoord_side.zw = vec2(position.x * scale + phase.x, position.z * scale);
 #endif
 
-    vec2 t = terrain_composition(xy);
-
-    vary_texcoord0.zw = t.xy;
-    vary_texcoord1.xy = t.xy-vec2(2.0, 0.0);
-    vary_texcoord1.zw = t.xy-vec2(1.0, 0.0);
-
+    vary_composition = terrain_composition(xy);
     vary_region_uv = xy / region_scale;
 }

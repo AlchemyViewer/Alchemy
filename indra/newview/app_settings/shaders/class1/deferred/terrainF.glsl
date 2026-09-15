@@ -38,8 +38,8 @@ uniform float region_scale;
 
 in vec3 pos;
 in vec3 vary_normal;
-in vec4 vary_texcoord0;
-in vec4 vary_texcoord1;
+in vec2 vary_texcoord0;
+in vec2 vary_composition;
 in vec2 vary_region_uv;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 in vec4 vary_texcoord_side;
@@ -65,7 +65,7 @@ struct TerrainMix
     vec4 weight;
     int type;
 };
-TerrainMix get_terrain_mix_weights(float alpha1, float alpha2, float alphaFinal);
+TerrainMix terrain_ramp_mix(sampler2D ramp, vec2 composition);
 
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 struct TerrainTriplanar
@@ -163,12 +163,9 @@ void main()
 
     mirrorClip(pos);
 
-    float alpha1 = texture(alpha_ramp, vary_texcoord0.zw).a;
-    float alpha2 = texture(alpha_ramp,vary_texcoord1.xy).a;
-    float alphaFinal = texture(alpha_ramp, vary_texcoord1.zw).a;
-    // The ramps' four-way mix, as weights, with the ones under the threshold dropped and the
+    // The ramp's four-way mix, as weights, with the ones under the threshold dropped and the
     // rest renormalised, so a texture that would barely show is not fetched at all.
-    TerrainMix tm = get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
+    TerrainMix tm = terrain_ramp_mix(alpha_ramp, vary_composition);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     // By the surface's normal under the fragment, in region space where the projection planes
     // are the axes; see terrain_facet.

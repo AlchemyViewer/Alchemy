@@ -46,8 +46,7 @@ out vec3 vary_normal;
 out vec3 vary_region_position;
 
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-out vec4 vary_texcoord0;
-out vec4 vary_texcoord1;
+out vec2 vary_composition; // composition value, alpha-ramp noise
 #endif
 
 void main()
@@ -64,9 +63,6 @@ void main()
     vary_region_position = position;
 
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-    vec2 tc = terrain_composition(xy);
-    vary_texcoord0.zw = tc.xy;
-    vary_texcoord1.xy = tc.xy-vec2(2.0, 0.0);
-    vary_texcoord1.zw = tc.xy-vec2(1.0, 0.0);
+    vary_composition = terrain_composition(xy);
 #endif
 }

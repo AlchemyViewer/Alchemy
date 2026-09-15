@@ -51,7 +51,7 @@ struct TerrainMix
     int type;
 };
 
-TerrainMix get_terrain_mix_weights(float alpha1, float alpha2, float alphaFinal);
+TerrainMix terrain_ramp_mix(sampler2D ramp, vec2 composition);
 TerrainMix get_terrain_usage_from_weight3(vec3 weight3);
 
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
@@ -179,10 +179,8 @@ in vec3 vary_position;
 in vec3 vary_normal;
 in vec3 vary_region_position;
 
-// The composition's alpha-ramp coordinates
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-in vec4 vary_texcoord0;
-in vec4 vary_texcoord1;
+in vec2 vary_composition; // composition value, alpha-ramp noise
 #endif
 
 void mirrorClip(vec3 position);
@@ -257,11 +255,7 @@ void main()
 
     TerrainMix tm;
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
-    float alpha1 = texture(alpha_ramp, vary_texcoord0.zw).a;
-    float alpha2 = texture(alpha_ramp,vary_texcoord1.xy).a;
-    float alphaFinal = texture(alpha_ramp, vary_texcoord1.zw).a;
-
-    tm = get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
+    tm = terrain_ramp_mix(alpha_ramp, vary_composition);
 #elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
     tm = get_terrain_usage_from_weight3(texture(paint_map, region_uv).xyz);
 #endif

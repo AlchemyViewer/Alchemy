@@ -430,6 +430,18 @@ TerrainMix get_terrain_mix_weights(float alpha1, float alpha2, float alphaFinal)
     return tm;
 }
 
+// The four-way mix from the alpha ramp at a fragment's composition: the ramp
+// sampled at the composition, and at one and two below it, are the three
+// blend alphas. The composition value and its noise arrive as one vec2; the
+// offsets are constants, so the evaluation stage need not carry them.
+TerrainMix terrain_ramp_mix(sampler2D ramp, vec2 composition)
+{
+    float alpha1 = texture(ramp, composition).a;
+    float alpha2 = texture(ramp, composition - vec2(2.0, 0.0)).a;
+    float alphaFinal = texture(ramp, composition - vec2(1.0, 0.0)).a;
+    return get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
+}
+
 // A paintmap weight applier for 4 swatches. The input saves a channel by not
 // storing swatch 1, and assuming the weights of the 4 swatches add to 1.
 // The components of weight3 should be between 0 and 1
