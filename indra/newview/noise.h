@@ -29,6 +29,26 @@
 
 #include "llmath.h"
 
+// The generator the noise tables are filled from: MSVC's rand() after srand(seed), which is
+//     state = state * 214013 + 2531011;  value = (state >> 16) & 0x7fff
+// on 32 bits of state. The tables were only ever filled from that, and the terrain textured
+// from them is what every region has looked like since. glibc and Apple's libc implement
+// rand() differently, so the same seed gave each of those platforms tables, and terrain, of
+// its own. This is the one generator, so every platform builds the one set of tables -- and
+// the CRT's state, and whoever else draws from it, are left alone.
+struct ALNoiseRand
+{
+    U32 mState;
+
+    explicit ALNoiseRand(U32 seed) : mState(seed) {}
+
+    S32 next()
+    {
+        mState = mState * 214013u + 2531011u;
+        return (S32)((mState >> 16) & 0x7fff);
+    }
+};
+
 F32 turbulence2(F32 *v, F32 freq);
 F32 turbulence3(float *v, float freq);
 F32 clouds3(float *v, float freq);
@@ -310,27 +330,28 @@ static void normalize3(F32 v[3])
 
 static void init(void)
 {
-    // we want repeatable noise (e.g. for stable terrain texturing), so seed with known value
-    srand(42);
+    // Repeatable noise, for terrain that looks the same on every visit and on every platform:
+    // a fixed seed into the one generator. See ALNoiseRand.
+    ALNoiseRand rand(42);
     int i, j, k;
 
     for (i = 0 ; i < B ; i++) {
         p[i] = i;
 
-        g1[i] = (F32)((rand() % (B + B)) - B) / B;
+        g1[i] = (F32)((rand.next() % (B + B)) - B) / B;
 
         for (j = 0 ; j < 2 ; j++)
-            g2[i][j] = (F32)((rand() % (B + B)) - B) / B;
+            g2[i][j] = (F32)((rand.next() % (B + B)) - B) / B;
         normalize2(g2[i]);
 
         for (j = 0 ; j < 3 ; j++)
-            g3[i][j] = (F32)((rand() % (B + B)) - B) / B;
+            g3[i][j] = (F32)((rand.next() % (B + B)) - B) / B;
         normalize3(g3[i]);
     }
 
     while (--i) {
         k = p[i];
-        p[i] = p[j = rand() % B];
+        p[i] = p[j = rand.next() % B];
         p[j] = k;
     }
 
@@ -342,9 +363,6 @@ static void init(void)
         for (j = 0 ; j < 3 ; j++)
             g3[B + i][j] = g3[i][j];
     }
-
-    // reintroduce entropy
-    srand((unsigned int)time(NULL));      // Flawfinder: ignore
 }
 
 #undef B
