@@ -31,7 +31,6 @@
 #include "alterrainsurfacemaps.h"
 #include "llfasttimer.h"
 
-#include "llagent.h"
 #include "llviewercontrol.h"
 #include "lldrawable.h"
 #include "llface.h"
@@ -382,7 +381,11 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
 //  LLViewerTexture *detail_texture2p = compp->mDetailTextures[2];
 //  LLViewerTexture *detail_texture3p = compp->mDetailTextures[3];
 
-    LLVector3d region_origin_global = gAgent.getRegion()->getOriginGlobal();
+    // The detail tiling is planar in world space; the vertices are region-local,
+    // so the phase of this region's origin within a tile is added back. It has
+    // to be this pool's region: a 256 m region is not a whole number of 12 m
+    // tiles, so the agent's region's phase seams every neighbour.
+    LLVector3d region_origin_global = regionp->getOriginGlobal();
     F32 offset_x = (F32)fmod(region_origin_global.mdV[VX], 1.0/(F64)sDetailScale)*sDetailScale;
     F32 offset_y = (F32)fmod(region_origin_global.mdV[VY], 1.0/(F64)sDetailScale)*sDetailScale;
 
