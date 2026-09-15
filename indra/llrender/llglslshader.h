@@ -346,6 +346,12 @@ public:
     void uniformMatrix3fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix3x4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
+
+    // The native matrices, as they lie: LLMatrix4a's rows are the columns
+    // the shader reads, and LLMatrix3a's three columns are packed to nine.
+    void uniformMatrix4fv(U32 index, const LLMatrix4a& m);
+    void uniformMatrix3fv(U32 index, const LLMatrix3a& m);
+
     void uniform1i(const LLStaticHashedString& uniform, GLint i);
 
     void setMinimumAlpha(F32 minimum);

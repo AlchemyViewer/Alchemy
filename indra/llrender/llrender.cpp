@@ -805,6 +805,11 @@ void LLRender::loadMatrix(const GLfloat* m)
     }
 }
 
+void LLRender::loadMatrix(const LLMatrix4a& m)
+{
+    loadMatrix(m.getF32ptr());
+}
+
 void LLRender::multMatrix(const GLfloat* m)
 {
     flush();
@@ -812,6 +817,11 @@ void LLRender::multMatrix(const GLfloat* m)
         mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::make_mat4(m);
         mMatHash[mMatrixMode]++;
     }
+}
+
+void LLRender::multMatrix(const LLMatrix4a& m)
+{
+    multMatrix(m.getF32ptr());
 }
 
 void LLRender::matrixMode(eMatrixMode mode)

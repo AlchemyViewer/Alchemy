@@ -237,8 +237,10 @@ public:
     void pushMatrix();
     void popMatrix();
     void loadMatrix(const GLfloat* m);
+    void loadMatrix(const LLMatrix4a& m);
     void loadIdentity();
     void multMatrix(const GLfloat* m);
+    void multMatrix(const LLMatrix4a& m);
     void matrixMode(eMatrixMode mode);
     eMatrixMode getMatrixMode();
 
