@@ -72,6 +72,15 @@ public:
     // Quaternion modification
     /////////////////////////
 
+    // Set this to the rotation of radians about axis, which need not be
+    // unit length; the identity when the axis has no length.
+    inline void setAxisAngle(const LLVector4a& axis, F32 radians);
+
+    // Set this to the rotation the upper 3x3 of m applies, which must be
+    // orthonormal: the rows are read as the rotated axes. A basis that is
+    // not a rotation gives the identity.
+    void setFromMatrix(const class LLMatrix4a& m);
+
     // Set this quaternion to the conjugate of src
     inline void setConjugate(const LLQuaternion2& src);
 

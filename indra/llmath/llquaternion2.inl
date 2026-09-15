@@ -62,6 +62,21 @@ inline LLVector4a& LLQuaternion2::getVector4aRw()
 // Quaternion modification
 /////////////////////////
 
+inline void LLQuaternion2::setAxisAngle(const LLVector4a& axis, F32 radians)
+{
+    const F32 mag = axis.getLength3().getF32();
+    if (mag > FP_MAG_THRESHOLD)
+    {
+        const F32 half = radians * 0.5f;
+        const F32 s = std::sin(half) / mag;
+        mQ = alsimd::select(alsimd::mask_xyz(), alsimd::mul(axis, alsimd::set1(s)), alsimd::set1(std::cos(half)));
+    }
+    else
+    {
+        mQ = alsimd::set(0.f, 0.f, 0.f, 1.f);
+    }
+}
+
 // Set this quaternion to the conjugate of src
 inline void LLQuaternion2::setConjugate(const LLQuaternion2& src)
 {
