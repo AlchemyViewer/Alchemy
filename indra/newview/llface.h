@@ -138,7 +138,7 @@ public:
     void            setDrawable(LLDrawable *drawable);
     void            setTEOffset(const S32 te_offset);
 
-    void            renderIndexed();
+    void            renderIndexed(U32 mode = LLRender::TRIANGLES);
 
     void            setFaceColor(const LLColor4& color); // override material color
     void            unsetFaceColor(); // switch back to material color

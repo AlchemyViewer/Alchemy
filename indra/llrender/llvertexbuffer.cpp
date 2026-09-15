@@ -728,7 +728,7 @@ static const std::string vb_type_name[] =
     "TYPE_WEIGHT",
     "TYPE_WEIGHT4",
     "TYPE_CLOTHWEIGHT",
-    "TYPE_JOINT"
+    "TYPE_JOINT",
     "TYPE_TEXTURE_INDEX",
     "TYPE_MAX",
     "TYPE_INDEX",
@@ -743,6 +743,7 @@ const U32 LLVertexBuffer::sGLMode[LLRender::NUM_MODES] =
     GL_LINES,
     GL_LINE_STRIP,
     GL_LINE_LOOP,
+    GL_PATCHES,
 };
 
 //static

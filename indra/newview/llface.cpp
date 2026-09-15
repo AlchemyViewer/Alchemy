@@ -2027,12 +2027,12 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
     return true;
 }
 
-void LLFace::renderIndexed()
+void LLFace::renderIndexed(U32 mode)
 {
     if (mVertexBuffer.notNull())
     {
         mVertexBuffer->setBuffer();
-        mVertexBuffer->drawRange(LLRender::TRIANGLES, getGeomIndex(), getGeomIndex() + getGeomCount()-1, getIndicesCount(), getIndicesStart());
+        mVertexBuffer->drawRange(mode, getGeomIndex(), getGeomIndex() + getGeomCount()-1, getIndicesCount(), getIndicesStart());
     }
 }
 

@@ -168,4 +168,6 @@ if(AL_BUILD_TESTS)
   al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
   # The hidden window itself, and a worker thread's shared context on it.
   al_add_test(alwindowsdlheadless GL PROJECT llrender LIBRARIES llrender)
+  # Tessellation stages and the quad conventions the terrain relies on.
+  al_add_test(altessellation_gl GL PROJECT llrender LIBRARIES llrender)
 endif()

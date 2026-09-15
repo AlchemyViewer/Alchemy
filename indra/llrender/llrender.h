@@ -147,6 +147,7 @@ public:
         LINES,
         LINE_STRIP,
         LINE_LOOP,
+        PATCHES,    // tessellation input; vertices per patch set with glPatchParameteri
         NUM_MODES
     };
 
