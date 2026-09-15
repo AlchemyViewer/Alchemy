@@ -2678,12 +2678,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gDeferredTerrainProgram.mName = "Deferred Terrain Shader";
+        // The projection count and hex tiling apply to the four-texture terrain as they do to
+        // the PBR one: terrainF blends its detail textures through pbrterrainUtilF's weights,
+        // slices and cells, which isPBRTerrain links in.
+        const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
+        const bool hex_tiling = gSavedSettings.getBOOL("AlchemyRenderTerrainHexTiling");
+        gDeferredTerrainProgram.mName = llformat("Deferred Terrain Shader %s%s",
+                (mapping == 1 ? "flat" : "triplanar"),
+                (hex_tiling ? " hex" : ""));
         gDeferredTerrainProgram.mFeatures.hasSrgb = true;
         gDeferredTerrainProgram.mFeatures.isAlphaLighting = true;
         gDeferredTerrainProgram.mFeatures.calculatesAtmospherics = true;
         gDeferredTerrainProgram.mFeatures.hasAtmospherics = true;
         gDeferredTerrainProgram.mFeatures.hasGamma = true;
+        gDeferredTerrainProgram.mFeatures.isPBRTerrain = true;
 
         gDeferredTerrainProgram.mFeatures.hasTessellatedTerrain = true;
 
@@ -2692,6 +2700,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainTC.glsl", GL_TESS_CONTROL_SHADER));
         gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainTE.glsl", GL_TESS_EVALUATION_SHADER));
         gDeferredTerrainProgram.mShaderFiles.push_back(make_pair("deferred/terrainF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredTerrainProgram.clearPermutations();
+        gDeferredTerrainProgram.addPermutation("TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT", llformat("%d", mapping));
+        if (hex_tiling)
+        {
+            gDeferredTerrainProgram.addPermutation("TERRAIN_HEX_TILING", "1");
+        }
 
         add_common_permutations(&gDeferredTerrainProgram);
 

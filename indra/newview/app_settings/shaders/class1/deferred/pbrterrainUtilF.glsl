@@ -237,7 +237,7 @@ uint _hex_hash(ivec2 corner)
     return h;
 }
 
-HexTile _hex_tile(vec2 uv)
+HexTile hex_tile(vec2 uv)
 {
     // Skew the plane into the lattice's own coordinates, where every triangle is half of a
     // unit square. The fragment's barycentrics come from its position in that square, and its
@@ -269,7 +269,7 @@ HexTile _hex_tile(vec2 uv)
 // Where a cell samples: the texture turned about the cell's centre and shifted, both by the
 // cell's hash. Returns the rotation so the caller can take the gradients and the normal
 // through it.
-mat2 _hex_cell(ivec2 corner, vec2 uv, out vec2 st)
+mat2 hex_cell(ivec2 corner, vec2 uv, out vec2 st)
 {
     uint h = _hex_hash(corner);
     vec2 offset = vec2(h & 0x7ffu, (h >> 11) & 0x7ffu) * (1.0 / 2048.0);
@@ -281,6 +281,22 @@ mat2 _hex_cell(ivec2 corner, vec2 uv, out vec2 st)
     vec2 centre = mat2(1.0, 0.0, 0.5, 0.8660254) * vec2(corner) * (1.0 / TERRAIN_HEX_GRID_SCALE);
     st = rot * (uv - centre) + centre + offset;
     return rot;
+}
+
+float hex_luma(vec3 rgb)
+{
+    return dot(rgb, vec3(0.299, 0.587, 0.114));
+}
+
+// The blend of a fragment's three cells: each cell's share of the lattice, with the brighter
+// sample taking a little more than that share. It reads as one cell's detail standing proud
+// of the other's instead of the two fading through each other. A cell that was not fetched
+// has a share of zero and stays out. Every map of a material blends by the one set of
+// weights, so they stay one surface.
+vec3 hex_weights(HexTile ht, vec3 luma)
+{
+    vec3 w = ht.weight * mix(vec3(1.0), luma, TERRAIN_HEX_FALLOFF);
+    return w / (w.x + w.y + w.z);
 }
 
 PBRMix sample_pbr(
@@ -299,7 +315,7 @@ PBRMix sample_pbr(
 #endif
     )
 {
-    HexTile ht = _hex_tile(uv);
+    HexTile ht = hex_tile(uv);
 
     // One fetch per cell that survived the threshold; the others stay zero and weigh nothing.
     // The gradients go through the cell's rotation with the uv, so the mip is the one the
@@ -319,7 +335,7 @@ PBRMix sample_pbr(
         if ((ht.type & (1 << i)) != 0)
         {
             vec2 st;
-            mat2 rot = _hex_cell(ht.corner[i], uv, st);
+            mat2 rot = hex_cell(ht.corner[i], uv, st);
             cell[i] = fetch_pbr(
                 st
                 , rot * uv_ddx
@@ -335,7 +351,7 @@ PBRMix sample_pbr(
                 , tex_emissive
 #endif
                 );
-            luma[i] = dot(cell[i].col.rgb, vec3(0.299, 0.587, 0.114));
+            luma[i] = hex_luma(cell[i].col.rgb);
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
             // The cell's texture is turned in the plane, so its normal's xy turn with it: by the
             // inverse of what took the uv there. Carried as a slope, which is what a blend of
@@ -347,11 +363,7 @@ PBRMix sample_pbr(
         }
     }
 
-    // The brighter sample takes a little more than its barycentric share, which reads as one
-    // cell's detail standing proud of the other's instead of the two fading through each
-    // other. Every map of the material blends by the same weights, so they stay one surface.
-    vec3 w = ht.weight * mix(vec3(1.0), luma, TERRAIN_HEX_FALLOFF);
-    w /= (w.x + w.y + w.z);
+    vec3 w = hex_weights(ht, luma);
 
     PBRMix mix = init_pbr_mix();
     mix = mix_pbr(mix, cell[0], w.x);
@@ -444,7 +456,7 @@ vec3 get_weight3_from_terrain_weight(vec4 weight)
 }
 
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-TerrainTriplanar _t_triplanar()
+TerrainTriplanar terrain_triplanar_weights()
 {
     float sharpness = TERRAIN_TRIPLANAR_BLEND_FACTOR;
     float threshold = TERRAIN_TRIPLANAR_MIX_THRESHOLD;
@@ -712,7 +724,7 @@ PBRMix terrain_sample_and_multiply_pbr(
         terrain_coord
         , terrain_coord_ddx
         , terrain_coord_ddy
-        , _t_triplanar()
+        , terrain_triplanar_weights()
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
         , tex_orm

@@ -40,25 +40,155 @@ in vec3 vary_normal;
 in vec4 vary_texcoord0;
 in vec4 vary_texcoord1;
 in vec2 vary_region_uv;
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+in vec3 vary_vertex_normal;
+in vec4 vary_texcoord_side;
+#endif
 
 void mirrorClip(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec3 srgb_to_linear(vec3 cs);
 
+// The four detail textures blend by the same weights, projections and cells the PBR terrain's
+// materials do; those live in pbrterrainUtilF.glsl, linked into this program as well. The bit
+// layout matches its.
+#define SAMPLE_X 1 << 0
+#define SAMPLE_Y 1 << 1
+#define SAMPLE_Z 1 << 2
+#define MIX_X    1 << 3
+#define MIX_Y    1 << 4
+#define MIX_Z    1 << 5
+#define MIX_W    1 << 6
+
+struct TerrainMix
+{
+    vec4 weight;
+    int type;
+};
+TerrainMix get_terrain_mix_weights(float alpha1, float alpha2, float alphaFinal);
+
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+struct TerrainTriplanar
+{
+    vec3 weight;
+    int type;
+};
+TerrainTriplanar terrain_triplanar_weights();
+#endif
+
+#ifdef TERRAIN_HEX_TILING
+struct HexTile
+{
+    ivec2 corner[3];
+    vec3 weight;
+    int type;
+};
+HexTile hex_tile(vec2 uv);
+mat2 hex_cell(ivec2 corner, vec2 uv, out vec2 st);
+float hex_luma(vec3 rgb);
+vec3 hex_weights(HexTile ht, vec3 luma);
+#endif
+
+// One detail texture at one uv. Gradients arrive as parameters: every call sits inside a
+// branch on which textures and which projections cover the fragment, where an implicit-LOD
+// fetch has no derivative to take. See fetch_pbr() in pbrterrainUtilF.glsl.
+vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy)
+{
+#ifdef TERRAIN_HEX_TILING
+    HexTile ht = hex_tile(uv);
+    vec4 cell[3];
+    vec3 luma = vec3(0.0);
+    for (int i = 0; i < 3; ++i)
+    {
+        cell[i] = vec4(0.0);
+        if ((ht.type & (1 << i)) != 0)
+        {
+            vec2 st;
+            mat2 rot = hex_cell(ht.corner[i], uv, st);
+            cell[i] = textureGrad(tex, st, rot * uv_ddx, rot * uv_ddy);
+            luma[i] = hex_luma(cell[i].rgb);
+        }
+    }
+    vec3 w = hex_weights(ht, luma);
+    return cell[0] * w.x + cell[1] * w.y + cell[2] * w.z;
+#else
+    return textureGrad(tex, uv, uv_ddx, uv_ddy);
+#endif
+}
+
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+// One detail texture over the projections the surface faces. The side slices are the yz and
+// xz uv with u negated on the far side of the axis, which is the frame the PBR slices use: a
+// legacy texture has no rotation, so the flip is the sign and nothing else.
+vec4 detail_sample(sampler2D tex, TerrainTriplanar tw, float sx, float sy
+    , vec2 uv, vec2 uv_ddx, vec2 uv_ddy
+    , vec4 side, vec4 side_ddx, vec4 side_ddy)
+{
+    vec4 c = vec4(0.0);
+    if ((tw.type & SAMPLE_X) != 0)
+    {
+        vec2 flip = vec2(sx, 1.0);
+        c += detail_fetch(tex, flip * side.xy, flip * side_ddx.xy, flip * side_ddy.xy) * tw.weight.x;
+    }
+    if ((tw.type & SAMPLE_Y) != 0)
+    {
+        vec2 flip = vec2(-sy, 1.0);
+        c += detail_fetch(tex, flip * side.zw, flip * side_ddx.zw, flip * side_ddy.zw) * tw.weight.y;
+    }
+    if ((tw.type & SAMPLE_Z) != 0)
+    {
+        c += detail_fetch(tex, uv, uv_ddx, uv_ddy) * tw.weight.z;
+    }
+    return c;
+}
+#define TERRAIN_DETAIL(tex) detail_sample(tex, tw, sx, sy, vary_texcoord0.xy, uv_ddx, uv_ddy, vary_texcoord_side, side_ddx, side_ddy)
+#else
+#define TERRAIN_DETAIL(tex) detail_fetch(tex, vary_texcoord0.xy, uv_ddx, uv_ddy)
+#endif
+
 void main()
 {
-    mirrorClip(pos);
-    /// Note: This should duplicate the blending functionality currently used for the terrain rendering.
+    // Every derivative this shader takes, taken here in uniform control flow and ahead of
+    // mirrorClip's discard, which can cost the quad the lanes a derivative needs.
+    vec2 uv_ddx = dFdx(vary_texcoord0.xy);
+    vec2 uv_ddy = dFdy(vary_texcoord0.xy);
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    vec4 side_ddx = dFdx(vary_texcoord_side);
+    vec4 side_ddy = dFdy(vary_texcoord_side);
+#endif
 
-    vec4 color0 = texture(detail_0, vary_texcoord0.xy);
-    vec4 color1 = texture(detail_1, vary_texcoord0.xy);
-    vec4 color2 = texture(detail_2, vary_texcoord0.xy);
-    vec4 color3 = texture(detail_3, vary_texcoord0.xy);
+    mirrorClip(pos);
 
     float alpha1 = texture(alpha_ramp, vary_texcoord0.zw).a;
     float alpha2 = texture(alpha_ramp,vary_texcoord1.xy).a;
     float alphaFinal = texture(alpha_ramp, vary_texcoord1.zw).a;
-    vec4 outColor = mix( mix(color3, color2, alpha2), mix(color1, color0, alpha1), alphaFinal );
+    // The ramps' four-way mix, as weights, with the ones under the threshold dropped and the
+    // rest renormalised, so a texture that would barely show is not fetched at all.
+    TerrainMix tm = get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    TerrainTriplanar tw = terrain_triplanar_weights();
+    // Which side of each axis the surface faces, as +-1; the same choice the PBR slices make.
+    float sx = vary_vertex_normal.x > 0.0 ? 1.0 : -1.0;
+    float sy = vary_vertex_normal.y > 0.0 ? 1.0 : -1.0;
+#endif
+
+    vec4 outColor = vec4(0.0);
+    if ((tm.type & MIX_X) != 0)
+    {
+        outColor += TERRAIN_DETAIL(detail_0) * tm.weight.x;
+    }
+    if ((tm.type & MIX_Y) != 0)
+    {
+        outColor += TERRAIN_DETAIL(detail_1) * tm.weight.y;
+    }
+    if ((tm.type & MIX_Z) != 0)
+    {
+        outColor += TERRAIN_DETAIL(detail_2) * tm.weight.z;
+    }
+    if ((tm.type & MIX_W) != 0)
+    {
+        outColor += TERRAIN_DETAIL(detail_3) * tm.weight.w;
+    }
 
     if (show_parcel_owners != 0)
     {

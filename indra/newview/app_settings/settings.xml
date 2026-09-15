@@ -10215,7 +10215,7 @@
     <key>RenderTerrainPBRPlanarSampleCount</key>
     <map>
       <key>Comment</key>
-      <string>How many UV planes to sample PBR terrain textures from. 1 is "flat", 3 is triplanar mapping (aka box mapping)</string>
+      <string>How many UV planes to sample terrain textures from, PBR and legacy alike. 1 is "flat", 3 is triplanar mapping (aka box mapping)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>

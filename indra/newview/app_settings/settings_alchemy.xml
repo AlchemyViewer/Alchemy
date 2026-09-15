@@ -1319,7 +1319,7 @@
         <key>AlchemyRenderTerrainHexTiling</key>
         <map>
             <key>Comment</key>
-            <string>Hex-tile PBR terrain textures: each cell of a hexagonal lattice shows the texture at its own offset and rotation, hiding the repeat. Up to three fetches per texture per projection. Change triggers a shader rebuild.</string>
+            <string>Hex-tile terrain textures, PBR and legacy alike: each cell of a hexagonal lattice shows the texture at its own offset and rotation, hiding the repeat. Up to three fetches per texture per projection. Change triggers a shader rebuild.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
