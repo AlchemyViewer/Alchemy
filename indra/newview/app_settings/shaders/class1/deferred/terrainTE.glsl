@@ -35,7 +35,6 @@ out vec4 vary_texcoord0;
 out vec4 vary_texcoord1;
 out vec2 vary_region_uv;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-out vec3 vary_vertex_normal; // Used by pbrterrainUtilF.glsl
 out vec4 vary_texcoord_side; // The yz projection's uv, then the xz projection's
 #endif
 
@@ -80,7 +79,6 @@ void main()
     // Transform and pass tex coords
     vary_texcoord0.xy = texgen_object(pre_pos, texture_matrix0, object_plane_s, object_plane_t);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    vary_vertex_normal = normal;
     // The side projections tile at the plane's scale and keep the origin phase of the axis
     // they share with it, so they meet across region borders as the top one does. Height
     // needs no phase: a region's origin is at z = 0, so region z is world z.

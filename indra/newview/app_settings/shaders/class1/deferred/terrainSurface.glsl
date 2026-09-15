@@ -23,6 +23,13 @@
  * analytic gradient. The CPU's copy of that surface is LLSurface::smoothHeight,
  * through the same arithmetic in the same order; the two must agree.
  *
+ * The fragment stages choose their projections by terrain_facet, the smooth
+ * surface's normal whichever surface is drawn. It is continuous, so no
+ * triangle edge shows through a blend of projections, and its limited
+ * tangents hold it upright to the lip of a cliff and turn it inside the
+ * face -- where the linear normal's stencil reaches two grids past the
+ * crease, and a drawn triangle's own plane steps at every tessellation edge.
+ *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
@@ -50,6 +57,7 @@ uniform int   terrain_smoothing;     // 0 the collision surface, 1 the smooth on
 
 const int TERRAIN_APRON = 2;
 
+#ifdef TESS_EVALUATION_SHADER
 // The point of the patch this invocation evaluates, in region-local metres.
 // Corners arrive in the order the patch buffer holds them: (x0,y0) (x1,y0)
 // (x1,y1) (x0,y1), so u runs along x and v along y.
@@ -59,6 +67,7 @@ vec2 terrain_patch_xy()
     vec2 top    = mix(gl_in[3].gl_Position.xy, gl_in[2].gl_Position.xy, gl_TessCoord.x);
     return mix(bottom, top, gl_TessCoord.y);
 }
+#endif
 
 // Grid sample, clamped to the map: a cell's far corner lands one past the
 // apron only at the region's edge, where its weight is zero.
@@ -199,6 +208,20 @@ vec3 terrain_surface(vec2 p_region, out vec3 n)
     }
     n = terrain_normal_linear(g);
     return vec3(p_region, terrain_height_linear(g));
+}
+
+// The normal a fragment chooses its projections by: the smooth surface's,
+// whichever surface is drawn. A blend of projections shows every step in the
+// normal it is taken from, and a drawn triangle's own plane steps at every
+// tessellation edge -- on the collision surface the tessellation's triangles
+// straddle the grid's diagonals besides, so even there the facets are not
+// the surface's. This normal is continuous, and its limited tangents keep it
+// upright to the lip of a cliff and turn it inside the face.
+vec3 terrain_facet(vec2 p_region)
+{
+    vec2 gradient;
+    terrain_height_smooth(p_region / terrain_grid_scale, gradient);
+    return normalize(vec3(-gradient / terrain_grid_scale, 1.0));
 }
 
 // Composition value and alpha-ramp noise at a point, bilinear between the

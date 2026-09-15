@@ -264,6 +264,11 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
                 return false;
             }
         }
+        // The fragment stage reads the same surface for the normal under each fragment.
+        if (!shader->attachFragmentObject("deferred/terrainSurface.glsl"))
+        {
+            return false;
+        }
     }
 
     ///////////////////////////////////////

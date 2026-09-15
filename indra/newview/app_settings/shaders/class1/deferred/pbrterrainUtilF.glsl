@@ -54,10 +54,6 @@
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-in vec3 vary_vertex_normal;
-#endif
-
 // A relatively agressive threshold for terrain material mixing sampling
 // cutoff. This ensures that only one or two materials are used in most places,
 // making PBR terrain blending more performant. Should be greater than 0 to work.
@@ -380,10 +376,15 @@ PBRMix sample_pbr(
 #define sample_pbr fetch_pbr
 #endif
 
+// Which projections cover a fragment and by how much, and which side of the x and y axes its
+// surface faces, as +-1: sign() would give 0 on the axis itself, and the evaluation stage
+// supplies a flipped slice for the negative side, so 0 has to land there.
 struct TerrainTriplanar
 {
     vec3 weight;
     int type;
+    float sx;
+    float sy;
 };
 
 struct TerrainMix
@@ -456,11 +457,17 @@ vec3 get_weight3_from_terrain_weight(vec4 weight)
 }
 
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-TerrainTriplanar terrain_triplanar_weights()
+// facet_region is the surface's normal under the fragment, in region space, where the
+// projection planes are the axes: terrain_facet in terrainSurface.glsl. It has to be evaluated
+// at the fragment. A normal carried from the vertices is interpolated across every triangle
+// that straddles a crease, and on the far side of a cliff top that hands a vertical face the
+// top's slice, or the level ground beside it the face's -- a smear one triangle wide along
+// every crease.
+TerrainTriplanar terrain_triplanar_weights(vec3 facet_region)
 {
     float sharpness = TERRAIN_TRIPLANAR_BLEND_FACTOR;
     float threshold = TERRAIN_TRIPLANAR_MIX_THRESHOLD;
-    vec3 weight_signed = pow(abs(vary_vertex_normal), vec3(sharpness));
+    vec3 weight_signed = pow(abs(facet_region), vec3(sharpness));
     weight_signed /= (weight_signed.x + weight_signed.y + weight_signed.z);
     weight_signed -= vec3(threshold);
     TerrainTriplanar tw;
@@ -471,6 +478,8 @@ TerrainTriplanar terrain_triplanar_weights()
     tw.type = ((usage.x) * SAMPLE_X) |
               ((usage.y) * SAMPLE_Y) |
               ((usage.z) * SAMPLE_Z);
+    tw.sx = facet_region.x > 0.0 ? 1.0 : -1.0;
+    tw.sy = facet_region.y > 0.0 ? 1.0 : -1.0;
     return tw;
 }
 #endif
@@ -542,11 +551,9 @@ PBRMix terrain_sample_pbr(
 {
     PBRMix mix = init_pbr_mix();
 
-    // Which side of each axis the surface faces. Decided once, as +-1, and used for both the uv
-    // slice and the normal frame below. sign() would give 0 on the axis itself; the vertex stage
-    // supplies a flipped slice for the negative side, so 0 has to land there.
-    float sx = vary_vertex_normal.x > 0.0 ? 1.0 : -1.0;
-    float sy = vary_vertex_normal.y > 0.0 ? 1.0 : -1.0;
+    // Which side of each axis the surface faces, for both the uv slice and the normal frame below.
+    float sx = tw.sx;
+    float sy = tw.sy;
 
 #define get_uv_x() _t_uv(terrain_coord[0].zw, terrain_coord[1].zw, sx)
 #define get_uv_y() _t_uv(terrain_coord[1].xy, terrain_coord[2].xy, sy)
@@ -696,6 +703,9 @@ PBRMix terrain_sample_and_multiply_pbr(
     TerrainCoord terrain_coord
     , TerrainCoord terrain_coord_ddx
     , TerrainCoord terrain_coord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    , TerrainTriplanar tw
+#endif
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
     , sampler2D tex_orm
@@ -724,7 +734,7 @@ PBRMix terrain_sample_and_multiply_pbr(
         terrain_coord
         , terrain_coord_ddx
         , terrain_coord_ddy
-        , terrain_triplanar_weights()
+        , tw
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
         , tex_orm

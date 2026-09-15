@@ -46,9 +46,6 @@ vec2 terrain_composition(vec2 p_region);
 
 out vec3 vary_position;
 out vec3 vary_normal;
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-out vec3 vary_vertex_normal; // Used by pbrterrainUtilF.glsl
-#endif
 out vec2 vary_region_uv;
 
 // vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
@@ -81,9 +78,6 @@ void main()
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
 
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    vary_vertex_normal = normal;
-#endif
     vary_normal = normalize(normal_matrix * normal);
     vary_region_uv = xy / region_scale;
 

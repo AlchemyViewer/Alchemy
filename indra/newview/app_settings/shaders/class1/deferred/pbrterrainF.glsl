@@ -53,6 +53,17 @@ struct TerrainMix
 TerrainMix get_terrain_mix_weights(float alpha1, float alpha2, float alphaFinal);
 TerrainMix get_terrain_usage_from_weight3(vec3 weight3);
 
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+struct TerrainTriplanar
+{
+    vec3 weight;
+    int type;
+    float sx;
+    float sy;
+};
+TerrainTriplanar terrain_triplanar_weights(vec3 facet_region);
+#endif
+
 struct PBRMix
 {
     vec4 col;       // RGB color with alpha, linear space
@@ -75,6 +86,9 @@ PBRMix terrain_sample_and_multiply_pbr(
     TerrainCoord terrain_coord
     , TerrainCoord terrain_coord_ddx
     , TerrainCoord terrain_coord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    , TerrainTriplanar tw
+#endif
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
     , sampler2D tex_orm
@@ -153,6 +167,7 @@ uniform mat2[4] terrain_normal_axes;
 
 uniform sampler2D parcel_overlay;
 uniform int show_parcel_owners;
+uniform float region_scale;
 
 in vec3 vary_position;
 in vec3 vary_normal;
@@ -180,30 +195,33 @@ vec3 srgb_to_linear(vec3 cs);
 
 float terrain_mix(TerrainMix tm, vec4 tms4);
 
+// terrainSurface.glsl
+vec3 terrain_facet(vec2 p_region);
+
 // The geometric normal this fragment shades against. Written once at the top of main().
 vec3 geom_normal;
 
-// Under TERRAIN_FLAT_NORMALS this is the true per-triangle normal, recovered from the
-// screen-space derivatives of the eye-space position.
-//
-// It cannot come from a per-vertex array. A terrain vertex is shared by up to six triangles, so
-// whichever facet normal gets stored there is wrong for the other five, and the rasterizer
-// interpolates all three corners regardless -- the result is neither flat nor smooth, just
-// lighting skewed off the geometry it describes. The ways around that on the CPU side are
-// tripling the vertex count or ordering indices so every triangle owns a unique provoking
-// vertex, and the LOD stitch strips rule out the second. Derivatives are constant across a
-// triangle, so this is exact at every fragment and at every LOD, with nothing stored, nothing
-// to keep in sync, and no cost that scales with patch density.
+#ifdef TERRAIN_FLAT_NORMALS
+// The drawn triangle's normal, recovered from the screen-space derivatives of the eye-space
+// position, which are constant across it: exact at every fragment and every tessellation
+// level, with nothing stored. It cannot come from a per-vertex array -- a terrain vertex is
+// shared by up to six triangles, and the rasterizer interpolates all three corners regardless.
 //
 // MUST be evaluated in uniform control flow. The material switches in main() branch per
 // fragment, and a derivative taken inside one is undefined.
-vec3 terrain_geometric_normal()
+vec3 terrain_triangle_normal()
 {
-#ifdef TERRAIN_FLAT_NORMALS
     vec3 n = normalize(cross(dFdx(vary_position), dFdy(vary_position)));
     // The cross follows window-space winding, which a mirrored view or a back-facing patch
     // inverts. The interpolated vertex normal is the reference for which side is out.
     return dot(n, vary_normal) < 0.0 ? -n : n;
+}
+#endif
+
+vec3 terrain_geometric_normal()
+{
+#ifdef TERRAIN_FLAT_NORMALS
+    return terrain_triangle_normal();
 #else
     return vary_normal;
 #endif
@@ -214,6 +232,12 @@ void main()
     // Ahead of mirrorClip: a discard can leave the quad without the neighbouring lanes a
     // derivative needs, so the one derivative this shader takes is taken while all four are live.
     geom_normal = terrain_geometric_normal();
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+    // The projections are chosen by the surface's normal under the fragment, in region space
+    // where the projection planes are the axes, whatever the lighting normal is -- see
+    // terrain_facet -- and decided once for every material.
+    TerrainTriplanar tw = terrain_triplanar_weights(terrain_facet(vary_region_uv * region_scale));
+#endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     // The same normal in region space, where the projection planes are the axes and every
     // material's normal is composed. The terrain's modelview is rigid, so the transpose is the
@@ -300,6 +324,9 @@ void main()
             terrain_texcoord
             , terrain_texcoord_ddx
             , terrain_texcoord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+            , tw
+#endif
             , detail_0_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_0_metallic_roughness
@@ -343,6 +370,9 @@ void main()
             terrain_texcoord
             , terrain_texcoord_ddx
             , terrain_texcoord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+            , tw
+#endif
             , detail_1_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_1_metallic_roughness
@@ -386,6 +416,9 @@ void main()
             terrain_texcoord
             , terrain_texcoord_ddx
             , terrain_texcoord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+            , tw
+#endif
             , detail_2_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_2_metallic_roughness
@@ -429,6 +462,9 @@ void main()
             terrain_texcoord
             , terrain_texcoord_ddx
             , terrain_texcoord_ddy
+#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
+            , tw
+#endif
             , detail_3_base_color
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , detail_3_metallic_roughness

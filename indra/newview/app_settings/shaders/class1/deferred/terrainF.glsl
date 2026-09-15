@@ -34,6 +34,7 @@ uniform sampler2D detail_3;
 uniform sampler2D alpha_ramp;
 uniform sampler2D parcel_overlay;
 uniform int show_parcel_owners;
+uniform float region_scale;
 
 in vec3 pos;
 in vec3 vary_normal;
@@ -41,7 +42,6 @@ in vec4 vary_texcoord0;
 in vec4 vary_texcoord1;
 in vec2 vary_region_uv;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-in vec3 vary_vertex_normal;
 in vec4 vary_texcoord_side;
 #endif
 
@@ -72,8 +72,12 @@ struct TerrainTriplanar
 {
     vec3 weight;
     int type;
+    float sx;
+    float sy;
 };
-TerrainTriplanar terrain_triplanar_weights();
+TerrainTriplanar terrain_triplanar_weights(vec3 facet_region);
+// terrainSurface.glsl
+vec3 terrain_facet(vec2 p_region);
 #endif
 
 #ifdef TERRAIN_HEX_TILING
@@ -166,10 +170,12 @@ void main()
     // rest renormalised, so a texture that would barely show is not fetched at all.
     TerrainMix tm = get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    TerrainTriplanar tw = terrain_triplanar_weights();
+    // By the surface's normal under the fragment, in region space where the projection planes
+    // are the axes; see terrain_facet.
+    TerrainTriplanar tw = terrain_triplanar_weights(terrain_facet(vary_region_uv * region_scale));
     // Which side of each axis the surface faces, as +-1; the same choice the PBR slices make.
-    float sx = vary_vertex_normal.x > 0.0 ? 1.0 : -1.0;
-    float sy = vary_vertex_normal.y > 0.0 ? 1.0 : -1.0;
+    float sx = tw.sx;
+    float sy = tw.sy;
 #endif
 
     vec4 outColor = vec4(0.0);
