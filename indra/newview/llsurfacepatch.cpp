@@ -27,14 +27,12 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llsurfacepatch.h"
-#include "llpatchvertexarray.h"
 #include "llviewerobjectlist.h"
 #include "llvosurfacepatch.h"
 #include "llsurface.h"
 #include "pipeline.h"
 #include "llagent.h"
 #include "llsky.h"
-#include "llviewercamera.h"
 
 // For getting composition values
 #include "llviewerregion.h"
@@ -42,7 +40,6 @@
 #include "lldrawpool.h"
 #include "noise.h"
 
-extern bool gShiftFrame;
 extern U64MicrosecondsImplicit gFrameTime;
 extern LLPipeline gPipeline;
 
@@ -54,7 +51,6 @@ LLSurfacePatch::LLSurfacePatch()
     mHeightsGenerated(false),
     mDataOffset(0),
     mDataZ(NULL),
-    mDataNorm(NULL),
     mVObjp(NULL),
     mOriginRegion(0.f, 0.f, 0.f),
     mCenterRegion(0.f, 0.f, 0.f),
@@ -75,10 +71,6 @@ LLSurfacePatch::LLSurfacePatch()
     for (i = 0; i < 8; i++)
     {
         setNeighborPatch(i, NULL);
-    }
-    for (i = 0; i < 9; i++)
-    {
-        mNormalsInvalid[i] = true;
     }
 }
 
@@ -137,7 +129,6 @@ void LLSurfacePatch::disconnectNeighbor(LLSurface *surfacep)
             if (getNeighborPatch(i)->mSurfacep == surfacep)
             {
                 setNeighborPatch(i, NULL);
-                mNormalsInvalid[i] = true;
             }
         }
     }
@@ -200,31 +191,18 @@ LLVector2 LLSurfacePatch::getTexCoords(const U32 x, const U32 y) const
 }
 
 
-void LLSurfacePatch::eval(const U32 x, const U32 y, const U32 stride, LLVector3 *vertex, LLVector3 *normal,
-                          LLVector2* tex0, LLVector2 *tex1) const
+void LLSurfacePatch::eval(const U32 x, const U32 y, LLVector3 *vertex, LLVector2 *tex1) const
 {
-    if (!mSurfacep || !mSurfacep->getRegion() || !mSurfacep->getGridsPerEdge() || !mVObjp)
+    if (!mSurfacep || !mSurfacep->getRegion() || !mSurfacep->getGridsPerEdge())
     {
         return; // failsafe
     }
-    llassert_always(vertex && normal && tex1);
+    llassert_always(vertex && tex1);
 
-    U32 surface_stride = mSurfacep->getGridsPerEdge();
-    U32 point_offset = x + y*surface_stride;
-
-    *normal = getNormal(x, y);
-
-    LLVector3 pos_agent = getOriginAgent();
-    pos_agent.mV[VX] += x * mSurfacep->getMetersPerGrid();
-    pos_agent.mV[VY] += y * mSurfacep->getMetersPerGrid();
-    pos_agent.mV[VZ]  = *(mDataZ + point_offset);
-    *vertex     = pos_agent-mVObjp->getRegion()->getOriginAgent();
-
-    // tex0 is used for ownership overlay
-    LLVector3 rel_pos = pos_agent - mSurfacep->getOriginAgent();
-    LLVector3 tex_pos = rel_pos * (1.f / (surface_stride * mSurfacep->getMetersPerGrid()));
-    tex0->mV[0] = tex_pos.mV[0];
-    tex0->mV[1] = tex_pos.mV[1];
+    const F32 meters_per_grid = mSurfacep->getMetersPerGrid();
+    vertex->set(mOriginRegion.mV[VX] + x * meters_per_grid,
+                mOriginRegion.mV[VY] + y * meters_per_grid,
+                *(mDataZ + x + y * mSurfacep->getGridsPerEdge()));
 
     tex1->mV[0] = mSurfacep->getRegion()->getCompositionXY(llfloor(mOriginRegion.mV[0])+x, llfloor(mOriginRegion.mV[1])+y);
     tex1->mV[1] = terrain_composition_noise(mOriginGlobal.mdV[0] + x, mOriginGlobal.mdV[1] + y);
@@ -244,153 +222,6 @@ F32 terrain_composition_noise(F64 x_global, F64 y_global)
 }
 
 
-void LLSurfacePatch::calcNormal(const U32 x, const U32 y, const U32 stride)
-{
-    U32 patch_width = mSurfacep->mPVArray.mPatchWidth;
-    U32 surface_stride = mSurfacep->getGridsPerEdge();
-
-    const F32 mpg = mSurfacep->getMetersPerGrid() * stride;
-
-    S32 poffsets[2][2][2];
-    poffsets[0][0][0] = x - stride;
-    poffsets[0][0][1] = y - stride;
-
-    poffsets[0][1][0] = x - stride;
-    poffsets[0][1][1] = y + stride;
-
-    poffsets[1][0][0] = x + stride;
-    poffsets[1][0][1] = y - stride;
-
-    poffsets[1][1][0] = x + stride;
-    poffsets[1][1][1] = y + stride;
-
-    const LLSurfacePatch *ppatches[2][2];
-
-    // LLVector3 p1, p2, p3, p4;
-
-    ppatches[0][0] = this;
-    ppatches[0][1] = this;
-    ppatches[1][0] = this;
-    ppatches[1][1] = this;
-
-    U32 i, j;
-    for (i = 0; i < 2; i++)
-    {
-        for (j = 0; j < 2; j++)
-        {
-            if (poffsets[i][j][0] < 0)
-            {
-                if (!ppatches[i][j]->getNeighborPatch(WEST))
-                {
-                    poffsets[i][j][0] = 0;
-                }
-                else
-                {
-                    poffsets[i][j][0] += patch_width;
-                    ppatches[i][j] = ppatches[i][j]->getNeighborPatch(WEST);
-                }
-            }
-            if (poffsets[i][j][1] < 0)
-            {
-                if (!ppatches[i][j]->getNeighborPatch(SOUTH))
-                {
-                    poffsets[i][j][1] = 0;
-                }
-                else
-                {
-                    poffsets[i][j][1] += patch_width;
-                    ppatches[i][j] = ppatches[i][j]->getNeighborPatch(SOUTH);
-                }
-            }
-            if (poffsets[i][j][0] >= (S32)patch_width)
-            {
-                if (!ppatches[i][j]->getNeighborPatch(EAST))
-                {
-                    poffsets[i][j][0] = patch_width - 1;
-                }
-                else
-                {
-                    poffsets[i][j][0] -= patch_width;
-                    ppatches[i][j] = ppatches[i][j]->getNeighborPatch(EAST);
-                }
-            }
-            if (poffsets[i][j][1] >= (S32)patch_width)
-            {
-                if (!ppatches[i][j]->getNeighborPatch(NORTH))
-                {
-                    poffsets[i][j][1] = patch_width - 1;
-                }
-                else
-                {
-                    poffsets[i][j][1] -= patch_width;
-                    ppatches[i][j] = ppatches[i][j]->getNeighborPatch(NORTH);
-                }
-            }
-        }
-    }
-
-    LLVector3 p00(-mpg,-mpg,
-                  *(ppatches[0][0]->mDataZ
-                  + poffsets[0][0][0]
-                  + poffsets[0][0][1]*surface_stride));
-    LLVector3 p01(-mpg,+mpg,
-                  *(ppatches[0][1]->mDataZ
-                  + poffsets[0][1][0]
-                  + poffsets[0][1][1]*surface_stride));
-    LLVector3 p10(+mpg,-mpg,
-                  *(ppatches[1][0]->mDataZ
-                  + poffsets[1][0][0]
-                  + poffsets[1][0][1]*surface_stride));
-    LLVector3 p11(+mpg,+mpg,
-                  *(ppatches[1][1]->mDataZ
-                  + poffsets[1][1][0]
-                  + poffsets[1][1][1]*surface_stride));
-
-    LLVector3 c1 = p11 - p00;
-    LLVector3 c2 = p01 - p10;
-
-    LLVector3 normal = c1;
-    normal %= c2;
-    normal.normVec();
-
-    llassert(mDataNorm);
-    *(mDataNorm + surface_stride * y + x) = normal;
-}
-
-const LLVector3 &LLSurfacePatch::getNormal(const U32 x, const U32 y) const
-{
-    U32 surface_stride = mSurfacep->getGridsPerEdge();
-    llassert(mDataNorm);
-    return *(mDataNorm + surface_stride * y + x);
-}
-
-
-void LLSurfacePatch::updateCameraDistanceRegion(const LLVector3 &pos_region)
-{
-    if (LLPipeline::sDynamicLOD)
-    {
-        if (!gShiftFrame)
-        {
-            LLVector3 dv = pos_region;
-            dv -= mCenterRegion;
-            mVisInfo.mDistance = llmax(0.f, (F32)(dv.magVec() - mRadius))/
-                llmax(LLVOSurfacePatch::sLODFactor, 0.1f);
-        }
-    }
-    else
-    {
-        mVisInfo.mDistance = 0.f;
-    }
-}
-
-F32 LLSurfacePatch::getDistance() const
-{
-    return mVisInfo.mDistance;
-}
-
-
-// Called when a patch has changed its height field
-// data.
 void LLSurfacePatch::updateVerticalStats()
 {
     if (!mDirtyZStats)
@@ -454,165 +285,73 @@ void LLSurfacePatch::updateVerticalStats()
 }
 
 
-void LLSurfacePatch::updateNormals()
+void LLSurfacePatch::updateNorthEastCorner()
 {
-    if (mSurfacep->mType == 'w')
-    {
-        return;
-    }
     U32 grids_per_patch_edge = mSurfacep->getGridsPerPatchEdge();
     U32 grids_per_edge = mSurfacep->getGridsPerEdge();
 
-    bool dirty_patch = false;
+    F32* corner = mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge;
+    const F32 own_diagonal = *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
 
-    U32 i, j;
-    // update the east edge
-    if (mNormalsInvalid[EAST] || mNormalsInvalid[NORTHEAST] || mNormalsInvalid[SOUTHEAST])
+    if (!getNeighborPatch(NORTHEAST))
     {
-        for (j = 0; j <= grids_per_patch_edge; j++)
+        if (!getNeighborPatch(NORTH))
         {
-            calcNormal(grids_per_patch_edge, j, 2);
-            calcNormal(grids_per_patch_edge - 1, j, 2);
-            calcNormal(grids_per_patch_edge - 2, j, 2);
-        }
-
-        dirty_patch = true;
-    }
-
-    // update the north edge
-    if (mNormalsInvalid[NORTHEAST] || mNormalsInvalid[NORTH] || mNormalsInvalid[NORTHWEST])
-    {
-        for (i = 0; i <= grids_per_patch_edge; i++)
-        {
-            calcNormal(i, grids_per_patch_edge, 2);
-            calcNormal(i, grids_per_patch_edge - 1, 2);
-            calcNormal(i, grids_per_patch_edge - 2, 2);
-        }
-
-        dirty_patch = true;
-    }
-
-    // update the west edge
-    if (mNormalsInvalid[NORTHWEST] || mNormalsInvalid[WEST] || mNormalsInvalid[SOUTHWEST])
-    {
-        for (j = 0; j < grids_per_patch_edge; j++)
-        {
-            calcNormal(0, j, 2);
-            calcNormal(1, j, 2);
-        }
-        dirty_patch = true;
-    }
-
-    // update the south edge
-    if (mNormalsInvalid[SOUTHWEST] || mNormalsInvalid[SOUTH] || mNormalsInvalid[SOUTHEAST])
-    {
-        for (i = 0; i < grids_per_patch_edge; i++)
-        {
-            calcNormal(i, 0, 2);
-            calcNormal(i, 1, 2);
-        }
-        dirty_patch = true;
-    }
-
-    // Invalidating the northeast corner is different, because depending on what the adjacent neighbors are,
-    // we'll want to do different things.
-    if (mNormalsInvalid[NORTHEAST])
-    {
-        if (!getNeighborPatch(NORTHEAST))
-        {
-            if (!getNeighborPatch(NORTH))
+            if (!getNeighborPatch(EAST))
             {
-                if (!getNeighborPatch(EAST))
-                {
-                    // No north or east neighbors.  Pull from the diagonal in your own patch.
-                    *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                        *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
-                }
-                else
-                {
-                    if (getNeighborPatch(EAST)->getHasReceivedData())
-                    {
-                        // East, but not north.  Pull from your east neighbor's northwest point.
-                        *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                            *(getNeighborPatch(EAST)->mDataZ + (grids_per_patch_edge - 1)*grids_per_edge);
-                    }
-                    else
-                    {
-                        *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                            *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
-                    }
-                }
+                // No north or east neighbors.  Pull from the diagonal in your own patch.
+                *corner = own_diagonal;
             }
             else
             {
-                // We have a north.
-                if (getNeighborPatch(EAST))
+                if (getNeighborPatch(EAST)->getHasReceivedData())
                 {
-                    // North and east neighbors, but not northeast.
-                    // Pull from diagonal in your own patch.
-                    *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                        *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
+                    // East, but not north.  Pull from your east neighbor's northwest point.
+                    *corner = *(getNeighborPatch(EAST)->mDataZ + (grids_per_patch_edge - 1)*grids_per_edge);
                 }
                 else
                 {
-                    if (getNeighborPatch(NORTH)->getHasReceivedData())
-                    {
-                        // North, but not east.  Pull from your north neighbor's southeast corner.
-                        *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                            *(getNeighborPatch(NORTH)->mDataZ + (grids_per_patch_edge - 1));
-                    }
-                    else
-                    {
-                        *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                            *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
-                    }
+                    *corner = own_diagonal;
                 }
-            }
-        }
-        else if (getNeighborPatch(NORTHEAST)->mSurfacep != mSurfacep)
-        {
-            if (
-                (!getNeighborPatch(NORTH) || (getNeighborPatch(NORTH)->mSurfacep != mSurfacep))
-                &&
-                (!getNeighborPatch(EAST) || (getNeighborPatch(EAST)->mSurfacep != mSurfacep)))
-            {
-                *(mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge) =
-                                        *(getNeighborPatch(NORTHEAST)->mDataZ);
             }
         }
         else
         {
-            // We've got a northeast patch in the same surface.
-            // The z and normals will be handled by that patch.
-        }
-        calcNormal(grids_per_patch_edge, grids_per_patch_edge, 2);
-        calcNormal(grids_per_patch_edge, grids_per_patch_edge - 1, 2);
-        calcNormal(grids_per_patch_edge - 1, grids_per_patch_edge, 2);
-        calcNormal(grids_per_patch_edge - 1, grids_per_patch_edge - 1, 2);
-        dirty_patch = true;
-    }
-
-    // update the middle normals
-    if (mNormalsInvalid[MIDDLE])
-    {
-        for (j=2; j < grids_per_patch_edge - 2; j++)
-        {
-            for (i=2; i < grids_per_patch_edge - 2; i++)
+            // We have a north.
+            if (getNeighborPatch(EAST))
             {
-                calcNormal(i, j, 2);
+                // North and east neighbors, but not northeast.
+                // Pull from diagonal in your own patch.
+                *corner = own_diagonal;
+            }
+            else
+            {
+                if (getNeighborPatch(NORTH)->getHasReceivedData())
+                {
+                    // North, but not east.  Pull from your north neighbor's southeast corner.
+                    *corner = *(getNeighborPatch(NORTH)->mDataZ + (grids_per_patch_edge - 1));
+                }
+                else
+                {
+                    *corner = own_diagonal;
+                }
             }
         }
-        dirty_patch = true;
     }
-
-    if (dirty_patch)
+    else if (getNeighborPatch(NORTHEAST)->mSurfacep != mSurfacep)
     {
-        mSurfacep->dirtySurfacePatch(this);
+        if (
+            (!getNeighborPatch(NORTH) || (getNeighborPatch(NORTH)->mSurfacep != mSurfacep))
+            &&
+            (!getNeighborPatch(EAST) || (getNeighborPatch(EAST)->mSurfacep != mSurfacep)))
+        {
+            *corner = *(getNeighborPatch(NORTHEAST)->mDataZ);
+        }
     }
-
-    for (i = 0; i < 9; i++)
+    else
     {
-        mNormalsInvalid[i] = false;
+        // We've got a northeast patch in the same surface.
+        // The z will be handled by that patch.
     }
 }
 
@@ -751,25 +490,13 @@ void LLSurfacePatch::dirtyZ()
 {
     mSTexUpdate = true;
 
-    // Invalidate all normals in this patch
-    U32 i;
-    for (i = 0; i < 9; i++)
-    {
-        mNormalsInvalid[i] = true;
-    }
-
-    // Invalidate normals in this and neighboring patches
-    for (i = 0; i < 8; i++)
+    // A neighbour's buffer edge, north-east corner and surface-map apron all
+    // read this patch's heights.
+    for (U32 i = 0; i < 8; i++)
     {
         if (getNeighborPatch(i))
         {
-            getNeighborPatch(i)->mNormalsInvalid[gDirOpposite[i]] = true;
             getNeighborPatch(i)->dirty();
-            if (i < 4)
-            {
-                getNeighborPatch(i)->mNormalsInvalid[gDirAdjacent[gDirOpposite[i]][0]] = true;
-                getNeighborPatch(i)->mNormalsInvalid[gDirAdjacent[gDirOpposite[i]][1]] = true;
-            }
         }
     }
 
@@ -803,19 +530,11 @@ void LLSurfacePatch::setOriginGlobal(const LLVector3d &origin_global)
     mOriginRegion = origin_region;
     mCenterRegion.mV[VX] = origin_region.mV[VX] + 0.5f*mSurfacep->getGridsPerPatchEdge()*mSurfacep->getMetersPerGrid();
     mCenterRegion.mV[VY] = origin_region.mV[VY] + 0.5f*mSurfacep->getGridsPerPatchEdge()*mSurfacep->getMetersPerGrid();
-
-    mVisInfo.mbIsVisible = false;
-    mVisInfo.mDistance = 512.0f;
-    mVisInfo.mRenderLevel = 0;
-    mVisInfo.mRenderStride = mSurfacep->getGridsPerPatchEdge();
-
 }
 
 void LLSurfacePatch::connectNeighbor(LLSurfacePatch *neighbor_patchp, const U32 direction)
 {
     llassert(neighbor_patchp);
-    mNormalsInvalid[direction] = true;
-    neighbor_patchp->mNormalsInvalid[gDirOpposite[direction]] = true;
 
     setNeighborPatch(direction, neighbor_patchp);
     neighbor_patchp->setNeighborPatch(gDirOpposite[direction], this);
@@ -842,79 +561,6 @@ void LLSurfacePatch::connectNeighbor(LLSurfacePatch *neighbor_patchp, const U32 
     }
 }
 
-void LLSurfacePatch::updateVisibility()
-{
-    if (mVObjp.isNull())
-    {
-        return;
-    }
-
-    const F32 DEFAULT_DELTA_ANGLE   = (0.15f);
-    U32 old_render_stride, max_render_stride;
-    U32 new_render_level;
-    F32 stride_per_distance = DEFAULT_DELTA_ANGLE / mSurfacep->getMetersPerGrid();
-    U32 grids_per_patch_edge = mSurfacep->getGridsPerPatchEdge();
-
-    LLVector4a center;
-    center.load3( (mCenterRegion + mSurfacep->getOriginAgent()).mV);
-    LLVector4a radius;
-    radius.splat(mRadius);
-
-    // sphere in frustum on global coordinates
-    if (LLViewerCamera::getInstance()->AABBInFrustumNoFarClip(center, radius))
-    {
-        // We now need to calculate the render stride based on patchp's distance
-        // from LLCamera render_stride is governed by a relation something like this...
-        //
-        //                       delta_angle * patch.distance
-        // render_stride <=  ----------------------------------------
-        //                           mMetersPerGrid
-        //
-        // where 'delta_angle' is the desired solid angle of the average polgon on a patch.
-        //
-        // Any render_stride smaller than the RHS would be 'satisfactory'.  Smaller
-        // strides give more resolution, but efficiency suggests that we use the largest
-        // of the render_strides that obey the relation.  Flexibility is achieved by
-        // modulating 'delta_angle' until we have an acceptable number of triangles.
-
-        old_render_stride = mVisInfo.mRenderStride;
-
-        // Calculate the render_stride using information in agent
-        max_render_stride = lltrunc(mVisInfo.mDistance * stride_per_distance);
-        max_render_stride = llmin(max_render_stride , 2*grids_per_patch_edge);
-
-        // We only use render_strides that are powers of two, so we use look-up tables to figure out
-        // the render_level and corresponding render_stride
-        new_render_level = mVisInfo.mRenderLevel = mSurfacep->getRenderLevel(max_render_stride);
-        mVisInfo.mRenderStride = mSurfacep->getRenderStride(new_render_level);
-
-        if ((mVisInfo.mRenderStride != old_render_stride))
-            // The reason we check !mbIsVisible is because non-visible patches normals
-            // are not updated when their data is changed.  When this changes we can get
-            // rid of mbIsVisible altogether.
-        {
-            if (mVObjp)
-            {
-                mVObjp->dirtyGeom();
-                if (getNeighborPatch(WEST))
-                {
-                    getNeighborPatch(WEST)->mVObjp->dirtyGeom();
-                }
-                if (getNeighborPatch(SOUTH))
-                {
-                    getNeighborPatch(SOUTH)->mVObjp->dirtyGeom();
-                }
-            }
-        }
-        mVisInfo.mbIsVisible = true;
-    }
-    else
-    {
-        mVisInfo.mbIsVisible = false;
-    }
-}
-
-
 const LLVector3d &LLSurfacePatch::getOriginGlobal() const
 {
     return mOriginGlobal;
@@ -923,21 +569,6 @@ const LLVector3d &LLSurfacePatch::getOriginGlobal() const
 LLVector3 LLSurfacePatch::getOriginAgent() const
 {
     return gAgent.getPosAgentFromGlobal(mOriginGlobal);
-}
-
-bool LLSurfacePatch::getVisible() const
-{
-    return mVisInfo.mbIsVisible;
-}
-
-U32 LLSurfacePatch::getRenderStride() const
-{
-    return mVisInfo.mRenderStride;
-}
-
-S32 LLSurfacePatch::getRenderLevel() const
-{
-    return mVisInfo.mRenderLevel;
 }
 
 void LLSurfacePatch::setHasReceivedData()
@@ -1010,12 +641,6 @@ F32 LLSurfacePatch::getMaxComposition() const
 void LLSurfacePatch::setNeighborPatch(const U32 direction, LLSurfacePatch *neighborp)
 {
     mNeighborPatches[direction] = neighborp;
-    mNormalsInvalid[direction] = true;
-    if (direction < 4)
-    {
-        mNormalsInvalid[gDirAdjacent[direction][0]] = true;
-        mNormalsInvalid[gDirAdjacent[direction][1]] = true;
-    }
 }
 
 LLSurfacePatch *LLSurfacePatch::getNeighborPatch(const U32 direction) const

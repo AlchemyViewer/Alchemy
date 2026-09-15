@@ -658,7 +658,6 @@ if(AL_BUILD_VIEWER)
     llpanelwearing.cpp
     llparcelselection.cpp
     llparticipantlist.cpp
-    llpatchvertexarray.cpp
     llpathfindingcharacter.cpp
     llpathfindingcharacterlist.cpp
     llpathfindinglinkset.cpp
@@ -1437,7 +1436,6 @@ if(AL_BUILD_VIEWER)
     llpanelwearing.h
     llparcelselection.h
     llparticipantlist.h
-    llpatchvertexarray.h
     llpathfindingcharacter.h
     llpathfindingcharacterlist.h
     llpathfindinglinkset.h

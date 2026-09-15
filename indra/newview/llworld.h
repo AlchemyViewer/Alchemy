@@ -32,7 +32,6 @@
 #ifndef LL_LLWORLD_H
 #define LL_LLWORLD_H
 
-#include "llpatchvertexarray.h"
 
 #include "llmath.h"
 #include "v3math.h"
@@ -235,7 +234,6 @@ private:
     static const F32 mWidthInMeters;
 
     F32 mLandFarClip;                   // Far clip distance for land.
-    LLPatchVertexArray      mLandPatch;
     S32 mLastPacketsIn;
     S32 mLastPacketsOut;
     S32 mLastPacketsLost;

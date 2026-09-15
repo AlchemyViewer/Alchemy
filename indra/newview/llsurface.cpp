@@ -29,14 +29,12 @@
 #include "llsurface.h"
 
 #include "alterrainsurfacemaps.h"
-#include "llpatchvertexarray.h"
 #include "patch_dct.h"
 #include "patch_code.h"
 #include "llbitpack.h"
 #include "llviewerobjectlist.h"
 #include "llregionhandle.h"
 #include "llagent.h"
-#include "llagentcamera.h"
 #include "llworld.h"
 #include "llviewercontrol.h"
 #include "llviewertexture.h"
@@ -48,7 +46,6 @@
 #include "llworldmipmap.h"
 
 extern LLPipeline gPipeline;
-extern bool gShiftFrame;
 
 namespace
 {
@@ -77,13 +74,9 @@ LLSurface::LLSurface(U32 type, LLViewerRegion *regionp) :
 {
     // Surface data
     mSurfaceZ = nullptr;
-    mNorm = nullptr;
 
     // Patch data
     mPatchList = nullptr;
-
-    // One of each for each camera
-    mVisiblePatchCount = 0;
 
     mHasZData = false;
     // "uninitialized" min/max z
@@ -106,8 +99,6 @@ LLSurface::~LLSurface()
 {
     delete [] mSurfaceZ;
     mSurfaceZ = nullptr;
-
-    delete [] mNorm;
 
     mGridsPerEdge = 0;
     mGridsPerPatchEdge = 0;
@@ -160,8 +151,6 @@ void LLSurface::create(const S32 grids_per_edge,
 
     mOriginGlobal.setVec(origin_global);
 
-    mPVArray.create(mGridsPerEdge, mGridsPerPatchEdge, LLWorld::getInstance()->getRegionScale());
-
     S32 number_of_grids = mGridsPerEdge * mGridsPerEdge;
 
     /////////////////////////////////////
@@ -169,19 +158,13 @@ void LLSurface::create(const S32 grids_per_edge,
     // Initialize data arrays for surface
     ///
     mSurfaceZ = new F32[number_of_grids];
-    mNorm = new LLVector3[number_of_grids];
 
     // Reset the surface to be a flat square grid
     for(S32 i=0; i < number_of_grids; i++)
     {
         // Surface is flat and zero
-        // Normals all point up
         mSurfaceZ[i] = 0.0f;
-        mNorm[i].setVec(0.f, 0.f, 1.f);
     }
-
-
-    mVisiblePatchCount = 0;
 
 
     ///////////////////////
@@ -579,31 +562,6 @@ void LLSurface::moveZ(const S32 x, const S32 y, const F32 delta)
 }
 
 
-void LLSurface::updatePatchVisibilities(LLAgent &agent)
-{
-    if (gShiftFrame)
-    {
-        return;
-    }
-
-    LLVector3 pos_region = mRegionp->getPosRegionFromGlobal(gAgentCamera.getCameraPositionGlobal());
-
-    LLSurfacePatch *patchp;
-
-    mVisiblePatchCount = 0;
-    for (S32 i=0; i<mNumberOfPatches; i++)
-    {
-        patchp = mPatchList + i;
-
-        patchp->updateVisibility();
-        if (patchp->getVisible())
-        {
-            mVisiblePatchCount++;
-            patchp->updateCameraDistanceRegion(pos_region);
-        }
-    }
-}
-
 bool LLSurface::idleUpdate(F32 max_update_time)
 {
     if (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_TERRAIN))
@@ -623,14 +581,14 @@ bool LLSurface::idleUpdate(F32 max_update_time)
         getRegion()->dirtyHeights();
     }
 
-    // Always call updateNormals() / updateVerticalStats()
+    // Always fill the corner and update the vertical stats
     //  every frame to avoid artifacts
     for(std::set<LLSurfacePatch *>::iterator iter = mDirtyPatchList.begin();
         iter != mDirtyPatchList.end(); )
     {
         std::set<LLSurfacePatch *>::iterator curiter = iter++;
         LLSurfacePatch *patchp = *curiter;
-        patchp->updateNormals();
+        patchp->updateNorthEastCorner();
         patchp->updateVerticalStats();
         if (max_update_time == 0.f || update_timer.getElapsedTimeF32() < max_update_time)
         {
@@ -961,7 +919,6 @@ std::ostream& operator<<(std::ostream &s, const LLSurface &S)
     s << "  mPatchesPerEdge = " << S.mPatchesPerEdge << "\n";
     s << "  mOriginGlobal = " << S.mOriginGlobal << "\n";
     s << "  mMetersPerGrid = " << S.mMetersPerGrid << "\n";
-    s << "  mVisiblePatchCount = " << S.mVisiblePatchCount << "\n";
     s << "}";
     return s;
 }
@@ -978,9 +935,6 @@ void LLSurface::createPatchData()
 
     // Allocate memory
     mPatchList = new LLSurfacePatch[mNumberOfPatches];
-
-    // One of each for each camera
-    mVisiblePatchCount = mNumberOfPatches;
 
     for (j=0; j<mPatchesPerEdge; j++)
     {
@@ -1002,7 +956,6 @@ void LLSurface::createPatchData()
             S32 data_offset = i * mGridsPerPatchEdge + j * mGridsPerPatchEdge * mGridsPerEdge;
 
             patchp->setDataZ(mSurfaceZ + data_offset);
-            patchp->setDataNorm(mNorm + data_offset);
 
 
             // We make each patch point to its neighbors so we can do resolution checking
@@ -1096,25 +1049,12 @@ void LLSurface::destroyPatchData()
 
     delete [] mPatchList;
     mPatchList = nullptr;
-    mVisiblePatchCount = 0;
 }
 
 
 void LLSurface::setTextureSize(const S32 texture_size)
 {
     sTextureSize = texture_size;
-}
-
-
-U32 LLSurface::getRenderLevel(const U32 render_stride) const
-{
-    return mPVArray.mRenderLevelp[render_stride];
-}
-
-
-U32 LLSurface::getRenderStride(const U32 render_level) const
-{
-    return mPVArray.mRenderStridep[render_level];
 }
 
 

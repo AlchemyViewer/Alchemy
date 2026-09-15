@@ -39,8 +39,6 @@ class LLFace;
 class LLVOSurfacePatch : public LLStaticViewerObject
 {
 public:
-    static F32 sLODFactor;
-
     LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp);
 
     /*virtual*/ void markDead();

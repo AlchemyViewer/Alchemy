@@ -685,7 +685,6 @@ void LLWorld::updateVisibilities()
             if (LLViewerCamera::getInstance()->AABBInFrustum(bounds[0], bounds[1]))
             {
                 regionp->calculateCameraDistance();
-                regionp->getLand().updatePatchVisibilities(gAgent);
             }
             else
             {

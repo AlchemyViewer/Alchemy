@@ -43,8 +43,6 @@
 #include "pipeline.h"
 #include "llspatialpartition.h"
 
-F32 LLVOSurfacePatch::sLODFactor = 1.f;
-
 LLVOSurfacePatch::LLVOSurfacePatch(const LLUUID &id, const LLPCode pcode, LLViewerRegion *regionp)
     :   LLStaticViewerObject(id, pcode, regionp),
         mDirtiedPatch(false),

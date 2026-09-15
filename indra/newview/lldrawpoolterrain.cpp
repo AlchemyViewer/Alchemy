@@ -62,6 +62,7 @@ constexpr F32 TESS_DENSITY = 64.f;
 S32 LLDrawPoolTerrain::sPBRDetailMode = 0;
 F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
 F32 LLDrawPoolTerrain::sPBRDetailScale = DETAIL_SCALE;
+F32 LLDrawPoolTerrain::sLODFactor = 1.f;
 static LLGLSLShader* sShader = NULL;
 
 #if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
@@ -204,8 +205,7 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     // which is what a probe wants.
     const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
-    // sLODFactor is RenderTerrainLODFactor squared, as it always was.
-    const F32 density = LLPipeline::sDynamicLOD ? TESS_DENSITY * LLVOSurfacePatch::sLODFactor : 0.f;
+    const F32 density = LLPipeline::sDynamicLOD ? TESS_DENSITY * sLODFactor : 0.f;
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());

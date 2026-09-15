@@ -68,6 +68,7 @@ public:
     static S32 sPBRDetailMode;
     static F32 sDetailScale; // textures per meter
     static F32 sPBRDetailScale; // textures per meter
+    static F32 sLODFactor; // RenderTerrainLODFactor squared; scales the tessellation density
 
 protected:
     void boostTerrainDetailTextures();
