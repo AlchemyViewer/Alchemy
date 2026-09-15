@@ -50,6 +50,7 @@
 #include "llrender.h"
 #include "llenvironment.h"
 #include "llsettingsvo.h"
+#include "llappviewer.h"
 
 const F32 DETAIL_SCALE = 1.f/16.f;
 int DebugDetailMap = 0;
@@ -58,6 +59,85 @@ S32 LLDrawPoolTerrain::sPBRDetailMode = 0;
 F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
 F32 LLDrawPoolTerrain::sPBRDetailScale = DETAIL_SCALE;
 static LLGLSLShader* sShader = NULL;
+
+#if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+namespace
+{
+// Primitives the lit pass draws for terrain, summed over every region and
+// plotted once per frame. Each region draw runs inside its own
+// GL_PRIMITIVES_GENERATED query; the queries a frame issues are read at the
+// start of the next frame's first terrain draw, by which point the results
+// are in, so the readback never waits on the GPU. A frame that needs more
+// queries than the ring holds draws the rest uncounted.
+class ALTerrainPrimitivePlot
+{
+public:
+    void begin()
+    {
+        if (mQueries[0] == 0)
+        {
+            glGenQueries(RING, mQueries);
+        }
+        if (gFrameCount != mFrame)
+        {
+            flush();
+            mFrame = gFrameCount;
+        }
+        if (mIssued.size() == RING)
+        {
+            return;
+        }
+        const GLuint query = mQueries[mNext];
+        mNext = (mNext + 1) % RING;
+        glBeginQuery(GL_PRIMITIVES_GENERATED, query);
+        mIssued.push_back(query);
+        mActive = true;
+    }
+
+    void end()
+    {
+        if (mActive)
+        {
+            glEndQuery(GL_PRIMITIVES_GENERATED);
+            mActive = false;
+        }
+    }
+
+private:
+    void flush()
+    {
+        int64_t total = 0;
+        for (GLuint query : mIssued)
+        {
+            GLuint available = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
+            if (!available)
+            {
+                mIssued.clear();
+                return;
+            }
+            GLuint count = 0;
+            glGetQueryObjectuiv(query, GL_QUERY_RESULT, &count);
+            total += count;
+        }
+        if (!mIssued.empty())
+        {
+            LL_PROFILE_PLOT("terrain primitives", total);
+        }
+        mIssued.clear();
+    }
+
+    static constexpr U32 RING = 32;
+    GLuint mQueries[RING] = {};
+    std::vector<GLuint> mIssued;
+    U32  mNext = 0;
+    U32  mFrame = 0;
+    bool mActive = false;
+};
+
+ALTerrainPrimitivePlot sPrimitivePlot;
+}
+#endif
 
 LLDrawPoolTerrain::LLDrawPoolTerrain(LLViewerTexture *texturep) :
     LLFacePool(POOL_TERRAIN),
@@ -131,6 +211,7 @@ void LLDrawPoolTerrain::endDeferredPass(S32 pass)
 void LLDrawPoolTerrain::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_TERRAIN);
+    LL_PROFILE_GPU_ZONE("terrain deferred");
     if (mDrawFace.empty())
     {
         return;
@@ -138,7 +219,21 @@ void LLDrawPoolTerrain::renderDeferred(S32 pass)
 
     boostTerrainDetailTextures();
 
+#if LL_PROFILER_CONFIGURATION >= LL_PROFILER_CONFIG_TRACY
+    // Probe and hero faces render through this pass too; only the main view counts.
+    const bool count_primitives = gPipeline.mRT == &gPipeline.mMainRT;
+    if (count_primitives)
+    {
+        sPrimitivePlot.begin();
+    }
     renderFullShader();
+    if (count_primitives)
+    {
+        sPrimitivePlot.end();
+    }
+#else
+    renderFullShader();
+#endif
 
     // Special-case for land ownership feedback
     static const LLCachedControl<bool> show_parcel_owners(gSavedSettings, "ShowParcelOwners");
@@ -170,6 +265,7 @@ void LLDrawPoolTerrain::endShadowPass(S32 pass)
 void LLDrawPoolTerrain::renderShadow(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_TERRAIN);
+    LL_PROFILE_GPU_ZONE("terrain shadow");
     if (mDrawFace.empty())
     {
         return;
