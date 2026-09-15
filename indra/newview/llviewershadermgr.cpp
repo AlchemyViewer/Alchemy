@@ -933,12 +933,11 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         return "windlight/atmosphericsFuncs.glsl";
     }
 
-    // The terrain's evaluation-stage objects. GLSL links per stage, so the vertex-side helpers
-    // the terrain evaluation calls are compiled a second time here, for that stage, under the
-    // same keys in the stage's own map.
+    // The terrain's evaluation-stage objects. GLSL links per stage, so the objects the terrain
+    // evaluation calls are compiled here for that stage, under the same keys in the stage's
+    // own map.
     shaders.clear();
     shaders.push_back( make_pair( "deferred/terrainSurface.glsl",           1 ) );
-    shaders.push_back( make_pair( "deferred/textureUtilV.glsl",             1 ) );
     shaders.push_back( make_pair( "windlight/atmosphericsVarsV.glsl",       mShaderLevel[SHADER_WINDLIGHT] ) );
     for (U32 i = 0; i < shaders.size(); i++)
     {

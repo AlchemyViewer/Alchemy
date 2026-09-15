@@ -23,11 +23,6 @@
  * $/LicenseInfo$
  */
 
-#define TERRAIN_PBR_DETAIL_EMISSIVE 0
-#define TERRAIN_PBR_DETAIL_OCCLUSION -1
-#define TERRAIN_PBR_DETAIL_NORMAL -2
-#define TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS -3
-
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
@@ -37,8 +32,6 @@
 
 layout(quads, fractional_odd_spacing, ccw) in;
 
-uniform float region_scale;
-
 // terrainSurface.glsl
 vec2 terrain_patch_xy();
 vec3 terrain_surface(vec2 p_region, out vec3 n);
@@ -46,27 +39,16 @@ vec2 terrain_composition(vec2 p_region);
 
 out vec3 vary_position;
 out vec3 vary_normal;
-out vec2 vary_region_uv;
+// Region-local metres. Every projection's uv is an affine map of this, and the
+// fragment stage applies the maps itself: a vertex carrying the slices ready-made
+// would carry forty floats for the four materials, each interpolated per fragment
+// and set up per triangle, where the position is three and the maps are uniforms.
+out vec3 vary_region_position;
 
-// vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
 out vec4 vary_texcoord0;
 out vec4 vary_texcoord1;
-#elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
-out vec2 vary_texcoord;
 #endif
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-out vec4[10] vary_coords;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-out vec4[2] vary_coords;
-#endif
-
-// *HACK: Each material uses only one texture transform, but the KHR texture
-// transform spec allows handling texture transforms separately for each
-// individual texture info.
-uniform vec4[5] terrain_texture_transforms;
-
-vec2 terrain_texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform);
 
 void main()
 {
@@ -79,84 +61,12 @@ void main()
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;
 
     vary_normal = normalize(normal_matrix * normal);
-    vary_region_uv = xy / region_scale;
-
-    // Transform and pass tex coords
-    {
-        // Zero-init the padding lanes ([0].w, [1].zw) the transform never reads;
-        // avoids the driver "used before initialized" warning. See the block above.
-        vec4[2] ttt = vec4[2](vec4(0.0), vec4(0.0));
-#define transform_xy()             terrain_texture_transform(position.xy,               ttt)
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-// Don't care about upside-down (transform_xy_flipped())
-#define transform_yz()             terrain_texture_transform(position.yz,               ttt)
-#define transform_negx_z()         terrain_texture_transform(position.xz * vec2(-1, 1), ttt)
-#define transform_yz_flipped()     terrain_texture_transform(position.yz * vec2(-1, 1), ttt)
-#define transform_negx_z_flipped() terrain_texture_transform(position.xz,               ttt)
-        // material 1
-        ttt[0].xyz = terrain_texture_transforms[0].xyz;
-        ttt[1].x = terrain_texture_transforms[0].w;
-        ttt[1].y = terrain_texture_transforms[1].x;
-        vary_coords[0].xy = transform_xy();
-        vary_coords[0].zw = transform_yz();
-        vary_coords[1].xy = transform_negx_z();
-        vary_coords[1].zw = transform_yz_flipped();
-        vary_coords[2].xy = transform_negx_z_flipped();
-        // material 2
-        ttt[0].xyz = terrain_texture_transforms[1].yzw;
-        ttt[1].xy = terrain_texture_transforms[2].xy;
-        vary_coords[2].zw = transform_xy();
-        vary_coords[3].xy = transform_yz();
-        vary_coords[3].zw = transform_negx_z();
-        vary_coords[4].xy = transform_yz_flipped();
-        vary_coords[4].zw = transform_negx_z_flipped();
-        // material 3
-        ttt[0].xy = terrain_texture_transforms[2].zw;
-        ttt[0].z = terrain_texture_transforms[3].x;
-        ttt[1].xy = terrain_texture_transforms[3].yz;
-        vary_coords[5].xy = transform_xy();
-        vary_coords[5].zw = transform_yz();
-        vary_coords[6].xy = transform_negx_z();
-        vary_coords[6].zw = transform_yz_flipped();
-        vary_coords[7].xy = transform_negx_z_flipped();
-        // material 4
-        ttt[0].x = terrain_texture_transforms[3].w;
-        ttt[0].yz = terrain_texture_transforms[4].xy;
-        ttt[1].xy = terrain_texture_transforms[4].zw;
-        vary_coords[7].zw = transform_xy();
-        vary_coords[8].xy = transform_yz();
-        vary_coords[8].zw = transform_negx_z();
-        vary_coords[9].xy = transform_yz_flipped();
-        vary_coords[9].zw = transform_negx_z_flipped();
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        // material 1
-        ttt[0].xyz = terrain_texture_transforms[0].xyz;
-        ttt[1].x = terrain_texture_transforms[0].w;
-        ttt[1].y = terrain_texture_transforms[1].x;
-        vary_coords[0].xy = transform_xy();
-        // material 2
-        ttt[0].xyz = terrain_texture_transforms[1].yzw;
-        ttt[1].xy = terrain_texture_transforms[2].xy;
-        vary_coords[0].zw = transform_xy();
-        // material 3
-        ttt[0].xy = terrain_texture_transforms[2].zw;
-        ttt[0].z = terrain_texture_transforms[3].x;
-        ttt[1].xy = terrain_texture_transforms[3].yz;
-        vary_coords[1].xy = transform_xy();
-        // material 4
-        ttt[0].x = terrain_texture_transforms[3].w;
-        ttt[0].yz = terrain_texture_transforms[4].xy;
-        ttt[1].xy = terrain_texture_transforms[4].zw;
-        vary_coords[1].zw = transform_xy();
-#endif
-    }
+    vary_region_position = position;
 
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
     vec2 tc = terrain_composition(xy);
     vary_texcoord0.zw = tc.xy;
     vary_texcoord1.xy = tc.xy-vec2(2.0, 0.0);
     vary_texcoord1.zw = tc.xy-vec2(1.0, 0.0);
-#elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
-    vary_texcoord = position.xy / region_scale;
 #endif
 }

@@ -33,11 +33,12 @@
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-#define TerrainCoord vec4[3]
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-#define TerrainCoord vec2
-#endif
+struct TerrainPoint
+{
+    vec3 p;
+    vec3 ddx;
+    vec3 ddy;
+};
 
 #define MIX_X    1 << 3
 #define MIX_Y    1 << 4
@@ -83,9 +84,9 @@ struct PBRMix
 PBRMix init_pbr_mix();
 
 PBRMix terrain_sample_and_multiply_pbr(
-    TerrainCoord terrain_coord
-    , TerrainCoord terrain_coord_ddx
-    , TerrainCoord terrain_coord_ddy
+    TerrainPoint pt
+    , mat2 uv_transform
+    , vec2 uv_offset
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     , TerrainTriplanar tw
 #endif
@@ -159,9 +160,14 @@ uniform vec4 roughnessFactors;
 uniform vec3[4] emissiveColors;
 #endif
 uniform vec4 minimum_alphas; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
+// Per material, its KHR texture transform as the affine map uv = A p + b of a projection's 2D
+// point of the region position, the v flips folded in. The pool builds it; every slice of a
+// material goes through the same map, and the derivatives through A alone.
+uniform mat2[4] terrain_uv_transform;
+uniform vec2[4] terrain_uv_offset;
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
 // Per material, the texture's u and v axes in the projection plane: the rotation and scale
-// sign of its terrain_texture_transforms entry, inverted. See _t_normal_compose().
+// sign of its texture transform, inverted. See _t_normal_compose().
 uniform mat2[4] terrain_normal_axes;
 #endif
 
@@ -171,19 +177,12 @@ uniform float region_scale;
 
 in vec3 vary_position;
 in vec3 vary_normal;
-in vec2 vary_region_uv;
+in vec3 vary_region_position;
 
-// vary_texcoord* are used for terrain composition, vary_coords are used for terrain UVs
+// The composition's alpha-ramp coordinates
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE
 in vec4 vary_texcoord0;
 in vec4 vary_texcoord1;
-#elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
-in vec2 vary_texcoord;
-#endif
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-in vec4[10] vary_coords;
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-in vec4[2] vary_coords;
 #endif
 
 void mirrorClip(vec3 position);
@@ -230,13 +229,20 @@ vec3 terrain_geometric_normal()
 void main()
 {
     // Ahead of mirrorClip: a discard can leave the quad without the neighbouring lanes a
-    // derivative needs, so the one derivative this shader takes is taken while all four are live.
+    // derivative needs, so every derivative this shader takes is taken while all four are live.
+    // The region position's are the ones every projection's uv derivatives come from; the
+    // material and projection switches below are then free to branch.
     geom_normal = terrain_geometric_normal();
+    TerrainPoint pt;
+    pt.p = vary_region_position;
+    pt.ddx = dFdx(vary_region_position);
+    pt.ddy = dFdy(vary_region_position);
+    vec2 region_uv = pt.p.xy / region_scale;
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     // The projections are chosen by the surface's normal under the fragment, in region space
     // where the projection planes are the axes, whatever the lighting normal is -- see
     // terrain_facet -- and decided once for every material.
-    TerrainTriplanar tw = terrain_triplanar_weights(terrain_facet(vary_region_uv * region_scale));
+    TerrainTriplanar tw = terrain_triplanar_weights(terrain_facet(pt.p.xy));
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     // The same normal in region space, where the projection planes are the axes and every
@@ -257,7 +263,7 @@ void main()
 
     tm = get_terrain_mix_weights(alpha1, alpha2, alphaFinal);
 #elif TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
-    tm = get_terrain_usage_from_weight3(texture(paint_map, vary_texcoord).xyz);
+    tm = get_terrain_usage_from_weight3(texture(paint_map, region_uv).xyz);
 #endif
 
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_OCCLUSION)
@@ -281,49 +287,15 @@ void main()
 
     PBRMix pbr_mix = init_pbr_mix();
     PBRMix mix2;
-    // Derivatives of every uv the material switches below can reach, taken here where all four
-    // lanes of the quad are still running the same code. Each vary_coords entry packs two uv
-    // sets, so one dFdx per entry covers both. The switches then only select among values that
-    // already exist, and the fetches inside them use textureGrad -- see sample_pbr().
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-    vec4 vary_coords_ddx[10];
-    vec4 vary_coords_ddy[10];
-    for (int c = 0; c < 10; ++c)
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-    vec4 vary_coords_ddx[2];
-    vec4 vary_coords_ddy[2];
-    for (int c = 0; c < 2; ++c)
-#endif
-    {
-        vary_coords_ddx[c] = dFdx(vary_coords[c]);
-        vary_coords_ddy[c] = dFdy(vary_coords[c]);
-    }
-
-// Assign a uv slice and its two gradient slices together. Keeping them in one statement is the
-// point: a uv paired with the wrong gradients samples a plausible-looking but wrong mip, which
-// is not something a reader would catch by eye.
-#define TERRAIN_TC3(dst, dc, src, sc) terrain_texcoord[dst].dc = vary_coords[src].sc; terrain_texcoord_ddx[dst].dc = vary_coords_ddx[src].sc; terrain_texcoord_ddy[dst].dc = vary_coords_ddy[src].sc
-#define TERRAIN_TC1(src, sc) terrain_texcoord = vary_coords[src].sc; terrain_texcoord_ddx = vary_coords_ddx[src].sc; terrain_texcoord_ddy = vary_coords_ddy[src].sc
-
-    TerrainCoord terrain_texcoord;
-    TerrainCoord terrain_texcoord_ddx;
-    TerrainCoord terrain_texcoord_ddy;
+    // Each material's fetches happen inside its branch, through textureGrad with the
+    // derivatives derived above -- see sample_pbr().
     switch (tm.type & MIX_X)
     {
     case MIX_X:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        TERRAIN_TC3(0, xy, 0, xy);
-        TERRAIN_TC3(0, zw, 0, zw);
-        TERRAIN_TC3(1, xy, 1, xy);
-        TERRAIN_TC3(1, zw, 1, zw);
-        TERRAIN_TC3(2, xy, 2, xy);
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        TERRAIN_TC1(0, xy);
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
-            , terrain_texcoord_ddx
-            , terrain_texcoord_ddy
+            pt
+            , terrain_uv_transform[0]
+            , terrain_uv_offset[0]
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -357,19 +329,10 @@ void main()
     switch (tm.type & MIX_Y)
     {
     case MIX_Y:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        TERRAIN_TC3(0, xy, 2, zw);
-        TERRAIN_TC3(0, zw, 3, xy);
-        TERRAIN_TC3(1, xy, 3, zw);
-        TERRAIN_TC3(1, zw, 4, xy);
-        TERRAIN_TC3(2, xy, 4, zw);
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        TERRAIN_TC1(0, zw);
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
-            , terrain_texcoord_ddx
-            , terrain_texcoord_ddy
+            pt
+            , terrain_uv_transform[1]
+            , terrain_uv_offset[1]
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -403,19 +366,10 @@ void main()
     switch (tm.type & MIX_Z)
     {
     case MIX_Z:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        TERRAIN_TC3(0, xy, 5, xy);
-        TERRAIN_TC3(0, zw, 5, zw);
-        TERRAIN_TC3(1, xy, 6, xy);
-        TERRAIN_TC3(1, zw, 6, zw);
-        TERRAIN_TC3(2, xy, 7, xy);
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        TERRAIN_TC1(1, xy);
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
-            , terrain_texcoord_ddx
-            , terrain_texcoord_ddy
+            pt
+            , terrain_uv_transform[2]
+            , terrain_uv_offset[2]
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -449,19 +403,10 @@ void main()
     switch (tm.type & MIX_W)
     {
     case MIX_W:
-#if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
-        TERRAIN_TC3(0, xy, 7, zw);
-        TERRAIN_TC3(0, zw, 8, xy);
-        TERRAIN_TC3(1, xy, 8, zw);
-        TERRAIN_TC3(1, zw, 9, xy);
-        TERRAIN_TC3(2, xy, 9, zw);
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-        TERRAIN_TC1(1, zw);
-#endif
         mix2 = terrain_sample_and_multiply_pbr(
-            terrain_texcoord
-            , terrain_texcoord_ddx
-            , terrain_texcoord_ddy
+            pt
+            , terrain_uv_transform[3]
+            , terrain_uv_offset[3]
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
             , tw
 #endif
@@ -533,7 +478,7 @@ void main()
     {
         // The overlay's texels are encoded; the blend is in the linear space
         // the material mix above happens in.
-        vec4 overlay = texture(parcel_overlay, vary_region_uv);
+        vec4 overlay = texture(parcel_overlay, region_uv);
         base_color = mix(base_color, srgb_to_linear(overlay.rgb), overlay.a);
     }
 

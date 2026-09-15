@@ -253,11 +253,11 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasTessellatedTerrain)
     {
-        // GLSL resolves calls within a stage: the evaluation stage needs its own copies of the
-        // vertex-side helpers it calls. atmosphericsVarsV declares the outputs the fragment
-        // side's atmosphericsVarsF expects to find in the stage before it, which with
-        // tessellation is this one.
-        for (const char* object : { "deferred/terrainSurface.glsl", "deferred/textureUtilV.glsl", "windlight/atmosphericsVarsV.glsl" })
+        // GLSL resolves calls within a stage: the evaluation stage needs its own copy of the
+        // surface it evaluates. atmosphericsVarsV declares the outputs the fragment side's
+        // atmosphericsVarsF expects to find in the stage before it, which with tessellation is
+        // this one.
+        for (const char* object : { "deferred/terrainSurface.glsl", "windlight/atmosphericsVarsV.glsl" })
         {
             if (!shader->attachStageObject(GL_TESS_EVALUATION_SHADER, object))
             {
@@ -1558,7 +1558,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("normal_texcoord"); // (GLTF)
     mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
 
-    mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
+    mReservedUniforms.push_back("terrain_uv_transform");
+    mReservedUniforms.push_back("terrain_uv_offset");
     mReservedUniforms.push_back("terrain_normal_axes");
 
     llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_NORMAL_AXES +1);

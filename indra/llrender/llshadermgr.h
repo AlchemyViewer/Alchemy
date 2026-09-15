@@ -67,7 +67,8 @@ public:
         NORMAL_TEXCOORD,                      //  "normal_texcoord" (GLTF)
         METALLIC_ROUGHNESS_TEXCOORD,          //  "metallic_roughness_texcoord" (GLTF)
 
-        TERRAIN_TEXTURE_TRANSFORMS,           //  "terrain_texture_transforms" (GLTF)
+        TERRAIN_UV_TRANSFORM,                 //  "terrain_uv_transform"
+        TERRAIN_UV_OFFSET,                    //  "terrain_uv_offset"
         TERRAIN_NORMAL_AXES,                  //  "terrain_normal_axes"
 
         VIEWPORT,                           //  "viewport"

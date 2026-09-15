@@ -562,7 +562,15 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
     //      i.e. this isn't fully compliant with KHR_texture_transform, but is
     //      compliant when all texture infos used by a material have the same
     //      texture transform.
-    LLGLTFMaterial::TextureTransform::PackTight transforms_packed[terrain_material_count];
+    //
+    // The fragment shader applies each material's transform to a projection's
+    // 2D point of the fragment's region position, so it goes up as the affine
+    // map it is: uv = A p + b, with the v flip either side of the KHR transform
+    // (the PBR terrain uv is v-down) folded into A and b. Being linear, A alone
+    // takes the position's screen derivatives to the uv's.
+    F32 uv_transform[terrain_material_count][4];
+    F32 uv_offset[terrain_material_count][2];
+    F32 normal_axes[terrain_material_count][4];
     for (U32 i = 0; i < terrain_material_count; ++i)
     {
         const LLFetchedGLTFMaterial* fetched_material = (*fetched_materials)[i].get();
@@ -583,37 +591,35 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
         // RenderTerrainPBRScale into the KHR_texture_transform. This only
         // works if the scale is uniform and no other transforms are
         // applied to the terrain UVs.
-        transform.mScale.mV[VX] *= sPBRDetailScale;
-        transform.mScale.mV[VY] *= sPBRDetailScale;
+        const F32 scale_u = transform.mScale.mV[VX] * sPBRDetailScale;
+        const F32 scale_v = transform.mScale.mV[VY] * sPBRDetailScale;
+        const F32 c = cosf(transform.mRotation);
+        const F32 s = sinf(transform.mRotation);
 
-        transform.getPackedTight(transforms_packed[i]);
-    }
-    const U32 transform_param_count = LLGLTFMaterial::TextureTransform::PACK_TIGHT_SIZE * terrain_material_count;
-    constexpr U32 vec4_size = 4;
-    const U32 transform_vec4_count = (transform_param_count + (vec4_size - 1)) / vec4_size;
-    llassert(transform_vec4_count == 5); // If false, need to update shader
-    shader->uniform4fv(LLShaderMgr::TERRAIN_TEXTURE_TRANSFORMS, transform_vec4_count, (F32*)transforms_packed);
+        // Column-major: (c su, s su) then (-s sv, c sv).
+        uv_transform[i][0] = c * scale_u;
+        uv_transform[i][1] = s * scale_u;
+        uv_transform[i][2] = -s * scale_v;
+        uv_transform[i][3] = c * scale_v;
+        uv_offset[i][0] = transform.mOffset.mV[VX];
+        uv_offset[i][1] = -transform.mOffset.mV[VY];
 
-    if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
-    {
         // The normal texture's xy are slopes in its own uv space; the shader composes them in the
         // projection plane. Per material, the plane-space direction of the texture's u and v axes
         // as one column-major 2x2: the transform's rotation and scale sign, inverted. Magnitude is
-        // left out -- denser tiling does not steepen a bump -- so RenderTerrainPBRScale, folded
-        // into the scale above, does not reach here.
-        F32 normal_axes[terrain_material_count][4];
-        for (U32 i = 0; i < terrain_material_count; ++i)
-        {
-            const F32 rotation = transforms_packed[i][2];
-            const F32 c = cosf(rotation);
-            const F32 s = sinf(rotation);
-            const F32 sign_u = transforms_packed[i][0] < 0.f ? -1.f : 1.f;
-            const F32 sign_v = transforms_packed[i][1] < 0.f ? -1.f : 1.f;
-            normal_axes[i][0] = sign_u * c;
-            normal_axes[i][1] = -sign_v * s;
-            normal_axes[i][2] = sign_u * s;
-            normal_axes[i][3] = sign_v * c;
-        }
+        // left out -- denser tiling does not steepen a bump -- so RenderTerrainPBRScale does not
+        // reach here.
+        const F32 sign_u = scale_u < 0.f ? -1.f : 1.f;
+        const F32 sign_v = scale_v < 0.f ? -1.f : 1.f;
+        normal_axes[i][0] = sign_u * c;
+        normal_axes[i][1] = -sign_v * s;
+        normal_axes[i][2] = sign_u * s;
+        normal_axes[i][3] = sign_v * c;
+    }
+    shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_UV_TRANSFORM, terrain_material_count, GL_FALSE, (F32*)uv_transform);
+    shader->uniform2fv(LLShaderMgr::TERRAIN_UV_OFFSET, terrain_material_count, (F32*)uv_offset);
+    if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
+    {
         shader->uniformMatrix2fv(LLShaderMgr::TERRAIN_NORMAL_AXES, terrain_material_count, GL_FALSE, (F32*)normal_axes);
     }
 

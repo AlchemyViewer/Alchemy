@@ -376,9 +376,21 @@ PBRMix sample_pbr(
 #define sample_pbr fetch_pbr
 #endif
 
+// The fragment's region-local position and its screen derivatives. Every projection's uv is
+// an affine map of a 2D slice of the position, applied per material below; the map is linear,
+// so a slice's uv derivatives are its matrix applied to the position's. The derivatives are
+// taken once by the caller, in uniform control flow, and the maps can then run inside the
+// material and projection branches with nothing left to take there.
+struct TerrainPoint
+{
+    vec3 p;
+    vec3 ddx;
+    vec3 ddy;
+};
+
 // Which projections cover a fragment and by how much, and which side of the x and y axes its
-// surface faces, as +-1: sign() would give 0 on the axis itself, and the evaluation stage
-// supplies a flipped slice for the negative side, so 0 has to land there.
+// surface faces, as +-1: sign() would give 0 on the axis itself, and the negative side of an
+// axis is sampled through a mirrored slice, so 0 has to land on one side or the other.
 struct TerrainTriplanar
 {
     vec3 weight;
@@ -519,21 +531,10 @@ vec3 _t_normal_compose(vec3 n, mat2 uv_axes, vec3 g)
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 // Triplanar mapping
 
-// Pre-transformed texture coordinates for each axial uv slice (Packing: xy, yz, (-x)z, unused)
-#define TerrainCoord vec4[3]
-
-// axis_sign is +1 for the unflipped slice and -1 for the flipped one. It is the same +-1 the
-// caller builds the projection's normal frame from, so the uv a fragment samples and the frame
-// its normal is placed in never disagree.
-vec2 _t_uv(vec2 uv_unflipped, vec2 uv_flipped, float axis_sign)
-{
-    return mix(uv_flipped, uv_unflipped, max(0.0, axis_sign));
-}
-
 PBRMix terrain_sample_pbr(
-    TerrainCoord terrain_coord
-    , TerrainCoord terrain_coord_ddx
-    , TerrainCoord terrain_coord_ddy
+    TerrainPoint pt
+    , mat2 uv_transform
+    , vec2 uv_offset
     , TerrainTriplanar tw
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
@@ -551,28 +552,21 @@ PBRMix terrain_sample_pbr(
 {
     PBRMix mix = init_pbr_mix();
 
-    // Which side of each axis the surface faces, for both the uv slice and the normal frame below.
+    // Which side of each axis the surface faces, for both the uv slice and the normal frame
+    // below. The x slice sees the surface as a heightfield over (sx y, z), the y slice over
+    // (-sy x, z), the z slice over (x, y): u runs away from the axis on either side, so the
+    // texture faces out of both faces of a ridge. The material's map takes each slice to its
+    // uv, and its matrix takes the slice's derivatives to the uv's.
     float sx = tw.sx;
     float sy = tw.sy;
 
-#define get_uv_x() _t_uv(terrain_coord[0].zw, terrain_coord[1].zw, sx)
-#define get_uv_y() _t_uv(terrain_coord[1].xy, terrain_coord[2].xy, sy)
-#define get_uv_z() terrain_coord[0].xy
-// The same slice selection, applied to the gradients. A uv and the gradients that size its mip
-// must come from the same projection.
-#define get_ddx_x() _t_uv(terrain_coord_ddx[0].zw, terrain_coord_ddx[1].zw, sx)
-#define get_ddx_y() _t_uv(terrain_coord_ddx[1].xy, terrain_coord_ddx[2].xy, sy)
-#define get_ddx_z() terrain_coord_ddx[0].xy
-#define get_ddy_x() _t_uv(terrain_coord_ddy[0].zw, terrain_coord_ddy[1].zw, sx)
-#define get_ddy_y() _t_uv(terrain_coord_ddy[1].xy, terrain_coord_ddy[2].xy, sy)
-#define get_ddy_z() terrain_coord_ddy[0].xy
     switch (tw.type & SAMPLE_X)
     {
     case SAMPLE_X:
         PBRMix mix_x = sample_pbr(
-            get_uv_x()
-            , get_ddx_x()
-            , get_ddy_x()
+            uv_transform * vec2(sx * pt.p.y, pt.p.z) + uv_offset
+            , uv_transform * vec2(sx * pt.ddx.y, pt.ddx.z)
+            , uv_transform * vec2(sx * pt.ddy.y, pt.ddy.z)
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -602,9 +596,9 @@ PBRMix terrain_sample_pbr(
     {
     case SAMPLE_Y:
         PBRMix mix_y = sample_pbr(
-            get_uv_y()
-            , get_ddx_y()
-            , get_ddy_y()
+            uv_transform * vec2(-sy * pt.p.x, pt.p.z) + uv_offset
+            , uv_transform * vec2(-sy * pt.ddx.x, pt.ddx.z)
+            , uv_transform * vec2(-sy * pt.ddy.x, pt.ddy.z)
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -634,9 +628,9 @@ PBRMix terrain_sample_pbr(
     {
     case SAMPLE_Z:
         PBRMix mix_z = sample_pbr(
-            get_uv_z()
-            , get_ddx_z()
-            , get_ddy_z()
+            uv_transform * pt.p.xy + uv_offset
+            , uv_transform * pt.ddx.xy
+            , uv_transform * pt.ddy.xy
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -666,11 +660,6 @@ PBRMix terrain_sample_pbr(
 
     return mix;
 }
-
-#elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
-
-#define TerrainCoord vec2
-
 #endif
 
 PBRMix multiply_factors_pbr(
@@ -700,9 +689,9 @@ PBRMix multiply_factors_pbr(
 }
 
 PBRMix terrain_sample_and_multiply_pbr(
-    TerrainCoord terrain_coord
-    , TerrainCoord terrain_coord_ddx
-    , TerrainCoord terrain_coord_ddy
+    TerrainPoint pt
+    , mat2 uv_transform
+    , vec2 uv_offset
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     , TerrainTriplanar tw
 #endif
@@ -731,9 +720,9 @@ PBRMix terrain_sample_and_multiply_pbr(
 {
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     PBRMix mix = terrain_sample_pbr(
-        terrain_coord
-        , terrain_coord_ddx
-        , terrain_coord_ddy
+        pt
+        , uv_transform
+        , uv_offset
         , tw
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
@@ -750,9 +739,9 @@ PBRMix terrain_sample_and_multiply_pbr(
         );
 #elif TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 1
     PBRMix mix = sample_pbr(
-        terrain_coord
-        , terrain_coord_ddx
-        , terrain_coord_ddy
+        uv_transform * pt.p.xy + uv_offset
+        , uv_transform * pt.ddx.xy
+        , uv_transform * pt.ddy.xy
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
         , tex_orm
