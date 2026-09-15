@@ -6055,18 +6055,22 @@ LLViewerTexture *LLViewerObject::getTEImage(const U8 face) const
 bool LLViewerObject::isImageAlphaBlended(const U8 te) const
 {
     LLViewerTexture* image = getTEImage(te);
+    if (image && image->isAlphaOnly())
+    {
+        return true;
+    }
     LLGLenum format = image ? image->getPrimaryFormat() : GL_RGB;
     switch (format)
     {
         case GL_RGBA:
-        case GL_ALPHA:
-        case GL_RED:
         {
             return true;
         }
         break;
 
-        case GL_RGB: break;
+        // a luminance source is R8 too, and has no alpha
+        case GL_RGB:
+        case GL_RED: break;
         default:
         {
             LL_WARNS() << "Unexpected tex format in LLViewerObject::isImageAlphaBlended...returning no alpha." << LL_ENDL;

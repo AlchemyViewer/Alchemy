@@ -293,6 +293,13 @@ LLGLenum LLGLTexture::getPrimaryFormat() const
     return mGLTexturep->getPrimaryFormat() ;
 }
 
+bool LLGLTexture::isAlphaOnly() const
+{
+    llassert(mGLTexturep.notNull()) ;
+
+    return mGLTexturep->isAlphaOnly() ;
+}
+
 bool LLGLTexture::getIsAlphaMask() const
 {
     llassert(mGLTexturep.notNull()) ;

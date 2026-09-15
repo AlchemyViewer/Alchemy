@@ -5378,7 +5378,7 @@ void LLPanelFace::LLSelectedTE::getImageFormat(LLGLenum& image_format_to_return,
             {
                 format = image->getPrimaryFormat();
                 missing = image->isMissingAsset();
-                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
+                if (format == GL_RGBA || image->isAlphaOnly())
                 {
                     mHasAlpha = true;
                 }
@@ -5611,8 +5611,7 @@ void LLPanelFace::LLSelectedTEMaterial::getCurrentDiffuseAlphaMode(U8& diffuse_a
             LLViewerTexture* image = object->getTEImage(face);
             if (image)
             {
-                LLGLenum format = image->getPrimaryFormat();
-                if (format == GL_RGBA || format == GL_ALPHA || format == GL_RED) // GL_RED is used for alpha in deprecated format swizzle cases
+                if (image->getPrimaryFormat() == GL_RGBA || image->isAlphaOnly())
                 {
                     has_alpha = true;
                 }

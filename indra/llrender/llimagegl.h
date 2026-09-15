@@ -257,6 +257,10 @@ public:
     bool isJustBound() const;
     bool getHasExplicitFormat() const { return mHasExplicitFormat; }
     LLGLenum getPrimaryFormat() const { return mFormatPrimary; }
+    // The source was alpha only (GL_ALPHA). It is held as R8 under a {0,0,0,R}
+    // swizzle, so getPrimaryFormat() cannot tell it from a luminance source;
+    // the format it was asked for can.
+    bool isAlphaOnly() const { return mDeprecatedSourceFormat == GL_ALPHA; }
     LLGLenum getFormatType() const { return mFormatType; }
 
     // Internal format to hand glTexStorage*. Block-compressed textures keep their sized
