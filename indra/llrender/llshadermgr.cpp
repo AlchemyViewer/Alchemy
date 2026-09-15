@@ -90,8 +90,47 @@ std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, con
     // and no second copy was compiled. Absence is always that decision and never a failure:
     // loadBasicShaders aborts the whole load if a copy it did want fails to build.
     const std::string key = path + suffix;
-    const auto& objects = (stage == GL_VERTEX_SHADER) ? mVertexShaderObjects : mFragmentShaderObjects;
-    return objects.count(key) ? key : path;
+    return mShaderObjects[stageIndex(stage)].contains(key) ? key : path;
+}
+
+// static
+LLShaderMgr::EShaderStage LLShaderMgr::stageIndex(GLenum type)
+{
+    switch (type)
+    {
+        case GL_VERTEX_SHADER:          return STAGE_VERTEX;
+        case GL_TESS_CONTROL_SHADER:    return STAGE_TESS_CONTROL;
+        case GL_TESS_EVALUATION_SHADER: return STAGE_TESS_EVALUATION;
+        case GL_GEOMETRY_SHADER:        return STAGE_GEOMETRY;
+        case GL_FRAGMENT_SHADER:        return STAGE_FRAGMENT;
+        case GL_COMPUTE_SHADER:         return STAGE_COMPUTE;
+        default:
+            LL_ERRS("Shaders") << "Unknown shader stage " << type << LL_ENDL;
+            return STAGE_VERTEX;
+    }
+}
+
+// static
+const char* LLShaderMgr::stageDefine(GLenum type)
+{
+    switch (stageIndex(type))
+    {
+        case STAGE_VERTEX:          return "#define VERTEX_SHADER 1\n";
+        case STAGE_TESS_CONTROL:    return "#define TESS_CONTROL_SHADER 1\n";
+        case STAGE_TESS_EVALUATION: return "#define TESS_EVALUATION_SHADER 1\n";
+        case STAGE_GEOMETRY:        return "#define GEOMETRY_SHADER 1\n";
+        case STAGE_FRAGMENT:        return "#define FRAGMENT_SHADER 1\n";
+        case STAGE_COMPUTE:         return "#define COMPUTE_SHADER 1\n";
+        default:                    return "";
+    }
+}
+
+void LLShaderMgr::clearShaderObjects()
+{
+    for (auto& objects : mShaderObjects)
+    {
+        objects.clear();
+    }
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -654,14 +693,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         }
     }
 
-    if (type == GL_FRAGMENT_SHADER)
-    {
-        extra_code_text[extra_code_count++] = strdup("#define FRAGMENT_SHADER 1\n");
-    }
-    else
-    {
-        extra_code_text[extra_code_count++] = strdup("#define VERTEX_SHADER 1\n");
-    }
+    extra_code_text[extra_code_count++] = strdup(stageDefine(type));
 
     // Use alpha float to store bit flags
     // See: C++: addDeferredAttachment(), shader: frag_data[2]
@@ -1084,12 +1116,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         // one -- a shared object compiled a second time under different defines needs its own
         // entry, since attach is by key (see variantObjectKey).
         const std::string& key = cache_key.empty() ? filename : cache_key;
-        if (type == GL_VERTEX_SHADER) {
-            mVertexShaderObjects[key] = ret;
-        }
-        else if (type == GL_FRAGMENT_SHADER) {
-            mFragmentShaderObjects[key] = ret;
-        }
+        mShaderObjects[stageIndex(type)][key] = ret;
         shader_level = try_gpu_class;
     }
     else

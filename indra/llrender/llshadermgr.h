@@ -33,6 +33,8 @@
 #include "llgl.h"
 #include "llglslshader.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 class LLShaderMgr
 {
 public:
@@ -580,10 +582,30 @@ public:
     bool loadCachedProgramBinary(LLGLSLShader* shader);
     bool saveCachedProgramBinary(LLGLSLShader* shader);
 
+    // The pipeline stages a shader object can be compiled for, as indices into
+    // mShaderObjects. GLSL links per stage, so an object a program attaches must
+    // have been compiled for the stage it is attached to; the same source can
+    // sit in several maps.
+    enum EShaderStage : U32
+    {
+        STAGE_VERTEX = 0,
+        STAGE_TESS_CONTROL,
+        STAGE_TESS_EVALUATION,
+        STAGE_GEOMETRY,
+        STAGE_FRAGMENT,
+        STAGE_COMPUTE,
+        STAGE_COUNT
+    };
+    static EShaderStage stageIndex(GLenum type);
+    // The "#define <STAGE>_SHADER 1" line loadShaderFile prepends for a stage.
+    static const char* stageDefine(GLenum type);
+
+    void clearShaderObjects();
+
 public:
-    // Map of shader names to compiled
-    std::map<std::string, GLuint> mVertexShaderObjects;
-    std::map<std::string, GLuint> mFragmentShaderObjects;
+    // Compiled shared shader objects per stage, keyed by path -- or by the
+    // distinct key an axis copy was stored under (see loadShaderFile).
+    boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;

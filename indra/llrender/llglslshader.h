@@ -320,8 +320,12 @@ public:
     // recreating the program invalidates them. Returns false if the program OR any requested
     // variant fails; a failed axis leaves its pointer null.
     bool createShader(U32 variants = 0);
-    bool attachFragmentObject(std::string object);
-    bool attachVertexObject(std::string object);
+    // Attach the shared object compiled for `stage` under `object` (a path, or a variant key
+    // from LLShaderMgr::variantObjectKey). An object compiled for another stage does not
+    // count: GLSL resolves calls within a stage.
+    bool attachStageObject(GLenum stage, const std::string& object);
+    bool attachFragmentObject(const std::string& object) { return attachStageObject(GL_FRAGMENT_SHADER, object); }
+    bool attachVertexObject(const std::string& object) { return attachStageObject(GL_VERTEX_SHADER, object); }
     void attachObject(GLuint object);
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
     bool mapAttributes();

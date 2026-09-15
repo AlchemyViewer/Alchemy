@@ -871,45 +871,25 @@ void dumpAttachObject(const char* func_name, GLuint program_object, const std::s
 }
 #endif // DEBUG_SHADER_INCLUDES
 
-bool LLGLSLShader::attachVertexObject(std::string object_path)
+bool LLGLSLShader::attachStageObject(GLenum stage, const std::string& object_path)
 {
-    if (LLShaderMgr::instance()->mVertexShaderObjects.count(object_path) > 0)
-    {
-        stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mVertexShaderObjects[object_path]);
-#if DEBUG_SHADER_INCLUDES
-        dumpAttachObject("attachVertexObject", mProgramObject, object_path);
-#endif // DEBUG_SHADER_INCLUDES
-        stop_glerror();
-        return true;
-    }
-    else
-    {
-        LL_SHADER_LOADING_WARNS() << "Attempting to attach shader object: '" << object_path << "' that hasn't been compiled." << LL_ENDL;
-        return false;
-    }
-}
-
-bool LLGLSLShader::attachFragmentObject(std::string object_path)
-{
-    if(mUsingBinaryProgram)
+    if (mUsingBinaryProgram)
         return true;
 
-    if (LLShaderMgr::instance()->mFragmentShaderObjects.count(object_path) > 0)
+    const auto& objects = LLShaderMgr::instance()->mShaderObjects[LLShaderMgr::stageIndex(stage)];
+    const auto found = objects.find(object_path);
+    if (found == objects.end())
     {
-        stop_glerror();
-        glAttachShader(mProgramObject, LLShaderMgr::instance()->mFragmentShaderObjects[object_path]);
-#if DEBUG_SHADER_INCLUDES
-        dumpAttachObject("attachFragmentObject", mProgramObject, object_path);
-#endif // DEBUG_SHADER_INCLUDES
-        stop_glerror();
-        return true;
-    }
-    else
-    {
-        LL_SHADER_LOADING_WARNS() << "Attempting to attach shader object: '" << object_path << "' that hasn't been compiled." << LL_ENDL;
+        LL_SHADER_LOADING_WARNS() << "Attempting to attach shader object: '" << object_path << "' that hasn't been compiled for stage " << stage << LL_ENDL;
         return false;
     }
+    stop_glerror();
+    glAttachShader(mProgramObject, found->second);
+#if DEBUG_SHADER_INCLUDES
+    dumpAttachObject("attachStageObject", mProgramObject, object_path);
+#endif // DEBUG_SHADER_INCLUDES
+    stop_glerror();
+    return true;
 }
 
 void LLGLSLShader::attachObject(GLuint object)
