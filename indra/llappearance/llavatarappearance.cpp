@@ -72,7 +72,7 @@ public:
         mChildren.clear();
     }
     bool parseXml(LLXmlTreeNode* node);
-    glm::mat4 getJointMatrix();
+    LLMatrix4a getJointMatrix();
 
 private:
     std::string mName;
@@ -113,7 +113,7 @@ private:
     static void getJointMatricesAndHierarhy(
         LLAvatarBoneInfo* bone_info,
         LLJointData& data,
-        const glm::mat4& parent_mat);
+        const LLMatrix4a& parent_mat);
 
 private:
     S32 mNumBones;
@@ -1641,17 +1641,15 @@ bool LLAvatarBoneInfo::parseXml(LLXmlTreeNode* node)
 }
 
 
-glm::mat4 LLAvatarBoneInfo::getJointMatrix()
+LLMatrix4a LLAvatarBoneInfo::getJointMatrix()
 {
-    glm::mat4 mat(1.0f);
-    // 1. Scaling
-    mat = glm::scale(mat, glm::vec3(mScale[0], mScale[1], mScale[2]));
-    // 2. Rotation (avatar_skeleton.xml stores Euler angles in degrees)
-    mat = glm::rotate(mat, glm::radians(mRot[0]), glm::vec3(1, 0, 0));
-    mat = glm::rotate(mat, glm::radians(mRot[1]), glm::vec3(0, 1, 0));
-    mat = glm::rotate(mat, glm::radians(mRot[2]), glm::vec3(0, 0, 1));
-    // 3. Position
-    mat = glm::translate(mat, glm::vec3(mPos[0], mPos[1], mPos[2]));
+    // The position, then the rotations about z, y and x (avatar_skeleton.xml
+    // stores Euler angles in degrees), then the scale.
+    LLMatrix4a mat = LLMatrix4a::translation(mPos[0], mPos[1], mPos[2]);
+    mat.setMul(mat, LLMatrix4a::rotation(mRot[2] * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f)));
+    mat.setMul(mat, LLMatrix4a::rotation(mRot[1] * DEG_TO_RAD, LLVector4a(0.f, 1.f, 0.f)));
+    mat.setMul(mat, LLMatrix4a::rotation(mRot[0] * DEG_TO_RAD, LLVector4a(1.f, 0.f, 0.f)));
+    mat.setMul(mat, LLMatrix4a::scaling(mScale[0], mScale[1], mScale[2]));
     return mat;
 }
 
@@ -1688,13 +1686,14 @@ bool LLAvatarSkeletonInfo::parseXml(LLXmlTreeNode* node)
 void LLAvatarSkeletonInfo::getJointMatricesAndHierarhy(
     LLAvatarBoneInfo* bone_info,
     LLJointData& data,
-    const glm::mat4& parent_mat)
+    const LLMatrix4a& parent_mat)
 {
     data.mName = bone_info->mName;
     data.mJointMatrix = bone_info->getJointMatrix();
-    data.mScale = glm::vec3(bone_info->mScale[0], bone_info->mScale[1], bone_info->mScale[2]);
+    data.mScale = bone_info->mScale;
     data.mRotation = bone_info->mRot;
-    data.mRestMatrix = parent_mat * data.mJointMatrix;
+    // this joint's transform, then the parent's
+    data.mRestMatrix.setMul(data.mJointMatrix, parent_mat);
     data.mIsJoint = bone_info->mIsJoint;
     data.mGroup = bone_info->mGroup;
     data.setSupport(bone_info->mSupport);
@@ -1782,7 +1781,7 @@ const LLAvatarAppearance::joint_alias_map_t& LLAvatarAppearance::getJointAliases
 
 void LLAvatarAppearance::getJointMatricesAndHierarhy(std::vector<LLJointData> &data) const
 {
-    glm::mat4 identity(1.f);
+    const LLMatrix4a identity = LLMatrix4a::identity();
     for (LLAvatarBoneInfo* bone_info : sAvatarSkeletonInfo->mBoneInfoList)
     {
         LLJointData& child_data = data.emplace_back();

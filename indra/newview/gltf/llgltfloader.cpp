@@ -27,7 +27,6 @@
 #include "llgltfloader.h"
 
 #include <meshoptimizer.h>
-#include <glm/gtc/packing.hpp>
 
 // Import & define single-header gltf import/export lib
 #define TINYGLTF_IMPLEMENTATION
@@ -73,20 +72,36 @@ static const std::string lod_suffix[LLModel::NUM_LODS] =
 };
 
 // Premade rotation matrix, GLTF is Y-up while SL is Z-up
-static const glm::mat4 coord_system_rotation(
+static const F32 COORD_SYSTEM_ROTATION[16] = {
     1.f, 0.f, 0.f, 0.f,
     0.f, 0.f, 1.f, 0.f,
     0.f, -1.f, 0.f, 0.f,
     0.f, 0.f, 0.f, 1.f
-);
+};
+static const LLMatrix4a coord_system_rotation(COORD_SYSTEM_ROTATION);
 
-
-static const glm::mat4 coord_system_rotationxy(
+static const F32 COORD_SYSTEM_ROTATION_XY[16] = {
     0.f, 1.f, 0.f, 0.f,
     -1.f, 0.f, 0.f, 0.f,
     0.f, 0.f, 1.f, 0.f,
     0.f, 0.f, 0.f, 1.f
-);
+};
+static const LLMatrix4a coord_system_rotationxy(COORD_SYSTEM_ROTATION_XY);
+
+// a then b, and the inverse, as values
+static LLMatrix4a then(const LLMatrix4a& a, const LLMatrix4a& b)
+{
+    LLMatrix4a r;
+    r.setMul(a, b);
+    return r;
+}
+
+static LLMatrix4a inverse_of(const LLMatrix4a& m)
+{
+    LLMatrix4a r;
+    r.setInverse(m);
+    return r;
+}
 
 static const S32 VERTEX_SPLIT_SAFETY_MARGIN = 3 * 3 + 1; // 10 vertices: 3 complete triangles plus remapping overhead
 static const S32 VERTEX_LIMIT = USHRT_MAX - VERTEX_SPLIT_SAFETY_MARGIN;
@@ -451,14 +466,14 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
             }
             else
             {
-                glm::mat4 hierarchy_transform;
+                LLMatrix4a hierarchy_transform;
                 computeCombinedNodeTransform(mGLTFAsset, node_idx, hierarchy_transform);
-                glm::mat4 combined = coord_system_rotation * hierarchy_transform;
+                LLMatrix4a combined = then(hierarchy_transform, coord_system_rotation);
                 if (mApplyXYRotation)
                 {
-                    combined = coord_system_rotationxy * combined;
+                    combined = then(combined, coord_system_rotationxy);
                 }
-                mTransform = LLMatrix4(glm::value_ptr(combined));
+                combined.store(mTransform);
             }
             transformation = mTransform;
 
@@ -535,11 +550,11 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
     }
 }
 
-void LLGLTFLoader::computeCombinedNodeTransform(const LL::GLTF::Asset& asset, S32 node_index, glm::mat4& combined_transform) const
+void LLGLTFLoader::computeCombinedNodeTransform(const LL::GLTF::Asset& asset, S32 node_index, LLMatrix4a& combined_transform) const
 {
     if (node_index < 0 || node_index >= static_cast<S32>(asset.mNodes.size()))
     {
-        combined_transform = glm::mat4(1.0f);
+        combined_transform.setIdentity();
         return;
     }
 
@@ -560,9 +575,9 @@ void LLGLTFLoader::computeCombinedNodeTransform(const LL::GLTF::Asset& asset, S3
         if (it != potential_parent.mChildren.end())
         {
             // Found parent - recursively get its combined transform and apply it
-            glm::mat4 parent_transform;
+            LLMatrix4a parent_transform;
             computeCombinedNodeTransform(asset, static_cast<S32>(i), parent_transform);
-            combined_transform = parent_transform * combined_transform;
+            combined_transform.setMul(combined_transform, parent_transform);
             return; // Early exit - a node can only have one parent
         }
     }
@@ -769,36 +784,37 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
     // of vertex baking), which would require adjusting inverse bind matrices, bind shape
     // matrix, and weight keying to match.
     S32 node_index = static_cast<S32>(&nodeno - &mGLTFAsset.mNodes[0]);
-    glm::mat4 hierarchy_transform;
+    LLMatrix4a hierarchy_transform;
     computeCombinedNodeTransform(mGLTFAsset, node_index, hierarchy_transform);
 
-    glm::mat4 vertex_transform;
+    LLMatrix4a vertex_transform;
     if (skinIdx >= 0)
     {
         // Skinned mesh: bake coord rotation + hierarchy into vertices.
         // Inverse bind matrices and skin weights depend on this transform being applied.
-        vertex_transform = coord_system_rotation * hierarchy_transform;
+        vertex_transform = then(hierarchy_transform, coord_system_rotation);
         if (mApplyXYRotation)
         {
-            vertex_transform = coord_system_rotationxy * vertex_transform;
+            vertex_transform = then(vertex_transform, coord_system_rotationxy);
         }
     }
     else
     {
         // Non-skinned mesh: don't apply any transform to vertices.
         // The hierarchy transform will be stored in the scene transform matrix.
-        vertex_transform = glm::mat4(1.0f); // identity
+        vertex_transform.setIdentity();
     }
 
     // Check if we have a negative scale (flipped coordinate system)
     // coord_system_rotation and coord_system_rotationxy are pure rotations (det=1),
     // so negative scale depends only on the hierarchy transform.
-    bool hasNegativeScale = glm::determinant(hierarchy_transform) < 0.0f;
+    bool hasNegativeScale = hierarchy_transform.determinant() < 0.0f;
 
-    bool hasVertexTransform = (vertex_transform != glm::mat4(1.0f));
+    bool hasVertexTransform = (vertex_transform != LLMatrix4a::identity());
 
     // Pre-compute normal transform matrix (transpose of inverse of upper-left 3x3)
-    const glm::mat3 normal_transform = glm::transpose(glm::inverse(glm::mat3(vertex_transform)));
+    LLMatrix4a normal_transform;
+    normal_transform.setNormalMatrix(vertex_transform);
 
     // Mark unsuported joints with '-1' so that they won't get added into weights
     // GLTF maps all joints onto all meshes. Gather use count per mesh to cut unused ones.
@@ -860,44 +876,47 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
 
             if (hasVertexTransform)
             {
-                glm::vec4 pos(prim.mPositions[i][0], prim.mPositions[i][1], prim.mPositions[i][2], 1.0f);
-                glm::vec4 transformed_pos = vertex_transform * pos;
-                vert.position = glm::vec3(transformed_pos);
+                LLVector4a transformed_pos;
+                vertex_transform.affineTransform(prim.mPositions[i], transformed_pos);
+                vert.position.set(transformed_pos.getF32ptr());
 
+                LLVector4a normal_vec(0.f, 0.f, 1.f, 0.f);
                 if (!prim.mNormals.empty())
                 {
-                    glm::vec3 normal_vec(prim.mNormals[i][0], prim.mNormals[i][1], prim.mNormals[i][2]);
-                    vert.normal = glm::normalize(normal_transform * normal_vec);
+                    normal_vec = prim.mNormals[i];
                 }
                 else
                 {
-                    vert.normal = glm::normalize(normal_transform * glm::vec3(0.0f, 0.0f, 1.0f));
                     LL_DEBUGS("GLTF_IMPORT") << "No normals found for primitive, using default normal." << LL_ENDL;
                 }
+                LLVector4a transformed_normal;
+                normal_transform.rotate(normal_vec, transformed_normal);
+                transformed_normal.normalize3();
+                vert.normal.set(transformed_normal.getF32ptr());
             }
             else
             {
                 // No transform: store raw GLTF positions and normals.
                 // The scene transform will carry coord rotation + hierarchy.
-                vert.position = glm::vec3(prim.mPositions[i][0], prim.mPositions[i][1], prim.mPositions[i][2]);
+                vert.position.set(prim.mPositions[i].getF32ptr());
 
                 if (!prim.mNormals.empty())
                 {
-                    vert.normal = glm::vec3(prim.mNormals[i][0], prim.mNormals[i][1], prim.mNormals[i][2]);
+                    vert.normal.set(prim.mNormals[i].getF32ptr());
                 }
                 else
                 {
-                    vert.normal = glm::vec3(0.0f, 0.0f, 1.0f);
+                    vert.normal.set(0.0f, 0.0f, 1.0f);
                     LL_DEBUGS("GLTF_IMPORT") << "No normals found for primitive, using default normal." << LL_ENDL;
                 }
             }
 
             // Flip texture V coordinate
-            vert.uv0 = glm::vec2(prim.mTexCoords0[i][0], 1.f - prim.mTexCoords0[i][1]);
+            vert.uv0.set(prim.mTexCoords0[i][0], 1.f - prim.mTexCoords0[i][1]);
 
             if (skinIdx >= 0)
             {
-                vert.weights = glm::vec4(prim.mWeights[i]);
+                vert.weights.set(prim.mWeights[i].getF32ptr());
 
                 auto accessorIdx = prim.mAttributes.at("JOINTS_0");
                 LL::GLTF::Accessor::ComponentType componentType = LL::GLTF::Accessor::ComponentType::UNSIGNED_BYTE;
@@ -909,19 +928,25 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
 
                 // The GLTF spec allows for either an unsigned byte for joint indices, or an unsigned short.
                 // Detect and unpack accordingly.
+                const U64 packed = prim.mJoints[i];
                 if (componentType == LL::GLTF::Accessor::ComponentType::UNSIGNED_BYTE)
                 {
-                    auto ujoint = glm::unpackUint4x8((U32)(prim.mJoints[i] & 0xFFFFFFFF));
-                    vert.joints = glm::u16vec4(ujoint.x, ujoint.y, ujoint.z, ujoint.w);
+                    for (U32 j = 0; j < 4; ++j)
+                    {
+                        vert.joints[j] = U16((packed >> (8 * j)) & 0xFF);
+                    }
                 }
                 else if (componentType == LL::GLTF::Accessor::ComponentType::UNSIGNED_SHORT)
                 {
-                    vert.joints = glm::unpackUint4x16(prim.mJoints[i]);
+                    for (U32 j = 0; j < 4; ++j)
+                    {
+                        vert.joints[j] = U16((packed >> (16 * j)) & 0xFFFF);
+                    }
                 }
                 else
                 {
-                    vert.joints = glm::zero<glm::u16vec4>();
-                    vert.weights = glm::zero<glm::vec4>();
+                    vert.joints[0] = vert.joints[1] = vert.joints[2] = vert.joints[3] = 0;
+                    vert.weights.clear();
                 }
             }
             vertices.push_back(vert);
@@ -941,8 +966,8 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
         }
 
         std::vector<LLVolumeFace::VertexData> faceVertices;
-        glm::vec3 min = glm::vec3(FLT_MAX);
-        glm::vec3 max = glm::vec3(-FLT_MAX);
+        LLVector3 min(FLT_MAX, FLT_MAX, FLT_MAX);
+        LLVector3 max(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
         for (U32 i = 0; i < vertices.size(); i++)
         {
@@ -955,19 +980,15 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             }
             else
             {
-                min.x = std::min(min.x, vertices[i].position.x);
-                min.y = std::min(min.y, vertices[i].position.y);
-                min.z = std::min(min.z, vertices[i].position.z);
-                max.x = std::max(max.x, vertices[i].position.x);
-                max.y = std::max(max.y, vertices[i].position.y);
-                max.z = std::max(max.z, vertices[i].position.z);
+                update_min_max(min, max, vertices[i].position);
             }
 
-            LLVector4a position = LLVector4a(vertices[i].position.x, vertices[i].position.y, vertices[i].position.z);
-            LLVector4a normal = LLVector4a(vertices[i].normal.x, vertices[i].normal.y, vertices[i].normal.z);
+            LLVector4a position, normal;
+            position.load3(vertices[i].position.mV);
+            normal.load3(vertices[i].normal.mV);
             vert.setPosition(position);
             vert.setNormal(normal);
-            vert.mTexCoord = LLVector2(vertices[i].uv0.x, vertices[i].uv0.y);
+            vert.mTexCoord = vertices[i].uv0;
             faceVertices.push_back(vert);
 
             if (skinIdx >= 0)
@@ -979,29 +1000,29 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                 // don't reindex them yet, more indexes will be removed
                 // Also drop joints that have no weight. GLTF stores 4 per vertex, so there might be
                 // 'empty' ones
-                if (gltf_joint_index_use[vertices[i].joints.x] >= 0
-                    && vertices[i].weights.x > 0.f)
+                if (gltf_joint_index_use[vertices[i].joints[0]] >= 0
+                    && vertices[i].weights.mV[0] > 0.f)
                 {
-                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints.x, vertices[i].weights.x));
-                    gltf_joint_index_use[vertices[i].joints.x]++;
+                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints[0], vertices[i].weights.mV[0]));
+                    gltf_joint_index_use[vertices[i].joints[0]]++;
                 }
-                if (gltf_joint_index_use[vertices[i].joints.y] >= 0
-                    && vertices[i].weights.y > 0.f)
+                if (gltf_joint_index_use[vertices[i].joints[1]] >= 0
+                    && vertices[i].weights.mV[1] > 0.f)
                 {
-                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints.y, vertices[i].weights.y));
-                    gltf_joint_index_use[vertices[i].joints.y]++;
+                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints[1], vertices[i].weights.mV[1]));
+                    gltf_joint_index_use[vertices[i].joints[1]]++;
                 }
-                if (gltf_joint_index_use[vertices[i].joints.z] >= 0
-                    && vertices[i].weights.z > 0.f)
+                if (gltf_joint_index_use[vertices[i].joints[2]] >= 0
+                    && vertices[i].weights.mV[2] > 0.f)
                 {
-                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints.z, vertices[i].weights.z));
-                    gltf_joint_index_use[vertices[i].joints.z]++;
+                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints[2], vertices[i].weights.mV[2]));
+                    gltf_joint_index_use[vertices[i].joints[2]]++;
                 }
-                if (gltf_joint_index_use[vertices[i].joints.w] >= 0
-                    && vertices[i].weights.w > 0.f)
+                if (gltf_joint_index_use[vertices[i].joints[3]] >= 0
+                    && vertices[i].weights.mV[3] > 0.f)
                 {
-                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints.w, vertices[i].weights.w));
-                    gltf_joint_index_use[vertices[i].joints.w]++;
+                    weight_list.push_back(LLModel::JointWeight(vertices[i].joints[3], vertices[i].weights.mV[3]));
+                    gltf_joint_index_use[vertices[i].joints[3]]++;
                 }
 
                 std::sort(weight_list.begin(), weight_list.end(), LLModel::CompareWeightGreater());
@@ -1031,7 +1052,7 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
 
                 if (wght.size() > 0)
                 {
-                    pModel->mSkinWeights[LLVector3(vertices[i].position)] = wght;
+                    pModel->mSkinWeights[vertices[i].position] = wght;
                 }
             }
         }
@@ -1089,8 +1110,8 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             vertices_remap.resize(vertex_count, -1);
             S32 created_faces = 0;
             std::vector<LLVolumeFace::VertexData> face_verts;
-            min = glm::vec3(FLT_MAX);
-            max = glm::vec3(-FLT_MAX);
+            min.set(FLT_MAX, FLT_MAX, FLT_MAX);
+            max.set(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
             for (size_t idx = 0; idx < optimized_indices.size(); idx++)
             {
@@ -1107,19 +1128,12 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                     const LLVector4a& vec = face_verts[new_vert_idx].getPosition();
                     if (new_vert_idx == 0)
                     {
-                        min.x = vec[0];
-                        min.y = vec[1];
-                        min.z = vec[2];
+                        min.set(vec.getF32ptr());
                         max = min;
                     }
                     else
                     {
-                        min.x = std::min(min.x, vec[0]);
-                        min.y = std::min(min.y, vec[1]);
-                        min.z = std::min(min.z, vec[2]);
-                        max.x = std::max(max.x, vec[0]);
-                        max.y = std::max(max.y, vec[1]);
-                        max.z = std::max(max.z, vec[2]);
+                        update_min_max(min, max, LLVector3(vec.getF32ptr()));
                     }
                 }
                 else
@@ -1133,8 +1147,8 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                 {
                     LLVolumeFace face;
                     face.fillFromLegacyData(face_verts, indices_16);
-                    face.mExtents[0] = LLVector4a(min.x, min.y, min.z, 0);
-                    face.mExtents[1] = LLVector4a(max.x, max.y, max.z, 0);
+                    face.mExtents[0] = LLVector4a(min.mV[0], min.mV[1], min.mV[2], 0.f);
+                    face.mExtents[1] = LLVector4a(max.mV[0], max.mV[1], max.mV[2], 0.f);
                     pModel->getVolumeFaces().push_back(face);
                     pModel->getMaterialList().push_back(materialName);
                     created_faces++;
@@ -1143,16 +1157,16 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                     indices_16.clear();
                     face_verts.clear();
 
-                    min = glm::vec3(FLT_MAX);
-                    max = glm::vec3(-FLT_MAX);
+                    min.set(FLT_MAX, FLT_MAX, FLT_MAX);
+                    max.set(-FLT_MAX, -FLT_MAX, -FLT_MAX);
                 }
             }
             if (indices_16.size() > 0 && face_verts.size() > 0)
             {
                 LLVolumeFace face;
                 face.fillFromLegacyData(face_verts, indices_16);
-                face.mExtents[0] = LLVector4a(min.x, min.y, min.z, 0);
-                face.mExtents[1] = LLVector4a(max.x, max.y, max.z, 0);
+                face.mExtents[0] = LLVector4a(min.mV[0], min.mV[1], min.mV[2], 0.f);
+                face.mExtents[1] = LLVector4a(max.mV[0], max.mV[1], max.mV[2], 0.f);
                 pModel->getVolumeFaces().push_back(face);
                 pModel->getMaterialList().push_back(materialName);
                 created_faces++;
@@ -1190,8 +1204,8 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
             }
 
             face.fillFromLegacyData(faceVertices, indices);
-            face.mExtents[0] = LLVector4a(min.x, min.y, min.z, 0);
-            face.mExtents[1] = LLVector4a(max.x, max.y, max.z, 0);
+            face.mExtents[0] = LLVector4a(min.mV[0], min.mV[1], min.mV[2], 0.f);
+            face.mExtents[1] = LLVector4a(max.mV[0], max.mV[1], max.mV[2], 0.f);
 
             pModel->getVolumeFaces().push_back(face);
             pModel->getMaterialList().push_back(materialName);
@@ -1375,7 +1389,7 @@ void LLGLTFLoader::populateJointsFromSkin(S32 skin_idx)
         data.mJointListIdx = i;
         data.mGltfRestMatrix = buildGltfRestMatrix(joint, skin);
         data.mGltfMatrix = jointNode.mMatrix;
-        data.mOverrideMatrix = glm::mat4(1.f);
+        data.mOverrideMatrix.setIdentity();
 
         if (mJointMap.find(jointNode.mName) != mJointMap.end())
         {
@@ -1400,7 +1414,7 @@ void LLGLTFLoader::populateJointsFromSkin(S32 skin_idx)
 
     // Go over viewer joints and build overrides
     // This is needed because gltf skeleton doesn't necessarily match viewer's skeleton.
-    glm::mat4 ident(1.0);
+    LLMatrix4a ident = LLMatrix4a::identity();
     for (auto &viewer_data : mViewerJointData)
     {
         buildOverrideMatrix(viewer_data, joints_data, names_to_nodes, ident, ident);
@@ -1419,8 +1433,7 @@ void LLGLTFLoader::populateJointsFromSkin(S32 skin_idx)
         for (S32 i = 0; i < joint_count && i < inverse_count; i++)
         {
             S32 joint = skin.mJoints[i];
-            glm::mat4 original_bind_matrix = glm::inverse(skin.mInverseBindMatricesData[i]);
-            rotated_bind_matrices[joint] = rotateGltfMatrixToViewerSpace(original_bind_matrix);
+            rotated_bind_matrices[joint] = rotateGltfMatrixToViewerSpace(inverse_of(skin.mInverseBindMatricesData[i]));
         }
     }
 
@@ -1463,14 +1476,13 @@ void LLGLTFLoader::populateJointsFromSkin(S32 skin_idx)
             // bind-pose rotation that the viewer parent does not, that rotation
             // could get baked into child inverse binds. Keeping the delta local
             // fixes the resulting child joint twists.
-            glm::mat4 translated_original = computeViewerBindMatrix(
+            const LLMatrix4a translated_original = computeViewerBindMatrix(
                 joints_data,
                 rotated_bind_matrices,
                 joint,
                 converted_bind_matrices);
-            glm::mat4 final_inverse_bind_matrix = glm::inverse(translated_original);
 
-            LLMatrix4 gltf_transform = LLMatrix4(glm::value_ptr(final_inverse_bind_matrix));
+            const LLMatrix4 gltf_transform = inverse_of(translated_original).toMatrix4();
             LL_DEBUGS("GLTF_DEBUG") << "mInvBindMatrix name: " << legal_name << " Translated val: " << gltf_transform << LL_ENDL;
             mInverseBindMatrices[skin_idx].push_back(LLMatrix4a(gltf_transform));
         }
@@ -1479,17 +1491,15 @@ void LLGLTFLoader::populateJointsFromSkin(S32 skin_idx)
             // If bind matrices aren't present (they are optional in gltf),
             // assume an identy matrix
             // todo: find a model with this, might need to use YZ rotated matrix
-            glm::mat4 inv_bind(1.0f);
-            glm::mat4 skeleton_transform = computeGltfToViewerSkeletonTransform(joints_data, joint, legal_name);
-            inv_bind = glm::inverse(skeleton_transform * inv_bind);
+            const LLMatrix4a skeleton_transform = computeGltfToViewerSkeletonTransform(joints_data, joint, legal_name);
 
-            LLMatrix4 gltf_transform = LLMatrix4(glm::value_ptr(inv_bind));
+            const LLMatrix4 gltf_transform = inverse_of(skeleton_transform).toMatrix4();
             LL_DEBUGS("GLTF_DEBUG") << "mInvBindMatrix name: " << legal_name << " Generated val: " << gltf_transform << LL_ENDL;
             mInverseBindMatrices[skin_idx].push_back(LLMatrix4a(gltf_transform));
         }
 
         // Compute Alternative matrices also known as overrides
-        LLMatrix4 original_joint_transform(glm::value_ptr(joints_data[joint].mOverrideMatrix));
+        const LLMatrix4 original_joint_transform = joints_data[joint].mOverrideMatrix.toMatrix4();
 
         // Viewer seems to care only about translation part,
         // but for parity with collada taking original value
@@ -1545,9 +1555,9 @@ void LLGLTFLoader::buildJointGroup(LLJointData& viewer_data, const std::string &
     }
 }
 
-void LLGLTFLoader::buildOverrideMatrix(LLJointData& viewer_data, joints_data_map_t &gltf_nodes, joints_name_to_node_map_t &names_to_nodes, glm::mat4& parent_rest, glm::mat4& parent_support_rest) const
+void LLGLTFLoader::buildOverrideMatrix(LLJointData& viewer_data, joints_data_map_t &gltf_nodes, joints_name_to_node_map_t &names_to_nodes, LLMatrix4a& parent_rest, LLMatrix4a& parent_support_rest) const
 {
-    glm::mat4 rest(1.f);
+    LLMatrix4a rest = LLMatrix4a::identity();
     joints_name_to_node_map_t::iterator found_node = names_to_nodes.find(viewer_data.mName);
     if (found_node != names_to_nodes.end())
     {
@@ -1556,49 +1566,48 @@ void LLGLTFLoader::buildOverrideMatrix(LLJointData& viewer_data, joints_data_map
         node.mIsOverrideValid = true;
         node.mViewerRestMatrix = viewer_data.mRestMatrix;
 
-        glm::mat4 gltf_joint_rest_pose = coord_system_rotation * node.mGltfRestMatrix;
+        LLMatrix4a gltf_joint_rest_pose = then(node.mGltfRestMatrix, coord_system_rotation);
         if (mApplyXYRotation)
         {
-            gltf_joint_rest_pose = coord_system_rotationxy * gltf_joint_rest_pose;
+            gltf_joint_rest_pose = then(gltf_joint_rest_pose, coord_system_rotationxy);
         }
 
-        glm::mat4 translated_joint;
+        LLMatrix4a translated_joint;
         // Example:
         // Viewer has pelvis->spine1->spine2->torso.
         // gltf example model has pelvis->torso
-        // By doing glm::inverse(transalted_rest_spine2) * gltf_rest_torso
+        // By taking gltf_rest_torso out of transalted_rest_spine2
         // We get what torso would have looked like if gltf had a spine2
         if (viewer_data.mIsJoint)
         {
-            translated_joint = glm::inverse(parent_rest) * gltf_joint_rest_pose;
+            translated_joint = then(gltf_joint_rest_pose, inverse_of(parent_rest));
         }
         else
         {
-            translated_joint = glm::inverse(parent_support_rest) * gltf_joint_rest_pose;
+            translated_joint = then(gltf_joint_rest_pose, inverse_of(parent_support_rest));
         }
 
-        glm::vec3 translation_override;
-        glm::vec3 skew;
-        glm::vec3 scale;
-        glm::vec4 perspective;
-        glm::quat rotation;
-        glm::decompose(translated_joint, scale, rotation, translation_override, skew, perspective);
+        LLVector4a translation_override(0.f, 0.f, 0.f, 1.f);
+        LLVector4a scale;
+        LLQuaternion2 rotation;
+        translated_joint.decompose(scale, rotation, translation_override);
 
-        glm::mat4 viewer_rotation_scale(1.0f);
-        viewer_rotation_scale = glm::rotate(viewer_rotation_scale, glm::radians(viewer_data.mRotation[0]), glm::vec3(1, 0, 0));
-        viewer_rotation_scale = glm::rotate(viewer_rotation_scale, glm::radians(viewer_data.mRotation[1]), glm::vec3(0, 1, 0));
-        viewer_rotation_scale = glm::rotate(viewer_rotation_scale, glm::radians(viewer_data.mRotation[2]), glm::vec3(0, 0, 1));
-        viewer_rotation_scale = glm::scale(viewer_rotation_scale, viewer_data.mScale);
+        // the viewer's rotation and scale for the joint: the scale, then the
+        // three axis rotations z, y, x
+        LLMatrix4a viewer_rotation_scale = LLMatrix4a::scaling(viewer_data.mScale.mV[0], viewer_data.mScale.mV[1], viewer_data.mScale.mV[2]);
+        viewer_rotation_scale = then(viewer_rotation_scale, LLMatrix4a::rotation(viewer_data.mRotation[2] * DEG_TO_RAD, LLVector4a(0.f, 0.f, 1.f)));
+        viewer_rotation_scale = then(viewer_rotation_scale, LLMatrix4a::rotation(viewer_data.mRotation[1] * DEG_TO_RAD, LLVector4a(0.f, 1.f, 0.f)));
+        viewer_rotation_scale = then(viewer_rotation_scale, LLMatrix4a::rotation(viewer_data.mRotation[0] * DEG_TO_RAD, LLVector4a(1.f, 0.f, 0.f)));
 
         // Viewer allows overrides, which are base joint with applied translation override.
         // fortunately normal bones use only translation, without rotation or scale
-        node.mOverrideMatrix = glm::recompose(glm::vec3(1, 1, 1), glm::identity<glm::quat>(), translation_override, glm::vec3(0, 0, 0), glm::vec4(0, 0, 0, 1));
+        node.mOverrideMatrix = LLMatrix4a::translation(translation_override);
 
-        glm::mat4 overriden_joint = node.mOverrideMatrix;
+        LLMatrix4a overriden_joint = node.mOverrideMatrix;
 
         // todo: if gltf bone had rotation or scale, they probably should be saved here
         // then applied to bind matrix
-        rest = parent_rest * overriden_joint;
+        rest = then(overriden_joint, parent_rest);
         if (viewer_data.mIsJoint)
         {
             node.mOverrideRestMatrix = rest;
@@ -1610,19 +1619,17 @@ void LLGLTFLoader::buildOverrideMatrix(LLJointData& viewer_data, joints_data_map
             // skeleton XML values. For non-uniform torso volumes, matching DAE
             // requires viewer rotation followed by viewer scale.
             overriden_joint = viewer_rotation_scale;
-            overriden_joint[3][0] = translation_override.x;
-            overriden_joint[3][1] = translation_override.y;
-            overriden_joint[3][2] = translation_override.z;
-            node.mOverrideRestMatrix = parent_support_rest * overriden_joint;
+            overriden_joint.setTranslation(translation_override);
+            node.mOverrideRestMatrix = then(overriden_joint, parent_support_rest);
         }
     }
     else
     {
         // No override for this joint
-        rest = parent_rest * viewer_data.mJointMatrix;
+        rest = then(viewer_data.mJointMatrix, parent_rest);
     }
 
-    glm::mat4 support_rest(1.f);
+    LLMatrix4a support_rest;
     if (viewer_data.mSupport == LLJointData::SUPPORT_BASE)
     {
         support_rest = rest;
@@ -1638,14 +1645,14 @@ void LLGLTFLoader::buildOverrideMatrix(LLJointData& viewer_data, joints_data_map
     }
 }
 
-glm::mat4 LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF::Skin& gltf_skin) const
+LLMatrix4a LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF::Skin& gltf_skin) const
 {
     // This is inefficient since we are recalculating some joints multiple times over
     // Todo: cache it?
 
     if (joint_node_index < 0 || joint_node_index >= static_cast<S32>(mGLTFAsset.mNodes.size()))
     {
-        return glm::mat4(1.0f);
+        return LLMatrix4a::identity();
     }
 
     const auto& node = mGLTFAsset.mNodes[joint_node_index];
@@ -1663,7 +1670,7 @@ glm::mat4 LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF
             {
                 // parent is a joint - recursively combine transform
                 // assumes that matrix is already valid
-                return buildGltfRestMatrix(static_cast<S32>(i), gltf_skin) * node.mMatrix;
+                return then(node.mMatrix, buildGltfRestMatrix(static_cast<S32>(i), gltf_skin));
             }
         }
     }
@@ -1671,21 +1678,21 @@ glm::mat4 LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const LL::GLTF
     return node.mMatrix;
 }
 
-glm::mat4 LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const joints_data_map_t& joint_data) const
+LLMatrix4a LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const joints_data_map_t& joint_data) const
 {
     // This is inefficient since we are recalculating some joints multiple times over
     // Todo: cache it?
 
     if (joint_node_index < 0 || joint_node_index >= static_cast<S32>(mGLTFAsset.mNodes.size()))
     {
-        return glm::mat4(1.0f);
+        return LLMatrix4a::identity();
     }
 
     auto& data = joint_data.at(joint_node_index);
 
     if (data.mParentNodeIdx >=0)
     {
-        return buildGltfRestMatrix(data.mParentNodeIdx, joint_data) * data.mGltfMatrix;
+        return then(data.mGltfMatrix, buildGltfRestMatrix(data.mParentNodeIdx, joint_data));
     }
     // Should we return armature or stop earlier?
     return data.mGltfMatrix;
@@ -1695,12 +1702,12 @@ glm::mat4 LLGLTFLoader::buildGltfRestMatrix(S32 joint_node_index, const joints_d
 // skeleton override and bind-pose calculations. Keeping this conversion in
 // one helper ensures bind and rest matrices use the same rotation path,
 // including the optional XY rotation applied for compatible uploads.
-glm::mat4 LLGLTFLoader::rotateGltfMatrixToViewerSpace(const glm::mat4& gltf_matrix) const
+LLMatrix4a LLGLTFLoader::rotateGltfMatrixToViewerSpace(const LLMatrix4a& gltf_matrix) const
 {
-    glm::mat4 rotated = coord_system_rotation * gltf_matrix;
+    LLMatrix4a rotated = then(gltf_matrix, coord_system_rotation);
     if (mApplyXYRotation)
     {
-        rotated = coord_system_rotationxy * rotated;
+        rotated = then(rotated, coord_system_rotationxy);
     }
     return rotated;
 }
@@ -1710,7 +1717,7 @@ glm::mat4 LLGLTFLoader::rotateGltfMatrixToViewerSpace(const glm::mat4& gltf_matr
 // matrices, then applies that same delta to the viewer override rest matrix.
 // Results are cached because child calculations can request the same joint
 // more than once while preserving local hierarchy behavior.
-glm::mat4 LLGLTFLoader::computeViewerBindMatrix(
+LLMatrix4a LLGLTFLoader::computeViewerBindMatrix(
     const joints_data_map_t& joints_data_map,
     const joint_node_mat4_map_t& rotated_bind_matrices,
     S32 gltf_node_index,
@@ -1725,14 +1732,14 @@ glm::mat4 LLGLTFLoader::computeViewerBindMatrix(
     auto node_iter = joints_data_map.find(gltf_node_index);
     if (node_iter == joints_data_map.end())
     {
-        return glm::mat4(1.f);
+        return LLMatrix4a::identity();
     }
 
     const JointNodeData& node_data = node_iter->second;
     if (!node_data.mIsOverrideValid)
     {
         // No valid override, falling back to rest matrix.
-        glm::mat4 fallback_bind = rotateGltfMatrixToViewerSpace(node_data.mGltfRestMatrix);
+        const LLMatrix4a fallback_bind = rotateGltfMatrixToViewerSpace(node_data.mGltfRestMatrix);
         converted_bind_matrices[gltf_node_index] = fallback_bind;
         return fallback_bind;
     }
@@ -1744,11 +1751,12 @@ glm::mat4 LLGLTFLoader::computeViewerBindMatrix(
         return node_data.mOverrideRestMatrix;
     }
 
-    glm::mat4 gltf_joint_node = rotateGltfMatrixToViewerSpace(node_data.mGltfRestMatrix);
-    glm::mat4 gltf_joint_bind = bind_iter->second;
-    glm::mat4 viewer_joint_node = node_data.mOverrideRestMatrix;
-    glm::mat4 bind_delta = gltf_joint_bind * glm::inverse(gltf_joint_node);
-    glm::mat4 viewer_joint_bind = bind_delta * viewer_joint_node;
+    const LLMatrix4a gltf_joint_node = rotateGltfMatrixToViewerSpace(node_data.mGltfRestMatrix);
+    const LLMatrix4a& gltf_joint_bind = bind_iter->second;
+    const LLMatrix4a& viewer_joint_node = node_data.mOverrideRestMatrix;
+    // out of the node's rest pose, into its bind pose
+    const LLMatrix4a bind_delta = then(inverse_of(gltf_joint_node), gltf_joint_bind);
+    const LLMatrix4a viewer_joint_bind = then(viewer_joint_node, bind_delta);
 
     converted_bind_matrices[gltf_node_index] = viewer_joint_bind;
     return viewer_joint_bind;
@@ -1757,41 +1765,36 @@ glm::mat4 LLGLTFLoader::computeViewerBindMatrix(
 // This function computes the transformation matrix needed to convert from GLTF skeleton space
 // to viewer skeleton space for a specific joint
 
-glm::mat4 LLGLTFLoader::computeGltfToViewerSkeletonTransform(const joints_data_map_t& joints_data_map, S32 gltf_node_index, const std::string& joint_name) const
+LLMatrix4a LLGLTFLoader::computeGltfToViewerSkeletonTransform(const joints_data_map_t& joints_data_map, S32 gltf_node_index, const std::string& joint_name) const
 {
     const JointNodeData& node_data = joints_data_map.at(gltf_node_index);
     if (!node_data.mIsOverrideValid)
     {
         // For now assume they are identical and return an identity (for ease of debuging)
-        return glm::mat4(1.0f);
+        return LLMatrix4a::identity();
     }
 
     // Get the GLTF joint's rest pose (in GLTF coordinate system)
-    const glm::mat4 &gltf_joint_rest_pose = node_data.mGltfRestMatrix;
-    glm::mat4 rest_pose = coord_system_rotation * gltf_joint_rest_pose;
+    const LLMatrix4a rest_pose = then(node_data.mGltfRestMatrix, coord_system_rotation);
 
-    LL_INFOS("GLTF_DEBUG") << "rest matrix for joint " << joint_name << ": ";
-
-    LLMatrix4 transform(glm::value_ptr(rest_pose));
-
-    LL_CONT << transform << LL_ENDL;
+    LL_INFOS("GLTF_DEBUG") << "rest matrix for joint " << joint_name << ": " << rest_pose.toMatrix4() << LL_ENDL;
 
     // Compute transformation from GLTF space to viewer space
     // This assumes both skeletons are in rest pose initially
-    return node_data.mOverrideRestMatrix * glm::inverse(rest_pose);
+    return then(inverse_of(rest_pose), node_data.mOverrideRestMatrix);
 }
 
 bool LLGLTFLoader::checkForXYrotation(const LL::GLTF::Skin& gltf_skin, S32 joint_idx, S32 bind_indx)
 {
-    glm::mat4 gltf_joint_rest = buildGltfRestMatrix(joint_idx, gltf_skin);
-    glm::mat4 test_mat = glm::inverse(gltf_joint_rest) * gltf_skin.mInverseBindMatricesData[bind_indx];
+    const LLMatrix4a gltf_joint_rest = buildGltfRestMatrix(joint_idx, gltf_skin);
+    const LLMatrix4a test_mat = then(gltf_skin.mInverseBindMatricesData[bind_indx], inverse_of(gltf_joint_rest));
     // Normally for shoulders it should be something close to
     // {1,0,0,0;0,-1,0,0;0,0,-1,0;0,0,0,1}
     // rotated one will look like
     // {0,0,0,-1;1,0,0,0;0,-1,0,0;0,0,0,1}
     // Todo: This is a cheap hack,
     // figure out how rotation is supposed to work
-    return abs(test_mat[0][0]) < 0.5 && abs(test_mat[1][1]) < 0.5 && abs(test_mat[2][2]) < 0.5;
+    return fabsf(test_mat.mMatrix[0][0]) < 0.5f && fabsf(test_mat.mMatrix[1][1]) < 0.5f && fabsf(test_mat.mMatrix[2][2]) < 0.5f;
 }
 
 void LLGLTFLoader::checkForXYrotation(const LL::GLTF::Skin& gltf_skin)
