@@ -690,7 +690,9 @@ class LLVolumeGeometryManager: public LLGeometryManager
     virtual void getGeometry(LLSpatialGroup* group);
     virtual void addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count);
     U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false, bool batch_gltf = false, bool batch_legacy = false);
-    void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type);
+    // material_slot: the face's texture index is a material slot from the indexed
+    // accumulation in genDrawInfo, not a texture index
+    void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type, bool material_slot);
 
 private:
     void allocateFaces(U32 pMaxFaceCount);
