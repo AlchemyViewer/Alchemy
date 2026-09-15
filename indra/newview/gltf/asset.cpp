@@ -93,7 +93,7 @@ namespace LL
 
 void Scene::updateTransforms(Asset& asset)
 {
-    mat4 identity = glm::identity<mat4>();
+    const mat4 identity = LLMatrix4a::identity();
 
     for (auto& nodeIndex : mNodes)
     {
@@ -105,9 +105,10 @@ void Scene::updateTransforms(Asset& asset)
 void Node::updateTransforms(Asset& asset, const mat4& parentMatrix)
 {
     makeMatrixValid();
-    mAssetMatrix = parentMatrix * mMatrix;
+    // this node's transform, then the parent's
+    mAssetMatrix.setMul(mMatrix, parentMatrix);
 
-    mAssetMatrixInv = glm::inverse(mAssetMatrix);
+    mAssetMatrixInv.setInverse(mAssetMatrix);
 
     S32 my_index = (S32)(this - &asset.mNodes[0]);
 
@@ -157,7 +158,7 @@ void Asset::uploadTransforms()
 
     for (U32 i = 0; i < node_count; ++i)
     {
-        F32* m = glm::value_ptr(t_mp[i]);
+        const F32* m = t_mp[i].getF32ptr();
 
         U32 idx = i * 12;
 
@@ -200,19 +201,19 @@ void Asset::uploadMaterials()
 
         // add texture transforms and UV indices
         material.mPbrMetallicRoughness.mBaseColorTexture.mTextureTransform.getPacked(&md[i+0]);
-        md[i + 1].g = (F32)material.mPbrMetallicRoughness.mBaseColorTexture.getTexCoord();
+        md[i + 1].getF32ptr()[1] = (F32)material.mPbrMetallicRoughness.mBaseColorTexture.getTexCoord();
         material.mNormalTexture.mTextureTransform.getPacked(&md[i + 2]);
-        md[i + 3].g = (F32)material.mNormalTexture.getTexCoord();
+        md[i + 3].getF32ptr()[1] = (F32)material.mNormalTexture.getTexCoord();
         material.mPbrMetallicRoughness.mMetallicRoughnessTexture.mTextureTransform.getPacked(&md[i+4]);
-        md[i + 5].g = (F32)material.mPbrMetallicRoughness.mMetallicRoughnessTexture.getTexCoord();
+        md[i + 5].getF32ptr()[1] = (F32)material.mPbrMetallicRoughness.mMetallicRoughnessTexture.getTexCoord();
         material.mEmissiveTexture.mTextureTransform.getPacked(&md[i + 6]);
-        md[i + 7].g = (F32)material.mEmissiveTexture.getTexCoord();
+        md[i + 7].getF32ptr()[1] = (F32)material.mEmissiveTexture.getTexCoord();
         material.mOcclusionTexture.mTextureTransform.getPacked(&md[i + 8]);
-        md[i + 9].g = (F32)material.mOcclusionTexture.getTexCoord();
+        md[i + 9].getF32ptr()[1] = (F32)material.mOcclusionTexture.getTexCoord();
 
         // add material properties
         F32 min_alpha = material.mAlphaMode == Material::AlphaMode::MASK ? material.mAlphaCutoff : -1.0f;
-        md[i + 10] = vec4(material.mEmissiveFactor, 1.f);
+        md[i + 10] = vec4(material.mEmissiveFactor.mV[0], material.mEmissiveFactor.mV[1], material.mEmissiveFactor.mV[2], 1.f);
         md[i + 11] = vec4(0.f,
             material.mPbrMetallicRoughness.mRoughnessFactor,
             material.mPbrMetallicRoughness.mMetallicFactor,
@@ -245,8 +246,7 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
         {
             bool newHit = false;
 
-            LLMatrix4a ami;
-            ami.loadu(glm::value_ptr(node.mAssetMatrixInv));
+            const LLMatrix4a& ami = node.mAssetMatrixInv;
             // transform start and end to this node's local space
             ami.affineTransform(start, local_start);
             ami.affineTransform(asset_end, local_end);
@@ -272,10 +272,8 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 
             if (newHit)
             {
-                LLMatrix4a am;
-                am.loadu(glm::value_ptr(node.mAssetMatrix));
                 // shorten line segment on hit
-                am.affineTransform(p, asset_end);
+                node.mAssetMatrix.affineTransform(p, asset_end);
 
                 // transform results back to asset space
                 if (intersection)
@@ -285,10 +283,8 @@ S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
 
                 if (normal || tangent)
                 {
-                    mat4 normalMatrix = glm::transpose(node.mAssetMatrixInv);
-
                     LLMatrix4a norm_mat;
-                    norm_mat.loadu(glm::value_ptr(normalMatrix));
+                    norm_mat.setTranspose(node.mAssetMatrixInv);
 
                     if (normal)
                     {
@@ -330,7 +326,7 @@ void Node::makeMatrixValid()
 {
     if (!mMatrixValid && mTRSValid)
     {
-        mMatrix = glm::recompose(mScale, mRotation, mTranslation, vec3(0,0,0), vec4(0,0,0,1));
+        mMatrix.setTRS(LLVector4a(mTranslation.mV[0], mTranslation.mV[1], mTranslation.mV[2]), mRotation, LLVector4a(mScale.mV[0], mScale.mV[1], mScale.mV[2]));
         mMatrixValid = true;
     }
 
@@ -341,9 +337,12 @@ void Node::makeTRSValid()
 {
     if (!mTRSValid && mMatrixValid)
     {
-        vec3 skew;
-        vec4 perspective;
-        glm::decompose(mMatrix, mScale, mRotation, mTranslation, skew, perspective);
+        LLVector4a scale, translation;
+        if (mMatrix.decompose(scale, mRotation, translation))
+        {
+            mScale.set(scale.getF32ptr());
+            mTranslation.set(translation.getF32ptr());
+        }
 
         mTRSValid = true;
     }
@@ -375,9 +374,9 @@ void Node::setScale(const vec3& s)
 void Node::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
-    write(mMatrix, "matrix", dst, glm::identity<mat4>());
-    write(mRotation, "rotation", dst, glm::identity<quat>());
-    write(mTranslation, "translation", dst, glm::vec3(0.f, 0.f, 0.f));
+    write(mMatrix, "matrix", dst, LLMatrix4a::identity());
+    write(mRotation, "rotation", dst, LLQuaternion2::identity());
+    write(mTranslation, "translation", dst, vec3(0.f, 0.f, 0.f));
     write(mScale, "scale", dst, vec3(1.f,1.f,1.f));
     write(mChildren, "children", dst);
     write(mMesh, "mesh", dst, INVALID_INDEX);
@@ -1216,8 +1215,8 @@ void Material::Unlit::serialize(JsonWriter& dst) const
 
 void TextureTransform::getPacked(vec4* packed) const
 {
-    packed[0] = vec4(mScale.x, mScale.y, mRotation, mOffset.x);
-    packed[1] = vec4(mOffset.y, 0.f, 0.f, 0.f);
+    packed[0] = vec4(mScale.mV[0], mScale.mV[1], mRotation, mOffset.mV[0]);
+    packed[1] = vec4(mOffset.mV[1], 0.f, 0.f, 0.f);
 }
 
 const TextureTransform& TextureTransform::operator=(const Value& src)

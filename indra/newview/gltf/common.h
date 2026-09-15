@@ -26,14 +26,10 @@
  * $/LicenseInfo$
  */
 
-#include "glm/vec2.hpp"
-#include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
-#include "glm/mat4x4.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/ext/quaternion_float.hpp"
-#include "glm/gtx/quaternion.hpp"
-#include "glm/gtx/matrix_decompose.hpp"
+#include "llmatrix4a.h"
+#include "llquaternion2.h"
+#include "v2math.h"
+#include "v3math.h"
 #include <simdjson.h>
 
 // Common types and constants used in the GLTF implementation
@@ -135,11 +131,14 @@ namespace LL
             bool mNeedComma = false;
         };
 
-        using mat4 = glm::mat4;
-        using vec4 = glm::vec4;
-        using vec3 = glm::vec3;
-        using vec2 = glm::vec2;
-        using quat = glm::quat;
+        // The vector vocabulary of the asset: the SIMD matrix, quaternion and
+        // four-vector, and the scalar three- and two-vectors for what JSON
+        // reads and writes as three and two numbers.
+        using mat4 = LLMatrix4a;
+        using vec4 = LLVector4a;
+        using vec3 = LLVector3;
+        using vec2 = LLVector2;
+        using quat = LLQuaternion2;
 
         constexpr S32 LINEAR = 9729;
         constexpr S32 NEAREST = 9728;

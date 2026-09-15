@@ -421,7 +421,7 @@ bool Primitive::prep(Asset& asset)
     if (mMaterial != INVALID_INDEX)
     {
         const Material& material = asset.mMaterials[mMaterial];
-        LLColor4 baseColor(glm::value_ptr(material.mPbrMetallicRoughness.mBaseColorFactor));
+        LLColor4 baseColor(material.mPbrMetallicRoughness.mBaseColorFactor.getF32ptr());
         for (auto& dst : mColors)
         {
             dst = LLColor4U(baseColor * LLColor4(dst));
