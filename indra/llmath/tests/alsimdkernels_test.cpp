@@ -36,6 +36,7 @@
 #include "linden_common.h"
 
 #include "../test/lltut.h"
+#include "llthread.h"
 #include "../llmath.h"
 #include "../llsimdmath.h"
 #include "../llvector4a.h"
@@ -671,6 +672,43 @@ namespace tut
                 }
                 ensure_close("tex u" + tag, got.tex[v].mV[0], expected.tex[v].mV[0], 2e-6, 4.0);
                 ensure_close("tex v" + tag, got.tex[v].mV[1], expected.tex[v].mV[1], 2e-6, 4.0);
+            }
+        }
+    }
+
+    // A face's texture index rides in w as bits, which for a small index
+    // is a denormal float; under the flush-to-zero mode the render thread
+    // runs in it has to come through every width and the public entry
+    // untouched.
+    template<> template<>
+    void alsimdkernels_object::test<10>()
+    {
+        set_thread_fp_mode();
+        const LLMatrix4a m = some_matrix();
+        for (S32 index : {0, 1, 7, 15})
+        {
+            const F32 w = std::bit_cast<F32>(index);
+            for (size_t n : COUNTS)
+            {
+                const std::vector<LLVector4a> src = some_vectors(n, 10);
+                for_each_width([&]<class W>(const char* width)
+                {
+                    std::vector<LLVector4a> dst(n + 1, SENTINEL);
+                    transform_impl<W, true, W_LANE::SET>(m, src.data(), dst.data(), n, w);
+                    for (size_t i = 0; i < n; ++i)
+                    {
+                        ensure_equals(std::string("index in w ") + width + " index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
+                                      std::bit_cast<S32>(dst[i][3]), index);
+                    }
+                });
+
+                std::vector<LLVector4a> dst(n + 1, SENTINEL);
+                alsimd::transform_points(m, src.data(), dst.data(), n, w);
+                for (size_t i = 0; i < n; ++i)
+                {
+                    ensure_equals("index in w through the library index " + std::to_string(index) + " n " + std::to_string(n) + " at " + std::to_string(i),
+                                  std::bit_cast<S32>(dst[i][3]), index);
+                }
             }
         }
     }
