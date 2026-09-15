@@ -55,9 +55,13 @@
 const F32 DETAIL_SCALE = 1.f/16.f;
 int DebugDetailMap = 0;
 
-// Tessellation level = edge length * density / distance, so a 16 m patch edge
-// reaches the 64-level cap inside 16 m and one segment at 1024 m.
-constexpr F32 TESS_DENSITY = 64.f;
+// Tessellation level = edge length * density / distance: at the default 64 a
+// 16 m patch edge reaches the 64-level cap inside 16 m and one segment at
+// 1024 m. The triangle count grows with the square of the density, so the
+// setting is held to a range where the low end still tessellates the near
+// field and the high end still finishes the frame.
+constexpr F32 TESS_DENSITY_MIN = 8.f;
+constexpr F32 TESS_DENSITY_MAX = 256.f;
 
 S32 LLDrawPoolTerrain::sPBRDetailMode = 0;
 F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
@@ -205,7 +209,10 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     // which is what a probe wants.
     const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
-    const F32 density = LLPipeline::sDynamicLOD ? TESS_DENSITY * sLODFactor : 0.f;
+    static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 64.f);
+    const F32 density = LLPipeline::sDynamicLOD
+        ? llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor
+        : 0.f;
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);

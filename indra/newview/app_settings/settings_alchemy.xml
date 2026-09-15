@@ -1338,6 +1338,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderTerrainTessDensity</key>
+        <map>
+            <key>Comment</key>
+            <string>Base density of the terrain tessellation: metres of patch edge per level, divided by the distance to the camera, so at 64 a 16 m patch is split 64 ways (25 cm) within 16 m of the camera, 16 ways (1 m) at 64 m and not at all past 1 km. The terrain detail slider multiplies it. Triangle count grows with the square; clamped to 8 to 256.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>64</real>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
