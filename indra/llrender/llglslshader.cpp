@@ -388,7 +388,10 @@ void LLGLSLShader::placeProfileQuery(bool for_runtime)
         if (!for_runtime)
         {
             glBeginQuery(GL_SAMPLES_PASSED, mSamplesQuery);
-            glBeginQuery(GL_PRIMITIVES_GENERATED, mPrimitivesQuery);
+            if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
+            {
+                glBeginQuery(GL_PRIMITIVES_GENERATED, mPrimitivesQuery);
+            }
         }
     }
 }
@@ -403,7 +406,10 @@ bool LLGLSLShader::readProfileQuery(bool for_runtime, bool force_read)
             if (!for_runtime)
             {
                 glEndQuery(GL_SAMPLES_PASSED);
-                glEndQuery(GL_PRIMITIVES_GENERATED);
+                if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
+                {
+                    glEndQuery(GL_PRIMITIVES_GENERATED);
+                }
             }
             mProfilePending = for_runtime;
         }
@@ -430,7 +436,10 @@ bool LLGLSLShader::readProfileQuery(bool for_runtime, bool force_read)
             glGetQueryObjectui64v(mSamplesQuery, GL_QUERY_RESULT, &samples_passed);
 
             GLuint64 primitives_generated = 0;
-            glGetQueryObjectui64v(mPrimitivesQuery, GL_QUERY_RESULT, &primitives_generated);
+            if (gGLManager.canQueryPrimitives(mFeatures.hasTessellatedTerrain))
+            {
+                glGetQueryObjectui64v(mPrimitivesQuery, GL_QUERY_RESULT, &primitives_generated);
+            }
             sTotalTimeElapsed += time_elapsed;
 
             sTotalSamplesDrawn += samples_passed;

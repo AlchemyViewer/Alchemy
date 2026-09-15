@@ -85,6 +85,14 @@ public:
 
     std::string getRawGLString(); // For sending to simulator
 
+    // Apple's Metal-backed driver aborts on tessellated draws while a
+    // GL_PRIMITIVES_GENERATED query is active without transform feedback.
+    // Timer and sample queries, and primitive queries for other draws, work.
+    bool canQueryPrimitives(bool tessellated) const
+    {
+        return !tessellated || !mIsApple;
+    }
+
     bool mInited;
     bool mIsDisabled;
 

@@ -28,6 +28,7 @@
 
 #include "../llgl.h"
 #include "../llglheaders.h"
+#include "../llglslshader.h"
 #include "../llrender.h"
 #include "../llvertexbuffer.h"
 
@@ -373,5 +374,37 @@ namespace tut
                               distinctOn(verts, edges[i].axis, edges[i].value), expected);
             }
         }
+    }
+
+    // Profiling a tessellated draw must still render. Apple's Metal-backed
+    // OpenGL driver aborts when GL_PRIMITIVES_GENERATED is active here.
+    template<> template<>
+    void altessellation_object::test<7>()
+    {
+        ensure("program linked", mLinked);
+        // Viewer programs do not capture transform feedback. Declaring a
+        // captured varying takes a different Apple driver path and hides the crash.
+        glTransformFeedbackVaryings(mProgram, 0, nullptr, GL_INTERLEAVED_ATTRIBS);
+        glLinkProgram(mProgram);
+        GLint linked = GL_FALSE;
+        glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
+        ensure("program linked without transform feedback", linked == GL_TRUE);
+        mOuter = glGetUniformLocation(mProgram, "outer");
+        mInner = glGetUniformLocation(mProgram, "inner");
+        setLevels(3, 3, 3, 3, 3, 3);
+        LLGLSLShader profile;
+        profile.mFeatures.hasTessellatedTerrain = true;
+        profile.clearStats();
+        LLGLSLShader::sProfileEnabled = true;
+        profile.placeProfileQuery();
+        const std::vector<U8> px = draw(kCCW);
+        const bool read = profile.readProfileQuery();
+        LLGLSLShader::sProfileEnabled = false;
+        const GLuint queries[] = { profile.mTimerQuery, profile.mSamplesQuery, profile.mPrimitivesQuery };
+        glDeleteQueries(3, queries);
+        ensure("profile read completed", read);
+        ensure("profiled terrain covers centre", white(px, W / 2, H / 2));
+        ensure("sample query still counts fragments", profile.mSamplesDrawn > 0);
+        ensure_equals("profiling leaves no GL error", glGetError(), GLenum(GL_NO_ERROR));
     }
 }

@@ -83,6 +83,10 @@ class ALTerrainPrimitivePlot
 public:
     void begin()
     {
+        if (!gGLManager.canQueryPrimitives(true))
+        {
+            return;
+        }
         if (mQueries[0] == 0)
         {
             glGenQueries(RING, mQueries);
