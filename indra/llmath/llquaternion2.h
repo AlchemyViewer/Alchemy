@@ -48,6 +48,11 @@ public:
     // Ctor from the raw <x, y, z, w> vector
     explicit LLQuaternion2( const LLVector4a& q ) : mQ(q) {}
 
+    // Lane for lane; see equals() for a tolerance, and remember a rotation
+    // has two quaternions.
+    bool operator==(const LLQuaternion2& rhs) const { return mQ == rhs.mQ; }
+    bool operator!=(const LLQuaternion2& rhs) const { return mQ != rhs.mQ; }
+
     // The rotation that changes nothing
     static inline const LLQuaternion2& identity();
 

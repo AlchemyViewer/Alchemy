@@ -576,6 +576,9 @@ LLMatrix4a al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_
 // w = 1.
 LLVector4a al_project(const LLVector4a& obj, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4]);
 LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& modelview, const LLMatrix4a& proj, const S32 viewport[4]);
+// The same through the inverse of modelview then projection, for a caller with several
+// points against one camera.
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& inverse, const S32 viewport[4]);
 // Window depth of the near / far plane under the active convention.
 inline F32 al_window_near() { return LLRender::sReverseZ ? 1.f : 0.f; }
 inline F32 al_window_far()  { return LLRender::sReverseZ ? 0.f : 1.f; }

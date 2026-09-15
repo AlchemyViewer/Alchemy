@@ -1756,6 +1756,12 @@ LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& modelview, cons
                                : alprojection::unproject(win, modelview, proj, viewport);
 }
 
+LLVector4a al_unproject(const LLVector4a& win, const LLMatrix4a& inverse, const S32 viewport[4])
+{
+    return LLRender::sReverseZ ? alprojection::unproject_zo(win, inverse, viewport)
+                               : alprojection::unproject(win, inverse, viewport);
+}
+
 #if AL_GLM_BRIDGE
 glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
 {

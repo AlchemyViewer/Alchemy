@@ -187,7 +187,7 @@ public:
     // code can never drift apart. mReservedUniform indexes LLShaderMgr::mReservedUniforms for
     // the GLSL member name; mName overrides it for members that aren't reserved uniforms.
     // mMatrix marks a matrix member, which is additionally required to introspect
-    // COLUMN-major: std140's default, and what the pack code writes (glm's own storage,
+    // COLUMN-major: std140's default, and what the pack code writes (an LLMatrix4a's rows,
     // uploaded straight through). A row-major layout would silently transpose every read.
 #if !LL_RELEASE_FOR_DOWNLOAD
     struct EngineBlockLayoutMember

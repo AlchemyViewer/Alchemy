@@ -313,6 +313,17 @@ public:
         res = rowMul(v, *this);
     }
 
+    // Transforms v as a point through every row and divides by the w that
+    // comes out: the point in normalized device coordinates when the matrix
+    // ends in a projection, and the affine transform when it does not. The
+    // result's w is 1.
+    inline void perspectiveTransform(const LLVector4a& v, LLVector4a& res) const
+    {
+        const LLQuad point = alsimd::select(alsimd::mask_xyz(), v, alsimd::set(0.f, 0.f, 0.f, 1.f));
+        const LLQuad clip = rowMul(point, *this);
+        res = alsimd::div(clip, alsimd::splat<3>(clip));
+    }
+
     template<int N> const LLVector4a& getRow() const { return mMatrix[N]; }
     template<int N> void setRow(const LLVector4a& row) { mMatrix[N] = row; }
 
