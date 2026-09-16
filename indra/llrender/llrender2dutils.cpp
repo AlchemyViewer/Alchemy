@@ -1136,13 +1136,26 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
     //polygon stipple is deprecated, use "Checker" texture
     LLPointer<LLUIImage> img = LLRender2D::getInstance()->getUIImage("Checker");
     // Per-binding: the Checker image is a shared UI texture, so wrap+point must not follow
-    // it to other users.
+    // it to other users. The quad is emitted here rather than through
+    // gl_draw_scaled_image, which binds the texture again with a clamped
+    // bilinear sampler and turns the tiled checks into one smeared cell.
     gGL.getTextureSlot(0)->bindSampled(img->getImage(), ALSamplers::PointWrap);
 
-    LLColor4 color(1.f, 1.f, 1.f, alpha);
-    LLRectf uv_rect(0, 0, rect.getWidth()/32.f, rect.getHeight()/32.f);
+    const F32 u = rect.getWidth() / 32.f;
+    const F32 v = rect.getHeight() / 32.f;
 
-    gl_draw_scaled_image(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight(), img->getImage(), color, uv_rect);
+    gGL.color4f(1.f, 1.f, 1.f, alpha);
+    gGL.begin(LLRender::TRIANGLES);
+    {
+        gGL.texCoord2f(u, v);   gGL.vertex2i(rect.mRight, rect.mTop);
+        gGL.texCoord2f(0.f, v); gGL.vertex2i(rect.mLeft, rect.mTop);
+        gGL.texCoord2f(0.f, 0.f); gGL.vertex2i(rect.mLeft, rect.mBottom);
+
+        gGL.texCoord2f(u, v);   gGL.vertex2i(rect.mRight, rect.mTop);
+        gGL.texCoord2f(0.f, 0.f); gGL.vertex2i(rect.mLeft, rect.mBottom);
+        gGL.texCoord2f(u, 0.f); gGL.vertex2i(rect.mRight, rect.mBottom);
+    }
+    gGL.end();
 
     gGL.flush();
 }
