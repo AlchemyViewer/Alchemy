@@ -250,6 +250,7 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     bool write_depth = rigged ||
         LLDrawPoolWater::sSkipScreenCopy
+        || LLPipeline::sImpostorRender
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
 

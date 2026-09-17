@@ -13426,6 +13426,13 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("generateImpostor");
     LLGLState::checkStates();
+    
+    // Save the caller's cull result so the impostor bake doesn't clobber it.
+    // In upstream this was harmless because the impostor postSort skipped the alpha
+    // group sort (sShadowRender=true). Now that we sort during impostor bakes,
+    // grabReferences() below would leave sCull pointing at the impostor's result
+    // after we return, causing the main frame's alpha pool to iterate the wrong list.
+    LLCullResult* saved_cull = sCull;
 
     static LLCullResult result;
     result.clear();
@@ -13899,6 +13906,8 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
     LLVertexBuffer::unbind();
     LLGLState::checkStates();
+    // Restore the main frame's cull result before returning.
+    sCull = saved_cull;
 }
 
 bool LLPipeline::hasRenderBatches(const U32 type) const
