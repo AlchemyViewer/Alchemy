@@ -26,6 +26,7 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <cmath>
 #include <iostream>
 #include <fstream>
 
@@ -587,54 +588,90 @@ bool LLFeatureManager::loadGPUClass()
     if (!gSavedSettings.getBOOL("SkipBenchmark"))
     {
         F32 class1_gbps = gSavedSettings.getF32("RenderClass1MemoryBandwidth");
-        //get memory bandwidth from benchmark
-        F32 gbps;
-        try
-        {
+        // Keep the raw renderer and full GL version: the display GPU string
+        // strips driver information on Linux.
+        const std::string gpu_string = gGLManager.getRawGLString();
+        const LLSD benchmark = gSavedSettings.getLLSD("GPUBenchmarkResult");
+        F32 gbps = (F32)benchmark["bandwidth"].asReal();
+        bool use_cached_result = benchmark["gpu"].asString() == gpu_string
+            && benchmark["vendor"].asString() == gGLManager.mGLVendor
+            && benchmark["driver"].asString() == gGLManager.mGLVersionString
+            && benchmark["bandwidth"].isReal()
+            && std::isfinite(gbps)
+            && (gbps > 0.f || gbps == -1.f);
 #if LL_WINDOWS
+        // An explicitly launched benchmark child must measure and report a result.
+        use_cached_result = use_cached_result && !gGPUBenchmarkMode;
+#endif
+
+        if (use_cached_result)
+        {
+            LL_INFOS("RenderInit") << "Using cached GPU benchmark result: " << gbps << " GB/sec" << LL_ENDL;
+        }
+        else
+        {
+            try
+            {
+#if LL_WINDOWS
+                if (gGPUBenchmarkMode)
+                {
+                    // We ARE the benchmark subprocess; run directly in-process.
+                    // logExceptionBenchmark wraps with SEH so structured exceptions
+                    // (e.g. access violations inside the driver) are still caught.
+                    gbps = logExceptionBenchmark();
+                }
+                else
+                {
+                    // Normal path: run benchmark in an isolated subprocess so a
+                    // driver hang can be killed without freezing the main viewer.
+                    gbps = subprocess_gpu_benchmark();
+                }
+#else
+                gbps = gpu_benchmark();
+#endif
+            }
+            catch (const std::exception& e)
+            {
+                gbps = -1.f;
+                LL_WARNS("RenderInit") << "GPU benchmark failed: " << e.what() << LL_ENDL;
+            }
+
+            if (!std::isfinite(gbps) || gbps <= 0.f)
+            {
+                gbps = -1.f;
+            }
+
+#if LL_WINDOWS
+            // If we are the benchmark subprocess, write the raw result to stdout
+            // so the parent process can read it, then exit immediately.
             if (gGPUBenchmarkMode)
             {
-                // We ARE the benchmark subprocess; run directly in-process.
-                // logExceptionBenchmark wraps with SEH so structured exceptions
-                // (e.g. access violations inside the driver) are still caught.
-                gbps = logExceptionBenchmark();
+                LL_WARNS("RenderInit") << "Passing " << gbps << " to parent" << LL_ENDL;
+                char buf[64];
+                int len = snprintf(buf, sizeof(buf), "%.6f\n", gbps);
+                DWORD written = 0;
+                WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), buf, (DWORD)len, &written, NULL);
+                FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
+                ExitProcess(0);
             }
-            else
-            {
-                // Normal path: run benchmark in an isolated subprocess so a
-                // driver hang can be killed without freezing the main viewer.
-                gbps = subprocess_gpu_benchmark();
-                if (gbps == -1.f
-                    && gGLManager.getRawGLString().find("Radeon") != std::string::npos
-                    && checkRDNA35())
-                {
-                    // Certain AMD GPUs have known issues with shader profiling and occlusion queries that can lead to hangs.
-                    // If test returned -1, we are likely on a bad driver.
-                    gSavedSettings.setBOOL("UseOcclusion", false);
-                }
-            }
-#else
-            gbps = gpu_benchmark();
 #endif
-        }
-        catch (const std::exception& e)
-        {
-            gbps = -1.f;
-            LL_WARNS("RenderInit") << "GPU benchmark failed: " << e.what() << LL_ENDL;
+
+            // Cache failures too, so a broken driver is not retried every startup.
+            LLSD result = LLSD::emptyMap();
+            result["gpu"] = gpu_string;
+            result["vendor"] = gGLManager.mGLVendor;
+            result["driver"] = gGLManager.mGLVersionString;
+            result["bandwidth"] = gbps;
+            gSavedSettings.setLLSD("GPUBenchmarkResult", result);
         }
 
 #if LL_WINDOWS
-        // If we are the benchmark subprocess, write the raw result to stdout
-        // so the parent process can read it, then exit immediately.
-        if (gGPUBenchmarkMode)
+        if (gbps == -1.f
+            && gpu_string.find("Radeon") != std::string::npos
+            && checkRDNA35())
         {
-            LL_WARNS("RenderInit") << "Passing " << gbps << " to parent" << LL_ENDL;
-            char buf[64];
-            int len = snprintf(buf, sizeof(buf), "%.6f\n", gbps);
-            DWORD written = 0;
-            WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), buf, (DWORD)len, &written, NULL);
-            FlushFileBuffers(GetStdHandle(STD_OUTPUT_HANDLE));
-            ExitProcess(0);
+            // Apply the driver workaround for fresh and cached failures.
+            gSavedSettings.setBOOL("UseOcclusion", false);
         }
 #endif
 

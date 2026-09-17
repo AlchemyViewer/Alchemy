@@ -16583,6 +16583,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>GPUBenchmarkResult</key>
+    <map>
+      <key>Comment</key>
+      <string>Cached GPU benchmark bandwidth in GB/sec (-1 for failure), with the GPU vendor, raw renderer and full OpenGL driver version. Reset to rerun the benchmark.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>LLSD</string>
+      <key>Value</key>
+      <map />
+    </map>
     <key>SkipBenchmark</key>
     <map>
       <key>Comment</key>
