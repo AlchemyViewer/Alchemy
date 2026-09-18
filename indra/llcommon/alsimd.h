@@ -63,6 +63,7 @@
 //   AL_SIMD_WIDTH                 floats in the widest register: 4, 8 or 16
 //   AL_SIMD_VEXT                  the vector-extension backend is in use
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)

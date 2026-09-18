@@ -63,7 +63,8 @@ namespace
     }
 
 #if AL_SIMD_DISTINCT_MASK
-    Lanes lanes_of(mask4 m)
+    // Only NEON with clang tells mask4 apart from f32x4, and no case here takes a mask.
+    [[maybe_unused]] Lanes lanes_of(mask4 m)
     {
         return lanes_of(as_f32(m));
     }

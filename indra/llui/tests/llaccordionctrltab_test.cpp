@@ -72,7 +72,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
 
-        const auto reads = [this](const std::string& attribute)
+        const auto reads = [](const std::string& attribute)
         {
             const std::string source =
                 "<accordion_tab name=\"tab\" title=\"Tab\" " + attribute + "=\"false\"/>\n";
