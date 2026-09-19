@@ -1268,11 +1268,14 @@
      name="XUIStudioGrid"
      value="0.3 0.82 1 0.12" />
     <color
-     name="XUIStudioRulerGround"
+     name="CanvasRulerGround"
      value="0.169 0.169 0.169 0.85" />
     <color
-     name="XUIStudioRulerInk"
+     name="CanvasRulerInk"
      reference="LtGray" />
+    <color
+     name="CanvasRulerMark"
+     reference="XUIStudioSelection" />
     <color
      name="PropertyGridBandColor"
      value="0.169 0.169 0.169 0.25" />

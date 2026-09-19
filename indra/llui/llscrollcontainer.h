@@ -110,6 +110,9 @@ public:
     // is not always what there was to scroll then.
     void            setDocPosVertical(S32 pos) { mScrollbar[VERTICAL]->setDocPos(pos); }
     S32             getDocPosHorizontal() const { return mScrollbar[HORIZONTAL]->getDocPos(); }
+    void            setDocPosHorizontal(S32 pos) { mScrollbar[HORIZONTAL]->setDocPos(pos); }
+    // What is scrolled, for a caller working out where a point of it is.
+    LLView*         getScrolledView() const { return mScrolledView; }
     S32             getBorderWidth() const;
 
     // LLView functionality
