@@ -2446,13 +2446,15 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             // dereferencing is strict-aliasing UB (you may not access a
             // char-typed object through a non-char pointer). std::memcpy is
             // defined and compiles down to a load on every supported target.
-            const U8* indices_bytes = idx.data();
-            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - indices");
-            for (U32 j = 0; j < num_indices; ++j)
             {
-                U16 idx_v;
-                std::memcpy(&idx_v, indices_bytes + j * sizeof(U16), sizeof(U16));
-                face.mIndices[j] = idx_v;
+                const U8* indices_bytes = idx.data();
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - indices");
+                for (U32 j = 0; j < num_indices; ++j)
+                {
+                    U16 idx_v;
+                    std::memcpy(&idx_v, indices_bytes + j * sizeof(U16), sizeof(U16));
+                    face.mIndices[j] = idx_v;
+                }
             }
 
             //copy out vertices
@@ -2731,36 +2733,38 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 
             //calculate bounding box
             // VFExtents change
-            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - extents");
-            LLVector4a& min = face.mExtents[0];
-            LLVector4a& max = face.mExtents[1];
-
-            if (face.mNumVertices < 3)
-            { //empty face, use a dummy 1cm (at 1m scale) bounding box
-                min.splat(-0.005f);
-                max.splat(0.005f);
-            }
-            else
             {
-                alsimd::extents(face.mPositions, face.mNumVertices, min, max);
+                LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - extents");
+                LLVector4a& min = face.mExtents[0];
+                LLVector4a& max = face.mExtents[1];
 
-                if (face.mTexCoords)
-                {
-                    LLVector2& min_tc = face.mTexCoordExtents[0];
-                    LLVector2& max_tc = face.mTexCoordExtents[1];
-
-                    min_tc = face.mTexCoords[0];
-                    max_tc = face.mTexCoords[0];
-
-                    for (S32 j = 1; j < face.mNumVertices; ++j)
-                    {
-                        update_min_max(min_tc, max_tc, face.mTexCoords[j]);
-                    }
+                if (face.mNumVertices < 3)
+                { //empty face, use a dummy 1cm (at 1m scale) bounding box
+                    min.splat(-0.005f);
+                    max.splat(0.005f);
                 }
                 else
                 {
-                    face.mTexCoordExtents[0].set(0,0);
-                    face.mTexCoordExtents[1].set(1,1);
+                    alsimd::extents(face.mPositions, face.mNumVertices, min, max);
+
+                    if (face.mTexCoords)
+                    {
+                        LLVector2& min_tc = face.mTexCoordExtents[0];
+                        LLVector2& max_tc = face.mTexCoordExtents[1];
+
+                        min_tc = face.mTexCoords[0];
+                        max_tc = face.mTexCoords[0];
+
+                        for (S32 j = 1; j < face.mNumVertices; ++j)
+                        {
+                            update_min_max(min_tc, max_tc, face.mTexCoords[j]);
+                        }
+                    }
+                    else
+                    {
+                        face.mTexCoordExtents[0].set(0,0);
+                        face.mTexCoordExtents[1].set(1,1);
+                    }
                 }
             }
         }
