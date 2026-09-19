@@ -141,6 +141,7 @@ namespace tut
 
         panel->refresh();
         const ALPropertyGrid::Field* white = rowNamed(panel, "White");
+        ensure("the changed row is still there", white != nullptr);
         ensure("changed rows are the person's", white->authored);
         ensure_equals("and sit under the first heading", white->group, 0);
         // The words are the viewer's strings, which these tests do not
@@ -150,6 +151,7 @@ namespace tut
         table.resetToDefault("White");
         panel->refresh();
         white = rowNamed(panel, "White");
+        ensure("the row survives the way back", white != nullptr);
         ensure("put back, it is the skin's again", !white->authored);
         ensure("under its file", white->group > 0);
         panel->die();
