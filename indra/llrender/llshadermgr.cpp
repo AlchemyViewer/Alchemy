@@ -1999,6 +1999,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uHighlightRatio");
     mReservedUniforms.push_back("uMidtoneRatio");
     mReservedUniforms.push_back("uMidtoneAmount");
+    mReservedUniforms.push_back("uSplitToneShadowRamp");
+    mReservedUniforms.push_back("uSplitToneHighlightRamp");
     mReservedUniforms.push_back("uToneAmount");
 
     // Display-space grading
@@ -2011,6 +2013,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uSaturation");
     mReservedUniforms.push_back("uVibrance");
     mReservedUniforms.push_back("uHueShiftNorm");
+
+    // Tone curve LUT
+    mReservedUniforms.push_back("uToneCurveLut");
+    mReservedUniforms.push_back("uToneCurveLutScale");
+    mReservedUniforms.push_back("uToneCurveAmount");
 
     // Vignette
     mReservedUniforms.push_back("uVignetteAmount");
@@ -2107,14 +2114,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
-
-    // Split-tone luma ramps and the baked tone curve LUT (appended; see the
-    // note at the end of eGLSLReservedUniforms)
-    mReservedUniforms.push_back("uSplitToneShadowRamp");
-    mReservedUniforms.push_back("uSplitToneHighlightRamp");
-    mReservedUniforms.push_back("uToneCurveLut");
-    mReservedUniforms.push_back("uToneCurveLutScale");
-    mReservedUniforms.push_back("uToneCurveAmount");
 
     // End Alchemy Effects Stack
 

@@ -478,6 +478,8 @@ public:
         SPLIT_TONE_HIGHLIGHT_RATIO,         //  "uHighlightRatio"
         SPLIT_TONE_MIDTONE_RATIO,           //  "uMidtoneRatio"
         SPLIT_TONE_MIDTONE_AMOUNT,          //  "uMidtoneAmount"
+        SPLIT_TONE_SHADOW_RAMP,             //  "uSplitToneShadowRamp"    (1/ws, -(mid - ws)/ws)
+        SPLIT_TONE_HIGHLIGHT_RAMP,          //  "uSplitToneHighlightRamp" (1/wh, -mid/wh)
         SPLIT_TONE_AMOUNT,                  //  "uToneAmount"
 
         // Display-space grading — all CPU-precomputed to scale/bias pairs
@@ -490,6 +492,11 @@ public:
         COLOR_GRADE_SATURATION,             //  "uSaturation"
         COLOR_GRADE_VIBRANCE,               //  "uVibrance"
         COLOR_GRADE_HUE_SHIFT_NORM,         //  "uHueShiftNorm"     (degrees / 360)
+
+        // Tone curve, baked to a 1D LUT by LLPipeline::bakeToneCurveLut
+        COLOR_GRADE_CURVE_LUT,              //  "uToneCurveLut"
+        COLOR_GRADE_CURVE_LUT_SCALE,        //  "uToneCurveLutScale"      (1 - 1/N, 0.5/N)
+        COLOR_GRADE_CURVE_AMOUNT,           //  "uToneCurveAmount"
 
         // Vignette
         VIGNETTE_AMOUNT,                    //  "uVignetteAmount"
@@ -528,10 +535,7 @@ public:
         REFERENCE_WIPE_MODE,                //  "uRefWipeMode"
         REFERENCE_WIPE_POS,                 //  "uRefWipePos"
 
-        // Geometric lens distortion — Brown-Conrady, applied in the final blit.
-        // New families are appended here rather than inserted among the blocks
-        // above: this list and the string table in llshadermgr.cpp are parallel
-        // and ordinal-coupled, so appending keeps every later index stable.
+        // Geometric lens distortion — Brown-Conrady, applied in the final blit
         LENS_DISTORT_AMOUNT,                //  "uLensDistortAmount"  master gate; 0 = off
         LENS_DISTORT_K,                     //  "uLensDistortK"       (k1, k2) pre-multiplied by amount on CPU
         LENS_DISTORT_SCALE,                 //  "uLensDistortScale"   auto-fit rescale (direct multiplier), solved on CPU
@@ -595,16 +599,6 @@ public:
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
-
-        // Split-tone luma ramps and the baked tone curve LUT. Appended at the
-        // tail rather than beside the split-tone and grading blocks above:
-        // this list and the string table in llshadermgr.cpp are parallel and
-        // ordinal-coupled, so appending keeps every earlier index stable.
-        SPLIT_TONE_SHADOW_RAMP,             //  "uSplitToneShadowRamp"    (1/ws, -(mid - ws)/ws)
-        SPLIT_TONE_HIGHLIGHT_RAMP,          //  "uSplitToneHighlightRamp" (1/wh, -mid/wh)
-        COLOR_GRADE_CURVE_LUT,              //  "uToneCurveLut"
-        COLOR_GRADE_CURVE_LUT_SCALE,        //  "uToneCurveLutScale"      (1 - 1/N, 0.5/N)
-        COLOR_GRADE_CURVE_AMOUNT,           //  "uToneCurveAmount"
 
         SH_PARTIAL,                         //  "shPartial"  (row partial sums of the probe SH projection)
 
