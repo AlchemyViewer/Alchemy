@@ -232,8 +232,8 @@ jobs:
       # vcpkg Setup
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_USERNAME: ${{ github.repository_owner }}
-      VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+      # VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      # VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
     steps:
       - name: Linux Dependency Install and Disk Cleanup
         if: runner.os == 'Linux'
@@ -303,33 +303,33 @@ jobs:
         run: |
           ./vcpkg/bootstrap-vcpkg.sh
 
-      - name: Set up vcpkg nuget caching
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]
-          then
-            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              sources add \
-              -Source "${{ env.VCPKG_FEED_URL }}" \
-              -StorePasswordInClearText \
-              -Name GitHubPackages \
-              -UserName "${{ env.VCPKG_USERNAME }}" \
-              -Password "${{ secrets.GITHUB_TOKEN }}"
-            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              setapikey "${{ secrets.GITHUB_TOKEN }}" \
-              -Source "${{ env.VCPKG_FEED_URL }}"
-          else
-            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              sources add \
-              -Source "${{ env.VCPKG_FEED_URL }}" \
-              -StorePasswordInClearText \
-              -Name GitHubPackages \
-              -UserName "${{ env.VCPKG_USERNAME }}" \
-              -Password "${{ secrets.GITHUB_TOKEN }}"
-            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              setapikey "${{ secrets.GITHUB_TOKEN }}" \
-              -Source "${{ env.VCPKG_FEED_URL }}"
-          fi
+      # - name: Set up vcpkg nuget caching
+      #   shell: bash
+      #   run: |
+      #     if [[ "$RUNNER_OS" == "Windows" ]]
+      #     then
+      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         sources add \
+      #         -Source "${{ env.VCPKG_FEED_URL }}" \
+      #         -StorePasswordInClearText \
+      #         -Name GitHubPackages \
+      #         -UserName "${{ env.VCPKG_USERNAME }}" \
+      #         -Password "${{ secrets.GITHUB_TOKEN }}"
+      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
+      #         -Source "${{ env.VCPKG_FEED_URL }}"
+      #     else
+      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         sources add \
+      #         -Source "${{ env.VCPKG_FEED_URL }}" \
+      #         -StorePasswordInClearText \
+      #         -Name GitHubPackages \
+      #         -UserName "${{ env.VCPKG_USERNAME }}" \
+      #         -Password "${{ secrets.GITHUB_TOKEN }}"
+      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
+      #         -Source "${{ env.VCPKG_FEED_URL }}"
+      #     fi
 
       - name: Cache Rust Dependencies
         uses: actions/cache@v6
