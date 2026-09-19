@@ -34,22 +34,35 @@
 #define AL_FLOATERLIGHTBOX_H
 
 #include "llfloater.h"
+#include "llframetimer.h"
 
 #include "aldaycyclelandmarks.h"
 #include "algradehistory.h"
+#include "allightboxdirectory.h"
 
 #include <array>
+#include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
 class ALCurveEditorCtrl;
+class ALDockPanel;
+class ALEmptyState;
+class ALPopover;
+class LLButton;
+class LLColor4;
+class LLColorSwatchCtrl;
 class LLComboBox;
+class LLPanel;
 class LLSettingsDay;
 class LLSettingsSky;
 class LLSettingsWater;
+class LLSliderCtrl;
 class LLSpinCtrl;
+class LLTabContainer;
 
 class ALFloaterLightBox final : public LLFloater
 {
@@ -63,15 +76,109 @@ public:
     ///
     /// Floater-local rather than a global action, unlike the hold-to-compare
     /// key: a global Ctrl+Z would fire while the user is typing anywhere in
-    /// the viewer. Being handled here also means a text field that wants
-    /// Ctrl+Z for its own undo gets it first, since the focus chain is offered
-    /// the key before the floater is.
+    /// the viewer. A focused text control with an edit history of its own
+    /// keeps these keys for it.
     bool handleKeyHere(KEY key, MASK mask) override;
+    /// Ctrl and Alt keys go to the menu bar's accelerators before the focused
+    /// floater unless something in the focus chain claims accelerators of its
+    /// own, so without this Ctrl+Shift+Z never reached handleKeyHere at all:
+    /// it is World > Environment > Midnight, and pressing it in the Lightbox
+    /// set the sky to midnight instead of redoing. Claiming them costs nothing
+    /// else -- a key this floater does not handle falls through to the menus
+    /// exactly as before.
+    bool hasAccelerators() const override { return true; }
     /// Only to notice the reference still appearing or going away, which is
     /// render state and so has no signal to hang on. See refreshReferenceRow.
     void draw() override;
+    /// A popover still up is closed as settled first: whatever it was showing
+    /// was chosen, and it must not outlive the floater its callbacks reach.
+    void onClose(bool app_quitting) override;
 
   private:
+    /// What the popover that is up, if any, is for.
+    enum class PopoverKind
+    {
+        None,
+        Find,
+        History,
+        Color,
+    };
+    /// A key the popover gets first while it has the keyboard: the floater's
+    /// own shortcuts, which would otherwise fall to the menu bar.
+    using PopoverKeyHook = std::function<bool(KEY, MASK)>;
+
+    /// Put @a content in a popover under @a anchor, closing any other first:
+    /// the Lightbox has one popover at a time.
+    ALPopover* showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook);
+    /// Make @a popover the one that is up, and open it under @a anchor.
+    void adoptPopover(PopoverKind kind, ALPopover* popover, LLView* anchor);
+    /// Close the popover that is up, keeping what it chose or, escaping,
+    /// keeping nothing.
+    void closePopover(bool escape);
+    /// Told once per popover, as it closes.
+    void onPopoverClosed(const LLView* which, bool escaped);
+
+    /// Find a setting or section by name (Ctrl+F): every section and every
+    /// setting, ranked against what is typed, and Return goes to it.
+    void openFind();
+    /// Show a section, or a setting and the section it is in: its tab chosen,
+    /// its section opened and scrolled to, and the setting given the keyboard
+    /// and its caption lit for a moment. @a target is "s:<section panel>" or
+    /// "k:<setting key>", as findCandidates makes them.
+    void jumpTo(const std::string& target);
+    /// A tab page's label ("Look"), by index.
+    std::string pageLabel(size_t page) const;
+
+    /// The undo stack as a list: every step by name, the present marked, and
+    /// a double-click on any step goes back or forward to it.
+    void openHistory();
+    /// Put the stack into the open history list. Also run from draw() when the
+    /// stack has moved under it.
+    void fillHistoryList();
+    /// Undo or redo, one step at a time, until @a cursor steps are in force.
+    void goToHistory(size_t cursor);
+
+    /// A colour row's swatch asking to open its picker: open the inline one
+    /// under it instead. False lets the swatch open the picker floater.
+    bool openColorPopover(LLColorSwatchCtrl* swatch, const std::string& key);
+    /// The inline picker moved: write the colour live, unrecorded.
+    void onColorPicked(const LLColor4& color);
+    /// The inline picker closed: put the colour back if it was escaped, or
+    /// record the whole pick as one undo step if it changed anything.
+    void endColorSession(bool escaped);
+
+    /// Size every section to what is in it: its lowest row's bottom plus a
+    /// margin, and its accordion tab to that plus the header. The heights the
+    /// XUI declares then only matter for the first layout and for XUI
+    /// Studio's preview, and a row added or moved can no longer leave a
+    /// section clipped or padded because nobody redid the sum.
+    void fitSections();
+
+    // --- Tabs in windows of their own ---
+    //
+    // Each page is wrapped in an ALDockPanel at the end of postBuild, after
+    // the directory has found everything on it: taking a page out moves its
+    // widgets into another window, where no search from this floater would
+    // find them, and the directory's pointers are what keep working.
+
+    /// Take the current tab out into a window of its own, or put it back.
+    void togglePane();
+    /// Put one page back.
+    void dockPane(size_t page);
+    /// Put every page back: before this floater closes, since a page left in
+    /// another window would outlive the callbacks it is wired to.
+    void dockPanes();
+    /// Remember which pages are out, and where their windows are.
+    void savePanes() const;
+    /// Take the pages that were out last time out again.
+    void restorePanes();
+    /// Keep the pages' empty states, the button and the saved state in step
+    /// with which pages are out. Polled from draw(), because a torn-off
+    /// window's own close box puts its page back without telling anyone.
+    void refreshPaneRow();
+    /// The window a page is out in, or null while it is here.
+    LLFloater* paneWindow(size_t page) const;
+
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
     /// Set or clear one section's bit in LLPipeline::sGradeBypassMask, from
@@ -81,24 +188,47 @@ public:
     /// here. The settings are never touched, so a comparison cannot dirty
     /// the Look.
     void onToggleSection(LLUICtrl* ctrl, const LLSD& userdata);
+    /// Put the number of bypassed grading sections on the Look tab, or take
+    /// it off when there are none. A bypass is state nothing else on screen
+    /// shows once its section is scrolled away or another tab is up, and it
+    /// is easy to forget one is in force while judging the grade.
+    void refreshBypassBadge();
     void onCommitVec3(LLUICtrl* ctrl);
     void refreshVec3Row(const std::string& setting_name);
     void setupToneCurve();
     void refreshToneCurve();
+    /// Interpret the graph's action (drag, add, remove) against the selected
+    /// curve and write that curve's setting: exactly one setting per commit.
     void onCommitToneCurve();
-    /// Which channel the tone curve graph edits: -1 for all three, else 0..2.
+    /// Reset the curve the channel combo selects, and nothing else.
+    void onClickResetToneCurveChannel();
+    /// Replace the selected curve with a named preset; parameter = preset id.
+    void onToneCurvePreset(const LLSD& userdata);
+    /// The channel combo's value: -1 for Master, else 0..2 for R, G, B.
     S32  getToneCurveChannel() const;
     void setupSplitToneGraph();
     void refreshSplitToneGraph();
+    /// Write balance or one of the two widths, by which handle moved.
     void onCommitSplitToneGraph();
     /// Arm the scene picker; the click that follows sets Temperature and Tint.
     void onClickWhiteBalancePicker();
     void onWhiteBalancePicked(const LLColor3& sample);
+    void populateAssetCombo(const std::string& combo_name,
+                            const std::string& dir_name,
+                            const std::vector<std::string>& extensions,
+                            const std::string& setting_name);
     void populateLUTCombo();
+    void openUserAssetFolder(const std::string& dir_name);
     /// Open the user's LUT folder in the platform file browser, creating it
     /// first if this is its first use.
     void onClickOpenLUTFolder();
+    void onLensDirtSliderHeld(bool held);
     void updateTonemapperRows();
+    /// Show the Bloom (HDR) sections, and the Cross Filter ones that run off
+    /// the same bloom, or the Glow (Legacy) ones, whichever the renderer is
+    /// running, and hide the other side: it does nothing until HDR is
+    /// switched the other way, and HDR is not switched from here.
+    void refreshBloomSections();
     /// Freeze the frame about to be presented, and switch the wipe on so the
     /// grab is visibly a grab.
     void onClickReferenceGrab();
@@ -158,6 +288,48 @@ public:
     void onClickLookRevert();
     void refreshLooksBar();
 
+    /// The tab strip and its pages, in tab order: Look, Lens, Scene, Sky.
+    LLTabContainer* mTabs = nullptr;
+    std::vector<LLPanel*> mTabPages;
+    /// What popovers hang from.
+    LLPanel* mTopBar = nullptr;
+    LLHandle<ALPopover> mPopover;
+    PopoverKind mPopoverKind = PopoverKind::None;
+    /// The caption a jump lit, and how long ago; draw() puts it out.
+    LLHandle<LLView> mLitCaption;
+    LLFrameTimer mLitTimer;
+
+    /// One per page, in tab order: its pane, by handle because a pane is in
+    /// another window while it is out and that window is its parent, and what
+    /// the page says while its pane is away.
+    struct Pane
+    {
+        LLHandle<LLView> mPane;
+        ALEmptyState* mEmpty = nullptr;
+    };
+    std::vector<Pane> mPanes;
+    LLButton* mPopOutButton = nullptr;
+    /// Which pages are out and which tab is up, as last shown; -1 before the
+    /// first refresh.
+    S32 mPaneRowState = -1;
+    /// Which pages were out when the state was last saved.
+    U32 mPanesOutSaved = 0;
+    /// Every section and setting, found in postBuild. After postBuild nothing
+    /// here looks a widget up by name: a page taken out into a window of its
+    /// own takes its widgets with it, out of reach of any search from this
+    /// floater, and the pointers held here are what keep working.
+    ALLightboxDirectory mDirectory;
+
+    /// One per tonemapper parameter row: the operator it belongs to, and the
+    /// row, which updateTonemapperRows greys -- reset button and all, since
+    /// the rows are setting rows.
+    struct TonemapperRow
+    {
+        S32 mType = 0;
+        LLUICtrl* mCtrl = nullptr;
+    };
+    std::vector<TonemapperRow> mTonemapperRows;
+
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a
     // vector-valued row is pure XUI.
@@ -168,13 +340,19 @@ public:
     std::map<std::string, std::array<LLUICtrl*, 3>> mVec3Rows;
     std::vector<boost::signals2::scoped_connection> mVec3Connections;
     boost::signals2::scoped_connection mTonemapConnection;
+    boost::signals2::scoped_connection mHDRConnection;
     boost::signals2::scoped_connection mLooksListConnection;
     boost::signals2::scoped_connection mLooksActiveConnection;
     LLComboBox* mLooksCombo = nullptr;
+    LLUICtrl* mLookSave = nullptr;
+    LLUICtrl* mLookDelete = nullptr;
+    LLUICtrl* mLookRevert = nullptr;
     bool mVec3Updating = false;
 
-    // Tone curve graph. Optional: the floater builds without it, so the XUI
-    // can drop the graph and keep the spinners.
+    // Tone curve graph. Optional: the floater builds without it. The four
+    // curve settings are read fresh on every refresh and commit rather than
+    // mirrored here -- undo, Looks and Debug Settings all write them behind
+    // the floater's back.
     std::vector<boost::signals2::scoped_connection> mToneCurveConnections;
     ALCurveEditorCtrl* mToneCurve = nullptr;
     LLComboBox* mToneCurveChannel = nullptr;
@@ -184,6 +362,10 @@ public:
     // remain the full interface if the XUI drops it.
     std::vector<boost::signals2::scoped_connection> mSplitToneConnections;
     ALCurveEditorCtrl* mSplitToneGraph = nullptr;
+    /// The width sliders, whose min_val/max_val are the range the edge
+    /// handles clamp into, so the XUI stays the single home of that range.
+    LLSliderCtrl* mSplitShadowWidthSlider = nullptr;
+    LLSliderCtrl* mSplitHighlightWidthSlider = nullptr;
     bool mSplitToneUpdating = false;
 
     // Undo. The history is a member, so it lives and dies with the floater:
@@ -196,12 +378,30 @@ public:
     /// signals a user edit does, and recording them would append the undo to
     /// the stack it came from.
     bool mApplyingHistory = false;
+    /// The settings undo watches, for deciding whether a pick is a step.
+    std::set<std::string> mRecordedKeys;
+
+    // The inline colour picker's session: the setting, what it held when the
+    // picker opened, and a flag held while the picker writes it. Its writes
+    // are not recorded one by one -- a pick that took longer than the
+    // coalescing window would become several steps -- and the pick is
+    // recorded once, whole, when the picker closes. No undo group is held
+    // open for the length of it: a popover can die without saying it closed,
+    // and a group left open would take every later write into itself.
+    std::string mColorKey;
+    LLSD mColorOriginal;
+    bool mColorWriting = false;
 
     // Undo and Redo in the top bar, polled by draw() like the row below:
     // the stack moves on every commit and every Look apply, and hanging a
     // refresh off each of those is more places to forget.
     LLUICtrl* mUndoButton = nullptr;
     LLUICtrl* mRedoButton = nullptr;
+    LLUICtrl* mHistoryButton = nullptr;
+    /// The list in the history popover while it is up, and the stack revision
+    /// it shows.
+    LLHandle<LLView> mHistoryList;
+    U32 mHistoryListRevision = 0;
     /// Bit 0 can-undo, bit 1 can-redo; -1 until the first refresh.
     S32 mHistoryButtonState = -1;
 

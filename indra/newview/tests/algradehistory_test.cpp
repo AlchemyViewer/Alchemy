@@ -21,6 +21,8 @@
 
 #include "../algradehistory.h"
 
+#include "llformat.h"
+
 namespace tut
 {
     struct history_data
@@ -281,5 +283,194 @@ namespace tut
             ++undone;
         }
         ensure_equals("the whole stack is walkable", undone, ALGradeHistory::MAX_DEPTH);
+    }
+
+    // A group names the step it makes, for a history that is shown; a step
+    // made any other way has no name, and the caller names it from its
+    // changes.
+    template<> template<>
+    void history_object::test<15>()
+    {
+        mHistory.beginGroup("Reset Bloom");
+        mHistory.record("A", LLSD(1.0), LLSD(0.0), 1.f);
+        mHistory.record("B", LLSD(2.0), LLSD(0.0), 1.f);
+        mHistory.endGroup();
+        mHistory.record("C", LLSD(0.0), LLSD(1.0), 5.f);
+
+        ensure_equals("two steps", mHistory.depth(), (size_t)2);
+        ensure_equals("the group's step carries its name", mHistory.labelOf(0), std::string("Reset Bloom"));
+        ensure("a lone write's step has none", mHistory.labelOf(1).empty());
+
+        // And a group that follows an unnamed one is not named after it.
+        mHistory.beginGroup();
+        mHistory.record("D", LLSD(0.0), LLSD(1.0), 9.f);
+        mHistory.endGroup();
+        ensure("an unnamed group stays unnamed", mHistory.labelOf(2).empty());
+    }
+
+    // Groups nest, and the one the user started is the one the step is named
+    // for: applying a Look that resets a section on the way is "Look: X".
+    template<> template<>
+    void history_object::test<16>()
+    {
+        mHistory.beginGroup("Look: Soft Film");
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.beginGroup("Reset Basic");
+        mHistory.record("B", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.endGroup();
+        mHistory.endGroup();
+
+        ensure_equals("one step", mHistory.depth(), (size_t)1);
+        ensure_equals("named by the outermost group", mHistory.labelOf(0), std::string("Look: Soft Film"));
+    }
+
+    // A name belongs to its step through everything that moves steps: the
+    // oldest dropping off the front at the cap, and the redo tail being cut.
+    template<> template<>
+    void history_object::test<17>()
+    {
+        const size_t made = ALGradeHistory::MAX_DEPTH + 5;
+        for (size_t i = 0; i < made; ++i)
+        {
+            mHistory.beginGroup(llformat("step %d", (S32)i));
+            mHistory.record("A", LLSD((F64)i), LLSD((F64)(i + 1)), 1.f);
+            mHistory.endGroup();
+        }
+        ensure_equals("capped", mHistory.depth(), ALGradeHistory::MAX_DEPTH);
+        ensure_equals("the oldest kept is the sixth made", mHistory.labelOf(0), std::string("step 5"));
+        ensure_equals("the newest is the last made", mHistory.labelOf(mHistory.depth() - 1),
+                      llformat("step %d", (S32)(made - 1)));
+
+        mHistory.clear();
+        for (const char* name : { "one", "two", "three" })
+        {
+            mHistory.beginGroup(name);
+            mHistory.record(name, LLSD(0.0), LLSD(1.0), 1.f);
+            mHistory.endGroup();
+        }
+        mHistory.undo();
+        mHistory.undo();
+        mHistory.beginGroup("four");
+        mHistory.record("four", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.endGroup();
+        ensure_equals("the undone two were cut", mHistory.depth(), (size_t)2);
+        ensure_equals("the first kept its name", mHistory.labelOf(0), std::string("one"));
+        ensure_equals("and the new one has its own", mHistory.labelOf(1), std::string("four"));
+    }
+
+    // A control a group moved and then put back is not part of what the
+    // group did, and a group made of nothing else is not a step at all.
+    template<> template<>
+    void history_object::test<18>()
+    {
+        mHistory.beginGroup("There and back");
+        mHistory.record("A", LLSD(1.0), LLSD(2.0), 1.f);
+        mHistory.record("A", LLSD(2.0), LLSD(1.0), 1.f);
+        mHistory.endGroup();
+        ensure("no step", !mHistory.canUndo());
+        ensure_equals("nothing kept", mHistory.depth(), (size_t)0);
+
+        mHistory.beginGroup();
+        mHistory.record("A", LLSD(1.0), LLSD(2.0), 1.f);
+        mHistory.record("B", LLSD(0.0), LLSD(5.0), 1.f);
+        mHistory.record("A", LLSD(2.0), LLSD(1.0), 1.f);
+        mHistory.endGroup();
+        ensure_equals("one step", mHistory.depth(), (size_t)1);
+        const auto* t = mHistory.undo();
+        ensure("got it", t != nullptr);
+        ensure_equals("holding only what changed", t->size(), (size_t)1);
+        ensure_equals("which is B", t->front().mName, std::string("B"));
+    }
+
+    // A drag that comes back to where it started did nothing, so it leaves no
+    // step -- and if it carries on, it is a new step from that same value.
+    template<> template<>
+    void history_object::test<19>()
+    {
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.record("A", LLSD(1.0), LLSD(0.0), 1.1f);
+        ensure_equals("back where it started, no step", mHistory.depth(), (size_t)0);
+        ensure("nothing to undo", !mHistory.canUndo());
+
+        mHistory.record("A", LLSD(0.0), LLSD(2.0), 1.2f);
+        ensure_equals("carrying on is a step", mHistory.depth(), (size_t)1);
+        const auto* t = mHistory.undo();
+        ensure("got it", t != nullptr);
+        ensure_equals("from the value the drag began at", t->front().mBefore.asReal(), 0.0);
+        ensure_equals("to where it went", t->front().mAfter.asReal(), 2.0);
+
+        // A drag that returns to its start does not take an earlier step with
+        // it: only its own is dropped.
+        mHistory.clear();
+        mHistory.record("B", LLSD(0.0), LLSD(3.0), 1.f);
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 5.f);
+        mHistory.record("A", LLSD(1.0), LLSD(0.0), 5.1f);
+        ensure_equals("the earlier step stays", mHistory.depth(), (size_t)1);
+        ensure_equals("and it is B's", mHistory.at(0).front().mName, std::string("B"));
+    }
+
+    // Writing the value already there is not a change, so it must not cost the
+    // user their redo tail.
+    template<> template<>
+    void history_object::test<20>()
+    {
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.record("B", LLSD(0.0), LLSD(1.0), 2.f);
+        mHistory.undo();
+        ensure("something to redo", mHistory.canRedo());
+
+        mHistory.record("C", LLSD(5.0), LLSD(5.0), 3.f);
+        ensure("still something to redo", mHistory.canRedo());
+        ensure_equals("and nothing added", mHistory.depth(), (size_t)2);
+    }
+
+    // The revision moves with the stack and the cursor and at no other time,
+    // which is what lets a view of the history ask one number whether it is
+    // out of date.
+    template<> template<>
+    void history_object::test<21>()
+    {
+        const U32 start = mHistory.revision();
+        ensure("reading an empty stack moves nothing", !mHistory.canUndo() && mHistory.revision() == start);
+
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        const U32 recorded = mHistory.revision();
+        ensure("a write moves it", recorded != start);
+
+        mHistory.depth();
+        mHistory.cursor();
+        mHistory.at(0);
+        mHistory.labelOf(0);
+        ensure_equals("reads do not", mHistory.revision(), recorded);
+
+        mHistory.record("A", LLSD(1.0), LLSD(1.0), 1.1f);
+        ensure_equals("nor does a write of the value already there", mHistory.revision(), recorded);
+
+        mHistory.undo();
+        const U32 undone = mHistory.revision();
+        ensure("an undo moves it", undone != recorded);
+        mHistory.redo();
+        ensure("a redo moves it", mHistory.revision() != undone);
+
+        const U32 before_clear = mHistory.revision();
+        mHistory.clear();
+        ensure("a clear moves it", mHistory.revision() != before_clear);
+    }
+
+    // What the stack shows is what undo will do.
+    template<> template<>
+    void history_object::test<22>()
+    {
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        mHistory.record("B", LLSD(2.0), LLSD(3.0), 5.f);
+
+        const ALGradeHistory::Transaction shown = mHistory.at(1);
+        const auto* undone = mHistory.undo();
+        ensure("got it", undone != nullptr);
+        ensure_equals("the same size", undone->size(), shown.size());
+        ensure_equals("the same control", undone->front().mName, shown.front().mName);
+        ensure_equals("the same start", undone->front().mBefore.asReal(), shown.front().mBefore.asReal());
+        ensure_equals("the same end", undone->front().mAfter.asReal(), shown.front().mAfter.asReal());
+        ensure_equals("and the cursor says it is no longer in force", mHistory.cursor(), (size_t)1);
     }
 }

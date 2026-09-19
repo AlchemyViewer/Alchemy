@@ -880,8 +880,7 @@ namespace tut
     // shares out only what tab_padding_right leaves; a child that is not a
     // panel stays a child rather than becoming a tab; and a button in the
     // kept room gets its own clicks, because the tabs' mouse capture stops
-    // where that room begins. The Lightbox keeps Scopes, Find and its
-    // pop-out there.
+    // where that room begins. The Lightbox keeps its pop-out button there.
     template<> template<>
     void lltabcontainer_object::test<28>()
     {

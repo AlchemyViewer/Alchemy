@@ -30,6 +30,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpresetsmanager.h"
+#include "alcurvemodel.h"
 
 #include "lldiriterator.h"
 #include "llfloater.h"
@@ -43,9 +44,73 @@
 #include "llagentcamera.h"
 #include "llfile.h"
 
+#if !LL_RELEASE_FOR_DOWNLOAD
+// The Looks whitelist, the settings declarations, and the bundled Look files
+// must stay in lockstep by hand, and every consumer fails silent on drift:
+// loadLooksPreset writes only keys present in BOTH the whitelist and the
+// file, so a bundled Look that falls behind quietly stops resetting the keys
+// it lacks -- and "Neutral" stops meaning neutral. Say so loudly at startup
+// instead. One parse of a handful of small files, once per session.
+static void audit_bundled_looks(const std::vector<std::string>& whitelist)
+{
+    const std::string app_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
+    std::string file;
+    LLDirIterator look_iter(app_dir, "*.xml");
+    while (look_iter.next(file))
+    {
+        llifstream look_stream(gDirUtilp->add(app_dir, file));
+        if (!look_stream.is_open())
+        {
+            continue;
+        }
+        LLSD look;
+        LLSDSerialize::fromXML(look, look_stream);
+        if (!look.isMap())
+        {
+            LL_WARNS("Presets") << "Bundled Look '" << file << "' is not a settings map" << LL_ENDL;
+            continue;
+        }
+        for (const std::string& name : whitelist)
+        {
+            if (!look.has(name))
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' is missing whitelisted key '"
+                                    << name << "'; applying it will leave that setting untouched" << LL_ENDL;
+                continue;
+            }
+
+            // Presence was never the only way these files rot. Each Look
+            // carries a full copy of every setting's Comment, and nothing reads
+            // those copies -- loadLooksPreset takes only Value -- so a reworded
+            // description in settings_alchemy.xml leaves three stale duplicates
+            // behind with no symptom at all until someone diffs them by hand.
+            // Five had already drifted that way before this check existed.
+            const LLControlVariable* ctrl = gSavedSettings.getControl(name).get();
+            if (ctrl && look[name].isMap() && look[name].has("Comment")
+                && look[name]["Comment"].asString() != ctrl->getComment())
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' has a stale Comment for '"
+                                    << name << "'; it no longer matches the setting's own description"
+                                    << LL_ENDL;
+            }
+        }
+    }
+}
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+
 LLPresetsManager::LLPresetsManager()
 {
     copyDefaultLooks();
+
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // Developer check, not a runtime one: it verifies that files in the source
+    // tree agree with each other, which a shipped build can do nothing about.
+    {
+        std::vector<std::string> looks_whitelist;
+        getLooksControlNames(looks_whitelist);
+        audit_bundled_looks(looks_whitelist);
+    }
+#endif
 
     // Connect preset signals
     startWatching(PRESETS_GRAPHIC);
@@ -545,9 +610,11 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderColorGradeLift",
         "RenderColorGradeGamma",
         "RenderColorGradeGain",
-        "RenderColorGradeCurveToe",
-        "RenderColorGradeCurveShoulder",
-        "RenderColorGradeCurveStrength",
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_MASTER),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_RED),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_GREEN),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_BLUE),
+        "RenderColorGradeCurveAmount",
         // Split toning
         "RenderSplitToneAmount",
         "RenderSplitToneBalance",
@@ -555,6 +622,8 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderSplitToneHighlightTint",
         "RenderSplitToneMidtoneTint",
         "RenderSplitToneMidtoneAmount",
+        "RenderSplitToneShadowWidth",
+        "RenderSplitToneHighlightWidth",
         // HDR bloom aesthetics (not the structural mip/resolution knobs)
         "RenderBloomStrength",
         "RenderBloomThreshold",
@@ -597,8 +666,8 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderLensFlareStarburstSpikes",
         "RenderLensFlareStarburstSharpness",
         "RenderLensFlareStarburstLength",
-        "RenderLensFlareOcclusionRadius",
-        "RenderLensFlareOcclusionTaps",
+        "RenderLensFlareOcclusionScale",
+        "RenderLensFlareFadeTime",
         // Chromatic aberration
         "RenderChromaticAberrationStrength",
         "RenderChromaticAberrationFalloff",
@@ -608,6 +677,53 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderChromaticAberrationOffsetRY",
         "RenderChromaticAberrationOffsetBX",
         "RenderChromaticAberrationOffsetBY",
+        // Lens distortion
+        "RenderLensDistortionAmount",
+        "RenderLensDistortionK1",
+        "RenderLensDistortionK2",
+        "RenderLensDistortionSqueeze",
+        "RenderLensDistortionFit",
+        "RenderLensDistortionCenter",
+        "RenderLensDistortionTangential",
+        // Bokeh aesthetics. The camera optics themselves (CameraFNumber,
+        // CameraFocalLength and friends) are deliberately absent from this
+        // list -- a Look is an aesthetic, not a shot setup -- and
+        // RenderBokehHighlightClamp stays out for a third reason: it is a
+        // firefly guard like RenderBloomFireflyClamp, a stability control
+        // rather than a look.
+        "RenderBokehHighlightGain",
+        "RenderBokehHighlightThreshold",
+        "RenderBokehApertureBlades",
+        "RenderBokehApertureRotation",
+        "RenderBokehApertureCurvature",
+        "RenderBokehAnamorphicSqueeze",
+        "RenderBokehCatEyeAmount",
+        "RenderBokehFringeAmount",
+        "RenderBokehFringeNearTint",
+        "RenderBokehFringeFarTint",
+        // Aberrations contributed by the glass rather than the iris
+        "RenderBokehSphericalAberration",
+        "RenderBokehFieldStretch",
+        "RenderBokehFieldFalloff",
+        "RenderBokehComaAsymmetry",
+        // Cross-screen filter
+        "RenderCrossFilterStrength",
+        "RenderCrossFilterPoints",
+        "RenderCrossFilterAngle",
+        "RenderCrossFilterLength",
+        "RenderCrossFilterFalloff",
+        "RenderCrossFilterChromatic",
+        // Lens dirt
+        "RenderLensDirtStrength",
+        "RenderLensDirtBloomResponse",
+        "RenderLensDirtFlareResponse",
+        "RenderLensDirtGrime",
+        "RenderLensDirtMoteScale",
+        "RenderLensDirtSmudge",
+        "RenderLensDirtScratches",
+        "RenderLensDirtSeed",
+        "RenderLensDirtToe",
+        "RenderLensDirtGain",
         // Vignette
         "RenderVignetteAmount",
         "RenderVignetteCenter",
@@ -925,24 +1041,57 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
     std::vector<std::string> allowed;
     getLooksControlNames(allowed);
 
+    auto carries = [&params](const std::string& ctrl_name)
+    {
+        if (!params.has(ctrl_name))
+        {
+            return false;
+        }
+        const LLSD& entry = params[ctrl_name];
+        return entry.isMap() && entry.has("Value");
+    };
+
     S32 applied = 0;
     mIgnoreChangedSignal = true;
     for (const std::string& ctrl_name : allowed)
     {
-        if (!params.has(ctrl_name))
-        {
-            continue;
-        }
-        const LLSD& entry = params[ctrl_name];
-        if (!entry.isMap() || !entry.has("Value"))
+        if (!carries(ctrl_name))
         {
             continue;
         }
         LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
         if (ctrl)
         {
-            ctrl->set(entry["Value"]);
+            ctrl->set(params[ctrl_name]["Value"]);
             ++applied;
+        }
+    }
+
+    // A Look is a full snapshot of the whitelist, so a whitelisted key the
+    // file does not mention was saved before that key existed and the Look
+    // never had it: apply its default rather than leave whatever the previous
+    // grade set, or a seeded copy of Neutral that predates a setting keeps it
+    // and stops meaning neutral. Three fences keep that from doing damage.
+    // Only a file carrying at least half the whitelist counts as a snapshot,
+    // so a truncated or hand-trimmed file applies what it has and touches
+    // nothing else. A key that is present but malformed is skipped, as it
+    // always was, rather than reset. And the master switch is left alone: a
+    // file that omits it was edited by hand, and its other keys are evidently
+    // meant to be seen. resetToDefault fires only on a real change.
+    const bool snapshot = applied * 2 >= static_cast<S32>(allowed.size());
+    if (snapshot)
+    {
+        for (const std::string& ctrl_name : allowed)
+        {
+            if (params.has(ctrl_name) || ctrl_name == "RenderColorGrade")
+            {
+                continue;
+            }
+            LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+            if (ctrl)
+            {
+                ctrl->resetToDefault(true);
+            }
         }
     }
     mIgnoreChangedSignal = false;

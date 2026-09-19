@@ -326,16 +326,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 font="SansSerifBold"
 				 name="reflect_hdr_ssr"
 				 value="Screen Space Reflections" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Iterations"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="1"
@@ -344,32 +342,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Ray-march steps to find a hit; more is more accurate but slower"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionIterations" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_iterations_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionIterations" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Ray step"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 text_width="56"
 				 increment="0.01"
@@ -379,32 +359,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Distance covered by each ray-march step"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionRayStep" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_raystep_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionRayStep" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Distance bias"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="3"
 				 text_width="56"
 				 increment="0.001"
@@ -414,32 +376,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Bias used when rejecting a potential reflection sample"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionDistanceBias" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_distance_bias_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionDistanceBias" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Depth reject bias"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="4"
 				 text_width="56"
 				 increment="0.0005"
@@ -449,32 +393,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Bias against the depth buffer before rejecting a sample"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionDepthRejectBias" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_depth_bias_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionDepthRejectBias" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Adaptive step"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="1"
@@ -483,32 +409,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Multiplier for adaptive ray-march stepping"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionAdaptiveStepMultiplier" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_adaptive_step_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionAdaptiveStepMultiplier" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Glossy samples"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="1"
@@ -517,22 +425,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Maximum samples for glossy (rough surface) reflections"
 				 enabled_control="RenderScreenSpaceReflections"
 				 control_name="RenderScreenSpaceReflectionGlossySamples" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssr_glossy_samples_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderScreenSpaceReflectionGlossySamples" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -608,16 +500,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderReflectionProbeCount" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Probe distance"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="8"
 				 min_val="16"
@@ -625,22 +515,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="reflect_distance"
 				 tool_tip="How far away probes are drawn and updated (meters)"
 				 control_name="RenderReflectionProbeDrawDistance" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="reflect_distance_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderReflectionProbeDrawDistance" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1080,16 +954,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 font="SansSerifBold"
 				 name="shadow_hdr_tuning"
 				 value="Shadow Tuning" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Bias"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="4"
 				 text_width="56"
 				 increment="0.0005"
@@ -1098,32 +970,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="shadow_bias"
 				 tool_tip="Sun/moon shadow depth bias; tune to trade shadow acne against peter-panning"
 				 control_name="RenderShadowBias" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_bias_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderShadowBias" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Offset"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="3"
 				 text_width="56"
 				 increment="0.005"
@@ -1132,32 +986,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="shadow_offset"
 				 tool_tip="Sun/moon shadow sample offset"
 				 control_name="RenderShadowOffset" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_offset_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderShadowOffset" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Projector bias"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="4"
 				 text_width="56"
 				 increment="0.0005"
@@ -1166,32 +1002,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="shadow_spot_bias"
 				 tool_tip="Projector (spot light) shadow depth bias"
 				 control_name="RenderSpotShadowBias" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_spot_bias_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSpotShadowBias" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Projector offset"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="3"
 				 text_width="56"
 				 increment="0.005"
@@ -1200,22 +1018,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="shadow_spot_offset"
 				 tool_tip="Projector (spot light) shadow sample offset"
 				 control_name="RenderSpotShadowOffset" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_spot_offset_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSpotShadowOffset" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -1235,16 +1037,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 font="SansSerifBold"
 				 name="shadow_hdr_ssao"
 				 value="Ambient Occlusion" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Blur size"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -1253,32 +1053,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Width of the blur that softens the occlusion buffer. Despite the setting's name this no longer affects shadow edges: shadow filtering is weighted at the source, so this pass blurs ambient occlusion only."
 				 enabled_control="RenderDeferredSSAO"
 				 control_name="RenderShadowBlurSize" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssao_blur_size_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderShadowBlurSize" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Scale"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="10"
 				 min_val="0"
@@ -1287,32 +1069,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Sampling radius scale for ambient occlusion"
 				 enabled_control="RenderDeferredSSAO"
 				 control_name="RenderSSAOScale" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssao_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSSAOScale" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max scale"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="5"
 				 min_val="1"
@@ -1321,32 +1085,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Cap on the screen-space sampling radius (pixels)"
 				 enabled_control="RenderDeferredSSAO"
 				 control_name="RenderSSAOMaxScale" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssao_max_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSSAOMaxScale" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Factor"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0.01"
@@ -1355,22 +1101,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Strength falloff factor for occlusion"
 				 enabled_control="RenderDeferredSSAO"
 				 control_name="RenderSSAOFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssao_factor_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSSAOFactor" />
-				</button>
 				<text
 				 follows="left|top"
 				 layout="topleft"
@@ -1380,6 +1110,11 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 height="15"
 				 name="ssao_effect_value_label"
 				 value="Occluded value" />
+				<!-- No scrub="true" on these two, unlike the labelled vector
+				     spinners on the Look and Lens tabs. Scrubbing drags a
+				     spinner's label, and these have none (the caption is the text
+				     beside them), so it would move onto the arrow buttons instead
+				     and cost them their hold-to-repeat. -->
 				<spinner
 				 follows="left|top"
 				 layout="topleft"
@@ -1476,16 +1211,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 			 top="0"
 			 right="-1"
 			 name="sec_perf">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Draw distance (m)"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="8"
 				 min_val="64"
@@ -1493,32 +1226,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_farclip"
 				 tool_tip="How far the world is drawn, in meters"
 				 control_name="RenderFarClip" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_farclip_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderFarClip" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Object detail"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.125"
 				 min_val="0"
@@ -1526,32 +1241,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_volume_lod"
 				 tool_tip="Level-of-detail factor for objects; higher keeps detail visible farther away"
 				 control_name="RenderVolumeLODFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_volume_lod_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVolumeLODFactor" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max avatar complexity"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="5000"
 				 min_val="0"
@@ -1559,32 +1256,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_max_complexity"
 				 tool_tip="Avatars above this rendering cost draw as solid-color JellyDolls. 0 = no limit."
 				 control_name="RenderAvatarMaxComplexity" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_max_complexity_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderAvatarMaxComplexity" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max animated avatars"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -1592,22 +1271,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_max_nonimpostors"
 				 tool_tip="Avatars beyond this count render as cheap impostors. 0 = animate everyone."
 				 control_name="RenderAvatarMaxNonImpostors" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_max_nonimpostors_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderAvatarMaxNonImpostors" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -1691,16 +1354,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderAvatarComplexityMode" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Avatar detail"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.125"
 				 min_val="0"
@@ -1708,32 +1369,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_avatar_lod"
 				 tool_tip="Level-of-detail factor for avatar meshes"
 				 control_name="RenderAvatarLODFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_avatar_lod_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderAvatarLODFactor" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Avatar physics"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -1741,32 +1384,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_physics_lod"
 				 tool_tip="Level-of-detail factor for avatar physics (jiggle)"
 				 control_name="RenderAvatarPhysicsLODFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_physics_lod_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderAvatarPhysicsLODFactor" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Terrain detail"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.125"
 				 min_val="1"
@@ -1774,22 +1399,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_terrain_lod"
 				 tool_tip="Level-of-detail factor for terrain"
 				 control_name="RenderTerrainLODFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_terrain_lod_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTerrainLODFactor" />
-				</button>
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -1812,16 +1421,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Show each terrain texture at a different offset and rotation in every cell of a hexagonal lattice, so its repeat does not show. Up to three fetches per texture instead of one. Rebuilds the terrain shaders."
 				 name="perf_terrain_hex_tiling"
 				 control_name="AlchemyRenderTerrainHexTiling" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Tree detail"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.125"
 				 min_val="0"
@@ -1829,32 +1436,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_tree_lod"
 				 tool_tip="Level-of-detail factor for Linden trees"
 				 control_name="RenderTreeLODFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_tree_lod_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderTreeLODFactor" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Flexiprim time"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -1862,32 +1451,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_flex_time"
 				 tool_tip="Update-time budget factor for flexible prims"
 				 control_name="RenderFlexTimeFactor" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_flex_time_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderFlexTimeFactor" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Max particles"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="256"
 				 min_val="0"
@@ -1895,22 +1466,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="perf_max_particles"
 				 tool_tip="Maximum particle count on screen"
 				 control_name="RenderMaxPartCount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="perf_max_particles_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderMaxPartCount" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -2066,16 +1621,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderCVDMode" />
 				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Compensation amount"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
@@ -2083,22 +1636,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 name="preview_cvd_amount"
 				 tool_tip="Strength of the CVD compensation"
 				 control_name="RenderCVDAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="preview_cvd_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderCVDAmount" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"

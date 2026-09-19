@@ -31,8 +31,22 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "alcolorpicker.h"
+#include "aldockpanel.h"
+#include "alemptystate.h"
+#include "alhistorylist.h"
+#include "alpopover.h"
+#include "alquickopen.h"
+#include "alsettingrow.h"
+#include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
+#include "llbutton.h"
+#include "llcolorswatch.h"
 #include "llcombobox.h"
+#include "lleditmenuhandler.h"
+#include "llfocusmgr.h"
+#include "llgl.h"
+#include "lltextbox.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
 #include "alcurvemodel.h"
@@ -44,8 +58,11 @@
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
+#include "llsdutil.h"
 #include "llsettingsvo.h"
+#include "llsliderctrl.h"
 #include "llspinctrl.h"
+#include "lltabcontainer.h"
 #include "lltimer.h"
 #include "lltoolmgr.h"
 #include "llviewercontrol.h"
@@ -59,10 +76,15 @@
 
 namespace
 {
-/// Everything recorded while this lives becomes a single undo step.
+/// Everything recorded while this lives becomes a single undo step, called
+/// @a label in the history list.
 struct ScopedHistoryGroup
 {
-    explicit ScopedHistoryGroup(ALGradeHistory& history) : mHistory(history) { mHistory.beginGroup(); }
+    explicit ScopedHistoryGroup(ALGradeHistory& history, const std::string& label = std::string())
+    :   mHistory(history)
+    {
+        mHistory.beginGroup(label);
+    }
     ~ScopedHistoryGroup() { mHistory.endGroup(); }
     ScopedHistoryGroup(const ScopedHistoryGroup&) = delete;
     ScopedHistoryGroup& operator=(const ScopedHistoryGroup&) = delete;
@@ -82,75 +104,135 @@ struct ScopedTrue
     bool& mFlag;
 };
 
-// Vector-valued rows follow the widget naming contract "vec3_<Setting>_<0|1|2>";
-// setting names never contain '_', so the parse is unambiguous.
-bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& component)
-{
-    static const std::string prefix = "vec3_";
-    if (name.size() <= prefix.size() || name.compare(0, prefix.size(), prefix) != 0)
-    {
-        return false;
-    }
-    size_t sep = name.rfind('_');
-    if (sep <= prefix.size() || sep + 2 != name.size())
-    {
-        return false;
-    }
-    S32 comp = name[sep + 1] - '0';
-    if (comp < 0 || comp > 2)
-    {
-        return false;
-    }
-    setting = name.substr(prefix.size(), sep - prefix.size());
-    component = comp;
-    return true;
-}
+/// How long a caption stays lit after going to its setting: long enough to
+/// find on a busy page, short enough not to be mistaken for a state.
+constexpr F32 LIT_CAPTION_SECONDS = 2.5f;
 
-// Any LLUICtrl will do; the name is the whole contract. Descending into
-// composites is safe because their internal children are named for their role
-// ("Slider", "value") and cannot parse as vec3_<Setting>_<n>.
-void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLUICtrl*, 3>>& rows)
+/// A popover the Lightbox opens. The same placing and the same three ways out
+/// as any other, plus the floater's own shortcuts while it has the keyboard:
+/// the popover is a window of its own, so a key pressed in it never climbs
+/// to the Lightbox, and Ctrl keys would go to the menu bar instead.
+class ALLightboxPopover final : public ALPopover
 {
-    for (LLView* childp : *viewp->getChildList())
-    {
-        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
-        {
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
-            {
-                rows[setting][component] = ctrlp;
-            }
-        }
-        collectVec3Spinners(childp, rows);
-    }
-}
+public:
+    using KeyHook = std::function<bool(KEY, MASK)>;
 
-void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
-{
-    for (LLView* childp : *viewp->getChildList())
+    ALLightboxPopover(const LLFloater::Params& p, KeyHook hook)
+    :   ALPopover(p),
+        mKeyHook(std::move(hook))
     {
-        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
-        {
-            if (LLControlVariable* controlp = ctrlp->getControlVariable())
-            {
-                // Only reset controls owned by gSavedSettings; enabled/visibility
-                // bindings live in separate slots and are not touched here.
-                if (gSavedSettings.getControl(controlp->getName()) == controlp)
-                {
-                    keys.insert(controlp->getName());
-                }
-            }
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
-            {
-                keys.insert(setting);
-            }
-        }
-        collectBoundControls(childp, keys);
     }
-}
+
+    /// Only with a hook to offer them to; otherwise the menu bar may have
+    /// every Ctrl key as usual.
+    bool hasAccelerators() const override { return (bool)mKeyHook; }
+
+    bool handleKeyHere(KEY key, MASK mask) override
+    {
+        if (mKeyHook && mKeyHook(key, mask))
+        {
+            return true;
+        }
+        return ALPopover::handleKeyHere(key, mask);
+    }
+
+private:
+    KeyHook mKeyHook;
+};
+
+/// The inline picker for a colour row: XUI Studio's hue ring, shade square and
+/// channel tracks, under the row's name, with a way on to the viewer's full
+/// picker for typed numbers and the eyedropper.
+///
+/// The picker is a child of the popover itself and not of a panel inside it,
+/// and that is load-bearing: a panel takes Escape for itself and drops the
+/// keyboard, which closes the popover as *settled*, and Escape here has to
+/// mean "put the colour back".
+class ALLightboxColorPopover final : public ALPopover
+{
+public:
+    // The picker gives its channel sliders 218px and the ring the rest of the
+    // width, up to its height. So its width is the ring plus 218: 440 by 220
+    // is a ring as tall as the picker. Narrower, and the ring is what shrinks
+    // -- at the 300 this started at, it was 74px across.
+    static constexpr S32 PICKER_WIDTH = 440;
+    static constexpr S32 PICKER_HEIGHT = 220;
+    // As small as it may be dragged: the sliders and a ring still worth
+    // aiming at.
+    static constexpr S32 MIN_PICKER_WIDTH = 330;
+    static constexpr S32 MIN_PICKER_HEIGHT = 150;
+    static constexpr S32 BUTTON_HEIGHT = 20;
+    static constexpr S32 BUTTON_WIDTH = 110;
+    static constexpr S32 GAP = 4;
+
+    /// The popover around a picker of @a picker_width by @a picker_height,
+    /// laid out under the title, which is drawn across the top of the rect.
+    static S32 widthFor(S32 picker_width) { return GAP + picker_width + GAP; }
+    static S32 heightFor(S32 header, S32 picker_height)
+    {
+        return header + GAP + picker_height + GAP + BUTTON_HEIGHT + GAP;
+    }
+
+    /// The size the last one was left at this session, or zero: how much of a
+    /// wheel someone wants to see is theirs to decide, and once decided it
+    /// should not have to be decided again for the next colour.
+    inline static S32 sWidth = 0;
+    inline static S32 sHeight = 0;
+
+    ALLightboxColorPopover(const LLFloater::Params& p, const LLColor4& start,
+                           std::function<void(const LLColor4&)> on_change,
+                           std::function<void()> on_full_picker,
+                           const std::string& full_picker_label, const std::string& full_picker_tooltip)
+    :   ALPopover(p)
+    {
+        const S32 width = getRect().getWidth();
+        const S32 top = getRect().getHeight() - getHeaderHeight();
+
+        ALColorPicker::Params pp(LLUICtrlFactory::getDefaultParams<ALColorPicker>());
+        pp.name = "picker";
+        // Everything between the title and the button row, so a popover
+        // dragged bigger is a bigger wheel.
+        pp.rect = LLRect(GAP, top - GAP, width - GAP, GAP + BUTTON_HEIGHT + GAP);
+        pp.follows.flags = FOLLOWS_ALL;
+        // Every colour row here is a Color3 setting: an alpha track would be a
+        // control that does nothing.
+        pp.show_alpha = false;
+        ALColorPicker* picker = LLUICtrlFactory::create<ALColorPicker>(pp);
+        picker->setColor(start);
+        // Its value is text, "r, g, b, a"; the colour is what is wanted.
+        picker->setCommitCallback([picker, on_change](LLUICtrl*, const LLSD&)
+        {
+            if (on_change)
+            {
+                on_change(picker->color());
+            }
+        });
+        addChild(picker);
+
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name = "full_picker";
+        bp.label = full_picker_label;
+        bp.tool_tip = full_picker_tooltip;
+        bp.rect = LLRect(width - GAP - BUTTON_WIDTH, GAP + BUTTON_HEIGHT, width - GAP, GAP);
+        bp.follows.flags = FOLLOWS_RIGHT | FOLLOWS_BOTTOM;
+        LLButton* full = LLUICtrlFactory::create<LLButton>(bp);
+        full->setCommitCallback([on_full_picker](LLUICtrl*, const LLSD&)
+        {
+            if (on_full_picker)
+            {
+                on_full_picker();
+            }
+        });
+        addChild(full);
+    }
+
+    void onClose(bool app_quitting) override
+    {
+        sWidth = getRect().getWidth();
+        sHeight = getRect().getHeight();
+        ALPopover::onClose(app_quitting);
+    }
+};
 } // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
@@ -174,18 +256,38 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
     mCommitCallbackRegistrar.add("LightBox.CommitToneCurve", std::bind(&ALFloaterLightBox::onCommitToneCurve, this));
     mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.ResetToneCurveChannel", std::bind(&ALFloaterLightBox::onClickResetToneCurveChannel, this));
+    mCommitCallbackRegistrar.add("LightBox.ToneCurvePreset", std::bind(&ALFloaterLightBox::onToneCurvePreset, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
     mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
     mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderDown", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, true));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderUp", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, false));
     mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
     mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
     mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
+    mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
+    mCommitCallbackRegistrar.add("LightBox.History", std::bind(&ALFloaterLightBox::openHistory, this));
+    mCommitCallbackRegistrar.add("LightBox.PopOut", std::bind(&ALFloaterLightBox::togglePane, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
+    // onClose has settled any popover already; this is for a floater that
+    // dies without closing. die() and not a close, so nothing it holds calls
+    // back into a floater half torn down.
+    if (ALPopover* popover = mPopover.get())
+    {
+        popover->die();
+    }
+    // onClose has put every page back; this is for a floater that dies
+    // without closing, which would otherwise leave a page in a window of its
+    // own wired to callbacks on a floater that is gone. By handle, because a
+    // pane still out belongs to its window, and that window may be gone first.
+    dockPanes();
+
     // The handle in the pick callback already makes a late sample harmless, but
     // an armed picker outliving its floater would leave the user holding an
     // eyedropper cursor that has nothing left to tell. Put the previous tool
@@ -211,12 +313,60 @@ ALFloaterLightBox::~ALFloaterLightBox()
 
 bool ALFloaterLightBox::postBuild()
 {
+    mTabs = getChild<LLTabContainer>("lightbox_tabs");
+    for (S32 i = 0; i < mTabs->getTabCount(); ++i)
+    {
+        if (LLPanel* page = mTabs->getPanelByIndex(i))
+        {
+            mTabPages.push_back(page);
+            // Each page's tool_tip is written for its tab button, and
+            // addTabPanel has already copied it there. Left on the page too it
+            // is worse than useless: LLView::handleToolTip offers a parent's
+            // tooltip before its children's, so it would pop up over every
+            // caption, gap and header on the page that has none of its own.
+            page->setToolTip(LLStringUtil::null);
+        }
+    }
+    // Normally clear here -- a new Lightbox opens with every section switched
+    // on -- but the mask belongs to the pipeline, so read it rather than
+    // assume it.
+    refreshBypassBadge();
+
+    // Every section and setting, while they are all still where the XUI put
+    // them. See mDirectory.
+    mDirectory.build(mTabPages);
+    mTopBar = findChild<LLPanel>("lightbox_topbar");
+
     populateLUTCombo();
 
+    // Khronos Neutral (0), ACES (1) and GT (5) take no parameters, so their
+    // selection leaves every one of these rows greyed.
+    static const std::pair<const char*, S32> tonemapper_rows[] = {
+        { "tone_aces_white", 2 },
+        { "tone_reinhard_white", 3 },
+        { "tone_filmic_white", 4 },
+        { "tone_agx_contrast", 6 },
+        { "tone_agx_white", 6 },
+    };
+    for (const auto& row : tonemapper_rows)
+    {
+        // Setting rows, which grey their own reset buttons along with them.
+        mTonemapperRows.push_back({ row.second, findChild<LLUICtrl>(row.first) });
+    }
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
     updateTonemapperRows();
 
+    // Bloom (HDR) or Glow (Legacy), whichever the renderer is running. HDR is
+    // switched from Preferences ("HDR and Emissive", which sets
+    // RenderHDREnabled), and possibly with this floater open.
+    mHDRConnection = gSavedSettings.getControl("RenderHDREnabled")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshBloomSections(); });
+    refreshBloomSections();
+
+    mLookSave = findChild<LLUICtrl>("look_save");
+    mLookDelete = findChild<LLUICtrl>("look_delete");
+    mLookRevert = findChild<LLUICtrl>("look_revert");
     mLooksCombo = getChild<LLComboBox>("looks_combo");
     mLooksListConnection = LLPresetsManager::instance().setPresetListChangeLooksCallback(
         std::bind(&ALFloaterLightBox::refreshLooksBar, this));
@@ -226,6 +376,7 @@ bool ALFloaterLightBox::postBuild()
 
     mUndoButton = findChild<LLUICtrl>("look_undo");
     mRedoButton = findChild<LLUICtrl>("look_redo");
+    mHistoryButton = findChild<LLUICtrl>("look_history");
     mReferenceClear = findChild<LLUICtrl>("reference_clear");
     mReferenceMode = findChild<LLUICtrl>("reference_mode");
     mReferencePosition = findChild<LLUICtrl>("reference_position");
@@ -260,9 +411,43 @@ bool ALFloaterLightBox::postBuild()
         mHistoryConnections.emplace_back(controlp->getSignal()->connect(
             [this, setting](LLControlVariable*, const LLSD& new_value, const LLSD& old_value)
             { onGradeSettingChanged(setting, old_value, new_value); }));
+        mRecordedKeys.insert(setting);
     }
 
-    collectVec3Spinners(this, mVec3Rows);
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+    {
+        const std::string key = setting.mKey;
+
+        // Colour rows pick inline. Only Color3 swatches: the inline picker has
+        // no alpha, and a Color4 row would lose its fourth number to it.
+        LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(setting.mCtrl);
+        LLControlVariable* controlp = gSavedSettings.getControl(key);
+        if (swatch && controlp && controlp->type() == TYPE_COL3)
+        {
+            swatch->setPickerOverride([self, key](LLColorSwatchCtrl* from)
+            {
+                ALFloaterLightBox* floater = self.get();
+                return floater && floater->openColorPopover(from, key);
+            });
+        }
+
+        // A setting row's reset comes through here, the same as a reset
+        // button's: a named undo step of its own rather than a bare write
+        // that folds into a drag just before it.
+        if (ALSettingRow* row = ALViewType::as<ALSettingRow>(setting.mCtrl))
+        {
+            row->setResetHandler([self, key](ALSettingRow*)
+            {
+                if (ALFloaterLightBox* floater = self.get())
+                {
+                    floater->onClickResetControlDefault(LLSD(key));
+                }
+            });
+        }
+    }
+
+    ALLightboxDirectory::collectVec3Controls(this, mVec3Rows);
     for (const auto& row : mVec3Rows)
     {
         const std::string& setting = row.first;
@@ -280,29 +465,77 @@ bool ALFloaterLightBox::postBuild()
     setupToneCurve();
     setupSplitToneGraph();
 
+    fitSections();
+
+    // Last, after everything above has found what it needs: from here a page
+    // can be taken out of the floater, and nothing may look for a widget
+    // through it again.
+    mPopOutButton = findChild<LLButton>("lightbox_pop_out");
+    for (size_t index = 0; index < mTabPages.size(); ++index)
+    {
+        LLPanel* page = mTabPages[index];
+        LLStringUtil::format_map_t args;
+        args["[TAB]"] = page->getLabel();
+
+        Pane pane;
+        if (ALDockPanel* dock = ALDockPanel::wrap(page, getString("pane_title", args)))
+        {
+            pane.mPane = dock->getHandle();
+        }
+
+        // What the page says while its pane is away: added after the wrap, so
+        // it stays on the page when the page's contents go.
+        ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+        ep.name = page->getName() + "_away";
+        ep.rect = page->getLocalRect();
+        ep.follows.flags = FOLLOWS_ALL;
+        ep.background_visible = false;
+        ep.visible = false;
+        pane.mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
+        page->addChild(pane.mEmpty);
+        pane.mEmpty->say(getString("pane_away_headline", args), getString("pane_away_sentence", args),
+                         getString("pane_put_back"));
+        pane.mEmpty->onAction([self, index]()
+        {
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->dockPane(index);
+            }
+        });
+        mPanes.push_back(pane);
+    }
+    restorePanes();
+
     return LLFloater::postBuild();
 }
 
-void ALFloaterLightBox::populateLUTCombo()
+// Shared by the colour LUT and lens dirt pickers. Both enumerate a bundled
+// directory and a user directory of the same name, list the bundled entries
+// first and the user ones behind a separator, and select whatever the setting
+// currently holds. Generalised rather than cloned: the two differ only in
+// directory, accepted extensions, and which setting they write.
+//
+// `extensions` must list only what the corresponding loader can actually
+// handle. Anything else in the directory -- a readme, a subfolder, a stray
+// .bak -- would become a selectable entry that fails at apply time with
+// nothing but a log line to say why. getExtension lowercases, so a .CUBE
+// passes here the same way it does when the renderer resolves it.
+void ALFloaterLightBox::populateAssetCombo(const std::string& combo_name,
+                                           const std::string& dir_name,
+                                           const std::vector<std::string>& extensions,
+                                           const std::string& setting_name)
 {
-    LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
-
-    // Only what setupGradingLUT can actually load. Anything else in the
-    // directory -- a readme, a subfolder, a stray .bak -- would become a
-    // selectable entry that fails at apply time with nothing but a log line
-    // to say why. getExtension lowercases, so a .CUBE passes here the same
-    // way it does when the renderer resolves it.
-    static const char* const LUT_EXTENSIONS[] = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+    LLComboBox* combo = getChild<LLComboBox>(combo_name);
 
     // Collected rather than added on the spot, so the caller can see whether
     // a directory contributed anything before committing to the separator.
-    auto collect_luts_from = [](const std::string& dir_name)
+    auto collect_from = [&extensions](const std::string& scan_dir)
     {
         std::vector<std::pair<std::string, std::string>> found; // stem, filename
 
         std::error_code ec;
-        std::filesystem::path luts_path = fsyspath(dir_name);
-        if (!std::filesystem::is_directory(luts_path, ec) || ec)
+        std::filesystem::path scan_path = fsyspath(scan_dir);
+        if (!std::filesystem::is_directory(scan_path, ec) || ec)
         {
             return found;
         }
@@ -312,65 +545,95 @@ void ALFloaterLightBox::populateLUTCombo()
         // parks the iterator at end instead, which is why ec is looked at
         // again once the loop is done.
         std::filesystem::directory_iterator end;
-        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != end && !ec; lut.increment(ec))
+        for (std::filesystem::directory_iterator entry(scan_path, ec); entry != end && !ec; entry.increment(ec))
         {
             std::error_code entry_ec;
-            if (!lut->is_regular_file(entry_ec) || entry_ec)
+            if (!entry->is_regular_file(entry_ec) || entry_ec)
             {
                 continue;
             }
 #if LL_WINDOWS
-            std::string lut_stem = ll_convert_wide_to_string(lut->path().stem().native());
-            std::string lut_filename = ll_convert_wide_to_string(lut->path().filename().native());
+            std::string entry_stem = ll_convert_wide_to_string(entry->path().stem().native());
+            std::string entry_filename = ll_convert_wide_to_string(entry->path().filename().native());
 #else
-            std::string lut_stem = lut->path().stem().native();
-            std::string lut_filename = lut->path().filename().native();
+            std::string entry_stem = entry->path().stem().native();
+            std::string entry_filename = entry->path().filename().native();
 #endif
-            const std::string exten = gDirUtilp->getExtension(lut_filename);
-            if (std::find(std::begin(LUT_EXTENSIONS), std::end(LUT_EXTENSIONS), exten) == std::end(LUT_EXTENSIONS))
+            const std::string exten = gDirUtilp->getExtension(entry_filename);
+            if (std::find(extensions.begin(), extensions.end(), exten) == extensions.end())
             {
                 continue;
             }
-            found.emplace_back(std::move(lut_stem), std::move(lut_filename));
+            found.emplace_back(std::move(entry_stem), std::move(entry_filename));
         }
         if (ec)
         {
-            LL_WARNS() << "Error reading LUT directory " << dir_name << ": " << ec.message() << LL_ENDL;
+            LL_WARNS() << "Error reading asset directory " << scan_dir << ": " << ec.message() << LL_ENDL;
         }
         return found;
     };
 
-    // Bundled LUTs first, then user LUTs behind a separator — the same order
+    // Bundled entries first, then user entries behind a separator — the same order
     // the renderer resolves a name in, where the user dir wins.
-    for (const auto& lut : collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut")))
+    for (const auto& entry : collect_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, dir_name)))
     {
-        lut_combo->add(lut.first, lut.second);
+        combo->add(entry.first, entry.second);
     }
 
-    const auto user_luts = collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut"));
-    if (!user_luts.empty())
+    const auto user_entries = collect_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, dir_name));
+    if (!user_entries.empty())
     {
-        lut_combo->addSeparator();
-        for (const auto& lut : user_luts)
+        combo->addSeparator();
+        for (const auto& entry : user_entries)
         {
-            lut_combo->add(lut.first, lut.second);
+            combo->add(entry.first, entry.second);
         }
     }
 
-    lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
-    lut_combo->resetDirty();
+    // Mandatory: the combo is allow_text_entry, so nothing else selects the
+    // saved value when the floater opens.
+    combo->selectByValue(gSavedSettings.getString(setting_name));
+    combo->resetDirty();
 }
 
-void ALFloaterLightBox::onClickOpenLUTFolder()
+void ALFloaterLightBox::populateLUTCombo()
+{
+    static const std::vector<std::string> LUT_EXTENSIONS = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+    populateAssetCombo("colorlut_combo", "colorlut", LUT_EXTENSIONS, "RenderColorGradeLUT");
+}
+
+// Parameterised by directory even though the colour LUT is once again the only
+// caller: the lens dirt plate that shared it is generated now. Kept general
+// because the shape is the shared part -- user folder, created on demand -- and
+// collapsing it back to a constant only has to be undone for the next asset.
+void ALFloaterLightBox::openUserAssetFolder(const std::string& dir_name)
 {
     // The user's folder, not the bundled one: it is the half of the pair that
     // is theirs to put files in, and the one the renderer prefers when a name
     // exists in both. Nothing creates it until there is something to put in
     // it, which is exactly now -- and LLFile::mkdir is quiet about a
     // directory that already exists.
-    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, dir_name);
     LLFile::mkdir(dir);
     gDirUtilp->openDir(dir);
+}
+
+// The lens dirt plate is regenerated whenever one of its parameters changes,
+// and at full resolution that is too expensive to do on every frame of a slider
+// drag. Rather than guess when a drag has ended from a timer, say so: the
+// renderer holds off while this is raised and rebuilds once on release.
+//
+// Only the generation sliders carry these. Strength and the two response
+// controls are applied per frame at composite time and rebuild nothing, so
+// holding them off would only make them feel broken.
+void ALFloaterLightBox::onLensDirtSliderHeld(bool held)
+{
+    gPipeline.mLensDirtSliderHeld = held;
+}
+
+void ALFloaterLightBox::onClickOpenLUTFolder()
+{
+    openUserAssetFolder("colorlut");
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
@@ -379,6 +642,13 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
     LLControlVariable* controlp = gSavedSettings.getControl(control_name);
     if (controlp)
     {
+        // A group, though it is one control: it names the step, and a reset
+        // straight after a drag of the same control is a second thing done
+        // rather than the end of the drag, which it would otherwise coalesce
+        // into.
+        LLStringUtil::format_map_t args;
+        args["[SETTING]"] = mDirectory.captionFor(control_name);
+        ScopedHistoryGroup group(mHistory, getString("history_reset_setting", args));
         controlp->resetToDefault(true);
     }
 }
@@ -391,14 +661,18 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
         return;
     }
 
+    // From the directory, not by name: the section may be on a page that has
+    // been taken out into a window of its own, out of reach of a search from
+    // this floater.
     std::set<std::string> keys;
-    if (LLPanel* panelp = findChild<LLPanel>(section))
+    const ALLightboxDirectory::Section* mainp = mDirectory.section(section);
+    if (mainp)
     {
-        collectBoundControls(panelp, keys);
+        ALLightboxDirectory::collectBoundKeys(mainp->mPanel, keys);
     }
-    if (LLPanel* advp = findChild<LLPanel>(section + "_adv"))
+    if (const ALLightboxDirectory::Section* advp = mDirectory.section(section + "_adv"))
     {
-        collectBoundControls(advp, keys);
+        ALLightboxDirectory::collectBoundKeys(advp->mPanel, keys);
     }
 
     // A section's own header can carry a bound checkbox -- Color Grading's
@@ -406,17 +680,19 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
     // drawn. It is not in the panel, so nothing above would find it. Walk the
     // control rather than reading it directly: LLCheckBoxCtrl hands
     // control_name down to its button, so the binding is on the child.
-    if (auto* tabp = findChild<LLAccordionCtrlTab>("atab_" + section))
+    if (mainp && mainp->mTab)
     {
-        if (LLCheckBoxCtrl* checkp = tabp->getHeaderCheckBox())
+        if (LLCheckBoxCtrl* checkp = mainp->mTab->getHeaderCheckBox())
         {
-            collectBoundControls(checkp, keys);
+            ALLightboxDirectory::collectBoundKeys(checkp, keys);
         }
     }
 
     // One thing the user did, however many controls it moves: undoing a Reset
     // All eleven times would be absurd.
-    ScopedHistoryGroup group(mHistory);
+    LLStringUtil::format_map_t args;
+    args["[SECTION]"] = mainp ? mainp->mTitle : section;
+    ScopedHistoryGroup group(mHistory, getString("history_reset_section", args));
     for (const std::string& key : keys)
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
@@ -462,6 +738,45 @@ void ALFloaterLightBox::onToggleSection(LLUICtrl* ctrl, const LLSD& userdata)
     {
         LLPipeline::sGradeBypassMask |= found->second;
     }
+
+    // The only writer of the mask, so the only place the badge can go stale.
+    refreshBypassBadge();
+}
+
+void ALFloaterLightBox::refreshBypassBadge()
+{
+    if (!mTabs || mTabPages.empty())
+    {
+        return;
+    }
+
+    // Counted from the mask rather than from the checkboxes: the mask is what
+    // the renderer obeys, and the badge is there to say what it is obeying.
+    static constexpr U32 section_bits[] = {
+        LLPipeline::GRADE_BYPASS_BASIC,
+        LLPipeline::GRADE_BYPASS_PRIMARIES,
+        LLPipeline::GRADE_BYPASS_SPLIT,
+        LLPipeline::GRADE_BYPASS_LUT,
+        LLPipeline::GRADE_BYPASS_CURVE,
+    };
+    S32 bypassed = 0;
+    for (U32 bit : section_bits)
+    {
+        if (LLPipeline::sGradeBypassMask & bit)
+        {
+            ++bypassed;
+        }
+    }
+
+    std::string label;
+    if (bypassed > 0)
+    {
+        LLStringUtil::format_map_t args;
+        args["[COUNT]"] = llformat("%d", bypassed);
+        label = getString("bypass_badge", args);
+    }
+    // The Look tab is the first page; the grading sections all live on it.
+    mTabs->setTabBadge(mTabPages.front(), label);
 }
 
 void ALFloaterLightBox::onClickReferenceGrab()
@@ -547,7 +862,751 @@ void ALFloaterLightBox::draw()
     refreshReferenceRow();
     refreshHistoryButtons();
     refreshDayCycleRow();
+    refreshPaneRow();
+
+    if (LLView* lit = mLitCaption.get())
+    {
+        if (mLitTimer.getElapsedTimeF32() > LIT_CAPTION_SECONDS)
+        {
+            if (LLTextBox* box = ALViewType::as<LLTextBox>(lit))
+            {
+                box->setHighlighted(false);
+            }
+            mLitCaption.markDead();
+        }
+    }
+
+    // The history list follows the stack while it is up: Ctrl+Z pressed in
+    // it, a drag in the floater behind it, a Look applied from the bar.
+    if (mHistoryList.get() && mHistory.revision() != mHistoryListRevision)
+    {
+        fillHistoryList();
+    }
+
     LLFloater::draw();
+}
+
+void ALFloaterLightBox::onClose(bool app_quitting)
+{
+    closePopover(false);
+    // Saved before they are put back, or every page would be remembered as
+    // here. And put back even when the viewer is quitting: windows are closed
+    // in no particular order then, and this is the last point at which both
+    // this floater and every torn-off window are sure to still be whole.
+    savePanes();
+    dockPanes();
+    LLFloater::onClose(app_quitting);
+}
+
+ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook)
+{
+    if (!anchor || !content)
+    {
+        delete content;
+        return nullptr;
+    }
+
+    // What ALPopover::show does, with the key hook added: no title, since
+    // the content is laid out over the whole popover and a title bar would be
+    // drawn under it.
+    const LLRect wanted = content->getRect();
+    ALLightboxPopover* popover = new ALLightboxPopover(
+        ALPopover::paramsFor(wanted.getWidth(), wanted.getHeight()), std::move(hook));
+    content->setOrigin(0, 0);
+    content->setFollows(FOLLOWS_ALL);
+    popover->addChild(content);
+
+    adoptPopover(kind, popover, anchor);
+    return popover;
+}
+
+void ALFloaterLightBox::adoptPopover(PopoverKind kind, ALPopover* popover, LLView* anchor)
+{
+    closePopover(true);
+
+    mPopover = popover->getDerivedHandle<ALPopover>();
+    mPopoverKind = kind;
+    // Handles both ways: the popover is a top-level window and can outlive
+    // this floater by a frame, and this floater can be closed under it.
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<ALPopover> which = mPopover;
+    popover->onClosed([self, which](bool escaped)
+    {
+        if (ALFloaterLightBox* floater = self.get())
+        {
+            floater->onPopoverClosed(which.get(), escaped);
+        }
+    });
+
+    popover->openBeside(anchor);
+}
+
+void ALFloaterLightBox::closePopover(bool escape)
+{
+    if (ALPopover* popover = mPopover.get())
+    {
+        if (escape)
+        {
+            popover->escape();
+        }
+        else
+        {
+            popover->settle();
+        }
+    }
+}
+
+void ALFloaterLightBox::onPopoverClosed(const LLView* which, bool escaped)
+{
+    // One that was replaced before it finished closing has nothing to say
+    // about the one up now.
+    if (!which || which != mPopover.get())
+    {
+        return;
+    }
+    const PopoverKind kind = mPopoverKind;
+    mPopover.markDead();
+    mPopoverKind = PopoverKind::None;
+    mHistoryList.markDead();
+
+    if (kind == PopoverKind::Color)
+    {
+        endColorSession(escaped);
+    }
+}
+
+bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::string& key)
+{
+    LLControlVariable* control = gSavedSettings.getControl(key);
+    if (!swatch || !control)
+    {
+        return false;
+    }
+    // Closed before the session below starts, so a colour popover already up
+    // finishes its own session with its own setting.
+    closePopover(true);
+
+    // A Color3 arrives as three numbers, which LLColor4 reads as transparent.
+    LLColor4 start(control->getValue());
+    start.mV[VALPHA] = 1.f;
+    mColorKey = key;
+    mColorOriginal = control->getValue();
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<LLView> swatch_handle = swatch->getHandle();
+    // Resizable, and opening at the size the last one was left at: the wheel
+    // is what grows.
+    using Popover = ALLightboxColorPopover;
+    const S32 header = LLFloater::getDefaultParams().header_height;
+    LLFloater::Params params = ALPopover::paramsFor(
+        Popover::sWidth > 0 ? Popover::sWidth : Popover::widthFor(Popover::PICKER_WIDTH),
+        Popover::sHeight > 0 ? Popover::sHeight : Popover::heightFor(header, Popover::PICKER_HEIGHT),
+        mDirectory.captionFor(key), /*resizable=*/true);
+    params.min_width = Popover::widthFor(Popover::MIN_PICKER_WIDTH);
+    params.min_height = Popover::heightFor(header, Popover::MIN_PICKER_HEIGHT);
+    ALLightboxColorPopover* popover = new ALLightboxColorPopover(
+        params,
+        start,
+        [self](const LLColor4& color)
+        {
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->onColorPicked(color);
+            }
+        },
+        [self, swatch_handle]()
+        {
+            // Settled rather than escaped: the full picker starts from what
+            // was picked here, and keeps it if it is closed.
+            if (ALFloaterLightBox* floater = self.get())
+            {
+                floater->closePopover(false);
+            }
+            if (LLColorSwatchCtrl* swatch = ALViewType::as<LLColorSwatchCtrl>(swatch_handle.get()))
+            {
+                swatch->showClassicPicker(true);
+            }
+        },
+        getString("color_full_picker"), getString("color_full_picker_tooltip"));
+    adoptPopover(PopoverKind::Color, popover, swatch);
+    return true;
+}
+
+void ALFloaterLightBox::onColorPicked(const LLColor4& color)
+{
+    LLControlVariable* control = gSavedSettings.getControl(mColorKey);
+    if (!control)
+    {
+        return;
+    }
+    // Live, as every row here is, and written the way the swatch writes a
+    // Color3: three numbers, never a fourth.
+    ScopedTrue writing(mColorWriting);
+    control->setValue(LLColor3(color).getValue());
+}
+
+void ALFloaterLightBox::endColorSession(bool escaped)
+{
+    const std::string key = mColorKey;
+    mColorKey.clear();
+    LLControlVariable* control = key.empty() ? nullptr : gSavedSettings.getControl(key);
+    if (!control)
+    {
+        return;
+    }
+
+    if (escaped)
+    {
+        // Escape keeps nothing, and nothing was recorded to take back.
+        ScopedTrue writing(mColorWriting);
+        control->setValue(mColorOriginal);
+        return;
+    }
+
+    // The whole pick, as one step, from the colour it started at to the one it
+    // was left at -- and none at all if it ended where it began.
+    const LLSD picked = control->getValue();
+    if (mRecordedKeys.count(key) && !llsd_equals(picked, mColorOriginal))
+    {
+        ScopedHistoryGroup group(mHistory);
+        mHistory.record(key, mColorOriginal, picked, (F32)LLTimer::getElapsedSeconds().value());
+    }
+}
+
+void ALFloaterLightBox::fitSections()
+{
+    // The margin under a section's last row, which is also what every
+    // section's hand-kept height used to add.
+    constexpr S32 BOTTOM_MARGIN = 8;
+
+    for (const ALLightboxDirectory::Section& section : mDirectory.sections())
+    {
+        LLPanel* panel = section.mPanel;
+        if (!panel)
+        {
+            continue;
+        }
+        // Every row follows the panel's top, so how far the lowest one reaches
+        // down from it is the height the panel needs, whatever it was given.
+        const S32 height = panel->getRect().getHeight();
+        S32 lowest = height;
+        for (const LLView* child : *panel->getChildList())
+        {
+            lowest = llmin(lowest, child->getRect().mBottom);
+        }
+        // Said to the tab the way everything that grows inside an accordion
+        // says it: the tab takes the height plus its header and padding (or
+        // remembers it, while it is shut) and asks the accordion to lay out
+        // again. Sent whether or not it differs, so a tab declared at the
+        // wrong height is put right as well.
+        panel->notifyParent(LLSD().with("action", "size_changes")
+                                  .with("height", height - lowest + BOTTOM_MARGIN));
+    }
+}
+
+LLFloater* ALFloaterLightBox::paneWindow(size_t page) const
+{
+    if (page >= mPanes.size())
+    {
+        return nullptr;
+    }
+    const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get());
+    return pane && pane->poppedOut() ? pane->getParentByType<LLFloater>() : nullptr;
+}
+
+void ALFloaterLightBox::togglePane()
+{
+    const S32 current = mTabs ? mTabs->getCurrentPanelIndex() : -1;
+    if (current < 0 || (size_t)current >= mPanes.size())
+    {
+        return;
+    }
+    ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[current].mPane.get());
+    if (!pane)
+    {
+        return;
+    }
+
+    if (pane->poppedOut())
+    {
+        dockPane((size_t)current);
+        return;
+    }
+
+    // The keyboard is not taken along. A focused control moving to another
+    // window, with this one still remembering it as where its focus was, is
+    // how a keystroke ends up somewhere nobody is looking.
+    if (gFocusMgr.childHasKeyboardFocus(pane))
+    {
+        gFocusMgr.setKeyboardFocus(nullptr);
+    }
+    gFocusMgr.clearLastFocusForGroup(this);
+    pane->popOut();
+    refreshPaneRow();
+}
+
+void ALFloaterLightBox::dockPane(size_t page)
+{
+    if (page >= mPanes.size())
+    {
+        return;
+    }
+    if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get()))
+    {
+        if (pane->poppedOut())
+        {
+            pane->dock();
+        }
+    }
+    refreshPaneRow();
+}
+
+void ALFloaterLightBox::dockPanes()
+{
+    for (const Pane& each : mPanes)
+    {
+        if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(each.mPane.get()))
+        {
+            if (pane->poppedOut())
+            {
+                pane->dock();
+            }
+        }
+    }
+}
+
+void ALFloaterLightBox::savePanes() const
+{
+    // By page name, so a page added or moved in the XUI keeps its own memory
+    // and a page removed takes nobody else's with it.
+    LLSD panes = LLSD::emptyMap();
+    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
+    {
+        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        if (!pane)
+        {
+            continue;
+        }
+        LLSD entry = LLSD::emptyMap();
+        entry["out"] = pane->poppedOut();
+        const LLRect rect = pane->floatingRect();
+        if (!rect.isEmpty())
+        {
+            entry["rect"] = rect.getValue();
+        }
+        panes[mTabPages[index]->getName()] = entry;
+    }
+    LLSD state = gSavedSettings.getLLSD("ALLightboxState");
+    if (!state.isMap())
+    {
+        state = LLSD::emptyMap();
+    }
+    state["panes_out"] = panes;
+    gSavedSettings.setLLSD("ALLightboxState", state);
+}
+
+void ALFloaterLightBox::restorePanes()
+{
+    const LLSD panes = gSavedSettings.getLLSD("ALLightboxState")["panes_out"];
+    if (!panes.isMap())
+    {
+        return;
+    }
+    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
+    {
+        ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        const LLSD entry = panes[mTabPages[index]->getName()];
+        if (!pane || !entry.isMap())
+        {
+            continue;
+        }
+        if (entry.has("rect"))
+        {
+            LLRect rect;
+            rect.setValue(entry["rect"]);
+            if (!rect.isEmpty())
+            {
+                pane->setFloatingRect(rect);
+            }
+        }
+        if (entry["out"].asBoolean())
+        {
+            pane->popOut();
+            // Where it was may be off a screen that has since gone.
+            if (LLFloater* window = paneWindow(index))
+            {
+                gFloaterView->adjustToFitScreen(window, false);
+            }
+        }
+    }
+}
+
+void ALFloaterLightBox::refreshPaneRow()
+{
+    if (mPanes.empty() || !mTabs)
+    {
+        return;
+    }
+
+    U32 out = 0;
+    for (size_t index = 0; index < mPanes.size(); ++index)
+    {
+        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
+        if (pane && pane->poppedOut())
+        {
+            out |= 1u << index;
+        }
+    }
+    const S32 current = mTabs->getCurrentPanelIndex();
+    const S32 state = (S32)(out << 4) | (current & 0xF);
+    if (state == mPaneRowState)
+    {
+        return;
+    }
+    mPaneRowState = state;
+
+    for (size_t index = 0; index < mPanes.size(); ++index)
+    {
+        if (mPanes[index].mEmpty)
+        {
+            mPanes[index].mEmpty->setVisible(((out >> index) & 1) != 0);
+        }
+    }
+
+    // The button speaks for the tab that is up: out, it brings the page
+    // back; here, it sends it out.
+    if (mPopOutButton && current >= 0)
+    {
+        const bool current_out = ((out >> current) & 1) != 0;
+        mPopOutButton->setImageOverlay(current_out ? "Conv_toolbar_arrow_sw" : "Conv_toolbar_arrow_ne");
+        LLStringUtil::format_map_t args;
+        args["[TAB]"] = pageLabel((size_t)current);
+        mPopOutButton->setToolTip(getString(current_out ? "pane_put_back_tooltip" : "pane_take_out_tooltip", args));
+    }
+
+    if (out != mPanesOutSaved)
+    {
+        mPanesOutSaved = out;
+        savePanes();
+    }
+}
+
+void ALFloaterLightBox::openHistory()
+{
+    constexpr S32 WIDTH = 340;
+    constexpr S32 HEIGHT = 280;
+    ALHistoryList::Params hp(LLUICtrlFactory::getDefaultParams<ALHistoryList>());
+    hp.name = "lightbox_history_list";
+    hp.rect = LLRect(0, HEIGHT, WIDTH, 0);
+    hp.empty_headline = getString("history_empty_headline");
+    hp.empty_sentence = getString("history_empty_sentence");
+    ALHistoryList* list = LLUICtrlFactory::create<ALHistoryList>(hp);
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    LLHandle<ALHistoryList> list_handle = list->getDerivedHandle<ALHistoryList>();
+    LLView* anchor = mHistoryButton ? static_cast<LLView*>(mHistoryButton)
+                                    : (mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this));
+    ALPopover* popover = showPopover(PopoverKind::History, anchor, list,
+        [self, list_handle](KEY key, MASK mask) -> bool
+        {
+            ALFloaterLightBox* floater = self.get();
+            if (!floater)
+            {
+                return false;
+            }
+            if (key == KEY_RETURN && mask == MASK_NONE)
+            {
+                if (ALHistoryList* steps = list_handle.get())
+                {
+                    steps->goToSelected();
+                }
+                floater->closePopover(false);
+                return true;
+            }
+            // The floater's own undo keys, stepping the list while it stays
+            // up: watching the marker move is the point of having it open.
+            const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
+            const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
+                                  (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+            if (undo_key || redo_key)
+            {
+                floater->applyHistory(redo_key);
+                return true;
+            }
+            if (key == 'F' && mask == MASK_CONTROL)
+            {
+                floater->openFind();
+                return true;
+            }
+            return false;
+        });
+    if (!popover)
+    {
+        return;
+    }
+
+    mHistoryList = list->getHandle();
+    list->onGoTo([self](size_t in_force)
+    {
+        // The list counts its first row, which is the start of the history
+        // rather than a step, so the cursor is one less than it asks for.
+        ALFloaterLightBox* floater = self.get();
+        if (floater && in_force > 0)
+        {
+            floater->goToHistory(in_force - 1);
+        }
+    });
+    fillHistoryList();
+}
+
+void ALFloaterLightBox::fillHistoryList()
+{
+    ALHistoryList* list = ALViewType::as<ALHistoryList>(mHistoryList.get());
+    if (!list)
+    {
+        return;
+    }
+    mHistoryListRevision = mHistory.revision();
+
+    // Nothing done yet: an empty list, which is what makes it say so.
+    std::vector<ALHistoryList::Step> steps;
+    if (mHistory.depth() == 0)
+    {
+        list->setSteps(std::move(steps), 0);
+        return;
+    }
+
+    // A first row that is no step at all: where the history starts. Without
+    // it no row could ask for nothing to be in force, and undoing everything
+    // is the one trip back a person is most likely to want.
+    steps.push_back({ getString("history_start"), std::string() });
+    for (size_t index = 0; index < mHistory.depth(); ++index)
+    {
+        const ALGradeHistory::Transaction& changes = mHistory.at(index);
+        ALHistoryList::Step step;
+        step.what = mHistory.labelOf(index);
+        if (step.what.empty())
+        {
+            if (changes.size() == 1)
+            {
+                step.what = mDirectory.captionFor(changes.front().mName);
+            }
+            else
+            {
+                LLStringUtil::format_map_t args;
+                args["[COUNT]"] = llformat("%d", (S32)changes.size());
+                step.what = getString("history_settings", args);
+            }
+        }
+
+        // Where, when every change in the step is in one section: that is
+        // what tells five Strength steps apart. A step across sections --
+        // a Look, a section with an Advanced tail -- says it in its name.
+        const ALLightboxDirectory::Section* common = nullptr;
+        bool one_section = !changes.empty();
+        for (const ALGradeHistory::Change& change : changes)
+        {
+            const ALLightboxDirectory::Section* in = mDirectory.sectionOf(change.mName);
+            if (!in || (common && in != common))
+            {
+                one_section = false;
+                break;
+            }
+            common = in;
+        }
+        if (one_section && common)
+        {
+            step.where = common->mTitle;
+        }
+        steps.push_back(std::move(step));
+    }
+    list->setSteps(std::move(steps), mHistory.cursor() + 1);
+}
+
+void ALFloaterLightBox::goToHistory(size_t cursor)
+{
+    // A step at a time through applyHistory, so every step is written back
+    // exactly the way Ctrl+Z and Ctrl+Y write it. The guard is for a stack
+    // that stops moving, which applyHistory reports rather than loops on.
+    size_t guard = mHistory.depth() + 1;
+    while (mHistory.cursor() > cursor && guard-- > 0)
+    {
+        if (!applyHistory(false))
+        {
+            break;
+        }
+    }
+    while (mHistory.cursor() < cursor && guard-- > 0)
+    {
+        if (!applyHistory(true))
+        {
+            break;
+        }
+    }
+}
+
+std::string ALFloaterLightBox::pageLabel(size_t page) const
+{
+    return page < mTabPages.size() ? mTabPages[page]->getLabel() : std::string();
+}
+
+void ALFloaterLightBox::openFind()
+{
+    LLView* anchor = mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this);
+
+    // As wide as the bar it hangs from, so it reads as the bar opening rather
+    // than as another window.
+    constexpr S32 HEIGHT = 300;
+    const S32 width = llmax(anchor->getRect().getWidth(), 300);
+    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+    qp.name = "lightbox_find_list";
+    qp.rect = LLRect(0, HEIGHT, width, 0);
+    qp.placeholder = getString("find_placeholder");
+    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
+
+    // Sections as well as settings: the list matches what a row is called,
+    // and "bloom" should reach the Bloom section even though none of its rows
+    // says bloom. Each setting says which section it is in, which is what
+    // tells the five Strength rows apart.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    const std::vector<ALLightboxDirectory::Section>& sections = mDirectory.sections();
+    for (size_t index = 0; index < sections.size(); ++index)
+    {
+        const ALLightboxDirectory::Section& section = sections[index];
+        // A section hidden for the renderer's mode is nowhere to go, and
+        // neither is anything in it.
+        if (section.mTab && !section.mTab->getVisible())
+        {
+            continue;
+        }
+        ALQuickOpen::Candidate here;
+        here.label = section.mTitle;
+        here.detail = pageLabel(section.mPage);
+        here.value = "s:" + section.mName;
+        candidates.push_back(std::move(here));
+        for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+        {
+            if (setting.mSection == index)
+            {
+                ALQuickOpen::Candidate row;
+                row.label = setting.mCaption;
+                row.detail = section.mTitle;
+                row.value = "k:" + setting.mKey;
+                candidates.push_back(std::move(row));
+            }
+        }
+    }
+    quick->setCandidates(std::move(candidates));
+
+    // Ctrl+F again, with the list up, goes back to what was typed.
+    LLHandle<ALQuickOpen> list = quick->getDerivedHandle<ALQuickOpen>();
+    ALPopover* popover = showPopover(PopoverKind::Find, anchor, quick, [list](KEY key, MASK mask)
+    {
+        if (key == 'F' && mask == MASK_CONTROL)
+        {
+            if (ALQuickOpen* open = list.get())
+            {
+                open->takeFocus();
+            }
+            return true;
+        }
+        return false;
+    });
+    if (!popover)
+    {
+        return;
+    }
+
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
+    quick->onChose([self](const std::string& target)
+    {
+        if (ALFloaterLightBox* floater = self.get())
+        {
+            // Closed first, so the keyboard comes back to the Lightbox and
+            // the jump can hand it on to the setting.
+            floater->closePopover(false);
+            floater->jumpTo(target);
+        }
+    });
+    quick->takeFocus();
+}
+
+void ALFloaterLightBox::jumpTo(const std::string& target)
+{
+    const ALLightboxDirectory::Section* section = nullptr;
+    const ALLightboxDirectory::Setting* setting = nullptr;
+    if (target.compare(0, 2, "s:") == 0)
+    {
+        section = mDirectory.section(target.substr(2));
+    }
+    else if (target.compare(0, 2, "k:") == 0)
+    {
+        setting = mDirectory.setting(target.substr(2));
+        if (setting)
+        {
+            section = &mDirectory.sections()[setting->mSection];
+        }
+    }
+    // Nor a section hidden since the list was made: HDR switched with Find up.
+    if (!section || (section->mTab && !section->mTab->getVisible()))
+    {
+        return;
+    }
+
+    if (isMinimized())
+    {
+        setMinimized(false);
+    }
+    // A page out in a window of its own is shown by raising the window; its
+    // tab here only says where it went.
+    if (LLFloater* window = paneWindow(section->mPage))
+    {
+        if (window->isMinimized())
+        {
+            window->setMinimized(false);
+        }
+        window->setFrontmost(true);
+    }
+    else if (section->mPage < mTabPages.size())
+    {
+        mTabs->selectTabPanel(mTabPages[section->mPage]);
+    }
+
+    // Only the target's own tab is opened: an Advanced section is a sibling of
+    // its essentials, not inside them. setDisplayChildren does not lay the
+    // accordion out again, and the scroll below needs it laid out.
+    if (section->mTab && !section->mTab->getDisplayChildren())
+    {
+        section->mTab->setDisplayChildren(true);
+        if (section->mAccordion)
+        {
+            section->mAccordion->arrange();
+        }
+    }
+
+    if (LLTextBox* was_lit = ALViewType::as<LLTextBox>(mLitCaption.get()))
+    {
+        was_lit->setHighlighted(false);
+    }
+    mLitCaption.markDead();
+
+    if (setting && setting->mCtrl)
+    {
+        // Scrolled to the row, not to the section: a tall section scrolled to
+        // shows its bottom, which is not where this row need be.
+        setting->mCtrl->onUpdateScrollToChild(setting->mCtrl);
+        setting->mCtrl->setFocus(true);
+        if (setting->mCaptionBox)
+        {
+            setting->mCaptionBox->setHighlighted(true);
+            mLitCaption = setting->mCaptionBox->getHandle();
+            mLitTimer.reset();
+        }
+    }
+    else if (section->mTab)
+    {
+        section->mTab->showAndFocusHeader();
+    }
 }
 
 std::shared_ptr<LLSettingsDay> ALFloaterLightBox::getScrubbableDay() const
@@ -873,6 +1932,11 @@ void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLS
         // between two values instead of walking backwards.
         return;
     }
+    if (mColorWriting)
+    {
+        // The inline picker, moving. The pick is recorded whole when it ends.
+        return;
+    }
 
     // A monotonic clock is all the history wants: it compares two of these to
     // decide whether one drag is still in progress, and never reads the value
@@ -882,6 +1946,13 @@ void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLS
 
 bool ALFloaterLightBox::applyHistory(bool redo_direction)
 {
+    // A pick still open has not been recorded yet, so the stack does not know
+    // about it: put it back before stepping past it.
+    if (mPopoverKind == PopoverKind::Color)
+    {
+        closePopover(true);
+    }
+
     const ALGradeHistory::Transaction* stepp = redo_direction ? mHistory.redo() : mHistory.undo();
     if (!stepp)
     {
@@ -912,20 +1983,40 @@ bool ALFloaterLightBox::applyHistory(bool redo_direction)
 
 bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
 {
-    // Reached only after the focus chain has declined the key, so a text field
-    // in the middle of an edit keeps Ctrl+Z for its own undo.
-    if (key == 'Z' && mask == MASK_CONTROL)
+    // Both spellings of redo: Ctrl+Y is the Windows convention and
+    // Ctrl+Shift+Z the one every grading application uses.
+    if (key == 'F' && mask == MASK_CONTROL)
     {
-        applyHistory(false);
+        openFind();
         return true;
     }
 
-    // Both spellings: Ctrl+Y is the Windows convention and Ctrl+Shift+Z the one
-    // every grading application uses.
-    if ((key == 'Y' && mask == MASK_CONTROL) ||
-        (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)))
+    const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
+    const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
+                          (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+    if (undo_key || redo_key)
     {
-        applyHistory(true);
+        // hasAccelerators means these arrive before the menu bar has seen
+        // them, so the Edit menu's own undo -- which is what a text control
+        // with an edit history of its own would have got from them -- is
+        // offered here instead, and only a key it declines reaches the grade.
+        LLEditMenuHandler* text = LLEditMenuHandler::gEditMenuHandler;
+        LLView* text_view = text ? text->asView() : nullptr;
+        if (text_view && text_view->hasAncestor(this))
+        {
+            if (undo_key && text->canUndo())
+            {
+                text->undo();
+                return true;
+            }
+            if (redo_key && text->canRedo())
+            {
+                text->redo();
+                return true;
+            }
+        }
+
+        applyHistory(redo_key);
         return true;
     }
 
@@ -941,7 +2032,7 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
 
     std::string setting;
     S32 component = 0;
-    if (!parseVec3WidgetName(ctrl->getName(), setting, component))
+    if (!ALLightboxDirectory::parseVec3Name(ctrl->getName(), setting, component))
     {
         return;
     }
@@ -966,69 +2057,66 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
 
 namespace
 {
-// The three settings the tone curve graph edits, and the order the handles
-// are built in. Kept together so the graph and the spinner rows below it can
-// never disagree about which key is which.
-const char* const TONE_CURVE_TOE      = "RenderColorGradeCurveToe";
-const char* const TONE_CURVE_SHOULDER = "RenderColorGradeCurveShoulder";
-const char* const TONE_CURVE_STRENGTH = "RenderColorGradeCurveStrength";
+// The four curve settings are loaded fresh on every refresh and commit rather
+// than mirrored in a member: the settings are the truth, and undo, Looks and
+// Debug Settings all write them behind the floater's back. Their names live
+// on ALToneCurveSet, the one list the renderer and the Looks whitelist share.
+ALToneCurveSet loadToneCurveSet()
+{
+    ALToneCurveSet curves;
+    for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
+    {
+        const ALToneCurveSet::EChannel channel = static_cast<ALToneCurveSet::EChannel>(c);
+        curves.setCurveFromLLSD(channel, gSavedSettings.getLLSD(ALToneCurveSet::settingName(channel)));
+    }
+    return curves;
+}
+
+// Ghosts of the channels not being edited, and the solid handle colour of the
+// one that is: the same three hues, dim and bright.
+const LLColor4 CHANNEL_TINT[3] = {
+    LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
+    LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
+    LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
+const LLColor4 CHANNEL_SOLID[3] = {
+    LLColor4(0.9f, 0.3f, 0.3f, 1.f),
+    LLColor4(0.3f, 0.85f, 0.4f, 1.f),
+    LLColor4(0.4f, 0.55f, 0.95f, 1.f) };
+// What a channel actually gets once Master is applied after it.
+const LLColor4 COMPOSITE_TINT(0.85f, 0.85f, 0.85f, 0.4f);
 
 // The split-toning settings the band graph reads. The tints colour the bands,
-// the amounts fade them, and the balance is the only one the graph writes.
-const char* const SPLIT_TONE_SHADOW         = "RenderSplitToneShadowTint";
-const char* const SPLIT_TONE_MIDTONE        = "RenderSplitToneMidtoneTint";
-const char* const SPLIT_TONE_HIGHLIGHT      = "RenderSplitToneHighlightTint";
-const char* const SPLIT_TONE_AMOUNT         = "RenderSplitToneAmount";
-const char* const SPLIT_TONE_MIDTONE_AMOUNT = "RenderSplitToneMidtoneAmount";
-const char* const SPLIT_TONE_BALANCE        = "RenderSplitToneBalance";
+// the amounts fade them, and the balance and the two widths are what its
+// three handles write.
+const char* const SPLIT_TONE_SHADOW          = "RenderSplitToneShadowTint";
+const char* const SPLIT_TONE_MIDTONE         = "RenderSplitToneMidtoneTint";
+const char* const SPLIT_TONE_HIGHLIGHT       = "RenderSplitToneHighlightTint";
+const char* const SPLIT_TONE_AMOUNT          = "RenderSplitToneAmount";
+const char* const SPLIT_TONE_MIDTONE_AMOUNT  = "RenderSplitToneMidtoneAmount";
+const char* const SPLIT_TONE_BALANCE         = "RenderSplitToneBalance";
+const char* const SPLIT_TONE_SHADOW_WIDTH    = "RenderSplitToneShadowWidth";
+const char* const SPLIT_TONE_HIGHLIGHT_WIDTH = "RenderSplitToneHighlightWidth";
+
+// The range an edge handle clamps a width into is the width slider's own,
+// read from the widget so the XUI stays the single home of it. The renderer
+// itself only floors a width (ALCurveModel::SPLIT_TONE_MIN_WIDTH), so Debug
+// Settings can still ask for more; the graph and the render agree either
+// way, because both go through the model. A dropped slider falls back to the
+// floor and the domain.
+void widthRange(const LLSliderCtrl* slider, F32& lo, F32& hi)
+{
+    lo = ALCurveModel::SPLIT_TONE_MIN_WIDTH;
+    hi = 1.f;
+    if (slider)
+    {
+        lo = slider->getMinValue();
+        hi = slider->getMaxValue();
+    }
+}
 
 LLColor3 getColor3(const char* key)
 {
     return gSavedSettings.getColor3(key);
-}
-
-// Write one component, or all three when channel is negative. Rebuilds the
-// whole array the way onCommitVec3 does, so an untouched component keeps its
-// value rather than being re-derived from a rounded read-back.
-void setColor3Component(const char* key, S32 channel, F32 value)
-{
-    LLControlVariable* controlp = gSavedSettings.getControl(key);
-    if (!controlp)
-    {
-        return;
-    }
-    const LLSD current = controlp->getValue();
-    LLSD updated = LLSD::emptyArray();
-    for (S32 i = 0; i < 3; ++i)
-    {
-        const bool touched = (channel < 0) || (channel == i);
-        updated.append(LLSD::Real(touched ? value : current[i].asReal()));
-    }
-    controlp->set(updated);
-}
-
-/// Where the curve departs furthest from the identity. That is the most
-/// sensitive place to read strength back from a dragged handle -- solving
-/// k = (y - x) / (s - x) anywhere the two are close would amplify a pixel of
-/// pointer movement into a wild swing -- and it is also where the eye reads
-/// the curve's effect, so it is where the handle belongs.
-F32 findMaxDeviation(F32 toe, F32 shoulder)
-{
-    constexpr S32 SAMPLES = 64;
-    F32 best_x = 0.5f;
-    F32 best_gap = -1.f;
-    for (S32 i = 1; i < SAMPLES; ++i)
-    {
-        const F32 x = (F32)i / (F32)SAMPLES;
-        // The pure curve at full strength: the deviation the blend scales.
-        const F32 gap = fabsf(ALCurveModel::smoothstep(x, toe, shoulder, 1.f) - x);
-        if (gap > best_gap)
-        {
-            best_gap = gap;
-            best_x = x;
-        }
-    }
-    return best_x;
 }
 } // namespace
 
@@ -1047,17 +2135,28 @@ void ALFloaterLightBox::setupToneCurve()
     mToneCurveChannel = findChild<LLComboBox>("tone_curve_channel");
     if (mToneCurveChannel)
     {
-        // Start linked. Without an explicit selection an unselected combo
+        // Start on Master. Without an explicit selection an unselected combo
         // reads back as 0, which would silently mean "red only".
         mToneCurveChannel->selectByValue(LLSD(-1));
     }
 
-    for (const char* key : { TONE_CURVE_TOE, TONE_CURVE_SHOULDER, TONE_CURVE_STRENGTH })
+    for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
     {
+        const char* key = ALToneCurveSet::settingName(static_cast<ALToneCurveSet::EChannel>(c));
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
         {
             mToneCurveConnections.emplace_back(controlp->getSignal()->connect(
                 [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshToneCurve(); }));
+        }
+    }
+
+    // The graph names the settings it edits in XUI so the section's Reset All
+    // can find them; a typo there fails silently, so say so once.
+    for (const std::string& name : mToneCurve->getEditedSettingNames())
+    {
+        if (!gSavedSettings.getControl(name))
+        {
+            LL_WARNS() << "tone_curve_graph names an unknown setting: " << name << LL_ENDL;
         }
     }
 
@@ -1071,69 +2170,50 @@ void ALFloaterLightBox::refreshToneCurve()
         return;
     }
 
-    const LLColor3 toe = getColor3(TONE_CURVE_TOE);
-    const LLColor3 shoulder = getColor3(TONE_CURVE_SHOULDER);
-    const LLColor3 strength = getColor3(TONE_CURVE_STRENGTH);
+    const ALToneCurveSet curves = loadToneCurveSet();
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    // A copy: the lambdas below outlive this call.
+    const ALCurveModel selected = curves.curve(channel);
 
-    // Linked edits all three at once and shows one curve; a single channel
-    // shows its own curve solid with the other two behind it, so you can see
-    // how far apart you have pulled them.
-    const S32 channel = getToneCurveChannel();
-    const S32 plotted = (channel < 0) ? 0 : channel;
-
-    const F32 t = toe.mV[plotted];
-    const F32 s = shoulder.mV[plotted];
-    const F32 k = strength.mV[plotted];
-
-    mToneCurve->setCurve([t, s, k](F32 x) { return ALCurveModel::smoothstep(x, t, s, k); });
+    // The selected curve alone is what is drawn solid. Its points are the
+    // handles, so what is seen is exactly what a drag edits.
+    mToneCurve->setCurve([selected](F32 x) { return selected.evaluate(x); });
 
     mToneCurve->clearGhostCurves();
-    if (channel >= 0)
+    if (channel != ALToneCurveSet::CH_MASTER &&
+        !ALToneCurveSet::isIdentityCurve(curves.curve(ALToneCurveSet::CH_MASTER)))
     {
-        static const LLColor4 channel_tint[3] = {
-            LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
-            LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
-            LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
-        for (S32 i = 0; i < 3; ++i)
+        // What this channel actually gets once Master is applied after it.
+        mToneCurve->addGhostCurve([curves, channel](F32 x) { return curves.evaluate(channel, x); }, COMPOSITE_TINT);
+    }
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const ALToneCurveSet::EChannel other = static_cast<ALToneCurveSet::EChannel>(ALToneCurveSet::CH_RED + i);
+        if (other == channel || ALToneCurveSet::isIdentityCurve(curves.curve(other)))
         {
-            if (i == channel)
-            {
-                continue;
-            }
-            const F32 gt = toe.mV[i];
-            const F32 gs = shoulder.mV[i];
-            const F32 gk = strength.mV[i];
-            mToneCurve->addGhostCurve(
-                [gt, gs, gk](F32 x) { return ALCurveModel::smoothstep(x, gt, gs, gk); },
-                channel_tint[i]);
+            continue;
         }
+        const ALCurveModel ghost = curves.curve(other);
+        mToneCurve->addGhostCurve([ghost](F32 x) { return ghost.evaluate(x); }, CHANNEL_TINT[i]);
     }
 
-    const F32 strength_x = findMaxDeviation(t, s);
-
+    // One handle per point, in point order: getActiveHandle() is then the
+    // point index, which is the whole contract onCommitToneCurve relies on.
     std::vector<ALCurveEditorCtrl::Handle> handles;
-    ALCurveEditorCtrl::Handle h;
-
-    h.mName = "toe";
-    h.mX = t;
-    h.mY = ALCurveModel::smoothstep(t, t, s, k);
-    h.mLockY = true;
-    handles.push_back(h);
-
-    h = ALCurveEditorCtrl::Handle();
-    h.mName = "shoulder";
-    h.mX = s;
-    h.mY = ALCurveModel::smoothstep(s, t, s, k);
-    h.mLockY = true;
-    handles.push_back(h);
-
-    h = ALCurveEditorCtrl::Handle();
-    h.mName = "strength";
-    h.mX = strength_x;
-    h.mY = ALCurveModel::smoothstep(strength_x, t, s, k);
-    h.mLockX = true;
-    handles.push_back(h);
-
+    const std::vector<ALCurveModel::Point>& points = selected.getPoints();
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        ALCurveEditorCtrl::Handle h;
+        const bool endpoint = (i == 0 || i + 1 == points.size());
+        h.mX = points[i].mX;
+        h.mY = points[i].mY;
+        // The model pins the ends too; the lock stops the pointer fighting it.
+        h.mLockX = endpoint;
+        h.mColor = (channel == ALToneCurveSet::CH_MASTER)
+                       ? LLColor4::white
+                       : CHANNEL_SOLID[channel - ALToneCurveSet::CH_RED];
+        handles.push_back(h);
+    }
     mToneCurve->setHandles(std::move(handles));
 }
 
@@ -1143,54 +2223,118 @@ void ALFloaterLightBox::onCommitToneCurve()
     {
         return;
     }
-
-    const std::string which = mToneCurve->getActiveHandleName();
-    const S32 index = mToneCurve->getActiveHandle();
-    if (which.empty() || index < 0 || index >= (S32)mToneCurve->getHandles().size())
+    const ALCurveEditorCtrl::EAction action = mToneCurve->getAction();
+    if (action == ALCurveEditorCtrl::ACTION_NONE)
     {
         return;
     }
-    const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
 
-    const S32 channel = getToneCurveChannel();
-    const S32 read = (channel < 0) ? 0 : channel;
-    const F32 toe = getColor3(TONE_CURVE_TOE).mV[read];
-    const F32 shoulder = getColor3(TONE_CURVE_SHOULDER).mV[read];
-    const F32 strength = getColor3(TONE_CURVE_STRENGTH).mV[read];
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    LLControlVariable* controlp = gSavedSettings.getControl(ALToneCurveSet::settingName(channel));
+    if (!controlp)
+    {
+        return;
+    }
 
-    // Writing a setting re-enters through its signal; let the write land, then
-    // rebuild the handles once from the values that actually stuck. Scoped so
-    // no early return can ever leave the flag stuck and the graph dead -- and
-    // the scope must close before the refresh below, which reads the same
-    // flag and would otherwise skip the rebuild it exists to do.
+    ALToneCurveSet curves = loadToneCurveSet();
+    ALCurveModel& curve = curves.curve(channel);
+
+    bool changed = false;
+    switch (action)
+    {
+        case ALCurveEditorCtrl::ACTION_DRAG:
+        {
+            const S32 index = mToneCurve->getActiveHandle();
+            if (index < 0 || index >= curve.getPointCount() || index >= (S32)mToneCurve->getHandles().size())
+            {
+                return;
+            }
+            // By value: the refresh below replaces the handle list.
+            const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
+            // Clamps into the neighbours' gap; the ends stay pinned.
+            curve.movePoint(index, handle.mX, handle.mY);
+            changed = true;
+            break;
+        }
+        case ALCurveEditorCtrl::ACTION_ADD:
+            // Past the cap the click is simply ignored, which is the honest
+            // answer; the tooltip states the limit.
+            changed = curve.addPoint(mToneCurve->getActionX(), mToneCurve->getActionY()) >= 0;
+            break;
+        case ALCurveEditorCtrl::ACTION_REMOVE:
+        {
+            // The same bound the drag has: the handle list and the point list
+            // are built from each other, but the setting can move between.
+            const S32 index = mToneCurve->getActiveHandle();
+            if (index < 0 || index >= curve.getPointCount())
+            {
+                return;
+            }
+            // False for an endpoint or a two-point curve.
+            changed = curve.removePoint(index);
+            break;
+        }
+        default:
+            break;
+    }
+
+    if (!changed)
+    {
+        // Put the handle back where the model kept the point.
+        refreshToneCurve();
+        return;
+    }
+
+    // One setting per commit: that is what lets the history coalesce a drag
+    // into a single undo step. Writing a setting re-enters through its
+    // signal; let the write land, then rebuild the handles once from the
+    // values that actually stuck. Scoped so no early return can leave the
+    // flag stuck, and closed before the refresh below, which reads it.
     {
         ScopedTrue updating(mToneCurveUpdating);
-
-        if (which == "toe")
-        {
-            // Held at or below the shoulder. The shader tolerates the inversion
-            // (its reciprocal is guarded) but it renders as a hard step with no
-            // visible cause; the spinners remain the way to ask for that.
-            setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
-        }
-        else if (which == "shoulder")
-        {
-            setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
-        }
-        else if (which == "strength")
-        {
-            // The handle rides the curve at a fixed x, so its height is
-            // mix(x, s, k) and k falls straight out of it.
-            const F32 x = handle.mX;
-            const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
-            const F32 gap = s - x;
-            if (fabsf(gap) > 1e-3f)
-            {
-                setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
-            }
-        }
+        controlp->set(ALToneCurveSet::pointsToLLSD(curve.getPoints()));
     }
     refreshToneCurve();
+}
+
+void ALFloaterLightBox::onClickResetToneCurveChannel()
+{
+    // resetToDefault fires the setting's signal, which refreshes the graph.
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    if (LLControlVariable* controlp = gSavedSettings.getControl(ALToneCurveSet::settingName(channel)))
+    {
+        controlp->resetToDefault(true);
+    }
+}
+
+void ALFloaterLightBox::onToneCurvePreset(const LLSD& userdata)
+{
+    // Point lists, both axes 0..1, with the ends at x = 0 and 1 as the model
+    // pins them. Modest on purpose: a preset is a starting shape.
+    typedef std::vector<ALCurveModel::Point> points_t;
+    static const std::map<std::string, points_t> presets = {
+        { "linear",   { { 0.f, 0.f }, { 1.f, 1.f } } },
+        { "soft_s",   { { 0.f, 0.f }, { 0.25f, 0.21f }, { 0.75f, 0.79f }, { 1.f, 1.f } } },
+        { "strong_s", { { 0.f, 0.f }, { 0.25f, 0.16f }, { 0.75f, 0.84f }, { 1.f, 1.f } } },
+        { "fade",     { { 0.f, 0.08f }, { 0.3f, 0.32f }, { 1.f, 1.f } } },
+        { "matte",    { { 0.f, 0.08f }, { 0.3f, 0.32f }, { 0.75f, 0.76f }, { 1.f, 0.94f } } },
+    };
+    const auto found = presets.find(userdata.asString());
+    if (found == presets.end())
+    {
+        return;
+    }
+
+    ALCurveModel curve;
+    curve.setPoints(found->second);
+
+    // One setting, the selected curve; its signal refreshes the graph. No
+    // re-entry guard: nothing is mid-drag.
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    if (LLControlVariable* controlp = gSavedSettings.getControl(ALToneCurveSet::settingName(channel)))
+    {
+        controlp->set(ALToneCurveSet::pointsToLLSD(curve.getPoints()));
+    }
 }
 
 void ALFloaterLightBox::setupSplitToneGraph()
@@ -1200,13 +2344,24 @@ void ALFloaterLightBox::setupSplitToneGraph()
     {
         return;
     }
+    // The widths are setting rows; the range widthRange reads is still the
+    // slider's own, reached through its row.
+    if (ALSettingRow* row = findChild<ALSettingRow>("split_shadow_width"))
+    {
+        mSplitShadowWidthSlider = row->getSlider();
+    }
+    if (ALSettingRow* row = findChild<ALSettingRow>("split_highlight_width"))
+    {
+        mSplitHighlightWidthSlider = row->getSlider();
+    }
 
-    // Every input, not just the balance: the tints decide what colour a band
-    // is drawn in and the amounts decide how solid, so a graph that only
-    // watched the balance would sit there showing a tint the renderer had
-    // already stopped applying.
+    // Every input, not just the three the handles write: the tints decide
+    // what colour a band is drawn in and the amounts decide how solid, so a
+    // graph that only watched its own settings would sit there showing a
+    // tint the renderer had already stopped applying.
     for (const char* key : { SPLIT_TONE_SHADOW, SPLIT_TONE_MIDTONE, SPLIT_TONE_HIGHLIGHT,
-                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE })
+                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE,
+                             SPLIT_TONE_SHADOW_WIDTH, SPLIT_TONE_HIGHLIGHT_WIDTH })
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
         {
@@ -1228,6 +2383,11 @@ void ALFloaterLightBox::refreshSplitToneGraph()
     const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
     const F32 amount     = llclamp(gSavedSettings.getF32(SPLIT_TONE_AMOUNT), 0.f, 1.f);
     const F32 mid_amount = llclamp(gSavedSettings.getF32(SPLIT_TONE_MIDTONE_AMOUNT), 0.f, 1.f);
+    // Not clamped to the slider range: the model floors a width the way the
+    // renderer does, so the bands show what is actually being applied even
+    // when Debug Settings asked for something the sliders would not.
+    const F32 ws = gSavedSettings.getF32(SPLIT_TONE_SHADOW_WIDTH);
+    const F32 wh = gSavedSettings.getF32(SPLIT_TONE_HIGHLIGHT_WIDTH);
 
     // A band wears the tint it applies. Normalised the way pipeline.cpp
     // normalises it, so what the graph shows is the hue the renderer will
@@ -1249,50 +2409,107 @@ void ALFloaterLightBox::refreshSplitToneGraph()
         // Alpha follows the amount, so a band the renderer is ignoring fades
         // instead of sitting at full strength claiming otherwise. It never
         // reaches zero: where the bands lie is worth seeing even when nothing
-        // is being applied, and that is what the balance handle moves.
+        // is being applied, and that is what the handles move.
         out.mV[VALPHA] = 0.16f + 0.44f * strength;
         return out;
     };
 
     mSplitToneGraph->clearFillCurves();
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mShadow; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mShadow; },
         band_color(SPLIT_TONE_SHADOW, amount));
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mMidtone; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mMidtone; },
         band_color(SPLIT_TONE_MIDTONE, mid_amount));
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mHighlight; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mHighlight; },
         band_color(SPLIT_TONE_HIGHLIGHT, amount));
 
-    // The handle rides the peak of the midtone band, which is exactly where the
-    // two ramps cross and hand over -- the split point the setting names. Held
-    // to the horizontal, because moving it up or down would mean nothing.
-    ALCurveEditorCtrl::Handle handle;
-    handle.mName = "balance";
-    handle.mX = mid;
-    handle.mY = 1.f;
-    handle.mLockY = true;
-    mSplitToneGraph->setHandles({ handle });
+    // Three handles along the top edge, all held to the horizontal because
+    // moving any of them up or down would mean nothing. Balance first, so a
+    // tie in the hit test goes to the split point. It rides the peak of the
+    // midtone band, where the two ramps hand over.
+    ALCurveEditorCtrl::Handle balance;
+    balance.mName = "balance";
+    balance.mX = mid;
+    balance.mY = 1.f;
+    balance.mLockY = true;
+
+    // The edges are the corners where the shadow band starts to fall away and
+    // where the highlight band reaches full strength, at the width the model
+    // actually renders -- floored like the ramp, so a zero or negative width
+    // from Debug Settings puts the handle where the band really ends. A ramp
+    // that runs off the plot has its handle held at the edge, locked and
+    // dimmed: the only positions a drag could report from there lie inside
+    // the plot, and writing one back would silently replace a wide ramp with
+    // a narrow one. The slider is the control for that case, and the commit
+    // refuses a locked handle.
+    auto edge_handle = [&band_color, amount](const char* name, F32 true_x, const char* tint_key)
+    {
+        ALCurveEditorCtrl::Handle h;
+        h.mName = name;
+        h.mX = llclamp(true_x, 0.f, 1.f);
+        h.mY = 1.f;
+        h.mLockY = true;
+        const bool parked = (true_x < 0.f || true_x > 1.f);
+        h.mLockX = parked;
+        h.mColor = band_color(tint_key, amount);
+        h.mColor.mV[VALPHA] = parked ? 0.5f : 1.f;
+        return h;
+    };
+    const F32 ws_drawn = llmax(ws, ALCurveModel::SPLIT_TONE_MIN_WIDTH);
+    const F32 wh_drawn = llmax(wh, ALCurveModel::SPLIT_TONE_MIN_WIDTH);
+
+    mSplitToneGraph->setHandles({ balance,
+                                  edge_handle("shadow_edge", mid - ws_drawn, SPLIT_TONE_SHADOW),
+                                  edge_handle("highlight_edge", mid + wh_drawn, SPLIT_TONE_HIGHLIGHT) });
 }
 
 void ALFloaterLightBox::onCommitSplitToneGraph()
 {
-    if (!mSplitToneGraph || mSplitToneGraph->getHandles().empty())
+    // Only a drag means anything here. The graph never asks for points, but a
+    // future XUI that set points_editable must not turn a double-click into a
+    // balance write.
+    if (!mSplitToneGraph || mSplitToneGraph->getAction() != ALCurveEditorCtrl::ACTION_DRAG)
     {
         return;
     }
+    const S32 index = mSplitToneGraph->getActiveHandle();
+    if (index < 0 || index >= (S32)mSplitToneGraph->getHandles().size())
+    {
+        return;
+    }
+    const ALCurveEditorCtrl::Handle handle = mSplitToneGraph->getHandles()[index];
+    const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
 
-    // Dragged past either end, the balance clamps and the refresh below puts
-    // the handle back where the setting actually landed, rather than leaving it
-    // parked somewhere the renderer will not follow.
-    const F32 mid = mSplitToneGraph->getHandles()[0].mX;
-
-    // Scoped for the same reason onCommitToneCurve's guard is, and closed
-    // before the refresh for the same reason too.
+    // Dragged past its range, the value clamps and the refresh below puts the
+    // handle back where the setting actually landed, rather than leaving it
+    // parked somewhere the renderer will not follow. One setting per handle:
+    // the balance drag moves both edges by writing only the balance, which is
+    // what keeps a drag one undo step. An edge handle held at the plot edge
+    // (mLockX, see refreshSplitToneGraph) writes nothing: its position is not
+    // the width, and the width slider is the control for it.
+    //
+    // Scoped for the same reason the tone curve guard is, and closed before
+    // the refresh for the same reason too.
     {
         ScopedTrue updating(mSplitToneUpdating);
-        gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
+        if (handle.mName == "balance")
+        {
+            gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(handle.mX));
+        }
+        else if (handle.mName == "shadow_edge" && !handle.mLockX)
+        {
+            F32 lo, hi;
+            widthRange(mSplitShadowWidthSlider, lo, hi);
+            gSavedSettings.setF32(SPLIT_TONE_SHADOW_WIDTH, llclamp(mid - handle.mX, lo, hi));
+        }
+        else if (handle.mName == "highlight_edge" && !handle.mLockX)
+        {
+            F32 lo, hi;
+            widthRange(mSplitHighlightWidthSlider, lo, hi);
+            gSavedSettings.setF32(SPLIT_TONE_HIGHLIGHT_WIDTH, llclamp(handle.mX - mid, lo, hi));
+        }
     }
     refreshSplitToneGraph();
 }
@@ -1346,6 +2563,9 @@ void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
         return;
     }
 
+    // One pick is one thing the user did, though it moves two sliders: without
+    // the group it undid as two steps, temperature first and then tint.
+    ScopedHistoryGroup group(mHistory, getString("history_white_balance"));
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceCCT", solved.mCCTOffset);
     gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
 }
@@ -1358,7 +2578,9 @@ void ALFloaterLightBox::onLookSelected()
         // Applying a Look writes every whitelisted key it carries. That is one
         // choice, so it is one undo step -- and it is the step a user most
         // wants back, having tried a Look on top of work they liked.
-        ScopedHistoryGroup group(mHistory);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = name;
+        ScopedHistoryGroup group(mHistory, getString("history_look", args));
         LLPresetsManager::getInstance()->loadLooksPreset(name);
     }
 }
@@ -1396,7 +2618,9 @@ void ALFloaterLightBox::onClickLookRevert()
     {
         // Same reasoning as onLookSelected: a revert throws away every edit
         // since the Look was applied, and that had better be one Ctrl+Z.
-        ScopedHistoryGroup group(mHistory);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = last;
+        ScopedHistoryGroup group(mHistory, getString("history_revert", args));
         LLPresetsManager::getInstance()->loadLooksPreset(last);
     }
 }
@@ -1431,28 +2655,77 @@ void ALFloaterLightBox::refreshLooksBar()
         args["[NAME]"] = last;
         mLooksCombo->setLabel(getString("look_name_modified", args));
     }
-    getChild<LLUICtrl>("look_save")->setEnabled(!active.empty() || !last.empty());
-    getChild<LLUICtrl>("look_delete")->setEnabled(mLooksCombo->getItemCount() > 0);
-    getChild<LLUICtrl>("look_revert")->setEnabled(modified);
+    if (mLookSave)
+    {
+        mLookSave->setEnabled(!active.empty() || !last.empty());
+    }
+    if (mLookDelete)
+    {
+        mLookDelete->setEnabled(mLooksCombo->getItemCount() > 0);
+    }
+    if (mLookRevert)
+    {
+        mLookRevert->setEnabled(modified);
+    }
 }
 
 void ALFloaterLightBox::updateTonemapperRows()
 {
-    // Khronos Neutral (0), ACES (1), and GT (5) take no parameters, so their
-    // selection leaves every per-operator row disabled.
     const S32 type = gSavedSettings.getS32("AlchemyRenderTonemapType");
-    static const std::pair<const char*, S32> param_rows[] = {
-        { "tone_aces_white", 2 },
-        { "tone_reinhard_white", 3 },
-        { "tone_filmic_white", 4 },
-        { "tone_agx_contrast", 6 },
-        { "tone_agx_white", 6 },
-    };
-    for (const auto& row : param_rows)
+    for (const TonemapperRow& row : mTonemapperRows)
     {
-        const bool active = (type == row.second);
-        getChild<LLUICtrl>(row.first)->setEnabled(active);
-        getChild<LLUICtrl>(std::string(row.first) + "_rst")->setEnabled(active);
+        if (row.mCtrl)
+        {
+            row.mCtrl->setEnabled(type == row.mType);
+        }
+    }
+}
+
+void ALFloaterLightBox::refreshBloomSections()
+{
+    // The renderer's own test (LLPipeline::createGLBuffers, renderFinalize):
+    // HDR bloom runs with RenderHDREnabled on GL above 4.05, and the legacy
+    // glow runs whenever it does not. Keep the two in step. The cross filter
+    // is on the HDR side with the bloom it is seeded from: it streaks what
+    // the bloom pyramid's top holds, and without the pyramid it draws nothing.
+    const bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
+    static const std::pair<const char*, bool> bloom_sections[] = {
+        { "sec_bloom", true },
+        { "sec_bloom_adv", true },
+        { "sec_crossfilter", true },
+        { "sec_crossfilter_adv", true },
+        { "sec_glow", false },
+        { "sec_glow_adv", false },
+    };
+    std::set<LLAccordionCtrl*> changed;
+    for (const auto& [name, for_hdr] : bloom_sections)
+    {
+        const ALLightboxDirectory::Section* section = mDirectory.section(name);
+        if (!section || !section->mTab)
+        {
+            continue;
+        }
+        const bool shown = (for_hdr == hdr);
+        if (section->mTab->getVisible() == shown)
+        {
+            continue;
+        }
+        // The keyboard does not stay in a section that is going.
+        if (!shown && gFocusMgr.childHasKeyboardFocus(section->mTab))
+        {
+            gFocusMgr.setKeyboardFocus(nullptr);
+        }
+        section->mTab->setVisible(shown);
+        if (section->mAccordion)
+        {
+            changed.insert(section->mAccordion);
+        }
+    }
+    // A tab's visibility does not lay its accordion out again; the gap it
+    // leaves, or the room it needs, only appears on the next arrange.
+    for (LLAccordionCtrl* accordion : changed)
+    {
+        accordion->arrange();
     }
 }
 

@@ -165,6 +165,7 @@ if(AL_BUILD_VIEWER)
     alviewcapture.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
+    allightboxdirectory.cpp
     almotionpredictor.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
@@ -952,6 +953,7 @@ if(AL_BUILD_VIEWER)
     alviewcapture.h
     algradehistory.h
     allegacynotificationwellwindow.h
+    allightboxdirectory.h
     almotionpredictor.h
     alobjectproperties.h
     alagentlocationformat.h

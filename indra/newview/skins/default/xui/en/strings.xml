@@ -348,6 +348,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="FontFieldItalic">Italic</string>
 	<string name="FontFieldUnderline">Underline</string>
 
+	<!-- A setting row's button back to its default, alsettingrow.cpp -->
+	<string name="SettingRowReset">Reset to [VALUE]</string>
+
 	<!-- XUI Studio's outline, beside a row's name -->
 	<string name="XUITreeHidden">hidden</string>
 	<string name="XUITreeHiddenHere">hidden here</string>

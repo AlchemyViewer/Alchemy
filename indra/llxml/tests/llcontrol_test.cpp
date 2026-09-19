@@ -151,4 +151,52 @@ namespace tut
         ensure("listener fired on changed setting", mListenerFired);
     }
 
+
+    // An LLSD-typed setting compares by value, and numbers compare as
+    // numbers: an integer-typed list equal to the real-typed default is at
+    // default, and writing it changes nothing and fires nothing.
+    template<> template<>
+    void control_group_t::test<5>()
+    {
+        auto pair_of = [](const LLSD& x, const LLSD& y) {
+            LLSD p = LLSD::emptyArray();
+            p.append(x);
+            p.append(y);
+            return p;
+        };
+        LLSD real_default = LLSD::emptyArray();
+        real_default.append(pair_of(LLSD::Real(0.0), LLSD::Real(0.0)));
+        real_default.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
+        mCG->declareLLSD("CurveSetting", real_default, "Dummy LLSD setting", LLControlVariable::PERSIST_NONDFT);
+        LLControlVariable* control = mCG->getControl("CurveSetting");
+        ensure("declared at default", control->isDefault());
+
+        bool fired = false;
+        control->getSignal()->connect([&fired](LLControlVariable*, const LLSD&, const LLSD&) { fired = true; });
+
+        LLSD same = LLSD::emptyArray();
+        same.append(pair_of(LLSD::Real(0.0), LLSD::Real(0.0)));
+        same.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
+        control->setValue(same, true);
+        ensure("an equal value does not fire", !fired);
+        ensure("and leaves the control at default", control->isDefault());
+
+        LLSD integers = LLSD::emptyArray();
+        integers.append(pair_of(LLSD::Integer(0), LLSD::Integer(0)));
+        integers.append(pair_of(LLSD::Integer(1), LLSD::Integer(1)));
+        control->setValue(integers, true);
+        ensure("an integer-typed equal value does not fire", !fired);
+        ensure("and is still at default", control->isDefault());
+
+        LLSD other = LLSD::emptyArray();
+        other.append(pair_of(LLSD::Real(0.0), LLSD::Real(0.0)));
+        other.append(pair_of(LLSD::Real(0.5), LLSD::Real(0.25)));
+        other.append(pair_of(LLSD::Real(1.0), LLSD::Real(1.0)));
+        control->setValue(other, true);
+        ensure("a different value fires", fired);
+        ensure("and is no longer default", !control->isDefault());
+
+        control->resetToDefault(true);
+        ensure("reset restores the default", control->isDefault());
+    }
 }
