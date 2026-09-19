@@ -1323,6 +1323,12 @@ bool LLWebRTCPeerConnectionImpl::initializeConnection(const LLWebRTCPeerConnecti
     mWebRTCImpl->PostSignalingTask(
         [self,options]()
         {
+            // A connection closed for a retry is this same object, and the
+            // close raised the flag that quiets the stats poll: lowered
+            // here, on the thread that raised it, or the new connection
+            // would report no stats once it connects.
+            self->mShuttingDown = false;
+
             webrtc::PeerConnectionInterface::RTCConfiguration config;
             for (auto server : options.mServers)
             {
