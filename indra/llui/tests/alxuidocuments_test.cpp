@@ -374,4 +374,59 @@ namespace tut
         ensure("closes it with work in the history", open.close(other));
         ensure("and the history is gone, since half of it named a file that is", open.history().empty());
     }
+
+    // Given a window, a run of edits to one field is one action: a number
+    // stepped three times comes back in one undo, as the field it is, and
+    // is put on again in one redo. Another field is another action, an
+    // Action over several steps is never joined, and an edit after an undo
+    // is a new run rather than more of the one put back.
+    template<> template<>
+    void alxuidocuments_object::test<11>()
+    {
+        const std::string base = write("base.xml", panel("a"));
+        ALXUIDocuments open;
+        open.setCoalesceWindow(60.0);
+        ALXUIEdit* held = open.open(base);
+        ensure("opens", held != nullptr);
+
+        for (const char* value : { "11", "12", "13" })
+        {
+            ensure("writes", held->setAttribute({ "a" }, "width", value));
+            open.settle();
+        }
+        std::vector<ALXUIDocuments::Entry> all = open.history();
+        ensure_equals("three steps are one action", all.size(), 1u);
+        ensure_equals("of three steps", all[0].steps, 3);
+        ensure("to one field", all[0].sameField);
+        ensure_equals("which it names", all[0].change.field, std::string("width"));
+
+        ensure("writes another field", held->setAttribute({ "a" }, "height", "20"));
+        open.settle();
+        ensure_equals("which is its own action", open.history().size(), 2u);
+        {
+            ALXUIDocuments::Action together(open);
+            ensure("writes", held->setAttribute({ "a" }, "height", "21"));
+            ensure("writes", held->setAttribute({ "a" }, "height", "22"));
+        }
+        all = open.history();
+        ensure_equals("an Action is never joined", all.size(), 3u);
+        ensure("and is not one field", !all[2].sameField);
+
+        ensure("put back", open.undo());
+        ensure("put back", open.undo());
+        ensure("put back", open.undo());
+        ensure_equals("the run went as one", held->resolve({ "a" }).attribute("width").as_int(), 10);
+        ensure("and says which field it was", open.lastChange().oneField && open.lastChange().field == "width");
+        ensure("nothing else to put back", !open.canUndo());
+
+        ensure("done again", open.redo());
+        ensure_equals("the whole run", held->resolve({ "a" }).attribute("width").as_int(), 13);
+
+        ensure("put back", open.undo());
+        ensure("writes after an undo", held->setAttribute({ "a" }, "width", "14"));
+        open.settle();
+        all = open.history();
+        ensure_equals("a new run, and the one put back is gone", all.size(), 1u);
+        ensure_equals("of one step", all[0].steps, 1);
+    }
 }

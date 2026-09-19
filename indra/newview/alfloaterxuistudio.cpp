@@ -1576,9 +1576,14 @@ namespace
 // ===========================================================================
 // ALFloaterXUIStudio
 // ===========================================================================
+// How close together two edits to the same field have to be to be put back
+// as one: a number stepped with an arrow, an element nudged along.
+static constexpr F64 COALESCE_SECONDS = 1.0;
+
 ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
 :   ALStudioFloater(key, "ALXUIStudioState")
 {
+    mDocuments.setCoalesceWindow(COALESCE_SECONDS);
     mCommitCallbackRegistrar.add("XUIStudio.Tree", boost::bind(&ALFloaterXUIStudio::onTreeAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
     mCommitCallbackRegistrar.add("XUIStudio.List", boost::bind(&ALFloaterXUIStudio::onListAction, this, _2));
@@ -4778,7 +4783,8 @@ void ALFloaterXUIStudio::saveAllDocuments()
 // is not any of the five things it wrote.
 std::string ALFloaterXUIStudio::describeAction(const ALXUIDocuments::Entry& entry) const
 {
-    if (entry.steps == 1 && entry.documents == 1)
+    // A run of steps to one field is that field, the same as one step to it.
+    if ((entry.steps == 1 || entry.sameField) && entry.documents == 1)
     {
         const std::string said = describeStep(entry.change);
         if (!said.empty())
@@ -4858,7 +4864,7 @@ void ALFloaterXUIStudio::onHistoryStepChosen(size_t at)
     const ALXUIDocuments::Entry& entry = all[at];
     // Only where the step named one element of the file being looked at:
     // selecting in a file nobody has open would be a jump nobody asked for.
-    if (entry.steps != 1 || entry.documents != 1 || entry.change.path.empty())
+    if ((entry.steps != 1 && !entry.sameField) || entry.documents != 1 || entry.change.path.empty())
     {
         return;
     }
