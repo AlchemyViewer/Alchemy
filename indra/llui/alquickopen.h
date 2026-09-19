@@ -65,6 +65,10 @@ public:
         // Said quietly beside the label: which folder, which file, which
         // skin. Not matched against, because a person types the name.
         std::string detail;
+        // Other words it answers to, scored a tier below what the label
+        // would score for the same match: what a thing is called in plain
+        // words, where the label is what a file calls it.
+        std::string also;
         std::string value;
         std::string icon;
     };
@@ -75,8 +79,9 @@ public:
     void setQuery(const std::string& query);
     const std::string& query() const { return mQuery; }
 
-    // The ranking, in order, best first. Public because it is the whole of
-    // this widget and the only part worth testing without a screen.
+    // The ranking, in order, best first: by the label, or by the other
+    // words a tier down. Public because it is the whole of this widget
+    // and the only part worth testing without a screen.
     static std::vector<size_t> rank(const std::vector<Candidate>& candidates,
                                     std::string_view query);
 

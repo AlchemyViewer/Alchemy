@@ -129,6 +129,9 @@ public:
 
     virtual void    draw() override;
     virtual bool    addChild(LLView* view, S32 tab_group = 0) override;
+    // The scrolled view taken out is no longer what is scrolled: the next
+    // one added is, which is how a container shows another view in turn.
+    void            removeChild(LLView* view) override;
 
     bool canAutoScroll(S32 x, S32 y);
     bool autoScroll(S32 x, S32 y);

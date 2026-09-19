@@ -241,4 +241,133 @@ namespace tut
         row->handleMouseUp(x + 40, y, MASK_NONE);
         delete list;
     }
+
+    // Cells: pictures across and down under their headings, chosen by the
+    // arrows as well as the pointer, and narrowed by the filter the same
+    // way rows are.
+    template<> template<>
+    void alspecimenlist_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList::Params p(LLUICtrlFactory::getDefaultParams<ALSpecimenList>());
+        p.rect = LLRect(0, 300, 330, 0);
+        p.cell_width = 100;
+        p.cell_height = 60;
+        p.empty_headline = "Nothing here.";
+        ALSpecimenList* list = LLUICtrlFactory::create<ALSpecimenList>(p);
+        ensure("a list given a cell size is cells", list->cells());
+
+        std::vector<ALSpecimenList::Specimen> pictures;
+        for (const char* name : { "PushButton_Off", "PushButton_Over", "Icon_Close" })
+        {
+            ALSpecimenList::Specimen one;
+            one.group = std::string(name).starts_with("Push") ? "Buttons" : "Icons";
+            one.label = name;
+            one.value = name;
+            one.image = name;
+            pictures.push_back(one);
+        }
+        list->setSpecimens(pictures);
+        ensure_equals("every picture shown", list->shown(), size_t(3));
+        ensure("no row was built for a cell", list->findChild<LLView>("row_PushButton_Off", true) == nullptr);
+
+        std::vector<std::string> chosen;
+        list->onChose([&chosen](const std::string& value) { chosen.push_back(value); });
+
+        // Nothing chosen: the first arrow takes the first cell; right takes
+        // the next; down takes the one below, which is the other heading's.
+        list->handleKeyHere(KEY_RIGHT, MASK_NONE);
+        ensure_equals("the first cell", list->chosen(), std::string("PushButton_Off"));
+        list->handleKeyHere(KEY_RIGHT, MASK_NONE);
+        ensure_equals("the next across", list->chosen(), std::string("PushButton_Over"));
+        list->handleKeyHere(KEY_DOWN, MASK_NONE);
+        ensure_equals("the one below", list->chosen(), std::string("Icon_Close"));
+        list->handleKeyHere(KEY_UP, MASK_NONE);
+        ensure_equals("and back up", list->chosen(), std::string("PushButton_Off"));
+        ensure_equals("each said", chosen.size(), size_t(4));
+
+        list->setChosen("Icon_Close");
+        ensure_equals("chosen quietly", list->chosen(), std::string("Icon_Close"));
+        ensure_equals("and not said", chosen.size(), size_t(4));
+
+        list->filter("icon");
+        ensure_equals("the filter narrows the cells", list->shown(), size_t(1));
+        list->filter("zzz");
+        ensure_equals("to nothing", list->shown(), size_t(0));
+        ensure("which the pane says", list->findChild<LLView>("empty", true)->getVisible());
+        delete list;
+    }
+
+    // Several cells at once: control adds one and takes it out again,
+    // shift takes the run between the chosen one and the pressed one, and
+    // a plain press is that one thing again.
+    template<> template<>
+    void alspecimenlist_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList::Params p(LLUICtrlFactory::getDefaultParams<ALSpecimenList>());
+        p.rect = LLRect(0, 300, 330, 0);
+        p.cell_width = 100;
+        p.cell_height = 60;
+        ALSpecimenList* list = LLUICtrlFactory::create<ALSpecimenList>(p);
+
+        std::vector<ALSpecimenList::Specimen> pictures;
+        for (const char* name : { "A", "B", "C", "D" })
+        {
+            ALSpecimenList::Specimen one;
+            one.group = "Letters";
+            one.label = name;
+            one.value = name;
+            one.image = name;
+            pictures.push_back(one);
+        }
+        list->setSpecimens(pictures);
+
+        S32 changes = 0;
+        list->onSelectionChanged([&changes]() { ++changes; });
+
+        list->cellPressed(0, MASK_NONE);
+        ensure_equals("chosen", list->chosen(), std::string("A"));
+        ensure_equals("and alone selected", list->selection().size(), size_t(1));
+
+        list->cellPressed(2, MASK_CONTROL);
+        ensure_equals("still chosen", list->chosen(), std::string("A"));
+        ensure_equals("two selected", list->selection().size(), size_t(2));
+        list->cellPressed(2, MASK_CONTROL);
+        ensure_equals("and out again", list->selection().size(), size_t(1));
+        list->cellPressed(0, MASK_CONTROL);
+        ensure_equals("the chosen one cannot be taken out", list->selection().size(), size_t(1));
+
+        list->cellPressed(3, MASK_SHIFT);
+        ensure_equals("the run from the chosen one", list->selection().size(), size_t(4));
+        ensure_equals("with the chosen one still A", list->chosen(), std::string("A"));
+
+        list->cellPressed(1, MASK_NONE);
+        ensure_equals("a plain press is one thing", list->selection().size(), size_t(1));
+        ensure_equals("that one", list->chosen(), std::string("B"));
+        ensure("every change was said", changes >= 6);
+        delete list;
+    }
+    template<> template<>
+    void alspecimenlist_object::test<8>()
+    {
+        if (!ui.ok()) { skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree"); }
+        auto* list = make();
+        list->setCellSize(100, 60);
+        list->setSpecimens(three());
+        ensure("select all is handled", list->handleKeyHere('A', MASK_CONTROL));
+        ensure_equals("all visible cells selected", list->selection().size(), size_t(3));
+        list->filter("panel");
+        ensure("filtered select all is handled", list->handleKeyHere('A', MASK_CONTROL));
+        ensure_equals("only the visible cell remains selected", list->selection().size(), size_t(1));
+        ensure_equals("the chosen cell follows the visible selection", list->chosen(), std::string("panel"));
+        delete list;
+    }
+
 }
