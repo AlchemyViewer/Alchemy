@@ -28,14 +28,12 @@
 #ifndef LLFLOATERCOLORSETTINGS_H
 #define LLFLOATERCOLORSETTINGS_H
 
-#include "llcontrol.h"
 #include "llfloater.h"
 
-class LLColorSwatchCtrl;
-class LLScrollListCtrl;
-class LLSpinCtrl;
-class LLTextBox;
+class ALColorTablePanel;
 
+// The colour table in a window of its own. Opened with a name, it is
+// opened on that colour.
 class LLFloaterSettingsColor final
 :   public LLFloater
 {
@@ -45,38 +43,15 @@ public:
     AL_VIEW_TYPE(LLFloaterSettingsColor, LLFloater);
 
     bool postBuild() override;
-    void draw() override;
-
-    void updateControl(const std::string& color_name);
-
-    void onCommitSettings();
-    void onClickDefault();
-
-    bool matchesSearchFilter(std::string setting_name);
-    bool isSettingHidden(const std::string& color_name);
+    void onOpen(const LLSD& key) override;
+    // What was changed here is kept.
+    void onClose(bool app_quitting) override;
 
 private:
     LLFloaterSettingsColor(const LLSD& key);
     virtual ~LLFloaterSettingsColor();
 
-    void updateList(bool skip_selection = false);
-    void onSettingSelect();
-    void setSearchFilter(const std::string& filter);
-
-    void updateDefaultColumn(const std::string& color_name);
-    void hideUIControls();
-
-    LLScrollListCtrl* mSettingList;
-
-protected:
-    LLUICtrl*           mDefaultButton = nullptr;
-    LLTextBox*          mSettingNameText = nullptr;
-
-    LLSpinCtrl* mAlphaSpinner = nullptr;
-    LLColorSwatchCtrl* mColorSwatch = nullptr;
-
-    std::string mSearchFilter;
+    ALColorTablePanel* mColors = nullptr;
 };
 
 #endif //LLFLOATERCOLORSETTINGS_H
-

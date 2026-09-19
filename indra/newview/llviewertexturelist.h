@@ -272,6 +272,9 @@ public:
     bool hasUIImage(std::string_view name) const override { return mUIImages.find(name) != mUIImages.end(); }
     void cleanUp() override;
 
+    // Every named image, for whoever offers them by name.
+    const auto& getUIImages() const { return mUIImages; }
+
     bool initFromFile();
 
     LLPointer<LLUIImage> preloadUIImage(const std::string& name, const std::string& filename, bool use_mips, const LLRect& scale_rect, const LLRect& clip_rect, LLUIImage::EScaleStyle stype);

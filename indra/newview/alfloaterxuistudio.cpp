@@ -50,13 +50,10 @@
 #include "llexternaleditor.h"
 #include "llfile.h"
 #include "llfiltereditor.h"
+#include "alviewcapture.h"
 #include "llfloaterreg.h"
+#include "llviewertexturelist.h"
 #include "llfocusmgr.h"
-#include "llimagebmp.h"
-#include "llimagej2c.h"
-#include "llimagejpeg.h"
-#include "llimagepng.h"
-#include "llimagetga.h"
 #include "llfolderview.h"
 #include "llkeyboard.h"
 #include "lllayoutstack.h"
@@ -200,8 +197,6 @@ namespace
         LLUIColor guide;            // what the numbers mean, drawn to the edges
         LLUIColor guideSibling;     // and to the element before it
         LLUIColor grid;
-        LLUIColor rulerGround;
-        LLUIColor rulerInk;
 
         Ink()
         {
@@ -219,8 +214,6 @@ namespace
             guide        = table.getColor("XUIStudioGuide", LLColor4::yellow);
             guideSibling = table.getColor("XUIStudioGuideSibling", LLColor4::cyan);
             grid         = table.getColor("XUIStudioGrid", LLColor4(0.3f, 0.82f, 1.f, 0.12f));
-            rulerGround  = table.getColor("XUIStudioRulerGround", LLColor4(0.169f, 0.169f, 0.169f, 0.85f));
-            rulerInk     = table.getColor("XUIStudioRulerInk", LLColor4::white);
         }
     };
 
@@ -230,12 +223,11 @@ namespace
         return held;
     }
 
-    // How much bigger than life a preview may be drawn, and how far one
-    // step of the wheel or one press of the spinner's arrow moves it. The
-    // spinner in the canvas bar says the same three numbers.
-    constexpr S32 ZOOM_LEAST = 20;
-    constexpr S32 ZOOM_MOST = 400;
-    constexpr S32 ZOOM_STEP = 10;
+    // How much bigger than life a preview may be drawn, as the canvas
+    // bounds it; the spinner in the canvas bar says the same two numbers.
+    constexpr S32 ZOOM_LEAST = (S32)(ALCanvasView::MIN_ZOOM * 100.f);
+    constexpr S32 ZOOM_MOST = (S32)(ALCanvasView::MAX_ZOOM * 100.f);
+
 
     // The sections the attribute grid is divided into, in the order an
     // author reads them: what the thing is, where it is, what it looks
@@ -473,13 +465,33 @@ public:
 
     // Rules are the canvas's own furniture: they stay their own size at
     // the edges of what can be seen, and it is the numbers on them that
-    // follow the preview.
+    // follow the preview. They are the canvas's; what they show, whether
+    // they show and what they step by is the tool's.
     void drawChrome() override
     {
-        if (mTool && root() && mTool->showRulers())
+        drawRulers();
+    }
+
+    bool rulersShown() const override
+    {
+        return mTool && root() && mTool->showRulers();
+    }
+
+    S32 rulerStep() const override
+    {
+        return mTool ? llmax(mTool->gridSize(), 2) : 2;
+    }
+
+    // The selection's edges, on both rules.
+    bool rulerHighlight(LLRect& content) const override
+    {
+        LLView* selected = mTool ? ALXUISelection::resolve(root(), mTool->selection().selection()) : nullptr;
+        if (!selected)
         {
-            drawRulers();
+            return false;
         }
+        content = localRectOf(selected);
+        return true;
     }
 
     // Everything that lives in the preview's own coordinates: the preview,
@@ -601,11 +613,13 @@ public:
     // selected.
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
         toContent(x, y);
         mLetGo = false;
-        if (!mTool || !root())
+        if (!mTool || !root() || panGesture())
         {
-            return LLPanel::handleMouseDown(x, y, mask);
+            return ALCanvasView::handleMouseDown(drawn_x, drawn_y, mask);
         }
 
         // A handle answers before the widget under it does, with or
@@ -671,11 +685,17 @@ public:
             setFocus(true);
             return true;
         }
-        return LLPanel::handleMouseDown(x, y, mask);
+        return ALCanvasView::handleMouseDown(drawn_x, drawn_y, mask);
     }
 
     bool handleHover(S32 x, S32 y, MASK mask) override
     {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        if (panning())
+        {
+            return ALCanvasView::handleHover(drawn_x, drawn_y, mask);
+        }
         toContent(x, y);
         if (grabbed())
         {
@@ -698,31 +718,15 @@ public:
                 }
             }
         }
-        return LLPanel::handleHover(x, y, mask);
+        return ALCanvasView::handleHover(drawn_x, drawn_y, mask);
     }
 
     // A panel that names a file of its own is one element here and a
     // document elsewhere; opening it is what a double click on it means.
-    // Control and the wheel zooms, which is what it does in every other
-    // canvas anybody has used. Without control the wheel belongs to whatever
-    // is under it -- a list in the preview scrolls -- and to the container
-    // when nothing wants it.
-    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override
-    {
-        // A wheel event carries no modifiers of its own, so the keyboard is
-        // asked what is held.
-        const MASK held = gKeyboard ? gKeyboard->currentMask(false) : MASK_NONE;
-        if ((held & MASK_CONTROL) && mTool && delta.mClicks != 0)
-        {
-            mTool->zoomBy(delta.mClicks > 0 ? -1 : 1);
-            return true;
-        }
-        toContent(x, y);
-        return LLPanel::handleScrollWheel(x, y, delta);
-    }
-
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override
     {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
         toContent(x, y);
         if (mTool && root() && (mask & MASK_CONTROL))
         {
@@ -735,11 +739,17 @@ public:
             }
             return true;
         }
-        return LLPanel::handleDoubleClick(x, y, mask);
+        return ALCanvasView::handleDoubleClick(drawn_x, drawn_y, mask);
     }
 
     bool handleMouseUp(S32 x, S32 y, MASK mask) override
     {
+        const S32 drawn_x = x;
+        const S32 drawn_y = y;
+        if (panning())
+        {
+            return ALCanvasView::handleMouseUp(drawn_x, drawn_y, mask);
+        }
         toContent(x, y);
         if (grabbed())
         {
@@ -778,40 +788,7 @@ public:
             }
             return true;
         }
-        return LLPanel::handleMouseUp(x, y, mask);
-    }
-
-    // The rest of what a pointer does, converted at the same door: a right
-    // click, a middle click and a tool tip all have to find the element
-    // under the pointer, and where that is depends on the zoom.
-    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override
-    {
-        toContent(x, y);
-        return LLPanel::handleRightMouseDown(x, y, mask);
-    }
-
-    bool handleRightMouseUp(S32 x, S32 y, MASK mask) override
-    {
-        toContent(x, y);
-        return LLPanel::handleRightMouseUp(x, y, mask);
-    }
-
-    bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override
-    {
-        toContent(x, y);
-        return LLPanel::handleMiddleMouseDown(x, y, mask);
-    }
-
-    bool handleMiddleMouseUp(S32 x, S32 y, MASK mask) override
-    {
-        toContent(x, y);
-        return LLPanel::handleMiddleMouseUp(x, y, mask);
-    }
-
-    bool handleToolTip(S32 x, S32 y, MASK mask) override
-    {
-        toContent(x, y);
-        return LLPanel::handleToolTip(x, y, mask);
+        return ALCanvasView::handleMouseUp(drawn_x, drawn_y, mask);
     }
 
     // Whoever took the pointer is why this is being called, so by now it is
@@ -1242,90 +1219,6 @@ private:
         }
     }
 
-    // Two strips along the top and the left edges of what can be seen,
-    // numbered from the previewed root's top left corner, which is where the
-    // file counts from: the rules belong to the canvas and stay put, and
-    // moving a preview renumbers them rather than carrying them off. Ticks
-    // are the grid, whatever the grid is; the numbers are every fifty, which
-    // is round whether or not fifty is a multiple of the grid. The
-    // selection's edges are marked on both.
-    void drawRulers()
-    {
-        static constexpr S32 RULER = 14;
-        static constexpr S32 LABEL_EVERY = 50;
-        const LLRect view = viewportRect();
-        if (view.getWidth() <= RULER * 2 || view.getHeight() <= RULER * 2)
-        {
-            return;
-        }
-        const LLRect origin = (root() && root() != this) ? localRectOf(root()) : getLocalRect();
-
-        const LLColor4 ground = ink().rulerGround.get();
-        const LLColor4 marks = ink().rulerInk.get();
-
-        const S32 rule_bottom = view.mTop - RULER;
-        const S32 rule_right = view.mLeft + RULER;
-        const LLRect top(view.mLeft, view.mTop, view.mRight, rule_bottom);
-        const LLRect left(view.mLeft, rule_bottom, rule_right, view.mBottom);
-        gl_rect_2d(top, ground, true);
-        gl_rect_2d(left, ground, true);
-        gl_rect_2d(top, marks, false);
-        gl_rect_2d(left, marks, false);
-
-        // The first mark at or after a coordinate. Rounding towards zero is
-        // not rounding down, and a rule that reaches left of the preview has
-        // negative numbers on it.
-        const auto from = [](S32 value, S32 step)
-        {
-            const S32 n = value >= 0 ? (value + step - 1) / step : -((-value) / step);
-            return n * step;
-        };
-
-        const S32 grid = llmax(mTool->gridSize(), 2);
-        const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-
-        // The rule is drawn on the canvas and numbered in the file: a mark
-        // for content coordinate n goes at n times the zoom.
-        const auto onCanvas = [this](S32 content) { return ll_round((F32)content * mZoom); };
-
-        for (S32 fx = from(ll_round((F32)rule_right / mZoom) - origin.mLeft, grid);
-             onCanvas(origin.mLeft + fx) <= view.mRight; fx += grid)
-        {
-            const S32 x = onCanvas(origin.mLeft + fx);
-            const bool named = fx % LABEL_EVERY == 0;
-            gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), marks);
-            if (named)
-            {
-                font->renderUTF8(std::to_string(fx), 0, x + 2, rule_bottom + 3,
-                                 marks, LLFontGL::LEFT, LLFontGL::BOTTOM);
-            }
-        }
-        for (S32 fy = from(origin.mTop - ll_round((F32)rule_bottom / mZoom), grid);
-             onCanvas(origin.mTop - fy) >= view.mBottom; fy += grid)
-        {
-            const S32 y = onCanvas(origin.mTop - fy);
-            const bool named = fy % LABEL_EVERY == 0;
-            gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, marks);
-            if (named)
-            {
-                font->renderUTF8(std::to_string(fy), 0, view.mLeft + 2, y - 10,
-                                 marks, LLFontGL::LEFT, LLFontGL::BOTTOM);
-            }
-        }
-
-        // Where the selection sits, on both rules.
-        if (LLView* selected = ALXUISelection::resolve(root(), mTool->selection().selection()))
-        {
-            const LLRect content = localRectOf(selected);
-            const LLRect box(onCanvas(content.mLeft), onCanvas(content.mTop),
-                             onCanvas(content.mRight), onCanvas(content.mBottom));
-            gl_rect_2d(LLRect(llmax(box.mLeft, rule_right), view.mTop, llmin(box.mRight, view.mRight), rule_bottom),
-                       ink().selection.get(), false);
-            gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
-                       ink().selection.get(), false);
-        }
-    }
-
     void drawBox(const LLView* view, const LLColor4& color, bool label)
     {
         const LLRect r = localRectOf(view);
@@ -1430,6 +1323,7 @@ public:
         mCanvas = new ALXUICanvas(tool, which, cp);
         mCanvas->initFromParams(cp);
         mCanvas->setSizable(true);
+        mCanvas->onZoomChange([tool, canvas = mCanvas](F32 zoom) { tool->zoomChanged(zoom, canvas); });
         addChild(mCanvas);
     }
 
@@ -1470,25 +1364,6 @@ private:
 
 namespace
 {
-    // The four regions that fold away, and the button in the window bar that
-    // folds each. The menu has the same four switches; both read the same
-    // state, so neither is the one that is right.
-    constexpr std::pair<const char*, const char*> FOLD_BUTTONS[] = {
-        { "fold_navigator",  "navigator_panel" },
-        { "fold_bottom",     "bottom_panel" },
-        { "fold_inspectors", "inspector_panel" },
-    };
-
-    // The regions that can be taken out into a window of their own, and the
-    // string each window is titled from. The canvas is not among them: it
-    // holds a built view tree with hit-testing of its own, and one mechanism
-    // must not serve both.
-    constexpr std::pair<const char*, const char*> POP_PANES[] = {
-        { "navigator_panel",  "PaneNavigator" },
-        { "bottom_panel",     "PaneBottom" },
-        { "inspector_panel",  "PaneInspectors" },
-    };
-
     constexpr S32 MAX_FIND_ROWS = 500;
 
     // The follows flags as a file writes them and back, through the one
@@ -1681,6 +1556,11 @@ namespace
     // Where the specimen sits in its row, past the label.
     constexpr S32 SPECIMEN_LEFT = 130;
     constexpr S32 SPECIMEN_WIDTH = 150;
+    constexpr S32 SPECIMEN_HEIGHT = 22;
+    // The Library's cells, when it is cells: room for a specimen as it
+    // is built, its name under it, and the cell's own margins.
+    constexpr S32 PALETTE_CELL_WIDTH = SPECIMEN_WIDTH + 12;
+    constexpr S32 PALETTE_CELL_HEIGHT = SPECIMEN_HEIGHT + 14 + 12;
 
     // Which heading a tag sits under in the Library. Five kinds, read off the
     // name: a guess over a vocabulary, and a wrong one costs a reader one
@@ -1697,7 +1577,7 @@ namespace
 // ALFloaterXUIStudio
 // ===========================================================================
 ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
-:   LLFloater(key)
+:   ALStudioFloater(key, "ALXUIStudioState")
 {
     mCommitCallbackRegistrar.add("XUIStudio.Tree", boost::bind(&ALFloaterXUIStudio::onTreeAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
@@ -1804,6 +1684,18 @@ bool ALFloaterXUIStudio::postBuild()
         mAttributeGrid->setEdgeTips({ getString("FollowsTipLeft"), getString("FollowsTipBottom"),
                                       getString("FollowsTipRight"), getString("FollowsTipTop"),
                                       getString("FollowsTipAcross"), getString("FollowsTipDown") });
+        // A picture row offers every picture the skin names.
+        mAttributeGrid->setImageChoices([textures = getString("ImageChoicesTextures")]()
+        {
+            std::vector<ALImageField::Choice> choices;
+            for (const auto& [name, image] : LLUIImageList::instance().getUIImages())
+            {
+                choices.push_back({ name, textures });
+            }
+            std::sort(choices.begin(), choices.end(),
+                      [](const ALImageField::Choice& a, const ALImageField::Choice& b) { return a.name < b.name; });
+            return choices;
+        });
     }
     mAttributeWhat = getChild<LLTextBox>("attributes_what");
     mAttributeFilter = getChild<LLFilterEditor>("attributes_filter");
@@ -1823,7 +1715,7 @@ bool ALFloaterXUIStudio::postBuild()
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
-    mMenuBar = getChild<LLMenuBarGL>("studio_menu");
+    setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
     // Two strips, split by what each mode needs rather than by what it is
     // about. The navigator holds the ones that are a list of names and read
     // well narrow; the band under the canvas holds the tables, which are
@@ -1877,6 +1769,12 @@ bool ALFloaterXUIStudio::postBuild()
     mChannels = getChild<LLScrollListCtrl>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
     mPalette = getChild<ALSpecimenList>("palette");
+    getChild<LLButton>("palette_cells")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
+    {
+        mPaletteCells = ctrl->getValue().asBoolean();
+        mPalette->setCellSize(mPaletteCells ? PALETTE_CELL_WIDTH : 0, mPaletteCells ? PALETTE_CELL_HEIGHT : 0);
+        saveState();
+    });
     mPaletteAttributes = getChild<LLScrollListCtrl>("palette_attributes");
     // The tag chosen above decides what is listed below it.
     mPalette->onChose([this](const std::string&) { fillPaletteAttributes(); });
@@ -1886,11 +1784,16 @@ bool ALFloaterXUIStudio::postBuild()
     {
         LLFloaterReg::showInstance("xui_library");
     });
-    for (const auto& [button, pane] : FOLD_BUTTONS)
-    {
-        getChild<LLButton>(button)->setCommitCallback(
-            [this, pane = pane](LLUICtrl*, const LLSD&) { togglePane(pane); });
-    }
+    // Each region put into a pane that knows it can be somewhere else, with
+    // the button that folds it. The canvas is not among them: it holds a
+    // built view tree with hit-testing of its own, and one mechanism must
+    // not serve both. Nothing in this window asks for anything inside a
+    // region by name after this point, which is the whole of why a region
+    // may leave.
+    mFolds.bind(this, { { "navigator", "navigator_panel", "fold_navigator", getString("PaneNavigator") },
+                        { "inspectors", "inspector_panel", "fold_inspectors", getString("PaneInspectors") },
+                        { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") } });
+    mFolds.onChanged([this]() { saveState(); });
     getChild<LLButton>("tree_up")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_up"));
     getChild<LLButton>("tree_down")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_down"));
     getChild<LLButton>("tree_in")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_in"));
@@ -1900,7 +1803,7 @@ bool ALFloaterXUIStudio::postBuild()
     mTranslateValue = getChild<LLTextEditor>("translate_value");
     mTranslateCounts = getChild<LLTextBox>("translate_counts");
     mEditTarget = getChild<LLTextBox>("edit_target");
-    mStatus = getChild<LLTextBox>("status");
+    setStatusLine(getChild<LLTextBox>("status"));
 
     // The canvases are built here rather than declared in the XUI because
     // they are the tool's own view of a preview, not a widget a file can
@@ -1929,6 +1832,8 @@ bool ALFloaterXUIStudio::postBuild()
             mCanvases[i] = new ALXUICanvas(this, i, cp);
             mCanvases[i]->initFromParams(cp);
             mCanvases[i]->setSizable(true);
+            mCanvases[i]->setBackdrop(mBackdrop);
+            mCanvases[i]->onZoomChange([this, i](F32 zoom) { zoomChanged(zoom, mCanvases[i]); });
             // A canvas with nothing on it takes no room on the row.
             mCanvases[i]->setVisible(false);
             mCanvasRow->addCanvas(mCanvases[i]);
@@ -1943,23 +1848,6 @@ bool ALFloaterXUIStudio::postBuild()
     mCanvasShown->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasShown, this));
     mCanvasPinned->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onToggleCanvasPinned, this));
 
-    // Each region put into a pane that knows it can be somewhere else. Done
-    // here rather than in the file so the file keeps naming what it lays
-    // out; the tree gains a level and every name in it is where it was.
-    // Nothing in this window asks for anything inside a region by name after
-    // this point, which is the whole of why a region may leave.
-    for (const auto& [region, title] : POP_PANES)
-    {
-        if (LLLayoutPanel* panel = findChild<LLLayoutPanel>(region, true))
-        {
-            if (ALDockPanel* pane = ALDockPanel::wrap(panel, getString(title)))
-            {
-                mPanes.push_back(pane->getHandle());
-            }
-        }
-    }
-
-    holdShapePanes();
     loadState();
     scanCatalog();
 
@@ -2092,6 +1980,7 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("canvas_snap")->setToggleState(mSnap);
     mGridCombo->setValue(mGrid);
     setZoom(mZoom);
+    setCanvasBackdrop(mBackdrop);
 
     mSelection.onSelectionChanged(boost::bind(&ALFloaterXUIStudio::onSelectionChanged, this));
     mSelection.onHoverChanged(boost::bind(&ALFloaterXUIStudio::onHoverChanged, this));
@@ -2119,18 +2008,37 @@ bool ALFloaterXUIStudio::postBuild()
     return true;
 }
 
+void ALFloaterXUIStudio::onOpen(const LLSD& key)
+{
+    if (!key.isMap() || !key.has("find") || !mFindBar || !mModes)
+    {
+        return;
+    }
+    mModes->selectTabByName("find_mode");
+    mFindBar->setValue("query", key["find"].asString());
+    mFindBar->setValue("field", "value");
+    mFindBar->setValue("how", "matching");
+    mFindBar->setValue("scope", "");
+    onFind();
+    onMode();
+
+    // Asked to go where it is found: the first place, with the widget
+    // selected, as a result pressed would.
+    if (key["go"].asBoolean() && mFindResults && mFindResults->getItemCount() > 0)
+    {
+        mFindResults->selectFirstItem();
+        onFindResult();
+    }
+}
+
 void ALFloaterXUIStudio::onClose(bool app_quitting)
 {
-    saveState();
-    // Before anything else: a pane left in a window this one does not own is
-    // destroyed along with it.
-    dockPanes();
+    ALStudioFloater::onClose(app_quitting);
     closePreviews();
 }
 
 void ALFloaterXUIStudio::draw()
 {
-    rememberShape();
     if (!mLintQueue.empty())
     {
         stepLintAll();
@@ -2220,15 +2128,12 @@ void ALFloaterXUIStudio::draw()
         mStateTimer.reset();
         refreshState(selectedView());
     }
-    LLFloater::draw();
+    ALStudioFloater::draw();
 }
 
 bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
 {
-    // The menu bar's own accelerators, which belong to this floater and
-    // not to the viewer: they answer while it has the keyboard and are
-    // silent everywhere else, which is what a floater-local menu is for.
-    if (mMenuBar && mMenuBar->handleAcceleratorKey(key, mask))
+    if (handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask))
     {
         return true;
     }
@@ -2304,9 +2209,9 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
                 {
                     return false;
                 }
-                if (paneCollapsed(pane))
+                if (mFolds.collapsed(pane))
                 {
-                    togglePane(pane);
+                    mFolds.toggle(pane);
                 }
                 return true;
             }
@@ -2805,206 +2710,72 @@ void ALFloaterXUIStudio::closePreviews()
     }
 }
 
-// A pane the developer is not using gives its room to the canvas, and the
-// canvas is the region that grows because it is the one the stack resizes.
-// A collapsed pane keeps everything it holds: what goes is the room, so
-// coming back costs nothing and loses no selection.
-void ALFloaterXUIStudio::setPaneCollapsed(std::string_view name, bool collapsed)
+// How much bigger than life the canvas draws. The spinner, the wheel and
+// what was saved from last time all arrive here, so one place knows the
+// limits and what moves when the number does. The canvases share one
+// scrolled row, so one of them decides where it scrolls to: the primary
+// zooms about the middle of what can be seen of it, and the rest only
+// take the number.
+void ALFloaterXUIStudio::setZoom(S32 percent)
 {
-    LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
-    if (LLLayoutStack* stack = panel ? panel->getParentAs<LLLayoutStack>() : nullptr)
-    {
-        stack->collapsePanel(panel, collapsed);
-    }
+    applyZoom(percent, nullptr);
 }
 
-void ALFloaterXUIStudio::togglePane(std::string_view name)
+// A canvas zoomed itself about the pointer, and the row is scrolled for
+// it already: the rest take the number.
+void ALFloaterXUIStudio::zoomChanged(F32 zoom, ALXUICanvas* zoomed)
 {
-    setPaneCollapsed(name, !paneCollapsed(name));
-    refreshPaneButtons();
+    applyZoom(ll_round(zoom * 100.f), zoomed);
     saveState();
 }
 
-// A region in a window of its own. The pane is moved, not copied, so
-// everything the tool holds a pointer to goes on working -- and nothing in
-// this window asks for anything inside a region by name after it is built,
-// which is what makes that safe.
-// Held rather than searched for: a search from this window would stop
-// finding a region the moment it left, which is the one time anybody asks.
-ALDockPanel* ALFloaterXUIStudio::paneOf(std::string_view name) const
-{
-    const std::string want = std::string(name) + "_pane";
-    for (const LLHandle<LLView>& held : mPanes)
-    {
-        ALDockPanel* pane = held.get() ? held.get()->as<ALDockPanel>() : nullptr;
-        if (pane && pane->getName() == want)
-        {
-            return pane;
-        }
-    }
-    return nullptr;
-}
-
-bool ALFloaterXUIStudio::paneOut(std::string_view name) const
-{
-    const ALDockPanel* pane = paneOf(name);
-    return pane && pane->poppedOut();
-}
-
-void ALFloaterXUIStudio::togglePaneOut(std::string_view name)
-{
-    if (ALDockPanel* pane = paneOf(name))
-    {
-        if (pane->poppedOut())
-        {
-            pane->dock();
-        }
-        else
-        {
-            pane->popOut();
-        }
-        refreshPaneButtons();
-        saveState();
-    }
-}
-
-// Every region that is out, put back. Called before this window closes:
-// a pane left in a window the tool does not own is destroyed with it.
-void ALFloaterXUIStudio::dockPanes()
-{
-    for (const LLHandle<LLView>& held : mPanes)
-    {
-        ALDockPanel* pane = held.get() ? held.get()->as<ALDockPanel>() : nullptr;
-        if (pane && pane->poppedOut())
-        {
-            pane->dock();
-        }
-    }
-}
-
-// The four buttons that fold the regions, pressed in while their region is
-// showing. They are the same switches as the menu's, so they say the same
-// thing about the same state and neither is the one that is right.
-void ALFloaterXUIStudio::refreshPaneButtons()
-{
-    for (const auto& [button, pane] : FOLD_BUTTONS)
-    {
-        if (LLButton* toggle = findChild<LLButton>(button, true))
-        {
-            toggle->setToggleState(!paneCollapsed(pane));
-        }
-    }
-}
-
-bool ALFloaterXUIStudio::paneCollapsed(std::string_view name) const
-{
-    const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
-    return panel && panel->isCollapsed();
-}
-
-S32 ALFloaterXUIStudio::paneDim(std::string_view name) const
-{
-    const LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
-    return panel ? panel->getTargetDim() : 0;
-}
-
-// The three panes a bar can be dragged on, held rather than searched for:
-// this is asked every frame, and a search by name walks the whole window.
-void ALFloaterXUIStudio::holdShapePanes()
-{
-    static const char* const NAMES[3] = { "navigator_panel", "inspector_panel", "bottom_panel" };
-    for (S32 i = 0; i < 3; ++i)
-    {
-        mShapePanes[i] = findChild<LLLayoutPanel>(NAMES[i], true);
-    }
-}
-
-// Asked for the way a drag on the bar asks, so the stack takes it from
-// its neighbours the way it would have then.
-void ALFloaterXUIStudio::setPaneDim(std::string_view name, S32 dim)
-{
-    LLLayoutPanel* panel = findChild<LLLayoutPanel>(name, true);
-    if (panel && dim > 0)
-    {
-        panel->setTargetDim(dim);
-    }
-}
-
-bool ALFloaterXUIStudio::applyRectControl()
-{
-    // Told to the per-account control the floater reads its rect from, so
-    // that the floater's own bookkeeping -- where it sits relative to the
-    // screen, what it writes back -- runs as it would have. The relative
-    // position the account kept is let go of, since it would otherwise
-    // outrank the rect it was derived from.
-    if (!mRestoredRect.isEmpty() && !mRectControl.empty())
-    {
-        LLControlGroup* group = getControlGroup();
-        group->setRect(mRectControl, mRestoredRect);
-        for (const std::string& name : { mPosXControl, mPosYControl })
-        {
-            if (LLControlVariable* control = group->getControl(name))
-            {
-                control->resetToDefault();
-            }
-        }
-    }
-    return LLFloater::applyRectControl();
-}
-
-void ALFloaterXUIStudio::rememberShape()
-{
-    // Not in the middle of a drag: the shape worth keeping is the one it
-    // ends at. And not while minimized, when the rect is a title bar.
-    if (gFocusMgr.getMouseCapture() || isMinimized())
-    {
-        return;
-    }
-    if (getRect() != mShapeRect)
-    {
-        saveState();
-        return;
-    }
-    for (S32 i = 0; i < 3; ++i)
-    {
-        if (mShapePanes[i] && mShapePanes[i]->getTargetDim() != mShapeDims[i])
-        {
-            saveState();
-            return;
-        }
-    }
-}
-
-// How much bigger than life the canvas draws. The spinner, the wheel and
-// what was saved from last time all arrive here, so one place knows the
-// limits and what moves when the number does.
-void ALFloaterXUIStudio::setZoom(S32 percent)
+void ALFloaterXUIStudio::applyZoom(S32 percent, ALXUICanvas* zoomed)
 {
     mZoom = llclamp(percent, ZOOM_LEAST, ZOOM_MOST);
     if (mZoomSpin && mZoomSpin->getValue().asInteger() != mZoom)
     {
         mZoomSpin->setValue(mZoom);
     }
+    const F32 zoom = (F32)mZoom / 100.f;
+    ALXUICanvas* about = zoomed ? zoomed : mCanvases[PRIMARY];
     for (ALXUICanvas* canvas : mCanvases)
     {
-        if (canvas)
+        if (!canvas)
         {
-            canvas->setZoom((F32)mZoom / 100.f);
+            continue;
+        }
+        if (canvas == about && !zoomed)
+        {
+            const LLRect seen = canvas->viewportRect();
+            canvas->zoomAbout(zoom, seen.getCenterX(), seen.getCenterY());
+        }
+        else
+        {
+            canvas->setZoom(zoom);
         }
     }
     layoutCanvases();
 }
 
-// One step of the zoom, which is the step the spinner's own arrows take: the
-// wheel over the canvas and the bar cannot disagree about how far a step is.
-void ALFloaterXUIStudio::zoomBy(S32 steps)
+// Every canvas there is, the ones in the row and any in a window of its
+// own, and the ones made later take it when they are made.
+void ALFloaterXUIStudio::setCanvasBackdrop(ALCanvasView::Backdrop backdrop)
 {
-    if (steps == 0)
+    mBackdrop = backdrop;
+    for (ALXUICanvas* canvas : mCanvases)
     {
-        return;
+        if (canvas)
+        {
+            canvas->setBackdrop(backdrop);
+        }
     }
-    setZoom(mZoom + steps * ZOOM_STEP);
-    saveState();
+    for (const Preview& pv : mPreviews)
+    {
+        if (ALXUICanvas* canvas = canvasOf(pv))
+        {
+            canvas->setBackdrop(backdrop);
+        }
+    }
 }
 
 void ALFloaterXUIStudio::layoutCanvases()
@@ -3773,7 +3544,7 @@ void ALFloaterXUIStudio::fillPalette()
             {
                 const std::string xml = "<" + child + " name=\"" + child + "\" label=\"" + child
                     + "\" layout=\"topleft\" left=\"0\" top=\"0\" width=\"" + std::to_string(SPECIMEN_WIDTH)
-                    + "\" height=\"22\"/>";
+                    + "\" height=\"" + std::to_string(SPECIMEN_HEIGHT) + "\"/>";
                 LLXMLNodePtr node;
                 if (LLXMLNode::parseBuffer(xml.data(), xml.size(), node))
                 {
@@ -5032,7 +4803,6 @@ void ALFloaterXUIStudio::fillHistory()
     mDocuments.settle();
 
     const std::vector<ALXUIDocuments::Entry> history = mDocuments.history();
-    refreshUndoLabels(history);
     std::vector<ALHistoryList::Step> steps;
     for (const ALXUIDocuments::Entry& entry : history)
     {
@@ -5046,47 +4816,8 @@ void ALFloaterXUIStudio::fillHistory()
         }
         steps.push_back(std::move(step));
     }
-    mHistory->setSteps(std::move(steps), mDocuments.inForce());
+    showHistory(mHistory, std::move(steps), mDocuments.inForce());
     refreshModeCounts();
-}
-
-// "Undo" on its own is a promise about nothing in particular. The next step
-// back and the next step forward are known, and each item says which it
-// is -- in the words the history list uses for the same step, so that the
-// menu and the list agree about what is about to happen.
-void ALFloaterXUIStudio::refreshUndoLabels(const std::vector<ALXUIDocuments::Entry>& history)
-{
-    if (!mMenuBar)
-    {
-        return;
-    }
-    const size_t in_force = mDocuments.inForce();
-    if (LLMenuItemGL* undo = mMenuBar->findChild<LLMenuItemGL>("undo", true))
-    {
-        LLStringUtil::format_map_t args;
-        if (in_force > 0 && in_force <= history.size())
-        {
-            args["[WHAT]"] = describeAction(history[in_force - 1]);
-            undo->setLabel(getString("MenuUndoWhat", args));
-        }
-        else
-        {
-            undo->setLabel(getString("MenuUndo"));
-        }
-    }
-    if (LLMenuItemGL* redo = mMenuBar->findChild<LLMenuItemGL>("redo", true))
-    {
-        if (in_force < history.size())
-        {
-            LLStringUtil::format_map_t args;
-            args["[WHAT]"] = describeAction(history[in_force]);
-            redo->setLabel(getString("MenuRedoWhat", args));
-        }
-        else
-        {
-            redo->setLabel(getString("MenuRedo"));
-        }
-    }
 }
 
 // A step chosen: put the documents back to just after it, however many undos
@@ -5535,6 +5266,7 @@ void ALFloaterXUIStudio::showPreview(S32 which)
             p.can_resize = true;
             ALXUIPreviewHost* preview = new ALXUIPreviewHost(this, which, p);
             host = preview;
+            preview->canvas()->setBackdrop(mBackdrop);
             pv.canvas = preview->canvas()->getHandle();
             root = buildRoot(which, *entry, preview->canvas(), node);
             if (root)
@@ -6486,47 +6218,19 @@ void ALFloaterXUIStudio::capturePreview()
         return;
     }
 
-    const S32 window_width = gViewerWindow->getWindowWidthRaw();
-    const S32 window_height = gViewerWindow->getWindowHeightRaw();
-    LLPointer<LLImageRaw> shot = new LLImageRaw;
-    if (!gViewerWindow->rawSnapshot(shot, window_width, window_height, /*keep_window_aspect=*/true,
-                                    /*is_texture=*/false, /*show_ui=*/true, /*show_hud=*/false))
+    LLPointer<LLImageRaw> capture;
+    switch (ALViewCapture::captureScreenRect(screen, capture))
     {
+    case ALViewCapture::Outcome::NoSnapshot:
         setStatus(getString("CaptureNoSnapshot"));
         return;
-    }
-
-    // The rect in the window, in the snapshot's own scale: a snapshot may
-    // come back at a different size than the window.
-    const F32 scale_x = (F32)shot->getWidth() / (F32)llmax(1, gViewerWindow->getWindowWidthScaled());
-    const F32 scale_y = (F32)shot->getHeight() / (F32)llmax(1, gViewerWindow->getWindowHeightScaled());
-    const S32 left = llclamp((S32)(screen.mLeft * scale_x), 0, shot->getWidth());
-    const S32 right = llclamp((S32)(screen.mRight * scale_x), left, shot->getWidth());
-    const S32 bottom = llclamp((S32)(screen.mBottom * scale_y), 0, shot->getHeight());
-    const S32 top = llclamp((S32)(screen.mTop * scale_y), bottom, shot->getHeight());
-    const S32 width = right - left;
-    const S32 height = top - bottom;
-    if (width <= 0 || height <= 0)
-    {
+    case ALViewCapture::Outcome::OffScreen:
         setStatus(getString("CaptureOffScreen"));
         return;
+    case ALViewCapture::Outcome::Captured:
+        break;
     }
 
-    // Row zero of the snapshot is the bottom of the window, which is
-    // where the rect's bottom is too.
-    const U8 components = shot->getComponents();
-    LLPointer<LLImageRaw> cropped = new LLImageRaw(width, height, components);
-    for (S32 row = 0; row < height; ++row)
-    {
-        memcpy(cropped->getData() + (size_t)row * width * components,
-               shot->getData() + ((size_t)(bottom + row) * shot->getWidth() + left) * components,
-               (size_t)width * components);
-    }
-
-    mCapture = cropped;
-
-    // The file and the format are one question: the extension the author
-    // types is what the image is written as.
     std::string name = mFile;
     for (char& c : name)
     {
@@ -6535,64 +6239,21 @@ void ALFloaterXUIStudio::capturePreview()
             c = '_';
         }
     }
-    name += "_" + mPreviews[PRIMARY].skin + "_" + mPreviews[PRIMARY].language + ".png";
-    LLFilePickerReplyThread::startPicker(boost::bind(&ALFloaterXUIStudio::writeCapture, this, _1),
-                                         LLFilePicker::FFSAVE_ALL, name);
-}
-
-void ALFloaterXUIStudio::writeCapture(const std::vector<std::string>& filenames)
-{
-    // Whichever way this goes the picture is not wanted afterwards: a
-    // picker cancelled is a capture nobody wants written.
-    const LLPointer<LLImageRaw> capture = mCapture;
-    mCapture = nullptr;
-    if (filenames.empty() || capture.isNull())
-    {
-        return;
-    }
-    std::string path = filenames.front();
-
-    std::string extension = gDirUtilp->getExtension(path);
-    LLStringUtil::toLower(extension);
-    if (extension.empty())
-    {
-        // A picture of a floater is a PNG unless the author says
-        // otherwise, and the file says what it is.
-        extension = "png";
-        path += ".png";
-    }
-    LLPointer<LLImageFormatted> image;
-    if (extension == "jpg" || extension == "jpeg")
-    {
-        image = new LLImageJPEG(gSavedSettings.getS32("SnapshotQuality"));
-    }
-    else if (extension == "bmp")
-    {
-        image = new LLImageBMP;
-    }
-    else if (extension == "tga")
-    {
-        image = new LLImageTGA;
-    }
-    else if (extension == "j2c" || extension == "jp2")
-    {
-        image = new LLImageJ2C;
-    }
-    else
-    {
-        image = new LLImagePNG;
-    }
-
-    LLStringUtil::format_map_t args;
-    args["[PATH]"] = path;
-    if (!image->encode(capture, 0.f) || !image->save(path))
-    {
-        setStatus(getString("CaptureWriteFailed", args));
-        return;
-    }
-    args["[WIDTH]"] = std::to_string(capture->getWidth());
-    args["[HEIGHT]"] = std::to_string(capture->getHeight());
-    setStatus(getString("CaptureWritten", args));
+    name += "_" + pv.skin + "_" + pv.language + ".png";
+    ALViewCapture::saveThroughPicker(capture, name,
+        [handle = getDerivedHandle<ALFloaterXUIStudio>()](const std::string& path, S32 width, S32 height, bool written)
+        {
+            ALFloaterXUIStudio* self = handle.get();
+            if (!self)
+            {
+                return;
+            }
+            LLStringUtil::format_map_t args;
+            args["[PATH]"] = path;
+            args["[WIDTH]"] = std::to_string(width);
+            args["[HEIGHT]"] = std::to_string(height);
+            self->setStatus(self->getString(written ? "CaptureWritten" : "CaptureWriteFailed", args));
+        });
 }
 
 // Every file in the catalog, checked a few per frame. What each of them said
@@ -8789,6 +8450,16 @@ void ALFloaterXUIStudio::alignSelection(const std::string& how)
 // because nothing went there. A translation written and a repair are
 // saved as they are made, so undoing one leaves its file dirty against
 // the disk, with Save the way to write the undo out.
+bool ALFloaterXUIStudio::undo()
+{
+    return undoEdit();
+}
+
+bool ALFloaterXUIStudio::redo()
+{
+    return redoEdit();
+}
+
 bool ALFloaterXUIStudio::undoEdit()
 {
     // What is about to be put back, asked before it is, since afterwards the
@@ -9571,21 +9242,6 @@ void ALFloaterXUIStudio::onFieldGutter(const std::string& name)
 // it has answered.
 void ALFloaterXUIStudio::openQuickly()
 {
-    if (LLView* up = mQuickPopover.get())
-    {
-        up->die();
-    }
-    mQuickPopover.markDead();
-
-    constexpr S32 WIDTH = 460;
-    constexpr S32 HEIGHT = 300;
-
-    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
-    qp.name = "quick_open";
-    qp.rect = LLRect(0, HEIGHT, WIDTH, 0);
-    qp.placeholder = getString("QuickOpenPlaceholder");
-    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
-
     std::vector<ALQuickOpen::Candidate> candidates;
     for (const ALXUICatalog::Entry& entry : mCatalog.entries())
     {
@@ -9599,26 +9255,8 @@ void ALFloaterXUIStudio::openQuickly()
         one.value = entry.name;
         candidates.push_back(std::move(one));
     }
-    quick->setCandidates(std::move(candidates));
-
-    // The popover takes the content, and takes it even when it cannot show.
-    ALPopover* popover = ALPopover::show(this, quick, getString("QuickOpenTitle"));
-    if (!popover)
-    {
-        return;
-    }
-    mQuickPopover = popover->getHandle();
-    quick->onChose([this](const std::string& file)
-    {
-        if (LLView* up = mQuickPopover.get())
-        {
-            up->die();
-        }
-        mQuickPopover.markDead();
-        goToFile(file);
-    });
-    popover->onClosed([this](bool) { mQuickPopover.markDead(); });
-    quick->takeFocus();
+    quickOpen(std::move(candidates), getString("QuickOpenPlaceholder"), getString("QuickOpenTitle"),
+              [this](const std::string& file) { goToFile(file); });
 }
 
 // The file, opened, with the canvas going there whether it is pinned or not:
@@ -10362,10 +10000,6 @@ void ALFloaterXUIStudio::openInEditor(const std::string& path, S32 line)
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
-void ALFloaterXUIStudio::setStatus(const std::string& text)
-{
-    mStatus->setText(text);
-}
 
 // Everything the menu bar does, by the name the item carries. The actions
 // are the methods the toolbar's own buttons call; the switches are the
@@ -10387,13 +10021,14 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
     else if (action == "save_repair")   { saveAndRepair(); }
     else if (action == "impact")        { reportTranslationImpact(); }
     else if (action == "revert")        { revertDocument(); }
-    else if (action == "undo")          { undoEdit(); }
-    else if (action == "redo")          { redoEdit(); }
+    else if (action == "undo")          { undo(); }
+    else if (action == "redo")          { redo(); }
     else if (action == "gallery")       { showGallery(); }
     else if (action == "library")       { LLFloaterReg::showInstance("xui_library"); }
     else if (action == "lint_all")      { startLintAll(); }
     else if (action == "census")        { startCensus(); }
     else if (action == "schema")        { onExportSchema(); }
+    else if (action == "colors")        { LLFloaterReg::showInstance("settings_color"); }
     else if (action == "repair_roots")  { onRepairRoots(); }
     else if (action == "repair_all")    { startRepairAll(); }
     else if (action == "remove_orphans") { onRemoveOrphans(); }
@@ -10407,12 +10042,16 @@ void ALFloaterXUIStudio::onMenuAction(const LLSD& param)
             showPreviews();
         }
     }
-    else if (action == "pane_navigator")    { togglePane("navigator_panel"); }
-    else if (action == "pane_inspectors")   { togglePane("inspector_panel"); }
-    else if (action == "pane_bottom")       { togglePane("bottom_panel"); }
-    else if (action == "out_navigator")     { togglePaneOut("navigator_panel"); }
-    else if (action == "out_inspectors")    { togglePaneOut("inspector_panel"); }
-    else if (action == "out_bottom")        { togglePaneOut("bottom_panel"); }
+    else if (action.starts_with("backdrop_"))
+    {
+        setCanvasBackdrop(ALCanvasView::backdropNamed(action.substr(9)));
+    }
+    else if (action == "pane_navigator")    { mFolds.toggle("navigator"); }
+    else if (action == "pane_inspectors")   { mFolds.toggle("inspectors"); }
+    else if (action == "pane_bottom")       { mFolds.toggle("bottom"); }
+    else if (action == "out_navigator")     { mFolds.toggleOut("navigator"); }
+    else if (action == "out_inspectors")    { mFolds.toggleOut("inspectors"); }
+    else if (action == "out_bottom")        { mFolds.toggleOut("bottom"); }
     else if (action == "float_preview")
     {
         // A preview changes home rather than moving, so what is on the one
@@ -10456,14 +10095,15 @@ bool ALFloaterXUIStudio::onMenuCheck(const LLSD& param)
     if (flag == "code_built")   { return mShowCodeBuilt; }
     if (flag == "real_floater") { return mRealFloater; }
     if (flag == "float_preview") { return mFloatPreview; }
+    if (flag.starts_with("backdrop_")) { return flag.substr(9) == ALCanvasView::backdropName(mBackdrop); }
     // The switch is on when the pane is showing, so the menu reads as a list
     // of what is on screen rather than a list of what is hidden.
-    if (flag == "pane_navigator")   { return !paneCollapsed("navigator_panel"); }
-    if (flag == "pane_inspectors")  { return !paneCollapsed("inspector_panel"); }
-    if (flag == "pane_bottom")      { return !paneCollapsed("bottom_panel"); }
-    if (flag == "out_navigator")    { return paneOut("navigator_panel"); }
-    if (flag == "out_inspectors")   { return paneOut("inspector_panel"); }
-    if (flag == "out_bottom")       { return paneOut("bottom_panel"); }
+    if (flag == "pane_navigator")   { return !mFolds.collapsed("navigator"); }
+    if (flag == "pane_inspectors")  { return !mFolds.collapsed("inspectors"); }
+    if (flag == "pane_bottom")      { return !mFolds.collapsed("bottom"); }
+    if (flag == "out_navigator")    { return mFolds.out("navigator"); }
+    if (flag == "out_inspectors")   { return mFolds.out("inspectors"); }
+    if (flag == "out_bottom")       { return mFolds.out("bottom"); }
     return false;
 }
 
@@ -10486,9 +10126,8 @@ void ALFloaterXUIStudio::onToggleSecondary()
     refreshCanvasHead();
 }
 
-void ALFloaterXUIStudio::saveState()
+void ALFloaterXUIStudio::writeState(LLSD& state) const
 {
-    LLSD state;
     state["file"] = mFile;
     state["skin"] = mSkin;
     state["language"] = mLanguage;
@@ -10501,9 +10140,11 @@ void ALFloaterXUIStudio::saveState()
     state["code_built"] = mShowCodeBuilt;
     state["snap"] = mSnap;
     state["rulers"] = mRulers;
+    state["palette_cells"] = mPaletteCells;
     state["real_floater"] = mRealFloater;
     state["grid"] = mGrid;
     state["zoom"] = mZoom;
+    state["backdrop"] = ALCanvasView::backdropName(mBackdrop);
     if (LLPanel* current = mInspectors ? mInspectors->getCurrentPanel() : nullptr)
     {
         state["tab"] = current->getName();
@@ -10516,60 +10157,10 @@ void ALFloaterXUIStudio::saveState()
     {
         state["bottom"] = current->getName();
     }
-    state["fold_navigator"] = paneCollapsed("navigator_panel");
-    state["fold_inspectors"] = paneCollapsed("inspector_panel");
-    state["fold_bottom"] = paneCollapsed("bottom_panel");
-    // How wide the side panes are and how tall the band is, as the drag
-    // left them; a folded pane remembers the size it unfolds to.
-    state["dim_navigator"] = paneDim("navigator_panel");
-    state["dim_inspectors"] = paneDim("inspector_panel");
-    state["dim_bottom"] = paneDim("bottom_panel");
-    // And the window itself, left, bottom, right, top.
-    {
-        const LLRect r = getRect();
-        state["rect"] = LLSD::emptyArray();
-        state["rect"].append(r.mLeft);
-        state["rect"].append(r.mBottom);
-        state["rect"].append(r.mRight);
-        state["rect"].append(r.mTop);
-        mShapeRect = r;
-        mShapeDims[0] = state["dim_navigator"].asInteger();
-        mShapeDims[1] = state["dim_inspectors"].asInteger();
-        mShapeDims[2] = state["dim_bottom"].asInteger();
-    }
-    // Which regions are in a window of their own, and where those windows
-    // are: a developer who put the inspectors on the other monitor finds
-    // them there next time.
-    LLSD out;
-    for (const auto& [region, title] : POP_PANES)
-    {
-        if (const ALDockPanel* pane = paneOf(region))
-        {
-            LLSD one;
-            one["out"] = pane->poppedOut();
-            const LLRect r = pane->floatingRect();
-            if (!r.isEmpty())
-            {
-                one["rect"] = LLSD::emptyArray();
-                one["rect"].append(r.mLeft);
-                one["rect"].append(r.mBottom);
-                one["rect"].append(r.mRight);
-                one["rect"].append(r.mTop);
-            }
-            out[region] = one;
-        }
-    }
-    state["panes_out"] = out;
-    gSavedSettings.setLLSD("ALXUIStudioState", state);
 }
 
-void ALFloaterXUIStudio::loadState()
+void ALFloaterXUIStudio::readState(const LLSD& state)
 {
-    const LLSD state = gSavedSettings.getLLSD("ALXUIStudioState");
-    if (!state.isMap())
-    {
-        return;
-    }
     mFile = state["file"].asString();
     if (state.has("skin"))
     {
@@ -10593,10 +10184,20 @@ void ALFloaterXUIStudio::loadState()
     }
     mSnap = state["snap"].asBoolean();
     mRulers = state["rulers"].asBoolean();
+    mPaletteCells = state["palette_cells"].asBoolean();
+    if (mPalette)
+    {
+        getChild<LLButton>("palette_cells")->setToggleState(mPaletteCells);
+        mPalette->setCellSize(mPaletteCells ? PALETTE_CELL_WIDTH : 0, mPaletteCells ? PALETTE_CELL_HEIGHT : 0);
+    }
     mRealFloater = state["real_floater"].asBoolean();
     if (state.has("grid"))
     {
         mGrid = llmax(1, state["grid"].asInteger());
+    }
+    if (state.has("backdrop"))
+    {
+        mBackdrop = ALCanvasView::backdropNamed(state["backdrop"].asString());
     }
     if (state.has("zoom"))
     {
@@ -10622,42 +10223,4 @@ void ALFloaterXUIStudio::loadState()
     {
         mBottom->selectTabByName(state["bottom"].asString());
     }
-    // The sizes before the folds: a fold keeps the size it will unfold to.
-    if (state.has("dim_navigator"))
-    {
-        setPaneDim("navigator_panel", state["dim_navigator"].asInteger());
-        setPaneDim("inspector_panel", state["dim_inspectors"].asInteger());
-        setPaneDim("bottom_panel", state["dim_bottom"].asInteger());
-    }
-    setPaneCollapsed("navigator_panel", state["fold_navigator"].asBoolean());
-    setPaneCollapsed("inspector_panel", state["fold_inspectors"].asBoolean());
-    setPaneCollapsed("bottom_panel", state["fold_bottom"].asBoolean());
-    if (state.has("rect") && state["rect"].size() == 4)
-    {
-        mRestoredRect = LLRect(state["rect"][0].asInteger(), state["rect"][3].asInteger(),
-                               state["rect"][2].asInteger(), state["rect"][1].asInteger());
-    }
-    if (state.has("panes_out"))
-    {
-        const LLSD& out = state["panes_out"];
-        for (const auto& [region, title] : POP_PANES)
-        {
-            ALDockPanel* pane = paneOf(region);
-            if (!pane || !out.has(region))
-            {
-                continue;
-            }
-            const LLSD& one = out[region];
-            if (one.has("rect") && one["rect"].size() == 4)
-            {
-                pane->setFloatingRect(LLRect(one["rect"][0].asInteger(), one["rect"][3].asInteger(),
-                                             one["rect"][2].asInteger(), one["rect"][1].asInteger()));
-            }
-            if (one["out"].asBoolean())
-            {
-                pane->popOut();
-            }
-        }
-    }
-    refreshPaneButtons();
 }

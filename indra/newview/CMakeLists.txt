@@ -162,6 +162,7 @@ if(AL_BUILD_VIEWER)
     alfloaterwebprofile.cpp
     alfloaterxuilibrary.cpp
     alfloaterxuistudio.cpp
+    alviewcapture.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
     almotionpredictor.cpp
@@ -948,6 +949,7 @@ if(AL_BUILD_VIEWER)
     alfloaterwebprofile.h
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
+    alviewcapture.h
     algradehistory.h
     allegacynotificationwellwindow.h
     almotionpredictor.h
