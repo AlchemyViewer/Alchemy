@@ -244,7 +244,7 @@ void ALLightboxDirectory::collectBoundKeys(LLView* view, std::set<std::string>& 
             }
             // A graph that edits settings not bound through control_name (an
             // LLSD point list cannot be) names them in XUI; enrol those too.
-            if (auto* graph = dynamic_cast<ALCurveEditorCtrl*>(ctrl))
+            if (ALCurveEditorCtrl* graph = ALViewType::as<ALCurveEditorCtrl>(ctrl))
             {
                 for (const std::string& name : graph->getEditedSettingNames())
                 {

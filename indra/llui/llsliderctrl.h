@@ -109,6 +109,8 @@ public:
     F32             getMaxValue() const override { return mSlider->getMaxValue(); }
 
     void            setLabel(const LLStringExplicit& label)     { if (mLabelBox) mLabelBox->setText(label); }
+    // The text box the label is shown in, or null for a slider built without one.
+    LLTextBox*      getLabelBox() const                         { return mLabelBox; }
     void            setLabelColor(const LLUIColor& c)            { mTextEnabledColor = c; }
     void            setDisabledLabelColor(const LLUIColor& c)    { mTextDisabledColor = c; }
 

@@ -35,6 +35,8 @@
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
+#include <fmt/format.h>
+
 #include <cmath>
 
 static LLDefaultChildRegistry::Register<ALSettingRow> r("setting_row");
@@ -186,21 +188,8 @@ void ALSettingRow::setFocus(bool focus)
 
 LLTextBox* ALSettingRow::getLabelBox() const
 {
-    // The slider made it from the label the row was given; it is the text
-    // box under the slider that says so.
-    if (mLabel.empty())
-    {
-        return nullptr;
-    }
-    for (LLView* child : *mSlider->getChildList())
-    {
-        LLTextBox* box = ALViewType::as<LLTextBox>(child);
-        if (box && box->getText() == mLabel)
-        {
-            return box;
-        }
-    }
-    return nullptr;
+    // The slider made it from the label the row was given.
+    return mLabel.empty() ? nullptr : mSlider->getLabelBox();
 }
 
 bool ALSettingRow::isModified()
@@ -270,7 +259,7 @@ void ALSettingRow::refreshReset()
     if (show)
     {
         LLStringUtil::format_map_t args;
-        args["[VALUE]"] = llformat("%.*f", llmax(mDecimalDigits, 0), getControlVariable()->getDefault().asReal());
+        args["[VALUE]"] = fmt::format("{:.{}f}", getControlVariable()->getDefault().asReal(), llmax(mDecimalDigits, 0));
         mReset->setToolTip(LLTrans::getString("SettingRowReset", args));
     }
     else if (mReset->hasFocus())
