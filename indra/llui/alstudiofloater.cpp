@@ -28,6 +28,7 @@
 
 #include "alpopover.h"
 #include "llcontrol.h"
+#include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
 #include "llmenugl.h"
 #include "lltextbox.h"
@@ -55,17 +56,38 @@ bool ALStudioFloater::handleMenuAccelerator(KEY key, MASK mask)
 
 bool ALStudioFloater::handleUndoKeys(KEY key, MASK mask)
 {
-    if (key == 'Z' && mask == MASK_CONTROL)
+    const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
+    const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) || (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+    if (!undo_key && !redo_key)
+    {
+        return false;
+    }
+
+    LLEditMenuHandler* text = LLEditMenuHandler::gEditMenuHandler;
+    LLView* text_view = text ? text->asView() : nullptr;
+    if (text_view && text_view->hasAncestor(this))
+    {
+        if (undo_key && text->canUndo())
+        {
+            text->undo();
+            return true;
+        }
+        if (redo_key && text->canRedo())
+        {
+            text->redo();
+            return true;
+        }
+    }
+
+    if (undo_key)
     {
         undo();
-        return true;
     }
-    if ((key == 'Y' && mask == MASK_CONTROL) || (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)))
+    else
     {
         redo();
-        return true;
     }
-    return false;
+    return true;
 }
 
 void ALStudioFloater::sayUndoRedo(const std::string& undo_what, const std::string& redo_what)
@@ -94,11 +116,27 @@ void ALStudioFloater::showHistory(ALHistoryList* list, std::vector<ALHistoryList
 }
 
 void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
-                                const std::string& title, std::function<void(const std::string&)> chose)
+                                const std::string& title, std::function<void(const std::string&)> chose,
+                                LLView* anchor, S32 width)
 {
+    // Asked for again while it is up -- the same key pressed twice -- it is
+    // what was typed that is wanted back, not a fresh field.
     if (LLView* up = mQuickPopover.get())
     {
-        up->die();
+        if (ALQuickOpen* quick = up->findChild<ALQuickOpen>("quick_open"))
+        {
+            quick->setCandidates(std::move(candidates));
+            quick->takeFocus();
+            return;
+        }
+        if (ALPopover* popover = ALViewType::as<ALPopover>(up))
+        {
+            popover->escape();
+        }
+        else
+        {
+            up->die();
+        }
     }
     mQuickPopover.markDead();
 
@@ -107,25 +145,28 @@ void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, 
 
     ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
     qp.name = "quick_open";
-    qp.rect = LLRect(0, HEIGHT, WIDTH, 0);
+    qp.rect = LLRect(0, HEIGHT, width > 0 ? width : WIDTH, 0);
     qp.placeholder = placeholder;
     ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
     quick->setCandidates(std::move(candidates));
 
     // The popover takes the content, and takes it even when it cannot show.
-    ALPopover* popover = ALPopover::show(this, quick, title);
+    ALPopover* popover = ALPopover::show(anchor ? anchor : this, quick, title);
     if (!popover)
     {
         return;
     }
     mQuickPopover = popover->getHandle();
-    quick->onChose([this, chose = std::move(chose)](const std::string& value)
+    LLHandle<ALPopover> held = popover->getDerivedHandle<ALPopover>();
+    quick->onChose([held, chose = std::move(chose)](const std::string& value)
     {
-        if (LLView* up = mQuickPopover.get())
+        // Settled first, so the keyboard comes back to the window before
+        // what was chosen is acted on -- a choice that puts the keyboard
+        // somewhere needs it back to give.
+        if (ALPopover* up = held.get())
         {
-            up->die();
+            up->settle();
         }
-        mQuickPopover.markDead();
         chose(value);
     });
     popover->onClosed([this](bool) { mQuickPopover.markDead(); });

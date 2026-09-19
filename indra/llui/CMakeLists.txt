@@ -429,6 +429,7 @@ if(AL_BUILD_TESTS)
     alfollowscontrol
     alcanvasview
     aldockpanel
+    alpanefolds
     alemptystate
     alxuifill
     alviewtype

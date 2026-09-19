@@ -34,6 +34,7 @@
 
 class ALDockPanel;
 class LLButton;
+class LLFloater;
 class LLLayoutPanel;
 class LLView;
 
@@ -49,6 +50,11 @@ class LLView;
 // into it keeps working; what stops working is every getChild that goes
 // through it from the window, so a window with such regions holds
 // pointers to what is in them.
+//
+// A region need not be a layout panel. Any view can be taken out and put
+// back and have that written down -- a tab page, say -- and only a layout
+// panel in a stack folds and has a size; asked to fold, another kind of
+// region does nothing.
 class ALPaneFolds
 {
 public:
@@ -56,7 +62,7 @@ public:
     {
         // What the state calls it: fold_<key>, dim_<key>, out_<key>.
         std::string mKey;
-        // The layout panel, and the toggle button that folds it, if any.
+        // The region, by name, and the toggle button that folds it, if any.
         std::string mPanel;
         std::string mButton;
         // What the window is called while the region is out; empty for a
@@ -86,6 +92,8 @@ public:
     bool out(std::string_view pane) const;
     void toggleOut(std::string_view pane);
     void dockAll();
+    // The window a region is out in, or null while it is home.
+    LLFloater* window(std::string_view pane) const;
 
     // The buttons pressed in while their regions show.
     void refreshButtons();
@@ -102,6 +110,8 @@ private:
     struct Bound
     {
         Pane mPane;
+        // The region, and the same as a layout panel where it is one.
+        LLView* mRegion = nullptr;
         LLLayoutPanel* mPanel = nullptr;
         LLButton* mButton = nullptr;
         ALDockPanel* mDock = nullptr;

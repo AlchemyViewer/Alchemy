@@ -27,6 +27,7 @@
 
 #include "aldockpanel.h"
 #include "llbutton.h"
+#include "llfloater.h"
 #include "lllayoutstack.h"
 
 void ALPaneFolds::bind(LLView* window, std::vector<Pane> panes)
@@ -37,12 +38,13 @@ void ALPaneFolds::bind(LLView* window, std::vector<Pane> panes)
     {
         Bound bound;
 
-        bound.mPanel = window->findChild<LLLayoutPanel>(pane.mPanel, true);
+        bound.mRegion = window->findChildView(pane.mPanel, true);
+        bound.mPanel = ALViewType::as<LLLayoutPanel>(bound.mRegion);
         bound.mButton = pane.mButton.empty() ? nullptr : window->findChild<LLButton>(pane.mButton, true);
         // Everything the region holds, moved into a pane of its own that
         // fills it: the tree gains a level and every name in it is where it
         // was.
-        bound.mDock = bound.mPanel && !pane.mTitle.empty() ? ALDockPanel::wrap(bound.mPanel, pane.mTitle) : nullptr;
+        bound.mDock = bound.mRegion && !pane.mTitle.empty() ? ALDockPanel::wrap(bound.mRegion, pane.mTitle) : nullptr;
         bound.mPane = std::move(pane);
 
         if (bound.mButton)
@@ -168,6 +170,13 @@ void ALPaneFolds::toggleOut(std::string_view pane)
     mChanged();
 }
 
+LLFloater* ALPaneFolds::window(std::string_view pane) const
+{
+    const Bound* bound = find(pane);
+
+    return bound && bound->mDock && bound->mDock->poppedOut() ? bound->mDock->getParentByType<LLFloater>() : nullptr;
+}
+
 void ALPaneFolds::dockAll()
 {
     for (const Bound& bound : mPanes)
@@ -199,8 +208,11 @@ void ALPaneFolds::save(LLSD& state) const
 {
     for (const Bound& bound : mPanes)
     {
-        state["fold_" + bound.mPane.mKey] = collapsed(bound.mPane.mKey);
-        state["dim_" + bound.mPane.mKey] = dim(bound.mPane.mKey);
+        if (bound.mPanel)
+        {
+            state["fold_" + bound.mPane.mKey] = collapsed(bound.mPane.mKey);
+            state["dim_" + bound.mPane.mKey] = dim(bound.mPane.mKey);
+        }
 
         if (!bound.mDock)
         {

@@ -86,7 +86,10 @@ protected:
     // first in handleKeyHere, before its own keys.
     bool handleMenuAccelerator(KEY key, MASK mask);
     // Control and Z, Y, and shift and Z, which the menu bar may not bind:
-    // what a subclass asks next.
+    // what a subclass asks next. A text control in this window with an
+    // edit history of its own keeps them for it -- with hasAccelerators
+    // they arrive before the Edit menu's own undo, which is what it would
+    // have got from them -- and only a key it declines reaches undo().
     bool handleUndoKeys(KEY key, MASK mask);
 
     // "Undo" on its own is a promise about nothing in particular. The
@@ -102,8 +105,12 @@ protected:
 
     // Open quickly: the candidates against a few letters, over the
     // window, gone as soon as one is chosen or the person looks away.
+    // Under `anchor` where one is given, else over the window; as wide as
+    // `width` where one is given. Asked again while it is up, it keeps
+    // what was typed and takes the keyboard back.
     void quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
-                   const std::string& title, std::function<void(const std::string&)> chose);
+                   const std::string& title, std::function<void(const std::string&)> chose,
+                   LLView* anchor = nullptr, S32 width = 0);
 
     // The regions that fold, which the subclass binds.
     ALPaneFolds mFolds;
