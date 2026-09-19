@@ -111,7 +111,7 @@ public:
     // all, and move to the other layout, which is kept built: switching
     // back and forth costs a frame and no rebuilding.
     void setCellSize(S32 width, S32 height);
-    bool cells() const { return mCellWidth > 0; }
+    bool cells() const { return mCellWidth > 0 && mCellHeight > 0; }
 
     void filter(const std::string& text);
     const std::string& filterText() const { return mFilter; }

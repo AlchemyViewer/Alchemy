@@ -167,9 +167,12 @@ public:
             return LLPanel::handleMouseDown(x, y, mask);
         }
         // The keyboard comes with the click, so the arrows work from here;
-        // the press is held, so one that goes on to move is a drag.
+        // the press is held, so one that goes on to move is a drag -- of
+        // what was pressed, which a control or shift click leaves short of
+        // being the chosen one.
         mList.setFocus(true);
         mList.cellPressed(index, mask);
+        mPressed = mList.mSpecimens[index].value;
         mPressX = x;
         mPressY = y;
         gFocusMgr.setMouseCapture(this);
@@ -193,7 +196,7 @@ public:
             if (dragged(x, y, mPressX, mPressY))
             {
                 gFocusMgr.setMouseCapture(nullptr);
-                mList.startDrag(mList.mChosen);
+                mList.startDrag(mPressed);
             }
             return true;
         }
@@ -225,6 +228,7 @@ public:
 private:
     ALSpecimenList& mList;
     S32             mHovered = -1;
+    std::string     mPressed;
     S32             mPressX = 0;
     S32             mPressY = 0;
 };
@@ -475,12 +479,21 @@ void ALSpecimenList::buildRows()
         if (!specimen.view && !specimen.image.empty())
         {
             // A picture is shown beside the label the way a view would be,
-            // fitted to the row.
+            // fitted to the row: across the rest of it where it is chrome,
+            // else at the row's height and twice as wide. The row's own
+            // rather than the specimen's view, which is the caller's to
+            // give: a cell draws the picture itself, and one that has been
+            // a row draws it the same way as one that has not.
             LLIconCtrl::Params ip;
             ip.name = "picture";
             ip.image = LLUI::getUIImage(specimen.image);
-            ip.rect = LLRect(0, mRowHeight - 4, mRowHeight * 2, 4);
-            specimen.view = LLUICtrlFactory::create<LLIconCtrl>(ip);
+            const S32 tall = mRowHeight - 8;
+            const S32 left = INSET + mLabelWidth + 4;
+            const S32 right = specimen.stretch ? getRect().getWidth() - INSET : left + tall * 2;
+            ip.rect = LLRect(left, 4 + tall, right, 4);
+            ip.follows.flags = specimen.stretch ? (FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT)
+                                                : (FOLLOWS_LEFT | FOLLOWS_TOP);
+            row->addChild(LLUICtrlFactory::create<LLIconCtrl>(ip));
         }
         mRowsPane->addChild(row);
         mRows.push_back(row);

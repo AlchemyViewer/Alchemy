@@ -370,4 +370,85 @@ namespace tut
         delete list;
     }
 
+    // A drag from a cell carries the cell that was pressed, which a control
+    // click leaves short of being the chosen one.
+    template<> template<>
+    void alspecimenlist_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList::Params p(LLUICtrlFactory::getDefaultParams<ALSpecimenList>());
+        p.rect = LLRect(0, 300, 330, 0);
+        p.cell_width = 100;
+        p.cell_height = 60;
+        ALSpecimenList* list = LLUICtrlFactory::create<ALSpecimenList>(p);
+        std::vector<ALSpecimenList::Specimen> pictures;
+        for (const char* name : { "A", "B", "C" })
+        {
+            ALSpecimenList::Specimen one;
+            one.group = "Letters";
+            one.label = name;
+            one.value = name;
+            one.image = name;
+            pictures.push_back(one);
+        }
+        list->setSpecimens(pictures);
+        std::vector<std::string> carried;
+        list->setDragStarter([&carried](const std::string& value)
+        {
+            carried.push_back(value);
+            return true;
+        });
+
+        // The cells sit across under their heading: B is the second, at
+        // the tiles' own height less the heading and half a cell.
+        LLView* tiles = list->findChild<LLView>("tiles", true);
+        const S32 x = 150;
+        const S32 y = tiles->getRect().getHeight() - 20 - 30;
+        list->cellPressed(0, MASK_NONE);
+        tiles->handleMouseDown(x, y, MASK_CONTROL);
+        ensure_equals("a control click leaves the chosen one", list->chosen(), std::string("A"));
+        ensure_equals("and takes the pressed one too", list->selection().size(), size_t(2));
+        tiles->handleHover(x + 20, y, MASK_CONTROL);
+        ensure_equals("moved, it carries the pressed one", carried.size(), 1u);
+        ensure_equals("B, not the chosen A", carried.front(), std::string("B"));
+        tiles->handleMouseUp(x + 20, y, MASK_CONTROL);
+        delete list;
+    }
+
+    // A picture beside a row's label is the row's own, so a list that has
+    // been rows draws its cells the way one that has not does: from the
+    // picture, with the specimen's view left to the caller. And a cell size
+    // with either side missing is no cell size.
+    template<> template<>
+    void alspecimenlist_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList* list = make();
+        std::vector<ALSpecimenList::Specimen> pictures;
+        ALSpecimenList::Specimen one;
+        one.group = "Icons";
+        one.label = "Icon_Close";
+        one.value = "Icon_Close";
+        one.image = "Icon_Close";
+        pictures.push_back(one);
+        list->setSpecimens(pictures);
+
+        LLView* row = list->findChild<LLView>("row_Icon_Close", true);
+        ensure("the row shows the picture", row != nullptr && row->findChild<LLView>("picture", true) != nullptr);
+
+        list->setCellSize(100, 0);
+        ensure("a width alone is not a cell size", !list->cells());
+        list->setCellSize(100, 60);
+        ensure("both sides are", list->cells());
+        LLView* tiles = list->findChild<LLView>("tiles", true);
+        ensure("the picture stayed with the row", tiles->findChild<LLView>("picture", true) == nullptr
+               && row->findChild<LLView>("picture", true) != nullptr);
+        delete list;
+    }
 }
