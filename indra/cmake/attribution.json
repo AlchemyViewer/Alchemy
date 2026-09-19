@@ -19,6 +19,7 @@
     "libcap": "built for libsystemd; nothing links it",
     "libmount": "built for libsystemd; nothing links it",
     "libxcrypt": "built for libsystemd; nothing links it",
+    "libuuid": "an empty port; the system library is used",
     "lz4": "built for libsystemd; nothing links it"
   },
 
