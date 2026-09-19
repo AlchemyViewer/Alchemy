@@ -53,11 +53,10 @@ namespace
     constexpr S32 ROW = 22;
     constexpr S32 MIN_WIDTH = 360;
     constexpr S32 MIN_HEIGHT = 340;
-
-    // Where the popover opens, and where it opens next time: it is
-    // resizable, and a size someone chose once is the size they wanted.
-    S32 sWidth = 470;
-    S32 sHeight = 460;
+    // Where the popover opens the first time; it is resizable, and the
+    // popover remembers where it was left after that.
+    constexpr S32 WIDTH = 470;
+    constexpr S32 HEIGHT = 460;
 
     // Four numbers, which is the other thing a file writes for a colour.
     bool literalColor(const std::string& text, LLColor4& out)
@@ -377,14 +376,6 @@ namespace
             gl_rect_2d(swatch, edge.get(), false);
         }
 
-        // The size it is left at is the size it opens at next time.
-        void onClose(bool app_quitting) override
-        {
-            sWidth = getRect().getWidth();
-            sHeight = getRect().getHeight();
-            ALPopover::onClose(app_quitting);
-        }
-
     private:
         void chose(const std::string& value)
         {
@@ -547,7 +538,7 @@ void ALColorField::openPopover()
 {
     closePopover();
 
-    LLFloater::Params p(ALPopover::paramsFor(sWidth, sHeight, mText, /*resizable=*/true));
+    LLFloater::Params p(ALPopover::paramsRemembered("color_field", WIDTH, HEIGHT, mText));
     p.min_width = MIN_WIDTH;
     p.min_height = MIN_HEIGHT;
     ALColorPopover* popover = new ALColorPopover(p, mText, mResolver, mChoices ? mChoices() : std::vector<Choice>());

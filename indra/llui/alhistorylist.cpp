@@ -185,6 +185,18 @@ void ALHistoryList::onRowChosen()
 // Choosing a step is asking for the document to be as it was just after that
 // step: the count in force is one more than its index. Choosing the one that
 // is already the present asks for nothing.
+bool ALHistoryList::handleKeyHere(KEY key, MASK mask)
+{
+    // Return is the double click by keyboard. Reached after the list has
+    // declined it, which a scroll list does.
+    if (key == KEY_RETURN && mask == MASK_NONE && mList && !mSteps.empty())
+    {
+        goToSelected();
+        return true;
+    }
+    return LLPanel::handleKeyHere(key, mask);
+}
+
 void ALHistoryList::goToSelected()
 {
     const LLScrollListItem* item = mList->getFirstSelected();

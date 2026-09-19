@@ -26,6 +26,7 @@
 
 #include "aldockpanel.h"
 
+#include "llfocusmgr.h"
 #include "lllayoutstack.h"
 #include "lluictrlfactory.h"
 
@@ -139,7 +140,8 @@ void ALDockPanel::popOut()
     // band with the title and the window's own buttons.
     const S32 header = LLFloater::getDefaultParams().header_height;
     LLRect where = mFloatingRect;
-    if (where.isEmpty())
+    const bool remembered = !where.isEmpty();
+    if (!remembered)
     {
         where = calcScreenRect();
         where.mTop += header;
@@ -180,7 +182,25 @@ void ALDockPanel::popOut()
         }
     }
 
+    // The keyboard is not taken along, and the window it came from forgets
+    // it was there: a focused control moving to another window, with this
+    // one still remembering it as where its focus was, is how a keystroke
+    // ends up somewhere nobody is looking.
+    if (gFocusMgr.childHasKeyboardFocus(this))
+    {
+        gFocusMgr.setKeyboardFocus(nullptr);
+    }
+    if (was_in)
+    {
+        gFocusMgr.clearLastFocusForGroup(was_in);
+    }
+
     floater->openFloater();
+    // Where it was remembered may be off a screen that has since gone.
+    if (remembered && gFloaterView && floater->getParent() == gFloaterView)
+    {
+        gFloaterView->adjustToFitScreen(floater, false);
+    }
     floater->setFocus(true);
 }
 
