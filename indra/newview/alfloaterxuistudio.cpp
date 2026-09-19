@@ -1323,7 +1323,18 @@ public:
         mCanvas = new ALXUICanvas(tool, which, cp);
         mCanvas->initFromParams(cp);
         mCanvas->setSizable(true);
-        mCanvas->onZoomChange([tool, canvas = mCanvas](F32 zoom) { tool->zoomChanged(zoom, canvas); });
+        // By handle: a host that has been detached -- the gallery, a
+        // secondary preview -- is a window of its own and can outlive the
+        // studio. Let go of on detach, so a detached canvas's wheel zooms
+        // itself and not the studio.
+        mZoomConnection = mCanvas->onZoomChange(
+            [held = tool->getDerivedHandle<ALFloaterXUIStudio>(), canvas = mCanvas](F32 zoom)
+            {
+                if (ALFloaterXUIStudio* studio = held.get())
+                {
+                    studio->zoomChanged(zoom, canvas);
+                }
+            });
         addChild(mCanvas);
     }
 
@@ -1340,6 +1351,7 @@ public:
     void detach()
     {
         mTool = nullptr;
+        mZoomConnection.disconnect();
         mCanvas->detach();
     }
 
@@ -1360,6 +1372,7 @@ private:
     ALFloaterXUIStudio* mTool;
     ALXUICanvas*        mCanvas = nullptr;
     S32                 mWhich;
+    boost::signals2::scoped_connection mZoomConnection;
 };
 
 namespace
