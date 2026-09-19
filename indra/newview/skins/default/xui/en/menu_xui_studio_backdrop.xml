@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<toggleable_menu
+ layout="topleft"
+ name="menu_xui_studio_backdrop">
+    <menu_item_check
+     label="Nothing behind the preview"
+     layout="topleft"
+     name="backdrop_none">
+        <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="backdrop_none" />
+        <menu_item_check.on_click function="XUIStudio.Menu" parameter="backdrop_none" />
+    </menu_item_check>
+    <menu_item_check
+     label="Pattern"
+     layout="topleft"
+     name="backdrop_pattern"
+     tool_tip="Bands of colour, discs and text, for what a translucent window shows of what is under it">
+        <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="backdrop_pattern" />
+        <menu_item_check.on_click function="XUIStudio.Menu" parameter="backdrop_pattern" />
+    </menu_item_check>
+    <menu_item_check
+     label="Checkerboard"
+     layout="topleft"
+     name="backdrop_checker"
+     tool_tip="Shows what is transparent">
+        <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="backdrop_checker" />
+        <menu_item_check.on_click function="XUIStudio.Menu" parameter="backdrop_checker" />
+    </menu_item_check>
+    <menu_item_check
+     label="Window colour"
+     layout="topleft"
+     name="backdrop_window"
+     tool_tip="The colour a window has, as a panel inside one sees it">
+        <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="backdrop_window" />
+        <menu_item_check.on_click function="XUIStudio.Menu" parameter="backdrop_window" />
+    </menu_item_check>
+    <menu_item_check
+     label="Light grey"
+     layout="topleft"
+     name="backdrop_light"
+     tool_tip="A light ground, for dark chrome to stand against">
+        <menu_item_check.on_check function="XUIStudio.MenuCheck" parameter="backdrop_light" />
+        <menu_item_check.on_click function="XUIStudio.Menu" parameter="backdrop_light" />
+    </menu_item_check>
+</toggleable_menu>

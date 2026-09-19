@@ -29,9 +29,28 @@
 #include "llpanel.h"
 #include "lluictrlfactory.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
+namespace
+{
+// The size each kind of popover was last left at, for the session.
+boost::unordered_flat_map<std::string, std::pair<S32, S32>>& rememberedSizes()
+{
+    static boost::unordered_flat_map<std::string, std::pair<S32, S32>> sizes;
+    return sizes;
+}
+} // namespace
+
 ALPopover::ALPopover(const LLFloater::Params& p)
 :   LLFloater(LLSD(), p)
 {
+    // What paramsRemembered wrote into the name, which is the one place a
+    // params block has to carry it.
+    static const std::string prefix = "popover:";
+    if (p.name().compare(0, prefix.size(), prefix) == 0)
+    {
+        mSizeKind = p.name().substr(prefix.size());
+    }
 }
 
 // static
@@ -67,6 +86,23 @@ LLFloater::Params ALPopover::paramsFor(S32 width, S32 height, const std::string&
     return p;
 }
 
+// static
+LLFloater::Params ALPopover::paramsRemembered(const std::string& kind, S32 width, S32 height,
+                                              const std::string& title, bool resizable)
+{
+    const auto found = rememberedSizes().find(kind);
+    if (found != rememberedSizes().end())
+    {
+        width = found->second.first;
+        height = found->second.second;
+    }
+    LLFloater::Params p = paramsFor(width, height, title, resizable);
+    // Carried on the name, since a params block has nowhere else to say it;
+    // the constructor reads it back.
+    p.name = "popover:" + kind;
+    return p;
+}
+
 // Under the control, its left edge with the control's, and flipped above it
 // where under would put it off the bottom: a panel a person cannot see the
 // whole of is a panel that has not opened. A side off the screen is put
@@ -76,6 +112,18 @@ void ALPopover::openBeside(const LLView* anchor)
 {
     if (anchor)
     {
+        // Where keys go: the window the anchor is in, or the anchor itself
+        // where it is one.
+        const LLFloater* home = ALViewType::as<LLFloater>(anchor);
+        if (!home)
+        {
+            home = anchor->getParentByType<LLFloater>();
+        }
+        if (home && home != this)
+        {
+            mHome = home->getHandle();
+        }
+
         const LLRect screen = anchor->calcScreenRect();
         LLRect where = getRect();
         where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
@@ -114,6 +162,10 @@ void ALPopover::onClose(bool app_quitting)
         mSaidSo = true;
         mClosed(mEscaped);
     }
+    if (!mSizeKind.empty())
+    {
+        rememberedSizes()[mSizeKind] = { getRect().getWidth(), getRect().getHeight() };
+    }
     LLFloater::onClose(app_quitting);
 }
 
@@ -137,5 +189,13 @@ bool ALPopover::handleKeyHere(KEY key, MASK mask)
         settle();
         return true;
     }
-    return LLFloater::handleKeyHere(key, mask);
+    if (LLFloater::handleKeyHere(key, mask))
+    {
+        return true;
+    }
+    if (LLFloater* home = mHome.get())
+    {
+        return home->handleKeyHere(key, mask);
+    }
+    return false;
 }

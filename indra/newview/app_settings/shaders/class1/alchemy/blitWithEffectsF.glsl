@@ -61,6 +61,8 @@ uniform float     uRefWipePos;      // Seam position, 0..1 across the frame.
 vec3 clampHDRRange(vec3 color);
 
 // From postEffectUtilsF.glsl (auto-linked via mFeatures.hasPostEffects).
+vec2  applyLensDistortion(vec2 uv);
+float lensDistortMask(vec2 duv);
 vec3 applyVignette(vec3 color, vec2 uv);
 vec3 applyCVDCompensation(vec3 color);
 vec3 applyFilmGrain(vec3 color, vec2 fragCoord);
@@ -79,25 +81,43 @@ vec3 applyPreview(vec3 color);
 // treatment, which is what a still is for.
 //
 // uRefWipeMode is zero whenever there is no still, so the sampler is never
-// read unless one has been grabbed.
+// read unless one has been grabbed -- GLSL's ?: evaluates only the selected
+// branch, so the ternary below preserves that.
+//
+// Lens distortion is threaded through here rather than applied to
+// vary_fragcoord in main(), and the order within this function matters:
+// remap first (which pane, which side of the seam), distort second. That way
+// the still and the live frame carry an identical warp, so a wipe compares
+// two grades of the same lens rather than a lens against a flat plate. The
+// seam test itself keeps the *raw* uv, which is what holds the divider
+// straight while the image bends around it.
 vec4 sampleWithReference(vec2 uv)
 {
+    vec2 pane_uv    = uv;
+    bool from_still = false;
+
     if (uRefWipeMode == 1)
     {
         // Wipe: the still to the left of the seam, live to the right.
-        return (uv.x < uRefWipePos) ? texture(uReferenceStill, uv)
-                                    : texture(diffuseRect, uv);
+        from_still = (uv.x < uRefWipePos);
     }
-
-    if (uRefWipeMode == 2)
+    else if (uRefWipeMode == 2)
     {
         // Side by side: both squeezed two to one, so the same region of the
         // image appears twice rather than two different halves of it.
-        return (uv.x < 0.5) ? texture(uReferenceStill, vec2(uv.x * 2.0, uv.y))
-                            : texture(diffuseRect,     vec2((uv.x - 0.5) * 2.0, uv.y));
+        from_still = (uv.x < 0.5);
+        pane_uv.x  = from_still ? uv.x * 2.0 : (uv.x - 0.5) * 2.0;
     }
 
-    return texture(diffuseRect, uv);
+    vec2 duv = applyLensDistortion(pane_uv);
+    vec4 s   = from_still ? texture(uReferenceStill, duv)
+                          : texture(diffuseRect, duv);
+
+    // Resolve out-of-frame samples to black rather than smearing the edge
+    // texel into the corners. rgb only: alpha carries no meaning at the
+    // backbuffer, and masking it would be a silent behaviour change.
+    s.rgb *= lensDistortMask(duv);
+    return s;
 }
 
 // A hairline at the seam, so the eye knows which side it is looking at. Drawn

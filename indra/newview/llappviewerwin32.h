@@ -63,7 +63,6 @@ protected:
     bool restoreErrorTrap() override;
 
     bool sendURLToOtherInstance(const std::string& url) override;
-    void setOSHibernationMode(eHibernationMode mode) override;
 
     std::string generateSerialNumber();
 

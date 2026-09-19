@@ -161,6 +161,7 @@
     <tag name="jump_bar" note="The path to where you are, each step of it offering the steps it could have been." />
     <tag name="quick_open" note="A few letters and a ranked list, for reaching a thing by name rather than by looking for it." />
     <tag name="scope_bar" note="A query written as a sentence: fixed words, dropdowns, and one field for what is looked for." />
+    <tag name="setting_row" note="One setting on one line: its name, a slider, its value, and a button back to its default that shows only when there is something to go back from." />
     <tag name="specimen_list" note="A list whose rows carry the things themselves rather than words about them." />
     <tag name="tab_strip" note="The documents a window holds, one tab each over the one it shows, with a dot for unsaved work and a way to close each." />
 

@@ -26,6 +26,8 @@
 
 #include "alxuidocuments.h"
 
+#include "llframetimer.h"
+
 #include <algorithm>
 
 ALXUIDocuments::ALXUIDocuments() = default;
@@ -113,10 +115,9 @@ bool ALXUIDocuments::close(std::string_view path)
         }
         return false;
     };
-    if (names(mDone) || names(mUndone))
+    if (names(mActions.undone()) || names(mActions.redone()))
     {
-        mDone.clear();
-        mUndone.clear();
+        mActions.clear();
     }
     if (was_active)
     {
@@ -138,8 +139,7 @@ void ALXUIDocuments::closeAll()
     mOpen.clear();
     mPaths.clear();
     mSeen.clear();
-    mDone.clear();
-    mUndone.clear();
+    mActions.clear();
     mActivePath.clear();
     mActivePtr = nullptr;
 }
@@ -222,39 +222,63 @@ void ALXUIDocuments::settle()
     // Everything taken since this last looked is one thing, because looking
     // is what says a thing has finished: a caller settles after each edit,
     // and an Action is a caller saying not to settle in the middle of one.
-    mDone.push_back(std::move(taken));
-    mUndone.clear();
+    // A one-step edit to a field joins a run of edits to the same field,
+    // within the window: the steps add up, and what the run did is what
+    // its last step did.
+    taken.sameField = taken.steps.size() == 1 && taken.steps.front().second == 1 && taken.what.oneField;
+    const std::string key = mCoalesceWindow > 0.0 && taken.sameField ? runKey(taken) : std::string();
+    mActions.note(std::move(taken), key, LLFrameTimer::getTotalSeconds(), mCoalesceWindow,
+        [](Taken& last, Taken&& next)
+        {
+            last.steps.front().second += next.steps.front().second;
+            last.what = std::move(next.what);
+        });
+}
+
+// static
+std::string ALXUIDocuments::runKey(const Taken& taken)
+{
+    std::string key = taken.steps.front().first;
+    for (const std::string& step : taken.what.path)
+    {
+        key += '\n';
+        key += step;
+    }
+    key += '\n';
+    key += taken.what.field;
+    return key;
 }
 
 bool ALXUIDocuments::undo()
 {
     settle();
-    if (mDone.empty())
+    std::optional<Taken> taken = mActions.takeUndo();
+    if (!taken)
     {
         return false;
     }
-    const Taken taken = mDone.back();
-    mDone.pop_back();
 
     mLastChange = ALXUIEdit::Change();
     mLastPath.clear();
     mLastDocument.clear();
     // Backwards, since the last step taken is the first put back.
-    for (auto it = taken.steps.rbegin(); it != taken.steps.rend(); ++it)
+    for (auto it = taken->steps.rbegin(); it != taken->steps.rend(); ++it)
     {
         ALXUIEdit* held = find(it->first);
         for (S32 i = 0; held && i < it->second; ++i)
         {
             held->undo();
         }
-        if (held && taken.steps.size() == 1 && it->second == 1)
+        // A run of one field is that field: what its first step put back
+        // is where the whole run leaves the element.
+        if (held && taken->steps.size() == 1 && (it->second == 1 || taken->sameField))
         {
             mLastChange = held->lastChange();
             mLastPath = held->lastPath();
             mLastDocument = it->first;
         }
     }
-    mUndone.push_back(taken);
+    mActions.pushRedo(std::move(*taken));
     remember();
     return true;
 }
@@ -262,44 +286,46 @@ bool ALXUIDocuments::undo()
 bool ALXUIDocuments::redo()
 {
     settle();
-    if (mUndone.empty())
+    std::optional<Taken> taken = mActions.takeRedo();
+    if (!taken)
     {
         return false;
     }
-    const Taken taken = mUndone.back();
-    mUndone.pop_back();
 
     mLastChange = ALXUIEdit::Change();
     mLastPath.clear();
     mLastDocument.clear();
-    for (const auto& [path, count] : taken.steps)
+    for (const auto& [path, count] : taken->steps)
     {
         ALXUIEdit* held = find(path);
         for (S32 i = 0; held && i < count; ++i)
         {
             held->redo();
         }
-        if (held && taken.steps.size() == 1 && count == 1)
+        if (held && taken->steps.size() == 1 && (count == 1 || taken->sameField))
         {
             mLastChange = held->lastChange();
             mLastPath = held->lastPath();
             mLastDocument = path;
         }
     }
-    mDone.push_back(taken);
+    mActions.pushUndo(std::move(*taken));
     remember();
     return true;
 }
 
 std::vector<ALXUIDocuments::Entry> ALXUIDocuments::history() const
 {
+    const std::vector<Taken>& done = mActions.undone();
+    const std::vector<Taken>& undone = mActions.redone();
     std::vector<Entry> all;
-    all.reserve(mDone.size() + mUndone.size());
+    all.reserve(done.size() + undone.size());
 
     const auto describe = [&all](const Taken& taken)
     {
         Entry entry;
         entry.change = taken.what;
+        entry.sameField = taken.sameField;
         entry.documents = (S32)taken.steps.size();
         for (const auto& [path, count] : taken.steps)
         {
@@ -312,13 +338,13 @@ std::vector<ALXUIDocuments::Entry> ALXUIDocuments::history() const
         all.push_back(std::move(entry));
     };
 
-    for (const Taken& taken : mDone)
+    for (const Taken& taken : done)
     {
         describe(taken);
     }
     // The most recently put back is the one nearest the present, so it comes
     // first of those: read forwards, the list is one timeline.
-    for (auto it = mUndone.rbegin(); it != mUndone.rend(); ++it)
+    for (auto it = undone.rbegin(); it != undone.rend(); ++it)
     {
         describe(*it);
     }
@@ -354,8 +380,7 @@ S32 ALXUIDocuments::rereadClean()
     }
     if (had_history)
     {
-        mDone.clear();
-        mUndone.clear();
+        mActions.clear();
     }
     remember();
     return read;

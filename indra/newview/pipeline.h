@@ -96,6 +96,11 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
+    void generateLensDirt();
+    /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
+    /// settings. Runs from colorCorrect when mToneCurveLutDirty is set: once
+    /// per change, never per frame.
+    void bakeToneCurveLut();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -140,15 +145,25 @@ public:
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
+    void generateLensFlareState(LLRenderTarget* src);
+    void clearLensFlareState();
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
+    // Whether generateBloomHDR will run this frame: the pyramid is deep
+    // enough and every shader it needs built. renderDoF asks before it
+    // borrows bloomMip[0], because a blur left in there would be composited
+    // as bloom if the extract never overwrote it.
+    bool bloomHDRReady() const;
     void generateBloomHDR(LLRenderTarget* src);
     void compositeBloomHDR(LLRenderTarget* scene);
     void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
     void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void renderDoF(LLRenderTarget* src, LLRenderTarget* dst);
+    // Operates in place on mRT->screen: the combine writes colour back under a
+    // mask that leaves the prim-glow alpha untouched, so callers neither pass
+    // buffers nor swap afterwards.
+    void renderDoF();
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
@@ -823,6 +838,13 @@ public:
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
 
+        // Depth of field owns no scratch. It runs pre-tonemap on linear HDR,
+        // so it cannot use postPingMap (GL_RGB10_A2 under HDR), and it does
+        // not widen deferredLight to serve one late pass. It borrows two
+        // full-frame targets that are idle for exactly the stretch of
+        // renderFinalize it runs in: mWaterDis for the sharp copy plus CoF,
+        // bloomMip[0] for the blur. renderDoF says why each is free.
+
         //sun shadow map
         LLRenderTarget          shadow[4];
 
@@ -830,6 +852,15 @@ public:
         // mBloomMip[0] is full-res extract; subsequent levels are halved.
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
+
+        // Cross-screen filter state for this frame. The three streak buffers
+        // own no memory: they are quadrants of mWaterDis, which is idle from
+        // the water pass to the next frame -- see generateBloomHDR. What
+        // colorCorrect needs to know is whether streaks were drawn this frame
+        // and at what size, to find the accumulator's quadrant.
+        bool                        crossFilterReady = false;
+        U32                         crossFilterWidth = 0;
+        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -858,6 +889,12 @@ public:
     LLRenderTarget          mLuminanceMap;
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
+
+    // lens flare sun state, 2x1, swapped each frame: [0] is this frame's, [1]
+    // last frame's. Layout in lensFlareStateF.glsl.
+    LLRenderTarget          mLensFlareState[2];
+    bool                    mLensFlareStateValid = false;
+    bool                    mLensFlareSunUp = true;    // which body the history describes
 
     // FXAA helper target
     LLRenderTarget          mFXAAMap;
@@ -985,6 +1022,73 @@ public:
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
 
+    // Lens dirt plate, generated rather than loaded -- see generateLensDirt.
+    // Nothing is allocated until the effect is switched on, and the memory goes
+    // back when it is switched off, so an incomplete target is also the signal
+    // to force the strength uniform to 0 and leave the sampler unread.
+    LLRenderTarget      mLensDirtMap;
+
+    // What the current plate was generated from. Comparing the whole set each
+    // frame is what triggers a rebuild, which covers parameter edits and window
+    // resizes through one test and needs no commit-signal plumbing. It also
+    // records a *failed* attempt, so a plate that could not be allocated is
+    // retried when something changes rather than on every frame.
+    struct LensDirtParams
+    {
+        U32 width      = 0;
+        U32 height     = 0;
+        F32 seed       = -1.f;
+        F32 grime      = -1.f;
+        F32 mote_scale = -1.f;
+        F32 smudge     = -1.f;
+        S32 scratches  = -1;
+        F32 toe        = -1.f;
+        F32 gain       = -1.f;
+
+        bool operator==(const LensDirtParams&) const = default;
+    };
+    LensDirtParams      mLensDirtParams;
+
+    // The lens distortion auto-fit scale, and what it was solved for. The
+    // solve walks the frame edge and an interior grid, and its inputs move
+    // only when a slider or the window does, so it is compared and skipped
+    // each frame the way the dirt plate is.
+    struct LensDistortFit
+    {
+        struct Inputs
+        {
+            F32 k1 = 0.f;
+            F32 k2 = 0.f;
+            F32 p1 = 0.f;
+            F32 p2 = 0.f;
+            F32 cx = 0.f;
+            F32 cy = 0.f;
+            F32 axis_x = 0.f;
+            F32 axis_y = 0.f;
+            F32 sq_x = 0.f;
+            S32 fit_mode = -1;
+
+            bool operator==(const Inputs&) const = default;
+        };
+        Inputs inputs;
+        F32    scale = 1.f;
+    };
+    LensDistortFit      mLensDistortFit;
+
+    // Raised by the Lightbox while one of the generation sliders is being
+    // dragged. The plate is full-resolution, so rebuilding on every frame of a
+    // drag is a stutter rather than a preview -- and worse the slower the
+    // machine, which is backwards. Holding off means the rebuild lands once, on
+    // release, which is also where the user expects to see the result.
+    bool                mLensDirtSliderHeld = false;
+    // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
+    // and B texels hold master(channel(x)) for each channel. A raw GL name
+    // like the SMAA maps above: created empty in createGLBuffers, filled by
+    // bakeToneCurveLut, released in releaseGLBuffers.
+    U32                 mToneCurveLut = 0;
+    bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
+    bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal
+
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;
     LLVector4           mSunDir;
@@ -994,7 +1098,8 @@ public:
     LLVector4           mTransformedSunDir;
     LLVector4           mTransformedMoonDir;
 
-    F32                 mLensFlareSunVisibility = 0.f;
+    // Sun (or moon) on screen this frame in UV, from generateLensFlareState.
+    LLVector2           mLensFlareSunUV = LLVector2(0.5f, 0.5f);
 
     bool                    mInitialized;
     bool                    mShadersLoaded;

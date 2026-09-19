@@ -405,6 +405,17 @@ void LLColorSwatchCtrl::setValid(bool valid )
 
 void LLColorSwatchCtrl::showPicker(bool take_focus)
 {
+    // Both ways in -- the click and the space bar -- come through here, so
+    // this is the one place an owner can take the picking over.
+    if (mPickerOverride && mPickerOverride(this))
+    {
+        return;
+    }
+    showClassicPicker(take_focus);
+}
+
+void LLColorSwatchCtrl::showClassicPicker(bool take_focus)
+{
     LLFloaterColorPicker* pickerp = (LLFloaterColorPicker*)mPickerHandle.get();
     if (!pickerp)
     {

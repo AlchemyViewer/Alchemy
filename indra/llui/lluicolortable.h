@@ -44,11 +44,14 @@ class LLUIColorTable : public LLSingleton<LLUIColorTable>
     LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
     LOG_CLASS(LLUIColorTable);
 
-    // Node based on purpose: getColor() hands out pointers into these, so an
-    // entry, once made, keeps its address and is never erased.
+    // Node based so effective colours keep the addresses held by widgets.
     typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
+    // Counts up on every change, for whoever shows a colour by name and
+    // would rather compare a number each frame than hold a connection.
+    U32 generation() const { return mGeneration; }
+
     // A parsed colors.xml and the name diagnostics know it by.
     typedef std::pair<LLXMLNodePtr, std::string> document_t;
 
@@ -95,8 +98,17 @@ public:
 private:
     void install(const ALColorSheet& sheet, string_color_map_t& table, bool drop_missing);
     void clearTable(string_color_map_t& table);
+    void refreshColors();
+    // The colour a loaded name has with the user's colours in force: the
+    // user's own, or what the skins declare, where a colour the skins
+    // declare as a reference takes what its target has now. An accent the
+    // user edits reaches every colour the skins defined by it.
+    LLColor4 inForce(std::string_view name) const;
     void setColor(std::string_view name, const LLColor4& color, string_color_map_t& table);
 
+    U32 mGeneration = 0;
+    // Only this map supplies live handles. Authored overrides can be erased.
+    string_color_map_t mColors;
     string_color_map_t mLoadedColors;
     string_color_map_t mUserSetColors;
     ALColorSheet       mLoadedSheet;

@@ -839,4 +839,236 @@ namespace tut
         box->setFocus(false);
         canvas->die();
     }
+
+    // The wheel climbs a ladder that doubles and halves rather than a fixed
+    // amount, and stops at the ends of the zoom's range.
+    template<> template<>
+    void alcanvasview_object::test<23>()
+    {
+        ALCanvasView* canvas = surface();
+
+        ensure_equals("life size to start", canvas->zoom(), 1.f);
+        const F32 up[] = { 1.5f, 2.f, 3.f, 4.f, 6.f, 8.f };
+        for (const F32 step : up)
+        {
+            canvas->setZoom(canvas->steppedZoom(1));
+            ensure_equals("up a rung", canvas->zoom(), step);
+        }
+        ensure_equals("and no further", canvas->steppedZoom(1), ALCanvasView::MAX_ZOOM);
+
+        canvas->setZoom(1.f);
+        const F32 down[] = { 0.75f, 0.5f, 0.25f };
+        for (const F32 step : down)
+        {
+            canvas->setZoom(canvas->steppedZoom(-1));
+            ensure_equals("down a rung", canvas->zoom(), step);
+        }
+        ensure_equals("to the floor", canvas->steppedZoom(-1), ALCanvasView::MIN_ZOOM);
+
+        // A zoom between rungs goes to the next rung, not past it.
+        canvas->setZoom(2.4f);
+        ensure_equals("between rungs, up", canvas->steppedZoom(1), 3.f);
+        ensure_equals("between rungs, down", canvas->steppedZoom(-1), 2.f);
+        canvas->setZoom(100.f);
+        ensure_equals("asked for too much, it is the ceiling", canvas->zoom(), ALCanvasView::MAX_ZOOM);
+        canvas->die();
+    }
+
+    // The zoom that fits is the largest rung at which what is on the
+    // surface still fits the room the surface is shown in.
+    template<> template<>
+    void alcanvasview_object::test<24>()
+    {
+        LLPanel::Params rp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        rp.name = "room";
+        rp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLPanel* room = LLUICtrlFactory::create<LLPanel>(rp);
+
+        ALCanvasView* canvas = surface();
+        room->addChild(canvas);
+        place(canvas, 200, 100);
+
+        // 208 by 108 with its margin: three times over fits 700 by 400,
+        // four times over does not.
+        ensure_equals("three times over", canvas->fittingZoom(), 3.f);
+        place(canvas, 1000, 100);
+        ensure_equals("too wide even at life size, so half", canvas->fittingZoom(), 0.5f);
+        // A surface is never narrower than 120 of its own units, so a small
+        // thing fits at four times over and not the eight its own size
+        // would allow.
+        place(canvas, 20, 20);
+        ensure_equals("a small thing stops where the surface's floor does", canvas->fittingZoom(), 4.f);
+        room->die();
+    }
+
+    // A surface that is the one thing in its container fills the container,
+    // so what is on it sits in the middle of the room until it outgrows it.
+    template<> template<>
+    void alcanvasview_object::test<25>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        ALCanvasView* canvas = surface();
+        area->addChild(canvas);
+        canvas->fitContent(200, 100);
+        canvas->refresh();
+
+        const LLRect room = area->getContentWindowRect();
+        ensure_equals("as wide as the room", canvas->getRect().getWidth(), room.getWidth());
+        ensure_equals("and as tall", canvas->getRect().getHeight(), room.getHeight());
+
+        canvas->setZoom(4.f);
+        canvas->refresh();
+        ensure("zoomed past the room, the surface is bigger than it " + size(canvas),
+               canvas->getRect().getWidth() > room.getWidth());
+        area->die();
+    }
+
+    // A surface told to fill a room never draws past it, whatever the zoom
+    // makes of the division: a pixel over brings out a scrollbar, which
+    // shrinks the room, which rounds the other way, and the canvas shakes.
+    template<> template<>
+    void alcanvasview_object::test<27>()
+    {
+        ALCanvasView* canvas = surface();
+        canvas->fitContent(120, 40);
+        // Zooms at which what is on it still fits the room: past that a
+        // scrollbar is right.
+        for (const F32 zoom : { 4.f, 3.f, 1.5f, 5.f })
+        {
+            canvas->setZoom(zoom);
+            for (S32 room = 640; room < 652; ++room)
+            {
+                canvas->setLeastSurface(room, room - 96);
+                ensure("no wider than the room at " + std::to_string(zoom) + " with " + std::to_string(room),
+                       canvas->getRect().getWidth() <= room);
+                ensure("nor taller", canvas->getRect().getHeight() <= room - 96);
+                ensure("and not far short of it either", canvas->getRect().getWidth() > room - zoom - 1);
+            }
+        }
+        canvas->die();
+    }
+
+    // What the canvas says about itself: empty until something is on it,
+    // and the zoom as a percentage once there is.
+    template<> template<>
+    void alcanvasview_object::test<26>()
+    {
+        ALCanvasView* canvas = surface();
+
+        ensure("nothing on it yet", canvas->empty());
+        ensure_equals("life size reads as a hundred", canvas->legend(), std::string("100%"));
+        place(canvas, 200, 100);
+        ensure("something on it now", !canvas->empty());
+        canvas->setZoom(2.f);
+        ensure_equals("twice life size", canvas->legend(), std::string("200%"));
+        canvas->die();
+
+        ensure("a backdrop by name", ALCanvasView::backdropNamed("checker") == ALCanvasView::Backdrop::Checker);
+        ensure_equals("and back", std::string(ALCanvasView::backdropName(ALCanvasView::Backdrop::Light)), std::string("light"));
+        ensure("an unknown name is none", ALCanvasView::backdropNamed("velvet") == ALCanvasView::Backdrop::None);
+    }
+
+    // Zooming about a point keeps that point of the surface where it was in
+    // the window: the container is scrolled by however much the zoom moved
+    // it. Where the pointer is in the window, read the way the canvas reads
+    // it.
+    template<> template<>
+    void alcanvasview_object::test<28>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        ALCanvasView* canvas = surface();
+        area->addChild(canvas);
+        canvas->fitContent(1000, 800);
+        canvas->refresh();
+        area->getContentWindowRect();
+
+        // A point of the surface, and where it is in the window before.
+        const auto inWindow = [&](S32 x, S32 y, S32& wx, S32& wy)
+        {
+            canvas->localPointToOtherView(x, y, &wx, &wy, area);
+            const LLRect window = area->getContentWindowRect();
+            wx -= window.mLeft;
+            wy -= window.mBottom;
+        };
+        S32 before_x = 0;
+        S32 before_y = 0;
+        inWindow(300, 500, before_x, before_y);
+
+        canvas->zoomAbout(2.f, 300, 500);
+        ensure_equals("zoomed", canvas->zoom(), 2.f);
+        ensure_equals("scrolled across to keep the point", area->getDocPosHorizontal(), 300);
+
+        // The same point of the surface is drawn at twice the distance from
+        // the corner, and the container has been scrolled so that it is
+        // still where it was in the window.
+        S32 after_x = 0;
+        S32 after_y = 0;
+        inWindow(600, 1000, after_x, after_y);
+        ensure_equals("same place across", after_x, before_x);
+        ensure_equals("same place down", after_y, before_y);
+        area->die();
+    }
+
+    // A pan is the container scrolled by how far the pointer went, and no
+    // further than there is to scroll.
+    template<> template<>
+    void alcanvasview_object::test<29>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLScrollContainer::Params cp(LLUICtrlFactory::getDefaultParams<LLScrollContainer>());
+        cp.name = "area";
+        cp.rect = LLRect(0, ROOM_H, ROOM_W, 0);
+        LLScrollContainer* area = LLUICtrlFactory::create<LLScrollContainer>(cp);
+
+        ALCanvasView* canvas = surface();
+        area->addChild(canvas);
+        canvas->fitContent(1000, 800);
+        canvas->refresh();
+        area->getContentWindowRect();
+
+        ensure("not panning yet", !canvas->panning());
+        canvas->beginPan(100, 100);
+        ensure("panning", canvas->panning());
+        // Dragged left and down: what is seen moves that way, so the
+        // container scrolls right and up.
+        canvas->panTo(50, 80);
+        ensure_equals("scrolled right by the drag", area->getDocPosHorizontal(), 50);
+        ensure_equals("and not above the top", area->getDocPosVertical(), 0);
+        canvas->panTo(150, 130);
+        ensure_equals("not past the left edge", area->getDocPosHorizontal(), 0);
+        ensure_equals("scrolled down by the drag", area->getDocPosVertical(), 30);
+        canvas->endPan();
+        ensure("let go", !canvas->panning());
+
+        canvas->panBy(-20, 10);
+        ensure_equals("panned by amount across", area->getDocPosHorizontal(), 20);
+        ensure_equals("and down", area->getDocPosVertical(), 40);
+
+        ensure("a plain surface does not drag by the left button", !canvas->dragPans());
+        canvas->setDragPans(true);
+        ensure("until it says so", canvas->panGesture());
+        area->die();
+    }
 }

@@ -15,14 +15,21 @@
  *
  *   LINEAR SPACE (colorCorrectF)
  *     vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
- *     vec3 computeLensFlare       (sampler2D diff, sampler2D depth, vec2 uv)
+ *     vec3 computeLensFlare       (vec2 uv)
  *
  *   DISPLAY SPACE (blitWithEffectsF)
+ *     vec2 applyLensDistortion    (vec2 uv)          -- UV in, UV out
  *     vec3 applyVignette          (vec3 color, vec2 uv)
  *     vec3 applyCVDCompensation   (vec3 color)
  *     vec3 applyFilmGrain         (vec3 color, vec2 fragCoord)
  *     vec3 applyDither            (vec3 color, vec2 fragCoord)
  *     vec3 applyPreview           (vec3 color)
+ *
+ * applyLensDistortion is the odd one out: it transforms a sample coordinate
+ * rather than a colour, so it runs *before* the scene is sampled and the
+ * colour effects above run on the result. It is a lens effect; everything
+ * else in the DISPLAY SPACE group is a sensor or print effect and stays in
+ * unwarped screen space.
  *
  * Conventions used throughout:
  *   - Every effect has an `amount <= 0` fast-path that returns the input
@@ -198,10 +205,10 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // Lens flare — anamorphic streak with optional glow, ghosts, halo, starburst
 // =============================================================================
 //
-// Screen-space approximation of an anamorphic lens flare. Driven by a
-// CPU-computed sun UV position and visibility (on-screen fade), plus a
-// multi-tap depth occlusion check done here so geometry in front of the sun
-// attenuates the flare smoothly.
+// Screen-space approximation of an anamorphic lens flare, driven by a
+// CPU-computed sun UV position and by the sun state texture that
+// lensFlareStateF.glsl measures and filters once per frame (its header says
+// why the measurement lives there and not here).
 //
 // Each sub-effect (glow / ghosts / halo / starburst) is gated by its own
 // intensity uniform (0 = disabled, else acts as a brightness multiplier), so
@@ -211,12 +218,11 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // ---- Driver inputs (set by the viewer each frame) --------------------------
 uniform float uLensFlareStrength;                 // master on/off + intensity
 uniform vec2  uLensFlareSunPos;                   // sun position in UV space
-uniform float uLensFlareSunVisibility;            // CPU-side on-screen fade
 uniform vec3  uLensFlareLightColor;               // artist tint applied to whole flare
 
-// ---- Depth occlusion -------------------------------------------------------
-uniform float uLensFlareOcclusionRadius;          // Poisson disk radius in UV space
-uniform int   uLensFlareOcclusionTaps;            // 1..32 — more taps = smoother partial occlusion
+// ---- Sun state (2x1, written by lensFlareStateF.glsl each frame) -----------
+// texel 0 rgb = the filtered, premultiplied flare drive; black means no flare.
+uniform sampler2D uLensFlareStateMap;
 
 // ---- Anamorphic streak -----------------------------------------------------
 uniform float uLensFlareStreakLength;             // horizontal extent in UV space
@@ -248,92 +254,19 @@ uniform int   uLensFlareStarburstSpikes;          // primary angular frequency �
 uniform float uLensFlareStarburstSharpness;       // pow() exponent — higher = tighter spikes
 uniform float uLensFlareStarburstFalloff;         // radial decay rate from the sun
 
-vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
+vec3 computeLensFlare(vec2 uv)
 {
     // Master gate: cheapest possible early-out.
-    float vis = uLensFlareSunVisibility * uLensFlareStrength;
-    if (vis <= 0.0)
+    if (uLensFlareStrength <= 0.0)
         return vec3(0.0);
 
-    vec2 sun_uv = uLensFlareSunPos;
-
-    // -------------------------------------------------------------------
-    // Depth-based occlusion.
-    //
-    // CPU-side visibility only tracks whether the sun is on-screen; it
-    // doesn't know about intervening geometry. Probe a Poisson disk of
-    // depth taps around the sun's UV and count how many are at the far
-    // plane (i.e. sky). This gives smooth partial occlusion when the sun
-    // is half-behind an object.
-    // -------------------------------------------------------------------
-    if (all(greaterThanEqual(sun_uv, vec2(0.0))) && all(lessThanEqual(sun_uv, vec2(1.0))))
-    {
-        // Pre-baked Poisson disk samples, good spatial distribution.
-        const vec2 taps[32] = vec2[32](
-            vec2( 0.0,     0.0),
-            vec2(-0.326,  -0.406),
-            vec2(-0.840,  -0.074),
-            vec2(-0.196,   0.457),
-            vec2( 0.498,   0.336),
-            vec2( 0.106,  -0.747),
-            vec2( 0.736,  -0.290),
-            vec2( 0.423,   0.767),
-            vec2(-0.621,   0.572),
-            vec2( 0.890,   0.156),
-            vec2(-0.453,  -0.780),
-            vec2( 0.215,  -0.945),
-            vec2(-0.928,   0.326),
-            vec2( 0.673,  -0.685),
-            vec2(-0.158,   0.892),
-            vec2( 0.952,   0.548),
-            vec2(-0.756,  -0.518),
-            vec2( 0.347,  -0.412),
-            vec2(-0.089,  -0.290),
-            vec2( 0.612,   0.710),
-            vec2(-0.544,   0.815),
-            vec2( 0.818,  -0.543),
-            vec2(-0.987,  -0.321),
-            vec2( 0.145,   0.623),
-            vec2(-0.412,   0.178),
-            vec2( 0.567,  -0.098),
-            vec2(-0.278,  -0.654),
-            vec2( 0.934,   0.389),
-            vec2(-0.703,   0.112),
-            vec2( 0.056,  -0.512),
-            vec2( 0.289,   0.934),
-            vec2(-0.867,   0.745)
-        );
-        int   num_taps = clamp(uLensFlareOcclusionTaps, 1, 32);
-        float occluded = 0.0;
-        for (int i = 0; i < num_taps; i++)
-        {
-            vec2  tap_uv = sun_uv + taps[i] * uLensFlareOcclusionRadius;
-            float d      = texture(depth, tap_uv).r;
-            // smoothstep against near-far plane — only sky counts as visible. Mirror the far
-            // end under reverse-Z (far=0): smoothstep(0.9999,1,1-d) == 1-smoothstep(0,1e-4,d).
-#ifdef REVERSE_Z
-            occluded += smoothstep(0.9999, 1.0, 1.0 - d);
-#else
-            occluded += smoothstep(0.9999, 1.0, d);
-#endif
-        }
-        vis *= occluded / float(num_taps);
-    }
-    if (vis <= 0.0)
+    // The filtered drive from the state pass: colour and visibility in one.
+    vec3 sun_color = texelFetch(uLensFlareStateMap, ivec2(0, 0), 0).rgb;
+    if (max(sun_color.r, max(sun_color.g, sun_color.b)) <= 0.0)
         return vec3(0.0);
 
-    // -------------------------------------------------------------------
-    // Sample sun brightness once, convert to a normalized "overbright"
-    // factor. We subtract 2.0 from luminance so only HDR-bright suns
-    // drive the flare — prevents diffuse bright surfaces from flaring.
-    // -------------------------------------------------------------------
-    vec3  sun_color  = texture(diffuse, clamp(sun_uv, vec2(0.0), vec2(1.0))).rgb;
-    float sun_lum    = dot(sun_color, LUMA);
-    float sun_bright = max(sun_lum - 2.0, 0.0) / max(sun_lum, 1e-4);
-    sun_color *= sun_bright;
-
-    if (sun_bright <= 0.0)
-        return vec3(0.0);
+    vec2  sun_uv = uLensFlareSunPos;
+    float vis    = uLensFlareStrength;
 
     float aspect = uResolution.x / max(uResolution.y, 1.0);
     vec2  delta  = uv - sun_uv;
@@ -457,7 +390,7 @@ vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
     }
 
     // Final scale: 0.15 tames peak intensity to a plausible lens-response
-    // range; tint and visibility factor apply equally to all sub-effects.
+    // range; tint and the master strength apply equally to all sub-effects.
     return max(flare * vis * uLensFlareLightColor * 0.15, vec3(0.0));
 }
 
@@ -812,4 +745,130 @@ vec3 applyDither(vec3 color, vec2 fragCoord)
 
     float levels = (uDitherBits >= 10) ? 1023.0 : 255.0;
     return color + tpdf * (uDitherAmount / levels);
+}
+
+
+// =============================================================================
+// Geometric lens distortion — Brown-Conrady radial + tangential
+// =============================================================================
+//
+// The only entry point here that transforms a coordinate instead of a colour.
+// Runs in the final blit, warping the coordinate the scene is sampled at, so
+// the vignette/grain/dither/CVD chain that follows stays in unwarped sensor
+// space. That split is deliberate: distortion happens in the lens, the print
+// effects happen at the sensor and on the print.
+//
+// This is the *inverse* map — for each output pixel it answers "where in the
+// source does this come from", which is the direction a gather-based post
+// process needs. Negative k1 therefore reads as barrel and positive as
+// pincushion, matching how the coefficients are named on a real lens profile.
+//
+// Radial distance is measured in aspect-corrected units using the same
+// branchless form the rest of this file uses: one component of `scale` stays
+// 1.0 and the other carries the ratio, so the wide axis is stretched to its
+// true physical extent and r lands near 1.0 at the frame corners. That is not
+// cosmetic -- on a 16:9 frame the corners really are further from the optical
+// axis than the edge midpoints, and a lens distorts by physical radius.
+//
+// Note: uLensDistortAmount, uLensDistortK, uLensDistortScale, uLensDistortSqueeze
+// and uLensDistortTangential arrive pre-baked from the CPU (pipeline.cpp).
+// The master amount is folded into the coefficients there, so the shader does
+// one gate and then pure polynomial evaluation. The slider ranges quoted below
+// are the *user-facing* values before baking.
+
+uniform float uLensDistortAmount;      // artist range [0, 1]: master gate. 0 disables.
+uniform vec2  uLensDistortK;           // (k1, k2) already multiplied by amount on the CPU.
+                                       //   k1 artist range [-0.5, 0.5]: negative barrel,
+                                       //   positive pincushion. k2 [-0.25, 0.25] shapes the tail.
+uniform float uLensDistortScale;       // auto-fit rescale, applied as a direct multiplier. Solved
+                                       //   exactly on the CPU over a dense frame probe (boundary
+                                       //   walk, plus an interior grid in Fit mode).
+                                       //   Uploaded as 1.0 when fit is off -- never 0.
+uniform vec2  uLensDistortSqueeze;     // (1 / squeeze, 1), pre-reciprocated. Anamorphic desqueeze.
+uniform vec2  uLensDistortCenter;      // [-0.5, 0.5] optical axis offset from frame centre.
+uniform vec2  uLensDistortTangential;  // (p1, p2) already multiplied by amount on the CPU.
+                                       //   Decentering terms; tiny values (< 0.01) are realistic.
+
+vec2 applyLensDistortion(vec2 uv)
+{
+    // Fast path when the effect is disabled — the uniform branch is coherent
+    // across the whole draw, and zero-initialized uniforms land here (see the
+    // GL 4.1 no-default-initializers note in llshadermgr).
+    if (uLensDistortAmount <= 0.0)
+        return uv;
+
+    // Offset from the optical axis, then aspect-corrected so the radial term
+    // is isotropic in physical units rather than in UV units.
+    vec2  p      = uv - 0.5 - uLensDistortCenter;
+    float aspect = uResolution.x / max(uResolution.y, 1.0);
+    vec2  scale  = max(vec2(aspect, 1.0 / max(aspect, 1e-4)), 1.0);
+    vec2  q      = p * scale;
+
+    float r2 = dot(q, q);
+
+    // Radial: 1 + k1*r^2 + k2*r^4. Horner keeps it to two FMAs.
+    float radial = 1.0 + r2 * (uLensDistortK.x + r2 * uLensDistortK.y);
+
+    // Tangential: the classic Brown-Conrady decentering pair. Zero by default,
+    // and the two terms vanish independently, so leaving them at 0 costs only
+    // the multiplies.
+    float p1 = uLensDistortTangential.x;
+    float p2 = uLensDistortTangential.y;
+    vec2  tangential = vec2(2.0 * p1 * q.x * q.y + p2 * (r2 + 2.0 * q.x * q.x),
+                            p1 * (r2 + 2.0 * q.y * q.y) + 2.0 * p2 * q.x * q.y);
+
+    // Warp, rescale to keep the frame filled, undo the aspect correction, then
+    // apply the anamorphic squeeze in UV space.
+    vec2 warped = (q * radial + tangential) * uLensDistortScale;
+    warped /= scale;
+    warped *= uLensDistortSqueeze;
+
+    return warped + 0.5 + uLensDistortCenter;
+}
+
+// =============================================================================
+// Lens dirt — grime on the front element, lit by whatever is already glowing
+// =============================================================================
+//
+// Contributes nothing on its own. Dirt is only visible where light is already
+// falling on it, so this takes the bloom and flare terms as its input rather
+// than the scene: point the camera at a flat wall and the lens looks clean no
+// matter how high the strength goes, exactly as a real one does. It is also
+// what makes the effect cheap -- the cost rides on effects that are already
+// running.
+//
+// Tier 3 (uniform branch) rather than a compile-time permutation, because this
+// file is a shared object attached to all nine post programs and no
+// per-program define can reach it. The strength is forced to 0 by the CPU
+// whenever no plate exists, so the sampler is never read unbound.
+//
+// The plate is a single channel: dirt is a scalar mask, and the generator
+// (lensDirtGenF.glsl) writes one into an R8 target.
+
+uniform sampler2D uLensDirtMap;
+uniform float     uLensDirtStrength;   // 0 disables
+
+vec3 applyLensDirt(vec2 uv, vec3 lens_light)
+{
+    if (uLensDirtStrength <= 0.0)
+        return vec3(0.0);
+
+    // Sampled with raw screen UV, and there is no fitting to do: the plate is
+    // generated at the frame's own aspect, so a mote is already round on the
+    // display it was made for.
+    return lens_light * texture(uLensDirtMap, uv).r * uLensDirtStrength;
+}
+
+
+// Companion to the above: 1.0 inside the frame, 0.0 outside, so the call site
+// can resolve out-of-frame samples to black instead of smearing the edge texel
+// across the corners. Branchless, and identically 1.0 when distortion is off
+// (the early-out above returns an in-range uv, and the gate makes that exact).
+float lensDistortMask(vec2 duv)
+{
+    if (uLensDistortAmount <= 0.0)
+        return 1.0;
+
+    vec2 inside = step(vec2(0.0), duv) * step(duv, vec2(1.0));
+    return inside.x * inside.y;
 }

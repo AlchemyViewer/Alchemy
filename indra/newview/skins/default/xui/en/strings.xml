@@ -324,11 +324,32 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ColorFieldFilter">Filter</string>
 	<string name="ColorFieldNames">Names</string>
 	<string name="ColorFieldCustom">Custom</string>
+	<string name="ImageFieldNoMatch">No picture by that name</string>
+	<string name="ImageFieldNoMatchHow">Clear the filter to see them all.</string>
+	<string name="ColorTableFilter">Find a colour</string>
+	<string name="ColorTableOnlyChanged">Only colours I changed</string>
+	<string name="ColorTableGroupChanged">Changed by you</string>
+	<string name="ColorTableGroupAdded">Added by you</string>
+	<string name="ColorTableTipField">[NAME]</string>
+	<string name="ColorTableTipSource">Declared in [SOURCE].</string>
+	<string name="ColorTableTipUnwritten">The skin's colour. Change it and it is yours.</string>
+	<string name="ColorTableTipRemove">Back to the skin's [NAME].</string>
+	<string name="ColorTableNothing">No colours</string>
+	<string name="ColorTableNothingHow">The skin declares none, or none of them carry your changes.</string>
+	<string name="ColorTableNoMatch">No colour by that name</string>
+	<string name="ColorTableNoMatchHow">Clear the search to see them all.</string>
+	<string name="ColorTableRefersTo">Refers to [NAME]: the skin draws this as that colour.</string>
+	<string name="ColorTableWas">The skin's: [VALUE]</string>
+	<string name="ColorTableUsers">Painted on [COUNT] shapes; the mark lists them.</string>
+	<string name="ColorTableUnused">Painted on no shape.</string>
 	<string name="FontFieldFilter">Filter fonts</string>
 	<string name="FontFieldSize">Size</string>
 	<string name="FontFieldBold">Bold</string>
 	<string name="FontFieldItalic">Italic</string>
 	<string name="FontFieldUnderline">Underline</string>
+
+	<!-- A setting row's button back to its default, alsettingrow.cpp -->
+	<string name="SettingRowReset">Reset to [VALUE]</string>
 
 	<!-- XUI Studio's outline, beside a row's name -->
 	<string name="XUITreeHidden">hidden</string>

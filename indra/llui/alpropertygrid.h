@@ -24,9 +24,14 @@
 
 #pragma once
 
+#include "alcolorfield.h"
 #include "aldeferredrebuild.h"
+#include "alimagefield.h"
 #include "alparamtype.h"
 #include "llpanel.h"
+#include "v4color.h"
+
+#include <functional>
 
 class ALEmptyState;
 class LLAccordionCtrl;
@@ -91,6 +96,31 @@ public:
         ALParamType::EValue         kind = ALParamType::OTHER;
         // An enumeration's names. A field with any becomes a list.
         std::vector<std::string>    values;
+        // What the list shows for each of them, where a file's word is not
+        // the one a person would choose by. One per value, in order, or
+        // none and the values are shown as they are.
+        std::vector<std::string>    valueLabels;
+        // A number's range, where the vocabulary knows one: the box refuses
+        // what is outside it, and with `slider` the row is a slider over it
+        // with the number beside, which is how an opacity or a blur is
+        // chosen rather than typed.
+        bool                        bounded = false;
+        F32                         minimum = 0.f;
+        F32                         maximum = 0.f;
+        bool                        slider = false;
+        // How a number steps and how many decimals it shows. Unset, a whole
+        // number steps by one and shows none, and a real steps by a tenth
+        // and shows three.
+        F32                         step = 0.f;
+        S32                         decimals = -1;
+        // A value that is a picture as much as numbers, and gets the editor
+        // that draws it: four corner radii around a rounded rectangle, an
+        // offset as a dot on a pad, a direction as a handle on a dial. The
+        // value is still the numbers with spaces between, as a file writes
+        // them; the row is as tall as the picture.
+        bool                        corners = false;
+        bool                        pad = false;
+        bool                        dial = false;
         // The C++ type: it decides the colour editor, and it is the rest
         // of the row's tool tip.
         std::string                 type;
@@ -163,6 +193,12 @@ public:
     typedef boost::signals2::signal<void(const std::string&, const std::string&)> commit_signal_t;
 
     void setFields(std::vector<Field> fields);
+    // The same rows with new values: what each field says now replaces
+    // what it said, and every editor that is not being dragged or typed
+    // in shows it, but no row is rebuilt -- a slider mid-drag and a
+    // popover mid-pick keep the control they belong to. False when the
+    // rows would differ, and then setFields is the answer.
+    bool updateFields(std::vector<Field> fields);
     void clearFields();
     const std::vector<Field>& fields() const { return mFields; }
 
@@ -224,6 +260,20 @@ public:
     // each field, because every such field means the same thing by them.
     void setEdgeTips(std::vector<std::string> tips);
 
+    // Asked first what a colour's text comes to, on every colour row, for
+    // a caller whose files write colours colors.xml knows nothing about.
+    typedef std::function<bool(const std::string&, LLColor4&)> color_resolver_t;
+    void setColorResolver(color_resolver_t resolver);
+    // The caller's own colour names, offered first by every colour row's
+    // popover: a theme value, with the colour it comes to.
+    void setColorChoices(ALColorField::choices_t choices);
+
+    // The pictures a picture row's popover offers, and the tool that edits
+    // one by name with what its button says. A grid given neither shows a
+    // picture row as its name and its picture, with no popover to open.
+    void setImageChoices(ALImageField::choices_t choices);
+    void setImageEditor(ALImageField::edit_t editor, std::string label);
+
     boost::signals2::connection onFieldCommit(const commit_signal_t::slot_type& cb)
     {
         return mFieldCommit.connect(cb);
@@ -265,6 +315,22 @@ public:
     void setNested(bool nested);
     bool nested() const { return mNested; }
 
+    // A section nothing is written in arrives folded, so what is written
+    // is what is in front of you: right for a file of fields, most of
+    // them at their defaults. A grid whose every row is a choice somebody
+    // made -- a shape's layer, where nothing is a default -- turns this
+    // off, and every section arrives open. Set before the groups.
+    void setFoldsUnwritten(bool folds);
+    bool foldsUnwritten() const { return mFoldsUnwritten; }
+
+    // Rows in the order they were given, within each section, instead of
+    // the written ones first and the rest by name: a vocabulary has an
+    // order of its own, and a row that jumps to the top of its section
+    // when it is first edited is a row that moves under the hand. Set
+    // before the fields.
+    void setKeepsOrder(bool keeps);
+    bool keepsOrder() const { return mKeepsOrder; }
+
     // A row is laid out to the width it was given, so a change of width is
     // a re-layout of the rows and not a stretch of them.
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -295,6 +361,14 @@ private:
     };
 
     void rebuild();
+    // The fields in the order the rows take.
+    void order(std::vector<Field>& fields) const;
+    // Whether two fields would make the same row.
+    static bool sameRow(const Field& a, const Field& b);
+    // The row's ink and tips for what the field says about itself now.
+    void refreshAuthored(const Field& field);
+    // The editor showing what the field says now, unless it is being used.
+    void refreshEditor(const Field& field);
     void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
     // The way back, at the right end of the row; shown on the rows the
     // file writes.
@@ -335,6 +409,11 @@ private:
 
     std::vector<Field>          mFields;
     std::vector<std::string>    mGroups;
+    color_resolver_t            mColorResolver;
+    ALColorField::choices_t     mColorChoices;
+    ALImageField::choices_t     mImageChoices;
+    ALImageField::edit_t        mImageEditor;
+    std::string                 mImageEditLabel;
     std::vector<Section>        mSections;
     LLAccordionCtrl*            mAccordion = nullptr;
     ALEmptyState*               mEmpty = nullptr;
@@ -353,6 +432,8 @@ private:
     S32                         mRemoveWidth;
     bool                        mAuthoredOnly = false;
     bool                        mNested = false;
+    bool                        mFoldsUnwritten = true;
+    bool                        mKeepsOrder = false;
     // A rebuild deletes every row, so one asked for from inside a row's own
     // callback -- a caller answering a commit by filling the grid again,
     // which is what XUI Studio does after any edit it cannot apply in place

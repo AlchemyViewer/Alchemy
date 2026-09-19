@@ -53,11 +53,10 @@ namespace
     constexpr S32 ROW = 22;
     constexpr S32 MIN_WIDTH = 360;
     constexpr S32 MIN_HEIGHT = 340;
-
-    // Where the popover opens, and where it opens next time: it is
-    // resizable, and a size someone chose once is the size they wanted.
-    S32 sWidth = 470;
-    S32 sHeight = 460;
+    // Where the popover opens the first time; it is resizable, and the
+    // popover remembers where it was left after that.
+    constexpr S32 WIDTH = 470;
+    constexpr S32 HEIGHT = 460;
 
     // Four numbers, which is the other thing a file writes for a colour.
     bool literalColor(const std::string& text, LLColor4& out)
@@ -115,15 +114,31 @@ namespace
             LLColor4    color;
         };
 
-        ALColorSwatchGrid(const LLPanel::Params& p, chose_t chose)
+        // The caller's own names first, as given; then every name the
+        // table has, the skin's and the ones a person added, each as the
+        // colour it comes to now rather than the one the skin shipped.
+        ALColorSwatchGrid(const LLPanel::Params& p, chose_t chose, const std::vector<ALColorField::Choice>& first)
         :   LLPanel(p),
             mChose(std::move(chose))
         {
-            for (const auto& [name, color] : LLUIColorTable::instance().getLoadedColors())
+            for (const ALColorField::Choice& choice : first)
             {
-                mAll.push_back({ name, color.get() });
+                mAll.push_back({ choice.name, choice.color });
             }
-            std::sort(mAll.begin(), mAll.end(),
+            const size_t own = mAll.size();
+            const LLUIColorTable& table = LLUIColorTable::instance();
+            for (const auto& [name, color] : table.getLoadedColors())
+            {
+                mAll.push_back({ name, table.getColor(name).get() });
+            }
+            for (const auto& [name, color] : table.getUserColors())
+            {
+                if (!table.getLoadedColors().contains(name))
+                {
+                    mAll.push_back({ name, color.get() });
+                }
+            }
+            std::sort(mAll.begin() + own, mAll.end(),
                       [](const Entry& a, const Entry& b) { return a.name < b.name; });
             filter(LLStringUtil::null);
         }
@@ -253,9 +268,11 @@ namespace
     public:
         AL_VIEW_TYPE(ALColorPopover, ALPopover);
 
-        ALColorPopover(const LLFloater::Params& p, const std::string& value)
+        ALColorPopover(const LLFloater::Params& p, const std::string& value, ALColorField::resolver_t resolver,
+                       const std::vector<ALColorField::Choice>& choices)
         :   ALPopover(p),
-            mValue(value)
+            mValue(value),
+            mResolver(std::move(resolver))
         {
             const S32 width = getRect().getWidth();
             // A floater draws its own title across the top of its rect, and
@@ -304,7 +321,7 @@ namespace
             {
                 chose(name);
                 showInPicker(name);
-            });
+            }, choices);
             mGrid->setChosen(mValue);
             scroll->addChild(mGrid);
             // A tab container picks its first tab when it is built, and this
@@ -352,19 +369,11 @@ namespace
             const S32 top = getRect().getHeight() - getHeaderHeight();
             const LLRect swatch(4, top - 4, 4 + HEADER - 8, top - 4 - (ROW - 2));
             LLColor4 color;
-            if (resolve(mValue, color))
+            if (comesTo(mValue, color))
             {
                 gl_rect_2d(swatch, color, true);
             }
             gl_rect_2d(swatch, edge.get(), false);
-        }
-
-        // The size it is left at is the size it opens at next time.
-        void onClose(bool app_quitting) override
-        {
-            sWidth = getRect().getWidth();
-            sHeight = getRect().getHeight();
-            ALPopover::onClose(app_quitting);
         }
 
     private:
@@ -386,13 +395,21 @@ namespace
         void showInPicker(const std::string& value)
         {
             LLColor4 color;
-            if (resolve(value, color))
+            if (comesTo(value, color))
             {
                 mPicker->setColor(color);
             }
         }
 
+        // What a text comes to, asked of the field's own resolver first,
+        // the way the field asks.
+        bool comesTo(const std::string& value, LLColor4& color) const
+        {
+            return (mResolver && mResolver(value, color)) || resolve(value, color);
+        }
+
         std::string         mValue;
+        ALColorField::resolver_t mResolver;
         LLFilterEditor*     mFilter = nullptr;
         ALColorSwatchGrid*  mGrid = nullptr;
         ALColorPicker*      mPicker = nullptr;
@@ -438,7 +455,13 @@ void ALColorField::setValue(const LLSD& value)
 void ALColorField::setText(const std::string& text)
 {
     mText = text;
-    mHasColor = resolve(mText, mColor);
+    resolveText();
+}
+
+void ALColorField::resolveText() const
+{
+    mHasColor = (mResolver && mResolver(mText, mColor)) || resolve(mText, mColor);
+    mSeenGeneration = LLUIColorTable::instance().generation();
 }
 
 LLSD ALColorField::getValue() const
@@ -446,8 +469,30 @@ LLSD ALColorField::getValue() const
     return mText;
 }
 
+bool ALColorField::textToColor(const std::string& text, LLColor4& color)
+{
+    return resolve(text, color);
+}
+
+void ALColorField::setResolver(resolver_t resolver)
+{
+    mResolver = std::move(resolver);
+    setText(mText);
+}
+
+void ALColorField::setChoices(choices_t choices)
+{
+    mChoices = std::move(choices);
+}
+
+// A name means what the table says now: a colour changed elsewhere
+// shows here without the text having changed.
 bool ALColorField::resolved(LLColor4& color) const
 {
+    if (mSeenGeneration != LLUIColorTable::instance().generation())
+    {
+        resolveText();
+    }
     color = mColor;
     return mHasColor;
 }
@@ -493,10 +538,10 @@ void ALColorField::openPopover()
 {
     closePopover();
 
-    LLFloater::Params p(ALPopover::paramsFor(sWidth, sHeight, mText, /*resizable=*/true));
+    LLFloater::Params p(ALPopover::paramsRemembered("color_field", WIDTH, HEIGHT, mText));
     p.min_width = MIN_WIDTH;
     p.min_height = MIN_HEIGHT;
-    ALColorPopover* popover = new ALColorPopover(p, mText);
+    ALColorPopover* popover = new ALColorPopover(p, mText, mResolver, mChoices ? mChoices() : std::vector<Choice>());
     mPopover = popover->getDerivedHandle<ALPopover>();
     // Told as it goes, while it still holds what was chosen; escaped is
     // the one way out that keeps what the field had.

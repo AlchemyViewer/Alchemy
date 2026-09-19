@@ -333,8 +333,6 @@
   <string>Substituir a URL base para a consulta de atualização.</string>
   <key>CollectFontVertexBuffers</key>
   <string>Quando ativado, alguns elementos de interface usam buffers de cache gerados por fontes e os reutilizam. Quando desativado, é usado um cache geral com sobrecarga significativa de hash, mas que regenera os vértices a cada quadro, ficando sempre atualizado.</string>
-  <key>ColorSettingsHideDefault</key>
-  <string>Mostrar apenas configurações não padrão na lista de Configurações de Cor.</string>
   <key>ComplexityChangesPopUpDelay</key>
   <string>Atraso antes de o viewer mostrar novamente o aviso de complexidade do avatar.</string>
   <key>ConnectAsGod</key>
@@ -1435,8 +1433,6 @@
   <string>Número de logins bem-sucedidos no Second Life.</string>
   <key>NvAPICreateApplicationProfile</key>
   <string>Criar perfil de aplicativo NVIDIA para configurações otimizadas.</string>
-  <key>OSHibernationMode</key>
-  <string>Se deve impedir que o SO hiberne. 0 - pode hibernar; 1 - não pode hibernar, pode desligar a tela; 2 - não pode hibernar, não pode desligar a tela.</string>
   <key>ObjectCacheEnabled</key>
   <string>Ativar o cache de objetos.</string>
   <key>ObjectCostHighColor</key>

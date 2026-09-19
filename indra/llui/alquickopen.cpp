@@ -48,6 +48,10 @@ namespace
     constexpr S32 SCORE_WORD_START  = 2000;
     constexpr S32 SCORE_RUN         = 1000;
     constexpr S32 SCORE_SCATTERED   = 100;
+    // What the other words a candidate answers to score below what its
+    // label would for the same match: a tier. A label that answers is
+    // still what was typed, and the words are how else it is known.
+    constexpr S32 SCORE_WORDS_BELOW = 1000;
 
     char lower(char c)
     {
@@ -175,10 +179,15 @@ S32 ALQuickOpen::score(std::string_view label, std::string_view query)
 std::vector<size_t> ALQuickOpen::rank(const std::vector<Candidate>& candidates,
                                       std::string_view query)
 {
+    // By the label, or by the other words a tier down: a candidate
+    // answering both is scored by whichever answers better.
     std::vector<std::pair<S32, size_t> > scored;
     for (size_t i = 0; i < candidates.size(); ++i)
     {
-        if (const S32 how = score(candidates[i].label, query); how > 0)
+        const S32 by_label = score(candidates[i].label, query);
+        const S32 by_words = score(candidates[i].also, query);
+        const S32 how = llmax(by_label, by_words > 0 ? llmax(1, by_words - SCORE_WORDS_BELOW) : 0);
+        if (how > 0)
         {
             scored.emplace_back(how, i);
         }

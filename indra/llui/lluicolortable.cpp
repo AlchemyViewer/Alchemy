@@ -34,23 +34,17 @@
 void LLUIColorTable::clear()
 {
     clearTable(mLoadedColors);
-    clearTable(mUserSetColors);
+    mUserSetColors.clear();
+    clearTable(mColors);
     mLoadedSheet.clear();
     mUserSheet.clear();
+    ++mGeneration;
 }
 
 LLUIColor LLUIColorTable::getColor(std::string_view name, const LLColor4& default_color) const
 {
-    string_color_map_t::const_iterator iter = mUserSetColors.find(name);
-
-    if(iter != mUserSetColors.end())
-    {
-        return LLUIColor(&iter->second);
-    }
-
-    iter = mLoadedColors.find(name);
-
-    if(iter != mLoadedColors.end())
+    const auto iter = mColors.find(name);
+    if (iter != mColors.end() && colorExists(name))
     {
         return LLUIColor(&iter->second);
     }
@@ -61,30 +55,11 @@ LLUIColor LLUIColorTable::getColor(std::string_view name, const LLColor4& defaul
 // update user color, loaded colors are parsed on initialization
 void LLUIColorTable::setColor(std::string_view name, const LLColor4& color)
 {
-    auto it = mUserSetColors.find(name);
-    if(it != mUserSetColors.end())
-    {
-        it->second = color;
-    }
-    else
-    {
-        string_color_map_t::iterator base_iter = mLoadedColors.find(name);
-        if (base_iter != mLoadedColors.end())
-        {
-            // The node itself moves to the user table, so every handle
-            // taken on the loaded colour now reads the user's; a fresh node
-            // keeps the loaded value for isDefault and resetToDefault.
-            LLColor4 original_color = base_iter->second.get();
-            auto color_handle = mLoadedColors.extract(base_iter);
-            auto new_color_pair = mUserSetColors.insert(std::move(color_handle));
-            new_color_pair.position->second = color;
-            mLoadedColors.emplace(name, LLUIColor(original_color));
-        }
-        else
-        {
-            mUserSetColors.insert(it, std::make_pair(name, color));
-        }
-    }
+    setColor(name, color, mUserSetColors);
+    // Every colour declared by reference to this one follows it.
+    refreshColors();
+
+    ++mGeneration;
 }
 
 bool LLUIColorTable::isDefault(std::string_view name) const
@@ -108,17 +83,16 @@ bool LLUIColorTable::isDefault(std::string_view name) const
 
 void LLUIColorTable::resetToDefault(std::string_view name)
 {
-    string_color_map_t::iterator iter = mUserSetColors.find(name);
-
-    if (iter != mUserSetColors.end())
+    const auto iter = mUserSetColors.find(name);
+    if (iter == mUserSetColors.end())
     {
-        auto default_iter = mLoadedColors.find(name);
-
-        if (default_iter != mLoadedColors.end())
-        {
-            iter->second = default_iter->second.get();
-        }
+        return;
     }
+    mUserSetColors.erase(iter);
+    // A user-only colour's handles keep reading magenta, and the colours
+    // declared by reference to it go back with it.
+    refreshColors();
+    ++mGeneration;
 }
 
 bool LLUIColorTable::loadFromSettings()
@@ -183,6 +157,8 @@ bool LLUIColorTable::load(std::span<const document_t> skin_documents, const LLXM
         }
     }
 
+    refreshColors();
+    ++mGeneration;
     return result;
 }
 
@@ -246,6 +222,52 @@ void LLUIColorTable::saveUserSettings(const bool scrub /* = false */) const
     }
 }
 
+void LLUIColorTable::refreshColors()
+{
+    clearTable(mColors);
+    for (const auto& [name, color] : mLoadedColors)
+    {
+        setColor(name, inForce(name), mColors);
+    }
+    for (const auto& [name, color] : mUserSetColors)
+    {
+        setColor(name, color.get(), mColors);
+    }
+}
+
+LLColor4 LLUIColorTable::inForce(std::string_view name) const
+{
+    // The sheet has already turned cycles and dangling references into the
+    // declarations they shadowed, so the chain ends; the bound is a guard.
+    std::string_view current = name;
+
+    for (S32 depth = 0; depth < 64; ++depth)
+    {
+        if (const auto user = mUserSetColors.find(current); user != mUserSetColors.end())
+        {
+            return user->second.get();
+        }
+
+        const ALColorSheet::Declaration* declared = mLoadedSheet.declarationOf(current);
+
+        if (!declared || declared->kind != ALColorSheet::Declaration::Kind::Reference)
+        {
+            break;
+        }
+
+        current = declared->reference;
+    }
+
+    if (const auto loaded = mLoadedColors.find(current); loaded != mLoadedColors.end())
+    {
+        return loaded->second.get();
+    }
+
+    const auto loaded = mLoadedColors.find(name);
+
+    return loaded == mLoadedColors.end() ? LLColor4::magenta : loaded->second.get();
+}
+
 bool LLUIColorTable::colorExists(std::string_view color_name) const
 {
     return ((mLoadedColors.find(color_name) != mLoadedColors.end())
@@ -273,7 +295,7 @@ void LLUIColorTable::setColor(std::string_view name, const LLColor4& color, stri
     }
     else
     {
-        table.insert(it, string_color_map_t::value_type(name, color));
+        table.emplace(name, color);
     }
 }
 

@@ -1731,6 +1731,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("res_scale");
     mReservedUniforms.push_back("dof_width");
     mReservedUniforms.push_back("dof_height");
+    mReservedUniforms.push_back("dof_uv_scale");
 
     mReservedUniforms.push_back("depthMap");
     mReservedUniforms.push_back("shadowMap0");
@@ -1978,8 +1979,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uLensFlareStarburstSpikes");
     mReservedUniforms.push_back("uLensFlareStarburstSharpness");
     mReservedUniforms.push_back("uLensFlareStarburstFalloff");
-    mReservedUniforms.push_back("uLensFlareOcclusionTaps");
     mReservedUniforms.push_back("uLensFlareLightColor");
+    mReservedUniforms.push_back("uLensFlareStateMap");
+    mReservedUniforms.push_back("uLensFlareFadeTime");
 
     // Color Correction LUT
     mReservedUniforms.push_back("uColorGradeLut");
@@ -1997,7 +1999,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uHighlightRatio");
     mReservedUniforms.push_back("uMidtoneRatio");
     mReservedUniforms.push_back("uMidtoneAmount");
-    mReservedUniforms.push_back("uSplitToneMid");
+    mReservedUniforms.push_back("uSplitToneShadowRamp");
+    mReservedUniforms.push_back("uSplitToneHighlightRamp");
     mReservedUniforms.push_back("uToneAmount");
 
     // Display-space grading
@@ -2011,10 +2014,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uVibrance");
     mReservedUniforms.push_back("uHueShiftNorm");
 
-    // Per-channel filmic curves
-    mReservedUniforms.push_back("uCurveToe");
-    mReservedUniforms.push_back("uCurveInvRange");
-    mReservedUniforms.push_back("uCurveStrength");
+    // Tone curve LUT
+    mReservedUniforms.push_back("uToneCurveLut");
+    mReservedUniforms.push_back("uToneCurveLutScale");
+    mReservedUniforms.push_back("uToneCurveAmount");
 
     // Vignette
     mReservedUniforms.push_back("uVignetteAmount");
@@ -2052,6 +2055,62 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uReferenceStill");
     mReservedUniforms.push_back("uRefWipeMode");
     mReservedUniforms.push_back("uRefWipePos");
+
+    // Geometric lens distortion
+    mReservedUniforms.push_back("uLensDistortAmount");
+    mReservedUniforms.push_back("uLensDistortK");
+    mReservedUniforms.push_back("uLensDistortScale");
+    mReservedUniforms.push_back("uLensDistortSqueeze");
+    mReservedUniforms.push_back("uLensDistortCenter");
+    mReservedUniforms.push_back("uLensDistortTangential");
+
+    // Bokeh
+    mReservedUniforms.push_back("uBokehHighlightThreshold");
+    mReservedUniforms.push_back("uBokehHighlightGain");
+    mReservedUniforms.push_back("uBokehHighlightClamp");
+    mReservedUniforms.push_back("uBokehBlades");
+    mReservedUniforms.push_back("uBokehApertureRotation");
+    mReservedUniforms.push_back("uBokehApertureCurvature");
+    mReservedUniforms.push_back("uBokehApertureConst");
+    mReservedUniforms.push_back("uBokehAnamorphic");
+    mReservedUniforms.push_back("uBokehCatEye");
+    mReservedUniforms.push_back("uBokehFringeAmount");
+    mReservedUniforms.push_back("uBokehFringeNearTint");
+    mReservedUniforms.push_back("uBokehFringeFarTint");
+
+    // Lens dirt
+    mReservedUniforms.push_back("uLensDirtMap");
+    mReservedUniforms.push_back("uLensDirtStrength");
+    mReservedUniforms.push_back("uLensDirtBloomResponse");
+    mReservedUniforms.push_back("uLensDirtFlareResponse");
+
+    // Lens dirt generation
+    mReservedUniforms.push_back("uDirtResolution");
+    mReservedUniforms.push_back("uDirtSeed");
+    mReservedUniforms.push_back("uDirtGrime");
+    mReservedUniforms.push_back("uDirtMoteScale");
+    mReservedUniforms.push_back("uDirtSmudge");
+    mReservedUniforms.push_back("uDirtScratches");
+    mReservedUniforms.push_back("uDirtToe");
+    mReservedUniforms.push_back("uDirtGain");
+
+    // Cross-screen filter
+    mReservedUniforms.push_back("uCrossTexel");
+    mReservedUniforms.push_back("uCrossDir");
+    mReservedUniforms.push_back("uCrossLength");
+    mReservedUniforms.push_back("uCrossFalloff");
+    mReservedUniforms.push_back("uCrossChromatic");
+    mReservedUniforms.push_back("uCrossPassScale");
+    mReservedUniforms.push_back("uCrossStrength");
+    mReservedUniforms.push_back("uCrossRegion");
+    mReservedUniforms.push_back("uCrossClamp");
+
+    mReservedUniforms.push_back("uBokehSpherical");
+    mReservedUniforms.push_back("uBokehFieldStretch");
+    mReservedUniforms.push_back("uBokehFieldFalloff");
+    mReservedUniforms.push_back("uBokehComaAsymmetry");
+
+    mReservedUniforms.push_back("crossFilterMap");
 
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");

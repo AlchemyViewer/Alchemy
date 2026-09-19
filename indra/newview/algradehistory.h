@@ -50,6 +50,19 @@
  * `record` takes the current time rather than reading one, so the coalescing
  * window is exercised by the tests directly instead of by sleeping.
  *
+ * @par Nothing that changed nothing
+ * A step whose every control ends where it started is not kept: a drag that
+ * comes back to its starting value, a group whose writes cancel out, a write
+ * of the value already there. Each of those would be an undo step that visibly
+ * does nothing, which reads as Ctrl+Z being broken just as surely as a hundred
+ * steps for one drag does.
+ *
+ * @par Names
+ * A group can be given a label when it opens -- "Reset Bloom", "Look: Soft
+ * Film" -- and the step it makes carries it, for a history that is shown
+ * rather than only stepped through. A step made any other way has none, and
+ * the caller names it from its changes.
+ *
  * @par What it deliberately does not do
  * It stores values, not dirty state. Undoing restores what the settings were;
  * it does not try to restore whether the active Look was considered modified.
@@ -78,15 +91,18 @@ public:
 
     /// Record one control changing from @a before to @a after at @a now
     /// (seconds, monotonic; only differences matter). Recording anything
-    /// discards the redo tail, as every undo stack does.
+    /// discards the redo tail, as every undo stack does -- except a write of
+    /// the value already there, which is not a change and leaves the stack
+    /// exactly as it was.
     void record(const std::string& name, const LLSD& before, const LLSD& after, F32 now);
 
     /// @name Grouping
     /// Everything recorded between these becomes a single step, whatever the
     /// controls or the timing -- for a section reset, or applying a Look.
-    /// Nesting is counted, so a group inside a group is still one step.
+    /// Nesting is counted, so a group inside a group is still one step, and
+    /// the outermost group's @a label is the one the step carries.
     /// @{
-    void beginGroup();
+    void beginGroup(const std::string& label = std::string());
     void endGroup();
     /// @}
 
@@ -105,12 +121,32 @@ public:
     size_t depth() const { return mStack.size(); }
     size_t cursor() const { return mCursor; }
 
+    /// @name Reading the stack, oldest first
+    /// For showing the history: @a index runs 0 .. depth() - 1, and the first
+    /// cursor() of them are the ones in force.
+    /// @{
+    const Transaction& at(size_t index) const { return mStack[index].mChanges; }
+    /// The label of the group that made the step, or empty.
+    const std::string& labelOf(size_t index) const { return mStack[index].mLabel; }
+    /// @}
+
+    /// Changes whenever the stack or the cursor does, and at no other time,
+    /// so a view of the history can tell from one number whether it is
+    /// showing the stack as it is now.
+    U32 revision() const { return mRevision; }
+
 private:
+    struct Step
+    {
+        Transaction mChanges;
+        std::string mLabel;
+    };
+
     /// True when the top transaction is a lone write to @a name that is recent
     /// enough to absorb another.
     bool canCoalesce(const std::string& name, F32 now) const;
 
-    std::vector<Transaction> mStack;
+    std::vector<Step> mStack;
 
     /// How many transactions are currently applied. Everything at or past this
     /// index is redoable; everything before it is undoable.
@@ -119,9 +155,12 @@ private:
     S32         mGroupDepth = 0;
     /// Index of the transaction the current group is accumulating into.
     size_t      mGroupIndex = 0;
+    /// What the outermost open group asked its step to be called.
+    std::string mGroupLabel;
     std::string mLastName;
     F32         mLastTime = 0.f;
     bool        mHaveLast = false;
+    U32         mRevision = 0;
 };
 
 #endif // AL_GRADEHISTORY_H

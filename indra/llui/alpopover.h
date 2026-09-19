@@ -51,6 +51,13 @@
 // header, or resizes -- derives from this, builds its own content, and
 // opens with openBeside(): the placing and the three ways out are the same
 // for every one of them.
+//
+// A popover is a window of its own, so a key pressed over it never climbs
+// to the window it opened from, and a Control key would go to the viewer's
+// menu bar instead. Keys the popover and its content do not take go home
+// to the floater the anchor was in, the way a pane out in a window of its
+// own sends them (ALPanelFloater), so a window's own shortcuts still answer
+// while one of its popovers has the keyboard.
 class ALPopover : public LLFloater
 {
 public:
@@ -71,6 +78,15 @@ public:
     static LLFloater::Params paramsFor(S32 width, S32 height,
                                        const std::string& title = LLStringUtil::null,
                                        bool resizable = false);
+
+    // The same, at the size the last popover of this kind was left at, or
+    // the size given where none has been: how much of a colour wheel a
+    // person wants to see is theirs to decide, and once decided it should
+    // not have to be decided again for the next one. A popover built from
+    // these remembers its size as it closes.
+    static LLFloater::Params paramsRemembered(const std::string& kind, S32 width, S32 height,
+                                              const std::string& title = LLStringUtil::null,
+                                              bool resizable = true);
 
     // Opened beside the anchor: under it with their left edges together,
     // above it where under would run off the bottom, and shoved back on
@@ -94,16 +110,23 @@ public:
 
     bool escaped() const { return mEscaped; }
 
+    // The floater the anchor was in, which unhandled keys go home to.
+    LLFloater* home() const { return mHome.get(); }
+
     void onClose(bool app_quitting) override;
     void onFocusLost() override;
     bool handleKeyHere(KEY key, MASK mask) override;
+    bool hasAccelerators() const override { return !mHome.isDead(); }
 
 protected:
     friend class LLUICtrlFactory;
     ALPopover(const LLFloater::Params& p);
 
 private:
-    bool            mEscaped = false;
-    bool            mSaidSo = false;    // the signal is sent once
-    closed_signal_t mClosed;
+    bool                mEscaped = false;
+    bool                mSaidSo = false;    // the signal is sent once
+    closed_signal_t     mClosed;
+    LLHandle<LLFloater> mHome;
+    // What paramsRemembered was asked for, and so what the size is kept as.
+    std::string         mSizeKind;
 };

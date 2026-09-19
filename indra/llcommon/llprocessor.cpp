@@ -186,6 +186,7 @@ namespace
         "SVE Instructions", // 47
     };
 
+#ifndef LL_ARM64
     std::string intel_CPUFamilyName(int composed_family)
     {
         switch(composed_family)
@@ -241,7 +242,7 @@ namespace
         }
         return STRINGIZE("Unrecognized CPU vendor <" << cpu_vendor << ">");
     }
-
+#endif
 } // end unnamed namespace
 
 // The base class for implementations.
