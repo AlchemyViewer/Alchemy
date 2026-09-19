@@ -52,6 +52,7 @@
 #include "llcommandhandler.h"   // secondlife:///app/chat/ support
 #include "llviewercontrol.h"
 #include "llgesturemgr.h"
+#include "llfloaterimcontainer.h"
 #include "llfloaterimnearbychat.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -416,6 +417,22 @@ void ALChatBar::changeChannelLabel(S32 channel)
 //-----------------------------------------------------------------------
 // Static functions
 //-----------------------------------------------------------------------
+
+// static
+bool ALChatBar::shouldUseChatBar()
+{
+    static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
+    if (!sChatInWindow)
+    {
+        return false;
+    }
+
+    // Prefer the chat bar only while the Conversations floater is closed, so
+    // that starting chat does not put the chat bar on top of the window the
+    // user is already reading.
+    LLFloaterIMContainer* conversations = LLFloaterIMContainer::findInstance();
+    return !conversations || !conversations->getVisible() || conversations->isMinimized();
+}
 
 // static
 void ALChatBar::startChat(const char* line)

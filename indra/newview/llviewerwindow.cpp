@@ -3457,8 +3457,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         letter_keys_Focus_chat_bar && !gAgentCamera.cameraMouselook() &&
         !keyboard_focus && key < 0x80 && (mask == MASK_NONE || mask == MASK_SHIFT) )
     {
-        static LLCachedControl<bool> sChatInWindow(gSavedSettings, "AlchemyNearbyChatInput", true);
-        if (!sChatInWindow)
+        if (!ALChatBar::shouldUseChatBar())
         {
             // Initialize nearby chat if it's missing
             LLFloaterIMNearbyChat* nearby_chat = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat");
