@@ -122,7 +122,7 @@ public:
     // The picker gives its channel sliders 218px and the ring the rest of the
     // width, up to its height. So its width is the ring plus 218: 440 by 220
     // is a ring as tall as the picker. Narrower, and the ring is what shrinks
-    // -- at the 300 this started at, it was 74px across.
+    // -- at 300 it is 74px across.
     static constexpr S32 PICKER_WIDTH = 440;
     static constexpr S32 PICKER_HEIGHT = 220;
     // As small as it may be dragged: the sliders and a ring still worth
@@ -1037,8 +1037,7 @@ void ALFloaterLightBox::endColorSession(bool escaped)
 
 void ALFloaterLightBox::fitSections()
 {
-    // The margin under a section's last row, which is also what every
-    // section's hand-kept height used to add.
+    // The margin under a section's last row.
     constexpr S32 BOTTOM_MARGIN = 8;
 
     for (const ALLightboxDirectory::Section& section : mDirectory.sections())

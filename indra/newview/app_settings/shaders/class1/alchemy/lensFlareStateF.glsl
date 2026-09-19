@@ -5,14 +5,14 @@
  *        pass multiplies its flare by. Written to a 2x1 target; read back next
  *        frame as its own history, exactly like the exposure map.
  *
- * Why a separate pass: the occlusion test used to run inside computeLensFlare,
- * per fragment and from scratch every frame. Its answer is the same for every
- * pixel on screen, and it was binary in time -- the sun's centre pixel gets
- * covered, the whole flare (a streak across the frame, halo, ghosts) is gone
- * in one frame and back the next. A moving camera behind fence posts or
- * foliage turned that into a strobe. Here the visibility can only change at
- * a bounded rate, whatever the geometry does. This header is the one place
- * that story is told; the other sites point here.
+ * Why a separate pass: the occlusion test's answer is the same for every
+ * pixel on screen, so it is measured once rather than per fragment of
+ * computeLensFlare; and measured raw it is binary in time -- the sun's centre
+ * pixel gets covered, the whole flare (a streak across the frame, halo,
+ * ghosts) is gone in one frame and back the next, and a moving camera behind
+ * fence posts or foliage strobes. Here the visibility can only change at a
+ * bounded rate, whatever the geometry does. This header is the one place that
+ * is explained; the other sites point here.
  *
  * Layout (texelFetch, no filtering):
  *   texel 0: rgb = drive, linear HDR: the sun's overbright colour integrated
@@ -36,7 +36,7 @@
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
- * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ * Copyright (C) 2026, Alchemy Viewer Project
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -143,9 +143,9 @@ void main()
         float w  = exp(-K_TAP * dot(t, t));
         w_sum += w;
         // A tap past the frame reads the nearest edge texel for depth and
-        // colour, as the clamped sampler did before this pass existed: an
-        // occluder reaching the edge still occludes, and a sun just out of
-        // view keeps its glow, so the streak survives across the edge margin.
+        // colour: an occluder reaching the edge still occludes, and a sun just
+        // out of view keeps its glow, so the streak survives across the edge
+        // margin.
         vec2  uv  = clamp(sun_uv + t * radius_uv, vec2(0.0), vec2(1.0));
         float sky = skyOf(texture(depthMap, uv).r);
         if (sky > 0.0)

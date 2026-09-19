@@ -339,11 +339,10 @@ void main()
             // axes multiply to 1), so the control changes the shape of the blur
             // without also changing how much of it there is.
             //
-            // Anamorphic alone is a diagonal matrix, which is what this used to
-            // be as two scalars. Field stretch adds a second squeeze on the
-            // radial axis, so the pair becomes a general 2x2 carried as its two
-            // column vectors. With field stretch off it reduces to (anam.x, 0)
-            // and (0, anam.y) -- the old behaviour, bit for bit.
+            // Anamorphic alone is a diagonal matrix. Field stretch adds a
+            // second squeeze on the radial axis, so the pair becomes a general
+            // 2x2 carried as its two column vectors; with field stretch off it
+            // reduces to (anam.x, 0) and (0, anam.y).
             if (uBokehFieldStretch != 0.0 && field_len > 1e-5)
             {
                 // Stretch across the radius for swirl, along it for coma. The
@@ -375,10 +374,9 @@ void main()
             // Largest singular value of the basis -- how far its widest axis
             // has been stretched. Ring sample counts scale by it so a deformed
             // disc does not thin out into visible rings. This reduces exactly
-            // to max(anam.x, anam.y) when there is no field stretch, which is
-            // what the line used to be, and it cannot be replaced by
-            // max(old, new) once field stretch is live: the two stretch axes
-            // can oppose, and the true maximum then sits *below* max(anam).
+            // to max(anam.x, anam.y) when there is no field stretch, and is
+            // not max(anam, field) with it: the two stretch axes can oppose,
+            // and the true maximum then sits *below* max(anam).
             // Capped because it multiplies the tap count directly, and the only
             // other bound on it is a pair of CPU clamps two files away.
             float bF = dot(ax, ax) + dot(ay, ay);

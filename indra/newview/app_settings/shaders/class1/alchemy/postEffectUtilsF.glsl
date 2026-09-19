@@ -840,10 +840,10 @@ vec2 applyLensDistortion(vec2 uv)
 // Tier 3 (uniform branch) rather than a compile-time permutation, because this
 // file is a shared object attached to all nine post programs and no
 // per-program define can reach it. The strength is forced to 0 by the CPU
-// whenever no plate is loaded, so the sampler is never read unbound.
+// whenever no plate exists, so the sampler is never read unbound.
 //
-// Single-channel plates are swizzled R -> RGB at upload, so mono and colour
-// plates both arrive here as plain RGB.
+// The plate is a single channel: dirt is a scalar mask, and the generator
+// (lensDirtGenF.glsl) writes one into an R8 target.
 
 uniform sampler2D uLensDirtMap;
 uniform float     uLensDirtStrength;   // 0 disables
@@ -855,10 +855,7 @@ vec3 applyLensDirt(vec2 uv, vec3 lens_light)
 
     // Sampled with raw screen UV, and there is no fitting to do: the plate is
     // generated at the frame's own aspect, so a mote is already round on the
-    // display it was made for. The square plates this replaced needed a
-    // cover-fit and gave up the frame's edges to get it.
-    //
-    // Single channel -- dirt is a scalar mask, and the generator writes one.
+    // display it was made for.
     return lens_light * texture(uLensDirtMap, uv).r * uLensDirtStrength;
 }
 

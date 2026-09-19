@@ -58,8 +58,7 @@ uniform float uCrossPassScale;    // 1, TAPS, TAPS^2 across the three iterations
 // range, which is exactly what CLAMP_TO_EDGE did at the edge of a dedicated
 // target and what stops a tap near the edge reading the neighbouring
 // quadrant. A whole texture is region (0,0,1,1) with a clamp of 0, where the
-// sampler's own edge clamp still applies. Verified texel for texel against
-// the dedicated-target chain before it shipped.
+// sampler's own edge clamp still applies.
 uniform vec4  uCrossRegion;
 uniform vec2  uCrossClamp;
 
@@ -73,8 +72,7 @@ in vec2 vary_texcoord0;
 // every integer offset from 0 to 63 exactly once, weighted falloff^-offset:
 // an exact exponential line filter from twelve taps instead of sixty-four.
 //
-// Two things break that, and both were shipped and had to be found the hard
-// way:
+// Two things break that:
 //
 //   - TAPS not matching the stride. Six taps against a stride of four covers
 //     the same span with multiplicity running 1,1,1,1,2,2,1,1,2,2,... -- a

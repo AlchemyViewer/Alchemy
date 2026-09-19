@@ -127,9 +127,8 @@ public:
     /// surfaces.
     /// @{
 
-    /// Default half-width of the shadow and highlight ramps. It was hard-coded
-    /// in the shader before the widths became settings; those settings default
-    /// to it so every Look saved before then renders unchanged.
+    /// Default half-width of the shadow and highlight ramps: what the width
+    /// settings default to, and so what a Look that does not carry them gets.
     static constexpr F32 SPLIT_TONE_DEFAULT_WIDTH = 0.35f;
 
     /// Floor applied before the reciprocal: a zero-width setting becomes a

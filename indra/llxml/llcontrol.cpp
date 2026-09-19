@@ -194,11 +194,10 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
         result = a.asString() == b.asString();
         break;
     case TYPE_LLSD:
-        // Deep equality by value. Without this case an LLSD-typed control
-        // compared as "always changed": a write of the value it already held
-        // fired the commit signal and dirtied whatever watched it, the control
-        // was never at its default and so was always persisted, and a reset
-        // from a value equal to the default still counted as a change.
+        // Deep equality by value, so that a write of the value already held
+        // fires nothing, a control holding its default is at default and not
+        // persisted, and a reset from a value equal to the default is not a
+        // change.
         result = llsd_settings_equal(a, b);
         break;
     default:

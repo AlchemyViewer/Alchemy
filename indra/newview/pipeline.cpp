@@ -1657,11 +1657,10 @@ void LLPipeline::createLUTBuffers()
 
 // Lens dirt plate generator.
 //
-// The plate used to be one of four bundled images picked from a list. Generating
-// it makes it resolution-independent -- built at the frame's own aspect, so a
-// mote stays round on an ultrawide without the cover-fit the square plates
-// needed -- and puts the grime itself on sliders instead of shipping fixed looks
-// and hoping one fits the shot.
+// Generated rather than loaded from a bundled image: a plate built at the
+// frame's own aspect keeps a mote round on an ultrawide with no cover-fit, and
+// puts the grime itself on sliders instead of shipping fixed looks and hoping
+// one fits the shot.
 //
 // This is not a per-frame pass. It runs when a parameter moves or the window
 // resizes, and that budget is what lets the shader afford four cellular layers,
@@ -8056,7 +8055,7 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     {
         // The history holds the old body's colour while the anchor moves to
         // the new one this frame; a sun flare fading out on the moon is wrong,
-        // so start over, as the per-frame probe used to.
+        // so start over.
         mLensFlareSunUp = sun_up;
         if (mLensFlareStateValid)
         {
@@ -9028,13 +9027,10 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         // Streak from mip 0, which at this point in the pass still holds the
         // raw thresholded extract: the downsample chain writes mips 1 and up
         // and leaves mip 0 untouched, so it is the sharpest and cleanest
-        // "which pixels are bright" answer available.
-        //
-        // This used to pick a half-resolution mip to save fill. That made the
-        // arms visibly fat, and not merely because of the upscale: mip 1 is a
-        // 13-tap downsample, so the highlight being streaked had already been
-        // smeared into a blob before the streak ever started, and a streak can
-        // be no thinner than the point it is drawn from.
+        // "which pixels are bright" answer available. Not a lower mip to save
+        // fill: mip 1 is a 13-tap downsample, so the highlight being streaked
+        // is already a blob before the streak starts, and a streak can be no
+        // thinner than the point it is drawn from.
         //
         // Cost scales with RenderBloomResolutionScale, which sizes the whole
         // pyramid -- lowering it makes the streaks cheaper and softer together.
@@ -9088,16 +9084,13 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_LENGTH, llclamp(cross_length(), 0.25f, 2.f));
 
             // Falloff is authored as a 0..1.5 tightness and converted here to
-            // the exponential base the shader wants.
-            //
-            // Exposing that base directly was a mistake. Weights are
-            // pow(base, -step_index) and step_index reaches 63 across the
-            // chain, so base 1.5 attenuates the far taps by 1e-11 -- the arms
-            // simply vanished -- and everything usable lived between 1.0 and
-            // roughly 1.1. Well over nine tenths of the shipped range did
-            // nothing but turn the effect off. This maps the whole slider onto
-            // that band: the value is how many e-folds of brightness are lost
-            // between the core and the tip of an arm, over six.
+            // the exponential base the shader wants, rather than exposing the
+            // base: weights are pow(base, -step_index) and step_index reaches
+            // 63 across the chain, so a base of 1.5 attenuates the far taps by
+            // 1e-11 and everything usable lives between 1.0 and roughly 1.1.
+            // This maps the whole slider onto that band: the value is how many
+            // e-folds of brightness are lost between the core and the tip of
+            // an arm, over six.
             const F32 tightness = llclamp(cross_falloff(), 0.1f, 3.f);
             // The chain's exact reach, TAPS^3 - 1, derived from the same constant
             // the shader compiles against -- see CROSS_FILTER_TAPS.
@@ -9184,11 +9177,10 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
                 // The arm's last pass adds into the shared accumulator -- except
                 // the first, which overwrites it. The fullscreen triangle covers
-                // every texel, so arm 0 establishes the buffer and the clear this
-                // used to need was the same redundant fill the scratch passes
-                // already avoid. It does couple correctness to the first
-                // iteration running, which holds because `arms` is clamped to at
-                // least 2 above.
+                // every texel, so arm 0 establishes the buffer and a clear would
+                // be the same redundant fill the scratch passes avoid. It does
+                // couple correctness to the first iteration running, which holds
+                // because `arms` is clamped to at least 2 above.
                 {
                     LLGLState blend(GL_BLEND, arm > 0);
                     gGL.setSceneBlendType(LLRender::BT_ADD);
@@ -9698,9 +9690,9 @@ void LLPipeline::renderDoF()
             //                there otherwise would be composited as bloom.
             //
             // Without HDR there is no pyramid, so the blur goes to postPongMap
-            // (RGBA8, idle until the AA chain), again what the old path used.
-            // Together this is what keeps DoF at zero full-frame targets of
-            // its own, where it used to carry two -- 44 MB at 1440p.
+            // (RGBA8, idle until the AA chain). Together this is what keeps DoF
+            // at zero full-frame targets of its own: two would be 44 MB at
+            // 1440p.
             static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);
             const bool hdr = gGLManager.mGLVersion > 4.05f && has_hdr();
 
@@ -9859,9 +9851,9 @@ void LLPipeline::renderDoF()
                                          (F32)dof_height / (F32)mRT->screen.getHeight());
 
             { // gather blur at CameraDoFResScale into the borrowed scratch
-                // Writes to a separate target rather than in place, so the
-                // alpha-preserving colour mask this pass used to need is gone:
-                // the CoF it reads still lives in the sharp copy's alpha.
+                // Writes to a separate target rather than in place, so no
+                // colour mask is needed to preserve alpha: the CoF it reads
+                // lives in the sharp copy's alpha.
                 blur->bindTarget();
                 glViewport(0, 0, dof_width, dof_height);
 
@@ -10273,10 +10265,9 @@ void LLPipeline::renderFinalize()
         {
             // Every shape parameter fades with the master amount, each toward
             // its own neutral: the polynomial coefficients and decentering
-            // toward 0, the squeeze toward 1. Scaling only the coefficients
-            // was a shipped bug -- with a non-neutral squeeze dialled in,
-            // dragging Amount off zero made the radial bend fade in smoothly
-            // while the full anamorphic stretch snapped on in a single frame.
+            // toward 0, the squeeze toward 1. The squeeze included -- scaling
+            // only the coefficients would have the radial bend fade in
+            // smoothly while a non-neutral stretch snapped on in one frame.
             const F32 k1 = llclamp(distort_k1(), -0.5f, 0.5f) * distort;
             const F32 k2 = llclamp(distort_k2(), -0.25f, 0.25f) * distort;
             const F32 p1 = llclamp(distort_tangential().mV[0], -0.05f, 0.05f) * distort;
@@ -10407,11 +10398,11 @@ void LLPipeline::renderFinalize()
                 // while the polynomial is monotonic over the frame -- but
                 // strong barrel folds it over (the radial factor goes negative
                 // past its turning point), and then an interior pixel can be
-                // flung further than any boundary pixel. Verified numerically:
-                // at clamp-edge settings a boundary-only solve passed all 64
-                // probes while a mid-frame island escaped. A 15x15 grid
-                // catches every satisfiable interior bind for a few hundred
-                // cheap evaluations. Fit only: Fill takes the max, which the
+                // flung further than any boundary pixel: at clamp-edge settings
+                // a boundary-only solve passes all 64 probes while a mid-frame
+                // island escapes. A 15x15 grid catches every satisfiable
+                // interior bind for a few hundred cheap evaluations. Fit only:
+                // Fill takes the max, which the
                 // near-axis interior would poison with huge exit scales.
                 if (fit_mode == 1)
                 {
