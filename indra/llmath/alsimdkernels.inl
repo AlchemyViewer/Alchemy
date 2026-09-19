@@ -443,8 +443,10 @@ AL_SIMD_INLINE void skin_blend_impl(const F32* weights, const LLMatrix4a* palett
     llassert(alsimd::lane<0>(sum) > 0.f);
     const f32x4 wv = alsimd::div(frac, sum);
 
+    alignas(16) F32 joint_bits[4];
+    alsimd::store(joint_bits, alsimd::as_f32(joints));
     alignas(16) S32 joint[4];
-    alsimd::store(reinterpret_cast<F32*>(joint), alsimd::as_f32(joints));
+    std::memcpy(joint, joint_bits, sizeof(joint));
     U32 idx[4];
     for (int k = 0; k < 4; ++k)
     {

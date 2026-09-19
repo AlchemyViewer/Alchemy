@@ -138,12 +138,12 @@ namespace
     // every lane's bits set but the one to skip
     AL_SIMD_INLINE Lanes::reg keep_all_but(U32 skip)
     {
-        alignas(16) U32 lanes[ALPlaneSet::LANES];
+        alignas(16) F32 lanes[ALPlaneSet::LANES];
         for (U32 i = 0; i < ALPlaneSet::LANES; ++i)
         {
-            lanes[i] = (i == skip) ? 0u : ~0u;
+            lanes[i] = std::bit_cast<F32>((i == skip) ? 0u : ~0u);
         }
-        return load_lanes(reinterpret_cast<const F32*>(lanes));
+        return load_lanes(lanes);
     }
 }
 
