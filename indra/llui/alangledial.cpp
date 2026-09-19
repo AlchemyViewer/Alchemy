@@ -201,6 +201,12 @@ bool ALAngleDial::handleHover(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleHover(x, y, mask);
 }
 
+void ALAngleDial::onMouseCaptureLost()
+{
+    mDragging = false;
+    LLUICtrl::onMouseCaptureLost();
+}
+
 bool ALAngleDial::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     if (!mDragging)

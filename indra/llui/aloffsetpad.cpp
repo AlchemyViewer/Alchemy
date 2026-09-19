@@ -198,6 +198,12 @@ bool ALOffsetPad::handleHover(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleHover(x, y, mask);
 }
 
+void ALOffsetPad::onMouseCaptureLost()
+{
+    mDragging = false;
+    LLUICtrl::onMouseCaptureLost();
+}
+
 bool ALOffsetPad::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     if (!mDragging)

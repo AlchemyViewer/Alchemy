@@ -51,6 +51,9 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
+    // A drag ends with the button, or with the mouse taken away: either
+    // way the pointer stops turning the dial.
+    void onMouseCaptureLost() override;
 
 protected:
     friend class LLUICtrlFactory;

@@ -430,6 +430,8 @@ if(AL_BUILD_TESTS)
     alcanvasview
     aldockpanel
     alpanefolds
+    alangledial
+    aloffsetpad
     alemptystate
     alxuifill
     alviewtype
