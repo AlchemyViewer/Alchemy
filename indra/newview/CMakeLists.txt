@@ -320,7 +320,6 @@ if(AL_BUILD_VIEWER)
     llfloaterassetrecovery.cpp
     llfloateravatarwelcomepack.cpp
     llfloaterbvhpreview.cpp
-    llfloateraddpaymentmethod.cpp
     llfloaterauction.cpp
     llfloaterautoreplacesettings.cpp
     llfloateravatarpicker.cpp
@@ -1110,7 +1109,6 @@ if(AL_BUILD_VIEWER)
     llfloaterassetrecovery.h
     llfloateravatarwelcomepack.h
     llfloaterbvhpreview.h
-    llfloateraddpaymentmethod.h
     llfloaterauction.h
     llfloaterautoreplacesettings.h
     llfloateravatarpicker.h
