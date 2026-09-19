@@ -35,6 +35,7 @@
 #include "../llaccordionctrltab.h"
 #include "../llspinctrl.h"
 #include "../lltextbox.h"
+#include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 #include "llcallbacklist.h"
 
@@ -1098,6 +1099,48 @@ namespace tut
         ensure_equals("first as given", grid->fields()[0].name, std::string("radius"));
         ensure_equals("second as given", grid->fields()[1].name, std::string("corners"));
         ensure_equals("the written one stays where it was", grid->fields()[2].name, std::string("border"));
+        grid->die();
+    }
+
+    // A kept row is put right in every way it can change under an update:
+    // what its tip says follows the field, a part being scrubbed keeps the
+    // number under the hand, and a field that would build a different
+    // control -- another step -- is refused rather than kept stale.
+    template<> template<>
+    void alpropertygrid_object::test<25>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("rect", 0));
+        fields.back().kind = ALParamType::INTEGER;
+        fields.back().components = { "L", "T", "R", "B" };
+        fields.back().value = "10 20 30 40";
+        grid->setFields(fields);
+        gIdleCallbacks.callFunctions();
+
+        LLPanel* row = grid->getChild<LLPanel>("identity_rows", true)->getChild<LLPanel>("rect_row", true);
+        LLTextBox* label = row->getChild<LLTextBox>("rect_label", true);
+        LLSpinCtrl* top = row->getChild<LLSpinCtrl>("rect.T", true);
+
+        fields[0].description = "Where it sits.";
+        ensure("a new description keeps the row", grid->updateFields(fields));
+        ensure("and the tip says it", label->getToolTip().find("Where it sits.") != std::string::npos);
+
+        // Scrubbing T: the update lands in the other three and not in T.
+        gFocusMgr.setMouseCapture(top);
+        fields[0].value = "11 21 31 41";
+        ensure("a new value keeps the row", grid->updateFields(fields));
+        ensure_equals("the part under the hand keeps its number", top->getValue().asInteger(), 20);
+        ensure_equals("and the others take theirs", row->getChild<LLSpinCtrl>("rect.L", true)->getValue().asInteger(), 11);
+        gFocusMgr.setMouseCapture(nullptr);
+
+        fields[0].step = 5.f;
+        ensure("another step is another control, so the rows differ", !grid->updateFields(fields));
         grid->die();
     }
 }

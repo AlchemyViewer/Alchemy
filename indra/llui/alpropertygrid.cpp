@@ -390,13 +390,18 @@ void ALPropertyGrid::order(std::vector<Field>& fields) const
     });
 }
 
+// Everything a row is built from, and nothing a row is refreshed with: the
+// value, who wrote it, what the tip says and where a subject sits change
+// under a kept row, and updateFields puts each of those right in place.
 bool ALPropertyGrid::sameRow(const Field& a, const Field& b)
 {
     return a.name == b.name && a.group == b.group && a.kind == b.kind && a.type == b.type && a.label == b.label
         && a.values == b.values && a.valueLabels == b.valueLabels && a.components == b.components
         && a.corners == b.corners && a.pad == b.pad && a.dial == b.dial && a.slider == b.slider
         && a.bounded == b.bounded && a.minimum == b.minimum && a.maximum == b.maximum
-        && a.edges == b.edges && a.flags == b.flags && a.pairWith == b.pairWith && a.ignored == b.ignored;
+        && a.step == b.step && a.decimals == b.decimals
+        && a.edges == b.edges && a.flags == b.flags && a.allWord == b.allWord && a.noneWord == b.noneWord
+        && a.pairWith == b.pairWith && a.ignored == b.ignored && a.alsoWritten == b.alsoWritten;
 }
 
 bool ALPropertyGrid::updateFields(std::vector<Field> fields)
@@ -416,16 +421,30 @@ bool ALPropertyGrid::updateFields(std::vector<Field> fields)
     for (size_t i = 0; i < fields.size(); ++i)
     {
         Field& current = mFields[i];
-        const bool value_changed = current.value != fields[i].value;
-        const bool authored_changed = current.authored != fields[i].authored || current.source != fields[i].source;
+        const Field& next = fields[i];
+        const bool value_changed = current.value != next.value;
+        const bool authored_changed = current.authored != next.authored || current.source != next.source;
+        // The tip is made from these as well as from who wrote the value.
+        const bool said_changed = current.unknown != next.unknown || current.deprecated != next.deprecated
+                               || current.instead != next.instead || current.description != next.description;
+        // Where the thing a follows row is about sits, which moves with
+        // every edit of its rect and is drawn rather than built.
+        const bool subject_changed = current.subject != next.subject || current.subjectParent != next.subjectParent;
         current = std::move(fields[i]);
-        if (authored_changed)
+        if (authored_changed || said_changed)
         {
             refreshAuthored(current);
         }
         if (value_changed || authored_changed)
         {
             refreshEditor(current);
+        }
+        if (subject_changed && !current.subjectParent.isEmpty())
+        {
+            if (ALFollowsControl* follows = findChild<ALFollowsControl>(current.name, true))
+            {
+                follows->setSubject(current.subject, current.subjectParent);
+            }
         }
     }
     return true;
@@ -447,7 +466,10 @@ void ALPropertyGrid::refreshEditor(const Field& field)
         for (size_t i = 0; i < field.components.size(); ++i)
         {
             LLSpinCtrl* spin = findChild<LLSpinCtrl>(field.name + "." + field.components[i], true);
-            if (spin && !gFocusMgr.childHasKeyboardFocus(spin) && !spin->hasFocus())
+            // The same test as the whole editor's: one of the three being
+            // scrubbed keeps what the hand is doing.
+            if (spin && !gFocusMgr.childHasKeyboardFocus(spin) && !gFocusMgr.childHasMouseCapture(spin)
+                && !spin->hasFocus() && !spin->hasMouseCapture())
             {
                 spin->setValue(i < parts.size() ? numberOf(parts[i]) : 0.f);
                 spin->setUnset(!field.authored);
