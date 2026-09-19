@@ -817,17 +817,16 @@ viewer.
 Floater-local is not enough on its own, though. `LLViewerWindow::handleKey`
 offers every Ctrl and Alt key to the **menu bar's accelerators before the
 focused floater**, unless something in the focus chain answers
-`hasAccelerators()`. Until the floater claimed them, Ctrl+Shift+Z never reached
-`handleKeyHere` at all: it is World > Environment > Midnight, so the documented
-redo set the sky to midnight. (Ctrl+Z and Ctrl+Y only ever got through because
-the Edit menu enables Undo and Redo only while the current edit handler can
-undo, and a Lightbox line editor has no undo of its own.) The floater now
-returns true from `hasAccelerators`, and a key it does not handle falls through
-to the menus exactly as before. The one thing the menu used to add, Edit > Undo
-for a text control with an edit history, is offered by `handleKeyHere` itself: a
-focused text control inside the floater that `canUndo()`/`canRedo()` gets the
-key before the grade does. Any new shortcut here has to be checked against
-`menu_viewer.xml`, because it is now the Lightbox that wins the clash.
+`hasAccelerators()`; Ctrl+Shift+Z is World > Environment > Midnight, and without
+the claim it sets the sky to midnight instead of redoing. The Lightbox is an
+`ALStudioFloater` (llui), which claims them, and whose `handleUndoKeys` answers
+Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z through the floater's `undo()` / `redo()`. A key
+the floater does not handle falls through to the menus as before. The one thing
+the menu used to add, Edit > Undo for a text control with an edit history, the
+base offers itself: a focused text control inside the floater that
+`canUndo()`/`canRedo()` gets the key before the grade does. Any new shortcut
+here has to be checked against `menu_viewer.xml`, because it is the Lightbox
+that wins the clash.
 
 The Undo and Redo buttons in the top bar are the visible half of that. Both, and
 the reference row, are greyed from `draw()` rather than from a signal — the undo
@@ -1078,11 +1077,16 @@ which any new popover here should go through `showPopover` to get:
   one as a fallback — `die()`, so nothing calls back into a floater half torn
   down.
 - **The floater's shortcuts come along.** A key pressed in a popover never
-  climbs to the Lightbox, since the popover is a window of its own, so each
-  popover can carry a key hook (it then claims accelerators, for the reason in
-  §4f). Find's hook takes Ctrl+F back to the field; History's steps the stack
-  on Ctrl+Z / Ctrl+Y, goes to the selected step on Return, and swaps itself for
-  Find on Ctrl+F.
+  climbs to the Lightbox, since the popover is a window of its own, so
+  `ALPopover` sends home the keys it and its content do not take, to the
+  floater its anchor was in (and claims accelerators, for the reason in §4f).
+  Ctrl+Z / Ctrl+Y step the stack with History up; Return in the history list
+  goes to the selected step; Ctrl+F with Find up takes the keyboard back to the
+  field, keeping what was typed.
+
+Find is the studio base's `quickOpen`, hung from the top bar and as wide as it;
+the base owns that popover, and only History and the colour picker go through
+`showPopover`.
 
 Two more things learned the hard way. A popover given a **title** through
 `ALPopover::show` lays its content over the title bar, so Find and History have
@@ -1136,24 +1140,26 @@ What this asks of the rest of the floater:
   from this floater's root does not reach a page that is out, and it is not an
   error when it fails — it just finds nothing, and Reset All quietly resets
   nothing. That was the reason for the directory.
-- **Pages go back before the floater closes.** `onClose` saves which pages are
-  out and where, then docks them all: a page left in another window would
-  outlive the callbacks it is wired to. It does so even when the viewer is
-  quitting, because windows are closed in no particular order then and
-  `onClose` is the last point at which both this floater and every torn-off
-  window are sure to be whole. The destructor docks again as a fallback, and
-  holds the panes by handle for it — a pane still out belongs to its window,
-  which may already be gone.
+- **Pages go back before the floater closes.** The pages are regions of the
+  studio base's `ALPaneFolds` (`mFolds`), bound at the end of `postBuild`. The
+  base's `onClose` saves which are out and where, then docks them all: a page
+  left in another window would outlive the callbacks it is wired to. It does
+  so even when the viewer is quitting, because windows are closed in no
+  particular order then and `onClose` is the last point at which both this
+  floater and every torn-off window are sure to be whole. The destructor docks
+  again as a fallback.
 - **Keys still reach the floater.** `ALPanelFloater` claims accelerators and
   passes a key it does not handle to the floater it came from, so Ctrl+Z,
   Ctrl+Y and Ctrl+F work from a torn-off tab.
-- **The keyboard is not taken along.** A control with focus is let go before
-  its page leaves, so no keystroke lands in a window nobody is looking at.
-- **Where they were is remembered**: `ALLightboxState["panes_out"]`, keyed by
-  page name, holds whether each page was out and its window's rect, and
-  `restorePanes` takes them out again when the Lightbox next opens.
-  `refreshPaneRow` (polled from `draw()`, since a torn-off window's close box
-  docks without telling anyone) saves whenever the set of pages out changes.
+- **The keyboard is not taken along.** `ALDockPanel::popOut` lets a focused
+  control go before its page leaves, and makes the window forget it was its
+  last focus, so no keystroke lands in a window nobody is looking at.
+- **Where they were is remembered**: `ALLightboxState` holds, per page name,
+  whether it was out (`out_<page>`) and its window's rect (`rect_<page>`), and
+  the Lightbox's own rect; `loadState` at the end of `postBuild` takes the
+  pages out again. `refreshPaneRow` (polled from `draw()`, since a torn-off
+  window's close box docks without telling anyone) saves whenever the set of
+  pages out changes.
 
 ### 5. Height math (the part everyone gets wrong)
 

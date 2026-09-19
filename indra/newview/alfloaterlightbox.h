@@ -33,7 +33,7 @@
 #ifndef AL_FLOATERLIGHTBOX_H
 #define AL_FLOATERLIGHTBOX_H
 
-#include "llfloater.h"
+#include "alstudiofloater.h"
 #include "llframetimer.h"
 
 #include "aldaycyclelandmarks.h"
@@ -41,7 +41,6 @@
 #include "allightboxdirectory.h"
 
 #include <array>
-#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -49,7 +48,6 @@
 #include <vector>
 
 class ALCurveEditorCtrl;
-class ALDockPanel;
 class ALEmptyState;
 class ALPopover;
 class LLButton;
@@ -64,7 +62,7 @@ class LLSliderCtrl;
 class LLSpinCtrl;
 class LLTabContainer;
 
-class ALFloaterLightBox final : public LLFloater
+class ALFloaterLightBox final : public ALStudioFloater
 {
 public:
     AL_VIEW_TYPE(ALFloaterLightBox, LLFloater);
@@ -76,17 +74,11 @@ public:
     ///
     /// Floater-local rather than a global action, unlike the hold-to-compare
     /// key: a global Ctrl+Z would fire while the user is typing anywhere in
-    /// the viewer. A focused text control with an edit history of its own
-    /// keeps these keys for it.
+    /// the viewer. The studio base answers Ctrl+Z and Ctrl+Y/Ctrl+Shift+Z
+    /// through undo() and redo(), and Ctrl+F is this floater's own.
     bool handleKeyHere(KEY key, MASK mask) override;
-    /// Ctrl and Alt keys go to the menu bar's accelerators before the focused
-    /// floater unless something in the focus chain claims accelerators of its
-    /// own, so without this Ctrl+Shift+Z never reached handleKeyHere at all:
-    /// it is World > Environment > Midnight, and pressing it in the Lightbox
-    /// set the sky to midnight instead of redoing. Claiming them costs nothing
-    /// else -- a key this floater does not handle falls through to the menus
-    /// exactly as before.
-    bool hasAccelerators() const override { return true; }
+    bool undo() override { return applyHistory(false); }
+    bool redo() override { return applyHistory(true); }
     /// Only to notice the reference still appearing or going away, which is
     /// render state and so has no signal to hang on. See refreshReferenceRow.
     void draw() override;
@@ -95,22 +87,19 @@ public:
     void onClose(bool app_quitting) override;
 
   private:
-    /// What the popover that is up, if any, is for.
+    /// What the popover that is up, if any, is for. Find is the studio
+    /// base's own quick-open popover, and is not one of these.
     enum class PopoverKind
     {
         None,
-        Find,
         History,
         Color,
     };
-    /// A key the popover gets first while it has the keyboard: the floater's
-    /// own shortcuts, which would otherwise fall to the menu bar.
-    using PopoverKeyHook = std::function<bool(KEY, MASK)>;
-
     /// Put @a content in a popover under @a anchor, closing any other first:
     /// the Lightbox has one popover at a time.
-    ALPopover* showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook);
-    /// Make @a popover the one that is up, and open it under @a anchor.
+    ALPopover* showPopover(PopoverKind kind, LLView* anchor, LLPanel* content);
+    /// Make @a popover the one that is up, and open it under @a anchor; a
+    /// null anchor says it is open already.
     void adoptPopover(PopoverKind kind, ALPopover* popover, LLView* anchor);
     /// Close the popover that is up, keeping what it chose or, escaping,
     /// keeping nothing.
@@ -119,7 +108,8 @@ public:
     void onPopoverClosed(const LLView* which, bool escaped);
 
     /// Find a setting or section by name (Ctrl+F): every section and every
-    /// setting, ranked against what is typed, and Return goes to it.
+    /// setting, ranked against what is typed, and Return goes to it. The
+    /// studio base's Open Quickly, hung from the top bar.
     void openFind();
     /// Show a section, or a setting and the section it is in: its tab chosen,
     /// its section opened and scrolled to, and the setting given the keyboard
@@ -156,28 +146,23 @@ public:
 
     // --- Tabs in windows of their own ---
     //
-    // Each page is wrapped in an ALDockPanel at the end of postBuild, after
-    // the directory has found everything on it: taking a page out moves its
-    // widgets into another window, where no search from this floater would
-    // find them, and the directory's pointers are what keep working.
+    // Each page is a region of the studio base's folds, bound at the end of
+    // postBuild after the directory has found everything on it: taking a
+    // page out moves its widgets into another window, where no search from
+    // this floater would find them, and the directory's pointers are what
+    // keep working. The base saves which are out and where, and puts them
+    // back before the floater closes.
 
     /// Take the current tab out into a window of its own, or put it back.
     void togglePane();
     /// Put one page back.
     void dockPane(size_t page);
-    /// Put every page back: before this floater closes, since a page left in
-    /// another window would outlive the callbacks it is wired to.
-    void dockPanes();
-    /// Remember which pages are out, and where their windows are.
-    void savePanes() const;
-    /// Take the pages that were out last time out again.
-    void restorePanes();
     /// Keep the pages' empty states, the button and the saved state in step
     /// with which pages are out. Polled from draw(), because a torn-off
     /// window's own close box puts its page back without telling anyone.
     void refreshPaneRow();
-    /// The window a page is out in, or null while it is here.
-    LLFloater* paneWindow(size_t page) const;
+    /// What the folds call a page: its panel's name.
+    const std::string& paneKey(size_t page) const;
 
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
@@ -299,15 +284,9 @@ public:
     LLHandle<LLView> mLitCaption;
     LLFrameTimer mLitTimer;
 
-    /// One per page, in tab order: its pane, by handle because a pane is in
-    /// another window while it is out and that window is its parent, and what
-    /// the page says while its pane is away.
-    struct Pane
-    {
-        LLHandle<LLView> mPane;
-        ALEmptyState* mEmpty = nullptr;
-    };
-    std::vector<Pane> mPanes;
+    /// One per page, in tab order: what the page says while its contents
+    /// are away in a window of their own.
+    std::vector<ALEmptyState*> mPaneEmpties;
     LLButton* mPopOutButton = nullptr;
     /// Which pages are out and which tab is up, as last shown; -1 before the
     /// first refresh.

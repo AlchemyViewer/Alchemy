@@ -32,7 +32,6 @@
 #include "alfloaterlightbox.h"
 
 #include "alcolorpicker.h"
-#include "aldockpanel.h"
 #include "alemptystate.h"
 #include "alhistorylist.h"
 #include "alpopover.h"
@@ -43,7 +42,6 @@
 #include "llbutton.h"
 #include "llcolorswatch.h"
 #include "llcombobox.h"
-#include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
 #include "llgl.h"
 #include "lltextbox.h"
@@ -68,6 +66,8 @@
 #include "llviewercontrol.h"
 #include "pipeline.h"
 #include "rlvactions.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <map>
@@ -108,38 +108,6 @@ struct ScopedTrue
 /// find on a busy page, short enough not to be mistaken for a state.
 constexpr F32 LIT_CAPTION_SECONDS = 2.5f;
 
-/// A popover the Lightbox opens. The same placing and the same three ways out
-/// as any other, plus the floater's own shortcuts while it has the keyboard:
-/// the popover is a window of its own, so a key pressed in it never climbs
-/// to the Lightbox, and Ctrl keys would go to the menu bar instead.
-class ALLightboxPopover final : public ALPopover
-{
-public:
-    using KeyHook = std::function<bool(KEY, MASK)>;
-
-    ALLightboxPopover(const LLFloater::Params& p, KeyHook hook)
-    :   ALPopover(p),
-        mKeyHook(std::move(hook))
-    {
-    }
-
-    /// Only with a hook to offer them to; otherwise the menu bar may have
-    /// every Ctrl key as usual.
-    bool hasAccelerators() const override { return (bool)mKeyHook; }
-
-    bool handleKeyHere(KEY key, MASK mask) override
-    {
-        if (mKeyHook && mKeyHook(key, mask))
-        {
-            return true;
-        }
-        return ALPopover::handleKeyHere(key, mask);
-    }
-
-private:
-    KeyHook mKeyHook;
-};
-
 /// The inline picker for a colour row: XUI Studio's hue ring, shade square and
 /// channel tracks, under the row's name, with a way on to the viewer's full
 /// picker for typed numbers and the eyedropper.
@@ -173,11 +141,8 @@ public:
         return header + GAP + picker_height + GAP + BUTTON_HEIGHT + GAP;
     }
 
-    /// The size the last one was left at this session, or zero: how much of a
-    /// wheel someone wants to see is theirs to decide, and once decided it
-    /// should not have to be decided again for the next colour.
-    inline static S32 sWidth = 0;
-    inline static S32 sHeight = 0;
+    /// What the popover remembers its size as, for the next colour.
+    static constexpr const char* SIZE_KIND = "lightbox_color";
 
     ALLightboxColorPopover(const LLFloater::Params& p, const LLColor4& start,
                            std::function<void(const LLColor4&)> on_change,
@@ -225,18 +190,11 @@ public:
         });
         addChild(full);
     }
-
-    void onClose(bool app_quitting) override
-    {
-        sWidth = getRect().getWidth();
-        sHeight = getRect().getHeight();
-        ALPopover::onClose(app_quitting);
-    }
 };
 } // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
-:   LLFloater(key)
+:   ALStudioFloater(key, "ALLightboxState")
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
@@ -284,9 +242,8 @@ ALFloaterLightBox::~ALFloaterLightBox()
     }
     // onClose has put every page back; this is for a floater that dies
     // without closing, which would otherwise leave a page in a window of its
-    // own wired to callbacks on a floater that is gone. By handle, because a
-    // pane still out belongs to its window, and that window may be gone first.
-    dockPanes();
+    // own wired to callbacks on a floater that is gone.
+    mFolds.dockAll();
 
     // The handle in the pick callback already makes a late sample harmless, but
     // an armed picker outliving its floater would leave the user holding an
@@ -469,44 +426,51 @@ bool ALFloaterLightBox::postBuild()
 
     // Last, after everything above has found what it needs: from here a page
     // can be taken out of the floater, and nothing may look for a widget
-    // through it again.
+    // through it again. Each page is a region of the folds, named after its
+    // panel, with no button to fold it -- a page does not fold -- and a
+    // title for the window it goes out in.
     mPopOutButton = findChild<LLButton>("lightbox_pop_out");
+    std::vector<ALPaneFolds::Pane> panes;
+    for (LLPanel* page : mTabPages)
+    {
+        LLStringUtil::format_map_t args;
+        args["[TAB]"] = page->getLabel();
+        panes.push_back({ page->getName(), page->getName(), std::string(), getString("pane_title", args) });
+    }
+    mFolds.bind(this, std::move(panes));
+
     for (size_t index = 0; index < mTabPages.size(); ++index)
     {
         LLPanel* page = mTabPages[index];
         LLStringUtil::format_map_t args;
         args["[TAB]"] = page->getLabel();
 
-        Pane pane;
-        if (ALDockPanel* dock = ALDockPanel::wrap(page, getString("pane_title", args)))
-        {
-            pane.mPane = dock->getHandle();
-        }
-
-        // What the page says while its pane is away: added after the wrap, so
-        // it stays on the page when the page's contents go.
+        // What the page says while its contents are away: added after the
+        // folds have wrapped them, so it stays on the page when they go.
         ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
         ep.name = page->getName() + "_away";
         ep.rect = page->getLocalRect();
         ep.follows.flags = FOLLOWS_ALL;
         ep.background_visible = false;
         ep.visible = false;
-        pane.mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
-        page->addChild(pane.mEmpty);
-        pane.mEmpty->say(getString("pane_away_headline", args), getString("pane_away_sentence", args),
-                         getString("pane_put_back"));
-        pane.mEmpty->onAction([self, index]()
+        ALEmptyState* empty = LLUICtrlFactory::create<ALEmptyState>(ep);
+        page->addChild(empty);
+        empty->say(getString("pane_away_headline", args), getString("pane_away_sentence", args),
+                   getString("pane_put_back"));
+        empty->onAction([self, index]()
         {
             if (ALFloaterLightBox* floater = self.get())
             {
                 floater->dockPane(index);
             }
         });
-        mPanes.push_back(pane);
+        mPaneEmpties.push_back(empty);
     }
-    restorePanes();
+    // The pages that were out last time come out again, and the window goes
+    // back to the shape it was left at.
+    loadState();
 
-    return LLFloater::postBuild();
+    return ALStudioFloater::postBuild();
 }
 
 // Shared by the colour LUT and lens dirt pickers. Both enumerate a bundled
@@ -772,7 +736,7 @@ void ALFloaterLightBox::refreshBypassBadge()
     if (bypassed > 0)
     {
         LLStringUtil::format_map_t args;
-        args["[COUNT]"] = llformat("%d", bypassed);
+        args["[COUNT]"] = fmt::format("{}", bypassed);
         label = getString("bypass_badge", args);
     }
     // The Look tab is the first page; the grading sections all live on it.
@@ -883,40 +847,34 @@ void ALFloaterLightBox::draw()
         fillHistoryList();
     }
 
-    LLFloater::draw();
+    ALStudioFloater::draw();
 }
 
 void ALFloaterLightBox::onClose(bool app_quitting)
 {
     closePopover(false);
-    // Saved before they are put back, or every page would be remembered as
-    // here. And put back even when the viewer is quitting: windows are closed
-    // in no particular order then, and this is the last point at which both
-    // this floater and every torn-off window are sure to still be whole.
-    savePanes();
-    dockPanes();
-    LLFloater::onClose(app_quitting);
+    // The base saves which pages are out before it puts them back, and puts
+    // them back even when the viewer is quitting: windows are closed in no
+    // particular order then, and this is the last point at which both this
+    // floater and every torn-off window are sure to still be whole.
+    ALStudioFloater::onClose(app_quitting);
 }
 
-ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPanel* content, PopoverKeyHook hook)
+ALPopover* ALFloaterLightBox::showPopover(PopoverKind kind, LLView* anchor, LLPanel* content)
 {
-    if (!anchor || !content)
+    // No title: the content is laid out over the whole popover, and a title
+    // bar would be drawn under it. The floater's own shortcuts still answer
+    // while the popover has the keyboard, since a popover sends the keys it
+    // does not take home.
+    // Closed before the new one opens: a popover that loses the keyboard to
+    // another settles, and what is up now is not what was chosen in it.
+    closePopover(true);
+    ALPopover* popover = ALPopover::show(anchor, content);
+    if (!popover)
     {
-        delete content;
         return nullptr;
     }
-
-    // What ALPopover::show does, with the key hook added: no title, since
-    // the content is laid out over the whole popover and a title bar would be
-    // drawn under it.
-    const LLRect wanted = content->getRect();
-    ALLightboxPopover* popover = new ALLightboxPopover(
-        ALPopover::paramsFor(wanted.getWidth(), wanted.getHeight()), std::move(hook));
-    content->setOrigin(0, 0);
-    content->setFollows(FOLLOWS_ALL);
-    popover->addChild(content);
-
-    adoptPopover(kind, popover, anchor);
+    adoptPopover(kind, popover, nullptr);
     return popover;
 }
 
@@ -938,7 +896,10 @@ void ALFloaterLightBox::adoptPopover(PopoverKind kind, ALPopover* popover, LLVie
         }
     });
 
-    popover->openBeside(anchor);
+    if (anchor)
+    {
+        popover->openBeside(anchor);
+    }
 }
 
 void ALFloaterLightBox::closePopover(bool escape)
@@ -998,10 +959,11 @@ bool ALFloaterLightBox::openColorPopover(LLColorSwatchCtrl* swatch, const std::s
     // is what grows.
     using Popover = ALLightboxColorPopover;
     const S32 header = LLFloater::getDefaultParams().header_height;
-    LLFloater::Params params = ALPopover::paramsFor(
-        Popover::sWidth > 0 ? Popover::sWidth : Popover::widthFor(Popover::PICKER_WIDTH),
-        Popover::sHeight > 0 ? Popover::sHeight : Popover::heightFor(header, Popover::PICKER_HEIGHT),
-        mDirectory.captionFor(key), /*resizable=*/true);
+    LLFloater::Params params = ALPopover::paramsRemembered(
+        Popover::SIZE_KIND,
+        Popover::widthFor(Popover::PICKER_WIDTH),
+        Popover::heightFor(header, Popover::PICKER_HEIGHT),
+        mDirectory.captionFor(key));
     params.min_width = Popover::widthFor(Popover::MIN_PICKER_WIDTH);
     params.min_height = Popover::heightFor(header, Popover::MIN_PICKER_HEIGHT);
     ALLightboxColorPopover* popover = new ALLightboxColorPopover(
@@ -1104,155 +1066,42 @@ void ALFloaterLightBox::fitSections()
     }
 }
 
-LLFloater* ALFloaterLightBox::paneWindow(size_t page) const
+const std::string& ALFloaterLightBox::paneKey(size_t page) const
 {
-    if (page >= mPanes.size())
-    {
-        return nullptr;
-    }
-    const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get());
-    return pane && pane->poppedOut() ? pane->getParentByType<LLFloater>() : nullptr;
+    return page < mTabPages.size() ? mTabPages[page]->getName() : LLStringUtil::null;
 }
 
 void ALFloaterLightBox::togglePane()
 {
     const S32 current = mTabs ? mTabs->getCurrentPanelIndex() : -1;
-    if (current < 0 || (size_t)current >= mPanes.size())
+    if (current < 0 || (size_t)current >= mTabPages.size())
     {
         return;
     }
-    ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[current].mPane.get());
-    if (!pane)
-    {
-        return;
-    }
-
-    if (pane->poppedOut())
-    {
-        dockPane((size_t)current);
-        return;
-    }
-
-    // The keyboard is not taken along. A focused control moving to another
-    // window, with this one still remembering it as where its focus was, is
-    // how a keystroke ends up somewhere nobody is looking.
-    if (gFocusMgr.childHasKeyboardFocus(pane))
-    {
-        gFocusMgr.setKeyboardFocus(nullptr);
-    }
-    gFocusMgr.clearLastFocusForGroup(this);
-    pane->popOut();
+    mFolds.toggleOut(paneKey((size_t)current));
     refreshPaneRow();
 }
 
 void ALFloaterLightBox::dockPane(size_t page)
 {
-    if (page >= mPanes.size())
+    if (mFolds.out(paneKey(page)))
     {
-        return;
-    }
-    if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[page].mPane.get()))
-    {
-        if (pane->poppedOut())
-        {
-            pane->dock();
-        }
+        mFolds.toggleOut(paneKey(page));
     }
     refreshPaneRow();
 }
 
-void ALFloaterLightBox::dockPanes()
-{
-    for (const Pane& each : mPanes)
-    {
-        if (ALDockPanel* pane = ALViewType::as<ALDockPanel>(each.mPane.get()))
-        {
-            if (pane->poppedOut())
-            {
-                pane->dock();
-            }
-        }
-    }
-}
-
-void ALFloaterLightBox::savePanes() const
-{
-    // By page name, so a page added or moved in the XUI keeps its own memory
-    // and a page removed takes nobody else's with it.
-    LLSD panes = LLSD::emptyMap();
-    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
-    {
-        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
-        if (!pane)
-        {
-            continue;
-        }
-        LLSD entry = LLSD::emptyMap();
-        entry["out"] = pane->poppedOut();
-        const LLRect rect = pane->floatingRect();
-        if (!rect.isEmpty())
-        {
-            entry["rect"] = rect.getValue();
-        }
-        panes[mTabPages[index]->getName()] = entry;
-    }
-    LLSD state = gSavedSettings.getLLSD("ALLightboxState");
-    if (!state.isMap())
-    {
-        state = LLSD::emptyMap();
-    }
-    state["panes_out"] = panes;
-    gSavedSettings.setLLSD("ALLightboxState", state);
-}
-
-void ALFloaterLightBox::restorePanes()
-{
-    const LLSD panes = gSavedSettings.getLLSD("ALLightboxState")["panes_out"];
-    if (!panes.isMap())
-    {
-        return;
-    }
-    for (size_t index = 0; index < mPanes.size() && index < mTabPages.size(); ++index)
-    {
-        ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
-        const LLSD entry = panes[mTabPages[index]->getName()];
-        if (!pane || !entry.isMap())
-        {
-            continue;
-        }
-        if (entry.has("rect"))
-        {
-            LLRect rect;
-            rect.setValue(entry["rect"]);
-            if (!rect.isEmpty())
-            {
-                pane->setFloatingRect(rect);
-            }
-        }
-        if (entry["out"].asBoolean())
-        {
-            pane->popOut();
-            // Where it was may be off a screen that has since gone.
-            if (LLFloater* window = paneWindow(index))
-            {
-                gFloaterView->adjustToFitScreen(window, false);
-            }
-        }
-    }
-}
-
 void ALFloaterLightBox::refreshPaneRow()
 {
-    if (mPanes.empty() || !mTabs)
+    if (mPaneEmpties.empty() || !mTabs)
     {
         return;
     }
 
     U32 out = 0;
-    for (size_t index = 0; index < mPanes.size(); ++index)
+    for (size_t index = 0; index < mTabPages.size(); ++index)
     {
-        const ALDockPanel* pane = ALViewType::as<ALDockPanel>(mPanes[index].mPane.get());
-        if (pane && pane->poppedOut())
+        if (mFolds.out(paneKey(index)))
         {
             out |= 1u << index;
         }
@@ -1265,12 +1114,9 @@ void ALFloaterLightBox::refreshPaneRow()
     }
     mPaneRowState = state;
 
-    for (size_t index = 0; index < mPanes.size(); ++index)
+    for (size_t index = 0; index < mPaneEmpties.size(); ++index)
     {
-        if (mPanes[index].mEmpty)
-        {
-            mPanes[index].mEmpty->setVisible(((out >> index) & 1) != 0);
-        }
+        mPaneEmpties[index]->setVisible(((out >> index) & 1) != 0);
     }
 
     // The button speaks for the tab that is up: out, it brings the page
@@ -1284,10 +1130,13 @@ void ALFloaterLightBox::refreshPaneRow()
         mPopOutButton->setToolTip(getString(current_out ? "pane_put_back_tooltip" : "pane_take_out_tooltip", args));
     }
 
+    // Written down as it changes, not only on close: a torn-off window's own
+    // close box puts its page back without telling anyone, and a viewer that
+    // goes down with the page out should still find it out next time.
     if (out != mPanesOutSaved)
     {
         mPanesOutSaved = out;
-        savePanes();
+        saveState();
     }
 }
 
@@ -1302,49 +1151,18 @@ void ALFloaterLightBox::openHistory()
     hp.empty_sentence = getString("history_empty_sentence");
     ALHistoryList* list = LLUICtrlFactory::create<ALHistoryList>(hp);
 
-    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
-    LLHandle<ALHistoryList> list_handle = list->getDerivedHandle<ALHistoryList>();
+    // The floater's own keys work while the list is up -- Ctrl+Z steps it
+    // with the marker moving, which is the point of having it open -- since
+    // the popover sends home the keys it does not take. Return in the list
+    // goes to the selected step, as a double click does.
     LLView* anchor = mHistoryButton ? static_cast<LLView*>(mHistoryButton)
                                     : (mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this));
-    ALPopover* popover = showPopover(PopoverKind::History, anchor, list,
-        [self, list_handle](KEY key, MASK mask) -> bool
-        {
-            ALFloaterLightBox* floater = self.get();
-            if (!floater)
-            {
-                return false;
-            }
-            if (key == KEY_RETURN && mask == MASK_NONE)
-            {
-                if (ALHistoryList* steps = list_handle.get())
-                {
-                    steps->goToSelected();
-                }
-                floater->closePopover(false);
-                return true;
-            }
-            // The floater's own undo keys, stepping the list while it stays
-            // up: watching the marker move is the point of having it open.
-            const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
-            const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
-                                  (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
-            if (undo_key || redo_key)
-            {
-                floater->applyHistory(redo_key);
-                return true;
-            }
-            if (key == 'F' && mask == MASK_CONTROL)
-            {
-                floater->openFind();
-                return true;
-            }
-            return false;
-        });
-    if (!popover)
+    if (!showPopover(PopoverKind::History, anchor, list))
     {
         return;
     }
 
+    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
     mHistoryList = list->getHandle();
     list->onGoTo([self](size_t in_force)
     {
@@ -1372,7 +1190,7 @@ void ALFloaterLightBox::fillHistoryList()
     std::vector<ALHistoryList::Step> steps;
     if (mHistory.depth() == 0)
     {
-        list->setSteps(std::move(steps), 0);
+        showHistory(list, std::move(steps), 0);
         return;
     }
 
@@ -1394,7 +1212,7 @@ void ALFloaterLightBox::fillHistoryList()
             else
             {
                 LLStringUtil::format_map_t args;
-                args["[COUNT]"] = llformat("%d", (S32)changes.size());
+                args["[COUNT]"] = fmt::format("{}", changes.size());
                 step.what = getString("history_settings", args);
             }
         }
@@ -1420,7 +1238,7 @@ void ALFloaterLightBox::fillHistoryList()
         }
         steps.push_back(std::move(step));
     }
-    list->setSteps(std::move(steps), mHistory.cursor() + 1);
+    showHistory(list, std::move(steps), mHistory.cursor() + 1);
 }
 
 void ALFloaterLightBox::goToHistory(size_t cursor)
@@ -1452,29 +1270,25 @@ std::string ALFloaterLightBox::pageLabel(size_t page) const
 
 void ALFloaterLightBox::openFind()
 {
-    LLView* anchor = mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this);
-
-    // As wide as the bar it hangs from, so it reads as the bar opening rather
-    // than as another window.
-    constexpr S32 HEIGHT = 300;
-    const S32 width = llmax(anchor->getRect().getWidth(), 300);
-    ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
-    qp.name = "lightbox_find_list";
-    qp.rect = LLRect(0, HEIGHT, width, 0);
-    qp.placeholder = getString("find_placeholder");
-    ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
-
     // Sections as well as settings: the list matches what a row is called,
     // and "bloom" should reach the Bloom section even though none of its rows
     // says bloom. Each setting says which section it is in, which is what
-    // tells the five Strength rows apart.
-    std::vector<ALQuickOpen::Candidate> candidates;
+    // tells the five Strength rows apart. A section hidden for the renderer's
+    // mode is nowhere to go, and neither is anything in it.
     const std::vector<ALLightboxDirectory::Section>& sections = mDirectory.sections();
+    std::vector<std::vector<ALQuickOpen::Candidate>> rows(sections.size());
+    for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+    {
+        ALQuickOpen::Candidate row;
+        row.label = setting.mCaption;
+        row.detail = sections[setting.mSection].mTitle;
+        row.value = "k:" + setting.mKey;
+        rows[setting.mSection].push_back(std::move(row));
+    }
+    std::vector<ALQuickOpen::Candidate> candidates;
     for (size_t index = 0; index < sections.size(); ++index)
     {
         const ALLightboxDirectory::Section& section = sections[index];
-        // A section hidden for the renderer's mode is nowhere to go, and
-        // neither is anything in it.
         if (section.mTab && !section.mTab->getVisible())
         {
             continue;
@@ -1484,51 +1298,26 @@ void ALFloaterLightBox::openFind()
         here.detail = pageLabel(section.mPage);
         here.value = "s:" + section.mName;
         candidates.push_back(std::move(here));
-        for (const ALLightboxDirectory::Setting& setting : mDirectory.settings())
+        for (ALQuickOpen::Candidate& row : rows[index])
         {
-            if (setting.mSection == index)
-            {
-                ALQuickOpen::Candidate row;
-                row.label = setting.mCaption;
-                row.detail = section.mTitle;
-                row.value = "k:" + setting.mKey;
-                candidates.push_back(std::move(row));
-            }
+            candidates.push_back(std::move(row));
         }
     }
-    quick->setCandidates(std::move(candidates));
 
-    // Ctrl+F again, with the list up, goes back to what was typed.
-    LLHandle<ALQuickOpen> list = quick->getDerivedHandle<ALQuickOpen>();
-    ALPopover* popover = showPopover(PopoverKind::Find, anchor, quick, [list](KEY key, MASK mask)
-    {
-        if (key == 'F' && mask == MASK_CONTROL)
-        {
-            if (ALQuickOpen* open = list.get())
-            {
-                open->takeFocus();
-            }
-            return true;
-        }
-        return false;
-    });
-    if (!popover)
-    {
-        return;
-    }
-
+    // Hung from the bar and as wide as it, so it reads as the bar opening
+    // rather than as another window. The popover the base opens is closed
+    // before the jump acts, so the keyboard is back here to hand on.
+    LLView* anchor = mTopBar ? static_cast<LLView*>(mTopBar) : static_cast<LLView*>(this);
     LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
-    quick->onChose([self](const std::string& target)
-    {
-        if (ALFloaterLightBox* floater = self.get())
-        {
-            // Closed first, so the keyboard comes back to the Lightbox and
-            // the jump can hand it on to the setting.
-            floater->closePopover(false);
-            floater->jumpTo(target);
-        }
-    });
-    quick->takeFocus();
+    quickOpen(std::move(candidates), getString("find_placeholder"), LLStringUtil::null,
+              [self](const std::string& target)
+              {
+                  if (ALFloaterLightBox* floater = self.get())
+                  {
+                      floater->jumpTo(target);
+                  }
+              },
+              anchor, llmax(anchor->getRect().getWidth(), 300));
 }
 
 void ALFloaterLightBox::jumpTo(const std::string& target)
@@ -1559,7 +1348,7 @@ void ALFloaterLightBox::jumpTo(const std::string& target)
     }
     // A page out in a window of its own is shown by raising the window; its
     // tab here only says where it went.
-    if (LLFloater* window = paneWindow(section->mPage))
+    if (LLFloater* window = mFolds.window(paneKey(section->mPage)))
     {
         if (window->isMinimized())
         {
@@ -1983,44 +1772,16 @@ bool ALFloaterLightBox::applyHistory(bool redo_direction)
 
 bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
 {
-    // Both spellings of redo: Ctrl+Y is the Windows convention and
-    // Ctrl+Shift+Z the one every grading application uses.
     if (key == 'F' && mask == MASK_CONTROL)
     {
         openFind();
         return true;
     }
-
-    const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
-    const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) ||
-                          (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
-    if (undo_key || redo_key)
+    if (handleUndoKeys(key, mask))
     {
-        // hasAccelerators means these arrive before the menu bar has seen
-        // them, so the Edit menu's own undo -- which is what a text control
-        // with an edit history of its own would have got from them -- is
-        // offered here instead, and only a key it declines reaches the grade.
-        LLEditMenuHandler* text = LLEditMenuHandler::gEditMenuHandler;
-        LLView* text_view = text ? text->asView() : nullptr;
-        if (text_view && text_view->hasAncestor(this))
-        {
-            if (undo_key && text->canUndo())
-            {
-                text->undo();
-                return true;
-            }
-            if (redo_key && text->canRedo())
-            {
-                text->redo();
-                return true;
-            }
-        }
-
-        applyHistory(redo_key);
         return true;
     }
-
-    return LLFloater::handleKeyHere(key, mask);
+    return ALStudioFloater::handleKeyHere(key, mask);
 }
 
 void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
