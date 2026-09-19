@@ -8,6 +8,7 @@ target_sources(
     alangledial.cpp
     alcornerfield.cpp
     aloffsetpad.cpp
+    alpanefolds.cpp
     fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
@@ -114,6 +115,7 @@ target_sources(
     llxuiparser.cpp
     alcanvasview.cpp
     alcolorfield.cpp
+    alcolortablepanel.cpp
     alcolorsheet.cpp
     aldeferredrebuild.cpp
     aldockpanel.cpp
@@ -126,6 +128,7 @@ target_sources(
     alquickopen.cpp
     alscopebar.cpp
     alspecimenlist.cpp
+    alstudiofloater.cpp
     altabstrip.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
@@ -152,6 +155,7 @@ target_sources(
         alangledial.h
         alcornerfield.h
         aloffsetpad.h
+        alpanefolds.h
         altextcaret.h
         alviewtype.h
         fsvirtualtrackpad.h
@@ -274,6 +278,7 @@ target_sources(
         llxuiparser.h
         alcanvasview.h
         alcolorfield.h
+        alcolortablepanel.h
         alcolorsheet.h
         aldeferredrebuild.h
         aldockpanel.h
@@ -286,6 +291,8 @@ target_sources(
         alquickopen.h
         alscopebar.h
         alspecimenlist.h
+        alstudiofloater.h
+        alundostack.h
         alstringmatch.h
         altabstrip.h
         alfollowscontrol.h
@@ -411,6 +418,7 @@ if(AL_BUILD_TESTS)
     llfloater
     alpropertygrid
     alcolorfield
+    alcolortablepanel
     alimagefield
     alcolorpicker
     alfontfield
@@ -440,6 +448,7 @@ if(AL_BUILD_TESTS)
     alxuitreemodel
     alcolorsheet
     lluicolortable
+    alundostack
   )
     al_add_test(
       ${test}
