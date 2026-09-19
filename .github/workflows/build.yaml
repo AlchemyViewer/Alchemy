@@ -361,17 +361,17 @@ jobs:
           SIGNING=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2026$cmake_preset_postfix"
+              cmake_preset_name="vs2026${cmake_preset_postfix}-fullopt"
               build_directory="build-Windows-$cmake_preset_name"
               vcpkg_triplet="x64-windows-alchemy-avx2-release"
               ;;
             macOS)
-              cmake_preset_name="ninja$cmake_preset_postfix-$BUILD_ARCH"
+              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
               build_directory="build-Darwin-$cmake_preset_name"
               vcpkg_triplet="$BUILD_ARCH-osx-alchemy-release"
               ;;
             Linux)
-              cmake_preset_name="ninja$cmake_preset_postfix"
+              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt"
               build_directory="build-Linux-$cmake_preset_name"
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then
