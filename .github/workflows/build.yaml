@@ -169,11 +169,11 @@ jobs:
         include:
           # Linux on arm64: NEON is a first-class target, and this is the
           # one row where GCC compiles the SIMD layer for it.
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-26.04-arm
             configuration: release
             arch: arm64
             build_variant: Viewer
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-26.04-arm
             configuration: release
             arch: arm64
             build_variant: Tests
@@ -209,7 +209,7 @@ jobs:
       # Linux runner gets one from Mesa's llvmpipe through SDL's offscreen
       # driver; the Windows runner has no GPU driver, and macOS is unproven,
       # so they build those suites and register them disabled.
-      AL_ENABLE_GL_TESTS: ${{ runner.os == 'Linux' }}
+      AL_ENABLE_GL_TESTS: ${{ startsWith(matrix.runner, 'ubuntu-') }}
       LIBGL_ALWAYS_SOFTWARE: 1
       # Build Config
       BUILD_ARCH: ${{ matrix.arch }}
