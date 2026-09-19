@@ -5,6 +5,9 @@ add_library(llui STATIC)
 target_sources(
   llui
   PRIVATE
+    alangledial.cpp
+    alcornerfield.cpp
+    aloffsetpad.cpp
     fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
     llaccordionctrltab.cpp
@@ -117,6 +120,7 @@ target_sources(
     alemptystate.cpp
     alflagsfield.cpp
     alhistorylist.cpp
+    alimagefield.cpp
     aljumpbar.cpp
     alpopover.cpp
     alquickopen.cpp
@@ -145,6 +149,9 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alangledial.h
+        alcornerfield.h
+        aloffsetpad.h
         altextcaret.h
         alviewtype.h
         fsvirtualtrackpad.h
@@ -273,6 +280,7 @@ target_sources(
         alemptystate.h
         alflagsfield.h
         alhistorylist.h
+        alimagefield.h
         aljumpbar.h
         alpopover.h
         alquickopen.h
@@ -403,6 +411,7 @@ if(AL_BUILD_TESTS)
     llfloater
     alpropertygrid
     alcolorfield
+    alimagefield
     alcolorpicker
     alfontfield
     alflagsfield

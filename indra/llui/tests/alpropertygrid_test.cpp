@@ -1033,4 +1033,71 @@ namespace tut
         ensure_equals("with what was committed", now->getText(), std::string("After"));
         grid->die();
     }
+
+    // The same rows with new values are taken without a rebuild: the
+    // editors are the same objects afterwards, saying the new values.
+    // Different rows are refused, and then the grid is filled again.
+    template<> template<>
+    void alpropertygrid_object::test<23>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setGroups({ "identity" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("label", 0));
+        fields.back().value = "Before";
+        fields.push_back(field("width", 0));
+        fields.back().kind = ALParamType::INTEGER;
+        fields.back().value = "10";
+        grid->setFields(fields);
+        gIdleCallbacks.callFunctions();
+
+        LLLineEditor* label = grid->getChild<LLLineEditor>("label", true);
+        LLSpinCtrl* width = grid->getChild<LLSpinCtrl>("width", true);
+
+        fields[0].value = "After";
+        fields[1].value = "20";
+        fields[1].authored = false;
+        ensure("the same rows are taken", grid->updateFields(fields));
+        ensure("the editors are the ones that were there", grid->findChild<LLLineEditor>("label", true) == label
+               && grid->findChild<LLSpinCtrl>("width", true) == width);
+        ensure_equals("saying the new text", label->getText(), std::string("After"));
+        ensure_equals("and the new number", width->getValue().asInteger(), 20);
+        ensure_equals("and the grid knows it", grid->fields()[1].value, std::string("20"));
+
+        fields.push_back(field("height", 0));
+        ensure("a row more is refused", !grid->updateFields(fields));
+        fields.pop_back();
+        fields[1].kind = ALParamType::REAL;
+        ensure("a row of another kind is refused", !grid->updateFields(fields));
+        grid->die();
+    }
+
+    // Rows keep the order they were given when asked to, however they are
+    // written: a vocabulary has an order of its own.
+    template<> template<>
+    void alpropertygrid_object::test<24>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALPropertyGrid* grid = build();
+        grid->setKeepsOrder(true);
+        grid->setGroups({ "identity" });
+        std::vector<ALPropertyGrid::Field> fields;
+        fields.push_back(field("radius", 0));
+        fields.back().authored = false;
+        fields.push_back(field("corners", 0));
+        fields.back().authored = false;
+        fields.push_back(field("border", 0));
+        grid->setFields(fields);
+        ensure_equals("first as given", grid->fields()[0].name, std::string("radius"));
+        ensure_equals("second as given", grid->fields()[1].name, std::string("corners"));
+        ensure_equals("the written one stays where it was", grid->fields()[2].name, std::string("border"));
+        grid->die();
+    }
 }

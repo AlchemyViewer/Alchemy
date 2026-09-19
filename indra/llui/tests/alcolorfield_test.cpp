@@ -267,4 +267,69 @@ namespace tut
                picker->color() == LLUIColorTable::instance().getColor(chosen).get());
         field->die();
     }
+
+    // The popover asks the field's resolver what a text comes to, the way
+    // the field does, so a caller's own $name opens the picker on its
+    // colour; and the caller's names are the first swatches offered.
+    template<> template<>
+    void alcolorfield_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorField* field = make();
+        field->setResolver([](const std::string& text, LLColor4& color)
+        {
+            if (text == "$Accent")
+            {
+                color = LLColor4(0.f, 0.5f, 1.f, 1.f);
+                return true;
+            }
+            return false;
+        });
+        field->setChoices([]()
+        {
+            return std::vector<ALColorField::Choice>{ { "$Accent", LLColor4(0.f, 0.5f, 1.f, 1.f) } };
+        });
+        field->setValue("$Accent");
+        LLColor4 shown;
+        ensure("the field resolves its own name", field->resolved(shown));
+        field->handleMouseDown(4, 10, MASK_NONE);
+
+        ALColorPicker* picker = gFloaterView->findChild<ALColorPicker>("picker", true);
+        ensure("the popover has its picker", picker != nullptr);
+        ensure("which starts from what the resolver says", picker->color() == LLColor4(0.f, 0.5f, 1.f, 1.f));
+
+        LLView* grid = swatchesUnder(gFloaterView);
+        ensure("and the grid", grid != nullptr);
+        // The first swatch is the caller's own name.
+        grid->handleMouseDown(5 + 14, grid->getRect().getHeight() - 5 - 14, MASK_NONE);
+        LLFloater* popover = grid->getParentByType<LLFloater>();
+        ensure_equals("the caller's name comes first", popover->getTitle(), std::string("$Accent"));
+        field->die();
+    }
+
+    // A name means what the table says now: the swatch follows a colour
+    // changed elsewhere without the text having changed.
+    template<> template<>
+    void alcolorfield_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLUIColorTable& table = LLUIColorTable::instance();
+        table.setColor("FieldTestColor", LLColor4::red);
+        ALColorField* field = make();
+        field->setValue("FieldTestColor");
+        LLColor4 shown;
+        ensure("resolved to the table's colour", field->resolved(shown) && shown == LLColor4::red);
+
+        const U32 before = table.generation();
+        table.setColor("FieldTestColor", LLColor4::green);
+        ensure("the table counted the change", table.generation() != before);
+        ensure("and the field followed it", field->resolved(shown) && shown == LLColor4::green);
+        field->die();
+    }
 }

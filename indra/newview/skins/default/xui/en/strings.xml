@@ -324,6 +324,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ColorFieldFilter">Filter</string>
 	<string name="ColorFieldNames">Names</string>
 	<string name="ColorFieldCustom">Custom</string>
+	<string name="ImageFieldNoMatch">No picture by that name</string>
+	<string name="ImageFieldNoMatchHow">Clear the filter to see them all.</string>
 	<string name="FontFieldFilter">Filter fonts</string>
 	<string name="FontFieldSize">Size</string>
 	<string name="FontFieldBold">Bold</string>
