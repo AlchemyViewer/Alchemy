@@ -1049,6 +1049,32 @@ public:
     };
     LensDirtParams      mLensDirtParams;
 
+    // The lens distortion auto-fit scale, and what it was solved for. The
+    // solve walks the frame edge and an interior grid, and its inputs move
+    // only when a slider or the window does, so it is compared and skipped
+    // each frame the way the dirt plate is.
+    struct LensDistortFit
+    {
+        struct Inputs
+        {
+            F32 k1 = 0.f;
+            F32 k2 = 0.f;
+            F32 p1 = 0.f;
+            F32 p2 = 0.f;
+            F32 cx = 0.f;
+            F32 cy = 0.f;
+            F32 axis_x = 0.f;
+            F32 axis_y = 0.f;
+            F32 sq_x = 0.f;
+            S32 fit_mode = -1;
+
+            bool operator==(const Inputs&) const = default;
+        };
+        Inputs inputs;
+        F32    scale = 1.f;
+    };
+    LensDistortFit      mLensDistortFit;
+
     // Raised by the Lightbox while one of the generation sliders is being
     // dragged. The plate is full-resolution, so rebuilding on every frame of a
     // drag is a stutter rather than a preview -- and worse the slower the

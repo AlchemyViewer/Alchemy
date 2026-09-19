@@ -8432,13 +8432,15 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // not -- so the shader's early-out fires and the sampler is never read
         // unbound, the same guard the grading LUT and the reference still use.
         // Also off under a clean plate: dirt is a look, not a quantisation aid.
+        // And only on the world frame, like the flare: the plate is made at
+        // the screen's shape, and the material preview is not that shape.
         S32 dirt_channel = -1;
         {
             static LLCachedControl<F32> lens_dirt_strength(gSavedSettings, "RenderLensDirtStrength", 0.f);
             static LLCachedControl<F32> lens_dirt_bloom(gSavedSettings, "RenderLensDirtBloomResponse", 1.f);
             static LLCachedControl<F32> lens_dirt_flare(gSavedSettings, "RenderLensDirtFlareResponse", 1.f);
 
-            const F32 dirt_strength = (clean_plate || !mLensDirtMap.isComplete())
+            const F32 dirt_strength = (clean_plate || !world_frame || !mLensDirtMap.isComplete())
                                     ? 0.f
                                     : llclamp(lens_dirt_strength(), 0.f, 2.f);
 
@@ -10332,7 +10334,12 @@ void LLPipeline::renderFinalize()
 
             F32 fit_scale = 1.f;
             const S32 fit_mode = llclamp(distort_fit(), 0, 2);
-            if (fit_mode != 0)
+            const LensDistortFit::Inputs inputs = { k1, k2, p1, p2, cx, cy, axis_x, axis_y, sq_x, fit_mode };
+            if (inputs == mLensDistortFit.inputs)
+            {
+                fit_scale = mLensDistortFit.scale;
+            }
+            else if (fit_mode != 0)
             {
                 // Walk the frame boundary densely instead of probing only the
                 // corners and edge midpoints.
@@ -10348,8 +10355,8 @@ void LLPipeline::renderFinalize()
                 // non-zero, since those break the clean radial structure a
                 // corners-dominate argument leans on.
                 //
-                // Sixty-four evaluations of a short polynomial, once a frame,
-                // and only while distortion is enabled.
+                // Sixty-four evaluations of a short polynomial, once per change
+                // of the inputs above.
                 const S32 probes_per_edge = 16;
 
                 // Fit (1): the smallest exit scale over every probe with a
@@ -10424,6 +10431,8 @@ void LLPipeline::renderFinalize()
                     fit_scale = llclamp(solved, 0.1f, 10.f);
                 }
             }
+            mLensDistortFit.inputs = inputs;
+            mLensDistortFit.scale = fit_scale;
 
             gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_K, k1, k2);
             gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_SCALE, fit_scale);
