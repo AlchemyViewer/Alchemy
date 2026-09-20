@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<text_view
+  name="text_view"
+  font="Monospace"
+  mouse_opaque="true"
+  tab_stop="true"
+  text_color="TextFgColor"
+  text_readonly_color="TextFgReadOnlyColor"
+  bg_color="TextBgWriteableColor"
+  bg_readonly_color="TextBgReadOnlyColor"
+  cursor_color="TextCursorColor"
+  selection_color="SelectionColor"
+  h_pad="4"
+  v_pad="2"
+  tab_width="4"/>

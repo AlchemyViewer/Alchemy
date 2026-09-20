@@ -1151,6 +1151,106 @@
   <color
     name="SyntaxLslStringLiteral"
     value="1 0.14 0 1" />
+
+  <!-- syntax highlighting (ALTextView, by token kind) -->
+  <color
+    name="SyntaxComment"
+    reference="SyntaxLslComment" />
+  <color
+    name="SyntaxDocComment"
+    reference="SyntaxLslComment" />
+  <color
+    name="SyntaxString"
+    reference="SyntaxLslStringLiteral" />
+  <color
+    name="SyntaxEscape"
+    reference="SyntaxLslConstant" />
+  <color
+    name="SyntaxNumber"
+    reference="SyntaxLslConstant" />
+  <color
+    name="SyntaxKeyword"
+    reference="SyntaxLslControlFlow" />
+  <color
+    name="SyntaxControl"
+    reference="SyntaxLslControlFlow" />
+  <color
+    name="SyntaxType"
+    reference="SyntaxLslDataType" />
+  <color
+    name="SyntaxConstant"
+    reference="SyntaxLslConstant" />
+  <color
+    name="SyntaxFunction"
+    reference="SyntaxLslFunction" />
+  <color
+    name="SyntaxEvent"
+    reference="SyntaxLslEvent" />
+  <color
+    name="SyntaxLabel"
+    reference="SyntaxLslControlLabel" />
+  <color
+    name="SyntaxOperator"
+    reference="TextFgColor" />
+  <color
+    name="SyntaxPunctuation"
+    reference="TextFgColor" />
+  <color
+    name="SyntaxPreprocessor"
+    value="0.5 0.35 0.2 1" />
+  <color
+    name="SyntaxTag"
+    reference="SyntaxLslFunction" />
+  <color
+    name="SyntaxAttribute"
+    reference="SyntaxLslDataType" />
+  <color
+    name="SyntaxAttributeValue"
+    reference="SyntaxLslStringLiteral" />
+  <color
+    name="SyntaxEntity"
+    reference="SyntaxLslConstant" />
+  <color
+    name="SyntaxVariable"
+    reference="TextFgColor" />
+  <color
+    name="SyntaxParameter"
+    reference="TextFgColor" />
+  <color
+    name="SyntaxProperty"
+    reference="SyntaxLslDataType" />
+  <color
+    name="SyntaxDeprecated"
+    reference="SyntaxLslDeprecated" />
+  <color
+    name="SyntaxInvalid"
+    value="0.9 0.1 0.1 1" />
+
+  <!-- the code editor's gutter and marks -->
+  <color
+    name="CodeGutterColor"
+    value="0.94 0.94 0.94 1" />
+  <color
+    name="CodeLineNumberColor"
+    value="0.55 0.55 0.55 1" />
+  <color
+    name="CodeCurrentLineColor"
+    value="0 0 0 0.05" />
+  <color
+    name="CodeBracketMatchColor"
+    value="0.2 0.5 0.9 0.9" />
+  <color
+    name="CodeMarkNote"
+    value="0.3 0.6 0.9 1" />
+  <color
+    name="CodeMarkWarning"
+    value="0.9 0.7 0.1 1" />
+  <color
+    name="CodeMarkError"
+    value="0.9 0.2 0.2 1" />
+  <color
+    name="CodeMarkRuntime"
+    value="0.7 0.2 0.8 1" />
   <color
     name="OutfitGalleryItemSelected"
     value="0.26 0.36 0.47 1"/>

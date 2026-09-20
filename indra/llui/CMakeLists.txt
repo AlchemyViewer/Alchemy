@@ -130,7 +130,15 @@ target_sources(
     alsettingrow.cpp
     alspecimenlist.cpp
     alstudiofloater.cpp
+    alcodeeditor.cpp
+    alkeymap.cpp
+    alsyntaxgrammar.cpp
+    alsyntaxhighlighter.cpp
     altabstrip.cpp
+    altextdocument.cpp
+    altextlayout.cpp
+    altextview.cpp
+    altextundo.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
     alcolorpicker.cpp
@@ -296,7 +304,15 @@ target_sources(
         alstudiofloater.h
         alundostack.h
         alstringmatch.h
+        alcodeeditor.h
+        alkeymap.h
+        alsyntaxgrammar.h
+        alsyntaxhighlighter.h
         altabstrip.h
+        altextdocument.h
+        altextlayout.h
+        altextview.h
+        altextundo.h
         alfollowscontrol.h
         alfontfield.h
         alcolorpicker.h
@@ -387,6 +403,15 @@ if(AL_BUILD_TESTS)
   )
   al_add_test(llchatautocompletemodel UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
+  al_add_test(
+    alsyntaxhighlighter
+    UNIT
+    PROJECT llui
+    SOURCES alsyntaxgrammar.cpp altextdocument.cpp
+    LIBRARIES ${test_libs}
+  )
 
   set(test_libs llui ${test_libs})
   foreach(
@@ -455,6 +480,10 @@ if(AL_BUILD_TESTS)
     alcolorsheet
     lluicolortable
     alundostack
+    alsyntaxgrammars
+    altextlayout
+    altextview
+    alcodeeditor
   )
     al_add_test(
       ${test}

@@ -1,0 +1,148 @@
+/**
+ * @file altextlayout.h
+ * @brief Where every glyph of a document's lines sits, laid out once and kept.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "alfontshaping.h"
+#include "altextdocument.h"
+#include "llfontgl.h"
+
+#include <boost/signals2.hpp>
+
+#include <vector>
+
+// The layout of a document's lines: each line shaped once, into glyphs with
+// their pen positions, and cut into rows where it wraps; each row a height;
+// every line a top, so a view can find the line under a pixel and the pixel
+// under a caret. Laid out lazily, line by line, as a view asks; an edit
+// throws away the lines it touched and nothing else; a change of font, tab
+// width or wrap width throws away everything.
+//
+// Fonts: one face for the whole document for now. The runs a line is
+// shaped in are where a second face would enter, and the glyphs already
+// carry the face they came from.
+//
+// A tab is a gap: a glyph with no face whose advance reaches the next stop.
+// An atom -- an image or a view in the text -- will be the same gap with a
+// height of its own, when there is one.
+class ALTextLayout
+{
+public:
+    // A glyph as the caret and the hit test see it: the byte of the line it
+    // begins at, where its pen sat, and how far the pen moved. Several
+    // glyphs may share a cluster; a caret sits only where a cluster begins.
+    struct Glyph
+    {
+        S32 cluster = 0;
+        F32 pen     = 0.f;
+        F32 advance = 0.f;
+    };
+
+    // A row of a line: the bytes it holds, the glyphs it holds, and where in
+    // the unwrapped line it starts, since the glyphs keep their unwrapped pen.
+    struct Row
+    {
+        S32    begin      = 0;
+        S32    end        = 0;
+        size_t glyphBegin = 0;
+        size_t glyphEnd   = 0;
+        F32    xStart     = 0.f;
+        F32    width      = 0.f;
+    };
+
+    struct Line
+    {
+        std::vector<LLFontGL::Placed> placed;
+        std::vector<Glyph>            glyphs;
+        std::vector<Row>              rows;
+        F32                           width = 0.f;
+        bool                          valid = false;
+    };
+
+    ALTextLayout();
+    ~ALTextLayout();
+    ALTextLayout(const ALTextLayout&) = delete;
+    ALTextLayout& operator=(const ALTextLayout&) = delete;
+
+    void attach(ALTextDocument* document);
+
+    void            setFont(const LLFontGL* font);
+    const LLFontGL* font() const { return mFont; }
+    // In pixels; nothing wraps at zero.
+    void setWrapWidth(S32 pixels);
+    S32  wrapWidth() const { return mWrapWidth; }
+    // In spaces.
+    void setTabWidth(S32 spaces);
+    S32  tabWidth() const { return mTabWidth; }
+
+    // Every row is this tall.
+    S32 rowHeight() const;
+    S32 lineCount() const { return static_cast<S32>(mLines.size()); }
+
+    // --- a line ------------------------------------------------------------
+
+    const Line& line(S32 index);
+    S32         rowCount(S32 index) { return static_cast<S32>(line(index).rows.size()); }
+    S32         lineHeight(S32 index) { return rowCount(index) * rowHeight(); }
+
+    // --- the column ----------------------------------------------------------
+
+    // The top of a line from the top of the document, and the whole. Lines
+    // not yet laid out count as one row.
+    S32 lineTop(S32 index);
+    S32 totalHeight();
+    // The line whose rows cover a y, clamped to the first and the last.
+    S32 lineAtY(S32 y);
+
+    // --- the caret -------------------------------------------------------------
+
+    // The row a column of a line falls in, and the x of the column within
+    // that row. A column at a wrap point is the start of the next row.
+    S32 rowOf(S32 index, S32 column);
+    F32 xOf(S32 index, S32 column, S32* row = nullptr);
+    // The column at an x within a row: the nearest cluster boundary where
+    // `round`, else the one at or before.
+    S32 columnAt(S32 index, S32 row, F32 x, bool round);
+
+private:
+    void onEdit(const ALTextDocument::Edit& edit);
+    void invalidateAll();
+    void layoutLine(S32 index, Line& out);
+    void ensureTops();
+    F32  spaceAdvance();
+
+    ALTextDocument*                    mDocument = nullptr;
+    boost::signals2::scoped_connection mConnection;
+    const LLFontGL*                    mFont      = nullptr;
+    S32                                mWrapWidth = 0;
+    S32                                mTabWidth  = 4;
+    std::vector<Line>                  mLines;
+    // mTops[i] is the top of line i; mTops[count] the whole height.
+    std::vector<S32>                   mTops;
+    bool                               mTopsDirty    = true;
+    F32                                mSpaceAdvance = -1.f;
+    // Scratch a wrapping loop keeps rather than allocates per line.
+    std::vector<size_t>                mBreaks;
+    std::vector<ALShapedGlyph>         mShaped;
+};

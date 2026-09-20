@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  A highlighting grammar for plain text, read by ALSyntaxGrammar (indra/llui).
+
+  states: named lists of rules, tried in order at every position. A rule
+  matches one of: match (a literal; whole_word to refuse it inside a word),
+  chars (a class, with min and max; unicode for everything beyond ASCII),
+  word (an identifier, looked up in `tables`, each a table and the kind a
+  word found there is), span (an opening with an end, an escape, and
+  multiline), span_regex with end_regex (where \1 stands for the opening's
+  first capture), regex (anchored where it is tried), or eol (the line's
+  end). It names the kind it makes and where it goes: push, pop or next.
+  What nothing matches is one character of the state's default kind.
+
+  words: the words the grammar itself puts in its tables; the language
+  service adds the rest at runtime.
+-->
+<llsd>
+  <map>
+    <key>name</key>
+    <string>text</string>
+    <key>extensions</key>
+    <array>
+      <string>txt</string>
+    </array>
+    <key>states</key>
+    <map>
+      <key>main</key>
+      <array />
+    </map>
+  </map>
+</llsd>

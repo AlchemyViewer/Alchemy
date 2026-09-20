@@ -2360,16 +2360,16 @@
                          min_dim="60"
                          name="source_text_panel"
                          width="478">
-                            <text_editor
+                            <code_editor
                              follows="all"
                              font="Monospace"
                              height="240"
-                             ignore_tab="false"
                              layout="topleft"
                              left="0"
                              name="source_text"
                              tool_tip="The element as each layer of the file writes it, in the order they are merged"
                              read_only="true"
+                             syntax="xml"
                              top="0"
                              width="476"
                              word_wrap="false" />

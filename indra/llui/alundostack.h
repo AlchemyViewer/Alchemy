@@ -87,6 +87,11 @@ public:
     // A frame later is something else.
     void closeLabel() { mLabelPending = false; }
 
+    // The next change is a step of its own whatever its key: what a caller
+    // says when it knows a run has ended -- the caret moved, a word was
+    // finished -- and the key and the window would not.
+    void breakRun() { mLastKey.clear(); }
+
     bool canUndo() const { return !mUndo.empty(); }
     bool canRedo() const { return !mRedo.empty(); }
 

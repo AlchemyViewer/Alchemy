@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  A highlighting grammar for LSL, read by ALSyntaxGrammar (indra/llui).
+
+  states: named lists of rules, tried in order at every position. A rule
+  matches one of: match (a literal; whole_word to refuse it inside a word),
+  chars (a class, with min and max; unicode for everything beyond ASCII),
+  word (an identifier, looked up in `tables`, each a table and the kind a
+  word found there is), span (an opening with an end, an escape, and
+  multiline), span_regex with end_regex (where \1 stands for the opening's
+  first capture), regex (anchored where it is tried), or eol (the line's
+  end). It names the kind it makes and where it goes: push, pop or next.
+  What nothing matches is one character of the state's default kind.
+
+  words: the words the grammar itself puts in its tables; the language
+  service adds the rest at runtime.
+-->
+<llsd>
+  <map>
+    <key>name</key>
+    <string>lsl</string>
+    <key>line_comment</key>
+    <string>//</string>
+    <key>extensions</key>
+    <array>
+      <string>lsl</string>
+    </array>
+    <key>words</key>
+    <map>
+      <key>control</key>
+      <array>
+        <string>if</string>
+        <string>else</string>
+        <string>for</string>
+        <string>do</string>
+        <string>while</string>
+        <string>jump</string>
+        <string>return</string>
+        <string>state</string>
+        <string>default</string>
+      </array>
+      <key>type</key>
+      <array>
+        <string>integer</string>
+        <string>float</string>
+        <string>string</string>
+        <string>key</string>
+        <string>vector</string>
+        <string>rotation</string>
+        <string>quaternion</string>
+        <string>list</string>
+      </array>
+    </map>
+    <key>states</key>
+    <map>
+      <key>main</key>
+      <array>
+        <map>
+          <key>regex</key>
+          <string>#[A-Za-z_]+.*</string>
+          <key>kind</key>
+          <string>preprocessor</string>
+        </map>
+        <map>
+          <key>match</key>
+          <string>//</string>
+          <key>kind</key>
+          <string>comment</string>
+          <key>push</key>
+          <string>line_comment</string>
+        </map>
+        <map>
+          <key>span</key>
+          <string>/*</string>
+          <key>end</key>
+          <string>*/</string>
+          <key>kind</key>
+          <string>comment</string>
+        </map>
+        <map>
+          <key>span</key>
+          <string>"</string>
+          <key>end</key>
+          <string>"</string>
+          <key>escape</key>
+          <string>\</string>
+          <key>kind</key>
+          <string>string</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>0[xX][0-9a-fA-F]+</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>[0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?|\.[0-9]+([eE][+-]?[0-9]+)?</string>
+          <key>kind</key>
+          <string>number</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>@[A-Za-z_][A-Za-z0-9_]*</string>
+          <key>kind</key>
+          <string>label</string>
+        </map>
+        <map>
+          <key>word</key>
+          <boolean>1</boolean>
+          <key>tables</key>
+          <array>
+            <map>
+              <key>table</key>
+              <string>control</string>
+              <key>kind</key>
+              <string>control</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>type</string>
+              <key>kind</key>
+              <string>type</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>event</string>
+              <key>kind</key>
+              <string>event</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>function</string>
+              <key>kind</key>
+              <string>function</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>deprecated</string>
+              <key>kind</key>
+              <string>deprecated</string>
+            </map>
+            <map>
+              <key>table</key>
+              <string>constant</string>
+              <key>kind</key>
+              <string>constant</string>
+            </map>
+          </array>
+        </map>
+        <map>
+          <key>chars</key>
+          <string>+\-*/%=!&lt;&gt;&amp;|^~</string>
+          <key>kind</key>
+          <string>operator</string>
+        </map>
+        <map>
+          <key>chars</key>
+          <string>(){}[];,.</string>
+          <key>max</key>
+          <integer>1</integer>
+          <key>kind</key>
+          <string>punctuation</string>
+        </map>
+      </array>
+      <key>line_comment</key>
+      <map>
+        <key>default</key>
+        <string>comment</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+    </map>
+  </map>
+</llsd>

@@ -74,6 +74,7 @@
 #include "llspinctrl.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
+#include "alcodeeditor.h"
 #include "lltexteditor.h"
 #include "lltimer.h"
 #include "lltoastalertpanel.h"
@@ -1729,7 +1730,7 @@ bool ALFloaterXUIStudio::postBuild()
         });
     mLayout = getChild<LLScrollListCtrl>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");
-    mSourceText = getChild<LLTextEditor>("source_text");
+    mSourceText = getChild<ALCodeEditor>("source_text");
     mBindings = getChild<LLScrollListCtrl>("bindings");
     mState = getChild<LLScrollListCtrl>("state");
     mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<code_editor
+  name="code_editor"
+  font="Monospace"
+  mouse_opaque="true"
+  tab_stop="true"
+  text_color="TextFgColor"
+  text_readonly_color="TextFgReadOnlyColor"
+  bg_color="TextBgWriteableColor"
+  bg_readonly_color="TextBgReadOnlyColor"
+  cursor_color="TextCursorColor"
+  selection_color="SelectionColor"
+  gutter_color="CodeGutterColor"
+  line_number_color="CodeLineNumberColor"
+  current_line_color="CodeCurrentLineColor"
+  bracket_match_color="CodeBracketMatchColor"
+  h_pad="4"
+  v_pad="2"
+  tab_width="4"/>

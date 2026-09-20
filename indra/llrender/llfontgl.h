@@ -36,6 +36,7 @@
 #include "llpointer.h"
 #include "llrect.h"
 #include "v2math.h"
+#include "v4coloru.h"
 
 class LLColor4;
 // Key used to request a font.
@@ -124,6 +125,29 @@ public:
     // those buffers out from under the draw that invoked it, and the shadow
     // would come out carrying the nested string's glyphs.
     typedef std::function<void()> pass_boundary_cb_t;
+
+    // One glyph placed by a caller that laid a line out for itself: the face
+    // the glyph came from and its index there, as ALFontShaping gave them,
+    // and where its pen sits in logical pixels from the origin renderGlyphs
+    // is given -- the shaped x offset added in, the y offset as it was. What
+    // a text view keeps per line, so that a line is shaped once and drawn
+    // every frame from that. A glyph with no face draws nothing: a tab's
+    // gap, an atom's box.
+    struct Placed
+    {
+        const LLFontFreetype* face     = nullptr;
+        U32                   glyph_id = 0;
+        F32                   x        = 0.f;
+        F32                   y        = 0.f;
+    };
+
+    // Draws glyphs the caller has shaped and placed, each in its own colour,
+    // from (x, y), the run's baseline in logical pixels. Nothing is shaped,
+    // measured, aligned or clipped here; that is the caller's layout. The
+    // glyph indices are this face's, so a style it does not carry is drawn
+    // the way it would be for itself -- bold doubled, italic slanted -- and
+    // no other face is consulted.
+    void renderGlyphs(const Placed* glyphs, const LLColor4U* colors, size_t count, F32 x, F32 y, U8 style = NORMAL) const;
 
     // The draw: `begin_offset`, `max_bytes` and the count returned all index
     // the UTF-8.

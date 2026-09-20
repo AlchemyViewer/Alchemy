@@ -80,6 +80,7 @@ class LLMenuBarGL;
 class LLTabContainer;
 class LLTextBox;
 class LLTextEditor;
+class ALCodeEditor;
 
 // Four regions that agree about one selection. The navigator, whose modes
 // are the files, a search across them, the findings, the translation table,
@@ -793,7 +794,7 @@ private:
     ALXUISelection::path_t mRenamedTo;      // until the rows are made again
     LLScrollListCtrl*   mLayout = nullptr;
     LLTextBox*          mSourceLayers = nullptr;
-    LLTextEditor*       mSourceText = nullptr;
+    ALCodeEditor*       mSourceText = nullptr;
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
