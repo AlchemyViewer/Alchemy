@@ -179,8 +179,9 @@ public:
     void supplyCompletions(const ALTextPos& at, std::vector<Completion> more);
     bool completionOpen() const;
     void closeCompletion();
-    // Puts the chosen completion in place of the prefix. False with none
-    // open.
+    // Puts the chosen completion in place of the prefix; a function comes
+    // with its brackets, the caret between them where it takes anything,
+    // and the call's signature asked for. False with none open.
     bool                           acceptCompletion();
     const std::vector<Completion>& completions() const { return mCompletions; }
     S32                            chosenCompletion() const;
@@ -200,6 +201,23 @@ public:
     // caret's is the one it is on or at the end of.
     ALTextRange identifierAt(const ALTextPos& pos) const;
     ALTextRange identifierAtCaret() const;
+
+    // --- placeholders ----------------------------------------------------------------
+
+    // The parameters of a call just completed, each a stretch to type
+    // over: the first is selected, tab selects the next and shift-tab the
+    // one before, past the last the caret lands after the call, and
+    // escape or a click lets them go. Typing over one keeps it as what
+    // was typed until tab leaves it.
+    const std::vector<ALTextRange>& placeholders() const { return mPlaceholders; }
+    S32                             placeholderAt() const { return mPlaceholderAt; }
+    void                            setPlaceholders(std::vector<ALTextRange> ranges, const ALTextPos& after);
+    bool                            nextPlaceholder(S32 direction);
+    void                            clearPlaceholders();
+    // The names of a signature's parameters, from how a completion's
+    // detail reads: "integer llSay(integer channel, string msg)" or
+    // "(channel: number, msg: string) -> ()".
+    static std::vector<std::string> parameterNames(std::string_view detail);
 
     // --- hover -------------------------------------------------------------------
 
@@ -337,8 +355,14 @@ private:
     symbol_request_t        mSymbolRequest;
     LLScrollListCtrl*       mCompletionList = nullptr;
     std::vector<Completion> mCompletions;
-    // The identifier the list is narrowing, which the choice replaces.
+    // The identifier the list is narrowing, which the choice replaces;
+    // and the name before the dot before it, where there is one, whose
+    // members are what is being asked for.
     ALTextRange             mCompletionRange;
+    std::string             mCompletionHead;
+    std::vector<ALTextRange> mPlaceholders;
+    S32                      mPlaceholderAt = -1;
+    ALTextPos                mPlaceholdersAfter;
     // Where the last request was made, so a late answer is known for
     // what it is about, and what was answered, kept through every
     // narrowing until the list closes.

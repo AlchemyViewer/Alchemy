@@ -386,4 +386,68 @@ namespace tut
         key(KEY_F12);
         ensure("and asked about Say, not ll", asked.size() == 1 && asked[0].begin == ALTextPos(0, 3));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<10>()
+    {
+        set_test_name("a dot opens the members of the name before it, and a function accepted comes with its brackets");
+        ALCodeEditor& e = make("", "slua");
+        e.highlighter().words().set("function", { "ll.Say", "ll.Abs", "print" });
+        std::vector<std::pair<ALTextPos, std::string>> asked;
+        e.setCompletionRequest([&](const ALTextPos& at, std::string_view prefix) { asked.emplace_back(at, std::string(prefix)); });
+        std::vector<ALTextPos> signatures;
+        e.setSignatureRequest([&](const ALTextPos& caret) { signatures.push_back(caret); });
+        type("ll");
+        ensure("two letters open the list", e.completionOpen());
+        type(".");
+        ensure("the dot keeps it open, on the members", e.completionOpen());
+        ensure_equals("the members, by their own names", e.completions().size(), size_t(2));
+        ensure_equals("the first", e.completions()[0].text, std::string("Abs"));
+        ensure("asked after the dot with nothing typed yet", !asked.empty() && asked.back().first == ALTextPos(0, 3) && asked.back().second.empty());
+        type("S");
+        ensure("narrowed to Say", e.completionOpen() && e.completions().size() == 1 && e.completions()[0].text == "Say");
+        key(KEY_TAB);
+        ensure_equals("accepted with its brackets", e.text(), std::string("ll.Say()"));
+        ensure("the caret between them", e.caret() == ALTextPos(0, 7));
+        ensure("and the signature asked for", signatures.size() == 1 && signatures[0] == ALTextPos(0, 7));
+        ensure("the list is closed", !e.completionOpen());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<11>()
+    {
+        set_test_name("a function accepted puts its parameters in as placeholders, tab moving through them");
+        ALCodeEditor& e = make("", "lsl");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            if (std::string_view("llSay").substr(0, prefix.size()) == prefix)
+            {
+                ALCodeEditor::Completion c;
+                c.text   = "llSay";
+                c.detail = "integer llSay(integer channel, string msg)";
+                c.kind   = ALSyntaxKind::Function;
+                out.push_back(c);
+            }
+        });
+        std::vector<std::string> names = ALCodeEditor::parameterNames("(channel: number, msg: string) -> ()");
+        ensure("Luau's names", names.size() == 2 && names[0] == "channel" && names[1] == "msg");
+        names = ALCodeEditor::parameterNames("float half(integer n)");
+        ensure("LSL's names", names.size() == 1 && names[0] == "n");
+        ensure("none for none", ALCodeEditor::parameterNames("function").empty() && ALCodeEditor::parameterNames("() -> ()").empty());
+
+        type("llS");
+        ensure("offered", e.completionOpen());
+        key(KEY_TAB);
+        ensure_equals("the call with its parameters", e.text(), std::string("llSay(channel, msg)"));
+        ensure_equals("the first selected", e.selectedText(), std::string("channel"));
+        ensure_equals("two placeholders", e.placeholders().size(), size_t(2));
+        type("0");
+        ensure_equals("typed over", e.text(), std::string("llSay(0, msg)"));
+        key(KEY_TAB);
+        ensure_equals("tab selects the next", e.selectedText(), std::string("msg"));
+        type("\"hi\"");
+        key(KEY_TAB);
+        ensure(llformat("past the last, after the call (not %d:%d), and done (%d left)", e.caret().line, e.caret().column, (int)e.placeholders().size()),
+               e.caret() == ALTextPos(0, 14) && e.placeholders().empty());
+        ensure_equals("the text", e.text(), std::string("llSay(0, \"hi\")"));
+    }
 }

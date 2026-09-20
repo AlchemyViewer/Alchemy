@@ -221,6 +221,12 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     list.has_border(true);
     list.background_visible(true);
     list.can_sort(false);
+    // Over the text, so it must be solid, and the bar must read as one.
+    list.draw_stripes(false);
+    list.bg_writeable_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
+    list.bg_readonly_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
+    list.scroll_bar_bg_visible(true);
+    list.scroll_bar_bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
     LLScrollListColumn::Params text_column;
     text_column.name("text");
     text_column.width.pixel_width(150);
@@ -259,6 +265,47 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                        mDecorations.end());
     mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !slide(r, removed, end_after); }),
                       mHighlights.end());
+    // The placeholder being typed over becomes what was typed; the others
+    // move with the text, and one the edit cut into goes.
+    if (!mPlaceholders.empty())
+    {
+        for (S32 i = 0; i < static_cast<S32>(mPlaceholders.size());)
+        {
+            ALTextRange& r = mPlaceholders[i];
+            if (i == mPlaceholderAt && r.begin <= removed.begin && removed.end <= r.end)
+            {
+                r.end = slidPast(r.end, removed, end_after);
+                ++i;
+            }
+            else if (slide(r, removed, end_after))
+            {
+                ++i;
+            }
+            else
+            {
+                mPlaceholders.erase(mPlaceholders.begin() + i);
+                if (mPlaceholderAt > i)
+                {
+                    --mPlaceholderAt;
+                }
+                else if (mPlaceholderAt == i)
+                {
+                    mPlaceholderAt = -1;
+                }
+            }
+        }
+        if (mPlaceholdersAfter.line == removed.end.line || mPlaceholdersAfter.line > removed.end.line)
+        {
+            if (removed.end <= mPlaceholdersAfter)
+            {
+                mPlaceholdersAfter = slidPast(mPlaceholdersAfter, removed, end_after);
+            }
+        }
+        if (mPlaceholders.empty() || mPlaceholderAt < 0)
+        {
+            clearPlaceholders();
+        }
+    }
 
     // Folds slide the same way. One that starts on the edit's first line
     // stays: typing on a block's first line is not opening the block.
@@ -644,6 +691,18 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             if (spanOnRow(line, row, range, x0, x1))
             {
                 gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, wash);
+            }
+        }
+    }
+    for (S32 i = 0; i < static_cast<S32>(mPlaceholders.size()); ++i)
+    {
+        F32 x0, x1;
+        if (spanOnRow(line, row, mPlaceholders[i], x0, x1))
+        {
+            gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, highlightColor() % alpha);
+            if (i == mPlaceholderAt)
+            {
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -1091,26 +1150,51 @@ void ALCodeEditor::refreshCompletion()
 {
     const std::string prefix = wordBeforeCaret();
     const ALTextPos   at     = caret();
-    if (prefix.empty() || hasSelection())
+    const ALTextPos   start(at.line, at.column - static_cast<S32>(prefix.size()));
+    // After `ll.` the members of `ll` are wanted: the head is put before
+    // the prefix for whoever answers by whole names, and taken off what
+    // they answer.
+    std::string head;
+    if (start.column >= 2 && document().line(start.line)[start.column - 1] == '.')
+    {
+        const ALTextRange before = identifierAt(ALTextPos(start.line, start.column - 2));
+        if (!before.empty() && before.end.column == start.column - 1)
+        {
+            head = document().text(before);
+        }
+    }
+    if ((prefix.empty() && head.empty()) || hasSelection())
     {
         closeCompletion();
         return;
     }
-    const ALTextPos start(at.line, at.column - static_cast<S32>(prefix.size()));
-    const bool      fresh = start != mCompletionAsked;
+    const bool fresh = start != mCompletionAsked;
     if (fresh)
     {
         mCompletionAsked = start;
         mSupplied.clear();
     }
+    mCompletionHead = head;
     mCompletions.clear();
+    const std::string asked = head.empty() ? prefix : head + "." + prefix;
     if (mProvider)
     {
-        mProvider(at, prefix, mCompletions);
+        mProvider(at, asked, mCompletions);
     }
     else
     {
-        vocabularyCompletions(prefix, mCompletions);
+        vocabularyCompletions(asked, mCompletions);
+    }
+    if (!head.empty())
+    {
+        const std::string dotted = head + ".";
+        for (Completion& c : mCompletions)
+        {
+            if (c.text.compare(0, dotted.size(), dotted) == 0)
+            {
+                c.text.erase(0, dotted.size());
+            }
+        }
     }
     // What was answered about this word, narrowed to the prefix as typed
     // now; what was known already keeps its place, and what is new about
@@ -1154,7 +1238,10 @@ void ALCodeEditor::refreshCompletion()
             mCompletions.push_back(c);
         }
     }
-    documentCompletions(at, prefix, mCompletions);
+    if (head.empty())
+    {
+        documentCompletions(at, prefix, mCompletions);
+    }
     if (fresh && mCompletionRequest)
     {
         mCompletionRequest(start, prefix);
@@ -1327,19 +1414,213 @@ bool ALCodeEditor::acceptCompletion()
         closeCompletion();
         return false;
     }
-    const std::string chosen = mCompletions[index].text;
+    const Completion  chosen = mCompletions[index];
     const ALTextRange range  = mCompletionRange;
     closeCompletion();
     setSelection(range);
-    insertText(chosen);
+    // A function called: its brackets, unless they are there already,
+    // with the caret between them where it takes anything, and the
+    // signature asked for.
+    const std::string& line   = document().line(range.end.line);
+    const bool         called = chosen.kind == ALSyntaxKind::Function && !(range.end.column < static_cast<S32>(line.size()) && line[range.end.column] == '(');
+    if (!called)
+    {
+        insertText(chosen.text);
+    }
+    else
+    {
+        // Its parameters as placeholders, where the detail names them;
+        // else the caret between the brackets where it takes anything.
+        const std::vector<std::string> names = parameterNames(chosen.detail);
+        const size_t open  = chosen.detail.find('(');
+        size_t       after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
+        const bool   takes = open == std::string::npos || after == std::string::npos || chosen.detail[after] != ')';
+        std::string  call  = chosen.text + "(";
+        std::vector<ALTextRange> places;
+        const ALTextPos begin = range.begin;
+        for (size_t i = 0; i < names.size(); ++i)
+        {
+            if (i > 0)
+            {
+                call += ", ";
+            }
+            const S32 from = begin.column + static_cast<S32>(call.size());
+            call += names[i];
+            places.emplace_back(ALTextPos(begin.line, from), ALTextPos(begin.line, from + static_cast<S32>(names[i].size())));
+        }
+        call += ")";
+        insertText(call);
+        if (!places.empty())
+        {
+            setPlaceholders(std::move(places), caret());
+        }
+        else if (takes)
+        {
+            setCaret(ALTextPos(caret().line, caret().column - 1));
+        }
+        if (takes && mSignatureRequest)
+        {
+            mSignatureRequest(caret());
+        }
+    }
     setFocus(true);
     return true;
+}
+
+// --- placeholders ------------------------------------------------------------------
+
+// static
+std::vector<std::string> ALCodeEditor::parameterNames(std::string_view detail)
+{
+    std::vector<std::string> names;
+    const size_t             open = detail.find('(');
+    if (open == std::string::npos)
+    {
+        return names;
+    }
+    // To the bracket that closes it, minding the ones inside.
+    size_t close = open + 1;
+    for (S32 depth = 1; close < detail.size() && depth > 0; ++close)
+    {
+        if (detail[close] == '(')
+        {
+            ++depth;
+        }
+        else if (detail[close] == ')')
+        {
+            if (--depth == 0)
+            {
+                break;
+            }
+        }
+    }
+    if (close >= detail.size())
+    {
+        return names;
+    }
+    const std::string_view inside = detail.substr(open + 1, close - open - 1);
+    size_t                 at     = 0;
+    S32                    depth  = 0;
+    std::string            piece;
+    auto take = [&]() {
+        // "integer channel", "channel: number", "...any" or "channel".
+        size_t a = piece.find_first_not_of(' ');
+        size_t z = piece.find_last_not_of(' ');
+        if (a == std::string::npos)
+        {
+            return;
+        }
+        std::string one = piece.substr(a, z - a + 1);
+        if (const size_t colon = one.find(':'); colon != std::string::npos)
+        {
+            one = one.substr(0, colon);
+        }
+        else if (const size_t space = one.rfind(' '); space != std::string::npos)
+        {
+            one = one.substr(space + 1);
+        }
+        while (!one.empty() && one.back() == '?')
+        {
+            one.pop_back();
+        }
+        if (one.rfind("...", 0) == 0)
+        {
+            one = "...";
+        }
+        if (!one.empty())
+        {
+            names.push_back(one);
+        }
+    };
+    for (; at < inside.size(); ++at)
+    {
+        const char c = inside[at];
+        if (c == '(' || c == '<' || c == '{' || c == '[')
+        {
+            ++depth;
+        }
+        else if (c == ')' || c == '>' || c == '}' || c == ']')
+        {
+            --depth;
+        }
+        if (c == ',' && depth == 0)
+        {
+            take();
+            piece.clear();
+        }
+        else
+        {
+            piece.push_back(c);
+        }
+    }
+    take();
+    return names;
+}
+
+void ALCodeEditor::setPlaceholders(std::vector<ALTextRange> ranges, const ALTextPos& after)
+{
+    mPlaceholders      = std::move(ranges);
+    mPlaceholdersAfter = after;
+    mPlaceholderAt     = mPlaceholders.empty() ? -1 : 0;
+    if (mPlaceholderAt >= 0)
+    {
+        setSelection(mPlaceholders[0]);
+    }
+}
+
+bool ALCodeEditor::nextPlaceholder(S32 direction)
+{
+    if (mPlaceholders.empty())
+    {
+        return false;
+    }
+    const S32 to = mPlaceholderAt + direction;
+    if (to < 0)
+    {
+        return false;
+    }
+    if (to >= static_cast<S32>(mPlaceholders.size()))
+    {
+        // Past the last: after the call, done.
+        const ALTextPos after = mPlaceholdersAfter;
+        clearPlaceholders();
+        setCaret(after);
+        return true;
+    }
+    mPlaceholderAt = to;
+    setSelection(mPlaceholders[to]);
+    if (mSignatureRequest)
+    {
+        mSignatureRequest(caret());
+    }
+    return true;
+}
+
+void ALCodeEditor::clearPlaceholders()
+{
+    mPlaceholders.clear();
+    mPlaceholderAt = -1;
 }
 
 // --- input -------------------------------------------------------------------
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
+    if (!mPlaceholders.empty() && !completionOpen())
+    {
+        if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT))
+        {
+            if (nextPlaceholder(mask == MASK_SHIFT ? -1 : 1))
+            {
+                return true;
+            }
+        }
+        else if (key == KEY_ESCAPE && mask == MASK_NONE)
+        {
+            clearPlaceholders();
+            return true;
+        }
+    }
     if (completionOpen() && mask == MASK_NONE)
     {
         const S32 count = static_cast<S32>(mCompletions.size());
@@ -1404,7 +1685,12 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         return false;
     }
     const bool identifier = uni_char < 0x80 && identifierByte(static_cast<char>(uni_char));
-    if (!identifier)
+    if (uni_char == '.' && mAutoComplete && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
+    {
+        // A member is coming: what there is to choose from, at once.
+        openCompletion();
+    }
+    else if (!identifier)
     {
         closeCompletion();
     }
@@ -1427,6 +1713,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
     closeCompletion();
+    clearPlaceholders();
     const LLRect text         = textRect();
     const S32    gutter_right = getLocalRect().mLeft + gutterWidth();
     if (mShowFoldMarkers && x < gutter_right && x >= gutter_right - FOLD_COLUMN)
@@ -1651,10 +1938,14 @@ void ALCodeEditor::drawSignature(const LLRect& text)
 void ALCodeEditor::draw()
 {
     // A signature is about a call on the caret's line; anywhere else it
-    // is stale.
+    // is stale, and so are the placeholders of a call the caret has left.
     if (mSignature && !signatureShown())
     {
         hideSignature();
+    }
+    if (!mPlaceholders.empty() && caret().line != mPlaceholders.front().begin.line)
+    {
+        clearPlaceholders();
     }
     ALTextView::draw();
     if (mSignature)

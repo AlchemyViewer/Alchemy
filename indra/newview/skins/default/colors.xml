@@ -1242,6 +1242,12 @@
   <color
     name="CodeMarkRuntime"
     value="0.7 0.2 0.8 1" />
+    <color
+    name="CodeCompletionBgColor"
+     reference="DkGray2" />
+    <color
+    name="CodeCompletionBorderColor"
+     reference="EmphasisColor_35" />
   <color
     name="OutfitGalleryItemSelected"
     value="0.26 0.36 0.47 1"/>
