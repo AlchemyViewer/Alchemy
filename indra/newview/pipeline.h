@@ -893,6 +893,9 @@ public:
     S32                     mScenePixelY = 0;
     bool                    mScenePixelPending = false;
 
+    // UI previews must not inherit reflection-probe resolution or scene scaling.
+    LLRenderTarget          mPreviewMap;
+
     // 2k bom scratch target
     LLRenderTarget          mBakeMap;
 

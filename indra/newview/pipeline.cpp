@@ -1044,6 +1044,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         // See LLViwerTextureList::updateImagesCreateTextures and LLImageGL::scaleDown
         mDownResMap.allocate(1024, 1024, GL_RGBA8);
 
+        if (!mPreviewMap.allocate(MAX_PREVIEW_WIDTH, MAX_PREVIEW_WIDTH, GL_SRGB8_ALPHA8, true, false,
+                                  ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
+
         mBakeMap.allocate(LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH, LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT, GL_RGBA8);
     }
     //HACK make screenbuffer allocations start failing after 30 seconds
@@ -1305,6 +1308,7 @@ void LLPipeline::releaseGLBuffers()
 
     mDownResMap.release();
 
+    mPreviewMap.release();
     mBakeMap.release();
 
     for (U32 i = 0; i < 3; i++)
