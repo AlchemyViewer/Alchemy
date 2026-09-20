@@ -316,4 +316,17 @@ namespace tut
         ensure("the event handler, as an event", outline[3].name == "LLEvents.touch_start" && outline[3].kind == ALScriptSymbolKind::Event);
         ensure("the global", outline[4].name == "handlers" && outline[4].kind == ALScriptSymbolKind::Variable);
     }
+
+    template<> template<>
+    void alluauservice_object::test<14>()
+    {
+        set_test_name("a key that is not there is named by what was written, with the nearest key there is");
+        ensure("definitions loaded: " + error, loaded);
+        ALScriptProblems problems = service.check("ll.ay(0, \"hi\")\n");
+        ensure("one problem", !problems.empty());
+        const std::string& message = problems.front().message;
+        ensure("names ll, not its fields: " + message, message.find("not found in ll") != std::string::npos && message.find("Abs") == std::string::npos);
+        ensure("and suggests Say: " + message, message.find("'Say'") != std::string::npos);
+        ensure(llformat("in a glance, not %d characters", (int)message.size()), message.size() < 100);
+    }
 }

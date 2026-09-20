@@ -163,6 +163,63 @@ namespace
         return nullptr;
     }
 
+    // How far apart two names are, in edits.
+    size_t editDistance(std::string_view a, std::string_view b)
+    {
+        std::vector<size_t> row(b.size() + 1);
+        for (size_t j = 0; j <= b.size(); ++j)
+        {
+            row[j] = j;
+        }
+        for (size_t i = 1; i <= a.size(); ++i)
+        {
+            size_t previous = row[0];
+            row[0]          = i;
+            for (size_t j = 1; j <= b.size(); ++j)
+            {
+                const size_t was = row[j];
+                const bool   same = LLStringOps::toLower(a[i - 1]) == LLStringOps::toLower(b[j - 1]);
+                row[j]            = std::min({ row[j] + 1, row[j - 1] + 1, previous + (same ? 0 : 1) });
+                previous          = was;
+            }
+        }
+        return row[b.size()];
+    }
+
+    // The property of a table or a class nearest a name that is not one:
+    // the same name in another case, else within a couple of edits.
+    std::string nearestProperty(Luau::TypeId type, const std::string& key)
+    {
+        type = Luau::follow(type);
+        std::vector<std::string> names;
+        if (const Luau::TableType* table = Luau::getTableType(type))
+        {
+            for (const auto& [name, property] : table->props)
+            {
+                names.push_back(name);
+            }
+        }
+        else if (const Luau::ExternType* cls = Luau::get<Luau::ExternType>(type))
+        {
+            for (const auto& [name, property] : cls->props)
+            {
+                names.push_back(name);
+            }
+        }
+        std::string best;
+        size_t      best_distance = std::max<size_t>(2, key.size() / 2) + 1;
+        for (const std::string& name : names)
+        {
+            const size_t distance = editDistance(name, key);
+            if (distance < best_distance || (distance == best_distance && !best.empty() && name.size() < best.size()))
+            {
+                best          = name;
+                best_distance = distance;
+            }
+        }
+        return best;
+    }
+
     std::string withoutBreaks(std::string text)
     {
         for (size_t at = text.find("<br>"); at != std::string::npos; at = text.find("<br>", at + 1))
@@ -639,6 +696,9 @@ struct ALLuauService::Impl
 ALLuauService::ALLuauService()
 :   mImpl(std::make_unique<Impl>())
 {
+    // A type in a message is a glance, not a listing: `ll` has hundreds
+    // of fields, and an error naming it must not print them all.
+    FInt::LuauTableTypeMaximumStringifierLength.value = 8;
     mImpl->frontend = Impl::plainFrontend(mImpl->files, mImpl->configs);
     Luau::freeze(mImpl->frontend->globals.globalTypes);
     Luau::freeze(mImpl->frontend->globalsForAutocomplete.globalTypes);
@@ -730,14 +790,43 @@ ALScriptProblems ALLuauService::check(std::string_view source)
 
     ALScriptProblems problems;
     problems.reserve(result.errors.size() + result.lintResult.errors.size() + result.lintResult.warnings.size());
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     for (const Luau::TypeError& error : result.errors)
     {
-        const bool syntax = Luau::get_if<Luau::SyntaxError>(&error.data) != nullptr;
+        const bool  syntax  = Luau::get_if<Luau::SyntaxError>(&error.data) != nullptr;
+        std::string message = Luau::toString(error);
+        if (const Luau::UnknownProperty* unknown = Luau::get_if<Luau::UnknownProperty>(&error.data))
+        {
+            // Named by what was written -- `ll`, not the table's fields --
+            // with the nearest key there is, which is usually the one meant.
+            std::string head;
+            if (module_source && module_source->root)
+            {
+                const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, error.location.begin);
+                for (auto it = ancestry.rbegin(); it != ancestry.rend() && head.empty(); ++it)
+                {
+                    if (Luau::AstExprIndexName* index = (*it)->as<Luau::AstExprIndexName>(); index && index->index.value == unknown->key)
+                    {
+                        head = nameOf(index->expr);
+                    }
+                }
+            }
+            if (head.empty())
+            {
+                head = typeText(unknown->table);
+            }
+            message = "Key '" + unknown->key + "' not found in " + head;
+            const std::string nearest = nearestProperty(unknown->table, unknown->key);
+            if (!nearest.empty())
+            {
+                message += "; did you mean '" + nearest + "'?";
+            }
+        }
         problems.push_back(problemAt(error.location,
                                      ALScriptProblem::Severity::Error,
                                      syntax ? ALScriptProblem::Source::Parser : ALScriptProblem::Source::Types,
                                      std::string(),
-                                     Luau::toString(error)));
+                                     std::move(message)));
     }
     for (const Luau::LintWarning& warning : result.lintResult.errors)
     {
