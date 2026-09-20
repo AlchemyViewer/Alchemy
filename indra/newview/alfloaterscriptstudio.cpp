@@ -27,6 +27,7 @@
 #include "alfloaterscriptstudio.h"
 
 #include "alcodeeditor.h"
+#include "aljumpbar.h"
 #include "altabstrip.h"
 #include "llagent.h"
 #include "lldate.h"
@@ -42,7 +43,9 @@
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
+#include "lltabcontainer.h"
 #include "lltextbox.h"
+#include "lltexteditor.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
@@ -89,6 +92,43 @@ namespace
         std::string   text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         return text;
     }
+
+    ALTextRange rangeOf(const ALScriptSpan& span)
+    {
+        return ALTextRange(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
+    }
+
+    // Whether a span holds a position, its ends included.
+    bool holds(const ALScriptSpan& span, const ALTextPos& pos)
+    {
+        const ALTextPos begin(span.line, span.column);
+        const ALTextPos end(span.endLine, span.endColumn);
+        return begin <= pos && pos <= end;
+    }
+
+    // Whether a span lies within another.
+    bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
+    {
+        return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
+    }
+
+    // A name as both languages spell one: a letter or an underscore, then
+    // letters, digits and underscores.
+    bool isIdentifier(const std::string& text)
+    {
+        if (text.empty() || (!isalpha(static_cast<unsigned char>(text[0])) && text[0] != '_'))
+        {
+            return false;
+        }
+        for (const char c : text)
+        {
+            if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 // static
@@ -123,12 +163,18 @@ bool ALFloaterScriptStudio::postBuild()
 {
     setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
     setStatusLine(getChild<LLTextBox>("status"));
-    mFolds.bind(this, { { "problems", "bottom_panel", "fold_problems", getString("PaneProblems") } });
+    mFolds.bind(this, { { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
+                        { "inspector", "inspector_panel", "fold_inspector", getString("PaneInspector") } });
     mFolds.onChanged([this]() { saveState(); });
 
     mEditorHost    = getChild<LLPanel>("editor_panel");
     mTabs          = getChild<ALTabStrip>("tabs");
+    mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
+    mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
     mProblems      = getChild<LLScrollListCtrl>("problems");
+    mReferences    = getChild<LLScrollListCtrl>("references");
+    mOutline       = getChild<LLScrollListCtrl>("outline");
+    mSymbol        = getChild<LLTextEditor>("symbol");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mResetButton   = getChild<LLButton>("reset_btn");
@@ -136,7 +182,10 @@ bool ALFloaterScriptStudio::postBuild()
 
     mTabs->onChosen(boost::bind(&ALFloaterScriptStudio::onTabChosen, this, _1));
     mTabs->onClosed(boost::bind(&ALFloaterScriptStudio::closeDocument, this, _1));
+    mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
+    mReferences->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReferenceChosen, this));
+    mOutline->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutlineChosen, this));
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
     mResetButton->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReset, this));
@@ -176,6 +225,7 @@ void ALFloaterScriptStudio::onClose(bool app_quitting)
 void ALFloaterScriptStudio::draw()
 {
     pumpAnalysis();
+    pumpCaret();
     ALStudioFloater::draw();
 }
 
@@ -540,6 +590,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setCompletionRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Complete, at); });
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
+    editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
     editor.setHoverProvider([this, lua](const ALTextPos&, std::string_view word, std::string& text) {
         const std::vector<Vocab>& words = vocabulary(lua);
         // A member of ll or a local is the analyzer's to explain.
@@ -714,6 +765,12 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
             doc.editor->showSignature(at, std::move(signature));
             break;
         }
+        case ALScriptAnalysis::Kind::References:
+            symbolAnswered(doc, result);
+            break;
+        case ALScriptAnalysis::Kind::Inspect:
+            inspected(doc, result);
+            break;
     }
 }
 
@@ -752,6 +809,13 @@ void ALFloaterScriptStudio::activate(size_t index)
     fillTabs();
     refreshToolbar();
     fillProblems(mDocs[index].get());
+    fillReferences(mDocs[index].get());
+    refreshOutline(*mDocs[index]);
+    // The inspector is about this script now: told again once the caret
+    // is seen.
+    mDocs[index]->caretSeen = ALTextPos(-1, -1);
+    mDocs[index]->inspectAt = ALTextPos(-1, -1);
+    mSymbol->setText(LLStringUtil::null);
 }
 
 void ALFloaterScriptStudio::fillTabs()
@@ -938,7 +1002,9 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysis         = result.problems;
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
+    doc.outline          = result.outline;
     refreshProblems(doc);
+    refreshOutline(doc);
 }
 
 void ALFloaterScriptStudio::refreshProblems(Doc& doc)
@@ -1063,6 +1129,475 @@ void ALFloaterScriptStudio::onProblemSelected()
     doc->editor->setFocus(true);
 }
 
+// --- the name at the caret ----------------------------------------------------------
+
+void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word)
+{
+    doc.symbolCommand = command;
+    doc.symbolVersion = doc.editor->document().version();
+    doc.symbolAt      = word.begin;
+    askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
+}
+
+void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result)
+{
+    // Of another question, or of a text that has moved on.
+    if (result.version != doc.symbolVersion || ALTextPos(result.line, result.column) != doc.symbolAt || doc.symbolCommand == ALEditorCommand::None)
+    {
+        return;
+    }
+    const ALEditorCommand     command = doc.symbolCommand;
+    const ALScriptReferences& refs    = result.references;
+    doc.symbolCommand                 = ALEditorCommand::None;
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->document().wordAt(doc.symbolAt).normalised());
+    if (!refs.found)
+    {
+        setStatus(getString("NoReferences", args));
+        return;
+    }
+    args["[COUNT]"] = std::to_string(refs.references.size());
+    switch (command)
+    {
+        case ALEditorCommand::GoToDefinition:
+            if (refs.hasDefinition)
+            {
+                doc.editor->goTo(rangeOf(refs.definition));
+                doc.editor->setFocus(true);
+            }
+            else
+            {
+                setStatus(getString("NoDefinition", args));
+            }
+            break;
+        case ALEditorCommand::FindReferences:
+        {
+            doc.references = refs;
+            std::vector<ALTextRange> lit;
+            lit.reserve(refs.references.size());
+            for (const ALScriptSpan& span : refs.references)
+            {
+                lit.push_back(rangeOf(span));
+            }
+            doc.editor->setHighlights(std::move(lit));
+            fillReferences(&doc);
+            showBottom("references_tab");
+            setStatus(getString("ReferencesFound", args));
+            break;
+        }
+        case ALEditorCommand::Rename:
+        {
+            if (!refs.renamable)
+            {
+                setStatus(getString("NotRenamable", args));
+                break;
+            }
+            LLSD substitutions;
+            substitutions["[NAME]"]  = refs.name;
+            substitutions["[COUNT]"] = static_cast<S32>(refs.references.size());
+            LLSD payload;
+            payload["id"]      = doc.id;
+            payload["version"] = static_cast<S32>(doc.symbolVersion);
+            payload["name"]    = refs.name;
+            for (const ALScriptSpan& span : refs.references)
+            {
+                LLSD one;
+                one.append(span.line);
+                one.append(span.column);
+                one.append(span.endLine);
+                one.append(span.endColumn);
+                payload["spans"].append(one);
+            }
+            const LLHandle<LLFloater> handle = getHandle();
+            LLNotificationsUtil::add("ScriptStudioRename", substitutions, payload, [handle](const LLSD& notification, const LLSD& response) {
+                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                {
+                    studio->renameAnswered(notification, response);
+                }
+            });
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void ALFloaterScriptStudio::renameAnswered(const LLSD& notification, const LLSD& response)
+{
+    if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+    {
+        return;
+    }
+    const LLSD&  payload = notification["payload"];
+    const size_t index   = indexOf(payload["id"].asString());
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc&        doc      = *mDocs[index];
+    std::string new_name = response["new_name"].asString();
+    LLStringUtil::trim(new_name);
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = new_name;
+    if (!isIdentifier(new_name))
+    {
+        setStatus(getString("RenameBadName", args), true);
+        return;
+    }
+    if (new_name == payload["name"].asString())
+    {
+        return;
+    }
+    if (doc.editor->document().version() != static_cast<U32>(payload["version"].asInteger()))
+    {
+        setStatus(getString("RenameStale", args), true);
+        return;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (LLSD::array_const_iterator it = payload["spans"].beginArray(); it != payload["spans"].endArray(); ++it)
+    {
+        const LLSD& span = *it;
+        edits.emplace_back(ALTextRange(ALTextPos(span[0].asInteger(), span[1].asInteger()), ALTextPos(span[2].asInteger(), span[3].asInteger())), new_name);
+    }
+    args["[COUNT]"] = std::to_string(edits.size());
+    if (doc.editor->replaceAll(std::move(edits)))
+    {
+        doc.editor->undoJournal().label("rename");
+        setStatus(getString("Renamed", args));
+    }
+    doc.editor->setFocus(true);
+}
+
+void ALFloaterScriptStudio::fillReferences(const Doc* doc)
+{
+    mReferences->deleteAllItems();
+    if (!doc || !doc->references.found)
+    {
+        return;
+    }
+    const ALTextDocument& text = doc->editor->document();
+    for (size_t i = 0; i < doc->references.references.size(); ++i)
+    {
+        const ALScriptSpan& span = doc->references.references[i];
+        std::string         line = text.text(ALTextRange(ALTextPos(span.line, 0), ALTextPos(span.line, text.lineLength(span.line))));
+        LLStringUtil::trim(line);
+        LLSD row;
+        row["value"]                = static_cast<S32>(i);
+        row["columns"][0]["column"] = "line";
+        row["columns"][0]["value"]  = llformat("%d:%d", span.line + 1, span.column + 1);
+        row["columns"][1]["column"] = "text";
+        row["columns"][1]["value"]  = line;
+        mReferences->addElement(row);
+    }
+}
+
+void ALFloaterScriptStudio::onReferenceChosen()
+{
+    Doc*              doc  = active();
+    LLScrollListItem* item = mReferences->getFirstSelected();
+    if (!doc || !item)
+    {
+        return;
+    }
+    const size_t index = static_cast<size_t>(item->getValue().asInteger());
+    if (index < doc->references.references.size())
+    {
+        doc->editor->goTo(rangeOf(doc->references.references[index]));
+        doc->editor->setFocus(true);
+    }
+}
+
+void ALFloaterScriptStudio::goToLine()
+{
+    Doc* doc = active();
+    if (!doc)
+    {
+        return;
+    }
+    LLSD substitutions;
+    substitutions["[COUNT]"] = doc->editor->document().lineCount();
+    LLSD payload;
+    payload["id"] = doc->id;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioGoToLine", substitutions, payload, [handle](const LLSD& notification, const LLSD& response) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->goToLineAnswered(notification, response);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::goToLineAnswered(const LLSD& notification, const LLSD& response)
+{
+    if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+    {
+        return;
+    }
+    const size_t index = indexOf(notification["payload"]["id"].asString());
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc&      doc  = *mDocs[index];
+    const S32 line = atoi(response["line"].asString().c_str());
+    if (line < 1)
+    {
+        return;
+    }
+    doc.editor->goToLine(llmin(line, doc.editor->document().lineCount()) - 1);
+    doc.editor->setFocus(true);
+}
+
+void ALFloaterScriptStudio::goToSymbol()
+{
+    Doc* doc = active();
+    if (!doc || doc->outline.empty())
+    {
+        return;
+    }
+    std::vector<ALQuickOpen::Candidate> candidates;
+    candidates.reserve(doc->outline.size());
+    for (size_t i = 0; i < doc->outline.size(); ++i)
+    {
+        const ALScriptOutlineEntry& entry = doc->outline[i];
+        ALQuickOpen::Candidate      one;
+        one.label  = entry.name;
+        one.detail = entry.detail.empty() ? kindName(entry.kind) : kindName(entry.kind) + "  " + entry.detail;
+        one.value  = std::to_string(i);
+        candidates.push_back(std::move(one));
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    quickOpen(std::move(candidates), getString("GoToSymbolPlaceholder"), getString("GoToSymbolTitle"), [handle](const std::string& value) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        Doc*                   doc    = studio ? studio->active() : nullptr;
+        const size_t           index  = static_cast<size_t>(atoi(value.c_str()));
+        if (doc && index < doc->outline.size())
+        {
+            doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
+            doc->editor->setFocus(true);
+        }
+    });
+}
+
+// --- the outline, the breadcrumb and the inspector -----------------------------------
+
+void ALFloaterScriptStudio::pumpCaret()
+{
+    Doc* doc = active();
+    if (!doc || !doc->loaded || doc->sourceView)
+    {
+        return;
+    }
+    const ALTextPos caret = doc->editor->caret();
+    const F64       now   = LLTimer::getTotalSeconds();
+    if (caret != doc->caretSeen)
+    {
+        doc->caretSeen  = caret;
+        doc->inspectDue = now + ANALYSIS_DELAY;
+        refreshBreadcrumb(*doc);
+        // The lit places go once the caret has left them all.
+        if (!doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
+        {
+            doc->editor->clearHighlights();
+        }
+    }
+    if (doc->inspectDue > 0.0 && now >= doc->inspectDue)
+    {
+        doc->inspectDue = 0.0;
+        const ALTextRange word    = doc->editor->identifierAtCaret();
+        const U32         version = doc->editor->document().version();
+        if (word.empty())
+        {
+            doc->inspectAt = ALTextPos(-1, -1);
+            mSymbol->setText(LLStringUtil::null);
+        }
+        else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
+        {
+            doc->inspectAt      = word.begin;
+            doc->inspectVersion = version;
+            askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
+        }
+    }
+}
+
+void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& result)
+{
+    // Still about the word the caret is on, and this script.
+    if (&doc != active() || ALTextPos(result.line, result.column) != doc.inspectAt)
+    {
+        return;
+    }
+    std::string text;
+    if (result.hover.found)
+    {
+        text = result.hover.label;
+        if (!result.hover.documentation.empty())
+        {
+            text += "\n\n" + result.hover.documentation;
+        }
+        if (!result.hover.link.empty())
+        {
+            text += "\n" + result.hover.link;
+        }
+    }
+    mSymbol->setText(text);
+}
+
+std::string ALFloaterScriptStudio::kindName(ALScriptSymbolKind kind) const
+{
+    switch (kind)
+    {
+        case ALScriptSymbolKind::Keyword:   return getString("KindKeyword");
+        case ALScriptSymbolKind::Variable:  return getString("KindVariable");
+        case ALScriptSymbolKind::Parameter: return getString("KindParameter");
+        case ALScriptSymbolKind::Function:  return getString("KindFunction");
+        case ALScriptSymbolKind::Field:     return getString("KindField");
+        case ALScriptSymbolKind::Type:      return getString("KindType");
+        case ALScriptSymbolKind::Constant:  return getString("KindConstant");
+        case ALScriptSymbolKind::Event:     return getString("KindEvent");
+        case ALScriptSymbolKind::State:     return getString("KindState");
+        case ALScriptSymbolKind::Label:     return getString("KindLabel");
+        case ALScriptSymbolKind::Module:    return getString("KindModule");
+    }
+    return std::string();
+}
+
+void ALFloaterScriptStudio::refreshOutline(Doc& doc)
+{
+    if (&doc != active())
+    {
+        return;
+    }
+    mOutline->deleteAllItems();
+    for (size_t i = 0; i < doc.outline.size(); ++i)
+    {
+        const ALScriptOutlineEntry& entry = doc.outline[i];
+        LLSD                        row;
+        row["value"]                = static_cast<S32>(i);
+        row["columns"][0]["column"] = "symbol";
+        row["columns"][0]["value"]  = std::string(static_cast<size_t>(entry.depth) * 4, ' ') + entry.name;
+        row["columns"][0]["tool_tip"] = entry.detail;
+        row["columns"][1]["column"] = "kind";
+        row["columns"][1]["value"]  = kindName(entry.kind);
+        mOutline->addElement(row);
+    }
+    refreshBreadcrumb(doc);
+}
+
+void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
+{
+    if (&doc != active())
+    {
+        return;
+    }
+    const ALTextPos               caret = doc.editor->caret();
+    std::vector<ALJumpBar::Crumb> crumbs;
+    LLStringUtil::format_map_t    args;
+
+    // The script itself, offering what it declares at the top.
+    ALJumpBar::Crumb root;
+    root.label     = doc.name;
+    root.value     = "top";
+    args["[NAME]"] = doc.name;
+    root.toolTip   = getString("CrumbRootTip", args);
+    for (size_t i = 0; i < doc.outline.size(); ++i)
+    {
+        if (doc.outline[i].depth == 0)
+        {
+            root.alternatives.emplace_back(doc.outline[i].name, std::to_string(i));
+        }
+    }
+    crumbs.push_back(std::move(root));
+
+    // Then each symbol around the caret, the outermost first: at each
+    // depth the last entry that holds the caret, within the one before,
+    // offering the others at its depth in the same holder.
+    size_t parent = NONE;
+    for (S32 depth = 0;; ++depth)
+    {
+        size_t found = NONE;
+        for (size_t i = 0; i < doc.outline.size(); ++i)
+        {
+            const ALScriptOutlineEntry& entry = doc.outline[i];
+            if (entry.depth == depth && holds(entry.span, caret) && (parent == NONE || within(entry.span, doc.outline[parent].span)))
+            {
+                found = i;
+            }
+        }
+        if (found == NONE)
+        {
+            break;
+        }
+        ALJumpBar::Crumb crumb;
+        crumb.label    = doc.outline[found].name;
+        crumb.value    = std::to_string(found);
+        args["[NAME]"] = crumb.label;
+        crumb.toolTip  = getString("CrumbTip", args);
+        for (size_t i = 0; i < doc.outline.size(); ++i)
+        {
+            const ALScriptOutlineEntry& entry = doc.outline[i];
+            if (entry.depth == depth && (parent == NONE || within(entry.span, doc.outline[parent].span)))
+            {
+                crumb.alternatives.emplace_back(entry.name, std::to_string(i));
+            }
+        }
+        if (crumb.alternatives.size() < 2)
+        {
+            crumb.alternatives.clear();
+        }
+        crumbs.push_back(std::move(crumb));
+        parent = found;
+    }
+    mBreadcrumb->setPath(std::move(crumbs));
+    args["[LINE]"] = std::to_string(caret.line + 1);
+    args["[COL]"]  = std::to_string(caret.column + 1);
+    mBreadcrumb->setTrailer(getString("CaretPosition", args));
+}
+
+void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
+{
+    Doc* doc = active();
+    if (!doc)
+    {
+        return;
+    }
+    if (value == "top")
+    {
+        doc->editor->goTo(ALTextPos(0, 0));
+    }
+    else
+    {
+        const size_t index = static_cast<size_t>(atoi(value.c_str()));
+        if (index < doc->outline.size())
+        {
+            doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
+        }
+    }
+    doc->editor->setFocus(true);
+}
+
+void ALFloaterScriptStudio::onOutlineChosen()
+{
+    Doc*              doc  = active();
+    LLScrollListItem* item = mOutline->getFirstSelected();
+    if (!doc || !item)
+    {
+        return;
+    }
+    const size_t index = static_cast<size_t>(item->getValue().asInteger());
+    if (index < doc->outline.size())
+    {
+        doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
+        doc->editor->setFocus(true);
+    }
+}
+
+void ALFloaterScriptStudio::showBottom(const char* tab)
+{
+    mFolds.setCollapsed("bottom", false);
+    mBottomTabs->selectTabByName(tab);
+}
+
 // --- closing ---------------------------------------------------------------------
 
 void ALFloaterScriptStudio::closeDocument(std::string_view id)
@@ -1138,6 +1673,11 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
         fillTabs();
         refreshToolbar();
         fillProblems(nullptr);
+        fillReferences(nullptr);
+        mOutline->deleteAllItems();
+        mBreadcrumb->setPath({});
+        mBreadcrumb->setTrailer(LLStringUtil::null);
+        mSymbol->setText(LLStringUtil::null);
     }
     else
     {
@@ -1232,6 +1772,26 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->editor->perform(ALEditorCommand::UnfoldAll);
     }
+    else if (doc && action == "go_to_definition")
+    {
+        doc->editor->perform(ALEditorCommand::GoToDefinition);
+    }
+    else if (doc && action == "find_references")
+    {
+        doc->editor->perform(ALEditorCommand::FindReferences);
+    }
+    else if (doc && action == "rename")
+    {
+        doc->editor->perform(ALEditorCommand::Rename);
+    }
+    else if (doc && action == "go_to_line")
+    {
+        goToLine();
+    }
+    else if (doc && action == "go_to_symbol")
+    {
+        goToSymbol();
+    }
     else if (action == "word_wrap")
     {
         mWordWrap = !mWordWrap;
@@ -1250,9 +1810,22 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         }
         saveState();
     }
-    else if (action == "problems")
+    else if (action == "problems" || action == "references")
     {
-        mFolds.toggle("problems");
+        // The tab, shown; or the pane folded when it is the tab showing.
+        const char* tab = action == "problems" ? "problems_tab" : "references_tab";
+        if (onMenuCheck(param))
+        {
+            mFolds.setCollapsed("bottom", true);
+        }
+        else
+        {
+            showBottom(tab);
+        }
+    }
+    else if (action == "inspector")
+    {
+        mFolds.toggle("inspector");
     }
 }
 
@@ -1299,6 +1872,26 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         return doc && doc->editor->canPerform(ALEditorCommand::UnfoldAll);
     }
+    if (action == "go_to_definition")
+    {
+        return doc && doc->editor->canPerform(ALEditorCommand::GoToDefinition);
+    }
+    if (action == "find_references")
+    {
+        return doc && doc->editor->canPerform(ALEditorCommand::FindReferences);
+    }
+    if (action == "rename")
+    {
+        return doc && doc->editor->canPerform(ALEditorCommand::Rename);
+    }
+    if (action == "go_to_line")
+    {
+        return doc != nullptr;
+    }
+    if (action == "go_to_symbol")
+    {
+        return doc && !doc->outline.empty();
+    }
     if (action == "undo")
     {
         return doc && doc->editor->canUndo();
@@ -1329,9 +1922,14 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     {
         return mLineNumbers;
     }
-    if (action == "problems")
+    if (action == "problems" || action == "references")
     {
-        return !mFolds.collapsed("problems");
+        const LLPanel* current = mBottomTabs->getCurrentPanel();
+        return !mFolds.collapsed("bottom") && current && current->getName() == (action == "problems" ? "problems_tab" : "references_tab");
+    }
+    if (action == "inspector")
+    {
+        return !mFolds.collapsed("inspector");
     }
     return false;
 }

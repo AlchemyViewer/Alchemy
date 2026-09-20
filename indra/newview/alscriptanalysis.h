@@ -40,8 +40,9 @@ namespace LL
 
 // The LSL and SLua analyzers, each owned by one worker thread and asked
 // about one script at a time, as doc/SCRIPT_STUDIO.md section 4.3 has it:
-// what is wrong with it, what could go at a position, what is at one, and
-// what a call there takes. A request carries the document's version, the
+// what is wrong with it and what it declares, what could go at a
+// position, what is at one, what a call there takes, and where a name is
+// bound and used. A request carries the document's version, the
 // answer comes back on the main thread, and whoever asked drops it when
 // the document has moved on. The definitions the analyzers work from are
 // the region's, by the paths the syntax cache gives, read on the worker.
@@ -57,10 +58,16 @@ class ALScriptAnalysis : public LLSingleton<ALScriptAnalysis>
 public:
     enum class Kind : U8
     {
+        // What is wrong, and what the script declares.
         Check,
         Complete,
+        // What is under the mouse, for a tip; what is at the caret, for
+        // the inspector. The same question, told apart by who asked.
         Hover,
-        Signature
+        Inspect,
+        Signature,
+        // Where the name at a position is bound and used.
+        References
     };
     struct Request
     {
@@ -83,10 +90,12 @@ public:
         bool                            lua     = false;
         S32                             line    = 0;
         S32                             column  = 0;
-        ALScriptProblems                problems;
-        std::vector<ALScriptCompletion> completions;
-        ALScriptHover                   hover;
-        ALScriptSignature               signature;
+        ALScriptProblems                  problems;
+        std::vector<ALScriptOutlineEntry> outline;
+        std::vector<ALScriptCompletion>   completions;
+        ALScriptHover                     hover;
+        ALScriptSignature                 signature;
+        ALScriptReferences                references;
         // Why the analyzer ran without its definitions, or nothing.
         std::string                     definitionsError;
     };

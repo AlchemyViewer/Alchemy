@@ -171,15 +171,20 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             {
                 case Kind::Check:
                     result.problems = mWorker->luau.check(request.text);
+                    result.outline  = mWorker->luau.outline(request.text);
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->luau.complete(request.text, request.line, request.column);
                     break;
                 case Kind::Hover:
+                case Kind::Inspect:
                     result.hover = mWorker->luau.hover(request.text, request.line, request.column);
                     break;
                 case Kind::Signature:
                     result.signature = mWorker->luau.signature(request.text, request.line, request.column);
+                    break;
+                case Kind::References:
+                    result.references = mWorker->luau.references(request.text, request.line, request.column);
                     break;
             }
         }
@@ -191,15 +196,20 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             {
                 case Kind::Check:
                     result.problems = mWorker->lsl.check(request.text, request.mono);
+                    result.outline  = mWorker->lsl.outline(request.text);
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
                     break;
                 case Kind::Hover:
+                case Kind::Inspect:
                     result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
                     break;
                 case Kind::Signature:
                     result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
+                    break;
+                case Kind::References:
+                    result.references = mWorker->lsl.references(request.text, request.line, request.column);
                     break;
             }
         }

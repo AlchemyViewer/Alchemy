@@ -23,7 +23,31 @@
     <floater.string name="SavedToFile">Written to [PATH]</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
-    <floater.string name="PaneProblems">Problems</floater.string>
+    <floater.string name="PaneBottom">Problems and references</floater.string>
+    <floater.string name="PaneInspector">Inspector</floater.string>
+    <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
+    <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
+    <floater.string name="ReferencesFound">[COUNT] place(s) where [NAME] stands.</floater.string>
+    <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
+    <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
+    <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
+    <floater.string name="Renamed">[COUNT] place(s) renamed to [NAME].</floater.string>
+    <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
+    <floater.string name="CrumbRootTip">[NAME]: press to go to the top; its arrow lists what the script declares</floater.string>
+    <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
+    <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
+    <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
+    <floater.string name="KindKeyword">keyword</floater.string>
+    <floater.string name="KindVariable">variable</floater.string>
+    <floater.string name="KindParameter">parameter</floater.string>
+    <floater.string name="KindFunction">function</floater.string>
+    <floater.string name="KindField">field</floater.string>
+    <floater.string name="KindType">type</floater.string>
+    <floater.string name="KindConstant">constant</floater.string>
+    <floater.string name="KindEvent">event</floater.string>
+    <floater.string name="KindState">state</floater.string>
+    <floater.string name="KindLabel">label</floater.string>
+    <floater.string name="KindModule">module</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabSourceTip">The source this script was written as, before the preprocessor expanded it; read-only here</floater.string>
@@ -123,6 +147,35 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="complete" />
             </menu_item_call>
+            <menu_item_call label="Rename Symbol..." layout="topleft" name="rename" shortcut="F2">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="rename" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="Go"
+         layout="topleft"
+         mouse_opaque="false"
+         name="go"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
+            </menu_item_call>
+            <menu_item_call label="Go to Symbol..." layout="topleft" name="go_to_symbol" shortcut="control|shift|O">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_symbol" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_symbol" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition" shortcut="F12">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_definition" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_definition" />
+            </menu_item_call>
+            <menu_item_call label="Find References" layout="topleft" name="find_references" shortcut="shift|F12">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_references" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_references" />
+            </menu_item_call>
         </menu>
         <menu
          label="View"
@@ -157,9 +210,17 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|1">
+            <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|alt|1">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
+            </menu_item_check>
+            <menu_item_check label="References" layout="topleft" name="references" shortcut="control|alt|2">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="references" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="references" />
+            </menu_item_check>
+            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|3">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
         </menu>
     </menu_bar>
@@ -211,10 +272,22 @@
      follows="right|top"
      height="22"
      is_toggle="true"
-     label="Problems"
+     label="Lists"
      layout="topleft"
-     name="fold_problems"
+     name="fold_bottom"
+     right="-176"
+     tool_tip="The band under the editor: the problems and the references (Control+Alt+1, Control+Alt+2)"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="right|top"
+     height="22"
+     is_toggle="true"
+     label="Inspector"
+     layout="topleft"
+     name="fold_inspector"
      right="-92"
+     tool_tip="The outline and the symbol at the caret, down the right (Control+Alt+3)"
      top_delta="0"
      width="80" />
     <button
@@ -234,7 +307,7 @@
      layout="topleft"
      left="8"
      name="main_stack"
-     orientation="vertical"
+     orientation="horizontal"
      top="70"
      width="884"
      border_size="10"
@@ -245,70 +318,226 @@
      drag_handle_color="DkGray0"
      drag_handle_on_hover="true">
         <layout_panel
-         auto_resize="false"
-         height="24"
-         layout="topleft"
-         min_dim="24"
-         name="editor_head"
-         width="884"
-         background_visible="true"
-         background_opaque="true"
-         bg_opaque_color="MouseGray"
-         border="true">
-            <tab_strip
-             follows="left|top|right"
-             height="22"
-             layout="topleft"
-             left="4"
-             name="tabs"
-             right="-4"
-             tool_tip="The scripts open here, one tab each; the tab shown is the script being edited"
-             top="1" />
-        </layout_panel>
-        <layout_panel
          auto_resize="true"
-         height="300"
+         height="464"
          layout="topleft"
-         min_dim="120"
-         name="editor_host"
-         user_resize="true"
-         width="884">
-            <panel
+         min_dim="300"
+         name="centre"
+         width="614">
+            <layout_stack
+             animate="false"
              follows="all"
-             height="300"
+             height="464"
              layout="topleft"
              left="0"
-             name="editor_panel"
+             name="centre_stack"
+             orientation="vertical"
              top="0"
-             width="884" />
+             width="614"
+             border_size="10"
+             show_drag_handle="true"
+             drag_handle_thickness="4"
+             drag_handle_first_indent="10"
+             drag_handle_second_indent="10"
+             drag_handle_color="DkGray0"
+             drag_handle_on_hover="true">
+                <layout_panel
+                 auto_resize="false"
+                 height="24"
+                 layout="topleft"
+                 min_dim="24"
+                 name="editor_head"
+                 width="614"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="MouseGray"
+                 border="true">
+                    <tab_strip
+                     follows="left|top|right"
+                     height="22"
+                     layout="topleft"
+                     left="4"
+                     name="tabs"
+                     right="-4"
+                     tool_tip="The scripts open here, one tab each; the tab shown is the script being edited"
+                     top="1" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 height="24"
+                 layout="topleft"
+                 min_dim="24"
+                 name="editor_crumbs"
+                 width="614">
+                    <jump_bar
+                     follows="left|top|right"
+                     height="22"
+                     layout="topleft"
+                     left="0"
+                     name="breadcrumb"
+                     tool_tip="Where the caret is, from the script down to the symbol around it. Press a step to go there; press its arrow to pick one of the symbols beside it instead."
+                     top="1"
+                     width="614" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="276"
+                 layout="topleft"
+                 min_dim="120"
+                 name="editor_host"
+                 user_resize="true"
+                 width="614">
+                    <panel
+                     follows="all"
+                     height="276"
+                     layout="topleft"
+                     left="0"
+                     name="editor_panel"
+                     top="0"
+                     width="614" />
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 expanded_min_dim="80"
+                 height="130"
+                 layout="topleft"
+                 min_dim="0"
+                 name="bottom_panel"
+                 user_resize="true"
+                 width="614"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="DkGray2"
+                 border="true">
+                    <tab_container
+                     follows="all"
+                     height="130"
+                     layout="topleft"
+                     left="0"
+                     name="bottom_tabs"
+                     tab_min_width="70"
+                     tab_position="top"
+                     top="0"
+                     width="614">
+                        <panel
+                         follows="all"
+                         height="108"
+                         label="Problems"
+                         layout="topleft"
+                         name="problems_tab"
+                         width="614">
+                            <scroll_list
+                             follows="all"
+                             height="108"
+                             layout="topleft"
+                             left="0"
+                             name="problems"
+                             tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
+                             top="0"
+                             width="614">
+                                <scroll_list.columns label="Line" name="line" width="70" />
+                                <scroll_list.columns label="Level" name="level" width="80" />
+                                <scroll_list.columns label="Source" name="source" width="90" />
+                                <scroll_list.columns dynamic_width="true" label="Message" name="message" />
+                            </scroll_list>
+                        </panel>
+                        <panel
+                         follows="all"
+                         height="108"
+                         label="References"
+                         layout="topleft"
+                         name="references_tab"
+                         width="614">
+                            <scroll_list
+                             follows="all"
+                             height="108"
+                             layout="topleft"
+                             left="0"
+                             name="references"
+                             tool_tip="Every place the name last looked up stands; choosing one goes there"
+                             top="0"
+                             width="614">
+                                <scroll_list.columns label="Line" name="line" width="70" />
+                                <scroll_list.columns dynamic_width="true" label="Text" name="text" />
+                            </scroll_list>
+                        </panel>
+                    </tab_container>
+                </layout_panel>
+            </layout_stack>
         </layout_panel>
         <layout_panel
          auto_resize="false"
-         expanded_min_dim="80"
-         height="130"
+         expanded_min_dim="180"
+         height="464"
          layout="topleft"
          min_dim="0"
-         name="bottom_panel"
+         name="inspector_panel"
          user_resize="true"
-         width="884"
+         width="260"
          background_visible="true"
          background_opaque="true"
          bg_opaque_color="DkGray2"
          border="true">
-            <scroll_list
+            <layout_stack
+             animate="false"
              follows="all"
-             height="130"
+             height="464"
              layout="topleft"
              left="0"
-             name="problems"
-             tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
+             name="inspector_stack"
+             orientation="vertical"
              top="0"
-             width="884">
-                <scroll_list.columns label="Line" name="line" width="70" />
-                <scroll_list.columns label="Level" name="level" width="80" />
-                <scroll_list.columns label="Source" name="source" width="90" />
-                <scroll_list.columns dynamic_width="true" label="Message" name="message" />
-            </scroll_list>
+             width="260"
+             border_size="10"
+             show_drag_handle="true"
+             drag_handle_thickness="4"
+             drag_handle_first_indent="10"
+             drag_handle_second_indent="10"
+             drag_handle_color="DkGray0"
+             drag_handle_on_hover="true">
+                <layout_panel
+                 auto_resize="true"
+                 height="300"
+                 layout="topleft"
+                 min_dim="80"
+                 name="outline_panel"
+                 user_resize="true"
+                 width="260">
+                    <scroll_list
+                     follows="all"
+                     height="300"
+                     layout="topleft"
+                     left="0"
+                     name="outline"
+                     tool_tip="What the script declares, in the order written; choosing one goes to it"
+                     top="0"
+                     width="260">
+                        <scroll_list.columns dynamic_width="true" label="Symbol" name="symbol" />
+                        <scroll_list.columns label="Kind" name="kind" width="70" />
+                    </scroll_list>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="false"
+                 expanded_min_dim="60"
+                 height="154"
+                 layout="topleft"
+                 min_dim="0"
+                 name="symbol_panel"
+                 user_resize="true"
+                 width="260">
+                    <text_editor
+                     follows="all"
+                     height="154"
+                     layout="topleft"
+                     left="0"
+                     name="symbol"
+                     read_only="true"
+                     tool_tip="The symbol at the caret: its declaration and its documentation"
+                     top="0"
+                     width="260"
+                     word_wrap="true" />
+                </layout_panel>
+            </layout_stack>
         </layout_panel>
     </layout_stack>
 

@@ -1744,6 +1744,49 @@ Save changes to &quot;[NAME]&quot;?
 
   <notification
    icon="alertmodal.tga"
+   label="Rename"
+   name="ScriptStudioRename"
+   type="alertmodal">
+Rename &quot;[NAME]&quot; everywhere it stands in this script ([COUNT] places):
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="new_name" type="text">[NAME]</input>
+      <button
+       default="true"
+       index="0"
+       name="Rename"
+       text="Rename"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Go to Line"
+   name="ScriptStudioGoToLine"
+   type="alertmodal">
+Go to line (1 to [COUNT]):
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="line" type="text">
+      </input>
+      <button
+       default="true"
+       index="0"
+       name="Go"
+       text="Go"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>

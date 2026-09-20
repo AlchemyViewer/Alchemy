@@ -38,22 +38,26 @@
 #include <string_view>
 #include <vector>
 
+class ALJumpBar;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
 class LLPanel;
 class LLScrollListCtrl;
+class LLTabContainer;
+class LLTextEditor;
 
 // The scripting studio of doc/SCRIPT_STUDIO.md, as far as phase 1 takes it:
 // scripts from inventory and from objects open in tabs over code editors,
 // saved and compiled through the workspace, with the compiler's problems in
 // a pane that jumps to the line, the region's vocabulary colouring,
 // completing and explaining the text, the analyzers checking it as it is
-// typed, and a script the preprocessor wrapped shown as the code the
+// typed and answering where a name lives -- go to definition, find
+// references, rename -- an outline in the inspector and a breadcrumb over
+// the editor, and a script the preprocessor wrapped shown as the code the
 // server compiled with the author's source in a tab beside it. Its regions
-// fold and come out as any studio's do. Not yet: the explorer, the output,
-// the inspector.
+// fold and come out as any studio's do. Not yet: the explorer, the output.
 class ALFloaterScriptStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
@@ -120,6 +124,21 @@ private:
             std::string message;
         };
         std::vector<Shown>                         shown;
+        // What the analyzer said the script declares, at analysisVersion.
+        std::vector<ALScriptOutlineEntry>          outline;
+        // The name last asked about -- its definition, its references, a
+        // new name -- where, and of which text.
+        ALEditorCommand                            symbolCommand = ALEditorCommand::None;
+        U32                                        symbolVersion = 0;
+        ALTextPos                                  symbolAt;
+        // The places last found, listed in the pane.
+        ALScriptReferences                         references;
+        // Where the caret was last seen; when the inspector is due to be
+        // told what it is on, or zero; and what it was last told about.
+        ALTextPos                                  caretSeen{ -1, -1 };
+        F64                                        inspectDue     = 0.0;
+        ALTextPos                                  inspectAt{ -1, -1 };
+        U32                                        inspectVersion = 0;
         boost::signals2::scoped_connection         changed;
     };
     static constexpr size_t NONE = static_cast<size_t>(-1);
@@ -170,6 +189,30 @@ private:
     // and the analyzer's together.
     void refreshProblems(Doc& doc);
 
+    // The name at the caret: asked about on a key or a menu item, and
+    // answered by going there, lighting its places, or asking for a new
+    // name and putting it everywhere as one step.
+    void askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word);
+    void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result);
+    void renameAnswered(const LLSD& notification, const LLSD& response);
+    void fillReferences(const Doc* doc);
+    void onReferenceChosen();
+    void goToLine();
+    void goToLineAnswered(const LLSD& notification, const LLSD& response);
+    void goToSymbol();
+
+    // The outline and the breadcrumb, from what the check said the script
+    // declares; the inspector, from what is at the caret, a moment after
+    // it has settled.
+    void        pumpCaret();
+    void        inspected(Doc& doc, const ALScriptAnalysis::Result& result);
+    void        refreshOutline(Doc& doc);
+    void        refreshBreadcrumb(Doc& doc);
+    void        onCrumbChosen(size_t at, const std::string& value);
+    void        onOutlineChosen();
+    void        showBottom(const char* tab);
+    std::string kindName(ALScriptSymbolKind kind) const;
+
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
     void letGoOf(size_t index);
@@ -198,7 +241,12 @@ private:
     bool                               mLineNumbers = true;
     LLPanel*                           mEditorHost    = nullptr;
     ALTabStrip*                        mTabs          = nullptr;
+    ALJumpBar*                         mBreadcrumb    = nullptr;
+    LLTabContainer*                    mBottomTabs    = nullptr;
     LLScrollListCtrl*                  mProblems      = nullptr;
+    LLScrollListCtrl*                  mReferences    = nullptr;
+    LLScrollListCtrl*                  mOutline       = nullptr;
+    LLTextEditor*                      mSymbol        = nullptr;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLButton*                          mResetButton   = nullptr;
