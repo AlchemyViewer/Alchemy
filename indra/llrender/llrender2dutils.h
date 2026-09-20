@@ -45,7 +45,6 @@ class LLUUID;
 
 extern const LLColor4 UI_VERTEX_COLOR;
 
-bool ui_point_in_rect(S32 x, S32 y, S32 left, S32 top, S32 right, S32 bottom);
 void gl_state_for_2d(S32 width, S32 height);
 
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2);
@@ -97,7 +96,6 @@ void gl_circle_2d(F32 x, F32 y, F32 radius, S32 steps, bool filled);
 void gl_arc_2d(F32 center_x, F32 center_y, F32 radius, S32 steps, bool filled, F32 start_angle, F32 end_angle);
 void gl_deep_circle( F32 radius, F32 depth );
 void gl_ring( F32 radius, F32 width, const LLColor4& center_color, const LLColor4& side_color, S32 steps, bool render_center );
-void gl_corners_2d(S32 left, S32 top, S32 right, S32 bottom, S32 length, F32 max_frac);
 void gl_washer_2d(F32 outer_radius, F32 inner_radius, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
 void gl_washer_segment_2d(F32 outer_radius, F32 inner_radius, F32 start_radians, F32 end_radians, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
 
@@ -119,7 +117,6 @@ void gl_washer_angular_2d(F32 outer_radius, F32 inner_radius,
 void gl_draw_image(S32 x, S32 y, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_target(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* target, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_image(S32 x, S32 y, S32 width, S32 height, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
-void gl_draw_rotated_image(S32 x, S32 y, F32 degrees, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degrees, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), LLRenderTarget* target = NULL);
 void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 border_width, S32 border_height, S32 width, S32 height, LLTexture* image, const LLColor4 &color, bool solid_color = false, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), bool scale_inner = true);
 void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTexture* image, const LLColor4 &color, bool solid_color = false, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f), const LLRectf& scale_rect = LLRectf(0.f, 1.f, 1.f, 0.f), bool scale_inner = true);
@@ -141,18 +138,6 @@ void gl_rect_2d_simple_tex( S32 width, S32 height );
       |                  |
 */
 
-typedef enum e_rounded_edge
-{
-    ROUNDED_RECT_LEFT   = 0x1,
-    ROUNDED_RECT_TOP    = 0x2,
-    ROUNDED_RECT_RIGHT  = 0x4,
-    ROUNDED_RECT_BOTTOM = 0x8,
-    ROUNDED_RECT_ALL    = 0xf
-}ERoundedEdge;
-
-
-void gl_segmented_rect_2d_tex(const S32 left, const S32 top, const S32 right, const S32 bottom, const S32 texture_width, const S32 texture_height, const S32 border_size, const U32 edges = ROUNDED_RECT_ALL);
-void gl_segmented_rect_2d_fragment_tex(const LLRect& rect, const S32 texture_width, const S32 texture_height, const S32 border_size, const F32 start_fragment, const F32 end_fragment, const U32 edges = ROUNDED_RECT_ALL);
 void gl_segmented_rect_3d_tex(const LLRectf& clip_rect, const LLRectf& center_uv_rect, const LLRectf& center_draw_rect, const LLVector3& width_vec, const LLVector3& height_vec);
 
 inline void gl_rect_2d( const LLRect& rect, bool filled )
