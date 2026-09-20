@@ -28,7 +28,6 @@
 
 // Linden library includes
 #include "v2math.h"
-#include "m3math.h"
 #include "v4color.h"
 #include "llfontgl.h"
 #include "llrender.h"
@@ -887,54 +886,29 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
     }
     else
     {
+        // Turned about the quad's centre. Halved in float, so an odd-sized
+        // image keeps its size and its centre through the turn.
+        const F32 half_w = (F32)width * 0.5f;
+        const F32 half_h = (F32)height * 0.5f;
+        const F32 rad = degrees * DEG_TO_RAD;
+        const F32 c = cosf(rad);
+        const F32 s = sinf(rad);
+        const LLVector2 rt( half_w * c - half_h * s,  half_w * s + half_h * c);
+        const LLVector2 lt(-half_w * c - half_h * s, -half_w * s + half_h * c);
+        const LLVector2 lb(-half_w * c + half_h * s, -half_w * s - half_h * c);
+        const LLVector2 rb( half_w * c + half_h * s,  half_w * s - half_h * c);
+
         gGL.pushUIMatrix();
-        gGL.translateUI((F32)x, (F32)y, 0.f);
-
-        F32 offset_x = F32(width/2);
-        F32 offset_y = F32(height/2);
-
-        gGL.translateUI(offset_x, offset_y, 0.f);
-
-        LLMatrix3 quat(0.f, 0.f, degrees*DEG_TO_RAD);
-
-        if(image != NULL)
-        {
-            gGL.getTextureSlot(0)->bindSampled(image, ALSamplers::BilinearClamp);
-        }
-        else
-        {
-            gGL.getTextureSlot(0)->bind(target);
-        }
-
-        gGL.color4fv(color.mV);
-
+        gGL.translateUI((F32)x + half_w, (F32)y + half_h, 0.f);
         gGL.begin(LLRender::TRIANGLES);
         {
-            LLVector3 v;
+            gGL.texCoord2f(uv_rect.mRight, uv_rect.mTop);    gGL.vertex2fv(rt.mV);
+            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mTop);     gGL.vertex2fv(lt.mV);
+            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mBottom);  gGL.vertex2fv(lb.mV);
 
-            v = LLVector3(offset_x, offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mRight, uv_rect.mTop);
-            gGL.vertex2f(v.mV[0], v.mV[1] );
-
-            v = LLVector3(-offset_x, offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mTop);
-            gGL.vertex2f(v.mV[0], v.mV[1] );
-
-            v = LLVector3(-offset_x, -offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mBottom);
-            gGL.vertex2f(v.mV[0], v.mV[1] );
-
-            v = LLVector3(offset_x, offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mRight, uv_rect.mTop);
-            gGL.vertex2f(v.mV[0], v.mV[1]);
-
-            v = LLVector3(-offset_x, -offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mBottom);
-            gGL.vertex2f(v.mV[0], v.mV[1]);
-
-            v = LLVector3(offset_x, -offset_y, 0.f) * quat;
-            gGL.texCoord2f(uv_rect.mRight, uv_rect.mBottom);
-            gGL.vertex2f(v.mV[0], v.mV[1] );
+            gGL.texCoord2f(uv_rect.mRight, uv_rect.mTop);    gGL.vertex2fv(rt.mV);
+            gGL.texCoord2f(uv_rect.mLeft, uv_rect.mBottom);  gGL.vertex2fv(lb.mV);
+            gGL.texCoord2f(uv_rect.mRight, uv_rect.mBottom); gGL.vertex2fv(rb.mV);
         }
         gGL.end();
         gGL.popUIMatrix();

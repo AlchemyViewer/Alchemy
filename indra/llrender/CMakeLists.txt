@@ -166,6 +166,8 @@ if(AL_BUILD_TESTS)
     DEFINES ${font_defines}
   )
   al_add_test(lluiimage GL PROJECT llrender LIBRARIES llrender)
+  # The quads the immediate-mode 2D helpers emit.
+  al_add_test(llrender2dutils_gl GL PROJECT llrender LIBRARIES llrender)
   # The hidden window itself, and a worker thread's shared context on it.
   al_add_test(alwindowsdlheadless GL PROJECT llrender LIBRARIES llrender)
   # Tessellation stages and the quad conventions the terrain relies on.
