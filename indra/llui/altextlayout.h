@@ -41,7 +41,14 @@
 //
 // Fonts: one face for the whole document for now. The runs a line is
 // shaped in are where a second face would enter, and the glyphs already
-// carry the face they came from.
+// carry the face they came from. A font reload swaps the faces under
+// their LLFontGL and bumps LLFontGL::sResolutionGeneration; the layout
+// checks it whenever it is asked for anything, and shapes everything
+// again, since the glyph ids and the faces it kept are the old font's.
+//
+// Positions are in the UI's pixels, as every other font measurement the
+// widgets see: shaping answers in the screen's, which the UI scale
+// divides, and LLFontGL::renderGlyphs multiplies back.
 //
 // A tab is a gap: a glyph with no face whose advance reaches the next stop.
 // An atom -- an image or a view in the text -- will be the same gap with a
@@ -146,7 +153,11 @@ private:
     void invalidateAll();
     void layoutLine(S32 index, Line& out);
     void ensureTops();
+    // A space's advance, in the screen's pixels.
     F32  spaceAdvance();
+    // Throws everything away when the fonts were reloaded or the UI
+    // scale changed since the last layout.
+    void refreshIfFontsChanged();
 
     ALTextDocument*                    mDocument = nullptr;
     boost::signals2::scoped_connection mConnection;
@@ -162,6 +173,10 @@ private:
     F32                                mSpaceAdvance = -1.f;
     // Negative until asked for.
     F32                                mContentWidth = -1.f;
+    // What the lines were laid out under.
+    S32                                mFontGeneration = -1;
+    F32                                mScaleX         = 1.f;
+    F32                                mScaleY         = 1.f;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
     std::vector<ALShapedGlyph>         mShaped;

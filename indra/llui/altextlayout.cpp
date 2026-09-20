@@ -89,6 +89,19 @@ S32 ALTextLayout::rowHeight() const
     return mFont ? mFont->getLineSpacing() : 0;
 }
 
+void ALTextLayout::refreshIfFontsChanged()
+{
+    if (mFontGeneration == LLFontGL::sResolutionGeneration && mScaleX == LLFontGL::sScaleX && mScaleY == LLFontGL::sScaleY)
+    {
+        return;
+    }
+    mFontGeneration = LLFontGL::sResolutionGeneration;
+    mScaleX         = LLFontGL::sScaleX > 0.f ? LLFontGL::sScaleX : 1.f;
+    mScaleY         = LLFontGL::sScaleY > 0.f ? LLFontGL::sScaleY : 1.f;
+    mSpaceAdvance   = -1.f;
+    invalidateAll();
+}
+
 void ALTextLayout::invalidateAll()
 {
     mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
@@ -131,10 +144,11 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
 
 F32 ALTextLayout::contentWidth()
 {
+    refreshIfFontsChanged();
     if (mContentWidth < 0.f)
     {
         F32       widest  = 0.f;
-        const F32 per_byte = spaceAdvance();
+        const F32 per_byte = spaceAdvance() / mScaleX;
         for (size_t i = 0; i < mLines.size(); ++i)
         {
             const F32 width = mLines[i].valid ? mLines[i].width
@@ -210,6 +224,9 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     const LLFontFreetype* face = mFont ? mFont->getFontFreetype() : nullptr;
     const bool            subpixel = face && face->useSubpixelPen();
     const F32             tab_stop = spaceAdvance() * static_cast<F32>(mTabWidth);
+    const F32             inv_x    = 1.f / mScaleX;
+    const F32             inv_y    = 1.f / mScaleY;
+    // The pen, in the screen's pixels; what is kept is in the UI's.
     F32                   x        = 0.f;
 
     // The text between tabs is shaped a piece at a time, and every tab is a
@@ -224,8 +241,8 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         ALFontShaping::shapeRun(face, text, begin, end, mShaped);
         for (const ALShapedGlyph& sg : mShaped)
         {
-            out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, x + sg.x_offset, sg.y_offset });
-            out.glyphs.push_back(Glyph{ sg.cluster, x, sg.x_advance });
+            out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, (x + sg.x_offset) * inv_x, sg.y_offset * inv_y });
+            out.glyphs.push_back(Glyph{ sg.cluster, x * inv_x, sg.x_advance * inv_x });
             x += sg.x_advance;
             if (!subpixel)
             {
@@ -238,13 +255,13 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     {
         shape(piece, at);
         const F32 stop = (floorf(x / tab_stop) + 1.f) * tab_stop;
-        out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x, 0.f });
-        out.glyphs.push_back(Glyph{ static_cast<S32>(at), x, stop - x });
+        out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
+        out.glyphs.push_back(Glyph{ static_cast<S32>(at), x * inv_x, (stop - x) * inv_x });
         x     = stop;
         piece = at + 1;
     }
     shape(piece, text.size());
-    out.width = x;
+    out.width = x * inv_x;
     if (mContentWidth >= 0.f && x > mContentWidth)
     {
         mContentWidth = x;
@@ -347,6 +364,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
 
 const ALTextLayout::Line& ALTextLayout::line(S32 index)
 {
+    refreshIfFontsChanged();
     if (index < 0 || index >= lineCount())
     {
         return EMPTY_LINE;
@@ -366,6 +384,7 @@ const ALTextLayout::Line& ALTextLayout::line(S32 index)
 
 void ALTextLayout::ensureTops()
 {
+    refreshIfFontsChanged();
     if (!mTopsDirty)
     {
         return;
