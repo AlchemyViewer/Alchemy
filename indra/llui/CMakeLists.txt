@@ -131,6 +131,7 @@ target_sources(
     alspecimenlist.cpp
     alstudiofloater.cpp
     alcodeeditor.cpp
+    alfindbar.cpp
     alkeymap.cpp
     aloutputlist.cpp
     alsyntaxgrammar.cpp
@@ -138,6 +139,7 @@ target_sources(
     altabstrip.cpp
     altextdocument.cpp
     altextlayout.cpp
+    altextsearch.cpp
     altextview.cpp
     altextundo.cpp
     alfollowscontrol.cpp
@@ -306,6 +308,7 @@ target_sources(
         alundostack.h
         alstringmatch.h
         alcodeeditor.h
+        alfindbar.h
         alkeymap.h
         aloutputlist.h
         alsyntaxgrammar.h
@@ -313,6 +316,7 @@ target_sources(
         altabstrip.h
         altextdocument.h
         altextlayout.h
+        altextsearch.h
         altextview.h
         altextundo.h
         alfollowscontrol.h
@@ -484,6 +488,7 @@ if(AL_BUILD_TESTS)
     alundostack
     alsyntaxgrammars
     altextlayout
+    altextsearch
     altextview
     alcodeeditor
     aloutputlist

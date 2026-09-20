@@ -89,6 +89,10 @@ enum class ALEditorCommand : U8
     GoToDefinition,
     FindReferences,
     Rename,
+    Find,
+    Replace,
+    FindNext,
+    FindPrevious,
     COUNT
 };
 
@@ -121,7 +125,9 @@ public:
     // control-shift-D duplicates one and control-shift-K deletes one,
     // control-shift with a square bracket folds and unfolds,
     // control-space completes, F12 goes to a definition, shift-F12 finds
-    // the references and F2 renames.
+    // the references, F2 renames, control-F finds, control-H (and
+    // control-alt-F, since a Mac keeps command-H) replaces, and F3 and
+    // shift-F3 go to the next and the previous match.
     static ALKeymap standard();
 
 private:

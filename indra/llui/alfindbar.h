@@ -1,0 +1,130 @@
+/**
+ * @file alfindbar.h
+ * @brief The find and replace bar of a text view.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "altextsearch.h"
+#include "llpanel.h"
+
+#include <boost/signals2.hpp>
+
+#include <string>
+
+class LLLineEditor;
+class LLTextBox;
+
+// The bar over a text view's top right corner, as the modern editors put
+// it: a field for what to find with its three ways of matching inside it,
+// the count of what was found and the arrows through them, a toggle for
+// the selection alone, and a way out; unfolded, a field for what to put
+// instead, as wide as the first, keeping each match's case if asked,
+// with the two ways of putting it. It
+// holds the query and the options; the view holds the matches and tells
+// the bar the count.
+//
+// Its buttons are flat glyphs, lit when on, as an editor's are: the
+// glyphs stand in until the icons are drawn.
+class ALFindBar : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(ALFindBar, LLPanel);
+
+    struct Params : public LLInitParam::Block<Params, LLPanel::Params>
+    {
+        Params();
+    };
+
+    void               setQuery(const std::string& query);
+    const std::string& query() const { return mQuery; }
+    void               setReplacement(const std::string& text);
+    std::string        replacement() const;
+    ALTextSearchOptions options() const;
+    bool               inSelection() const;
+
+    // The second row, shown or folded away; and whether it may be at all,
+    // which a read-only view says no to.
+    void setReplaceShown(bool shown);
+    bool replaceShown() const { return mReplaceShown; }
+    void setReplaceAllowed(bool allowed);
+
+    // What the view found: which one is current, of how many; or what was
+    // wrong with the pattern.
+    void setCount(S32 current, S32 total, const std::string& error);
+
+    // The colours of the view the bar is over: its glyphs and its count
+    // in the view's ink, its background a shade off the view's.
+    void setColors(const LLColor4& background, const LLColor4& ink);
+
+    // The height the bar wants for its state.
+    S32  wantedHeight() const;
+    void focusQuery();
+    void focusReplacement();
+
+    typedef boost::signals2::signal<void()> signal_t;
+    boost::signals2::connection onChanged(const signal_t::slot_type& cb) { return mChanged.connect(cb); }
+    boost::signals2::connection onNext(const signal_t::slot_type& cb) { return mNext.connect(cb); }
+    boost::signals2::connection onPrevious(const signal_t::slot_type& cb) { return mPrevious.connect(cb); }
+    boost::signals2::connection onReplace(const signal_t::slot_type& cb) { return mReplace.connect(cb); }
+    boost::signals2::connection onReplaceAll(const signal_t::slot_type& cb) { return mReplaceAll.connect(cb); }
+    boost::signals2::connection onClose(const signal_t::slot_type& cb) { return mClose.connect(cb); }
+
+    void draw() override;
+    bool handleKeyHere(KEY key, MASK mask) override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+
+protected:
+    friend class LLUICtrlFactory;
+    ALFindBar(const Params& p);
+
+private:
+    // A glyph that is a button: flat, lit when it is a toggle that is on.
+    class Flat;
+
+    Flat*         flat(const std::string& name, const std::string& glyph, bool toggle, const std::string& tip);
+    LLLineEditor* field(const std::string& name, const std::string& label, S32 pad_right);
+    void          layout();
+
+    std::string   mQuery;
+    bool          mReplaceShown   = false;
+    bool          mReplaceAllowed = true;
+    LLUIColor     mBgColor;
+    LLUIColor     mInkColor;
+
+    Flat*         mExpand       = nullptr;
+    LLLineEditor* mFind         = nullptr;
+    Flat*         mCase         = nullptr;
+    Flat*         mWord         = nullptr;
+    Flat*         mRegex        = nullptr;
+    LLTextBox*    mCount        = nullptr;
+    Flat*         mPrev         = nullptr;
+    Flat*         mNextButton   = nullptr;
+    Flat*         mSelection    = nullptr;
+    Flat*         mCloseButton  = nullptr;
+    LLLineEditor* mReplaceField = nullptr;
+    Flat*         mPreserveCase = nullptr;
+    Flat*         mReplaceOne   = nullptr;
+    Flat*         mReplaceEvery = nullptr;
+
+    signal_t mChanged, mNext, mPrevious, mReplace, mReplaceAll, mClose;
+};
