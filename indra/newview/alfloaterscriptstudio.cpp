@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "aljumpbar.h"
+#include "aloutputlist.h"
 #include "altabstrip.h"
 #include "llagent.h"
 #include "lldate.h"
@@ -54,6 +55,7 @@
 #include "llviewerregion.h"
 
 #include <algorithm>
+#include <ctime>
 #include <fstream>
 
 namespace
@@ -110,6 +112,79 @@ namespace
     bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
     {
         return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
+    }
+
+    // The time of day something was said, from seconds since the epoch.
+    std::string clockOf(F64 seconds_since_epoch)
+    {
+        const time_t when = static_cast<time_t>(seconds_since_epoch);
+        struct tm    local;
+#if LL_WINDOWS
+        localtime_s(&local, &when);
+#else
+        localtime_r(&when, &local);
+#endif
+        char buffer[16];
+        strftime(buffer, sizeof(buffer), "%H:%M:%S", &local);
+        return buffer;
+    }
+
+    // A message as one row reads it.
+    std::string oneLine(std::string text)
+    {
+        for (char& c : text)
+        {
+            if (c == '\n' || c == '\r' || c == '\t')
+            {
+                c = ' ';
+            }
+        }
+        return text;
+    }
+
+    // "12" or "12:5", as a person types a place: the line and the column
+    // from one, zero where there is none or it is not a number.
+    void placeTyped(const std::string& text, S32& line, S32& column)
+    {
+        line = column = 0;
+        std::string_view rest(text);
+        while (!rest.empty() && rest.front() == ' ')
+        {
+            rest.remove_prefix(1);
+        }
+        while (!rest.empty() && rest.front() == ':')
+        {
+            rest.remove_prefix(1);
+        }
+        size_t digits = 0;
+        while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
+        {
+            ++digits;
+        }
+        if (digits == 0)
+        {
+            return;
+        }
+        line = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
+        rest.remove_prefix(digits);
+        if (rest.empty() || (rest.front() != ':' && rest.front() != ','))
+        {
+            return;
+        }
+        rest.remove_prefix(1);
+        while (!rest.empty() && rest.front() == ' ')
+        {
+            rest.remove_prefix(1);
+        }
+        digits = 0;
+        while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
+        {
+            ++digits;
+        }
+        if (digits > 0)
+        {
+            column = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
+        }
     }
 
     // A name as both languages spell one: a letter or an underscore, then
@@ -175,6 +250,8 @@ bool ALFloaterScriptStudio::postBuild()
     mReferences    = getChild<LLScrollListCtrl>("references");
     mOutline       = getChild<LLScrollListCtrl>("outline");
     mSymbol        = getChild<LLTextEditor>("symbol");
+    mOutput        = getChild<ALOutputList>("output");
+    mOutputFilter  = getChild<LLComboBox>("output_filter");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mResetButton   = getChild<LLButton>("reset_btn");
@@ -186,6 +263,16 @@ bool ALFloaterScriptStudio::postBuild()
     mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
     mReferences->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReferenceChosen, this));
     mOutline->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutlineChosen, this));
+    mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
+    mOutputFilter->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputFilter, this));
+    mOutput->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputChosen, this));
+    getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) { mOutput->clearEntries(); });
+    // What was said before the window opened, then everything after.
+    for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
+    {
+        runtimeEvent(event);
+    }
+    mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) { runtimeEvent(event); });
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
     mResetButton->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReset, this));
@@ -326,6 +413,12 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->changed = doc->editor->onTextChanged([this, raw]() {
         fillTabs();
         scheduleAnalysis(*raw);
+        // A run-time error was about the text as it was.
+        if (!raw->runtime.empty())
+        {
+            raw->runtime.clear();
+            refreshProblems(*raw);
+        }
     });
 
     mDocs.push_back(std::move(doc));
@@ -392,6 +485,11 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
         scheduleAnalysis(doc, true);
+        if (doc.pendingLine >= 0)
+        {
+            doc.editor->goToLine(doc.pendingLine);
+            doc.pendingLine = -1;
+        }
     }
     fillTabs();
     if (index == mActive)
@@ -934,6 +1032,11 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
         doc.assetId = result.newAssetId;
     }
     doc.problems = result.diagnostics;
+    if (result.success)
+    {
+        // A new script runs from here; what the old one said is past.
+        doc.runtime.clear();
+    }
     refreshProblems(doc);
 
     if (result.success)
@@ -1012,6 +1115,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
     static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
     static const LLUIColor note_color    = LLUIColorTable::instance().getColor("CodeMarkNote", LLColor4::blue);
+    static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
 
     doc.shown.clear();
     doc.editor->clearMarks();
@@ -1040,7 +1144,11 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             end = text.nextWord(begin);
         }
         decoration.range   = ALTextRange(begin, end);
-        decoration.color   = (mark == ALCodeEditor::Mark::Error ? error_color : mark == ALCodeEditor::Mark::Warning ? warning_color : note_color).get();
+        decoration.color   = (mark == ALCodeEditor::Mark::Error     ? error_color
+                              : mark == ALCodeEditor::Mark::Warning ? warning_color
+                              : mark == ALCodeEditor::Mark::Runtime ? runtime_color
+                                                                    : note_color)
+                                 .get();
         decoration.message = origin + ": " + message;
         decorations.push_back(std::move(decoration));
     };
@@ -1064,6 +1172,12 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
                                                                                       : getString("OriginLint");
         const std::string message = problem.code.empty() ? problem.message : problem.message + " [" + problem.code + "]";
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level, origin, message);
+    }
+    for (const Doc::RuntimeProblem& problem : doc.runtime)
+    {
+        const S32 line   = llmax(0, problem.line);
+        const S32 column = llmax(0, problem.column);
+        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, "ERROR", getString("OriginRuntime"), problem.message);
     }
     if (!doc.definitionsError.empty())
     {
@@ -1150,7 +1264,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     const ALScriptReferences& refs    = result.references;
     doc.symbolCommand                 = ALEditorCommand::None;
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->document().wordAt(doc.symbolAt).normalised());
+    args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
     if (!refs.found)
     {
         setStatus(getString("NoReferences", args));
@@ -1186,78 +1300,113 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
             break;
         }
         case ALEditorCommand::Rename:
-        {
-            if (!refs.renamable)
+            if (refs.renamable)
+            {
+                askNewName(doc, refs);
+            }
+            else
             {
                 setStatus(getString("NotRenamable", args));
-                break;
             }
-            LLSD substitutions;
-            substitutions["[NAME]"]  = refs.name;
-            substitutions["[COUNT]"] = static_cast<S32>(refs.references.size());
-            LLSD payload;
-            payload["id"]      = doc.id;
-            payload["version"] = static_cast<S32>(doc.symbolVersion);
-            payload["name"]    = refs.name;
-            for (const ALScriptSpan& span : refs.references)
-            {
-                LLSD one;
-                one.append(span.line);
-                one.append(span.column);
-                one.append(span.endLine);
-                one.append(span.endColumn);
-                payload["spans"].append(one);
-            }
-            const LLHandle<LLFloater> handle = getHandle();
-            LLNotificationsUtil::add("ScriptStudioRename", substitutions, payload, [handle](const LLSD& notification, const LLSD& response) {
-                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-                {
-                    studio->renameAnswered(notification, response);
-                }
-            });
             break;
-        }
         default:
             break;
     }
 }
 
-void ALFloaterScriptStudio::renameAnswered(const LLSD& notification, const LLSD& response)
+void ALFloaterScriptStudio::askNewName(Doc& doc, const ALScriptReferences& refs)
 {
-    if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+    const std::string         id       = doc.id;
+    const U32                 version  = doc.symbolVersion;
+    const std::string         old_name = refs.name;
+    std::vector<ALTextRange>  places;
+    places.reserve(refs.references.size());
+    for (const ALScriptSpan& span : refs.references)
+    {
+        places.push_back(rangeOf(span));
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    ALQuickOpen* quick = quickOpen(
+        {}, getString("RenamePlaceholder"), getString("RenameTitle"),
+        [handle, id, version, places, old_name](const std::string& typed) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->renameTo(id, version, places, old_name, typed);
+            }
+        },
+        nullptr, 420, 56);
+    if (!quick)
     {
         return;
     }
-    const LLSD&  payload = notification["payload"];
-    const size_t index   = indexOf(payload["id"].asString());
+    // The row under the field says what return will do with what is typed.
+    const S32 count = static_cast<S32>(places.size());
+    quick->onQueryChanged([handle, quick, count, old_name](const std::string& typed) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (!studio)
+        {
+            return;
+        }
+        std::string name = typed;
+        LLStringUtil::trim(name);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = old_name;
+        args["[NEW]"]   = name;
+        args["[COUNT]"] = std::to_string(count);
+        if (name.empty())
+        {
+            quick->setHint(studio->getString("RenameHint", args));
+        }
+        else if (!isIdentifier(name))
+        {
+            args["[NAME]"] = name;
+            quick->setHint(studio->getString("RenameBadName", args));
+        }
+        else if (name == old_name)
+        {
+            quick->setHint(studio->getString("RenameSame", args));
+        }
+        else
+        {
+            quick->setHint(studio->getString("RenameTo", args));
+        }
+    });
+    quick->setQuery(old_name);
+    quick->takeFocus();
+}
+
+void ALFloaterScriptStudio::renameTo(const std::string& id, U32 version, const std::vector<ALTextRange>& places, const std::string& old_name, const std::string& new_name)
+{
+    const size_t index = indexOf(id);
     if (index == NONE)
     {
         return;
     }
-    Doc&        doc      = *mDocs[index];
-    std::string new_name = response["new_name"].asString();
-    LLStringUtil::trim(new_name);
+    Doc&        doc  = *mDocs[index];
+    std::string name = new_name;
+    LLStringUtil::trim(name);
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = new_name;
-    if (!isIdentifier(new_name))
+    args["[NAME]"] = name;
+    if (!isIdentifier(name))
     {
         setStatus(getString("RenameBadName", args), true);
         return;
     }
-    if (new_name == payload["name"].asString())
+    if (name == old_name)
     {
+        doc.editor->setFocus(true);
         return;
     }
-    if (doc.editor->document().version() != static_cast<U32>(payload["version"].asInteger()))
+    if (doc.editor->document().version() != version)
     {
         setStatus(getString("RenameStale", args), true);
         return;
     }
     std::vector<std::pair<ALTextRange, std::string>> edits;
-    for (LLSD::array_const_iterator it = payload["spans"].beginArray(); it != payload["spans"].endArray(); ++it)
+    edits.reserve(places.size());
+    for (const ALTextRange& place : places)
     {
-        const LLSD& span = *it;
-        edits.emplace_back(ALTextRange(ALTextPos(span[0].asInteger(), span[1].asInteger()), ALTextPos(span[2].asInteger(), span[3].asInteger())), new_name);
+        edits.emplace_back(place, name);
     }
     args["[COUNT]"] = std::to_string(edits.size());
     if (doc.editor->replaceAll(std::move(edits)))
@@ -1314,38 +1463,82 @@ void ALFloaterScriptStudio::goToLine()
     {
         return;
     }
-    LLSD substitutions;
-    substitutions["[COUNT]"] = doc->editor->document().lineCount();
-    LLSD payload;
-    payload["id"] = doc->id;
+    const std::string         id     = doc->id;
+    const ALTextPos           was    = doc->editor->caret();
     const LLHandle<LLFloater> handle = getHandle();
-    LLNotificationsUtil::add("ScriptStudioGoToLine", substitutions, payload, [handle](const LLSD& notification, const LLSD& response) {
-        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+    // The editor at the place typed, while it is typed; return leaves it
+    // there, escape puts it back.
+    auto docOf = [handle, id]() -> Doc* {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const size_t           index  = studio ? studio->indexOf(id) : NONE;
+        return index == NONE ? nullptr : studio->mDocs[index].get();
+    };
+    auto placeOf = [](const Doc& doc, const std::string& typed, S32& line, S32& column) {
+        placeTyped(typed, line, column);
+        const S32 count = doc.editor->document().lineCount();
+        return line >= 1 && line <= count;
+    };
+    ALQuickOpen* quick = quickOpen(
+        {}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"),
+        [docOf, placeOf, was](const std::string& typed) {
+            Doc* doc = docOf();
+            if (!doc)
+            {
+                return;
+            }
+            S32 line, column;
+            if (placeOf(*doc, typed, line, column))
+            {
+                doc->editor->goTo(ALTextPos(line - 1, llmax(0, column - 1)));
+            }
+            else
+            {
+                doc->editor->goTo(was);
+            }
+            doc->editor->setFocus(true);
+        },
+        nullptr, 420, 56,
+        [docOf, was]() {
+            if (Doc* doc = docOf())
+            {
+                doc->editor->goTo(was);
+            }
+        });
+    if (!quick)
+    {
+        return;
+    }
+    quick->onQueryChanged([handle, docOf, placeOf, quick, was](const std::string& typed) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        Doc*                   doc    = docOf();
+        if (!studio || !doc)
         {
-            studio->goToLineAnswered(notification, response);
+            return;
+        }
+        S32                        line, column;
+        const bool                 there = placeOf(*doc, typed, line, column);
+        LLStringUtil::format_map_t args;
+        args["[COUNT]"] = std::to_string(doc->editor->document().lineCount());
+        args["[LINE]"]  = std::to_string(line);
+        args["[COL]"]   = std::to_string(column);
+        std::string trimmed = typed;
+        LLStringUtil::trim(trimmed);
+        if (trimmed.empty())
+        {
+            quick->setHint(studio->getString("GoToLineHint", args));
+            doc->editor->goTo(was);
+        }
+        else if (there)
+        {
+            quick->setHint(studio->getString(column > 0 ? "GoToLineGoColumn" : "GoToLineGo", args));
+            doc->editor->goTo(ALTextPos(line - 1, llmax(0, column - 1)));
+        }
+        else
+        {
+            quick->setHint(studio->getString("GoToLineNone", args));
         }
     });
-}
-
-void ALFloaterScriptStudio::goToLineAnswered(const LLSD& notification, const LLSD& response)
-{
-    if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
-    {
-        return;
-    }
-    const size_t index = indexOf(notification["payload"]["id"].asString());
-    if (index == NONE)
-    {
-        return;
-    }
-    Doc&      doc  = *mDocs[index];
-    const S32 line = atoi(response["line"].asString().c_str());
-    if (line < 1)
-    {
-        return;
-    }
-    doc.editor->goToLine(llmin(line, doc.editor->document().lineCount()) - 1);
-    doc.editor->setFocus(true);
+    quick->setQuery(std::string());
 }
 
 void ALFloaterScriptStudio::goToSymbol()
@@ -1598,6 +1791,98 @@ void ALFloaterScriptStudio::showBottom(const char* tab)
     mBottomTabs->selectTabByName(tab);
 }
 
+// --- what scripts say ---------------------------------------------------------------
+
+void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event)
+{
+    static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
+
+    // The object, offered in the filter the first time it speaks.
+    if (event.root.notNull() && mOutputObjects.emplace(event.root, event.objectName).second)
+    {
+        mOutputFilter->add(event.objectName, LLSD(event.root));
+    }
+
+    ALOutputList::Entry entry;
+    entry.time   = clockOf(event.time);
+    entry.source = event.scriptName.empty() ? event.objectName : event.objectName + " / " + event.scriptName;
+    entry.kind   = getString(event.isError ? "KindError" : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? "KindOwnerSay" : "KindDebug");
+    entry.text   = oneLine(event.isError && !event.error.empty() ? event.error : event.message);
+    if (event.isError)
+    {
+        entry.color = runtime_color.get();
+        if (event.line >= 0)
+        {
+            entry.text += llformat(" (line %d)", event.line + 1);
+        }
+    }
+    entry.key             = event.root;
+    entry.value["prim"]   = event.prim;
+    entry.value["item"]   = event.item;
+    entry.value["name"]   = event.scriptName;
+    entry.value["line"]   = event.line;
+    entry.value["column"] = event.column;
+    mOutput->append(std::move(entry));
+
+    // A run-time error in a script that is open marks its line.
+    if (event.isError && event.item.notNull())
+    {
+        const size_t index = indexOf(ALScriptRef(event.prim, event.item));
+        if (index != NONE)
+        {
+            Doc::RuntimeProblem problem;
+            problem.line    = event.line;
+            problem.column  = event.column;
+            problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+            mDocs[index]->runtime.push_back(std::move(problem));
+            refreshProblems(*mDocs[index]);
+        }
+    }
+}
+
+void ALFloaterScriptStudio::onOutputFilter()
+{
+    const LLUUID root = mOutputFilter->getValue().asUUID();
+    if (root.isNull())
+    {
+        mOutput->setFilter(nullptr);
+    }
+    else
+    {
+        mOutput->setFilter([root](const ALOutputList::Entry& entry) { return entry.key.asUUID() == root; });
+    }
+}
+
+void ALFloaterScriptStudio::onOutputChosen()
+{
+    const ALOutputList::Entry* entry = mOutput->chosen();
+    if (!entry || entry->value["item"].asUUID().isNull())
+    {
+        return;
+    }
+    const ALScriptRef ref(entry->value["prim"].asUUID(), entry->value["item"].asUUID());
+    const S32         line   = entry->value["line"].asInteger();
+    const S32         column = entry->value["column"].asInteger();
+    size_t            index  = indexOf(ref);
+    if (index == NONE)
+    {
+        // The script it names, opened; the line once it has loaded.
+        openScript(ref, entry->value["name"].asString());
+        index = indexOf(ref);
+        if (index != NONE)
+        {
+            mDocs[index]->pendingLine = line;
+        }
+        return;
+    }
+    activate(index);
+    if (line >= 0)
+    {
+        mDocs[index]->editor->goTo(ALTextPos(line, llmax(0, column)));
+        mDocs[index]->editor->setFocus(true);
+    }
+}
+
 // --- closing ---------------------------------------------------------------------
 
 void ALFloaterScriptStudio::closeDocument(std::string_view id)
@@ -1810,10 +2095,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         }
         saveState();
     }
-    else if (action == "problems" || action == "references")
+    else if (action == "problems" || action == "references" || action == "output")
     {
         // The tab, shown; or the pane folded when it is the tab showing.
-        const char* tab = action == "problems" ? "problems_tab" : "references_tab";
+        const char* tab = action == "problems" ? "problems_tab" : action == "references" ? "references_tab" : "output_tab";
         if (onMenuCheck(param))
         {
             mFolds.setCollapsed("bottom", true);
@@ -1922,10 +2207,11 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     {
         return mLineNumbers;
     }
-    if (action == "problems" || action == "references")
+    if (action == "problems" || action == "references" || action == "output")
     {
         const LLPanel* current = mBottomTabs->getCurrentPanel();
-        return !mFolds.collapsed("bottom") && current && current->getName() == (action == "problems" ? "problems_tab" : "references_tab");
+        const char*    tab     = action == "problems" ? "problems_tab" : action == "references" ? "references_tab" : "output_tab";
+        return !mFolds.collapsed("bottom") && current && current->getName() == tab;
     }
     if (action == "inspector")
     {

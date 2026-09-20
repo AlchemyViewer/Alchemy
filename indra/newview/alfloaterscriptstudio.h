@@ -32,6 +32,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -39,6 +40,7 @@
 #include <vector>
 
 class ALJumpBar;
+class ALOutputList;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -55,9 +57,10 @@ class LLTextEditor;
 // completing and explaining the text, the analyzers checking it as it is
 // typed and answering where a name lives -- go to definition, find
 // references, rename -- an outline in the inspector and a breadcrumb over
-// the editor, and a script the preprocessor wrapped shown as the code the
-// server compiled with the author's source in a tab beside it. Its regions
-// fold and come out as any studio's do. Not yet: the explorer, the output.
+// the editor, what scripts say in an Output tab with their run-time errors
+// marked in the gutter, and a script the preprocessor wrapped shown as the
+// code the server compiled with the author's source in a tab beside it.
+// Its regions fold and come out as any studio's do. Not yet: the explorer.
 class ALFloaterScriptStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
@@ -106,6 +109,17 @@ private:
         std::optional<ALScriptEnvelope>            envelope;
         // What the compiler said of the last save.
         std::vector<ALScriptWorkspace::Diagnostic> problems;
+        // What the script said as it ran, since it was last saved or
+        // edited: a run-time error's place, or -1 for none, and its words.
+        struct RuntimeProblem
+        {
+            S32         line   = -1;
+            S32         column = -1;
+            std::string message;
+        };
+        std::vector<RuntimeProblem>                runtime;
+        // A line to go to once the script has loaded, or -1.
+        S32                                        pendingLine = -1;
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
         ALScriptProblems                           analysis;
@@ -194,11 +208,16 @@ private:
     // name and putting it everywhere as one step.
     void askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word);
     void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result);
-    void renameAnswered(const LLSD& notification, const LLSD& response);
+    // The new name asked for in a popover over the window, with a row
+    // saying what return will do as it is typed, and put everywhere as
+    // one step if the text has not moved on.
+    void askNewName(Doc& doc, const ALScriptReferences& refs);
+    void renameTo(const std::string& id, U32 version, const std::vector<ALTextRange>& places, const std::string& old_name, const std::string& new_name);
     void fillReferences(const Doc* doc);
     void onReferenceChosen();
+    // A line, or line:column, typed into the same popover, the editor
+    // showing the line as it is typed and going back on escape.
     void goToLine();
-    void goToLineAnswered(const LLSD& notification, const LLSD& response);
     void goToSymbol();
 
     // The outline and the breadcrumb, from what the check said the script
@@ -212,6 +231,12 @@ private:
     void        onOutlineChosen();
     void        showBottom(const char* tab);
     std::string kindName(ALScriptSymbolKind kind) const;
+
+    // What scripts say, from the workspace: listed in the Output tab, and
+    // a run-time error in a script that is open marked on its line.
+    void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
+    void onOutputFilter();
+    void onOutputChosen();
 
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
@@ -247,10 +272,15 @@ private:
     LLScrollListCtrl*                  mReferences    = nullptr;
     LLScrollListCtrl*                  mOutline       = nullptr;
     LLTextEditor*                      mSymbol        = nullptr;
+    ALOutputList*                      mOutput        = nullptr;
+    LLComboBox*                        mOutputFilter  = nullptr;
+    // The objects heard from, offered in the filter.
+    std::map<LLUUID, std::string>      mOutputObjects;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLButton*                          mResetButton   = nullptr;
     LLButton*                          mSaveButton    = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
+    boost::signals2::scoped_connection mRuntimeConnection;
 };

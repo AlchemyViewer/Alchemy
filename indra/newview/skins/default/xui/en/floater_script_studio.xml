@@ -37,6 +37,17 @@
     <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
     <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
+    <floater.string name="GoToLineTitle">Go to Line</floater.string>
+    <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
+    <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
+    <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
+    <floater.string name="GoToLineGoColumn">Go to line [LINE], column [COL].</floater.string>
+    <floater.string name="GoToLineNone">There is no line [LINE]; the script has [COUNT].</floater.string>
+    <floater.string name="RenameTitle">Rename</floater.string>
+    <floater.string name="RenamePlaceholder">The new name</floater.string>
+    <floater.string name="RenameHint">Type the new name for [NAME].</floater.string>
+    <floater.string name="RenameSame">[NAME] is its name already.</floater.string>
+    <floater.string name="RenameTo">Rename [COUNT] place(s) of [NAME] to [NEW].</floater.string>
     <floater.string name="KindKeyword">keyword</floater.string>
     <floater.string name="KindVariable">variable</floater.string>
     <floater.string name="KindParameter">parameter</floater.string>
@@ -48,6 +59,11 @@
     <floater.string name="KindState">state</floater.string>
     <floater.string name="KindLabel">label</floater.string>
     <floater.string name="KindModule">module</floater.string>
+    <floater.string name="KindDebug">debug</floater.string>
+    <floater.string name="KindOwnerSay">owner</floater.string>
+    <floater.string name="KindError">error</floater.string>
+    <floater.string name="OriginRuntime">Runtime</floater.string>
+    <floater.string name="OutputAllObjects">All objects</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabSourceTip">The source this script was written as, before the preprocessor expanded it; read-only here</floater.string>
@@ -218,7 +234,11 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="references" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="references" />
             </menu_item_check>
-            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|3">
+            <menu_item_check label="Output" layout="topleft" name="output" shortcut="control|alt|3">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
+            </menu_item_check>
+            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|4">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
@@ -276,7 +296,7 @@
      layout="topleft"
      name="fold_bottom"
      right="-176"
-     tool_tip="The band under the editor: the problems and the references (Control+Alt+1, Control+Alt+2)"
+     tool_tip="The band under the editor: the problems, the references and what the scripts say (Control+Alt+1, 2 and 3)"
      top_delta="0"
      width="80" />
     <button
@@ -287,7 +307,7 @@
      layout="topleft"
      name="fold_inspector"
      right="-92"
-     tool_tip="The outline and the symbol at the caret, down the right (Control+Alt+3)"
+     tool_tip="The outline and the symbol at the caret, down the right (Control+Alt+4)"
      top_delta="0"
      width="80" />
     <button
@@ -460,6 +480,47 @@
                                 <scroll_list.columns label="Line" name="line" width="70" />
                                 <scroll_list.columns dynamic_width="true" label="Text" name="text" />
                             </scroll_list>
+                        </panel>
+                        <panel
+                         follows="all"
+                         height="108"
+                         label="Output"
+                         layout="topleft"
+                         name="output_tab"
+                         width="614">
+                            <combo_box
+                             follows="left|top"
+                             height="22"
+                             layout="topleft"
+                             left="2"
+                             name="output_filter"
+                             tool_tip="Which object's scripts to listen to"
+                             top="2"
+                             width="220" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Clear"
+                             layout="topleft"
+                             left_pad="6"
+                             name="output_clear"
+                             tool_tip="Forget what was said so far"
+                             top_delta="0"
+                             width="60" />
+                            <output_list
+                             follows="all"
+                             height="82"
+                             layout="topleft"
+                             left="0"
+                             name="output"
+                             tool_tip="What the scripts said on the debug channel and to their owner; choosing a run-time error goes to its line, opening the script if need be"
+                             top_pad="2"
+                             width="614">
+                                <output_list.columns label="Time" name="time" width="70" />
+                                <output_list.columns label="Object" name="source" width="180" />
+                                <output_list.columns label="Kind" name="kind" width="60" />
+                                <output_list.columns dynamic_width="true" label="Text" name="text" />
+                            </output_list>
                         </panel>
                     </tab_container>
                 </layout_panel>
