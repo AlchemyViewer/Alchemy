@@ -35,8 +35,9 @@
 // The LSL analyzer: Tailslide's parser, symbol table and type checks, given
 // the grid's builtins and asked about one script at a time: what is wrong
 // with it, which of its own symbols are in scope at a position, what is at
-// one, and what a call there takes. The optimizer and the pretty printer
-// come in phase 3.
+// one, what a call there takes, where a symbol is declared and used, and
+// what the script declares. The optimizer and the pretty printer come in
+// phase 3.
 //
 // Tailslide's headers stay behind the implementation. Not thread-safe, and
 // the builtins are a table the library holds once for the whole process.
@@ -71,6 +72,13 @@ public:
     ALScriptHover hover(std::string_view source, S32 line, S32 column);
     // The call a position is inside, if any, builtin or the script's own.
     ALScriptSignature signature(std::string_view source, S32 line, S32 column);
+    // The symbol named at a position, with where the script declares it
+    // and every place it stands. A builtin stands where it is used and is
+    // not the script's to rename; nor is `default`.
+    ALScriptReferences references(std::string_view source, S32 line, S32 column);
+    // The script's globals, functions and states, with each state's
+    // events one deeper, in the order written.
+    std::vector<ALScriptOutlineEntry> outline(std::string_view source);
 
 private:
     struct Impl;

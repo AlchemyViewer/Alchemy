@@ -1,6 +1,6 @@
 /**
  * @file alscriptsymbol.h
- * @brief What the analyzers say about a place in a script: what could go there, what is there, what a call takes.
+ * @brief What the analyzers say about a place in a script: what could go there, what is there, what a call takes, where a name lives.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -83,4 +83,57 @@ struct ALScriptSignature
     // Which one the position is at, or past the end.
     S32                      active = 0;
     std::string              documentation;
+};
+
+// A stretch of the script, the end exclusive.
+struct ALScriptSpan
+{
+    S32 line      = 0;
+    S32 column    = 0;
+    S32 endLine   = 0;
+    S32 endColumn = 0;
+
+    friend bool operator==(const ALScriptSpan& a, const ALScriptSpan& b)
+    {
+        return a.line == b.line && a.column == b.column && a.endLine == b.endLine && a.endColumn == b.endColumn;
+    }
+    friend bool operator<(const ALScriptSpan& a, const ALScriptSpan& b)
+    {
+        return a.line != b.line ? a.line < b.line : a.column < b.column;
+    }
+};
+
+// The name at a position: where the script declares it, if it does, and
+// every place it stands.
+struct ALScriptReferences
+{
+    bool               found = false;
+    std::string        name;
+    ALScriptSymbolKind kind = ALScriptSymbolKind::Variable;
+    // Where the script declares it. A builtin, or anything from the
+    // definitions, has no declaration here.
+    bool               hasDefinition = false;
+    ALScriptSpan       definition;
+    // Whether every place it stands is the script's to change: declared
+    // here, and not a name the language fixes, as LSL's `default` is.
+    bool               renamable = false;
+    // Every place, the declaration among them, in order; each is the name
+    // alone, which is what a rename replaces.
+    std::vector<ALScriptSpan> references;
+};
+
+// One symbol of the script's outline: what it declares at the top, and
+// what those hold, in the order written.
+struct ALScriptOutlineEntry
+{
+    std::string        name;
+    // Its type or its parameters, as a declaration reads.
+    std::string        detail;
+    ALScriptSymbolKind kind = ALScriptSymbolKind::Variable;
+    // The name itself, and everything the symbol spans.
+    ALScriptSpan       nameSpan;
+    ALScriptSpan       span;
+    // How far in: a state's events are one deeper than the state, and a
+    // function inside a function one deeper than its holder.
+    S32                depth = 0;
 };

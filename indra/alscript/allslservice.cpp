@@ -29,6 +29,7 @@
 #include "llfile.h"
 
 #include <tailslide/tailslide.hh>
+#include <tailslide/visitor.hh>
 
 #include <algorithm>
 #include <cstring>
@@ -206,6 +207,126 @@ namespace
         const Tailslide::YYLTYPE& where = *identifier->getLoc();
         return where.first_line < line || (where.first_line == line && column > nameEnd(identifier));
     }
+
+    // The name alone, from where a location starts.
+    ALScriptSpan nameSpanOf(const Tailslide::YYLTYPE& where, const char* name)
+    {
+        ALScriptSpan span;
+        span.line      = zeroBased(where.first_line);
+        span.column    = zeroBased(where.first_column);
+        span.endLine   = span.line;
+        span.endColumn = span.column + static_cast<S32>(strlen(name));
+        return span;
+    }
+
+    // Everything a node spans. Tailslide's last column is the last
+    // character's, counted from one, which is the column after it
+    // counted from zero.
+    ALScriptSpan spanOf(const Tailslide::YYLTYPE& where)
+    {
+        ALScriptSpan span;
+        span.line      = zeroBased(where.first_line);
+        span.column    = zeroBased(where.first_column);
+        span.endLine   = zeroBased(where.last_line);
+        span.endColumn = std::max(0, where.last_column);
+        return span;
+    }
+
+    // The identifier named at a position, resolved, or null.
+    Tailslide::LSLSymbol* symbolAt(Tailslide::LSLScript* script, int one_line, int one_column)
+    {
+        std::vector<Tailslide::LSLASTNode*> path;
+        holding(script, one_line, one_column, path);
+        for (auto it = path.rbegin(); it != path.rend(); ++it)
+        {
+            if ((*it)->getNodeType() != Tailslide::NODE_IDENTIFIER || !onName(static_cast<Tailslide::LSLIdentifier*>(*it), one_line, one_column))
+            {
+                continue;
+            }
+            if (Tailslide::LSLSymbol* symbol = (*it)->getSymbol())
+            {
+                return symbol;
+            }
+        }
+        return nullptr;
+    }
+
+    // Every identifier bound to one symbol. Each handler of an event is
+    // a symbol of its own, so an event's places are every handler of it.
+    struct Uses final : public Tailslide::ASTVisitor
+    {
+        Tailslide::LSLSymbol*     target;
+        std::vector<ALScriptSpan> spans;
+
+        explicit Uses(Tailslide::LSLSymbol* target_in)
+        :   target(target_in)
+        {
+        }
+
+        bool same(Tailslide::LSLSymbol* symbol) const
+        {
+            if (symbol == target)
+            {
+                return true;
+            }
+            return symbol && target->getSymbolType() == Tailslide::SYM_EVENT && symbol->getSymbolType() == Tailslide::SYM_EVENT
+                   && strcmp(symbol->getName(), target->getName()) == 0;
+        }
+
+        bool visit(Tailslide::LSLIdentifier* identifier) override
+        {
+            if (same(identifier->getSymbol()) && identifier->getLoc()->first_line > 0)
+            {
+                spans.push_back(nameSpanOf(*identifier->getLoc(), identifier->getName()));
+            }
+            return true;
+        }
+    };
+
+    // A declaration's identifier, which is its first child.
+    Tailslide::LSLIdentifier* identifierOf(Tailslide::LSLASTNode* node)
+    {
+        Tailslide::LSLASTNode* first = node->getChild(0);
+        return first && first->getNodeType() == Tailslide::NODE_IDENTIFIER ? static_cast<Tailslide::LSLIdentifier*>(first) : nullptr;
+    }
+
+    // Where a symbol the script declares is named in its declaration: a
+    // symbol's own location is its declaration's start, which for a
+    // global is the type before the name, so the name is the first
+    // identifier bound to it on that line from there on. False for a
+    // builtin, or a symbol with no location.
+    bool declarationOf(Tailslide::LSLScript* script, Tailslide::LSLSymbol* symbol, ALScriptSpan& span, std::vector<ALScriptSpan>* every = nullptr)
+    {
+        if (symbol->getSubType() == Tailslide::SYM_BUILTIN || symbol->getLoc()->first_line == 0)
+        {
+            return false;
+        }
+        Uses uses(symbol);
+        script->visit(&uses);
+        std::sort(uses.spans.begin(), uses.spans.end());
+        uses.spans.erase(std::unique(uses.spans.begin(), uses.spans.end()), uses.spans.end());
+        const S32 line   = zeroBased(symbol->getLoc()->first_line);
+        const S32 column = zeroBased(symbol->getLoc()->first_column);
+        bool      found  = false;
+        for (const ALScriptSpan& one : uses.spans)
+        {
+            if (one.line == line && one.column >= column)
+            {
+                span  = one;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            span = nameSpanOf(*symbol->getLoc(), symbol->getName());
+        }
+        if (every)
+        {
+            *every = std::move(uses.spans);
+        }
+        return true;
+    }
 }
 
 struct ALLSLService::Impl
@@ -375,11 +496,11 @@ ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
         }
         answer.found = true;
         answer.label = declarationOf(symbol);
-        if (symbol->getSubType() != Tailslide::SYM_BUILTIN && symbol->getLoc()->first_line > 0)
+        if (ALScriptSpan declared; declarationOf(script, symbol, declared))
         {
             answer.hasDefinition    = true;
-            answer.definitionLine   = zeroBased(symbol->getLoc()->first_line);
-            answer.definitionColumn = zeroBased(symbol->getLoc()->first_column);
+            answer.definitionLine   = declared.line;
+            answer.definitionColumn = declared.column;
         }
         break;
     }
@@ -439,4 +560,105 @@ ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32
         break;
     }
     return answer;
+}
+
+// --- where a symbol lives -----------------------------------------------------------
+
+ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S32 column)
+{
+    Tailslide::ScopedScriptParser parser(nullptr);
+    Tailslide::LSLScript*         script = resolved(parser, source);
+    ALScriptReferences            answer;
+    if (!script)
+    {
+        return answer;
+    }
+    Tailslide::LSLSymbol* symbol = symbolAt(script, line + 1, column + 1);
+    if (!symbol)
+    {
+        return answer;
+    }
+    answer.found = true;
+    answer.name  = symbol->getName();
+    answer.kind  = kindOf(symbol);
+    if (declarationOf(script, symbol, answer.definition, &answer.references))
+    {
+        answer.hasDefinition = true;
+        // An event's name is the language's, and so is the default state's.
+        answer.renamable = symbol->getSymbolType() != Tailslide::SYM_EVENT && answer.name != "default";
+    }
+    else
+    {
+        Uses uses(symbol);
+        script->visit(&uses);
+        std::sort(uses.spans.begin(), uses.spans.end());
+        uses.spans.erase(std::unique(uses.spans.begin(), uses.spans.end()), uses.spans.end());
+        answer.references = std::move(uses.spans);
+    }
+    return answer;
+}
+
+// --- what the script declares ------------------------------------------------------
+
+std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
+{
+    Tailslide::ScopedScriptParser     parser(nullptr);
+    Tailslide::LSLScript*             script = resolved(parser, source);
+    std::vector<ALScriptOutlineEntry> out;
+    if (!script)
+    {
+        return out;
+    }
+    auto entry = [&](Tailslide::LSLASTNode* node, ALScriptSymbolKind kind, S32 depth, bool detailed) {
+        Tailslide::LSLIdentifier* identifier = identifierOf(node);
+        if (!identifier || identifier->getLoc()->first_line == 0)
+        {
+            return;
+        }
+        ALScriptOutlineEntry one;
+        one.name     = identifier->getName();
+        one.kind     = kind;
+        one.depth    = depth;
+        one.nameSpan = nameSpanOf(*identifier->getLoc(), identifier->getName());
+        one.span     = node->getLoc()->first_line > 0 ? spanOf(*node->getLoc()) : one.nameSpan;
+        if (detailed && identifier->getSymbol())
+        {
+            one.detail = declarationOf(identifier->getSymbol());
+        }
+        out.push_back(std::move(one));
+    };
+    if (Tailslide::LSLASTNode* globals = script->getGlobals())
+    {
+        for (Tailslide::LSLASTNode* global = globals->getChild(0); global; global = global->getNext())
+        {
+            if (global->getNodeType() == Tailslide::NODE_GLOBAL_VARIABLE)
+            {
+                entry(global, ALScriptSymbolKind::Variable, 0, true);
+            }
+            else if (global->getNodeType() == Tailslide::NODE_GLOBAL_FUNCTION)
+            {
+                entry(global, ALScriptSymbolKind::Function, 0, true);
+            }
+        }
+    }
+    if (Tailslide::LSLASTNode* states = script->getStates())
+    {
+        for (Tailslide::LSLASTNode* state = states->getChild(0); state; state = state->getNext())
+        {
+            if (state->getNodeType() != Tailslide::NODE_STATE)
+            {
+                continue;
+            }
+            entry(state, ALScriptSymbolKind::State, 0, false);
+            Tailslide::LSLASTNode* handlers = static_cast<Tailslide::LSLState*>(state)->getEventHandlers();
+            for (Tailslide::LSLASTNode* handler = handlers ? handlers->getChild(0) : nullptr; handler; handler = handler->getNext())
+            {
+                if (handler->getNodeType() == Tailslide::NODE_EVENT_HANDLER)
+                {
+                    entry(handler, ALScriptSymbolKind::Event, 1, true);
+                }
+            }
+        }
+    }
+    return out;
 }

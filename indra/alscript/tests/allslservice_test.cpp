@@ -251,4 +251,84 @@ namespace tut
         ensure_equals("its only parameter", sig.active, 0);
         ensure("none at the top", !service.signature(script, 0, 0).found);
     }
+
+    template<> template<>
+    void allslservice_object::test<9>()
+    {
+        set_test_name("references find a symbol's declaration and every use; builtins, events and default are not the script's to rename");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "integer count = 0;\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        count = count + 1;\n"
+            "        llSay(0, (string)count);\n"
+            "        state other;\n"
+            "    }\n"
+            "}\n"
+            "state other\n"
+            "{\n"
+            "    state_entry() { state default; }\n"
+            "}\n";
+        ALScriptReferences refs = service.references(script, 5, 16);  // on the second `count`
+        ensure("found", refs.found && refs.name == "count");
+        ensure("a variable", refs.kind == ALScriptSymbolKind::Variable);
+        ensure(llformat("declared on the first line, not %d:%d-%d (%d)", refs.definition.line, refs.definition.column, refs.definition.endColumn, (int)refs.hasDefinition),
+               refs.hasDefinition && refs.definition.line == 0 && refs.definition.column == 8 && refs.definition.endColumn == 13);
+        ensure_equals("four places", refs.references.size(), size_t(4));
+        ensure("the declaration first", refs.references[0] == refs.definition);
+        ensure("the cast's operand last", refs.references[3].line == 6 && refs.references[3].column == 25);
+        ensure("renamable", refs.renamable);
+
+        refs = service.references(script, 6, 10);  // on llSay
+        ensure("a builtin is found", refs.found && refs.name == "llSay");
+        ensure("used once, declared nowhere here", refs.references.size() == 1 && !refs.hasDefinition && !refs.renamable);
+
+        refs = service.references(script, 7, 15);  // on `other` in `state other;`
+        ensure("a state is found", refs.found && refs.kind == ALScriptSymbolKind::State);
+        ensure("declared where it is", refs.hasDefinition && refs.definition.line == 10 && refs.definition.column == 6);
+        ensure_equals("the declaration and the change", refs.references.size(), size_t(2));
+        ensure("renamable", refs.renamable);
+
+        refs = service.references(script, 12, 26);  // on `default` in `state default;`
+        ensure("default is found", refs.found && refs.name == "default");
+        ensure("but is not the script's to rename", !refs.renamable);
+
+        refs = service.references(script, 3, 6);  // on state_entry
+        ensure("an event is found", refs.found && refs.kind == ALScriptSymbolKind::Event);
+        ensure(llformat("in both states, not %d places", (int)refs.references.size()), refs.references.size() == 2);
+        ensure("not renamable", !refs.renamable);
+    }
+
+    template<> template<>
+    void allslservice_object::test<10>()
+    {
+        set_test_name("the outline lists the globals, the functions and the states with their events one deeper");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "integer count = 0;\n"
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    state_entry() { }\n"
+            "    touch_start(integer total)\n"
+            "    {\n"
+            "    }\n"
+            "}\n"
+            "state other { }\n";
+        std::vector<ALScriptOutlineEntry> outline = service.outline(script);
+        std::string names;
+        for (const ALScriptOutlineEntry& e : outline) names += " " + e.name + llformat("@%d", e.depth);
+        ensure_equals("six entries:" + names, outline.size(), size_t(6));
+        ensure("the global", outline[0].name == "count" && outline[0].kind == ALScriptSymbolKind::Variable && outline[0].detail == "integer count" && outline[0].depth == 0);
+        ensure("the function, as declared", outline[1].name == "half" && outline[1].kind == ALScriptSymbolKind::Function && outline[1].detail == "float half(integer n)");
+        ensure("its name where it is", outline[1].nameSpan.line == 1 && outline[1].nameSpan.column == 6 && outline[1].nameSpan.endColumn == 10);
+        ensure("default, a state", outline[2].name == "default" && outline[2].kind == ALScriptSymbolKind::State && outline[2].depth == 0);
+        ensure("spanning its lines", outline[2].span.line == 2 && outline[2].span.endLine == 8);
+        ensure("state_entry, one deeper", outline[3].name == "state_entry" && outline[3].kind == ALScriptSymbolKind::Event && outline[3].depth == 1);
+        ensure("touch_start with its parameter", outline[4].name == "touch_start" && outline[4].detail == "touch_start(integer total)" && outline[4].span.line == 5 && outline[4].span.endLine == 7);
+        ensure("the other state", outline[5].name == "other" && outline[5].kind == ALScriptSymbolKind::State);
+    }
 }

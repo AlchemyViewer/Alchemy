@@ -246,4 +246,70 @@ namespace tut
         ensure_equals("at the second", sig.active, 1);
         ensure("none outside a call", !service.signature(script, 0, 0).found);
     }
+
+    template<> template<>
+    void alluauservice_object::test<12>()
+    {
+        set_test_name("references find where a name is bound and every place it stands, and know what is the script's to rename");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local count = 1\n"
+            "ll.Say(0, tostring(count))\n"
+            "count = count + 1\n"
+            "local M = {}\n"
+            "function M.f(n: number) return n end\n"
+            "M.f(count)\n";
+        ALScriptReferences refs = service.references(script, 1, 20);  // on `count` in the call
+        ensure("the local is found", refs.found);
+        ensure_equals("by name", refs.name, std::string("count"));
+        ensure(llformat("a variable, not kind %d", (int)refs.kind), refs.kind == ALScriptSymbolKind::Variable);
+        ensure(llformat("bound on the first line, not %d:%d-%d", refs.definition.line, refs.definition.column, refs.definition.endColumn),
+               refs.hasDefinition && refs.definition.line == 0 && refs.definition.column == 6 && refs.definition.endColumn == 11);
+        ensure_equals("five places", refs.references.size(), size_t(5));
+        ensure("the first is the binding", refs.references[0] == refs.definition);
+        ensure("the last is the argument", refs.references[4].line == 5 && refs.references[4].column == 4);
+        ensure("the script's to rename", refs.renamable);
+
+        refs = service.references(script, 1, 4);  // on `Say`
+        ensure("a field of ll is found", refs.found && refs.name == "Say");
+        ensure("a function", refs.kind == ALScriptSymbolKind::Function);
+        ensure("not bound in the script", !refs.hasDefinition && !refs.renamable);
+        ensure_equals("used once", refs.references.size(), size_t(1));
+
+        refs = service.references(script, 5, 2);  // on `f` in `M.f(count)`
+        ensure("the script's own field is found", refs.found && refs.name == "f");
+        ensure("bound by the function statement", refs.hasDefinition && refs.definition.line == 4 && refs.definition.column == 11);
+        ensure_equals("declared and called", refs.references.size(), size_t(2));
+        ensure("and renamable", refs.renamable);
+
+        refs = service.references(script, 0, 6);  // on the binding itself
+        ensure("asked at the binding, the same answer", refs.found && refs.references.size() == 5);
+        ensure("nothing at nothing", !service.references(script, 3, 0).found);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<13>()
+    {
+        set_test_name("the outline lists what the top binds and every function, each function's own one deeper");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local count = 1\n"
+            "local function half(n: number)\n"
+            "    local inner = 2\n"
+            "    local function quarter() return n / 4 end\n"
+            "    return n / 2\n"
+            "end\n"
+            "function LLEvents.touch_start(n: number) end\n"
+            "handlers = {}\n";
+        std::vector<ALScriptOutlineEntry> outline = service.outline(script);
+        std::string names;
+        for (const ALScriptOutlineEntry& e : outline) names += " " + e.name + llformat("@%d", e.depth);
+        ensure_equals("five entries:" + names, outline.size(), size_t(5));
+        ensure("count first, a number", outline[0].name == "count" && outline[0].kind == ALScriptSymbolKind::Variable && outline[0].detail == "number" && outline[0].depth == 0);
+        ensure("half, a function spanning its lines", outline[1].name == "half" && outline[1].kind == ALScriptSymbolKind::Function && outline[1].span.line == 1 && outline[1].span.endLine == 5);
+        ensure("its name where it is", outline[1].nameSpan.line == 1 && outline[1].nameSpan.column == 15);
+        ensure("quarter inside it, one deeper", outline[2].name == "quarter" && outline[2].depth == 1);
+        ensure("the event handler, as an event", outline[3].name == "LLEvents.touch_start" && outline[3].kind == ALScriptSymbolKind::Event);
+        ensure("the global", outline[4].name == "handlers" && outline[4].kind == ALScriptSymbolKind::Variable);
+    }
 }

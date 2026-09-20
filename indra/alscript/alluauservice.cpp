@@ -44,6 +44,7 @@
 #include "Luau/TypeArena.h"
 #include "Luau/TypePack.h"
 
+#include <set>
 #include <unordered_map>
 
 namespace
@@ -167,6 +168,394 @@ namespace
         }
         return text;
     }
+
+    ALScriptSpan spanOf(const Luau::Location& where)
+    {
+        ALScriptSpan span;
+        span.line      = static_cast<S32>(where.begin.line);
+        span.column    = static_cast<S32>(where.begin.column);
+        span.endLine   = static_cast<S32>(where.end.line);
+        span.endColumn = static_cast<S32>(where.end.column);
+        return span;
+    }
+
+    // What a position names: a local, by the binding itself; a global, by
+    // its name; or a field, by its name and the table it is a field of.
+    struct Target
+    {
+        enum class Kind : U8
+        {
+            None,
+            Local,
+            Global,
+            Field
+        };
+        Kind            kind  = Kind::None;
+        Luau::AstLocal* local = nullptr;
+        Luau::AstName   global;
+        std::string     field;
+        // The table a field belongs to, followed, or null for one whose
+        // table has no type; fields of the same name on other tables are
+        // other fields.
+        Luau::TypeId    table = nullptr;
+    };
+
+    Luau::TypeId tableTypeOf(const Luau::Module& module, Luau::AstExpr* expr)
+    {
+        const Luau::TypeId* type = module.astTypes.find(expr);
+        return type ? Luau::follow(*type) : nullptr;
+    }
+
+    Target targetAt(const Luau::Module& module, const Luau::SourceModule& source, Luau::Position at)
+    {
+        Target             target;
+        Luau::ExprOrLocal  found = Luau::findExprOrLocalAtPosition(source, at);
+        if (Luau::AstLocal* local = found.getLocal())
+        {
+            target.kind  = Target::Kind::Local;
+            target.local = local;
+            return target;
+        }
+        Luau::AstExpr* expr = found.getExpr();
+        if (!expr)
+        {
+            return target;
+        }
+        if (Luau::AstExprLocal* local = expr->as<Luau::AstExprLocal>())
+        {
+            target.kind  = Target::Kind::Local;
+            target.local = local->local;
+        }
+        else if (Luau::AstExprGlobal* global = expr->as<Luau::AstExprGlobal>())
+        {
+            target.kind   = Target::Kind::Global;
+            target.global = global->name;
+        }
+        else if (Luau::AstExprIndexName* index = expr->as<Luau::AstExprIndexName>())
+        {
+            if (index->indexLocation.containsClosed(at))
+            {
+                target.kind  = Target::Kind::Field;
+                target.field = index->index.value;
+                target.table = tableTypeOf(module, index->expr);
+            }
+        }
+        else if (Luau::AstExprConstantString* key = expr->as<Luau::AstExprConstantString>())
+        {
+            // A record's key in a table constructor: a name to a person,
+            // a string to the parser.
+            for (Luau::AstNode* node : Luau::findAstAncestryOfPosition(source, at))
+            {
+                Luau::AstExprTable* table = node->as<Luau::AstExprTable>();
+                if (!table)
+                {
+                    continue;
+                }
+                for (const Luau::AstExprTable::Item& item : table->items)
+                {
+                    if (item.kind == Luau::AstExprTable::Item::Kind::Record && item.key == key)
+                    {
+                        target.kind  = Target::Kind::Field;
+                        target.field = std::string(key->value.data, key->value.size);
+                        target.table = tableTypeOf(module, table);
+                    }
+                }
+            }
+        }
+        return target;
+    }
+
+    // Every place a target stands, and where it is bound.
+    struct Uses final : public Luau::AstVisitor
+    {
+        const Target&                 target;
+        const Luau::Module&           module;
+        std::vector<ALScriptSpan>     spans;
+        std::optional<Luau::Location> definition;
+        bool                          parameter = false;
+        bool                          function  = false;
+
+        Uses(const Target& target_in, const Luau::Module& module_in)
+        :   target(target_in),
+            module(module_in)
+        {
+        }
+
+        bool sameTable(Luau::AstExpr* expr) const
+        {
+            if (!target.table)
+            {
+                return true;
+            }
+            const Luau::TypeId type = tableTypeOf(module, expr);
+            return !type || type == target.table;
+        }
+        bool isField(Luau::AstExprIndexName* index) const
+        {
+            return target.kind == Target::Kind::Field && target.field == index->index.value && sameTable(index->expr);
+        }
+        bool isGlobal(Luau::AstExprGlobal* global) const { return target.kind == Target::Kind::Global && global->name == target.global; }
+        bool isLocal(Luau::AstLocal* local) const { return target.kind == Target::Kind::Local && local == target.local; }
+
+        void add(const Luau::Location& where) { spans.push_back(spanOf(where)); }
+        void declare(const Luau::Location& where)
+        {
+            if (!definition)
+            {
+                definition = where;
+            }
+            add(where);
+        }
+
+        bool visit(Luau::AstExprLocal* expr) override
+        {
+            if (isLocal(expr->local))
+            {
+                add(expr->location);
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprGlobal* expr) override
+        {
+            if (isGlobal(expr))
+            {
+                add(expr->location);
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprIndexName* expr) override
+        {
+            if (isField(expr))
+            {
+                add(expr->indexLocation);
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprTable* table) override
+        {
+            if (target.kind == Target::Kind::Field && sameTable(table))
+            {
+                for (const Luau::AstExprTable::Item& item : table->items)
+                {
+                    Luau::AstExprConstantString* key = item.key ? item.key->as<Luau::AstExprConstantString>() : nullptr;
+                    if (item.kind == Luau::AstExprTable::Item::Kind::Record && key
+                        && std::string_view(key->value.data, key->value.size) == target.field)
+                    {
+                        declare(key->location);
+                    }
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocal* stat) override
+        {
+            for (Luau::AstLocal* local : stat->vars)
+            {
+                if (isLocal(local))
+                {
+                    declare(local->location);
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocalFunction* stat) override
+        {
+            if (isLocal(stat->name))
+            {
+                declare(stat->name->location);
+                function = true;
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprFunction* expr) override
+        {
+            if (expr->self && isLocal(expr->self))
+            {
+                declare(expr->self->location);
+                parameter = true;
+            }
+            for (Luau::AstLocal* arg : expr->args)
+            {
+                if (isLocal(arg))
+                {
+                    declare(arg->location);
+                    parameter = true;
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatFor* stat) override
+        {
+            if (isLocal(stat->var))
+            {
+                declare(stat->var->location);
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatForIn* stat) override
+        {
+            for (Luau::AstLocal* local : stat->vars)
+            {
+                if (isLocal(local))
+                {
+                    declare(local->location);
+                }
+            }
+            return true;
+        }
+        // The name of a function statement, or the first assignment, is
+        // where a global or a field is bound; the name itself is added
+        // when it is visited as the expression it is.
+        bool visit(Luau::AstStatFunction* stat) override
+        {
+            if (!definition && bind(stat->name))
+            {
+                function = true;
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatAssign* stat) override
+        {
+            for (Luau::AstExpr* var : stat->vars)
+            {
+                bind(var);
+            }
+            return true;
+        }
+        // Whether this is the target's first binding.
+        bool bind(Luau::AstExpr* name)
+        {
+            if (definition)
+            {
+                return false;
+            }
+            if (Luau::AstExprGlobal* global = name->as<Luau::AstExprGlobal>(); global && isGlobal(global))
+            {
+                definition = global->location;
+            }
+            else if (Luau::AstExprIndexName* index = name->as<Luau::AstExprIndexName>(); index && isField(index))
+            {
+                definition = index->indexLocation;
+            }
+            return definition.has_value();
+        }
+    };
+
+    // The outline: what the top of the script binds, and every function,
+    // each function's own one deeper. The locals inside a function are
+    // its business.
+    struct Outliner final : public Luau::AstVisitor
+    {
+        const Luau::Module*               module;
+        std::vector<ALScriptOutlineEntry> out;
+        S32                               depth = 0;
+        std::set<std::string>             bound;
+
+        explicit Outliner(const Luau::Module* module_in)
+        :   module(module_in)
+        {
+        }
+
+        std::string typeAt(Luau::AstExpr* expr) const
+        {
+            const Luau::TypeId* type = expr && module ? module->astTypes.find(expr) : nullptr;
+            return type ? typeText(*type) : std::string();
+        }
+        static bool isEvent(const std::string& name) { return name.rfind("LLEvents.", 0) == 0; }
+        void entry(std::string name, const Luau::Location& name_where, const Luau::Location& where, ALScriptSymbolKind kind, std::string detail)
+        {
+            ALScriptOutlineEntry one;
+            one.name     = std::move(name);
+            one.detail   = std::move(detail);
+            one.kind     = kind;
+            one.nameSpan = spanOf(name_where);
+            one.span     = spanOf(where);
+            one.depth    = depth;
+            out.push_back(std::move(one));
+        }
+        void inside(Luau::AstStatBlock* body)
+        {
+            ++depth;
+            body->visit(this);
+            --depth;
+        }
+
+        bool visit(Luau::AstStatLocal* stat) override
+        {
+            if (depth == 0)
+            {
+                for (size_t i = 0; i < stat->vars.size; ++i)
+                {
+                    Luau::AstExpr* value = i < stat->values.size ? stat->values.data[i] : nullptr;
+                    const bool     function = value && value->is<Luau::AstExprFunction>();
+                    entry(stat->vars.data[i]->name.value, stat->vars.data[i]->location, stat->location,
+                          function ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Variable, typeAt(value));
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocalFunction* stat) override
+        {
+            entry(stat->name->name.value, stat->name->location, stat->location, ALScriptSymbolKind::Function, typeAt(stat->func));
+            inside(stat->func->body);
+            return false;
+        }
+        bool visit(Luau::AstStatFunction* stat) override
+        {
+            const std::string name = nameOf(stat->name);
+            Luau::Location    name_where = stat->name->location;
+            if (Luau::AstExprIndexName* index = stat->name->as<Luau::AstExprIndexName>())
+            {
+                name_where = index->indexLocation;
+            }
+            entry(name.empty() ? "function" : name, name_where, stat->location,
+                  isEvent(name) ? ALScriptSymbolKind::Event : ALScriptSymbolKind::Function, typeAt(stat->func));
+            inside(stat->func->body);
+            return false;
+        }
+        bool visit(Luau::AstStatAssign* stat) override
+        {
+            if (depth == 0)
+            {
+                for (size_t i = 0; i < stat->vars.size; ++i)
+                {
+                    Luau::AstExpr*    var  = stat->vars.data[i];
+                    const std::string name = nameOf(var);
+                    if (name.empty() || !bound.insert(name).second)
+                    {
+                        continue;
+                    }
+                    Luau::AstExpr* value    = i < stat->values.size ? stat->values.data[i] : nullptr;
+                    const bool     function = value && value->is<Luau::AstExprFunction>();
+                    Luau::Location name_where = var->location;
+                    ALScriptSymbolKind kind = var->is<Luau::AstExprGlobal>() ? ALScriptSymbolKind::Variable : ALScriptSymbolKind::Field;
+                    if (Luau::AstExprIndexName* index = var->as<Luau::AstExprIndexName>())
+                    {
+                        name_where = index->indexLocation;
+                    }
+                    if (function)
+                    {
+                        kind = isEvent(name) ? ALScriptSymbolKind::Event : ALScriptSymbolKind::Function;
+                    }
+                    entry(name, name_where, stat->location, kind, typeAt(value));
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatTypeAlias* stat) override
+        {
+            if (depth == 0)
+            {
+                entry(stat->name.value, stat->nameLocation, stat->location, ALScriptSymbolKind::Type, std::string());
+            }
+            return false;
+        }
+        bool visit(Luau::AstExprFunction* expr) override
+        {
+            inside(expr->body);
+            return false;
+        }
+    };
 }
 
 namespace
@@ -574,4 +963,87 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
         answer.documentation = doc->documentation;
     }
     return answer;
+}
+
+// --- where a name lives -------------------------------------------------------------
+
+ALScriptReferences ALLuauService::references(std::string_view source, S32 line, S32 column)
+{
+    Impl& impl = *mImpl;
+    impl.checked(source, /*for_autocomplete*/ false);
+    ALScriptReferences        answer;
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    if (!module_source || !module || !module_source->root)
+    {
+        return answer;
+    }
+    const Luau::Position at     = positionOf(line, column);
+    const Target         target = targetAt(*module, *module_source, at);
+    if (target.kind == Target::Kind::None)
+    {
+        return answer;
+    }
+    Uses uses(target, *module);
+    module_source->root->visit(&uses);
+    std::sort(uses.spans.begin(), uses.spans.end());
+    uses.spans.erase(std::unique(uses.spans.begin(), uses.spans.end()), uses.spans.end());
+
+    answer.found = true;
+    switch (target.kind)
+    {
+        case Target::Kind::Local:
+            answer.name = target.local->name.value;
+            break;
+        case Target::Kind::Global:
+            answer.name = target.global.value;
+            break;
+        default:
+            answer.name = target.field;
+            break;
+    }
+    const std::optional<Luau::TypeId> type     = Luau::findTypeAtPosition(*module, *module_source, at);
+    const bool                        callable = uses.function || (type && functionOf(*type));
+    if (uses.parameter)
+    {
+        answer.kind = ALScriptSymbolKind::Parameter;
+    }
+    else if (callable)
+    {
+        answer.kind = ALScriptSymbolKind::Function;
+    }
+    else
+    {
+        answer.kind = target.kind == Target::Kind::Field ? ALScriptSymbolKind::Field : ALScriptSymbolKind::Variable;
+    }
+    if (uses.definition)
+    {
+        answer.hasDefinition = true;
+        answer.definition    = spanOf(*uses.definition);
+        answer.renamable     = true;
+    }
+    answer.references = std::move(uses.spans);
+    return answer;
+}
+
+// --- what the script declares ------------------------------------------------------
+
+std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source)
+{
+    Impl& impl = *mImpl;
+    // The text just checked is laid out already; anything else is checked
+    // now, since the types beside the names come from the check.
+    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
+    {
+        impl.checked(source, /*for_autocomplete*/ false);
+    }
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    if (!module_source || !module_source->root)
+    {
+        return {};
+    }
+    Outliner outliner(module.get());
+    module_source->root->visit(&outliner);
+    return std::move(outliner.out);
 }

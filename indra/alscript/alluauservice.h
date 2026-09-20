@@ -34,9 +34,10 @@
 
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
 // grid's definitions and asked about one script at a time: what is wrong
-// with it, what could go at a position, what is at one, and what a call
-// there takes. The documentation comes from the docs JSON beside the
-// definitions, keyed the way luau-lsp keys it.
+// with it, what could go at a position, what is at one, what a call there
+// takes, where a name is bound and used, and what the script declares.
+// The documentation comes from the docs JSON beside the definitions,
+// keyed the way luau-lsp keys it.
 //
 // The Luau headers stay behind the implementation, so nothing that includes
 // this pays for them. Not thread-safe: one of these belongs to one thread.
@@ -72,6 +73,12 @@ public:
     ALScriptHover hover(std::string_view source, S32 line, S32 column);
     // The call a position is inside, if any.
     ALScriptSignature signature(std::string_view source, S32 line, S32 column);
+    // The name at a position -- a local, a global, a field of something
+    // -- with where the script binds it and every place it stands.
+    ALScriptReferences references(std::string_view source, S32 line, S32 column);
+    // The script's own shape: what it binds at the top and the functions
+    // in it, each function's own one deeper.
+    std::vector<ALScriptOutlineEntry> outline(std::string_view source);
 
 private:
     struct Impl;
