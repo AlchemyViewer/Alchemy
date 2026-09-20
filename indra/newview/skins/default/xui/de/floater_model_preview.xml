@@ -140,24 +140,12 @@
 						Schritt 1: Detailstufe
 					</text>
 					<combo_box name="physics_lod_combo" tool_tip="Detailstufe für Physikform">
-						<combo_item name="choose_one">
-							Eine auswählen...
-						</combo_item>
-						<combo_item name="physics_high">
-							Hoch
-						</combo_item>
-						<combo_item name="physics_medium">
-							Mittel
-						</combo_item>
-						<combo_item name="physics_low">
-							Niedrig
-						</combo_item>
-						<combo_item name="physics_lowest">
-							Niedrigste
-						</combo_item>
-						<combo_item name="load_from_file">
-							Aus Datei
-						</combo_item>
+						<combo_item name="choose_one" label="Eine auswählen..."/>
+						<combo_item name="physics_high" label="Hoch"/>
+						<combo_item name="physics_medium" label="Mittel"/>
+						<combo_item name="physics_low" label="Niedrig"/>
+						<combo_item name="physics_lowest" label="Niedrigste"/>
+						<combo_item name="load_from_file" label="Aus Datei"/>
 					</combo_box>
 					<button label="Durchsuchen..." name="physics_browse"/>
 				</panel>
