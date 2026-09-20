@@ -28,6 +28,11 @@
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabSourceTip">The source this script was written as, before the preprocessor expanded it; read-only here</floater.string>
     <floater.string name="SourceTabName">[NAME] (source)</floater.string>
+    <floater.string name="OriginCompiler">Compiler</floater.string>
+    <floater.string name="OriginParser">Parser</floater.string>
+    <floater.string name="OriginTypes">Types</floater.string>
+    <floater.string name="OriginLint">Lint</floater.string>
+    <floater.string name="OriginDefinitions">Definitions</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
@@ -296,11 +301,12 @@
              layout="topleft"
              left="0"
              name="problems"
-             tool_tip="What the compiler said; choosing one goes to its line"
+             tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
              top="0"
              width="884">
                 <scroll_list.columns label="Line" name="line" width="70" />
                 <scroll_list.columns label="Level" name="level" width="80" />
+                <scroll_list.columns label="Source" name="source" width="90" />
                 <scroll_list.columns dynamic_width="true" label="Message" name="message" />
             </scroll_list>
         </layout_panel>

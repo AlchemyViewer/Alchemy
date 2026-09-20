@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptworkspace.h"
 #include "alstudiofloater.h"
@@ -47,11 +48,12 @@ class LLScrollListCtrl;
 // The scripting studio of doc/SCRIPT_STUDIO.md, as far as phase 1 takes it:
 // scripts from inventory and from objects open in tabs over code editors,
 // saved and compiled through the workspace, with the compiler's problems in
-// a pane that jumps to the line, the region's vocabulary colouring and
-// completing the text, and a script the preprocessor wrapped shown as the
-// code the server compiled with the author's source in a tab beside it.
-// Its regions fold and come out as any studio's do. Not yet: the explorer,
-// the output, the inspector, the analyzers' diagnostics.
+// a pane that jumps to the line, the region's vocabulary colouring,
+// completing and explaining the text, the analyzers checking it as it is
+// typed, and a script the preprocessor wrapped shown as the code the
+// server compiled with the author's source in a tab beside it. Its regions
+// fold and come out as any studio's do. Not yet: the explorer, the output,
+// the inspector.
 class ALFloaterScriptStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
@@ -98,7 +100,26 @@ private:
         // The envelope the asset came in, whose expanded code the editor
         // holds, and which a save wraps the code back in.
         std::optional<ALScriptEnvelope>            envelope;
+        // What the compiler said of the last save.
         std::vector<ALScriptWorkspace::Diagnostic> problems;
+        // What the analyzer said of the text at analysisVersion; when the
+        // next check is due, or zero; the version last asked about.
+        ALScriptProblems                           analysis;
+        U32                                        analysisVersion  = 0;
+        U32                                        requestedVersion = 0;
+        F64                                        analysisDue      = 0.0;
+        std::string                                definitionsError;
+        // Both, in the order the pane lists them.
+        struct Shown
+        {
+            S32         line      = 0;
+            S32         column    = 0;
+            bool        hasColumn = false;
+            std::string level;
+            std::string origin;
+            std::string message;
+        };
+        std::vector<Shown>                         shown;
         boost::signals2::scoped_connection         changed;
     };
     static constexpr size_t NONE = static_cast<size_t>(-1);
@@ -109,6 +130,7 @@ private:
     {
         std::string  text;
         std::string  detail;
+        std::string  tooltip;
         ALSyntaxKind kind = ALSyntaxKind::Text;
         bool         deprecated = false;
     };
@@ -123,7 +145,11 @@ private:
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
     void                      showSource(Doc& doc);
     const std::vector<Vocab>& vocabulary(bool lua);
-    void                      teachEditor(ALCodeEditor& editor, bool lua);
+    // The region's words for colouring and completing, and the analyzer
+    // behind completion, hover and signature help.
+    void                      teachEditor(Doc& doc);
+    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
+    void                      answered(const ALScriptAnalysis::Result& result);
     std::string               textToSave(const Doc& doc) const;
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
@@ -132,6 +158,17 @@ private:
     void compiled(const ALScriptWorkspace::CompileResult& result);
     void fillProblems(const Doc* doc);
     void onProblemSelected();
+
+    // The analyzers: a check is due a moment after the last keystroke,
+    // sent from draw, answered whenever the worker gets to it, and kept
+    // only if the text has not moved on.
+    void scheduleAnalysis(Doc& doc, bool now = false);
+    void pumpAnalysis();
+    void requestAnalysis(Doc& doc);
+    void analysed(const ALScriptAnalysis::Result& result);
+    // The marks, the squiggles and the pane, from the compiler's problems
+    // and the analyzer's together.
+    void refreshProblems(Doc& doc);
 
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
@@ -167,4 +204,5 @@ private:
     LLButton*                          mResetButton   = nullptr;
     LLButton*                          mSaveButton    = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
+    boost::signals2::scoped_connection mDefinitionsConnection;
 };

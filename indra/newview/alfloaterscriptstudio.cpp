@@ -30,6 +30,7 @@
 #include "altabstrip.h"
 #include "llagent.h"
 #include "lldate.h"
+#include "lltimer.h"
 #include "llsyntaxid.h"
 #include "llversioninfo.h"
 #include "llbutton.h"
@@ -51,6 +52,12 @@
 
 #include <algorithm>
 #include <fstream>
+
+namespace
+{
+    // How long after the last keystroke the analyzers are asked.
+    const F64 ANALYSIS_DELAY = 0.35;
+}
 
 namespace
 {
@@ -140,6 +147,20 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { compiled(result); });
+    // New definitions from the region: the analyzers reload, the words
+    // are rebuilt, and every script is checked again.
+    mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
+        ALScriptAnalysis::instance().definitionsChanged();
+        mVocabularyBuilt[0] = mVocabularyBuilt[1] = false;
+        for (std::unique_ptr<Doc>& doc : mDocs)
+        {
+            if (doc->loaded)
+            {
+                teachEditor(*doc);
+                scheduleAnalysis(*doc, true);
+            }
+        }
+    });
 
     loadState();
     refreshToolbar();
@@ -154,6 +175,7 @@ void ALFloaterScriptStudio::onClose(bool app_quitting)
 
 void ALFloaterScriptStudio::draw()
 {
+    pumpAnalysis();
     ALStudioFloater::draw();
 }
 
@@ -250,7 +272,11 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->name   = name.empty() ? getString("Untitled") : name;
     doc->editor = makeEditor(doc->id, true);
     doc->editor->setText(getString("Loading"));
-    doc->changed = doc->editor->onTextChanged([this]() { fillTabs(); });
+    Doc* raw     = doc.get();
+    doc->changed = doc->editor->onTextChanged([this, raw]() {
+        fillTabs();
+        scheduleAnalysis(*raw);
+    });
 
     mDocs.push_back(std::move(doc));
     activate(mDocs.size() - 1);
@@ -289,7 +315,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         doc.loaded = true;
         doc.editor->setSyntax(answer.language.lua ? "slua" : "lsl");
-        teachEditor(*doc.editor, answer.language.lua);
+        teachEditor(doc);
         // A script the preprocessor wrapped: the editor holds what the
         // server compiled, and the source goes in a tab of its own.
         doc.envelope = ALScriptEnvelope::parse(answer.text);
@@ -315,6 +341,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
+        scheduleAnalysis(doc, true);
     }
     fillTabs();
     if (index == mActive)
@@ -350,7 +377,7 @@ void ALFloaterScriptStudio::showSource(Doc& doc)
     source.name     = getString("SourceTabName", args);
     source.language = doc.language;
     source.editor->setSyntax(doc.language.lua ? "slua" : "lsl");
-    teachEditor(*source.editor, doc.language.lua);
+    teachEditor(source);
     source.editor->setText(doc.envelope->source);
 }
 
@@ -444,6 +471,7 @@ const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabula
             Vocab       word;
             word.text       = entry->first;
             word.kind       = kind;
+            word.tooltip    = attrs.get("tooltip").asString();
             word.deprecated = attrs.has("deprecated") && (attrs["deprecated"].asBoolean() || attrs["deprecated"].asString() == "true");
             switch (kind)
             {
@@ -474,9 +502,11 @@ const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabula
     return out;
 }
 
-void ALFloaterScriptStudio::teachEditor(ALCodeEditor& editor, bool lua)
+void ALFloaterScriptStudio::teachEditor(Doc& doc)
 {
-    const std::vector<Vocab>& words = vocabulary(lua);
+    ALCodeEditor&             editor = *doc.editor;
+    const bool                lua    = doc.language.lua;
+    const std::vector<Vocab>& words  = vocabulary(lua);
     std::vector<std::string>  functions, events, types, controls, constants, deprecated;
     for (const Vocab& word : words)
     {
@@ -504,6 +534,36 @@ void ALFloaterScriptStudio::teachEditor(ALCodeEditor& editor, bool lua)
     tables.set("deprecated", std::move(deprecated));
     editor.highlighter().wordsChanged();
 
+    // The analyzer answers what the vocabulary cannot: the script's own
+    // symbols, the types of things, what a call takes.
+    Doc* raw = &doc;
+    editor.setCompletionRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Complete, at); });
+    editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
+    editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
+    editor.setHoverProvider([this, lua](const ALTextPos&, std::string_view word, std::string& text) {
+        const std::vector<Vocab>& words = vocabulary(lua);
+        // A member of ll or a local is the analyzer's to explain.
+        if (lua)
+        {
+            return false;
+        }
+        const auto it = std::lower_bound(words.begin(), words.end(), word,
+                                         [](const Vocab& v, std::string_view w) { return v.text < w; });
+        if (it == words.end() || it->text != word)
+        {
+            return false;
+        }
+        text = it->detail.empty() ? it->text : it->detail;
+        if (!it->tooltip.empty())
+        {
+            text += "\n" + it->tooltip;
+        }
+        if (it->deprecated)
+        {
+            text += "\n(deprecated)";
+        }
+        return true;
+    });
     editor.setCompletionProvider([this, lua](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
         for (const Vocab& word : vocabulary(lua))
         {
@@ -526,6 +586,135 @@ void ALFloaterScriptStudio::teachEditor(ALCodeEditor& editor, bool lua)
             }
         }
     });
+}
+
+void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)
+{
+    if (!doc.loaded)
+    {
+        return;
+    }
+    ALScriptAnalysis::Request request;
+    request.kind    = kind;
+    request.id      = doc.id;
+    request.version = doc.editor->document().version();
+    request.lua     = doc.language.lua;
+    request.mono    = doc.language.compileTarget != "lsl2";
+    request.text    = doc.editor->text();
+    request.line    = at.line;
+    request.column  = at.column;
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptAnalysis::instance().ask(std::move(request), [handle](const ALScriptAnalysis::Result& result) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->answered(result);
+        }
+    });
+}
+
+namespace
+{
+    ALSyntaxKind syntaxKindOf(ALScriptSymbolKind kind)
+    {
+        switch (kind)
+        {
+            case ALScriptSymbolKind::Keyword:   return ALSyntaxKind::Keyword;
+            case ALScriptSymbolKind::Variable:  return ALSyntaxKind::Variable;
+            case ALScriptSymbolKind::Parameter: return ALSyntaxKind::Parameter;
+            case ALScriptSymbolKind::Function:  return ALSyntaxKind::Function;
+            case ALScriptSymbolKind::Field:     return ALSyntaxKind::Property;
+            case ALScriptSymbolKind::Type:      return ALSyntaxKind::Type;
+            case ALScriptSymbolKind::Constant:  return ALSyntaxKind::Constant;
+            case ALScriptSymbolKind::Event:     return ALSyntaxKind::Event;
+            case ALScriptSymbolKind::State:     return ALSyntaxKind::Label;
+            case ALScriptSymbolKind::Label:     return ALSyntaxKind::Label;
+            default:                            return ALSyntaxKind::Text;
+        }
+    }
+
+    // Each parameter's place in the label, found in order.
+    std::vector<std::pair<S32, S32>> spansIn(const std::string& label, const std::vector<std::string>& parameters)
+    {
+        std::vector<std::pair<S32, S32>> spans;
+        size_t                           from = 0;
+        for (const std::string& parameter : parameters)
+        {
+            const size_t at = parameter.empty() ? std::string::npos : label.find(parameter, from);
+            if (at == std::string::npos)
+            {
+                spans.emplace_back(0, 0);
+                continue;
+            }
+            spans.emplace_back(static_cast<S32>(at), static_cast<S32>(at + parameter.size()));
+            from = at + parameter.size();
+        }
+        return spans;
+    }
+}
+
+void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
+{
+    const size_t index = indexOf(result.id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc&            doc = *mDocs[index];
+    const ALTextPos at(result.line, result.column);
+    switch (result.kind)
+    {
+        case ALScriptAnalysis::Kind::Check:
+            analysed(result);
+            break;
+        case ALScriptAnalysis::Kind::Complete:
+        {
+            std::vector<ALCodeEditor::Completion> more;
+            more.reserve(result.completions.size());
+            for (const ALScriptCompletion& c : result.completions)
+            {
+                ALCodeEditor::Completion completion;
+                completion.text   = c.text;
+                completion.detail = c.detail;
+                completion.kind   = c.deprecated ? ALSyntaxKind::Deprecated : syntaxKindOf(c.kind);
+                more.push_back(std::move(completion));
+            }
+            doc.editor->supplyCompletions(at, std::move(more));
+            break;
+        }
+        case ALScriptAnalysis::Kind::Hover:
+        {
+            if (!result.hover.found)
+            {
+                break;
+            }
+            std::string text = result.hover.label;
+            if (!result.hover.documentation.empty())
+            {
+                text += "\n" + result.hover.documentation;
+            }
+            if (!result.hover.link.empty())
+            {
+                text += "\n" + result.hover.link;
+            }
+            doc.editor->supplyHover(at, text);
+            break;
+        }
+        case ALScriptAnalysis::Kind::Signature:
+        {
+            if (!result.signature.found)
+            {
+                doc.editor->hideSignature();
+                break;
+            }
+            ALCodeEditor::Signature signature;
+            signature.label         = result.signature.label;
+            signature.parameters    = spansIn(signature.label, result.signature.parameters);
+            signature.active        = result.signature.active;
+            signature.documentation = result.signature.documentation;
+            doc.editor->showSignature(at, std::move(signature));
+            break;
+        }
+    }
 }
 
 std::string ALFloaterScriptStudio::textToSave(const Doc& doc) const
@@ -638,8 +827,7 @@ void ALFloaterScriptStudio::save(Doc& doc)
     }
     doc.saving = true;
     doc.problems.clear();
-    doc.editor->clearMarks();
-    doc.editor->setDecorations({});
+    refreshProblems(doc);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     setStatus(getString("Saving", args));
@@ -682,24 +870,7 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
         doc.assetId = result.newAssetId;
     }
     doc.problems = result.diagnostics;
-
-    std::vector<ALCodeEditor::Decoration> decorations;
-    static const LLUIColor error_color = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
-    for (const ALScriptWorkspace::Diagnostic& problem : doc.problems)
-    {
-        const bool error = problem.level != "WARNING";
-        const ALCodeEditor::Mark mark = error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning;
-        if (doc.editor->markAt(problem.line) < mark)
-        {
-            doc.editor->setMark(problem.line, mark);
-        }
-        ALCodeEditor::Decoration decoration;
-        const ALTextPos at(problem.line, problem.hasColumn ? problem.column : 0);
-        decoration.range = ALTextRange(doc.editor->document().clamp(at), doc.editor->document().nextWord(at));
-        decoration.color = error_color.get();
-        decorations.push_back(std::move(decoration));
-    }
-    doc.editor->setDecorations(std::move(decorations));
+    refreshProblems(doc);
 
     if (result.success)
     {
@@ -712,13 +883,136 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     }
     if (index == mActive)
     {
-        fillProblems(&doc);
         refreshToolbar();
     }
     fillTabs();
     if (doc.closeAfterSave)
     {
         letGoOf(index);
+    }
+}
+
+// --- the analyzers -------------------------------------------------------------
+
+void ALFloaterScriptStudio::scheduleAnalysis(Doc& doc, bool now)
+{
+    if (!doc.loaded || doc.sourceView)
+    {
+        return;
+    }
+    doc.analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
+}
+
+void ALFloaterScriptStudio::pumpAnalysis()
+{
+    const F64 now = LLTimer::getTotalSeconds();
+    for (std::unique_ptr<Doc>& doc : mDocs)
+    {
+        if (doc->analysisDue > 0.0 && now >= doc->analysisDue)
+        {
+            doc->analysisDue = 0.0;
+            requestAnalysis(*doc);
+        }
+    }
+}
+
+void ALFloaterScriptStudio::requestAnalysis(Doc& doc)
+{
+    doc.requestedVersion = doc.editor->document().version();
+    askAnalyzer(doc, ALScriptAnalysis::Kind::Check, ALTextPos());
+}
+
+void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
+{
+    const size_t index = indexOf(result.id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    // Of a text that has moved on: the check of the newer text follows.
+    if (result.version != doc.editor->document().version())
+    {
+        return;
+    }
+    doc.analysis         = result.problems;
+    doc.analysisVersion  = result.version;
+    doc.definitionsError = result.definitionsError;
+    refreshProblems(doc);
+}
+
+void ALFloaterScriptStudio::refreshProblems(Doc& doc)
+{
+    static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
+    static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
+    static const LLUIColor note_color    = LLUIColorTable::instance().getColor("CodeMarkNote", LLColor4::blue);
+
+    doc.shown.clear();
+    doc.editor->clearMarks();
+    std::vector<ALCodeEditor::Decoration> decorations;
+    const ALTextDocument&                 text = doc.editor->document();
+
+    auto add = [&](S32 line, S32 column, bool has_column, S32 end_line, S32 end_column, ALCodeEditor::Mark mark,
+                   const std::string& level, const std::string& origin, const std::string& message) {
+        Doc::Shown row;
+        row.line      = line;
+        row.column    = column;
+        row.hasColumn = has_column;
+        row.level     = level;
+        row.origin    = origin;
+        row.message   = message;
+        doc.shown.push_back(std::move(row));
+        if (doc.editor->markAt(line) < mark)
+        {
+            doc.editor->setMark(line, mark);
+        }
+        ALCodeEditor::Decoration decoration;
+        const ALTextPos begin = text.clamp(ALTextPos(line, has_column ? column : 0));
+        ALTextPos       end   = text.clamp(ALTextPos(end_line, end_column));
+        if (end <= begin)
+        {
+            end = text.nextWord(begin);
+        }
+        decoration.range   = ALTextRange(begin, end);
+        decoration.color   = (mark == ALCodeEditor::Mark::Error ? error_color : mark == ALCodeEditor::Mark::Warning ? warning_color : note_color).get();
+        decoration.message = origin + ": " + message;
+        decorations.push_back(std::move(decoration));
+    };
+
+    for (const ALScriptWorkspace::Diagnostic& problem : doc.problems)
+    {
+        const bool error = problem.level != "WARNING";
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column,
+            error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning, problem.level, getString("OriginCompiler"), problem.message);
+    }
+    for (const ALScriptProblem& problem : doc.analysis)
+    {
+        const ALCodeEditor::Mark mark = problem.severity == ALScriptProblem::Severity::Error     ? ALCodeEditor::Mark::Error
+                                        : problem.severity == ALScriptProblem::Severity::Warning ? ALCodeEditor::Mark::Warning
+                                                                                                 : ALCodeEditor::Mark::Note;
+        const std::string level  = problem.severity == ALScriptProblem::Severity::Error     ? "ERROR"
+                                   : problem.severity == ALScriptProblem::Severity::Warning ? "WARNING"
+                                                                                            : "NOTE";
+        const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? getString("OriginParser")
+                                   : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
+                                                                                      : getString("OriginLint");
+        const std::string message = problem.code.empty() ? problem.message : problem.message + " [" + problem.code + "]";
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level, origin, message);
+    }
+    if (!doc.definitionsError.empty())
+    {
+        Doc::Shown row;
+        row.level   = "NOTE";
+        row.origin  = getString("OriginDefinitions");
+        row.message = doc.definitionsError;
+        doc.shown.push_back(std::move(row));
+    }
+    std::stable_sort(doc.shown.begin(), doc.shown.end(),
+                     [](const Doc::Shown& a, const Doc::Shown& b) { return a.line != b.line ? a.line < b.line : a.column < b.column; });
+    doc.editor->setDecorations(std::move(decorations));
+    if (&doc == active())
+    {
+        fillProblems(&doc);
     }
 }
 
@@ -729,22 +1023,25 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     {
         return;
     }
-    for (size_t i = 0; i < doc->problems.size(); ++i)
+    for (size_t i = 0; i < doc->shown.size(); ++i)
     {
-        const ALScriptWorkspace::Diagnostic& problem = doc->problems[i];
-        LLSD                                 row;
-        row["value"]                    = static_cast<S32>(i);
-        row["columns"][0]["column"]     = "line";
-        row["columns"][0]["value"]      = problem.hasColumn ? llformat("%d:%d", problem.line + 1, problem.column + 1) : llformat("%d", problem.line + 1);
-        row["columns"][1]["column"]     = "level";
-        row["columns"][1]["value"]      = problem.level;
-        row["columns"][2]["column"]     = "message";
-        row["columns"][2]["value"]      = problem.message;
+        const Doc::Shown& problem = doc->shown[i];
+        LLSD              row;
+        row["value"]                = static_cast<S32>(i);
+        row["columns"][0]["column"] = "line";
+        row["columns"][0]["value"]  = problem.hasColumn ? llformat("%d:%d", problem.line + 1, problem.column + 1) : llformat("%d", problem.line + 1);
+        row["columns"][1]["column"] = "level";
+        row["columns"][1]["value"]  = problem.level;
+        row["columns"][2]["column"] = "source";
+        row["columns"][2]["value"]  = problem.origin;
+        row["columns"][3]["column"] = "message";
+        row["columns"][3]["value"]  = problem.message;
         mProblems->addElement(row);
     }
-    if (doc->problems.empty())
+    if (doc->shown.empty())
     {
-        mProblems->setCommentText(doc->loaded && !doc->editor->isDirty() ? getString("NoProblems") : std::string());
+        const bool current = doc->loaded && doc->analysisVersion == doc->editor->document().version();
+        mProblems->setCommentText(current ? getString("NoProblems") : std::string());
     }
 }
 
@@ -757,11 +1054,11 @@ void ALFloaterScriptStudio::onProblemSelected()
         return;
     }
     const size_t index = static_cast<size_t>(item->getValue().asInteger());
-    if (index >= doc->problems.size())
+    if (index >= doc->shown.size())
     {
         return;
     }
-    const ALScriptWorkspace::Diagnostic& problem = doc->problems[index];
+    const Doc::Shown& problem = doc->shown[index];
     doc->editor->setCaret(ALTextPos(problem.line, problem.hasColumn ? problem.column : 0));
     doc->editor->setFocus(true);
 }
