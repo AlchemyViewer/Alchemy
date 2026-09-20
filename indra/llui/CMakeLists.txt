@@ -132,6 +132,7 @@ target_sources(
     alstudiofloater.cpp
     alcodeeditor.cpp
     alkeymap.cpp
+    aloutputlist.cpp
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
     altabstrip.cpp
@@ -306,6 +307,7 @@ target_sources(
         alstringmatch.h
         alcodeeditor.h
         alkeymap.h
+        aloutputlist.h
         alsyntaxgrammar.h
         alsyntaxhighlighter.h
         altabstrip.h
@@ -484,6 +486,7 @@ if(AL_BUILD_TESTS)
     altextlayout
     altextview
     alcodeeditor
+    aloutputlist
   )
     al_add_test(
       ${test}
