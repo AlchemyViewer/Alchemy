@@ -230,4 +230,85 @@ namespace tut
         documents.erase(documents.begin());
         ensure("no good file is not", !table.load(documents, nullptr, "user.xml"));
     }
+
+    // Putting a colour back removes the user's entry rather than copying
+    // the skin's value into it, and every handle taken before or during
+    // the edit reads what is in force; a colour only the user made goes
+    // away with it, its handles reading magenta until it is set again.
+    template<> template<>
+    void lluicolortable_object::test<6>()
+    {
+        ensure("loads", load({ "<color name=\"T6Base\" value=\"1 0 0 1\"/>" }));
+        auto& table = LLUIColorTable::instance();
+        const LLUIColor before = table.getColor("T6Base");
+        table.setColor("T6Base", LLColor4::blue);
+        const LLUIColor during = table.getColor("T6Base");
+        table.resetToDefault("T6Base");
+        ensure("reset removes the override", !has(table.getUserColors(), "T6Base"));
+        ensure("old handles read the default", before.get() == LLColor4::red && during.get() == LLColor4::red);
+        table.setColor("T6Base", LLColor4::green);
+        ensure("both handles follow another edit", before.get() == LLColor4::green && during.get() == LLColor4::green);
+        table.resetToDefault("T6Base");
+        table.setColor("T6New", LLColor4::blue);
+        const LLUIColor added = table.getColor("T6New");
+        table.resetToDefault("T6New");
+        ensure("reset removes a new user colour too", !has(table.getUserColors(), "T6New"));
+        ensure("the removed colour's handle stays valid", added.get() == LLColor4::magenta);
+        ensure("the removed name no longer exists", !table.colorExists("T6New"));
+        ensure("fresh lookups use the supplied fallback", table.getColor("T6New", LLColor4::yellow).get() == LLColor4::yellow);
+        ensure_does_not_contain("the removed colour is not saved", written(), "T6New");
+        table.setColor("T6New", LLColor4::green);
+        ensure("redo updates the existing handle", added.get() == LLColor4::green);
+    }
+
+    // A colour the skins declare as a reference follows its target when the
+    // user sets the target, at runtime and from the user's document, and
+    // goes back with it; a colour the user set for itself does not.
+    template<> template<>
+    void lluicolortable_object::test<7>()
+    {
+        ensure("loads", load({ "<color name=\"T7Accent\" value=\"1 0 0 1\"/>\n"
+                               "<color name=\"T7Link\" reference=\"T7Accent\"/>\n"
+                               "<color name=\"T7Chain\" reference=\"T7Link\"/>\n"
+                               "<color name=\"T7Own\" reference=\"T7Accent\"/>\n" }));
+        auto& table = LLUIColorTable::instance();
+        const LLUIColor link = table.getColor("T7Link");
+        const LLUIColor chain = table.getColor("T7Chain");
+
+        table.setColor("T7Own", LLColor4::green);
+        table.setColor("T7Accent", LLColor4::blue);
+        ensure("a reference follows the accent it names", link.get() == LLColor4::blue);
+        ensure("and a reference to that reference", chain.get() == LLColor4::blue);
+        ensure("a colour the user set keeps it", is("T7Own", 0, 1, 0));
+        ensure("the references stay default", table.isDefault("T7Link") && table.isDefault("T7Chain"));
+        ensure_does_not_contain("and are not written as the user's", written(), "T7Link");
+
+        table.setColor("T7Link", LLColor4::yellow);
+        ensure("a chain takes the nearest colour the user set", chain.get() == LLColor4::yellow);
+        table.resetToDefault("T7Link");
+        ensure("and follows the accent again once that is reset", chain.get() == LLColor4::blue);
+        table.resetToDefault("T7Accent");
+        ensure("resetting the accent takes its references back", link.get() == LLColor4::red && chain.get() == LLColor4::red);
+
+        ensure("loads with a user accent", load({ "<color name=\"T7Accent\" value=\"1 0 0 1\"/>\n"
+                                                   "<color name=\"T7Link\" reference=\"T7Accent\"/>\n" },
+                                                 "<color name=\"T7Accent\" value=\"0 0 1 1\"/>\n"));
+        ensure("a reference follows the user's saved accent", is("T7Link", 0, 0, 1));
+    }
+
+    // The generation moves with every change and not otherwise.
+    template<> template<>
+    void lluicolortable_object::test<8>()
+    {
+        ensure("loads", load({ "<color name=\"T8Base\" value=\"1 0 0 1\"/>" }));
+        auto& table = LLUIColorTable::instance();
+        const U32 loaded = table.generation();
+        table.resetToDefault("T8Base");
+        ensure_equals("putting back what was never set moves nothing", table.generation(), loaded);
+        table.setColor("T8Base", LLColor4::blue);
+        ensure("a change moves it", table.generation() > loaded);
+        const U32 set = table.generation();
+        table.resetToDefault("T8Base");
+        ensure("and so does putting it back", table.generation() > set);
+    }
 }

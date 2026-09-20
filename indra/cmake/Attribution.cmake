@@ -86,7 +86,11 @@ function(al_holder_line copyright out)
   set(line "")
   if(lines)
     list(GET lines 0 line)
-    string(REGEX REPLACE "^[ \t/*#-]*(SPDX-FileCopyrightText:[ \t]*)?" "" line "${line}")
+    # The prefix may be absent, and string(REGEX REPLACE) rejects an empty
+    # match before CMake 4.1; a capture takes the remainder either way.
+    if(line MATCHES "^[ \t/*#-]*(SPDX-FileCopyrightText:[ \t]*)?(.*)$")
+      set(line "${CMAKE_MATCH_2}")
+    endif()
     string(REGEX REPLACE "<br>[ \t]*$" "" line "${line}")
     string(STRIP "${line}" line)
   endif()

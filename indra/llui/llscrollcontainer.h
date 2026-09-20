@@ -110,6 +110,9 @@ public:
     // is not always what there was to scroll then.
     void            setDocPosVertical(S32 pos) { mScrollbar[VERTICAL]->setDocPos(pos); }
     S32             getDocPosHorizontal() const { return mScrollbar[HORIZONTAL]->getDocPos(); }
+    void            setDocPosHorizontal(S32 pos) { mScrollbar[HORIZONTAL]->setDocPos(pos); }
+    // What is scrolled, for a caller working out where a point of it is.
+    LLView*         getScrolledView() const { return mScrolledView; }
     S32             getBorderWidth() const;
 
     // LLView functionality
@@ -126,6 +129,9 @@ public:
 
     virtual void    draw() override;
     virtual bool    addChild(LLView* view, S32 tab_group = 0) override;
+    // The scrolled view taken out is no longer what is scrolled: the next
+    // one added is, which is how a container shows another view in turn.
+    void            removeChild(LLView* view) override;
 
     bool canAutoScroll(S32 x, S32 y);
     bool autoScroll(S32 x, S32 y);

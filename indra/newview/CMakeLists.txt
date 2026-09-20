@@ -162,8 +162,10 @@ if(AL_BUILD_VIEWER)
     alfloaterwebprofile.cpp
     alfloaterxuilibrary.cpp
     alfloaterxuistudio.cpp
+    alviewcapture.cpp
     algradehistory.cpp
     allegacynotificationwellwindow.cpp
+    allightboxdirectory.cpp
     almotionpredictor.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
@@ -320,7 +322,6 @@ if(AL_BUILD_VIEWER)
     llfloaterassetrecovery.cpp
     llfloateravatarwelcomepack.cpp
     llfloaterbvhpreview.cpp
-    llfloateraddpaymentmethod.cpp
     llfloaterauction.cpp
     llfloaterautoreplacesettings.cpp
     llfloateravatarpicker.cpp
@@ -949,8 +950,10 @@ if(AL_BUILD_VIEWER)
     alfloaterwebprofile.h
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
+    alviewcapture.h
     algradehistory.h
     allegacynotificationwellwindow.h
+    allightboxdirectory.h
     almotionpredictor.h
     alobjectproperties.h
     alagentlocationformat.h
@@ -1110,7 +1113,6 @@ if(AL_BUILD_VIEWER)
     llfloaterassetrecovery.h
     llfloateravatarwelcomepack.h
     llfloaterbvhpreview.h
-    llfloateraddpaymentmethod.h
     llfloaterauction.h
     llfloaterautoreplacesettings.h
     llfloateravatarpicker.h

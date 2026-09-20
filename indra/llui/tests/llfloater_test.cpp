@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "../alxuidiagnostics.h"
 #include "../llfloater.h"
 #include "../lluictrlfactory.h"
 
@@ -131,6 +132,76 @@ namespace tut
         ensure("it builds from the tree", f->buildFromXML(root, "floater_of_no_file.xml"));
         ensure_equals("as wide as the tree says", f->getRect().getWidth(), 123);
         ensure_equals("and titled what it says", f->getTitle(), std::string("Held in memory"));
+
+        fv.reset();
+        gFloaterView = nullptr;
+    }
+
+    // A floater's strings are parameters written as elements, and every
+    // file has several: the parser reads each into the block and takes it
+    // out of the tree so the factory, which builds what is left as child
+    // widgets, never sees it. Taking one out is a removal from a run of
+    // same-named siblings, which has to work from anywhere in the run --
+    // it once worked only from wherever multimap::find happened to land,
+    // and the string it missed reached the factory as a widget it could
+    // not build. Panel strings under a nested panel are the same case one
+    // level down.
+    template<> template<>
+    void llfloater_object::test<3>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        std::unique_ptr<LLFloaterView> fv(floaterView());
+        gFloaterView = fv.get();
+
+        const std::string xml =
+            "<floater name=\"strings\" width=\"200\" height=\"100\">"
+            "<floater.string name=\"a\">A</floater.string>"
+            "<string name=\"b\">B</string>"
+            "<string name=\"c\">C</string>"
+            "<string name=\"d\">D</string>"
+            "<panel name=\"inner\" width=\"100\" height=\"50\">"
+            "<panel.string name=\"e\">E</panel.string>"
+            "<panel.string name=\"f\">F</panel.string>"
+            "<panel.string name=\"g\">G</panel.string>"
+            "</panel>"
+            "</floater>";
+        LLXMLNodePtr root;
+        ensure("the tree parses", LLXMLNode::parseBuffer(xml.data(), (U32)xml.size(), root));
+
+        LLFloater::Params fp;
+        fp.name = "shell";
+        fp.rect = LLRect(0, 10, 10, 0);
+        TestFloater* f = new TestFloater(fp);
+
+        ALXUIDiagnostics sink;
+        ensure("it builds", f->buildFromXML(root, "floater_of_no_file.xml"));
+        ensure_equals("nothing reached the factory that it could not build",
+                      sink.count(ALXUIDiagnostics::Kind::CreateFailed), (size_t)0);
+
+        for (const char* name : { "a", "b", "c", "d" })
+        {
+            std::string upper(name);
+            upper[0] = (char)toupper(upper[0]);
+            ensure_equals(std::string("floater string ") + name, f->getString(name), upper);
+        }
+        LLPanel* inner = f->findChild<LLPanel>("inner");
+        ensure("the panel was built", inner != nullptr);
+        for (const char* name : { "e", "f", "g" })
+        {
+            std::string upper(name);
+            upper[0] = (char)toupper(upper[0]);
+            ensure_equals(std::string("panel string ") + name, inner->getString(name), upper);
+        }
+
+        // The strings were taken out of the tree; the panel is what is left.
+        ensure_equals("one child left under the floater", root->getChildCount(), 1u);
+        LLXMLNodePtr panel_node;
+        ensure("and it is the panel", root->getChild("panel", panel_node));
+        ensure_equals("with nothing left under it", panel_node->getChildCount(), 0u);
 
         fv.reset();
         gFloaterView = nullptr;

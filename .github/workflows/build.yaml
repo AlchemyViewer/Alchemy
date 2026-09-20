@@ -169,11 +169,11 @@ jobs:
         include:
           # Linux on arm64: NEON is a first-class target, and this is the
           # one row where GCC compiles the SIMD layer for it.
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-26.04-arm
             configuration: release
             arch: arm64
             build_variant: Viewer
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-26.04-arm
             configuration: release
             arch: arm64
             build_variant: Tests
@@ -209,7 +209,7 @@ jobs:
       # Linux runner gets one from Mesa's llvmpipe through SDL's offscreen
       # driver; the Windows runner has no GPU driver, and macOS is unproven,
       # so they build those suites and register them disabled.
-      AL_ENABLE_GL_TESTS: ${{ runner.os == 'Linux' }}
+      AL_ENABLE_GL_TESTS: ${{ startsWith(matrix.runner, 'ubuntu-') }}
       LIBGL_ALWAYS_SOFTWARE: 1
       # Build Config
       BUILD_ARCH: ${{ matrix.arch }}
@@ -232,8 +232,8 @@ jobs:
       # vcpkg Setup
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_USERNAME: ${{ github.repository_owner }}
-      VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+      # VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+      VCPKG_BINARY_SOURCES: "clear;default,readwrite"
     steps:
       - name: Linux Dependency Install and Disk Cleanup
         if: runner.os == 'Linux'
@@ -303,33 +303,63 @@ jobs:
         run: |
           ./vcpkg/bootstrap-vcpkg.sh
 
-      - name: Set up vcpkg nuget caching
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]
-          then
-            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              sources add \
-              -Source "${{ env.VCPKG_FEED_URL }}" \
-              -StorePasswordInClearText \
-              -Name GitHubPackages \
-              -UserName "${{ env.VCPKG_USERNAME }}" \
-              -Password "${{ secrets.GITHUB_TOKEN }}"
-            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              setapikey "${{ secrets.GITHUB_TOKEN }}" \
-              -Source "${{ env.VCPKG_FEED_URL }}"
-          else
-            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              sources add \
-              -Source "${{ env.VCPKG_FEED_URL }}" \
-              -StorePasswordInClearText \
-              -Name GitHubPackages \
-              -UserName "${{ env.VCPKG_USERNAME }}" \
-              -Password "${{ secrets.GITHUB_TOKEN }}"
-            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
-              setapikey "${{ secrets.GITHUB_TOKEN }}" \
-              -Source "${{ env.VCPKG_FEED_URL }}"
-          fi
+      - name: Install AWS CLI on macOS
+        if: >-
+          vars.VCPKG_R2_ENABLED == 'true' && runner.os == 'macOS' &&
+          ((github.ref_protected && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        run: brew install awscli
+
+      - name: Configure R2 binary cache for trusted builds
+        if: vars.VCPKG_R2_ENABLED == 'true' && github.ref_protected && github.event_name != 'pull_request'
+        env:
+          R2_CACHE_MODE: readwrite
+          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
+        run: python scripts/vcpkg/configure_r2_cache.py
+
+      - name: Configure R2 binary cache for same-repository PRs
+        if: >-
+          vars.VCPKG_R2_ENABLED == 'true' && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          # Temporary cache population test; restore read mode and reader secrets afterward.
+          R2_CACHE_MODE: readwrite
+          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
+        run: python scripts/vcpkg/configure_r2_cache.py
+
+      # - name: Set up vcpkg nuget caching
+      #   shell: bash
+      #   run: |
+      #     if [[ "$RUNNER_OS" == "Windows" ]]
+      #     then
+      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         sources add \
+      #         -Source "${{ env.VCPKG_FEED_URL }}" \
+      #         -StorePasswordInClearText \
+      #         -Name GitHubPackages \
+      #         -UserName "${{ env.VCPKG_USERNAME }}" \
+      #         -Password "${{ secrets.GITHUB_TOKEN }}"
+      #       $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
+      #         -Source "${{ env.VCPKG_FEED_URL }}"
+      #     else
+      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         sources add \
+      #         -Source "${{ env.VCPKG_FEED_URL }}" \
+      #         -StorePasswordInClearText \
+      #         -Name GitHubPackages \
+      #         -UserName "${{ env.VCPKG_USERNAME }}" \
+      #         -Password "${{ secrets.GITHUB_TOKEN }}"
+      #       mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
+      #         setapikey "${{ secrets.GITHUB_TOKEN }}" \
+      #         -Source "${{ env.VCPKG_FEED_URL }}"
+      #     fi
 
       - name: Cache Rust Dependencies
         uses: actions/cache@v6
@@ -361,17 +391,17 @@ jobs:
           SIGNING=()
           case "$RUNNER_OS" in
             Windows)
-              cmake_preset_name="vs2026$cmake_preset_postfix"
+              cmake_preset_name="vs2026${cmake_preset_postfix}-fullopt"
               build_directory="build-Windows-$cmake_preset_name"
               vcpkg_triplet="x64-windows-alchemy-avx2-release"
               ;;
             macOS)
-              cmake_preset_name="ninja$cmake_preset_postfix-$BUILD_ARCH"
+              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt-$BUILD_ARCH"
               build_directory="build-Darwin-$cmake_preset_name"
               vcpkg_triplet="$BUILD_ARCH-osx-alchemy-release"
               ;;
             Linux)
-              cmake_preset_name="ninja$cmake_preset_postfix"
+              cmake_preset_name="ninja${cmake_preset_postfix}-fullopt"
               build_directory="build-Linux-$cmake_preset_name"
               if [[ "$BUILD_ARCH" == "arm64" ]]
               then

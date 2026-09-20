@@ -98,9 +98,9 @@ public:
     //
     // Main application logic
     //
-    virtual bool init();            // Override to do application initialization
-    virtual bool cleanup();         // Override to do application cleanup
-    virtual bool frame(); // Override for application body logic
+    bool init() override;            // Override to do application initialization
+    bool cleanup() override;         // Override to do application cleanup
+    bool frame() override; // Override for application body logic
 
     // Application control
     void flushLFSIO(); // waits for lfs transfers to complete
@@ -286,8 +286,6 @@ public:
     // Note: mQuitRequested can be aborted by user.
     void outOfMemorySoftQuit();
 
-    virtual void setPermitOSHibernation(bool permit);
-
 #ifdef LL_DISCORD
     static void initDiscordSocial();
     static void updateDiscordActivity();
@@ -304,14 +302,6 @@ protected:
     virtual bool initSLURLHandler();
     virtual bool sendURLToOtherInstance(const std::string& url);
 
-    typedef enum
-    {
-        LL_HIBERNATE_MODE_DEFAULT = 0, // Use the platform's default behavior.
-        LL_HIBERNATE_MODE_PREVENT = 1,
-        LL_HIBERNATE_MODE_PREVENT_SCREEN = 2,
-    } eHibernationMode;
-    virtual void setOSHibernationMode(eHibernationMode mode);
-
     virtual bool initParseCommandLine(LLCommandLineParser& clp)
         { return true; } // Allow platforms to specify the command line args.
 
@@ -319,7 +309,7 @@ protected:
 
     virtual bool meetsRequirementsForMaximizedStart(); // Used on first login to decide to launch maximized
 
-    virtual void sendOutOfDiskSpaceNotification();
+    void sendOutOfDiskSpaceNotification() override;
 
 protected:
 
@@ -416,9 +406,6 @@ private:
     LLAppCoreHttp mAppCoreHttp;
 
     bool mIsFirstRun;
-
-    eHibernationMode mCurrentHibernationMode = LL_HIBERNATE_MODE_DEFAULT;
-    boost::signals2::scoped_connection mOSHibernationModeChangeConnection;
 };
 
 // Globals with external linkage. From viewer.h

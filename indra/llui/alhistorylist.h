@@ -91,8 +91,11 @@ public:
     }
 
     // The step now selected, asked for as the present: what a double click
-    // does, and what a caller with a key bound to it calls.
+    // does, what Return does while the list has the keyboard, and what a
+    // caller with another key bound to it calls.
     void goToSelected();
+
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     // A row selected, by its index into the steps: for a caller that shows
     // the element a step was about while it is pointed at.

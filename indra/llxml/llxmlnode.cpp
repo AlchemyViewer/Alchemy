@@ -161,8 +161,12 @@ bool LLXMLNode::removeChild(LLXMLNode *target_child)
     }
     else if (mChildren.notNull())
     {
-        LLXMLChildList::iterator children_itr = mChildren->map.find(target_child->mName);
-        while (children_itr != mChildren->map.end())
+        // Siblings share names, so the walk must begin at the first entry
+        // under this one, and multimap::find promises only some entry with
+        // the key: libc++ 22 returns whichever the tree descent reaches, so
+        // a walk from there can start past the target and miss it.
+        auto [children_itr, children_end] = mChildren->map.equal_range(target_child->mName);
+        for (; children_itr != children_end; ++children_itr)
         {
             if (target_child == children_itr->second)
             {
@@ -189,14 +193,6 @@ bool LLXMLNode::removeChild(LLXMLNode *target_child)
                     mChildren = nullptr;
                 }
                 return true;
-            }
-            else if (children_itr->first != target_child->mName)
-            {
-                break;
-            }
-            else
-            {
-                ++children_itr;
             }
         }
     }
@@ -937,8 +933,11 @@ bool LLXMLNode::getChild(const LLStringTableEntry* name, LLXMLNodePtr& node, boo
 {
     if (mChildren.notNull())
     {
-        LLXMLChildList::const_iterator child_itr = mChildren->map.find(name);
-        if (child_itr != mChildren->map.end())
+        // The first child of the name in document order: equal keys sit in
+        // insertion order, and lower_bound is the front of the run where
+        // find would land anywhere in it.
+        LLXMLChildList::const_iterator child_itr = mChildren->map.lower_bound(name);
+        if (child_itr != mChildren->map.end() && child_itr->first == name)
         {
             node = (*child_itr).second;
             return true;
@@ -961,20 +960,11 @@ void LLXMLNode::getChildren(const LLStringTableEntry* name, LLXMLNodeList &child
 {
     if (mChildren.notNull())
     {
-        LLXMLChildList::const_iterator child_itr = mChildren->map.find(name);
-        if (child_itr != mChildren->map.end())
+        auto [child_itr, children_end] = mChildren->map.equal_range(name);
+        for (; child_itr != children_end; ++child_itr)
         {
-            LLXMLChildList::const_iterator children_end = mChildren->map.end();
-            while (child_itr != children_end)
-            {
-                LLXMLNodePtr child = (*child_itr).second;
-                if (name != child->mName)
-                {
-                    break;
-                }
-                children.emplace(child->mName->mString, child);
-                child_itr++;
-            }
+            const LLXMLNodePtr& child = child_itr->second;
+            children.emplace(child->mName->mString, child);
         }
     }
     if (children.size() == 0 && use_default_if_missing && !mDefault.isNull())

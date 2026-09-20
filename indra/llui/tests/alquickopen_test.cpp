@@ -206,4 +206,42 @@ namespace tut
         gFocusMgr.setKeyboardFocus(nullptr);
         quick->die();
     }
+
+    // The other words a candidate answers to: typing them finds it, below
+    // anything whose label answers.
+    template<> template<>
+    void alquickopen_object::test<7>()
+    {
+        std::vector<ALQuickOpen::Candidate> shapes;
+        for (const auto& [name, words] : { std::pair<const char*, const char*>{ "PushButton_Off", "Push button buttons" },
+                                           { "Rounded_Square", "Rounded square basic" },
+                                           { "Circle", "round disc" } })
+        {
+            ALQuickOpen::Candidate one;
+            one.label = name;
+            one.also = words;
+            one.value = name;
+            shapes.push_back(one);
+        }
+
+        std::vector<size_t> order = ALQuickOpen::rank(shapes, "basic");
+        ensure_equals("the words alone find it", order.size(), size_t(1));
+        ensure_equals("the square", shapes[order.front()].label, std::string("Rounded_Square"));
+
+        // The same match on a label outranks it on the words; a better
+        // match on the words outranks a poor one on a label.
+        order = ALQuickOpen::rank(shapes, "round");
+        ensure_equals("both answer", order.size(), size_t(2));
+        ensure_equals("the label first", shapes[order.front()].label, std::string("Rounded_Square"));
+        ensure_equals("the words after", shapes[order.back()].label, std::string("Circle"));
+
+        ALQuickOpen::Candidate scattered;
+        scattered.label = "pxuxsxh";
+        scattered.value = "scattered";
+        shapes.push_back(scattered);
+        order = ALQuickOpen::rank(shapes, "push");
+        ensure_equals("both answer", order.size(), size_t(2));
+        ensure_equals("the words' whole word before the label's scattered letters",
+                      shapes[order.front()].label, std::string("PushButton_Off"));
+    }
 }

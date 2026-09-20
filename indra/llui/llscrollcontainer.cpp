@@ -592,6 +592,15 @@ bool LLScrollContainer::addChild(LLView* view, S32 tab_group)
     return ret_val;
 }
 
+void LLScrollContainer::removeChild(LLView* view)
+{
+    if (view == mScrolledView)
+    {
+        mScrolledView = nullptr;
+    }
+    LLView::removeChild(view);
+}
+
 void LLScrollContainer::updateScroll()
 {
     // Reached several times over in one layout: from this container's reshape,

@@ -31,8 +31,11 @@
 #include "llui.h"
 #include "llaccordionctrl.h"
 #include "llaccordionctrltab.h"
+#include "alangledial.h"
 #include "alcolorfield.h"
+#include "alcornerfield.h"
 #include "alflagsfield.h"
+#include "aloffsetpad.h"
 #include "alemptystate.h"
 #include "alfollowscontrol.h"
 #include "alfontfield.h"
@@ -40,10 +43,12 @@
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "lllineeditor.h"
+#include "llsliderctrl.h"
 #include "llspinctrl.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+#include "llfocusmgr.h"
 
 #include <fmt/format.h>
 
@@ -108,6 +113,28 @@ namespace
         return (F32)atof(text.c_str());
     }
 
+    // How a number's box behaves: what the vocabulary said where it said
+    // anything, and the old rule of thumb where it did not.
+    S32 decimalsOf(const ALPropertyGrid::Field& field, bool whole)
+    {
+        return field.decimals >= 0 ? field.decimals : whole ? 0 : 3;
+    }
+
+    F32 stepOf(const ALPropertyGrid::Field& field, bool whole)
+    {
+        return field.step > 0.f ? field.step : whole ? 1.f : 0.1f;
+    }
+
+    F32 minimumOf(const ALPropertyGrid::Field& field)
+    {
+        return field.bounded ? field.minimum : field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
+    }
+
+    F32 maximumOf(const ALPropertyGrid::Field& field)
+    {
+        return field.bounded ? field.maximum : 100000.f;
+    }
+
     // A value that is several numbers, as the numbers it is. A file writes
     // them with spaces between them and an LLSD one arrives with commas, so
     // both separate.
@@ -147,6 +174,13 @@ namespace
     bool isFontType(std::string_view type)
     {
         return type.find("LLFontGL") != std::string_view::npos;
+    }
+
+    // A picture is a name out of the skin, and is known by sight: the
+    // type is the pointer the block holds.
+    bool isImageType(std::string_view type)
+    {
+        return type.find("LLUIImage") != std::string_view::npos;
     }
 
     // A field nothing writes is shown in the quieter ink, and so is one
@@ -325,17 +359,21 @@ void ALPropertyGrid::setGroups(std::vector<std::string> groups)
     mRebuild.request();
 }
 
-void ALPropertyGrid::setFields(std::vector<Field> fields)
+void ALPropertyGrid::order(std::vector<Field>& fields) const
 {
-    mFields = std::move(fields);
     // A heading the caller never named is the last one: a row has to be
     // somewhere, and a field filed past the end was not shown at all.
     const S32 last = (S32)mSections.size() - 1;
-    for (Field& field : mFields)
+    for (Field& field : fields)
     {
         field.group = last < 0 ? 0 : llclamp(field.group, 0, last);
     }
-    std::sort(mFields.begin(), mFields.end(), [](const Field& a, const Field& b)
+    if (mKeepsOrder)
+    {
+        std::stable_sort(fields.begin(), fields.end(), [](const Field& a, const Field& b) { return a.group < b.group; });
+        return;
+    }
+    std::sort(fields.begin(), fields.end(), [](const Field& a, const Field& b)
     {
         // The headings first, in the order they were named; what the file
         // writes at the top of each, since that is what is being worked
@@ -350,6 +388,132 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
         }
         return a.name < b.name;
     });
+}
+
+// Everything a row is built from, and nothing a row is refreshed with: the
+// value, who wrote it, what the tip says and where a subject sits change
+// under a kept row, and updateFields puts each of those right in place.
+bool ALPropertyGrid::sameRow(const Field& a, const Field& b)
+{
+    return a.name == b.name && a.group == b.group && a.kind == b.kind && a.type == b.type && a.label == b.label
+        && a.values == b.values && a.valueLabels == b.valueLabels && a.components == b.components
+        && a.corners == b.corners && a.pad == b.pad && a.dial == b.dial && a.slider == b.slider
+        && a.bounded == b.bounded && a.minimum == b.minimum && a.maximum == b.maximum
+        && a.step == b.step && a.decimals == b.decimals
+        && a.edges == b.edges && a.flags == b.flags && a.allWord == b.allWord && a.noneWord == b.noneWord
+        && a.pairWith == b.pairWith && a.ignored == b.ignored && a.alsoWritten == b.alsoWritten;
+}
+
+bool ALPropertyGrid::updateFields(std::vector<Field> fields)
+{
+    order(fields);
+    if (fields.size() != mFields.size())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        if (!sameRow(fields[i], mFields[i]))
+        {
+            return false;
+        }
+    }
+    for (size_t i = 0; i < fields.size(); ++i)
+    {
+        Field& current = mFields[i];
+        const Field& next = fields[i];
+        const bool value_changed = current.value != next.value;
+        const bool authored_changed = current.authored != next.authored || current.source != next.source;
+        // The tip is made from these as well as from who wrote the value.
+        const bool said_changed = current.unknown != next.unknown || current.deprecated != next.deprecated
+                               || current.instead != next.instead || current.description != next.description;
+        // Where the thing a follows row is about sits, which moves with
+        // every edit of its rect and is drawn rather than built.
+        const bool subject_changed = current.subject != next.subject || current.subjectParent != next.subjectParent;
+        current = std::move(fields[i]);
+        if (authored_changed || said_changed)
+        {
+            refreshAuthored(current);
+        }
+        if (value_changed || authored_changed)
+        {
+            refreshEditor(current);
+        }
+        if (subject_changed && !current.subjectParent.isEmpty())
+        {
+            if (ALFollowsControl* follows = findChild<ALFollowsControl>(current.name, true))
+            {
+                follows->setSubject(current.subject, current.subjectParent);
+            }
+        }
+    }
+    return true;
+}
+
+void ALPropertyGrid::refreshEditor(const Field& field)
+{
+    LLUICtrl* editor = findChild<LLUICtrl>(field.name, true);
+    // Being dragged or typed in: what it shows is what the hand is doing,
+    // and what the hand is doing is what the field is about to say.
+    if (editor && (gFocusMgr.childHasKeyboardFocus(editor) || gFocusMgr.childHasMouseCapture(editor)
+                   || editor->hasFocus() || editor->hasMouseCapture()))
+    {
+        return;
+    }
+    if (!field.components.empty())
+    {
+        const std::vector<std::string> parts = numbersOf(field.value);
+        for (size_t i = 0; i < field.components.size(); ++i)
+        {
+            LLSpinCtrl* spin = findChild<LLSpinCtrl>(field.name + "." + field.components[i], true);
+            // The same test as the whole editor's: one of the three being
+            // scrubbed keeps what the hand is doing.
+            if (spin && !gFocusMgr.childHasKeyboardFocus(spin) && !gFocusMgr.childHasMouseCapture(spin)
+                && !spin->hasFocus() && !spin->hasMouseCapture())
+            {
+                spin->setValue(i < parts.size() ? numberOf(parts[i]) : 0.f);
+                spin->setUnset(!field.authored);
+            }
+        }
+        return;
+    }
+    if (!editor)
+    {
+        return;
+    }
+    if (LLSpinCtrl* spin = editor->as<LLSpinCtrl>())
+    {
+        spin->setValue(numberOf(field.value));
+        spin->setUnset(!field.authored);
+    }
+    else if (LLSliderCtrl* slider = editor->as<LLSliderCtrl>())
+    {
+        slider->setValue(numberOf(field.value));
+    }
+    else if (LLComboBox* combo = editor->as<LLComboBox>())
+    {
+        combo->setValue(field.value);
+        combo->setUnset(!field.authored);
+    }
+    else if (LLCheckBoxCtrl* check = editor->as<LLCheckBoxCtrl>())
+    {
+        check->setValue(field.value == "true" || field.value == "1");
+    }
+    else if (LLLineEditor* line = editor->as<LLLineEditor>())
+    {
+        line->setText(field.authored ? field.value : LLStringUtil::null);
+        line->setLabel(field.authored ? LLStringUtil::null : field.value);
+    }
+    else
+    {
+        editor->setValue(field.value);
+    }
+}
+
+void ALPropertyGrid::setFields(std::vector<Field> fields)
+{
+    mFields = std::move(fields);
+    order(mFields);
 
     // A section the file writes nothing in is every field the tag will take
     // and none that anyone chose, which is a page of grey to scroll past to
@@ -362,7 +526,7 @@ void ALPropertyGrid::setFields(std::vector<Field> fields)
     // grid, and a grid of one section draws no heading, so there would be
     // nothing to unfold it with: a setting at its default showed a blank
     // strip and nothing else. Folding and headings are one decision.
-    const bool folds = mSections.size() > 1;
+    const bool folds = mFoldsUnwritten && mSections.size() > 1;
     for (size_t group = 0; group < mSections.size(); ++group)
     {
         const bool written = std::any_of(mFields.begin(), mFields.end(),
@@ -395,6 +559,16 @@ void ALPropertyGrid::setAuthoredOnly(bool only)
     }
 }
 
+void ALPropertyGrid::setFoldsUnwritten(bool folds)
+{
+    mFoldsUnwritten = folds;
+}
+
+void ALPropertyGrid::setKeepsOrder(bool keeps)
+{
+    mKeepsOrder = keeps;
+}
+
 void ALPropertyGrid::setNested(bool nested)
 {
     if (mNested != nested)
@@ -420,6 +594,31 @@ boost::signals2::connection ALPropertyGrid::onNoticeAction(const notice_signal_t
 void ALPropertyGrid::setTips(Tips tips)
 {
     mTips = std::move(tips);
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setColorResolver(color_resolver_t resolver)
+{
+    mColorResolver = std::move(resolver);
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setColorChoices(ALColorField::choices_t choices)
+{
+    mColorChoices = std::move(choices);
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setImageChoices(ALImageField::choices_t choices)
+{
+    mImageChoices = std::move(choices);
+    mRebuild.request();
+}
+
+void ALPropertyGrid::setImageEditor(ALImageField::edit_t editor, std::string label)
+{
+    mImageEditor = std::move(editor);
+    mImageEditLabel = std::move(label);
     mRebuild.request();
 }
 
@@ -460,7 +659,10 @@ bool ALPropertyGrid::shows(const Field& field) const
     {
         return false;
     }
-    return ALStringMatch::containsNoCase(field.name, mFilter);
+    // By the name a file writes or the words the row is called by: a
+    // person looking for the fill colour types either.
+    return ALStringMatch::containsNoCase(field.name, mFilter)
+        || (!field.label.empty() && ALStringMatch::containsNoCase(field.label, mFilter));
 }
 
 // What the row is, then where what is in force came from, then -- where
@@ -506,6 +708,18 @@ S32 ALPropertyGrid::rowHeight(const Field& field) const
     if (field.edges.size() == 4)
     {
         return llmax(mRowHeight, PICTURE_HEIGHT);
+    }
+    if (field.corners)
+    {
+        return llmax(mRowHeight, ALCornerField::HEIGHT);
+    }
+    if (field.pad)
+    {
+        return llmax(mRowHeight, ALOffsetPad::HEIGHT);
+    }
+    if (field.dial)
+    {
+        return llmax(mRowHeight, ALAngleDial::HEIGHT);
     }
     // A row whose parts are captioned is a caption taller than one whose
     // value needs no saying which part it is -- and a colour is never
@@ -693,10 +907,10 @@ void ALPropertyGrid::makeComponents(const Field& field, const LLRect& box, LLPan
         p.name = field.name + "." + field.components[i];
         p.rect = LLRect(left, box.mTop - 1, left + each, box.mBottom + 1 + CAPTION_HEIGHT);
         p.label_width = 0;
-        p.decimal_digits = whole ? 0 : 3;
-        p.increment = whole ? 1.f : 0.1f;
-        p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
-        p.max_value = 100000.f;
+        p.decimal_digits = decimalsOf(field, whole);
+        p.increment = stepOf(field, whole);
+        p.min_value = minimumOf(field);
+        p.max_value = maximumOf(field);
         p.initial_value = i < parts.size() ? numberOf(parts[i]) : 0.f;
         LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
         spin->setUnset(!field.authored);
@@ -737,8 +951,38 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
 {
     const std::string name = field.name;
     LLUICtrl* editor = nullptr;
+    const bool picture = field.corners || field.pad || field.dial;
 
-    if (field.kind == ALParamType::BOOLEAN)
+    if (field.corners)
+    {
+        ALCornerField::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
+        ALCornerField* corners = LLUICtrlFactory::create<ALCornerField>(p);
+        corners->setRange(minimumOf(field), maximumOf(field), stepOf(field, false), decimalsOf(field, false));
+        corners->setValue(field.value);
+        editor = corners;
+    }
+    else if (field.pad)
+    {
+        ALOffsetPad::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
+        ALOffsetPad* pad = LLUICtrlFactory::create<ALOffsetPad>(p);
+        pad->setRange(field.bounded ? llmax(1.f, field.maximum) : 32.f, stepOf(field, false), decimalsOf(field, false));
+        pad->setValue(field.value);
+        editor = pad;
+    }
+    else if (field.dial)
+    {
+        ALAngleDial::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
+        ALAngleDial* dial = LLUICtrlFactory::create<ALAngleDial>(p);
+        dial->setValue(field.value);
+        editor = dial;
+    }
+    else if (field.kind == ALParamType::BOOLEAN)
     {
         LLCheckBoxCtrl::Params p;
         p.name = name;
@@ -754,8 +998,35 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         p.name = name;
         p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
         ALColorField* colour = LLUICtrlFactory::create<ALColorField>(p);
+        if (mColorResolver)
+        {
+            colour->setResolver(mColorResolver);
+        }
+        if (mColorChoices)
+        {
+            colour->setChoices(mColorChoices);
+        }
         colour->setValue(field.value);
         editor = colour;
+    }
+    else if (isImageType(field.type))
+    {
+        // The other type known by sight: the picture beside its name, and
+        // the skin's pictures to choose from.
+        ALImageField::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
+        ALImageField* image = LLUICtrlFactory::create<ALImageField>(p);
+        if (mImageChoices)
+        {
+            image->setChoices(mImageChoices);
+        }
+        if (mImageEditor)
+        {
+            image->setEditor(mImageEditor, mImageEditLabel);
+        }
+        image->setValue(field.value);
+        editor = image;
     }
     else if (field.edges.size() == 4)
     {
@@ -820,15 +1091,43 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         {
             combo->add(field.value);
         }
-        for (const std::string& value : field.values)
+        // Shown by the label where there is one, chosen by the value
+        // either way: what commits is what a file writes.
+        const bool labelled = field.valueLabels.size() == field.values.size();
+        for (size_t i = 0; i < field.values.size(); ++i)
         {
-            combo->add(value);
+            if (labelled)
+            {
+                combo->add(field.valueLabels[i], LLSD(field.values[i]));
+            }
+            else
+            {
+                combo->add(field.values[i]);
+            }
         }
         combo->setValue(field.value);
         // Nobody wrote this one: what is shown is what is in force, not a
         // choice made here.
         combo->setUnset(!field.authored);
         editor = combo;
+    }
+    else if (field.slider && field.bounded && field.kind == ALParamType::REAL)
+    {
+        // A number chosen out of a range rather than typed: the slider is
+        // the range and the box beside it is the number.
+        LLSliderCtrl::Params p;
+        p.name = name;
+        p.rect = LLRect(box.mLeft, box.mTop - 1, box.mRight, box.mBottom + 1);
+        p.label_width = 0;
+        p.show_text = true;
+        p.can_edit_text = true;
+        p.text_width = 52;
+        p.decimal_digits = decimalsOf(field, false);
+        p.increment = stepOf(field, false);
+        p.min_value = field.minimum;
+        p.max_value = field.maximum;
+        p.initial_value = llclamp(numberOf(field.value), field.minimum, field.maximum);
+        editor = LLUICtrlFactory::create<LLSliderCtrl>(p);
     }
     else if (field.kind == ALParamType::INTEGER || field.kind == ALParamType::UNSIGNED
           || field.kind == ALParamType::REAL)
@@ -838,15 +1137,15 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
         p.name = name;
         p.rect = LLRect(box.mLeft, box.mTop - 1, llmin(box.mRight, box.mLeft + NUMBER_WIDTH), box.mBottom + 1);
         p.label_width = 0;
-        p.decimal_digits = whole ? 0 : 3;
+        p.decimal_digits = decimalsOf(field, whole);
         // A whole number steps by one. The step is a tenth unless it is said
         // otherwise, and a field carrying no decimals rounds a tenth straight
         // back to the number it started at -- so every press of an arrow and
         // every notch of the wheel wrote back the number that was there, and
         // only the keyboard could change one.
-        p.increment = whole ? 1.f : 0.1f;
-        p.min_value = field.kind == ALParamType::UNSIGNED ? 0.f : -100000.f;
-        p.max_value = 100000.f;
+        p.increment = stepOf(field, whole);
+        p.min_value = minimumOf(field);
+        p.max_value = maximumOf(field);
         p.initial_value = numberOf(field.value);
         LLSpinCtrl* spin = LLUICtrlFactory::create<LLSpinCtrl>(p);
         // Nobody wrote this one, so the number in force goes behind the box
@@ -874,7 +1173,9 @@ LLUICtrl* ALPropertyGrid::makeEditor(const Field& field, const LLRect& box, LLPa
     // font, which answers by its parts above, since it is three fields and
     // a commit of the whole would write the name a second time.
     const bool whole = field.kind != ALParamType::REAL;
-    const ALParamType::EValue kind = field.kind;
+    // A picture answers with the numbers already spelled the way a file
+    // writes them.
+    const ALParamType::EValue kind = picture ? ALParamType::OTHER : field.kind;
     if (!editor->as<ALFontField>())
     {
         editor->setCommitCallback([this, name, kind, whole](LLUICtrl* ctrl, const LLSD&)
@@ -1010,6 +1311,11 @@ void ALPropertyGrid::addRow(Rows* host, const Field& field, const Field* partner
     {
         makeEditor(field, LLRect(left, top, left + editor_width, 0), row);
     }
+    else if (field.corners || field.pad || field.dial)
+    {
+        // A picture of the value, as tall as the row was made for it.
+        makeEditor(field, LLRect(left, top, left + editor_width, bottom), row);
+    }
     else if (!field.components.empty() && !isColorType(field.type))
     {
         // Several numbers, as the numbers they are. The row was made a
@@ -1140,16 +1446,21 @@ void ALPropertyGrid::setAuthored(const std::string& name, bool authored, const s
         mRebuild.request();
         return;
     }
+    refreshAuthored(*field);
+}
 
-    // The row is this field's own, or the one it shares with the field it
-    // partners -- where the label is the other field's, the way back is
-    // both of theirs, and only the editor is this one's to tell.
-    const std::string tip = tipFor(*field);
+// The row is this field's own, or the one it shares with the field it
+// partners -- where the label is the other field's, the way back is
+// both of theirs, and only the editor is this one's to tell.
+void ALPropertyGrid::refreshAuthored(const Field& field)
+{
+    const std::string& name = field.name;
+    const std::string tip = tipFor(field);
     if (LLPanel* row = rowOf(name))
     {
         if (LLTextBox* label = row->findChild<LLTextBox>(name + "_label"))
         {
-            label->setColor(inkFor(*field));
+            label->setColor(inkFor(field));
             label->setToolTip(tip);
         }
         for (LLView* child : *row->getChildList())

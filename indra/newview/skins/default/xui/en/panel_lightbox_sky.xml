@@ -202,16 +202,14 @@ them was reachable from any UI before this; they were Debug Settings only.
 			 top="0"
 			 right="-1"
 			 name="sec_skyfx">
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
+				 top="7"
+				 right="-8"
+				 height="18"
 				 label="Aurora Intensity"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0"
@@ -220,22 +218,6 @@ them was reachable from any UI before this; they were Debug Settings only.
 				 name="aurora_intensity"
 				 tool_tip="Procedural aurora borealis, drawn on the client only. 0 switches it off entirely, which is the default; 1 is a clear display and 2 a vivid one. Night only, on the same star brightness gate as the stars, and it fades as the moon brightens because scattered moonlight would wash the emission out anyway. An HDRI sky replaces the dome and leaves nothing to draw into."
 				 control_name="RenderAuroraIntensity" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aurora_intensity_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderAuroraIntensity" />
-				</button>
 				<!-- A dropdown and not a slider, by the rule in §2: committing
 				     this value regenerates every star position and rebuilds the
 				     vertex buffer, and a slider commits on every mouse move.
@@ -308,16 +290,14 @@ them was reachable from any UI before this; they were Debug Settings only.
 				 name="meteors_enable"
 				 tool_tip="Procedural meteor streaks, drawn on the client only, on the same night gate as the stars they cross."
 				 control_name="RenderMeteorsEnabled" />
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="8"
-				 right="-32"
-				 height="16"
+				 top_pad="7"
+				 right="-8"
+				 height="18"
 				 label="Max Meteors"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="0"
 				 increment="1"
 				 min_val="0"
@@ -327,32 +307,14 @@ them was reachable from any UI before this; they were Debug Settings only.
 				 tool_tip="How many streaks may be in the sky together. 64 is the ceiling because the vertex buffer is sized for it once and never reallocated."
 				 enabled_control="RenderMeteorsEnabled"
 				 control_name="RenderMeteorMaxCount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="meteor_max_count_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderMeteorMaxCount" />
-				</button>
-				<slider
+				<setting_row
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
 				 label="Meteor Interval"
-				 label_width="140"
-				 can_edit_text="true"
 				 decimal_digits="2"
 				 increment="0.25"
 				 min_val="0.25"
@@ -362,22 +324,6 @@ them was reachable from any UI before this; they were Debug Settings only.
 				 tool_tip="Mean seconds between one streak and the next, so higher is rarer. A mean and not a fixed gap: the renderer rolls for a spawn every frame, which is what makes it read as weather rather than animation."
 				 enabled_control="RenderMeteorsEnabled"
 				 control_name="RenderMeteorSpawnInterval" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="meteor_spawn_interval_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderMeteorSpawnInterval" />
-				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"

@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "alcanvasview.h"
+#include "alstudiofloater.h"
 #include "alxuicatalog.h"
 #include "alxuidiagnostics.h"
 #include "alxuidocuments.h"
@@ -85,31 +87,23 @@ class LLTextEditor;
 // the previewed file. The canvas, where the file is built from its layered
 // document in the chosen skin and language, once per variant, and drawn
 // over with the hover and the selection. And the inspectors.
-class ALFloaterXUIStudio final : public LLFloater
+class ALFloaterXUIStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
 public:
-    AL_VIEW_TYPE(ALFloaterXUIStudio, LLFloater);
+    AL_VIEW_TYPE(ALFloaterXUIStudio, ALStudioFloater);
 
     static constexpr S32 PRIMARY = 0;
     static constexpr S32 SECONDARY = 1;
     static constexpr S32 PREVIEWS = 2;
 
     bool postBuild() override;
+    // Opened by another window with something to find: the query goes
+    // into the find mode and runs over every skin.
+    void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
-    // The window opens where and as big as it was left, out of its own
-    // state rather than the per-account one: this is opened from the
-    // login screen as often as from the world, and there is no account
-    // yet to have remembered anything.
-    bool applyRectControl() override;
-
-    // This window has a menu bar of its own, so its shortcuts are asked
-    // before the viewer's. Without saying so the viewer's menu answers
-    // first and quietly keeps every key it also binds -- Control+0 is Zoom
-    // In out there, and the pane it folds here was never reached.
-    bool hasAccelerators() const override { return true; }
 
     // What a preview host reports: the view under the mouse, a modifier
     // click, a handle dragged, and its own closing.
@@ -168,16 +162,25 @@ public:
     bool nudge(KEY key, MASK mask);
     bool undoEdit();
     bool redoEdit();
+    bool undo() override;
+    bool redo() override;
 
     // Which edge of its parent the selected element is tied to, from the
     // anchor the canvas draws outside that edge.
     void toggleFollows(S32 edge);
 
-    // How much bigger than life the canvas draws, as a percentage, and one
-    // step of it: the wheel over the canvas takes the step the bar's own
-    // spinner takes, so the two cannot disagree about how far a step is.
+    // How much bigger than life the canvas draws, as a percentage: the
+    // spinner and the saved state arrive here, and so does the wheel, by
+    // way of the canvas it zoomed about the pointer; the rest follow it.
     void setZoom(S32 percent);
-    void zoomBy(S32 steps);
+    void zoomChanged(F32 zoom, ALXUICanvas* zoomed);
+    // The number onto every canvas, with the row scrolled about the one
+    // that decides, unless one has scrolled it already.
+    void applyZoom(S32 percent, ALXUICanvas* zoomed);
+    // What every canvas draws under the preview: nothing, or something
+    // that shows what a window's transparency does.
+    void setCanvasBackdrop(ALCanvasView::Backdrop backdrop);
+    ALCanvasView::Backdrop canvasBackdrop() const { return mBackdrop; }
 
     // --- the document under edit ---------------------------------------------
     // Edits go into a document the tool holds, and the preview is built
@@ -344,19 +347,6 @@ private:
     // The variants side by side, after any of them has been built: a canvas
     // is as big as what it holds, so where the next one starts is not known
     // until the one before it has something on it.
-    // A region the developer is not using, folded away and brought back with
-    // everything it held.
-    void togglePane(std::string_view name);
-
-    // A region in a window of its own, and back. The canvas is not one of
-    // these: it holds a built view tree with hit-testing of its own.
-    ALDockPanel* paneOf(std::string_view name) const;
-    bool paneOut(std::string_view name) const;
-    void togglePaneOut(std::string_view name);
-    void dockPanes();
-    void setPaneCollapsed(std::string_view name, bool collapsed);
-    bool paneCollapsed(std::string_view name) const;
-    void refreshPaneButtons();
     void layoutCanvases();
     // The pill: what is on the canvas, whether it is being shown, and
     // whether it is being held on this file.
@@ -460,7 +450,6 @@ private:
     // needs without the viewer. The picker names the file and its
     // extension chooses the format.
     void capturePreview();
-    void writeCapture(const std::vector<std::string>& filenames);
 
     // --- the translation table -----------------------------------------------
     // One row per field a translator writes, with what the language has
@@ -618,16 +607,10 @@ private:
     void openInEditor(const std::string& path, S32 line);
 
     // --- state ---------------------------------------------------------------
-    void setStatus(const std::string& text);
-    void saveState();
-    void loadState();
-    // The shape a drag leaves behind -- the window's rect, the width of
-    // the two side panes, the height of the band -- noticed once the drag
-    // is over, rather than written on every pixel of it.
-    void rememberShape();
-    void holdShapePanes();
-    S32 paneDim(std::string_view name) const;
-    void setPaneDim(std::string_view name, S32 dim);
+    // What this window keeps besides the regions and the rect, which the
+    // studio base keeps.
+    void writeState(LLSD& state) const override;
+    void readState(const LLSD& state) override;
     // The menu bar: an action by name, and whether a switch is on.
     void onMenuAction(const LLSD& param);
     bool onMenuCheck(const LLSD& param);
@@ -645,9 +628,6 @@ private:
     // save them first, let them go, or keep the document.
     void closeDocumentAnswered(const std::string& path, S32 option);
     void letGoOf(const std::string& path);
-    // The two menu items say what they will take back or put on again, as
-    // the history says it.
-    void refreshUndoLabels(const std::vector<ALXUIDocuments::Entry>& history);
 
     // Every list in the tool is a table someone will want in a message or
     // a bug report: shift and control extend the selection, and the right
@@ -677,12 +657,15 @@ private:
     bool                mShowCodeBuilt = true;
     bool                mSnap = false;
     bool                mRulers = false;
+    // The Library as cells across and down rather than rows.
+    bool                mPaletteCells = false;
     // Build the registered class rather than a shell of the file. Off, and
     // remembered off: what it costs is the viewer's own crashes.
     bool                mRealFloater = false;
     S32                 mGrid = 4;
     // How much bigger than life the canvas draws, as a percentage.
     S32                 mZoom = 100;
+    ALCanvasView::Backdrop mBackdrop = ALCanvasView::Backdrop::None;
     bool                mSyncingTree = false;
     bool                mReloadPending = false;
     bool                mReloadEntryOnly = false;   // one file changed, not the tree
@@ -699,13 +682,6 @@ private:
     // this one, to the skin this one varies -- and each of those refusals is
     // a thing the developer came here to do.
     ALXUIDocuments      mDocuments;
-    // What the state file said the window's rect was, applied when it
-    // opens; and what was last written, so that a frame can tell whether
-    // anything moved.
-    LLRect              mRestoredRect;
-    LLRect              mShapeRect;
-    S32                 mShapeDims[3] = { 0, 0, 0 };
-    LLLayoutPanel*      mShapePanes[3] = { nullptr, nullptr, nullptr };
     S32                 mLastX = -1;
     S32                 mLastY = -1;
 
@@ -717,7 +693,6 @@ private:
     // By handle: a pane in a window of its own goes with that window when
     // the application quits, and whether it or this window is closed
     // first is not this window's to say.
-    std::vector<LLHandle<LLView> > mPanes;
     ALXUICanvas*        mCanvases[PREVIEWS] = {};
     bool                mFloatPreview = false;
     // The pill above the canvas. Hidden, the region is given over to the
@@ -730,7 +705,6 @@ private:
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;
 
-    LLPointer<LLImageRaw>           mCapture;       // taken before the picker opens
     LLScrollListCtrl*               mMenuList = nullptr;    // the list the right button was over
     std::string                     mMenuCell;      // the cell it was over
     LLHandle<LLView>                mListMenu;
@@ -788,7 +762,6 @@ private:
     LLScrollListCtrl*   mSourceLayerList = nullptr;
     // The list inside the gutter popover, which lives only while it is up.
     LLHandle<LLView>    mGutterPopover;
-    LLHandle<LLView>    mQuickPopover;
     LLScrollListCtrl*   mGutterList = nullptr;
     LLTextBox*          mOverrideField = nullptr;
     // The field the layer table is about: whichever gutter was last clicked,
@@ -824,7 +797,6 @@ private:
     LLScrollListCtrl*   mBindings = nullptr;
     LLScrollListCtrl*   mState = nullptr;
     LLScrollListCtrl*   mSelectionFindings = nullptr;
-    LLMenuBarGL*        mMenuBar = nullptr;
     LLTabContainer*     mModes = nullptr;
     LLTabContainer*     mBottom = nullptr;
     LLScrollListCtrl*   mNotifications = nullptr;
@@ -843,7 +815,6 @@ private:
     LLTextEditor*       mTranslateValue = nullptr;
     LLTextBox*          mTranslateCounts = nullptr;
     LLTextBox*          mEditTarget = nullptr;
-    LLTextBox*          mStatus = nullptr;
 
     boost::unordered_map<std::string, LLFolderViewItem*> mRows;
 };

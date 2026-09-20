@@ -204,6 +204,7 @@
     <floater.string name="AttributeTipDeprecated">[NAME] works, and nothing new should write it.</floater.string>
     <floater.string name="AttributeTipDeprecatedFor">[NAME] works, and nothing new should write it: [INSTEAD] is the name to use.</floater.string>
     <floater.string name="AttributeTipRemove">Take [NAME] out of this file again, and let whatever was in force before it be in force.</floater.string>
+    <floater.string name="ImageChoicesTextures">Textures</floater.string>
     <floater.string name="FollowsTipLeft">Holds the gap between this element's left edge and its parent's, so the element stays where it is when the parent widens. Click to hold it or to let it go.</floater.string>
     <floater.string name="FollowsTipBottom">Holds the gap between this element's bottom edge and its parent's, so the element stays where it is when the parent grows taller. Click to hold it or to let it go.</floater.string>
     <floater.string name="FollowsTipRight">Holds the gap between this element's right edge and its parent's, so the element travels with that edge when the parent widens. Click to hold it or to let it go.</floater.string>
@@ -542,6 +543,13 @@
              layout="topleft"
              name="schema">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="schema" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call
+             label="Colour Settings"
+             layout="topleft"
+             name="colors">
+                <menu_item_call.on_click function="XUIStudio.Menu" parameter="colors" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call
@@ -1150,18 +1158,29 @@
                          min_dim="80"
                          name="palette_area"
                          width="376">
+                            <button
+                             follows="right|top"
+                             height="20"
+                             is_toggle="true"
+                             label="Grid"
+                             layout="topleft"
+                             name="palette_cells"
+                             right="-2"
+                             tool_tip="The widgets as cells across and down, each with its name under it, rather than one to a row"
+                             top="0"
+                             width="48" />
                             <specimen_list
                              empty_headline="Nothing may go in here."
                              empty_sentence="Choose an element in the outline; what it accepts is listed here, each as the widget itself."
                              follows="all"
-                             height="418"
+                             height="396"
                              label_width="120"
                              layout="topleft"
                              left="0"
                              name="palette"
                              row_height="30"
                              tool_tip="The tags the selected element may contain, each as the widget it builds"
-                             top="0"
+                             top="22"
                              width="376" />
                         </layout_panel>
                         <layout_panel
@@ -1389,8 +1408,8 @@
                  increment="10"
                  initial_value="100"
                  layout="topleft"
-                 left_pad="16"
-                 max_val="400"
+                 left_pad="8"
+                 max_val="800"
                  min_val="20"
                  name="canvas_zoom"
                  scrub="true"
@@ -1435,12 +1454,24 @@
                     <combo_box.item label="8 px" name="grid_8" value="8" />
                     <combo_box.item label="16 px" name="grid_16" value="16" />
                 </combo_box>
+                <menu_button
+                 follows="left|top"
+                 height="22"
+                 image_overlay="Checker"
+                 label=""
+                 layout="topleft"
+                 left_pad="8"
+                 menu_filename="menu_xui_studio_backdrop.xml"
+                 name="canvas_backdrop"
+                 tool_tip="What is behind the preview: nothing, a pattern that shows what a translucent window does to what is under it, a checkerboard that shows what is transparent, the colour of a window, or a light grey"
+                 top_delta="0"
+                 width="26" />
                 <check_box
                  follows="left|top"
                  height="16"
                  label="Second"
                  layout="topleft"
-                 left_pad="16"
+                 left_pad="8"
                  name="secondary_check"
                  tool_tip="Build the file a second time in another language, on the canvas beside the first, sharing its selection"
                  top_delta="3"

@@ -58,7 +58,6 @@ protected:
     bool initSLURLHandler() override;
     bool sendURLToOtherInstance(const std::string& url) override;
 
-    void setOSHibernationMode(eHibernationMode mode) override;
 };
 
 #endif // LL_LLAPPVIEWERSDL_H

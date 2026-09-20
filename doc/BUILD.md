@@ -218,6 +218,10 @@ This creates a build tree at `build-<HostSystem>-<preset>/` next to the source �
 
 The first configure run downloads and builds every vcpkg dependency from source. Expect **30–60+ minutes** and several GB of disk; subsequent configures finish in seconds.
 
+An optional [R2 binary cache](VCPKG-R2.md) can restore matching dependencies.
+The setup guide covers pipeline environment variables, read-only developer
+access, retention, and rollout checks.
+
 #### Platform notes
 
 - **macOS** — `xcode-os` and `ninja-os` (no arch suffix) pick the host architecture. Use the explicit `-arm64` / `-x64` preset to cross-build (e.g. an arm64 bundle from an Intel Mac).

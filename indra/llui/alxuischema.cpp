@@ -71,13 +71,10 @@ namespace
         return std::nullopt;
     }
 
-    // typeid spells a type the way a compiler does. This takes off the parts
-    // that are the spelling rather than the type, and leaves the rest alone:
-    // where it is a mangled name there is nothing to take off, and a mangled
-    // name still says more than "value" does.
+    // Decode compiler type names before removing any remaining MSVC qualifiers.
     std::string readableType(const char* name)
     {
-        std::string out(name ? name : "");
+        std::string out = name ? LLError::Log::demangle(name) : "";
         for (const char* prefix : { "class ", "struct ", "enum " })
         {
             if (out.compare(0, std::strlen(prefix), prefix) == 0)

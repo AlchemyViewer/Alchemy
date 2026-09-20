@@ -33,6 +33,8 @@
 
 #include "../test/lltut.h"
 
+#include <vector>
+
 class LLAvatarName;
 const std::string gPopoverTestAnonName("Anon");
 const std::string& rlvGetAnonym(const LLAvatarName& av_name)
@@ -201,6 +203,94 @@ namespace tut
                popover->getRect().mRight <= screen_width);
         ensure("and no narrower for it", popover->getRect().getWidth() == 160);
         popover->closeFloater();
+        over->die();
+    }
+
+    // A popover is a window of its own, so a key it does not take goes home
+    // to the window its anchor is in, and it asks before the viewer's menu
+    // does -- otherwise a window's own shortcuts stop working the moment one
+    // of its popovers has the keyboard.
+    template<> template<>
+    void alpopover_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        struct Home : public LLFloater
+        {
+            Home(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+            bool handleKeyHere(KEY key, MASK mask) override
+            {
+                heard.push_back(key);
+                return key == 'F' && mask == MASK_CONTROL;
+            }
+            std::vector<KEY> heard;
+        };
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name = "home";
+        fp.rect = LLRect(100, 500, 500, 100);
+        fp.save_rect = false;
+        fp.save_visibility = false;
+        Home* home = new Home(fp);
+        LLPanel* over = anchor();
+        home->addChild(over);
+
+        ALPopover* popover = ALPopover::show(over, content());
+        ensure_equals("it knows where home is", popover->home(), home);
+        ensure("and asks before the viewer's own menu does", popover->hasAccelerators());
+        ensure("a key home takes is taken", popover->handleKeyHere('F', MASK_CONTROL));
+        ensure_equals("and home heard it", home->heard.size(), 1u);
+        ensure("a key home declines is declined", !popover->handleKeyHere('Q', MASK_CONTROL));
+        ensure_equals("having been asked", home->heard.size(), 2u);
+        ensure("escape is still the popover's own", popover->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        ensure_equals("and never reaches home", home->heard.size(), 2u);
+
+        // Hung off nothing in a window, it has no home and no claim on the
+        // menu's keys.
+        LLPanel* loose = anchor();
+        ALPopover* alone = ALPopover::show(loose, content());
+        ensure("no home", alone->home() == nullptr);
+        ensure("no claim", !alone->hasAccelerators());
+        alone->closeFloater();
+        loose->die();
+        home->die();
+    }
+
+    // A popover built to remember its size opens at the size the last of
+    // its kind was left at, and one of another kind does not.
+    template<> template<>
+    void alpopover_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        // As a popover with more to it than a panel is made: derived, and
+        // opened with openBeside.
+        struct Remembering : public ALPopover
+        {
+            Remembering(const LLFloater::Params& p) : ALPopover(p) {}
+        };
+        LLPanel* over = anchor();
+        ALPopover* first = new Remembering(ALPopover::paramsRemembered("popover_test_kind", 200, 120));
+        first->openBeside(over);
+        ensure_equals("opens at the size given", first->getRect().getWidth(), 200);
+        first->reshape(260, 150);
+        first->closeFloater();
+
+        ALPopover* second = new Remembering(ALPopover::paramsRemembered("popover_test_kind", 200, 120));
+        second->openBeside(over);
+        ensure_equals("the next of its kind opens as wide as the last was left", second->getRect().getWidth(), 260);
+        ensure_equals("and as tall", second->getRect().getHeight(), 150);
+        second->closeFloater();
+
+        ALPopover* other = new Remembering(ALPopover::paramsRemembered("popover_test_other", 200, 120));
+        other->openBeside(over);
+        ensure_equals("another kind is not told", other->getRect().getWidth(), 200);
+        other->closeFloater();
         over->die();
     }
 }
