@@ -1014,11 +1014,13 @@ void gl_circle_2d(F32 center_x, F32 center_y, F32 radius, S32 steps, bool filled
 }
 
 // Renders a ring with sides (tube shape)
-void gl_deep_circle( F32 radius, F32 depth, S32 steps )
+static void gl_deep_circle( F32 radius, F32 depth, S32 steps )
 {
     F32 x = radius;
     F32 y = 0.f;
-    F32 angle_delta = F_TWO_PI / (F32)steps;
+    const F32 angle_delta = F_TWO_PI / (F32)steps;
+    const F32 sin_delta = sinf(angle_delta);
+    const F32 cos_delta = cosf(angle_delta);
     gGL.begin( LLRender::TRIANGLE_STRIP  );
     {
         S32 step = steps + 1; // An extra step to close the circle.
@@ -1027,8 +1029,8 @@ void gl_deep_circle( F32 radius, F32 depth, S32 steps )
             gGL.vertex3f( x, y, depth );
             gGL.vertex3f( x, y, 0.f );
 
-            F32 x_new = x * cosf(angle_delta) - y * sinf(angle_delta);
-            y = x * sinf(angle_delta) +  y * cosf(angle_delta);
+            F32 x_new = x * cos_delta - y * sin_delta;
+            y = x * sin_delta +  y * cos_delta;
             x = x_new;
         }
     }
@@ -1176,16 +1178,15 @@ void gl_washer_angular_2d(F32 outer_radius, F32 inner_radius,
     // LLRender auto-flushes this mode on a multiple of three, so a finely
     // stepped ring cannot overrun the immediate-mode buffer and lose its tail.
     gGL.begin(LLRender::TRIANGLES);
+    // Step i's leading edge is step i-1's trailing edge, so each edge is
+    // computed once and carried across.
+    F32 c0 = 1.f, s0 = 0.f;
+    LLColor4 in0(colors[0]);  in0.mV[VALPHA] *= inner_fade;
     for (size_t i = 0; i < steps; ++i)
     {
         const size_t j = (i + 1) % steps;
-        const F32 a0 = F_TWO_PI * (F32)i / (F32)steps;
         const F32 a1 = F_TWO_PI * (F32)j / (F32)steps;
-
-        const F32 c0 = cosf(a0), s0 = sinf(a0);
         const F32 c1 = cosf(a1), s1 = sinf(a1);
-
-        LLColor4 in0(colors[i]);  in0.mV[VALPHA] *= inner_fade;
         LLColor4 in1(colors[j]);  in1.mV[VALPHA] *= inner_fade;
 
         // Outer i -> outer j -> inner j, then outer i -> inner j -> inner i.
@@ -1196,6 +1197,10 @@ void gl_washer_angular_2d(F32 outer_radius, F32 inner_radius,
         gGL.color4fv(colors[i].mV); gGL.vertex2f(outer_radius * c0, outer_radius * s0);
         gGL.color4fv(in1.mV);       gGL.vertex2f(inner_radius * c1, inner_radius * s1);
         gGL.color4fv(in0.mV);       gGL.vertex2f(inner_radius * c0, inner_radius * s0);
+
+        c0 = c1;
+        s0 = s1;
+        in0 = in1;
     }
     gGL.end();
     gGL.flush();
