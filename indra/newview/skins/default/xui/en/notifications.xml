@@ -1731,6 +1731,19 @@ Save Changes?
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioSaveChanges"
+   type="alertmodal">
+Save changes to &quot;[NAME]&quot;?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>

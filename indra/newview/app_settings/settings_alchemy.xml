@@ -266,6 +266,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptStudioEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Open scripts from inventory and objects in Script Studio instead of the legacy script editor.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptStudioState</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio: the editor switches, and the window's rect, pane sizes and folds, restored when it opens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
         <key>ALSimulatePacketLoss</key>
         <map>
             <key>Comment</key>

@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ legacy_header_height="18"
+ can_resize="true"
+ height="560"
+ layout="topleft"
+ min_height="360"
+ min_width="640"
+ name="script_studio"
+ help_topic="script_studio"
+ save_rect="true"
+ single_instance="true"
+ title="Script Studio"
+ width="900">
+    <floater.string name="Untitled">Script</floater.string>
+    <floater.string name="Loading">Loading...</floater.string>
+    <floater.string name="Loaded">[NAME] loaded.</floater.string>
+    <floater.string name="LoadedReadOnly">[NAME] loaded; it may be read and not changed.</floater.string>
+    <floater.string name="Saving">Saving [NAME]...</floater.string>
+    <floater.string name="Compiled">[NAME] compiled.</floater.string>
+    <floater.string name="CompileFailed">[NAME] did not compile: [COUNT] problem(s).</floater.string>
+    <floater.string name="SaveFailed">[NAME] was not saved: [ERROR]</floater.string>
+    <floater.string name="SavedToFile">Written to [PATH]</floater.string>
+    <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
+    <floater.string name="NoProblems">No problems.</floater.string>
+    <floater.string name="PaneProblems">Problems</floater.string>
+    <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
+    <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
+    <floater.string name="MenuUndo">Undo</floater.string>
+    <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
+    <floater.string name="MenuRedo">Redo</floater.string>
+    <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
+
+    <menu_bar
+     bg_visible="false"
+     follows="left|top"
+     height="18"
+     layout="topleft"
+     left="4"
+     mouse_opaque="false"
+     name="studio_menu"
+     top="20"
+     width="600">
+        <menu
+         label="File"
+         layout="topleft"
+         mouse_opaque="false"
+         name="file"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Save" layout="topleft" name="save" shortcut="control|S">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
+            </menu_item_call>
+            <menu_item_call label="Save All" layout="topleft" name="save_all" shortcut="control|alt|S">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_all" />
+            </menu_item_call>
+            <menu_item_call label="Revert to Saved" layout="topleft" name="revert">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="revert" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="revert" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Load from File..." layout="topleft" name="load_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
+            </menu_item_call>
+            <menu_item_call label="Save to File..." layout="topleft" name="save_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Close Script" layout="topleft" name="close" shortcut="control|W">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="Edit"
+         layout="topleft"
+         mouse_opaque="false"
+         name="edit"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Undo" layout="topleft" name="undo" shortcut="control|Z">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="undo" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="undo" />
+            </menu_item_call>
+            <menu_item_call label="Redo" layout="topleft" name="redo" shortcut="control|Y">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="redo" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="redo" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Cut" layout="topleft" name="cut" shortcut="control|X">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="cut" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="cut" />
+            </menu_item_call>
+            <menu_item_call label="Copy" layout="topleft" name="copy" shortcut="control|C">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="copy" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="copy" />
+            </menu_item_call>
+            <menu_item_call label="Paste" layout="topleft" name="paste" shortcut="control|V">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="paste" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="paste" />
+            </menu_item_call>
+            <menu_item_call label="Select All" layout="topleft" name="select_all" shortcut="control|A">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment" shortcut="control|/">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="View"
+         layout="topleft"
+         mouse_opaque="false"
+         name="view"
+         tear_off="false"
+         width="200">
+            <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="word_wrap" />
+            </menu_item_check>
+            <menu_item_check label="Line Numbers" layout="topleft" name="line_numbers">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|1">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
+            </menu_item_check>
+        </menu>
+    </menu_bar>
+
+    <!-- The toolbar: what the active script compiles for, whether it runs,
+         and the buttons every script editor has had. -->
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="compile_target_label"
+     top="44"
+     width="60">
+        Compiler:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     left_pad="4"
+     name="compile_target"
+     top_delta="-3"
+     width="170">
+        <combo_box.item label="LSL on Mono (recommended)" name="compile_target_mono" value="mono" />
+        <combo_box.item label="LSL Legacy" name="compile_target_lsl2" value="lsl2" />
+        <combo_box.item label="LSL on Luau" name="compile_target_lsl_luau" value="lsl-luau" />
+        <combo_box.item label="Lua" name="compile_target_luau" value="luau" />
+    </combo_box>
+    <check_box
+     follows="left|top"
+     height="22"
+     label="Running"
+     layout="topleft"
+     left_pad="12"
+     name="running"
+     top_delta="0"
+     width="90" />
+    <button
+     follows="left|top"
+     height="22"
+     label="Reset"
+     layout="topleft"
+     left_pad="4"
+     name="reset_btn"
+     top_delta="0"
+     width="70" />
+    <button
+     follows="right|top"
+     height="22"
+     is_toggle="true"
+     label="Problems"
+     layout="topleft"
+     name="fold_problems"
+     right="-92"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="right|top"
+     height="22"
+     label="Save"
+     layout="topleft"
+     name="save_btn"
+     right="-8"
+     top_delta="0"
+     width="80" />
+
+    <layout_stack
+     animate="false"
+     follows="all"
+     height="464"
+     layout="topleft"
+     left="8"
+     name="main_stack"
+     orientation="vertical"
+     top="70"
+     width="884"
+     border_size="10"
+     show_drag_handle="true"
+     drag_handle_thickness="4"
+     drag_handle_first_indent="10"
+     drag_handle_second_indent="10"
+     drag_handle_color="DkGray0"
+     drag_handle_on_hover="true">
+        <layout_panel
+         auto_resize="false"
+         height="24"
+         layout="topleft"
+         min_dim="24"
+         name="editor_head"
+         width="884"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="MouseGray"
+         border="true">
+            <tab_strip
+             follows="left|top|right"
+             height="22"
+             layout="topleft"
+             left="4"
+             name="tabs"
+             right="-4"
+             tool_tip="The scripts open here, one tab each; the tab shown is the script being edited"
+             top="1" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="true"
+         height="300"
+         layout="topleft"
+         min_dim="120"
+         name="editor_host"
+         user_resize="true"
+         width="884">
+            <panel
+             follows="all"
+             height="300"
+             layout="topleft"
+             left="0"
+             name="editor_panel"
+             top="0"
+             width="884" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         expanded_min_dim="80"
+         height="130"
+         layout="topleft"
+         min_dim="0"
+         name="bottom_panel"
+         user_resize="true"
+         width="884"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
+            <scroll_list
+             follows="all"
+             height="130"
+             layout="topleft"
+             left="0"
+             name="problems"
+             tool_tip="What the compiler said; choosing one goes to its line"
+             top="0"
+             width="884">
+                <scroll_list.columns label="Line" name="line" width="70" />
+                <scroll_list.columns label="Level" name="level" width="80" />
+                <scroll_list.columns dynamic_width="true" label="Message" name="message" />
+            </scroll_list>
+        </layout_panel>
+    </layout_stack>
+
+    <text
+     follows="left|right|bottom"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="status"
+     top_pad="6"
+     use_ellipses="true"
+     width="884" />
+</floater>

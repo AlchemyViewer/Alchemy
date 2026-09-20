@@ -169,7 +169,9 @@ if(AL_BUILD_VIEWER)
     alfloatertransactionlog.cpp
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
+    alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
+    alfloaterscriptstudio.cpp
     alfloaterwebprofile.cpp
     alfloaterxuilibrary.cpp
     alfloaterxuistudio.cpp
@@ -956,8 +958,10 @@ if(AL_BUILD_VIEWER)
     alfloatertransactionlog.h
     alsceneexplorerpredicate.h
     alscopedata.h
+    alscriptworkspace.h
     alterrainsurfacemaps.h
     altexturetable.h
+    alfloaterscriptstudio.h
     alfloaterwebprofile.h
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
