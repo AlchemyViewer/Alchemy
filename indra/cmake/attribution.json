@@ -50,6 +50,7 @@
     "opus": { "holder": "Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo, Mozilla, Amazon" },
     "pffft": { "license": "LicenseRef-FFTPACK" },
     "tinyexr": { "holder": "Copyright (c) 2014-2021 Syoyo Fujita and many contributors" },
+    "tailslide": { "holder": "Copyright (c) the Tailslide authors, after pclewis's lslint; the bitstream code Copyright (c) Kai Mast" },
     "tinygltf": { "license": "MIT" },
     "v-hacd": { "license": "BSD-3-Clause" },
     "vlc-bin": { "holder": "Copyright (C) 1996-2023 VLC authors and VideoLAN" },

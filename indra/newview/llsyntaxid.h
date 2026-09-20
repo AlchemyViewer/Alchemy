@@ -107,6 +107,15 @@ public:
     const_iterator  find(const std::string& name) const { return mFileCachePaths.find(name); }
 
     std::vector<std::string> getCacheFileNames() const;
+
+    // The definitions beyond the keyword LLSD, by path, for the analyzers
+    // that read files: the Luau type definitions (secondlife.d.luau), their
+    // documentation (secondlife.docs.json) and the LSL builtins
+    // (builtins.txt). The region's where it delivered one, else the shipped
+    // default; empty where there is neither.
+    std::string              getLuauDefinitionsPath() const;
+    std::string              getLuauDocsPath() const;
+    std::string              getLSLBuiltinsPath() const;
     bool                     hasCacheFile(const std::string& name) const { return mFileCachePaths.hasName(name); }
     std::string              loadCacheFile(const std::string& name) const;
     LLSD                     loadCacheFileAsLLSD(const std::string& name) const;

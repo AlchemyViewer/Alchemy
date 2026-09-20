@@ -89,6 +89,8 @@ al_import(ll::plutosvg     PACKAGE plutosvg        CONFIG TARGETS plutosvg::plut
 al_import(ll::pugixml      PACKAGE pugixml         CONFIG TARGETS pugixml::pugixml)
 al_import(ll::simdjson     PACKAGE simdjson        CONFIG TARGETS simdjson::simdjson)
 al_import(ll::simdutf      PACKAGE simdutf                TARGETS simdutf::simdutf)
+al_import(ll::slua         PACKAGE unofficial-slua CONFIG TARGETS unofficial::slua::Luau.Analysis unofficial::slua::Luau.Compiler)
+al_import(ll::tailslide    PACKAGE unofficial-tailslide CONFIG TARGETS unofficial::tailslide::libtailslide)
 al_import(ll::tinyexr      PACKAGE tinyexr         CONFIG TARGETS unofficial::tinyexr::tinyexr)
 al_import(ll::vorbis       PACKAGE Vorbis          CONFIG TARGETS Vorbis::vorbisfile Vorbis::vorbisenc Vorbis::vorbis)
 al_import(ll::websocketpp  PACKAGE websocketpp     CONFIG TARGETS websocketpp::websocketpp)

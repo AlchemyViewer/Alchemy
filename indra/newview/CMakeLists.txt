@@ -45,6 +45,17 @@ if(AL_BUILD_VIEWER)
     "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml"
     COPYONLY
   )
+  # The rest of the definitions, for the analyzers: the Luau type
+  # definitions, their documentation and the LSL builtins, laid out as the
+  # install step lays them out, so that a build-tree run finds them in the
+  # same place an installed viewer does.
+  foreach(definition builtins.txt secondlife.d.luau secondlife.docs.json)
+    configure_file(
+      "${LSL_DEFINITIONS_DIR}/${definition}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/syntax_default/${definition}"
+      COPYONLY
+    )
+  endforeach()
 
   find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
   message(VERBOSE "Copying fonts from ${ALCHEMY_FONTS_DIR}")

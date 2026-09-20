@@ -30,6 +30,8 @@
         "secondlife-emoji-shortcodes",
         "sentry-cocoa",
         "sentry-native",
+        "slua",
+        "tailslide",
         "tinygltf",
         "tracy",
         "v-hacd",

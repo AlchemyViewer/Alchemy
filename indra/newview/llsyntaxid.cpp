@@ -48,6 +48,9 @@ namespace
     const std::string FILENAME_INTERNAL_LUA        = "lua_keywords.xml";
     const std::string FILENAME_DEFAULT_LSL         = "keywords_lsl_default.xml";
     const std::string FILENAME_DEFAULT_LUA         = "keywords_lua_default.xml";
+    const std::string FILENAME_LUAU_DEFINITIONS    = "secondlife.d.luau";
+    const std::string FILENAME_LUAU_DOCS           = "secondlife.docs.json";
+    const std::string FILENAME_LSL_BUILTINS        = "builtins.txt";
 
     constexpr U32     LLSD_SYNTAX_LSL_VERSION_EXPECTED = 2;
     const std::string LLSD_SYNTAX_LSL_VERSION_KEY("llsd-lsl-syntax-version");
@@ -354,6 +357,19 @@ void LLSyntaxDefCache::buildCachePaths(const LLUUID &syntax_id)
     else
     {
         mFileCachePaths.clear();
+        // Everything the definitions ship beyond the keyword files -- the
+        // Luau type definitions, their documentation, the LSL builtins --
+        // as laid out under app_settings/syntax_default. The two keyword
+        // files are named last so that their copies under app_settings,
+        // which every build has, are the ones read.
+        std::string default_dir = buildCacheDirectoryName(LLUUID::null);
+        if (gDirUtilp->fileExists(default_dir))
+        {
+            for (const auto& file : gDirUtilp->getFilesInDir(default_dir))
+            {
+                mFileCachePaths.addNamePath(file, gDirUtilp->add(default_dir, file));
+            }
+        }
         mFileCachePaths.addNamePath(
             FILENAME_INTERNAL_LSL,
             gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, FILENAME_DEFAULT_LSL));
@@ -523,6 +539,21 @@ void LLSyntaxDefCache::loadKeywordsIntoLLSD()
     }
 
     mSyntaxIDChangedSignal();
+}
+
+std::string LLSyntaxDefCache::getLuauDefinitionsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LUAU_DEFINITIONS);
+}
+
+std::string LLSyntaxDefCache::getLuauDocsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LUAU_DOCS);
+}
+
+std::string LLSyntaxDefCache::getLSLBuiltinsPath() const
+{
+    return mFileCachePaths.getPath(FILENAME_LSL_BUILTINS);
 }
 
 std::vector<std::string> LLSyntaxDefCache::getCacheFileNames() const

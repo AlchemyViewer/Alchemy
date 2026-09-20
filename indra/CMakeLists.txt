@@ -429,6 +429,7 @@ add_subdirectory(template_verifier)
 
 add_subdirectory(dullahan)
 add_subdirectory(llprecompiled)
+add_subdirectory(alscript)
 add_subdirectory(llaudio)
 add_subdirectory(llappearance)
 add_subdirectory(llcharacter)
