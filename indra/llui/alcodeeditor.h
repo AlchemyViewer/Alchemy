@@ -27,6 +27,7 @@
 #include "altextview.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -100,6 +101,8 @@ public:
         ALTextRange range;
         Style       style = Style::Squiggle;
         LLColor4    color;
+        // Shown when the mouse rests on it, where there is something to say.
+        std::string message;
     };
     void                           setDecorations(std::vector<Decoration> decorations);
     const std::vector<Decoration>& decorations() const { return mDecorations; }
@@ -154,6 +157,13 @@ public:
     // and the whole is ordered: the case typed first, then the alphabet.
     typedef std::function<void(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out)> completion_provider_t;
     void setCompletionProvider(completion_provider_t provider) { mProvider = std::move(provider); }
+    // Told when the list opens at a new identifier, for whoever answers
+    // later: an analyzer on another thread. What it answers comes back
+    // through supplyCompletions, and is merged in if the list is still
+    // about the same identifier.
+    typedef std::function<void(const ALTextPos& at, std::string_view prefix)> completion_request_t;
+    void setCompletionRequest(completion_request_t request) { mCompletionRequest = std::move(request); }
+    void supplyCompletions(const ALTextPos& at, std::vector<Completion> more);
     bool completionOpen() const;
     void closeCompletion();
     // Puts the chosen completion in place of the prefix. False with none
@@ -162,9 +172,49 @@ public:
     const std::vector<Completion>& completions() const { return mCompletions; }
     S32                            chosenCompletion() const;
 
+    // --- hover -------------------------------------------------------------------
+
+    // Asked what to say about the word the mouse rests on; answers into
+    // `text` and true where there is something. A decoration's message
+    // comes first where the mouse is on one.
+    typedef std::function<bool(const ALTextPos& at, std::string_view word, std::string& text)> hover_provider_t;
+    void setHoverProvider(hover_provider_t provider) { mHover = std::move(provider); }
+    // Asked when the provider had nothing to say, for an answer that
+    // comes later through supplyHover; shown if the mouse is still there.
+    typedef std::function<void(const ALTextPos& at, std::string_view word)> hover_request_t;
+    void setHoverRequest(hover_request_t request) { mHoverRequest = std::move(request); }
+    void supplyHover(const ALTextPos& at, const std::string& text);
+
+    // --- signature help ------------------------------------------------------------
+
+    // The call the caret is in, drawn above its row: the label with the
+    // parameter the caret is at picked out, and a line of documentation.
+    struct Signature
+    {
+        std::string                          label;
+        // Each parameter's span in the label, in bytes.
+        std::vector<std::pair<S32, S32>>     parameters;
+        S32                                  active = 0;
+        std::string                          documentation;
+    };
+    // Asked for the call at the caret when an opening bracket or a comma
+    // is typed, and again at every change while one is shown; the answer
+    // comes through showSignature, or hideSignature for none.
+    typedef std::function<void(const ALTextPos& caret)> signature_request_t;
+    void setSignatureRequest(signature_request_t request) { mSignatureRequest = std::move(request); }
+    void showSignature(const ALTextPos& caret, Signature signature);
+    void hideSignature();
+    // Shown, and still about the call the caret is in: on its line, and
+    // not before where it began.
+    bool signatureShown() const;
+    const Signature* signature() const { return mSignature ? &*mSignature : nullptr; }
+
+    void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onFocusLost() override;
 
 protected:
@@ -198,6 +248,12 @@ private:
     void openCompletion();
     void refreshCompletion();
     void placeCompletion();
+    void listCompletions();
+    // Out of sight, but still about the word it was asked about, for an
+    // answer that may yet come.
+    void hideCompletionList();
+    void drawSignature(const LLRect& text);
+    void showTip(const ALTextRange& about, const std::string& says);
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
     void documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out);
 
@@ -238,8 +294,22 @@ private:
     std::vector<S32>        mFolded;
 
     completion_provider_t   mProvider;
+    completion_request_t    mCompletionRequest;
+    hover_provider_t        mHover;
+    hover_request_t         mHoverRequest;
+    signature_request_t     mSignatureRequest;
     LLScrollListCtrl*       mCompletionList = nullptr;
     std::vector<Completion> mCompletions;
     // The identifier the list is narrowing, which the choice replaces.
     ALTextRange             mCompletionRange;
+    // Where the last request was made, so a late answer is known for
+    // what it is about, and what was answered, kept through every
+    // narrowing until the list closes.
+    ALTextPos               mCompletionAsked{ -1, -1 };
+    std::vector<Completion> mSupplied;
+    ALTextRange             mHoverAsked;
+    S32                     mMouseX = -1;
+    S32                     mMouseY = -1;
+    std::optional<Signature> mSignature;
+    ALTextPos               mSignatureAt;
 };

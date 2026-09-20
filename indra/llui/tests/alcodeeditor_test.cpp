@@ -261,4 +261,59 @@ namespace tut
         key(KEY_TAB);
         ensure_equals("tab takes it", e.text(), std::string("integer count;\nllSay(0, count, de) custom"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<7>()
+    {
+        set_test_name("a late answer joins the list if it is still about the same word, and a signature follows the call");
+        ALCodeEditor& e = make("x = ab", "lsl");
+        e.setCaret(e.document().end());
+        ALTextPos        asked(-1, -1);
+        std::string      asked_prefix;
+        e.setCompletionRequest([&](const ALTextPos& at, std::string_view prefix) {
+            asked        = at;
+            asked_prefix = std::string(prefix);
+        });
+        key(' ', MASK_CONTROL);
+        ensure("asked where the word begins", asked == ALTextPos(0, 4) && asked_prefix == "ab");
+        ensure("nothing to show yet", !e.completionOpen());
+        std::vector<ALCodeEditor::Completion> late;
+        ALCodeEditor::Completion              one;
+        one.text   = "abacus";
+        one.detail = "integer";
+        late.push_back(one);
+        one.text = "zzz";
+        late.push_back(one);
+        e.supplyCompletions(ALTextPos(0, 4), late);
+        ensure("the answer opens the list", e.completionOpen());
+        ensure_equals("with the one that fits", e.completions().size(), size_t(1));
+        ensure_equals("which is", e.completions()[0].text, std::string("abacus"));
+        type("a");
+        ensure("narrowing keeps it", e.completionOpen() && e.completions()[0].text == "abacus");
+        ensure("no new request while narrowing", asked == ALTextPos(0, 4));
+        e.supplyCompletions(ALTextPos(0, 9), late);
+        ensure("an answer about another word is ignored", e.completions().size() == 1);
+        key(KEY_ESCAPE);
+
+        std::vector<ALTextPos> signature_asks;
+        e.setSignatureRequest([&](const ALTextPos& caret) { signature_asks.push_back(caret); });
+        type("(");
+        ensure("an opening bracket asks", signature_asks.size() == 1 && signature_asks.back() == e.caret());
+        ALCodeEditor::Signature sig;
+        sig.label      = "float half(integer n)";
+        sig.parameters = { { 11, 20 } };
+        sig.active     = 0;
+        e.showSignature(e.caret(), sig);
+        ensure("shown", e.signatureShown() && e.signature()->label == sig.label);
+        type("4");
+        ensure("typing inside asks again", signature_asks.size() == 2);
+        e.hideSignature();
+        ensure("hidden", !e.signatureShown());
+        e.showSignature(e.caret(), sig);
+        key(KEY_ESCAPE);
+        ensure("escape hides it", !e.signatureShown());
+        e.showSignature(e.caret(), sig);
+        e.setCaret(ALTextPos(0, 0));
+        ensure("the caret leaving the call ends it", !e.signatureShown());
+    }
 }

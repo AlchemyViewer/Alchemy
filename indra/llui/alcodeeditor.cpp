@@ -30,6 +30,7 @@
 #include "llrender2dutils.h"
 #include "llscrolllistctrl.h"
 #include "llstring.h"
+#include "lltooltip.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
@@ -54,6 +55,7 @@ namespace
     const S32 COMPLETION_ROWS    = 8;
     const S32 COMPLETION_AUTO_AT = 2;
     const size_t COMPLETION_CAP  = 200;
+    const S32    SIGNATURE_PAD   = 6;
 
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
@@ -919,7 +921,7 @@ bool ALCodeEditor::completionOpen() const
     return mCompletionList && mCompletionList->getVisible();
 }
 
-void ALCodeEditor::closeCompletion()
+void ALCodeEditor::hideCompletionList()
 {
     if (mCompletionList)
     {
@@ -927,6 +929,13 @@ void ALCodeEditor::closeCompletion()
         mCompletionList->deleteAllItems();
     }
     mCompletions.clear();
+}
+
+void ALCodeEditor::closeCompletion()
+{
+    hideCompletionList();
+    mCompletionAsked = ALTextPos(-1, -1);
+    mSupplied.clear();
 }
 
 S32 ALCodeEditor::chosenCompletion() const
@@ -1016,6 +1025,13 @@ void ALCodeEditor::refreshCompletion()
         closeCompletion();
         return;
     }
+    const ALTextPos start(at.line, at.column - static_cast<S32>(prefix.size()));
+    const bool      fresh = start != mCompletionAsked;
+    if (fresh)
+    {
+        mCompletionAsked = start;
+        mSupplied.clear();
+    }
     mCompletions.clear();
     if (mProvider)
     {
@@ -1025,7 +1041,53 @@ void ALCodeEditor::refreshCompletion()
     {
         vocabularyCompletions(prefix, mCompletions);
     }
+    // What was answered about this word, narrowed to the prefix as typed
+    // now; what was known already keeps its place, and what is new about
+    // it fills what was empty.
+    auto begins = [&](const std::string& word) {
+        if (word.size() < prefix.size())
+        {
+            return false;
+        }
+        for (size_t i = 0; i < prefix.size(); ++i)
+        {
+            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (const Completion& c : mSupplied)
+    {
+        if (!begins(c.text))
+        {
+            continue;
+        }
+        bool known = false;
+        for (Completion& have : mCompletions)
+        {
+            if (have.text == c.text)
+            {
+                known = true;
+                if (have.detail.empty())
+                {
+                    have.detail = c.detail;
+                    have.kind   = c.kind;
+                }
+                break;
+            }
+        }
+        if (!known)
+        {
+            mCompletions.push_back(c);
+        }
+    }
     documentCompletions(at, prefix, mCompletions);
+    if (fresh && mCompletionRequest)
+    {
+        mCompletionRequest(start, prefix);
+    }
     // What matches the case typed comes first; then the alphabet.
     std::stable_sort(mCompletions.begin(), mCompletions.end(), [&](const Completion& a, const Completion& b) {
         const bool a_exact = a.text.compare(0, prefix.size(), prefix) == 0;
@@ -1042,27 +1104,42 @@ void ALCodeEditor::refreshCompletion()
     }
     if (mCompletions.empty())
     {
-        closeCompletion();
+        hideCompletionList();
         return;
     }
     mCompletionRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
+    listCompletions();
+}
 
+void ALCodeEditor::listCompletions()
+{
     const S32 was = mCompletionList->getFirstSelectedIndex();
     mCompletionList->deleteAllItems();
     for (size_t i = 0; i < mCompletions.size(); ++i)
     {
         const Completion& c = mCompletions[i];
         LLSD              row;
-        row["id"]                     = static_cast<S32>(i);
-        row["columns"][0]["column"]   = "text";
-        row["columns"][0]["value"]    = c.text;
-        row["columns"][1]["column"]   = "detail";
-        row["columns"][1]["value"]    = c.detail;
+        row["id"]                   = static_cast<S32>(i);
+        row["columns"][0]["column"] = "text";
+        row["columns"][0]["value"]  = c.text;
+        row["columns"][1]["column"] = "detail";
+        row["columns"][1]["value"]  = c.detail;
         mCompletionList->addElement(row);
     }
     mCompletionList->selectNthItem(llclamp(was, 0, static_cast<S32>(mCompletions.size()) - 1));
     placeCompletion();
     mCompletionList->setVisible(true);
+}
+
+void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
+{
+    // Only about the identifier the list is still narrowing.
+    if (at != mCompletionAsked || hasSelection() || isReadOnly())
+    {
+        return;
+    }
+    mSupplied = std::move(more);
+    refreshCompletion();
 }
 
 void ALCodeEditor::placeCompletion()
@@ -1174,7 +1251,17 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
     {
         closeCompletion();
     }
-    return ALTextView::handleKeyHere(key, mask);
+    if (mSignature && key == KEY_ESCAPE && mask == MASK_NONE)
+    {
+        hideSignature();
+        return true;
+    }
+    const bool taken = ALTextView::handleKeyHere(key, mask);
+    if (taken && mSignature && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE))
+    {
+        mSignatureRequest(caret());
+    }
+    return taken;
 }
 
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
@@ -1192,6 +1279,11 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     else if (!was_open && mAutoComplete && static_cast<S32>(wordBeforeCaret().size()) >= COMPLETION_AUTO_AT)
     {
         openCompletion();
+    }
+    // A call begins, moves on to its next argument, or ends.
+    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')' || mSignature))
+    {
+        mSignatureRequest(caret());
     }
     return true;
 }
@@ -1231,6 +1323,206 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         }
     }
     return ALTextView::handleMouseDown(x, y, mask);
+}
+
+bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    const LLRect text = textRect();
+    if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
+    {
+        return ALTextView::handleToolTip(x, y, mask);
+    }
+    const ALTextPos at = posAtLocal(x, y, false);
+    std::string     says;
+    ALTextRange     about;
+    // A problem under the mouse says what it is; else the word does.
+    for (const Decoration& d : mDecorations)
+    {
+        const ALTextRange range = d.range.normalised();
+        if (!d.message.empty() && range.begin <= at && at < range.end)
+        {
+            says  = d.message;
+            about = range;
+            break;
+        }
+    }
+    if (says.empty() && mHover)
+    {
+        const ALTextRange word = document().wordAt(at).normalised();
+        if (!word.empty())
+        {
+            const std::string word_text = document().text(word);
+            if (!word_text.empty() && identifierByte(word_text[0]) && mHover(at, word_text, says))
+            {
+                about = word;
+            }
+        }
+    }
+    if (says.empty())
+    {
+        // Somebody may know later.
+        const ALTextRange word = document().wordAt(at).normalised();
+        if (mHoverRequest && !word.empty() && word != mHoverAsked)
+        {
+            const std::string word_text = document().text(word);
+            if (!word_text.empty() && identifierByte(word_text[0]))
+            {
+                mHoverAsked = word;
+                mHoverRequest(word.begin, word_text);
+            }
+        }
+        return ALTextView::handleToolTip(x, y, mask);
+    }
+    showTip(about, says);
+    return true;
+}
+
+void ALCodeEditor::showTip(const ALTextRange& about, const std::string& says)
+{
+    // The tip stays while the mouse stays over what it is about.
+    const LLRect text = textRect();
+    S32          row;
+    layout().xOf(about.begin.line, about.begin.column, &row);
+    const S32 top = screenTopOf(text, about.begin.line, row);
+    F32       x0, x1;
+    LLRect    local(text.mLeft, top, text.mRight, top - layout().rowHeight());
+    if (spanOnRow(about.begin.line, row, about, x0, x1))
+    {
+        const F32 left = static_cast<F32>(text.mLeft) - scrollX();
+        local.mLeft    = static_cast<S32>(left + x0);
+        local.mRight   = static_cast<S32>(left + x1);
+    }
+    LLRect sticky;
+    localRectToScreen(local, &sticky);
+    LLToolTipMgr::instance().show(LLToolTip::Params().message(says).sticky_rect(sticky));
+}
+
+void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
+{
+    if (text.empty() || mHoverAsked.empty() || at != mHoverAsked.begin)
+    {
+        return;
+    }
+    // Still over the same word, or the moment has passed.
+    if (mMouseX < 0 || !textRect().pointInRect(mMouseX, mMouseY))
+    {
+        return;
+    }
+    const ALTextPos   under = posAtLocal(mMouseX, mMouseY, false);
+    const ALTextRange word  = document().wordAt(under).normalised();
+    if (word != mHoverAsked)
+    {
+        return;
+    }
+    showTip(word, text);
+}
+
+bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
+{
+    mMouseX = x;
+    mMouseY = y;
+    return ALTextView::handleHover(x, y, mask);
+}
+
+// --- signature help -------------------------------------------------------------
+
+void ALCodeEditor::showSignature(const ALTextPos& at, Signature signature)
+{
+    mSignature   = std::move(signature);
+    mSignatureAt = at;
+}
+
+void ALCodeEditor::hideSignature()
+{
+    mSignature.reset();
+}
+
+bool ALCodeEditor::signatureShown() const
+{
+    return mSignature && caret().line == mSignatureAt.line && !(caret() < mSignatureAt);
+}
+
+void ALCodeEditor::drawSignature(const LLRect& text)
+{
+    if (!mSignature || mSignature->label.empty())
+    {
+        return;
+    }
+    const Signature& sig   = *mSignature;
+    const LLFontGL*  font  = getFont();
+    const F32        alpha = getDrawContext().mAlpha;
+    const S32        row_h = layout().rowHeight();
+    const S32        line_h = font->getLineHeight();
+    const bool       docs  = !sig.documentation.empty();
+    const std::string doc_line = docs ? sig.documentation.substr(0, sig.documentation.find('\n')) : std::string();
+    const S32        width = llmax(font->getWidth(sig.label), docs ? font->getWidth(doc_line) : 0) + 2 * SIGNATURE_PAD;
+    const S32        height = line_h * (docs ? 2 : 1) + 2 * SIGNATURE_PAD;
+
+    // Above the caret's row, left with the call's column, kept inside the
+    // view; under the row where above would run off the top.
+    S32       row;
+    const F32 x    = layout().xOf(mSignatureAt.line, mSignatureAt.column, &row);
+    const S32 top  = screenTopOf(text, mSignatureAt.line, row);
+    const LLRect local = getLocalRect();
+    S32       left = llclamp(static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x), local.mLeft, llmax(local.mLeft, local.mRight - width));
+    LLRect    box  = (top + height <= local.mTop) ? LLRect(left, top + height, left + width, top)
+                                                  : LLRect(left, top - row_h, left + width, top - row_h - height);
+
+    const LLColor4 bg     = towards(backgroundColor(), textColor(), 0.08f) % alpha;
+    const LLColor4 border = foldColor() % alpha;
+    const LLColor4 ink    = textColor() % alpha;
+    const LLColor4 active = mBracketMatchColor.get() % alpha;
+    const LLColor4 faint  = lineNumberColor() % alpha;
+    gl_rect_2d(box, bg);
+    gl_rect_2d(box, border, false);
+
+    // The label in three pieces, the active parameter in its own colour.
+    const F32 baseline = static_cast<F32>(box.mTop - SIGNATURE_PAD - llround(font->getAscenderHeight()));
+    F32       pen      = static_cast<F32>(box.mLeft + SIGNATURE_PAD);
+    S32       begin = -1, end = -1;
+    if (sig.active >= 0 && sig.active < static_cast<S32>(sig.parameters.size()))
+    {
+        begin = sig.parameters[sig.active].first;
+        end   = sig.parameters[sig.active].second;
+    }
+    auto piece = [&](S32 from, S32 to, const LLColor4& color) {
+        if (to <= from)
+        {
+            return;
+        }
+        const std::string part = sig.label.substr(from, to - from);
+        font->renderUTF8(part, 0, pen, baseline, color, LLFontGL::LEFT, LLFontGL::BASELINE);
+        pen += static_cast<F32>(font->getWidth(part));
+    };
+    if (begin >= 0 && end > begin && end <= static_cast<S32>(sig.label.size()))
+    {
+        piece(0, begin, ink);
+        piece(begin, end, active);
+        piece(end, static_cast<S32>(sig.label.size()), ink);
+    }
+    else
+    {
+        piece(0, static_cast<S32>(sig.label.size()), ink);
+    }
+    if (docs)
+    {
+        font->renderUTF8(doc_line, 0, static_cast<F32>(box.mLeft + SIGNATURE_PAD), baseline - static_cast<F32>(line_h), faint, LLFontGL::LEFT, LLFontGL::BASELINE);
+    }
+}
+
+void ALCodeEditor::draw()
+{
+    // A signature is about a call on the caret's line; anywhere else it
+    // is stale.
+    if (mSignature && !signatureShown())
+    {
+        hideSignature();
+    }
+    ALTextView::draw();
+    if (mSignature)
+    {
+        drawSignature(textRect());
+    }
 }
 
 void ALCodeEditor::onFocusLost()
