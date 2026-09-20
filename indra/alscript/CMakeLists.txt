@@ -10,7 +10,9 @@ target_sources(alscript PRIVATE alluauservice.cpp allslservice.cpp alscriptenvel
 
 target_sources(
   alscript
-  PUBLIC FILE_SET HEADERS FILES alluauservice.h allslservice.h alscriptenvelope.h alscriptproblem.h
+  PUBLIC
+    FILE_SET HEADERS
+      FILES alluauservice.h allslservice.h alscriptenvelope.h alscriptproblem.h alscriptsymbol.h
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide PUBLIC llcommon)

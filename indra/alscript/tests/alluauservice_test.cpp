@@ -174,4 +174,76 @@ namespace tut
         ensure("with a reason", !why.empty());
         ensure("and nothing loaded", !bare.hasDefinitions());
     }
+
+    template<> template<>
+    void alluauservice_object::test<9>()
+    {
+        set_test_name("completion offers the fields of ll and the locals in scope");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local count = 1\nll.Sa\n";
+        // At the end of `ll.Sa`.
+        std::vector<ALScriptCompletion> found = service.complete(script, 1, 5);
+        bool say = false;
+        for (const ALScriptCompletion& c : found)
+        {
+            if (c.text == "Say")
+            {
+                say = true;
+                ensure("a function", c.kind == ALScriptSymbolKind::Function);
+                ensure("with a signature: " + c.detail, c.detail.find("(") != std::string::npos);
+            }
+        }
+        std::string names = llformat("%d entries:", (int)found.size());
+        for (size_t i = 0; i < found.size() && i < 12; ++i) names += " " + found[i].text;
+        ensure("ll.Say is offered; " + names, say);
+        // At the start of an empty statement: bindings and keywords.
+        found = service.complete(script, 2, 0);
+        bool local = false, keyword = false;
+        for (const ALScriptCompletion& c : found)
+        {
+            local   = local || (c.text == "count" && c.kind == ALScriptSymbolKind::Variable && c.detail == "number");
+            keyword = keyword || (c.text == "local" && c.kind == ALScriptSymbolKind::Keyword);
+        }
+        ensure("the local, typed", local);
+        ensure("a keyword", keyword);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<10>()
+    {
+        set_test_name("hover says what a name is, with its documentation, and where a local was bound");
+        ensure("definitions loaded: " + error, loaded);
+        std::ifstream in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.docs.json", std::ios::binary);
+        std::stringstream json;
+        json << in.rdbuf();
+        std::string docs_error;
+        ensure("docs loaded: " + docs_error, service.loadDocs(json.str(), docs_error));
+        const std::string script = "local count = 1\nll.Say(0, tostring(count))\n";
+        ALScriptHover hover = service.hover(script, 1, 4);  // on `Say`
+        ensure("found", hover.found);
+        ensure("the name and its type: " + hover.label, hover.label.find("Say") != std::string::npos && hover.label.find("(") != std::string::npos);
+        ensure("documented: " + hover.documentation, !hover.documentation.empty());
+        ensure("not the script's own", !hover.hasDefinition);
+        hover = service.hover(script, 1, 20);  // on `count` in the call
+        ensure("found the local", hover.found);
+        ensure("a number: " + hover.label, hover.label.find("number") != std::string::npos);
+        ensure("bound in the script", hover.hasDefinition && hover.definitionLine == 0);
+        ensure("nothing at nothing", !service.hover(script, 2, 0).found);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<11>()
+    {
+        set_test_name("a signature names the call the position is in and which parameter it is at");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "ll.Say(0, \"hi\")\n";
+        ALScriptSignature sig = service.signature(script, 0, 7);  // in the first argument
+        ensure("found", sig.found);
+        ensure("the call: " + sig.label, sig.label.find("Say") != std::string::npos);
+        ensure_equals("two parameters", sig.parameters.size(), size_t(2));
+        ensure_equals("at the first", sig.active, 0);
+        sig = service.signature(script, 0, 11);  // in the second
+        ensure_equals("at the second", sig.active, 1);
+        ensure("none outside a call", !service.signature(script, 0, 0).found);
+    }
 }

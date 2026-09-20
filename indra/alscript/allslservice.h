@@ -25,15 +25,18 @@
 #pragma once
 
 #include "alscriptproblem.h"
+#include "alscriptsymbol.h"
 
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The LSL analyzer: Tailslide's parser, symbol table and type checks, given
-// the grid's builtins and asked about one script at a time. Phase 0 of
-// doc/SCRIPT_STUDIO.md: it loads the builtins and checks a script. The
-// optimizer, the pretty printer and the rest come with the language service.
+// the grid's builtins and asked about one script at a time: what is wrong
+// with it, which of its own symbols are in scope at a position, what is at
+// one, and what a call there takes. The optimizer and the pretty printer
+// come in phase 3.
 //
 // Tailslide's headers stay behind the implementation. Not thread-safe, and
 // the builtins are a table the library holds once for the whole process.
@@ -57,6 +60,17 @@ public:
     // was said. `mono` chooses Mono's rules for what a global initialiser
     // may be; LSO's otherwise.
     ALScriptProblems check(std::string_view source, bool mono = true);
+
+    // The script's own symbols in scope at a position: its globals,
+    // functions, states, and the parameters and locals of what encloses
+    // the position and was declared before it. The builtins are the
+    // region's vocabulary, which the studio already has.
+    std::vector<ALScriptCompletion> symbols(std::string_view source, S32 line, S32 column);
+    // The symbol named at a position, as its declaration reads, and
+    // where it was declared when the script declared it.
+    ALScriptHover hover(std::string_view source, S32 line, S32 column);
+    // The call a position is inside, if any, builtin or the script's own.
+    ALScriptSignature signature(std::string_view source, S32 line, S32 column);
 
 private:
     struct Impl;

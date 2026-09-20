@@ -25,15 +25,18 @@
 #pragma once
 
 #include "alscriptproblem.h"
+#include "alscriptsymbol.h"
 
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
-// grid's definitions and asked about one script at a time. Phase 0 of
-// doc/SCRIPT_STUDIO.md: it loads the definitions and checks a script.
-// Completion, hover and the rest come with the language service.
+// grid's definitions and asked about one script at a time: what is wrong
+// with it, what could go at a position, what is at one, and what a call
+// there takes. The documentation comes from the docs JSON beside the
+// definitions, keyed the way luau-lsp keys it.
 //
 // The Luau headers stay behind the implementation, so nothing that includes
 // this pays for them. Not thread-safe: one of these belongs to one thread.
@@ -52,9 +55,23 @@ public:
     bool loadDefinitions(std::string_view source, std::string& error);
     bool hasDefinitions() const;
 
+    // The documentation, as secondlife.docs.json has it: a map from a
+    // symbol such as "@sl-slua/global/ll.Say" to its text and link.
+    bool loadDocs(std::string_view json, std::string& error);
+    bool hasDocs() const;
+
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.
     ALScriptProblems check(std::string_view source);
+
+    // What could go at a position of the script: the keywords, the
+    // bindings in scope, the fields of what is being indexed.
+    std::vector<ALScriptCompletion> complete(std::string_view source, S32 line, S32 column);
+    // What is at a position: its name and type, its documentation, and
+    // where in the script it was bound.
+    ALScriptHover hover(std::string_view source, S32 line, S32 column);
+    // The call a position is inside, if any.
+    ALScriptSignature signature(std::string_view source, S32 line, S32 column);
 
 private:
     struct Impl;

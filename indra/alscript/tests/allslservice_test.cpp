@@ -172,4 +172,83 @@ namespace tut
         ensure("with a reason", !why.empty());
         ensure("nothing loaded", !bare.hasBuiltins());
     }
+
+    template<> template<>
+    void allslservice_object::test<7>()
+    {
+        set_test_name("the script's symbols in scope: globals, functions, states, and locals declared before the position");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "integer count = 0;\n"
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    touch_start(integer total)\n"
+            "    {\n"
+            "        string before = \"a\";\n"
+            "        llSay(0, before);\n"
+            "        string after = \"b\";\n"
+            "    }\n"
+            "}\n"
+            "state other { }\n";
+        // Inside the llSay call.
+        std::vector<ALScriptCompletion> found = service.symbols(script, 7, 12);
+        auto has = [&](const char* name, ALScriptSymbolKind kind, const char* detail) {
+            for (const ALScriptCompletion& c : found)
+            {
+                if (c.text == name)
+                {
+                    return c.kind == kind && c.detail == detail;
+                }
+            }
+            return false;
+        };
+        ensure("the global", has("count", ALScriptSymbolKind::Variable, "integer count"));
+        ensure("the function", has("half", ALScriptSymbolKind::Function, "float half(integer n)"));
+        ensure("the state", has("other", ALScriptSymbolKind::State, "state other"));
+        ensure("the event's parameter", has("total", ALScriptSymbolKind::Parameter, "integer total"));
+        ensure("the local before", has("before", ALScriptSymbolKind::Variable, "string before"));
+        bool after = false, builtin = false;
+        for (const ALScriptCompletion& c : found)
+        {
+            after   = after || c.text == "after";
+            builtin = builtin || c.text == "llSay";
+        }
+        ensure("not the local after", !after);
+        ensure("not the builtins", !builtin);
+    }
+
+    template<> template<>
+    void allslservice_object::test<8>()
+    {
+        set_test_name("hover reads a symbol's declaration and points at it; a signature says which argument");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        llSay(0, (string)half(4));\n"
+            "    }\n"
+            "}\n";
+        ALScriptHover hover = service.hover(script, 5, 26);  // on `half`
+        ensure("found", hover.found);
+        ensure_equals("as declared", hover.label, std::string("float half(integer n)"));
+        ensure("declared on the first line", hover.hasDefinition && hover.definitionLine == 0);
+        hover = service.hover(script, 5, 10);  // on `llSay`
+        ensure("a builtin is found", hover.found);
+        ensure("as declared: " + hover.label, hover.label.find("llSay(") != std::string::npos);
+        ensure("but not in the script", !hover.hasDefinition);
+
+        ALScriptSignature sig = service.signature(script, 5, 15);  // in llSay's first argument
+        ensure("in the call", sig.found);
+        ensure("the builtin's signature: " + sig.label, sig.label.find("llSay(") == 0 || sig.label.find(" llSay(") != std::string::npos);
+        ensure_equals("two parameters", sig.parameters.size(), size_t(2));
+        ensure_equals("the first", sig.active, 0);
+        sig = service.signature(script, 5, 30);  // just inside half(
+        ensure("the inner call", sig.found && sig.label == "float half(integer n)");
+        ensure_equals("its only parameter", sig.active, 0);
+        ensure("none at the top", !service.signature(script, 0, 0).found);
+    }
 }
