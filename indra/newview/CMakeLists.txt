@@ -1935,6 +1935,7 @@ if(AL_BUILD_VIEWER)
     ${AL_VIEWER_BINARY_NAME}
     PRIVATE
       al::flags
+      alscript
       llaudio
       llcharacter
       llimage

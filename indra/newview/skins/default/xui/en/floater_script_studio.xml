@@ -26,6 +26,8 @@
     <floater.string name="PaneProblems">Problems</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
+    <floater.string name="TabSourceTip">The source this script was written as, before the preprocessor expanded it; read-only here</floater.string>
+    <floater.string name="SourceTabName">[NAME] (source)</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
@@ -112,6 +114,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
             </menu_item_call>
+            <menu_item_call label="Complete" layout="topleft" name="complete">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="complete" />
+            </menu_item_call>
         </menu>
         <menu
          label="View"
@@ -128,6 +134,23 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
             </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Fold" layout="topleft" name="fold">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold" />
+            </menu_item_call>
+            <menu_item_call label="Unfold" layout="topleft" name="unfold">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold" />
+            </menu_item_call>
+            <menu_item_call label="Fold All" layout="topleft" name="fold_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold_all" />
+            </menu_item_call>
+            <menu_item_call label="Unfold All" layout="topleft" name="unfold_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
+            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|1">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />

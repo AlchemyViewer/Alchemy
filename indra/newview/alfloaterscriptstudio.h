@@ -24,17 +24,19 @@
 
 #pragma once
 
+#include "alcodeeditor.h"
+#include "alscriptenvelope.h"
 #include "alscriptworkspace.h"
 #include "alstudiofloater.h"
 
 #include <boost/signals2.hpp>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
-class ALCodeEditor;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -45,9 +47,11 @@ class LLScrollListCtrl;
 // The scripting studio of doc/SCRIPT_STUDIO.md, as far as phase 1 takes it:
 // scripts from inventory and from objects open in tabs over code editors,
 // saved and compiled through the workspace, with the compiler's problems in
-// a pane that jumps to the line. Its regions fold and come out as any
-// studio's do. Not yet: the explorer, the output, the inspector, the
-// analyzers' diagnostics, the envelope.
+// a pane that jumps to the line, the region's vocabulary colouring and
+// completing the text, and a script the preprocessor wrapped shown as the
+// code the server compiled with the author's source in a tab beside it.
+// Its regions fold and come out as any studio's do. Not yet: the explorer,
+// the output, the inspector, the analyzers' diagnostics.
 class ALFloaterScriptStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
@@ -75,10 +79,13 @@ private:
     ALFloaterScriptStudio(const LLSD& key);
     ~ALFloaterScriptStudio() override;
 
-    // One script open in the studio.
+    // One tab of the studio: a script, or the author's source of one that
+    // the preprocessor wrapped, read-only beside it.
     struct Doc
     {
         ALScriptRef                                ref;
+        // The script's id, or the script's id and ":source".
+        std::string                                id;
         std::string                                name;
         ALCodeEditor*                              editor = nullptr;
         ALScriptWorkspace::Language                language;
@@ -87,10 +94,24 @@ private:
         bool                                       modifiable = false;
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
+        bool                                       sourceView = false;
+        // The envelope the asset came in, whose expanded code the editor
+        // holds, and which a save wraps the code back in.
+        std::optional<ALScriptEnvelope>            envelope;
         std::vector<ALScriptWorkspace::Diagnostic> problems;
         boost::signals2::scoped_connection         changed;
     };
     static constexpr size_t NONE = static_cast<size_t>(-1);
+
+    // A word of the language, as the region defines it: what colours and
+    // completes.
+    struct Vocab
+    {
+        std::string  text;
+        std::string  detail;
+        ALSyntaxKind kind = ALSyntaxKind::Text;
+        bool         deprecated = false;
+    };
 
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
@@ -98,6 +119,12 @@ private:
     void   activate(size_t index);
     void   fillTabs();
     void   refreshToolbar();
+
+    ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
+    void                      showSource(Doc& doc);
+    const std::vector<Vocab>& vocabulary(bool lua);
+    void                      teachEditor(ALCodeEditor& editor, bool lua);
+    std::string               textToSave(const Doc& doc) const;
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void save(Doc& doc);
@@ -128,6 +155,8 @@ private:
 
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
+    std::vector<Vocab>                 mVocabulary[2];
+    bool                               mVocabularyBuilt[2] = { false, false };
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
     LLPanel*                           mEditorHost    = nullptr;
