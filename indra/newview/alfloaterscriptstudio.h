@@ -47,8 +47,11 @@ class LLCheckBoxCtrl;
 class LLComboBox;
 class LLPanel;
 class LLScrollListCtrl;
+class LLContextMenu;
+class LLEditMenuHandler;
 class LLTabContainer;
 class LLTextEditor;
+class LLViewerObject;
 
 // The scripting studio of doc/SCRIPT_STUDIO.md, as far as phase 1 takes it:
 // scripts from inventory and from objects open in tabs over code editors,
@@ -58,9 +61,11 @@ class LLTextEditor;
 // typed and answering where a name lives -- go to definition, find
 // references, rename -- an outline in the inspector and a breadcrumb over
 // the editor, what scripts say in an Output tab with their run-time errors
-// marked in the gutter, and a script the preprocessor wrapped shown as the
-// code the server compiled with the author's source in a tab beside it.
-// Its regions fold and come out as any studio's do. Not yet: the explorer.
+// marked in the gutter, an explorer of the objects in hand with their
+// scripts to open, start, stop and reset, a check before every save, and
+// a script the preprocessor wrapped shown as the code the server compiled
+// with the author's source in a tab beside it. Its regions fold and come
+// out as any studio's do.
 class ALFloaterScriptStudio final : public ALStudioFloater
 {
     friend class LLFloaterReg;
@@ -120,6 +125,13 @@ private:
         std::vector<RuntimeProblem>                runtime;
         // A line to go to once the script has loaded, or -1.
         S32                                        pendingLine = -1;
+        // Whether the script runs in its object, as the region last
+        // said: -1 until it has.
+        S32                                        running = -1;
+        // A save waiting on a check of the text as it stands; and until
+        // when a save goes ahead over what the check found.
+        bool                                       saveAfterCheck  = false;
+        F64                                        saveAnywayUntil = 0.0;
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
         ALScriptProblems                           analysis;
@@ -238,6 +250,41 @@ private:
     void onOutputFilter();
     void onOutputChosen();
 
+    // The explorer: the objects in hand -- selected in world, or holding
+    // a script that is open -- each prim's scripts and notecards listed
+    // as they are fetched, with whether each script runs.
+    struct ExplorerPrim
+    {
+        LLUUID                            id;
+        std::string                       name;
+        bool                              fetched = false;
+        std::vector<ALScriptWorkspace::Item> items;
+    };
+    struct ExplorerObject
+    {
+        LLUUID                    root;
+        std::string               name;
+        std::vector<ExplorerPrim> prims;
+    };
+    void pumpExplorer();
+    void refreshExplorer();
+    void explorerContents(const ALScriptWorkspace::Contents& contents);
+    void fillExplorer();
+    bool explorerChoice(ALScriptRef& ref, std::string& name) const;
+    void onExplorerChosen();
+    void onExplorerAction(const std::string& action);
+    void runningState(const ALScriptWorkspace::RunningState& state);
+
+    // Whether a save may go ahead: the analyzers' check of the text as it
+    // stands found no errors, or the person asked twice.
+    bool preflight(Doc& doc);
+
+    // Copy, from whichever list or editor has the keyboard; and a
+    // right-click menu on a list for the same.
+    static LLEditMenuHandler* focusedEditHandler();
+    void                      listMenuFor(LLScrollListCtrl* list);
+    void                      showListMenu(LLScrollListCtrl* list, S32 x, S32 y);
+
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
     void letGoOf(size_t index);
@@ -274,6 +321,15 @@ private:
     LLTextEditor*                      mSymbol        = nullptr;
     ALOutputList*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
+    LLScrollListCtrl*                  mExplorer      = nullptr;
+    std::vector<ExplorerObject>        mExplorerModel;
+    // The roots selected in world when last looked, and when.
+    std::vector<LLUUID>                mExplorerRoots;
+    F64                                mExplorerPolled = 0.0;
+    // What the region said runs, by prim and item.
+    std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
+    LLHandle<LLContextMenu>            mListMenuHandle;
+    LLScrollListCtrl*                  mListMenuFor   = nullptr;
     // The objects heard from, offered in the filter.
     std::map<LLUUID, std::string>      mOutputObjects;
     LLComboBox*                        mCompileTarget = nullptr;
@@ -283,4 +339,5 @@ private:
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
     boost::signals2::scoped_connection mRuntimeConnection;
+    boost::signals2::scoped_connection mRunningConnection;
 };

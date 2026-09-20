@@ -213,6 +213,7 @@
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
+#include "alscriptworkspace.h"
 #include "llpreviewscript.h"
 #include "llproxy.h"
 #include "llproductinforequest.h"
@@ -3129,7 +3130,7 @@ void register_viewer_callbacks(LLMessageSystem* msg)
     msg->setHandlerFuncFast(_PREHASH_CoarseLocationUpdate,      LLWorld::processCoarseUpdate);
     msg->setHandlerFuncFast(_PREHASH_ReplyTaskInventory,        LLViewerObject::processTaskInv);
     msg->setHandlerFuncFast(_PREHASH_DerezContainer,            process_derez_container);
-    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        LLLiveLSLEditor::processScriptRunningReply);
+    msg->setHandlerFuncFast(_PREHASH_ScriptRunningReply,        ALScriptWorkspace::processScriptRunningReply);
 
     msg->setHandlerFuncFast(_PREHASH_DeRezAck,                  process_derez_ack);
 

@@ -11,7 +11,7 @@
  save_rect="true"
  single_instance="true"
  title="Script Studio"
- width="900">
+ width="1100">
     <floater.string name="Untitled">Script</floater.string>
     <floater.string name="Loading">Loading...</floater.string>
     <floater.string name="Loaded">[NAME] loaded.</floater.string>
@@ -23,8 +23,19 @@
     <floater.string name="SavedToFile">Written to [PATH]</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
-    <floater.string name="PaneBottom">Problems and references</floater.string>
+    <floater.string name="PaneExplorer">Explorer</floater.string>
+    <floater.string name="PaneBottom">Problems, references and output</floater.string>
     <floater.string name="PaneInspector">Inspector</floater.string>
+    <floater.string name="KindObject">object</floater.string>
+    <floater.string name="KindPrim">prim</floater.string>
+    <floater.string name="KindScript">script</floater.string>
+    <floater.string name="KindLua">lua</floater.string>
+    <floater.string name="KindNotecard">notecard</floater.string>
+    <floater.string name="RunningYes">yes</floater.string>
+    <floater.string name="RunningNo">no</floater.string>
+    <floater.string name="ObjectUnnamed">Object</floater.string>
+    <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
+    <floater.string name="PreflightErrors">[COUNT] error(s) the analyzers found in [NAME]; save again to compile anyway.</floater.string>
     <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFound">[COUNT] place(s) where [NAME] stands.</floater.string>
@@ -107,6 +118,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="revert" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="revert" />
             </menu_item_call>
+            <menu_item_check label="Check Before Saving" layout="topleft" name="preflight">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
+            </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Load from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
@@ -226,6 +241,10 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu_item_check label="Explorer" layout="topleft" name="explorer" shortcut="control|alt|0">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="explorer" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="explorer" />
+            </menu_item_check>
             <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|alt|1">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
@@ -292,6 +311,17 @@
      follows="right|top"
      height="22"
      is_toggle="true"
+     label="Explorer"
+     layout="topleft"
+     name="fold_explorer"
+     right="-260"
+     tool_tip="The objects in hand and their scripts, down the left (Control+Alt+0)"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="right|top"
+     height="22"
+     is_toggle="true"
      label="Lists"
      layout="topleft"
      name="fold_bottom"
@@ -329,7 +359,7 @@
      name="main_stack"
      orientation="horizontal"
      top="70"
-     width="884"
+     width="1084"
      border_size="10"
      show_drag_handle="true"
      drag_handle_thickness="4"
@@ -338,12 +368,89 @@
      drag_handle_color="DkGray0"
      drag_handle_on_hover="true">
         <layout_panel
+         auto_resize="false"
+         expanded_min_dim="160"
+         height="464"
+         layout="topleft"
+         min_dim="0"
+         name="explorer_panel"
+         user_resize="true"
+         width="240"
+         background_visible="true"
+         background_opaque="true"
+         bg_opaque_color="DkGray2"
+         border="true">
+            <scroll_list
+             follows="all"
+             height="438"
+             layout="topleft"
+             left="0"
+             name="explorer"
+             tool_tip="The objects in hand -- selected in world, or holding a script that is open -- and their scripts and notecards; double-click a script to open it"
+             top="0"
+             width="240">
+                <scroll_list.columns dynamic_width="true" label="Name" name="name" />
+                <scroll_list.columns label="Kind" name="kind" width="58" />
+                <scroll_list.columns label="Run" name="run" width="34" />
+            </scroll_list>
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Open"
+             layout="topleft"
+             left="0"
+             name="explorer_open"
+             tool_tip="Open the chosen script"
+             top_pad="4"
+             width="46" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Start"
+             layout="topleft"
+             left_pad="2"
+             name="explorer_start"
+             tool_tip="Set the chosen script running"
+             top_delta="0"
+             width="46" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Stop"
+             layout="topleft"
+             left_pad="2"
+             name="explorer_stop"
+             tool_tip="Stop the chosen script"
+             top_delta="0"
+             width="46" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Reset"
+             layout="topleft"
+             left_pad="2"
+             name="explorer_reset"
+             tool_tip="Reset the chosen script"
+             top_delta="0"
+             width="46" />
+            <button
+             follows="left|bottom"
+             height="22"
+             label="Fetch"
+             layout="topleft"
+             left_pad="2"
+             name="explorer_refresh"
+             tool_tip="List the objects' contents again"
+             top_delta="0"
+             width="46" />
+        </layout_panel>
+        <layout_panel
          auto_resize="true"
          height="464"
          layout="topleft"
          min_dim="300"
          name="centre"
-         width="614">
+         width="574">
             <layout_stack
              animate="false"
              follows="all"
@@ -353,7 +460,7 @@
              name="centre_stack"
              orientation="vertical"
              top="0"
-             width="614"
+             width="574"
              border_size="10"
              show_drag_handle="true"
              drag_handle_thickness="4"
@@ -367,7 +474,7 @@
                  layout="topleft"
                  min_dim="24"
                  name="editor_head"
-                 width="614"
+                 width="574"
                  background_visible="true"
                  background_opaque="true"
                  bg_opaque_color="MouseGray"
@@ -388,7 +495,7 @@
                  layout="topleft"
                  min_dim="24"
                  name="editor_crumbs"
-                 width="614">
+                 width="574">
                     <jump_bar
                      follows="left|top|right"
                      height="22"
@@ -397,7 +504,7 @@
                      name="breadcrumb"
                      tool_tip="Where the caret is, from the script down to the symbol around it. Press a step to go there; press its arrow to pick one of the symbols beside it instead."
                      top="1"
-                     width="614" />
+                     width="574" />
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"
@@ -406,7 +513,7 @@
                  min_dim="120"
                  name="editor_host"
                  user_resize="true"
-                 width="614">
+                 width="574">
                     <panel
                      follows="all"
                      height="276"
@@ -414,7 +521,7 @@
                      left="0"
                      name="editor_panel"
                      top="0"
-                     width="614" />
+                     width="574" />
                 </layout_panel>
                 <layout_panel
                  auto_resize="false"
@@ -424,7 +531,7 @@
                  min_dim="0"
                  name="bottom_panel"
                  user_resize="true"
-                 width="614"
+                 width="574"
                  background_visible="true"
                  background_opaque="true"
                  bg_opaque_color="DkGray2"
@@ -438,14 +545,14 @@
                      tab_min_width="70"
                      tab_position="top"
                      top="0"
-                     width="614">
+                     width="574">
                         <panel
                          follows="all"
                          height="108"
                          label="Problems"
                          layout="topleft"
                          name="problems_tab"
-                         width="614">
+                         width="574">
                             <scroll_list
                              follows="all"
                              height="108"
@@ -454,7 +561,7 @@
                              name="problems"
                              tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
                              top="0"
-                             width="614">
+                             width="574">
                                 <scroll_list.columns label="Line" name="line" width="70" />
                                 <scroll_list.columns label="Level" name="level" width="80" />
                                 <scroll_list.columns label="Source" name="source" width="90" />
@@ -467,7 +574,7 @@
                          label="References"
                          layout="topleft"
                          name="references_tab"
-                         width="614">
+                         width="574">
                             <scroll_list
                              follows="all"
                              height="108"
@@ -476,7 +583,7 @@
                              name="references"
                              tool_tip="Every place the name last looked up stands; choosing one goes there"
                              top="0"
-                             width="614">
+                             width="574">
                                 <scroll_list.columns label="Line" name="line" width="70" />
                                 <scroll_list.columns dynamic_width="true" label="Text" name="text" />
                             </scroll_list>
@@ -487,7 +594,7 @@
                          label="Output"
                          layout="topleft"
                          name="output_tab"
-                         width="614">
+                         width="574">
                             <combo_box
                              follows="left|top"
                              height="22"
@@ -515,7 +622,7 @@
                              name="output"
                              tool_tip="What the scripts said on the debug channel and to their owner; choosing a run-time error goes to its line, opening the script if need be"
                              top_pad="2"
-                             width="614">
+                             width="574">
                                 <output_list.columns label="Time" name="time" width="70" />
                                 <output_list.columns label="Object" name="source" width="180" />
                                 <output_list.columns label="Kind" name="kind" width="60" />
@@ -534,7 +641,7 @@
          min_dim="0"
          name="inspector_panel"
          user_resize="true"
-         width="260"
+         width="250"
          background_visible="true"
          background_opaque="true"
          bg_opaque_color="DkGray2"
@@ -548,7 +655,7 @@
              name="inspector_stack"
              orientation="vertical"
              top="0"
-             width="260"
+             width="250"
              border_size="10"
              show_drag_handle="true"
              drag_handle_thickness="4"
@@ -563,7 +670,7 @@
                  min_dim="80"
                  name="outline_panel"
                  user_resize="true"
-                 width="260">
+                 width="250">
                     <scroll_list
                      follows="all"
                      height="300"
@@ -572,7 +679,7 @@
                      name="outline"
                      tool_tip="What the script declares, in the order written; choosing one goes to it"
                      top="0"
-                     width="260">
+                     width="250">
                         <scroll_list.columns dynamic_width="true" label="Symbol" name="symbol" />
                         <scroll_list.columns label="Kind" name="kind" width="70" />
                     </scroll_list>
@@ -585,7 +692,7 @@
                  min_dim="0"
                  name="symbol_panel"
                  user_resize="true"
-                 width="260">
+                 width="250">
                     <text_editor
                      follows="all"
                      height="154"
@@ -595,7 +702,7 @@
                      read_only="true"
                      tool_tip="The symbol at the caret: its declaration and its documentation"
                      top="0"
-                     width="260"
+                     width="250"
                      word_wrap="true" />
                 </layout_panel>
             </layout_stack>
@@ -610,5 +717,5 @@
      name="status"
      top_pad="6"
      use_ellipses="true"
-     width="884" />
+     width="1084" />
 </floater>

@@ -41,6 +41,7 @@
 class LLChat;
 class LLEventTimer;
 class LLInventoryItem;
+class LLMessageSystem;
 
 // Where a script lives: an item of the agent's inventory, or an item of an
 // object's contents. The one identity for a script wherever the viewer
@@ -175,6 +176,45 @@ public:
     bool setRunning(const ALScriptRef& ref, bool running);
     bool reset(const ALScriptRef& ref);
 
+    // Whether a script in an object runs and what it compiles for, asked
+    // of the region; every listener hears the answer. False where there
+    // is nobody to ask.
+    struct RunningState
+    {
+        ALScriptRef ref;
+        bool        running = false;
+        std::string compileTarget;
+    };
+    bool askRunning(const ALScriptRef& ref);
+    typedef boost::signals2::signal<void(const RunningState&)> running_signal_t;
+    boost::signals2::connection onRunningState(const running_signal_t::slot_type& slot) { return mRunningState.connect(slot); }
+    // The region's answer, registered for the message; the legacy live
+    // editor hears it through here.
+    static void processScriptRunningReply(LLMessageSystem* msg, void** data);
+
+    // --- what an object holds ----------------------------------------------------
+
+    // A script or a notecard in a prim's contents.
+    struct Item
+    {
+        LLUUID      id;
+        std::string name;
+        bool        script = true;
+        bool        lua    = false;
+    };
+    struct Contents
+    {
+        LLUUID            prim;
+        std::string       name;
+        // False where the prim is not known here, or nothing came back.
+        bool              fetched = false;
+        std::vector<Item> items;
+    };
+    typedef std::function<void(const Contents&)> contents_callback_t;
+    // The scripts and notecards a prim holds, fetched from the region if
+    // need be, answered once on the main thread.
+    void listContents(const LLUUID& prim, contents_callback_t callback);
+
     // --- what scripts say ------------------------------------------------------
 
     // What an object's scripts say on the debug channel and to their
@@ -222,8 +262,10 @@ public:
 
 private:
     struct Burst;
+    struct ContentsListener;
     void flushExpiredBurst();
     void deliverRuntime(const Burst& burst);
+    void sweepListeners();
 
     struct LoadRequest;
     static void onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType type, void* user_data, S32 status, LLExtStat ext_status);
@@ -231,6 +273,8 @@ private:
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running);
 
     compiled_signal_t             mCompiled;
+    running_signal_t              mRunningState;
+    std::vector<std::unique_ptr<ContentsListener>> mListeners;
     std::unique_ptr<Burst>        mBurst;
     std::unique_ptr<LLEventTimer> mBurstTimer;
     std::deque<RuntimeEvent>      mRecent;

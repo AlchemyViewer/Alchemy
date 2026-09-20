@@ -36,12 +36,14 @@
 #include "llinventory.h"
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
+#include "llpreviewscript.h"
 #include "llscripteditorws.h"
 #include "llviewerassetupload.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
+#include "llvoinventorylistener.h"
 #include "message.h"
 // [RLVa:KB]
 #include "rlvhandler.h"
@@ -50,6 +52,7 @@
 
 #include <boost/regex.hpp>
 
+#include <algorithm>
 #include <memory>
 
 namespace
@@ -93,6 +96,77 @@ namespace
         return nullptr;
     }
 }
+
+// One prim's contents asked for: answered once the object has them, then
+// let go of.
+struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
+{
+    LLUUID              prim;
+    contents_callback_t callback;
+    bool                done = false;
+
+    ContentsListener(LLViewerObject* object, const LLUUID& prim_in, contents_callback_t callback_in)
+    :   prim(prim_in),
+        callback(std::move(callback_in))
+    {
+        registerVOInventoryListener(object, nullptr);
+        requestVOInventory();
+    }
+
+    void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32, void*) override
+    {
+        if (done)
+        {
+            return;
+        }
+        done = true;
+        Contents contents;
+        contents.prim    = prim;
+        contents.fetched = inventory != nullptr;
+        if (object)
+        {
+            if (LLNameValue* name = object->getNVPair("Name"))
+            {
+                contents.name = name->getString() ? name->getString() : "";
+            }
+        }
+        if (inventory)
+        {
+            for (const auto& entry : *inventory)
+            {
+                LLInventoryItem* item = dynamic_cast<LLInventoryItem*>(entry.get());
+                if (!item)
+                {
+                    continue;
+                }
+                Item one;
+                one.id   = item->getUUID();
+                one.name = item->getName();
+                if (item->getType() == LLAssetType::AT_LSL_TEXT)
+                {
+                    one.script = true;
+                    one.lua    = item->getRuntime() == "luau" || item->getInventorySubType() == SST_LUA;
+                }
+                else if (item->getType() == LLAssetType::AT_NOTECARD)
+                {
+                    one.script = false;
+                }
+                else
+                {
+                    continue;
+                }
+                contents.items.push_back(std::move(one));
+            }
+        }
+        // The object is walking its listeners: this one leaves the walk
+        // now, and answers once it is over.
+        removeVOInventoryListener();
+        LLAppViewer::instance()->postToMainCoro([answer = std::move(callback), contents]() {
+            answer(contents);
+            ALScriptWorkspace::instance().sweepListeners();
+        });
+    }
+};
 
 // The lines one script has said within a moment of each other, not yet
 // delivered.
@@ -458,6 +532,69 @@ bool ALScriptWorkspace::setRunning(const ALScriptRef& ref, bool running)
 bool ALScriptWorkspace::reset(const ALScriptRef& ref)
 {
     return scriptMessage(ref, _PREHASH_ScriptReset, false, false);
+}
+
+// --- running -----------------------------------------------------------------------
+
+bool ALScriptWorkspace::askRunning(const ALScriptRef& ref)
+{
+    if (ref.inInventory())
+    {
+        return false;
+    }
+    LLViewerObject* object = gObjectList.findObject(ref.object);
+    if (!object || !object->getRegion())
+    {
+        return false;
+    }
+    LLMessageSystem* msg = gMessageSystem;
+    msg->newMessageFast(_PREHASH_GetScriptRunning);
+    msg->nextBlockFast(_PREHASH_Script);
+    msg->addUUIDFast(_PREHASH_ObjectID, ref.object);
+    msg->addUUIDFast(_PREHASH_ItemID, ref.item);
+    msg->sendReliable(object->getRegion()->getHost());
+    return true;
+}
+
+// static
+void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** data)
+{
+    RunningState state;
+    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, state.ref.object);
+    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ItemID, state.ref.item);
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, state.running);
+    bool mono = false, luau = false, luau_language = false;
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_Mono, mono);
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_Luau, luau);
+    msg->getBOOLFast(_PREHASH_Script, _PREHASH_LuauLanguage, luau_language);
+    state.compileTarget = luau ? (luau_language ? "luau" : "lsl-luau") : mono ? "mono" : "lsl2";
+    if (instanceExists())
+    {
+        instance().mRunningState(state);
+    }
+    LLLiveLSLEditor::processScriptRunningReply(msg, data);
+}
+
+// --- what an object holds ----------------------------------------------------------
+
+void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t callback)
+{
+    sweepListeners();
+    LLViewerObject* object = gObjectList.findObject(prim);
+    if (!object)
+    {
+        Contents none;
+        none.prim = prim;
+        callback(none);
+        return;
+    }
+    mListeners.push_back(std::make_unique<ContentsListener>(object, prim, std::move(callback)));
+}
+
+void ALScriptWorkspace::sweepListeners()
+{
+    mListeners.erase(std::remove_if(mListeners.begin(), mListeners.end(), [](const std::unique_ptr<ContentsListener>& l) { return l->done; }),
+                     mListeners.end());
 }
 
 // --- what scripts say ------------------------------------------------------------
