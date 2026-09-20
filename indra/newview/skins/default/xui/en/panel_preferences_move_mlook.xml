@@ -53,6 +53,17 @@
    tool_tip="Mouse steering resets your camera and avatar position to face away from the camera when you click your avatar."
    top_pad="0"
    width="256" />
+  <check_box
+   control_name="AlchemyTurnTowardSelectedObjects"
+   follows="left|top"
+   height="20"
+   label="Turn toward selected objects"
+   layout="topleft"
+   left_delta="0"
+   name="turn_toward_selected_objects"
+   tool_tip="Automatically turn your avatar toward objects you select or right-click while your camera is detached. Uncheck to keep your avatar facing the same direction."
+   top_pad="0"
+   width="350" />
   <text
    type="string"
    length="1"
