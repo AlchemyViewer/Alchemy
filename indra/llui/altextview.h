@@ -148,11 +148,21 @@ public:
     // In place of the selection, or at the caret.
     void insertText(std::string_view text);
     void deleteRange(const ALTextRange& range);
+    // Several ranges of the text as it stands, each replaced by its
+    // string, as one step to undo: what a rename is. The ranges must not
+    // overlap. The caret keeps its place in the text around it. False
+    // where nothing changed.
+    bool replaceAll(std::vector<std::pair<ALTextRange, std::string>> edits);
     bool perform(ALEditorCommand command);
     // Whether a command would do anything now: what a menu asks.
     bool canPerform(ALEditorCommand command) const;
     ALKeymap&       keymap() { return mKeymap; }
     const ALKeymap& keymap() const { return mKeymap; }
+
+    // The caret put at a place, or a stretch selected, and brought into
+    // view: where a list of places sends it.
+    void goTo(const ALTextPos& pos);
+    void goTo(const ALTextRange& range);
 
     // --- scrolling -----------------------------------------------------------
 
@@ -245,6 +255,10 @@ protected:
     virtual bool canFold(ALEditorCommand command) const { return false; }
     // Completion was asked for.
     virtual bool complete() { return false; }
+    // Something was asked about the name at the caret: its definition,
+    // its references, a new name; whether it could be.
+    virtual bool performSymbol(ALEditorCommand command) { return false; }
+    virtual bool canSymbol(ALEditorCommand command) const { return false; }
     // The screen y of the top of a line's row, and every row on screen in
     // turn, for a subclass drawing beside them.
     S32  screenTopOf(const LLRect& text, S32 line, S32 row);

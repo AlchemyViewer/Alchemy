@@ -316,4 +316,56 @@ namespace tut
         e.setCaret(ALTextPos(0, 0));
         ensure("the caret leaving the call ends it", !e.signatureShown());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<8>()
+    {
+        set_test_name("the name at the caret is asked about; highlights light its places and slide; a rename is one step");
+        ALCodeEditor& e = make("integer count = 1;\ncount = count + 1;\n", "lsl");
+        ensure("nothing to ask without anyone to answer", !e.canPerform(ALEditorCommand::GoToDefinition));
+        std::vector<std::pair<ALEditorCommand, ALTextRange>> asked;
+        e.setSymbolRequest([&](ALEditorCommand command, const ALTextRange& word) { asked.emplace_back(command, word); });
+        e.setCaret(ALTextPos(1, 0));
+        ensure("on a name, it can be asked", e.canPerform(ALEditorCommand::GoToDefinition) && e.canPerform(ALEditorCommand::Rename));
+        key(KEY_F12);
+        ensure_equals("F12 asks", asked.size(), size_t(1));
+        ensure("for the definition of the word", asked[0].first == ALEditorCommand::GoToDefinition && asked[0].second == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)));
+        e.setCaret(ALTextPos(1, 13));  // at the end of the second `count`
+        key(KEY_F12, MASK_SHIFT);
+        ensure("shift-F12 asks for the references, of the word the caret ends", asked.size() == 2 && asked[1].first == ALEditorCommand::FindReferences && asked[1].second == ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)));
+        e.setCaret(ALTextPos(1, 6));  // on the `=`
+        ensure("not on a name", !e.canPerform(ALEditorCommand::FindReferences));
+        ensure("and no request is made", !e.handleKeyHere(KEY_F2, MASK_NONE) && asked.size() == 2);
+
+        e.setHighlights({ ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)), ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
+        ensure("lit where a name stands", e.highlighted(ALTextPos(1, 2)) && e.highlighted(ALTextPos(1, 5)));
+        ensure("not elsewhere", !e.highlighted(ALTextPos(1, 6)));
+        e.setCaret(ALTextPos(0, 0));
+        type("\n");
+        ensure("a line above slides them all", e.highlights().size() == 3 && e.highlights()[0] == ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) && e.highlights()[2].begin.line == 2);
+        e.setCaret(ALTextPos(2, 6));
+        type("x");
+        ensure("text between them pushes along the ones after it", e.highlights().size() == 3 && e.highlights()[2] == ALTextRange(ALTextPos(2, 9), ALTextPos(2, 14)) && e.highlights()[1].begin == ALTextPos(2, 0));
+        e.setCaret(ALTextPos(2, 2));
+        type("y");
+        ensure_equals("text inside one drops it", e.highlights().size(), size_t(2));
+        e.undo();
+        e.undo();
+        ensure_equals("back to the text before", e.text(), std::string("\ninteger count = 1;\ncount = count + 1;\n"));
+
+        // A rename, with the caret inside the last place.
+        e.setCaret(ALTextPos(2, 10));
+        std::vector<std::pair<ALTextRange, std::string>> edits = {
+            { ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)), "total" },
+            { ALTextRange(ALTextPos(2, 0), ALTextPos(2, 5)), "total" },
+            { ALTextRange(ALTextPos(2, 8), ALTextPos(2, 13)), "total" },
+        };
+        ensure("replaced", e.replaceAll(edits));
+        ensure_equals("everywhere", e.text(), std::string("\ninteger total = 1;\ntotal = total + 1;\n"));
+        ensure("the caret keeps its place in the word", e.caret() == ALTextPos(2, 10));
+        e.undo();
+        ensure_equals("one step back undoes it all", e.text(), std::string("\ninteger count = 1;\ncount = count + 1;\n"));
+        ensure("read-only, a rename cannot be asked", (e.setReadOnly(true), !e.canPerform(ALEditorCommand::Rename)));
+        ensure("but a definition can", e.canPerform(ALEditorCommand::GoToDefinition));
+    }
 }

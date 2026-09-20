@@ -68,4 +68,17 @@
     <menu_item_call.on_click function="TextView.Perform" parameter="complete" />
     <menu_item_call.on_enable function="TextView.Enable" parameter="complete" />
   </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition">
+    <menu_item_call.on_click function="TextView.Perform" parameter="go_to_definition" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="go_to_definition" />
+  </menu_item_call>
+  <menu_item_call label="Find References" layout="topleft" name="find_references">
+    <menu_item_call.on_click function="TextView.Perform" parameter="find_references" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="find_references" />
+  </menu_item_call>
+  <menu_item_call label="Rename..." layout="topleft" name="rename">
+    <menu_item_call.on_click function="TextView.Perform" parameter="rename" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="rename" />
+  </menu_item_call>
 </context_menu>

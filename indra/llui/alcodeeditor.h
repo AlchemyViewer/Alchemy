@@ -38,7 +38,8 @@ class LLScrollListCtrl;
 // per line for what an analyzer said about it and a marker per block that
 // folds, a band under the caret's row, the bracket the caret is at and its
 // match boxed, decorations over ranges -- a squiggle under a problem, a
-// wash behind a find -- and a list of completions under the caret.
+// wash behind a find -- the places a name stands lit, and a list of
+// completions under the caret.
 //
 // Blocks are found by indentation, which every language here writes by,
 // with a brace or an `end` on the line after a block taken as part of it;
@@ -67,6 +68,9 @@ public:
         Optional<LLUIColor> current_line_color;
         Optional<LLUIColor> bracket_match_color;
         Optional<LLUIColor> fold_color;
+        // Behind every place a name stands, once its references were
+        // asked for; mixed from the text's unless a skin names it.
+        Optional<LLUIColor> highlight_color;
 
         Params();
     };
@@ -106,6 +110,15 @@ public:
     };
     void                           setDecorations(std::vector<Decoration> decorations);
     const std::vector<Decoration>& decorations() const { return mDecorations; }
+
+    // The places a name stands, washed over until they are cleared or
+    // the caret leaves them all; an edit slides them as it does the
+    // decorations.
+    void                            setHighlights(std::vector<ALTextRange> ranges);
+    void                            clearHighlights() { mHighlights.clear(); }
+    const std::vector<ALTextRange>& highlights() const { return mHighlights; }
+    // Whether a position is on one of them.
+    bool                            highlighted(const ALTextPos& at) const;
 
     // The bracket the caret is at -- just before it, or under it -- and
     // its match, skipping what is inside strings and comments. False where
@@ -172,6 +185,18 @@ public:
     const std::vector<Completion>& completions() const { return mCompletions; }
     S32                            chosenCompletion() const;
 
+    // --- the name at the caret -----------------------------------------------------
+
+    // Asked, on F12, shift-F12 or F2, or the menu, to find the definition
+    // or the references of the identifier the caret is on, or to rename
+    // it: the command, and the identifier's range. Whoever answers goes
+    // there, lights the places, or asks for the new name and calls
+    // replaceAll. Nothing is asked with the caret on no identifier.
+    typedef std::function<void(ALEditorCommand command, const ALTextRange& word)> symbol_request_t;
+    void setSymbolRequest(symbol_request_t request) { mSymbolRequest = std::move(request); }
+    // The identifier the caret is on or at the end of, or an empty range.
+    ALTextRange identifierAtCaret() const;
+
     // --- hover -------------------------------------------------------------------
 
     // Asked what to say about the word the mouse rests on; answers into
@@ -228,6 +253,8 @@ protected:
     bool performFold(ALEditorCommand command) override;
     bool canFold(ALEditorCommand command) const override;
     bool complete() override;
+    bool performSymbol(ALEditorCommand command) override;
+    bool canSymbol(ALEditorCommand command) const override;
 
 private:
     void onEdit(const ALTextDocument::Edit& edit);
@@ -263,6 +290,7 @@ private:
     LLColor4 lineNumberColor() const;
     LLColor4 currentLineColor() const;
     LLColor4 foldColor() const;
+    LLColor4 highlightColor() const;
 
     bool mShowLineNumbers      = true;
     bool mShowFoldMarkers      = true;
@@ -275,16 +303,19 @@ private:
     LLUIColor mCurrentLineColor;
     LLUIColor mBracketMatchColor;
     LLUIColor mFoldColor;
+    LLUIColor mHighlightColor;
     bool      mGutterColorSet      = false;
     bool      mLineNumberColorSet  = false;
     bool      mCurrentLineColorSet = false;
     bool      mFoldColorSet        = false;
+    bool      mHighlightColorSet   = false;
     LLUIColor mMarkColors[static_cast<size_t>(Mark::COUNT)];
 
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
     std::vector<Mark>                  mMarks;
     std::vector<Decoration>            mDecorations;
+    std::vector<ALTextRange>           mHighlights;
     std::vector<LLVector2>             mSquiggleScratch;
 
     std::vector<FoldRegion> mRegions;
@@ -298,6 +329,7 @@ private:
     hover_provider_t        mHover;
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;
+    symbol_request_t        mSymbolRequest;
     LLScrollListCtrl*       mCompletionList = nullptr;
     std::vector<Completion> mCompletions;
     // The identifier the list is narrowing, which the choice replaces.

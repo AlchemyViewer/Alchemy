@@ -88,6 +88,7 @@ namespace
             case ALEditorCommand::MoveLineDown:
             case ALEditorCommand::DeleteLine:
             case ALEditorCommand::Complete:
+            case ALEditorCommand::Rename:
                 return true;
             default:
                 return false;
@@ -628,6 +629,89 @@ void ALTextView::insertText(std::string_view text)
     }
 }
 
+bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edits)
+{
+    if (mReadOnly || edits.empty())
+    {
+        return false;
+    }
+    for (auto& one : edits)
+    {
+        one.first = one.first.normalised();
+    }
+    std::sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
+
+    // Where the caret ends up: past every replacement before it on its
+    // line, its column moves by what each grew or shrank; inside one, it
+    // keeps its place in what replaced it, or the end of it. A
+    // replacement across lines above it moves its line.
+    const ALTextPos was   = mCaret;
+    ALTextPos       caret = was;
+    for (const auto& [range, text] : edits)
+    {
+        const S32 lines_in = static_cast<S32>(std::count(text.begin(), text.end(), '\n'));
+        const S32 lines_was = range.end.line - range.begin.line;
+        ALTextPos end_after;
+        if (lines_in == 0)
+        {
+            end_after = ALTextPos(range.begin.line, range.begin.column + static_cast<S32>(text.size()));
+        }
+        else
+        {
+            end_after = ALTextPos(range.begin.line + lines_in, static_cast<S32>(text.size() - text.rfind('\n') - 1));
+        }
+        if (range.end <= was)
+        {
+            if (range.end.line == was.line)
+            {
+                caret.column += end_after.column - range.end.column;
+            }
+            caret.line += lines_in - lines_was;
+        }
+        else if (range.begin < was)
+        {
+            if (lines_in == 0 && lines_was == 0)
+            {
+                caret.column = range.begin.column + llmin(was.column - range.begin.column, static_cast<S32>(text.size()));
+            }
+            else
+            {
+                caret = end_after;
+            }
+            break;
+        }
+    }
+
+    // From the last to the first, so no replacement moves another.
+    mUndo.beginGroup();
+    bool any = false;
+    for (auto it = edits.rbegin(); it != edits.rend(); ++it)
+    {
+        if (!edit(it->first, it->second).nothing())
+        {
+            any = true;
+        }
+    }
+    mUndo.endGroup();
+    if (!any)
+    {
+        return false;
+    }
+    placeCaret(mDocument.clamp(caret), false);
+    afterEdit();
+    return true;
+}
+
+void ALTextView::goTo(const ALTextPos& pos)
+{
+    setCaret(mDocument.clamp(pos));
+}
+
+void ALTextView::goTo(const ALTextRange& range)
+{
+    setSelection(ALTextRange(mDocument.clamp(range.begin), mDocument.clamp(range.end)));
+}
+
 void ALTextView::deleteRange(const ALTextRange& range)
 {
     if (mReadOnly)
@@ -940,6 +1024,10 @@ bool ALTextView::perform(ALEditorCommand command)
             return performFold(command);
         case C::Complete:
             return complete();
+        case C::GoToDefinition:
+        case C::FindReferences:
+        case C::Rename:
+            return performSymbol(command);
     }
     return false;
 }
@@ -970,6 +1058,10 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::FoldAll:
         case C::UnfoldAll:
             return canFold(command);
+        case C::GoToDefinition:
+        case C::FindReferences:
+        case C::Rename:
+            return canSymbol(command);
         default:
             return !(mReadOnly && editsText(command));
     }

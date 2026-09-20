@@ -39,7 +39,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "new_line",      "indent",          "unindent",        "undo",             "redo",             "cut",
         "copy",          "paste",           "delete",          "toggle_comment",   "duplicate_line",   "move_line_up",
         "move_line_down", "delete_line",    "fold",            "unfold",           "fold_all",         "unfold_all",
-        "complete",
+        "complete",      "go_to_definition", "find_references", "rename",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -151,6 +151,9 @@ ALKeymap ALKeymap::standard()
     map.bind('[', MASK_CONTROL | MASK_SHIFT, C::Fold);
     map.bind(']', MASK_CONTROL | MASK_SHIFT, C::Unfold);
     map.bind(' ', MASK_CONTROL, C::Complete);
+    map.bind(KEY_F12, MASK_NONE, C::GoToDefinition);
+    map.bind(KEY_F12, MASK_SHIFT, C::FindReferences);
+    map.bind(KEY_F2, MASK_NONE, C::Rename);
 #if LL_DARWIN
     // Command-space belongs to the system; the control key itself does
     // what it does everywhere else.

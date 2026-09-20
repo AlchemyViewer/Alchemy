@@ -81,6 +81,38 @@ namespace
                kind == ALSyntaxKind::Escape || kind == ALSyntaxKind::AttributeValue;
     }
 
+    // Where a position past an edit ends up once the edit is made.
+    ALTextPos slidPast(const ALTextPos& pos, const ALTextRange& removed, const ALTextPos& end_after)
+    {
+        if (pos.line == removed.end.line)
+        {
+            return ALTextPos(end_after.line, end_after.column + (pos.column - removed.end.column));
+        }
+        return ALTextPos(pos.line + (end_after.line - removed.end.line), pos.column);
+    }
+
+    // A range through an edit of the text it is over: false where the
+    // edit took some of it or landed inside it, else the range moved
+    // along with the text. Text put right before it pushes it along;
+    // text put right after it is not it.
+    bool slide(ALTextRange& range, const ALTextRange& removed, const ALTextPos& end_after)
+    {
+        ALTextRange r = range.normalised();
+        const bool  cut = removed.empty() ? (r.begin < removed.begin && removed.begin < r.end)
+                                          : (r.begin < removed.end && removed.begin < r.end);
+        if (cut)
+        {
+            return false;
+        }
+        if (removed.end <= r.begin)
+        {
+            r.begin = slidPast(r.begin, removed, end_after);
+            r.end   = slidPast(r.end, removed, end_after);
+        }
+        range = r;
+        return true;
+    }
+
     bool identifierByte(char c)
     {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
@@ -136,7 +168,8 @@ ALCodeEditor::Params::Params()
     line_number_color("line_number_color"),
     current_line_color("current_line_color"),
     bracket_match_color("bracket_match_color"),
-    fold_color("fold_color")
+    fold_color("fold_color"),
+    highlight_color("highlight_color")
 {
 }
 
@@ -152,10 +185,12 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mCurrentLineColor(p.current_line_color),
     mBracketMatchColor(p.bracket_match_color),
     mFoldColor(p.fold_color),
+    mHighlightColor(p.highlight_color),
     mGutterColorSet(p.gutter_color.isProvided()),
     mLineNumberColorSet(p.line_number_color.isProvided()),
     mCurrentLineColorSet(p.current_line_color.isProvided()),
-    mFoldColorSet(p.fold_color.isProvided())
+    mFoldColorSet(p.fold_color.isProvided()),
+    mHighlightColorSet(p.highlight_color.isProvided())
 {
     for (size_t mark = 0; mark < static_cast<size_t>(Mark::COUNT); ++mark)
     {
@@ -215,23 +250,15 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     mMarks.insert(mMarks.begin() + first, made, Mark::None);
     mMarks.resize(document().lineCount(), Mark::None);
 
-    // Decorations below the edit slide by the lines it added or took; the
-    // ones it cut through go.
-    const S32 delta = made - (last - first + 1);
-    mDecorations.erase(std::remove_if(mDecorations.begin(), mDecorations.end(),
-                                      [&](const Decoration& d) {
-                                          const ALTextRange r = d.range.normalised();
-                                          return r.end.line >= first && r.begin.line <= last;
-                                      }),
+    // Decorations and highlights after the edit move along with the text;
+    // the ones it cut into go.
+    const S32         delta     = made - (last - first + 1);
+    const ALTextRange removed   = edit.range.normalised();
+    const ALTextPos   end_after = document().clamp(edit.endAfter());
+    mDecorations.erase(std::remove_if(mDecorations.begin(), mDecorations.end(), [&](Decoration& d) { return !slide(d.range, removed, end_after); }),
                        mDecorations.end());
-    for (Decoration& d : mDecorations)
-    {
-        if (d.range.normalised().begin.line > last)
-        {
-            d.range.begin.line += delta;
-            d.range.end.line += delta;
-        }
-    }
+    mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !slide(r, removed, end_after); }),
+                      mHighlights.end());
 
     // Folds slide the same way. One that starts on the edit's first line
     // stays: typing on a block's first line is not opening the block.
@@ -271,6 +298,27 @@ void ALCodeEditor::clearMarks()
 void ALCodeEditor::setDecorations(std::vector<Decoration> decorations)
 {
     mDecorations = std::move(decorations);
+}
+
+void ALCodeEditor::setHighlights(std::vector<ALTextRange> ranges)
+{
+    mHighlights = std::move(ranges);
+    for (ALTextRange& range : mHighlights)
+    {
+        range = range.normalised();
+    }
+}
+
+bool ALCodeEditor::highlighted(const ALTextPos& at) const
+{
+    for (const ALTextRange& range : mHighlights)
+    {
+        if (range.begin <= at && at <= range.end)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 // --- brackets ----------------------------------------------------------------
@@ -394,6 +442,17 @@ LLColor4 ALCodeEditor::currentLineColor() const
 LLColor4 ALCodeEditor::foldColor() const
 {
     return mFoldColorSet ? mFoldColor.get() : towards(backgroundColor(), textColor(), 0.6f);
+}
+
+LLColor4 ALCodeEditor::highlightColor() const
+{
+    if (mHighlightColorSet)
+    {
+        return mHighlightColor.get();
+    }
+    LLColor4 wash = textColor();
+    wash.mV[VALPHA] *= 0.18f;
+    return wash;
 }
 
 // --- the gutter --------------------------------------------------------------
@@ -576,6 +635,18 @@ LLRect ALCodeEditor::foldBoxOf(S32 line, const LLRect& text)
 void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
 {
     const S32 row_h = layout().rowHeight();
+    if (!mHighlights.empty())
+    {
+        const LLColor4 wash = highlightColor() % alpha;
+        for (const ALTextRange& range : mHighlights)
+        {
+            F32 x0, x1;
+            if (spanOnRow(line, row, range, x0, x1))
+            {
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, wash);
+            }
+        }
+    }
     for (const Decoration& d : mDecorations)
     {
         F32 x0, x1;
@@ -1171,6 +1242,45 @@ void ALCodeEditor::placeCompletion()
 void ALCodeEditor::openCompletion()
 {
     refreshCompletion();
+}
+
+// --- the name at the caret ---------------------------------------------------------
+
+ALTextRange ALCodeEditor::identifierAtCaret() const
+{
+    const ALTextDocument& doc  = document();
+    ALTextRange           word = doc.wordAt(caret()).normalised();
+    if (word.empty() && caret().column > 0)
+    {
+        // At the end of one.
+        word = doc.wordAt(ALTextPos(caret().line, caret().column - 1)).normalised();
+    }
+    if (word.empty())
+    {
+        return ALTextRange();
+    }
+    const std::string text = doc.text(word);
+    return !text.empty() && identifierByte(text[0]) && !(text[0] >= '0' && text[0] <= '9') ? word : ALTextRange();
+}
+
+bool ALCodeEditor::canSymbol(ALEditorCommand command) const
+{
+    if (!mSymbolRequest || (command == ALEditorCommand::Rename && isReadOnly()))
+    {
+        return false;
+    }
+    return !identifierAtCaret().empty();
+}
+
+bool ALCodeEditor::performSymbol(ALEditorCommand command)
+{
+    if (!canSymbol(command))
+    {
+        return false;
+    }
+    closeCompletion();
+    mSymbolRequest(command, identifierAtCaret());
+    return true;
 }
 
 bool ALCodeEditor::complete()

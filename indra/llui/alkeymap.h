@@ -86,6 +86,9 @@ enum class ALEditorCommand : U8
     FoldAll,
     UnfoldAll,
     Complete,
+    GoToDefinition,
+    FindReferences,
+    Rename,
     COUNT
 };
 
@@ -116,8 +119,9 @@ public:
     // Mac, where alt with an arrow is a word as well. Then the editor's
     // own: control-slash comments, alt-up and alt-down move lines,
     // control-shift-D duplicates one and control-shift-K deletes one,
-    // control-shift with a square bracket folds and unfolds, and
-    // control-space completes.
+    // control-shift with a square bracket folds and unfolds,
+    // control-space completes, F12 goes to a definition, shift-F12 finds
+    // the references and F2 renames.
     static ALKeymap standard();
 
 private:
