@@ -105,7 +105,8 @@ protected:
 
     // Open quickly: the candidates against a few letters, over the
     // window, gone as soon as one is chosen or the person looks away.
-    // Under `anchor` where one is given, else over the window; as wide
+    // Centred over the top of `anchor` where one is given, else of the
+    // window; as wide
     // and as tall as given, where given. Asked again while it is up, it
     // keeps what was typed and takes the keyboard back. The widget comes
     // back for a caller with more to say to it -- a hint that follows

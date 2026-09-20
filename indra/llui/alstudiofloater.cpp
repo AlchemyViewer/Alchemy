@@ -152,8 +152,10 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
     ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
     quick->setCandidates(std::move(candidates));
 
-    // The popover takes the content, and takes it even when it cannot show.
-    ALPopover* popover = ALPopover::show(anchor ? anchor : this, quick, title);
+    // The popover takes the content, and takes it even when it cannot
+    // show. Over the top of the anchor, centred, which is where a person
+    // typing a name into a window looks.
+    ALPopover* popover = ALPopover::showOver(anchor ? anchor : this, quick, title);
     if (!popover)
     {
         return nullptr;

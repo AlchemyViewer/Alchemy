@@ -71,6 +71,10 @@ public:
     // whole of it and there is no bar to drag it by.
     static ALPopover* show(LLView* anchor, LLPanel* content,
                            const std::string& title = LLStringUtil::null);
+    // Over the anchor instead: centred on it a little below its top,
+    // where a prompt over a window goes, as a quick open does.
+    static ALPopover* showOver(LLView* anchor, LLPanel* content,
+                               const std::string& title = LLStringUtil::null);
 
     // What a popover this size is built from: no close box, no minimise,
     // no tear-off, nothing saved, and a size a person may change only
@@ -92,6 +96,9 @@ public:
     // above it where under would run off the bottom, and shoved back on
     // screen where a side would run off, then shown and given the keyboard.
     void openBeside(const LLView* anchor);
+    // Opened over the anchor: centred on it, its top a little below the
+    // anchor's, shoved back on screen where it would run off.
+    void openOver(const LLView* anchor);
 
     // Gone, having settled: what a caller calls when the thing in it has been
     // chosen. The closed signal says it was not escaped.
@@ -123,6 +130,10 @@ protected:
     ALPopover(const LLFloater::Params& p);
 
 private:
+    // The window the anchor is in, adopted as where keys go home to.
+    void adopt(const LLView* anchor);
+    void openAt(LLRect where);
+
     bool                mEscaped = false;
     bool                mSaidSo = false;    // the signal is sent once
     closed_signal_t     mClosed;

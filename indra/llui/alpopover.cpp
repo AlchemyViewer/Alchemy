@@ -72,6 +72,24 @@ ALPopover* ALPopover::show(LLView* anchor, LLPanel* content, const std::string& 
 }
 
 // static
+ALPopover* ALPopover::showOver(LLView* anchor, LLPanel* content, const std::string& title)
+{
+    if (!anchor || !content)
+    {
+        delete content;
+        return nullptr;
+    }
+
+    const LLRect wanted = content->getRect();
+    ALPopover* popover = new ALPopover(paramsFor(wanted.getWidth(), wanted.getHeight(), title));
+    content->setOrigin(0, 0);
+    content->setFollows(FOLLOWS_ALL);
+    popover->addChild(content);
+    popover->openOver(anchor);
+    return popover;
+}
+
+// static
 LLFloater::Params ALPopover::paramsFor(S32 width, S32 height, const std::string& title, bool resizable)
 {
     LLFloater::Params p(LLFloater::getDefaultParams());
@@ -108,37 +126,59 @@ LLFloater::Params ALPopover::paramsRemembered(const std::string& kind, S32 width
 // whole of is a panel that has not opened. A side off the screen is put
 // back on it for the same reason, which is what the floater view does for
 // every window it holds.
-void ALPopover::openBeside(const LLView* anchor)
+void ALPopover::adopt(const LLView* anchor)
 {
-    if (anchor)
+    // Where keys go: the window the anchor is in, or the anchor itself
+    // where it is one.
+    const LLFloater* home = ALViewType::as<LLFloater>(anchor);
+    if (!home)
     {
-        // Where keys go: the window the anchor is in, or the anchor itself
-        // where it is one.
-        const LLFloater* home = ALViewType::as<LLFloater>(anchor);
-        if (!home)
-        {
-            home = anchor->getParentByType<LLFloater>();
-        }
-        if (home && home != this)
-        {
-            mHome = home->getHandle();
-        }
-
-        const LLRect screen = anchor->calcScreenRect();
-        LLRect where = getRect();
-        where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-        if (where.mBottom < 0)
-        {
-            where.translate(0, screen.getHeight() + where.getHeight());
-        }
-        setRect(where);
+        home = anchor->getParentByType<LLFloater>();
     }
+    if (home && home != this)
+    {
+        mHome = home->getHandle();
+    }
+}
+
+void ALPopover::openAt(LLRect where)
+{
+    setRect(where);
     if (gFloaterView && getParent() == gFloaterView)
     {
         gFloaterView->adjustToFitScreen(this, false);
     }
     openFloater();
     setFocus(true);
+}
+
+void ALPopover::openBeside(const LLView* anchor)
+{
+    LLRect where = getRect();
+    if (anchor)
+    {
+        adopt(anchor);
+        const LLRect screen = anchor->calcScreenRect();
+        where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
+        if (where.mBottom < 0)
+        {
+            where.translate(0, screen.getHeight() + where.getHeight());
+        }
+    }
+    openAt(where);
+}
+
+void ALPopover::openOver(const LLView* anchor)
+{
+    constexpr S32 BELOW_TOP = 12;
+    LLRect where = getRect();
+    if (anchor)
+    {
+        adopt(anchor);
+        const LLRect screen = anchor->calcScreenRect();
+        where.setLeftTopAndSize(screen.getCenterX() - where.getWidth() / 2, screen.mTop - BELOW_TOP, where.getWidth(), where.getHeight());
+    }
+    openAt(where);
 }
 
 void ALPopover::settle()
