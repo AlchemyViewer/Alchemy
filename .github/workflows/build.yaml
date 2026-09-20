@@ -325,11 +325,12 @@ jobs:
           vars.VCPKG_R2_ENABLED == 'true' && github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository
         env:
-          R2_CACHE_MODE: read
+          # Temporary cache population test; restore read mode and reader secrets afterward.
+          R2_CACHE_MODE: readwrite
           R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
           R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
-          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
         run: python scripts/vcpkg/configure_r2_cache.py
 
       # - name: Set up vcpkg nuget caching

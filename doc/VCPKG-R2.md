@@ -16,8 +16,8 @@ GitHub Actions repository variables and secrets before enabling the integration.
 | `VCPKG_R2_BUCKET` | Variable | `R2_BUCKET` | Bucket name without a path |
 | `VCPKG_R2_ACCESS_KEY_ID` | Secret | `R2_ACCESS_KEY_ID` | Writer's R2 S3 access key ID |
 | `VCPKG_R2_SECRET_ACCESS_KEY` | Secret | `R2_SECRET_ACCESS_KEY` | Writer's R2 S3 secret access key |
-| `VCPKG_R2_READ_ACCESS_KEY_ID` | Secret | `R2_ACCESS_KEY_ID` | Reader's R2 S3 access key ID for same-repository PRs |
-| `VCPKG_R2_READ_SECRET_ACCESS_KEY` | Secret | `R2_SECRET_ACCESS_KEY` | Reader's R2 S3 secret access key for same-repository PRs |
+| `VCPKG_R2_READ_ACCESS_KEY_ID` | Secret | `R2_ACCESS_KEY_ID` | Reader's R2 S3 access key ID, reserved for restoring read-only PR access |
+| `VCPKG_R2_READ_SECRET_ACCESS_KEY` | Secret | `R2_SECRET_ACCESS_KEY` | Reader's R2 S3 secret access key, reserved for restoring read-only PR access |
 
 No account, bucket, or credential is embedded in the repository. Jurisdictional
 `<account-id>.eu.r2.cloudflarestorage.com` and
@@ -25,19 +25,21 @@ No account, bucket, or credential is embedded in the repository. Jurisdictional
 Objects use `cache/<ABI>.zip`. The prefix is fixed so build configuration and
 retention rules address the same objects.
 
-Use bucket-scoped Object Read & Write credentials for protected non-PR runs,
-and a separate bucket-scoped Object Read credential for same-repository PRs.
-The workflow sets `R2_CACHE_MODE=readwrite` for the former and `read` for the
-latter. The script defaults to `read` when the mode is omitted. The read-only
+For the temporary cache population test, protected non-PR runs and
+same-repository PRs both use `R2_CACHE_MODE=readwrite` and the bucket-scoped
+Object Read & Write credentials. After testing, restore the PR step to
+`R2_CACHE_MODE=read` and switch both credential references back to
+`VCPKG_R2_READ_ACCESS_KEY_ID` and `VCPKG_R2_READ_SECRET_ACCESS_KEY`.
+The script still defaults to `read` when the mode is omitted. The reader
 credential must enforce Object Read permissions at R2; setting vcpkg to `read`
 does not restrict a credential that can write.
 
 Protect the branches and tags that should publish cache entries. A manual
 dispatch on an unprotected branch skips R2. Fork PRs also skip R2 to keep the
 bucket private without exposing credentials. All PRs retain local read/write
-caching. For same-repository Dependabot PRs, configure the
-two reader secrets under Dependabot secrets as well, using the same names.
-Missing reader credentials fail setup when R2 is enabled for a same-repository
+caching. Same-repository Dependabot PRs need the credentials selected by the PR
+step under Dependabot secrets as well, using the same names.
+Missing credentials fail setup when R2 is enabled for a same-repository
 PR. Do not put R2 credentials in job-wide environment variables or expose them
 to fork builds.
 Anyone able to change a workflow that receives write credentials can publish
@@ -53,7 +55,7 @@ changing the job environment. It does not prove upload or restore behavior.
 
 After preflight, the script exports R2 credentials, the S3 endpoint, region
 `auto`, and the extended `VCPKG_BINARY_SOURCES` through `GITHUB_ENV`. Protected
-non-PR builds can write to R2; PR builds only read it.
+non-PR builds and same-repository PRs can write to R2 during this test.
 Packages restored from the local cache
 are not automatically copied into R2. Seed required ABIs explicitly or allow
 R2 to fill as dependencies rebuild.
@@ -95,12 +97,16 @@ R2 credentials.
 
 ## Live acceptance checks
 
-Run these before relying on R2 across the build matrix. No live R2 checks were performed when this
-integration was added because no target bucket or credentials were supplied.
+Run these before relying on R2 across the build matrix. The supplied
+`logs_96086559729.zip` confirmed authenticated read preflights on all ten build
+jobs, with zero restored packages and R2 in read-only mode. Uploads and
+successful restores still need validation.
 
 1. On each runner platform, confirm the setup log identifies the vcpkg-selected
    AWS CLI and passes the read preflight. Check a same-repository PR reports
-   `read` mode and uses the reader credential. Check a fork PR skips both R2
+   `readwrite` mode and uses the writer credential during this test. After
+   reverting the temporary change, expect `read` and the reader credential.
+   Check a fork PR skips both R2
    setup steps, and a protected non-PR run reports `readwrite` mode.
 2. Pick a real Alchemy cache ZIP larger than 100 MiB. Upload it using `aws s3 cp`
    to a unique `validation/<run-id>/` prefix, download it to a different local

@@ -110,7 +110,7 @@ class R2CacheTests(unittest.TestCase):
             self.assertNotIn(self.env["R2_ACCESS_KEY_ID"], messages.getvalue())
             self.assertNotIn(self.env["R2_SECRET_ACCESS_KEY"], messages.getvalue())
 
-    def test_read_only_pr_exports_only_reader_credentials(self):
+    def test_read_only_mode_exports_only_reader_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "github-env"
             self.env.update(GITHUB_ENV=str(output), R2_CACHE_MODE="read",
