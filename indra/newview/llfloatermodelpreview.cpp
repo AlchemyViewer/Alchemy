@@ -1067,35 +1067,21 @@ void LLFloaterModelPreview::onPhysicsBrowse(LLUICtrl* ctrl, void* userdata)
 //static
 void LLFloaterModelPreview::onPhysicsUseLOD(LLUICtrl* ctrl, void* userdata)
 {
-    S32 num_lods = 4;
-    S32 which_mode;
-
-    LLCtrlSelectionInterface* iface = sInstance->childGetSelectionInterface("physics_lod_combo");
-    if (iface)
+    const std::string source = ctrl->getValue().asString();
+    if (source == "bounding_box")
     {
-        which_mode = iface->getFirstSelectedIndex();
+        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
     }
     else
     {
-        LL_WARNS() << "no iface" << LL_ENDL;
-        return;
-    }
-
-    if (which_mode <= 0)
-    {
-        LL_WARNS() << "which_mode out of range, " << which_mode << LL_ENDL;
-    }
-
-    S32 file_mode = iface->getItemCount() - 1;
-    S32 cube_mode = file_mode - 1;
-    if (which_mode < cube_mode)
-    {
-        S32 which_lod = num_lods - which_mode;
-        sInstance->mModelPreview->setPhysicsFromLOD(which_lod);
-    }
-    else if (which_mode == cube_mode)
-    {
-        sInstance->loadModel(LLModel::LOD_PHYSICS, getBoundingBoxCubePath());
+        for (S32 lod = 0; lod < NUM_LOD; ++lod)
+        {
+            if (source == lod_name[lod])
+            {
+                sInstance->mModelPreview->setPhysicsFromLOD(lod);
+                break;
+            }
+        }
     }
 
     LLModelPreview *model_preview = sInstance->mModelPreview;
@@ -1144,6 +1130,7 @@ void LLFloaterModelPreview::initDecompControls()
     childSetCommitCallback("decompose_cancel", onPhysicsStageCancel, NULL);
     childSetCommitCallback("analyze_cancel", onPhysicsStageCancel, NULL);
 
+    childSetValue("physics_lod_combo", "none");
     childSetCommitCallback("physics_lod_combo", onPhysicsUseLOD, NULL);
     childSetCommitCallback("physics_browse", onPhysicsBrowse, NULL);
 
@@ -1781,7 +1768,7 @@ void LLFloaterModelPreview::setCtrlLoadFromFile(S32 lod)
         LLComboBox* lod_combo = findChild<LLComboBox>("physics_lod_combo");
         if (lod_combo)
         {
-            lod_combo->setCurrentByIndex(lod_combo->getItemCount() - 1);
+            lod_combo->setValue("file");
         }
     }
     else
@@ -1910,7 +1897,7 @@ void LLFloaterModelPreview::resetUploadOptions()
             ctrl->setValue(p.second);
         }
     }
-    getChild<LLComboBox>("physics_lod_combo")->setCurrentByIndex(0);
+    childSetValue("physics_lod_combo", "none");
     getChild<LLComboBox>("Cosine%")->setCurrentByIndex(0);
 }
 

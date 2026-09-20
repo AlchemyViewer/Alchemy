@@ -2543,8 +2543,7 @@ void LLModelPreview::updateStatusMessages()
     S32 phys_tris = 0;
     S32 phys_hulls = 0;
     S32 phys_points = 0;
-    S32 which_mode = 0;
-    S32 file_mode = 1;
+    bool physics_from_file = false;
 
     //get the triangle count for the whole scene
     for (LLModelLoader::scene::iterator iter = mScene[LLModel::LOD_PHYSICS].begin(), endIter = mScene[LLModel::LOD_PHYSICS].end(); iter != endIter; ++iter)
@@ -2679,16 +2678,11 @@ void LLModelPreview::updateStatusMessages()
             fmp->childEnable("decompose_cancel");
         }
 
-        LLCtrlSelectionInterface* iface = fmp->childGetSelectionInterface("physics_lod_combo");
-        if (iface)
-        {
-            which_mode = iface->getFirstSelectedIndex();
-            file_mode = iface->getItemCount() - 1;
-        }
+        physics_from_file = fmp->childGetValue("physics_lod_combo").asString() == "file";
     }
 
 
-    if (which_mode == file_mode)
+    if (physics_from_file)
     {
         mFMP->childEnable("physics_file");
         mFMP->childEnable("physics_browse");
