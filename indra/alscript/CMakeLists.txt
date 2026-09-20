@@ -6,11 +6,11 @@
 
 add_library(alscript STATIC)
 
-target_sources(alscript PRIVATE alluauservice.cpp allslservice.cpp)
+target_sources(alscript PRIVATE alluauservice.cpp allslservice.cpp alscriptenvelope.cpp)
 
 target_sources(
   alscript
-  PUBLIC FILE_SET HEADERS FILES alluauservice.h allslservice.h alscriptproblem.h
+  PUBLIC FILE_SET HEADERS FILES alluauservice.h allslservice.h alscriptenvelope.h alscriptproblem.h
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide PUBLIC llcommon)
@@ -34,4 +34,5 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
   )
+  al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
 endif()
