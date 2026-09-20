@@ -186,7 +186,9 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
 
 void ALStudioFloater::setStatus(const std::string& text, bool failure)
 {
-    static const LLUIColor normal = LLUIColorTable::instance().getColor("TextFgColor", LLColor4::white);
+    // The text box's own ink: the field's, TextFgColor, is black in a skin
+    // whose fields are light, and the status line is on the panel.
+    static const LLUIColor normal = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
     static const LLUIColor alarm = LLUIColorTable::instance().getColor("LtOrange", LLColor4::yellow);
 
     if (mStatus)

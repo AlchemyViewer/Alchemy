@@ -188,6 +188,9 @@ private:
     void   refreshToolbar();
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
+    // The options every editor shares, put on one, or on all.
+    void                      applyEditorOptions(ALCodeEditor& editor) const;
+    void                      applyEditorOptions();
     void                      showSource(Doc& doc);
     const std::vector<Vocab>& vocabulary(bool lua);
     // The region's words for colouring and completing, and the analyzer
@@ -311,6 +314,12 @@ private:
     bool                               mVocabularyBuilt[2] = { false, false };
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
+    // The scrollbar as a map: whether, how wide, whether it previews the
+    // lines under the mouse, and on which side.
+    bool                               mScrollMap        = false;
+    S32                                mScrollMapWidth   = 90;
+    bool                               mScrollMapPreview = true;
+    bool                               mScrollMapLeft    = false;
     LLPanel*                           mEditorHost    = nullptr;
     ALTabStrip*                        mTabs          = nullptr;
     ALJumpBar*                         mBreadcrumb    = nullptr;

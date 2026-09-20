@@ -448,8 +448,28 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     p.soft_tabs         = true;
     ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
     editor->setVisible(false);
+    applyEditorOptions(*editor);
     mEditorHost->addChild(editor);
     return editor;
+}
+
+void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
+{
+    editor.setWordWrap(mWordWrap);
+    editor.setShowLineNumbers(mLineNumbers);
+    editor.setScrollMapWidth(mScrollMapWidth);
+    editor.setScrollMapPreview(mScrollMapPreview);
+    editor.setScrollMapOnLeft(mScrollMapLeft);
+    editor.setScrollMap(mScrollMap);
+}
+
+void ALFloaterScriptStudio::applyEditorOptions()
+{
+    for (std::unique_ptr<Doc>& each : mDocs)
+    {
+        applyEditorOptions(*each->editor);
+    }
+    saveState();
 }
 
 void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string& name)
@@ -690,7 +710,13 @@ const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabula
             {
                 case ALSyntaxKind::Function:
                 {
-                    const std::string returns = attrs.get("return").asString();
+                    // Lua says "()" for a function that returns nothing,
+                    // which is nothing worth reading before the name.
+                    std::string returns = attrs.get("return").asString();
+                    if (returns == "()")
+                    {
+                        returns.clear();
+                    }
                     word.detail = (returns.empty() ? std::string() : returns + " ") + word.text + "(" + arguments(attrs.get("arguments")) + ")";
                     break;
                 }
@@ -2547,23 +2573,51 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         goToSymbol();
     }
+    else if (doc && action == "find")
+    {
+        doc->editor->perform(ALEditorCommand::Find);
+    }
+    else if (doc && action == "replace")
+    {
+        doc->editor->perform(ALEditorCommand::Replace);
+    }
+    else if (doc && action == "find_next")
+    {
+        doc->editor->perform(ALEditorCommand::FindNext);
+    }
+    else if (doc && action == "find_previous")
+    {
+        doc->editor->perform(ALEditorCommand::FindPrevious);
+    }
     else if (action == "word_wrap")
     {
         mWordWrap = !mWordWrap;
-        for (std::unique_ptr<Doc>& each : mDocs)
-        {
-            each->editor->setWordWrap(mWordWrap);
-        }
-        saveState();
+        applyEditorOptions();
     }
     else if (action == "line_numbers")
     {
         mLineNumbers = !mLineNumbers;
-        for (std::unique_ptr<Doc>& each : mDocs)
-        {
-            each->editor->setShowLineNumbers(mLineNumbers);
-        }
-        saveState();
+        applyEditorOptions();
+    }
+    else if (action == "scroll_bar" || action == "scroll_map")
+    {
+        mScrollMap = action == "scroll_map";
+        applyEditorOptions();
+    }
+    else if (action == "map_narrow" || action == "map_medium" || action == "map_wide")
+    {
+        mScrollMapWidth = action == "map_narrow" ? 60 : action == "map_medium" ? 90 : 130;
+        applyEditorOptions();
+    }
+    else if (action == "map_preview")
+    {
+        mScrollMapPreview = !mScrollMapPreview;
+        applyEditorOptions();
+    }
+    else if (action == "map_left")
+    {
+        mScrollMapLeft = !mScrollMapLeft;
+        applyEditorOptions();
     }
     else if (action == "problems" || action == "references" || action == "output")
     {
@@ -2660,7 +2714,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         return doc && doc->editor->canPerform(ALEditorCommand::Rename);
     }
-    if (action == "go_to_line")
+    if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {
         return doc != nullptr;
     }
@@ -2689,6 +2743,34 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "line_numbers")
     {
         return mLineNumbers;
+    }
+    if (action == "scroll_bar")
+    {
+        return !mScrollMap;
+    }
+    if (action == "scroll_map")
+    {
+        return mScrollMap;
+    }
+    if (action == "map_narrow")
+    {
+        return mScrollMapWidth <= 60;
+    }
+    if (action == "map_medium")
+    {
+        return mScrollMapWidth > 60 && mScrollMapWidth < 130;
+    }
+    if (action == "map_wide")
+    {
+        return mScrollMapWidth >= 130;
+    }
+    if (action == "map_preview")
+    {
+        return mScrollMapPreview;
+    }
+    if (action == "map_left")
+    {
+        return mScrollMapLeft;
     }
     if (action == "problems" || action == "references" || action == "output")
     {
@@ -2825,6 +2907,10 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
 {
     state["word_wrap"]    = mWordWrap;
     state["line_numbers"] = mLineNumbers;
+    state["scroll_map"]   = mScrollMap;
+    state["map_width"]    = mScrollMapWidth;
+    state["map_preview"]  = mScrollMapPreview;
+    state["map_left"]     = mScrollMapLeft;
 }
 
 void ALFloaterScriptStudio::readState(const LLSD& state)
@@ -2836,5 +2922,21 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("line_numbers"))
     {
         mLineNumbers = state["line_numbers"].asBoolean();
+    }
+    if (state.has("scroll_map"))
+    {
+        mScrollMap = state["scroll_map"].asBoolean();
+    }
+    if (state.has("map_width"))
+    {
+        mScrollMapWidth = llmax(20, state["map_width"].asInteger());
+    }
+    if (state.has("map_preview"))
+    {
+        mScrollMapPreview = state["map_preview"].asBoolean();
+    }
+    if (state.has("map_left"))
+    {
+        mScrollMapLeft = state["map_left"].asBoolean();
     }
 }

@@ -182,6 +182,23 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="rename" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
             </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Find..." layout="topleft" name="find" shortcut="control|F">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find" />
+            </menu_item_call>
+            <menu_item_call label="Replace..." layout="topleft" name="replace" shortcut="control|H">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="replace" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="replace" />
+            </menu_item_call>
+            <menu_item_call label="Find Next" layout="topleft" name="find_next" shortcut="F3">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_next" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_next" />
+            </menu_item_call>
+            <menu_item_call label="Find Previous" layout="topleft" name="find_previous" shortcut="shift|F3">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_previous" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_previous" />
+            </menu_item_call>
         </menu>
         <menu
          label="Go"
@@ -223,6 +240,44 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
             </menu_item_check>
+            <menu
+             label="Scrollbar"
+             layout="topleft"
+             mouse_opaque="false"
+             name="scrollbar_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_check label="Bar" layout="topleft" name="scroll_bar">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_bar" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_bar" />
+                </menu_item_check>
+                <menu_item_check label="Map" layout="topleft" name="scroll_map">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_map" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_map" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Narrow Map" layout="topleft" name="map_narrow">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_narrow" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_narrow" />
+                </menu_item_check>
+                <menu_item_check label="Medium Map" layout="topleft" name="map_medium">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_medium" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_medium" />
+                </menu_item_check>
+                <menu_item_check label="Wide Map" layout="topleft" name="map_wide">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_wide" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_wide" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Preview Under the Mouse" layout="topleft" name="map_preview">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_preview" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_preview" />
+                </menu_item_check>
+                <menu_item_check label="Map on the Left" layout="topleft" name="map_left">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_left" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_left" />
+                </menu_item_check>
+            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Fold" layout="topleft" name="fold">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
