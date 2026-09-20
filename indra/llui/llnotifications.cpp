@@ -1309,9 +1309,11 @@ bool LLNotifications::uniqueFilter(LLNotificationPtr pNotif)
         return true;
     }
 
-    // checks against existing unique notifications
-    for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-        existing_it != mUniqueNotifications.end();
+    // checks against existing unique notifications. A name can hold several,
+    // and multimap::find promises only some entry with the key, so the walk
+    // is over the whole run under it.
+    for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+        existing_it != end;
         ++existing_it)
     {
         LLNotificationPtr existing_notification = existing_it->second;
@@ -1372,8 +1374,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Update the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;
@@ -1392,8 +1394,8 @@ bool LLNotifications::failedUniquenessTest(const LLSD& payload)
         // Add to the existing unique notification with the data from this particular instance...
         // This guarantees that duplicate notifications will be collapsed to the one
         // most recently triggered
-        for (LLNotificationMap::iterator existing_it = mUniqueNotifications.find(pNotif->getName());
-            existing_it != mUniqueNotifications.end();
+        for (auto [existing_it, end] = mUniqueNotifications.equal_range(pNotif->getName());
+            existing_it != end;
             ++existing_it)
         {
             LLNotificationPtr existing_notification = existing_it->second;

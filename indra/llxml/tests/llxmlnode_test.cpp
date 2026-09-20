@@ -31,6 +31,8 @@
 
 #include <cmath>
 #include <sstream>
+#include <string>
+#include <vector>
 
 namespace tut
 {
@@ -222,5 +224,91 @@ namespace tut
         LLXMLNodePtr c;
         ensure("getChild c", node->getChild("c", c));
         ensure_equals("c line", c->getLineNumber(), 3);
+    }
+
+    // Siblings that share a name. The child map is a multimap keyed by the
+    // name, and multimap::find promises only some entry with the key: since
+    // libc++ 22 it is whichever the tree descent reaches rather than the
+    // first, so anything that walked forward from find() could start past
+    // the child it wanted. Every same-named child must be deletable whatever
+    // its place in the run, getChild must answer the first in document
+    // order, and getChildren all of them. Eight children make the tree deep
+    // enough that a descent rarely lands on the first.
+    template<> template<>
+    void llxmlnode_object::test<13>()
+    {
+        const std::string xml =
+            "<root>"
+            "<s n=\"0\"/><s n=\"1\"/><s n=\"2\"/><s n=\"3\"/>"
+            "<s n=\"4\"/><s n=\"5\"/><s n=\"6\"/><s n=\"7\"/>"
+            "<other/>"
+            "</root>";
+        LLXMLNodePtr root;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
+        ensure_equals("nine children", root->getChildCount(), 9u);
+
+        LLXMLNodePtr first;
+        ensure("getChild finds one", root->getChild("s", first));
+        std::string n;
+        ensure("it has n", first->getAttributeString("n", n));
+        ensure_equals("and is the first in the file", n, std::string("0"));
+
+        LLXMLNodeList all;
+        root->getChildren("s", all);
+        ensure_equals("getChildren finds them all", all.size(), 8u);
+
+        // Delete in document order: each deletion is of the front of the
+        // run, which is where a descent is least likely to land.
+        for (int expected = 0; expected < 8; ++expected)
+        {
+            LLXMLNodePtr child;
+            ensure("still one to find", root->getChild("s", child));
+            ensure("attribute", child->getAttributeString("n", n));
+            ensure_equals("in document order", n, std::to_string(expected));
+            ensure("deleted", root->deleteChild(child));
+            ensure("and orphaned", child->mParent == nullptr);
+            ensure_equals("count follows", root->getChildCount(), (U32)(8 - expected));
+
+            // The sibling list agrees with the map about what is left.
+            U32 listed = 0;
+            for (LLXMLNodePtr c = root->getFirstChild(); c.notNull(); c = c->getNextSibling())
+            {
+                ++listed;
+            }
+            ensure_equals("sibling list agrees", listed, root->getChildCount());
+        }
+
+        LLXMLNodePtr none;
+        ensure("no s is left", !root->getChild("s", none));
+        LLXMLNodePtr other;
+        ensure("the other child remains", root->getChild("other", other));
+    }
+
+    // The same run deleted from the back and from the middle, so the
+    // target is never at the front of the equal range either.
+    template<> template<>
+    void llxmlnode_object::test<14>()
+    {
+        const std::string xml =
+            "<root>"
+            "<s n=\"0\"/><s n=\"1\"/><s n=\"2\"/><s n=\"3\"/>"
+            "<s n=\"4\"/><s n=\"5\"/><s n=\"6\"/><s n=\"7\"/>"
+            "</root>";
+        LLXMLNodePtr root;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), root, nullptr));
+
+        std::vector<LLXMLNodePtr> children;
+        for (LLXMLNodePtr c = root->getFirstChild(); c.notNull(); c = c->getNextSibling())
+        {
+            children.push_back(c);
+        }
+        ensure_equals("eight in the list", children.size(), 8u);
+
+        for (size_t index : { 7u, 3u, 0u, 5u, 1u, 6u, 2u, 4u })
+        {
+            ensure("deleted from wherever it sits", root->deleteChild(children[index]));
+        }
+        ensure_equals("none left", root->getChildCount(), 0u);
+        ensure("and the list is empty", root->getFirstChild().isNull());
     }
 }
