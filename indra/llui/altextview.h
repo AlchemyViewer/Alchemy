@@ -28,6 +28,7 @@
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
 #include "altextlayout.h"
+#include "altextsearch.h"
 #include "altextundo.h"
 #include "lleditmenuhandler.h"
 #include "llframetimer.h"
@@ -42,8 +43,8 @@
 #include <string_view>
 #include <vector>
 
+class ALFindBar;
 class LLContextMenu;
-class LLScrollbar;
 
 // A view of a document: the lines laid out and drawn, only the ones in
 // sight, a caret and a selection in them, a keymap that turns keys into
@@ -56,6 +57,13 @@ class LLScrollbar;
 // An input method composes into it through LLPreeditor, as the legacy
 // editors do; a right click shows the menu its file names; lines a
 // subclass hides (folding) take no room and the caret passes over them.
+// A find and replace bar sits over its top right corner when asked for.
+// The scrollbars are its own, drawn over the text: a ruler down the
+// right that always shows where the caret is and the marks a subclass
+// gives, with a thumb that fades once the mouse has left and the text
+// has settled; and a thumb along the bottom for a text wider than the
+// view. Or the ruler can be a map of the text instead, with the lines
+// drawn small and the rows on screen as a window over it.
 //
 // What is not here yet: spell check, atoms and display substitutions.
 class ALTextView : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor
@@ -87,6 +95,15 @@ public:
         Optional<std::string> default_text;
         // The file the right-click menu is built from; none for no menu.
         Optional<std::string> context_menu;
+        // Behind every match of what the find bar looks for.
+        Optional<LLUIColor>   find_match_color;
+        // The vertical scrollbar as a map of the text: whether, how wide,
+        // whether resting on it shows the lines there, and which side --
+        // on the left it is left of the gutter.
+        Optional<bool>        scroll_map;
+        Optional<S32>         scroll_map_width;
+        Optional<bool>        scroll_map_preview;
+        Optional<bool>        scroll_map_left;
 
         Params();
     };
@@ -190,6 +207,43 @@ public:
 
     void showContextMenu(S32 x, S32 y);
 
+    // --- find and replace ------------------------------------------------------
+
+    // The bar, shown over the top right corner with the query seeded from
+    // a selection of a line or less; with the replace row unfolded where
+    // asked and the text may change. Every match is washed as the bar's
+    // query changes; the current one is the selection.
+    void       showFind(bool with_replace);
+    void       hideFind();
+    bool       findShown() const;
+    ALFindBar* findBar() { return mFindBar; }
+    const std::vector<ALTextRange>& findMatches() const { return mMatches; }
+    S32                             findCurrent() const { return mMatch; }
+    // The next match selected and brought into view, or the one before;
+    // round the ends. False with none.
+    bool findNext(bool forward);
+    // The current match replaced by the bar's replacement and the next
+    // found; or, with no current match, the next found. How many, for
+    // every match as one step to undo.
+    bool replaceMatch();
+    S32  replaceAllMatches();
+
+    // --- the scrollbar as a map ------------------------------------------------
+
+    void   setScrollMap(bool map);
+    bool   scrollMap() const { return mScrollMap; }
+    void   setScrollMapWidth(S32 width);
+    S32    scrollMapWidth() const { return mScrollMapWidth; }
+    void   setScrollMapPreview(bool preview) { mScrollMapPreview = preview; }
+    bool   scrollMapPreview() const { return mScrollMapPreview; }
+    void   setScrollMapOnLeft(bool left);
+    bool   scrollMapOnLeft() const { return mScrollMapLeft; }
+    // Where the map is drawn, or an empty rect without one.
+    LLRect mapRect() const;
+    // Where the gutter and the text begin: past the map when it is on
+    // the left.
+    S32    leftEdge() const;
+
     // --- LLEditMenuHandler ---------------------------------------------------
 
     LLView* asView() override { return this; }
@@ -223,6 +277,7 @@ public:
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onMouseCaptureLost() override;
     void setFocus(bool focus) override;
     void onFocusLost() override;
@@ -253,8 +308,19 @@ protected:
     virtual void revealLine(S32 line) { mLayout.setHidden(line, line, false); }
     virtual bool performFold(ALEditorCommand command) { return false; }
     virtual bool canFold(ALEditorCommand command) const { return false; }
+    // Whether a click lands where the last one did, which is what makes
+    // it the next of a run; and the run armed for a third click, once a
+    // subclass has taken a double click as its own.
+    bool sameClickSpot(S32 x, S32 y) const;
+    void armTripleClick();
     // Completion was asked for.
     virtual bool complete() { return false; }
+    // What the map shows beside a line: a mark's colour, where the
+    // subclass has one for it.
+    virtual bool mapMark(S32 line, LLColor4& color) const { return false; }
+    // The x span of a range on a row, if it touches the row; a range past
+    // the line's end reaches a little past the last glyph.
+    bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
     // Something was asked about the name at the caret: its definition,
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
@@ -293,8 +359,26 @@ private:
     void                 allowLanguageInput(bool allow);
 
     void syncScrollbar();
-    void onScrollChange(S32 pos, LLScrollbar* bar);
+    // The bars: where each is, where its thumb is on it, how faded they
+    // are, and the scroll a drag or a press on one asks for.
+    LLRect rulerRect() const;
+    LLRect hBarRect() const;
+    LLRect vThumb(const LLRect& track);
+    LLRect hThumb(const LLRect& track);
+    F32    barAlpha() const;
+    void   scrollToRulerY(S32 y, S32 offset);
+    void   scrollToBarX(S32 x, S32 offset);
+    void   drawBars(F32 alpha);
     void drawRows(const LLRect& text);
+    void placeFindBar();
+    void refreshFind();
+    // The map: the lines it shows, hidden ones left out, and how far its
+    // window is scrolled; the line at a y of it; the view scrolled so a
+    // y of it is in the middle.
+    S32  mapScroll(const LLRect& map);
+    S32  mapLineAt(S32 y);
+    void scrollToMapY(S32 y);
+    void drawMap(F32 alpha);
     void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
@@ -306,9 +390,21 @@ private:
     ALSyntaxHighlighter mHighlighter;
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
-    LLScrollbar*        mScrollbar  = nullptr;
-    LLScrollbar*        mHScrollbar = nullptr;
     const LLFontGL*     mFont       = nullptr;
+    // Whether the text needs a bar each way; since when the bars were
+    // last wanted in sight; and which one a drag has hold of, by how far
+    // into its thumb it was taken.
+    bool         mNeedV = false;
+    bool         mNeedH = false;
+    LLFrameTimer mBarShown;
+    enum class BarDrag : U8
+    {
+        None,
+        Vertical,
+        Horizontal
+    };
+    BarDrag      mBarDrag       = BarDrag::None;
+    S32          mBarDragOffset = 0;
 
     LLUIColor mTextColor;
     LLUIColor mTextReadOnlyColor;
@@ -335,7 +431,12 @@ private:
     F32          mScrollX  = 0.f;
     bool         mSelecting = false;
     LLFrameTimer mBlink;
+    // The second and the third click of a run count only where they land
+    // by the first: the window tells clicks apart by time alone, and two
+    // quick clicks in two places are two clicks.
     LLFrameTimer mTripleClick;
+    S32          mClickX = -1000;
+    S32          mClickY = -1000;
     bool         mChangedSinceFocus = false;
 
     // The composition, where one is in progress: where it starts, how many
@@ -353,6 +454,22 @@ private:
 
     std::string             mContextMenuFile;
     LLHandle<LLContextMenu> mContextMenuHandle;
+
+    ALFindBar*               mFindBar = nullptr;
+    std::vector<ALTextRange> mMatches;
+    S32                      mMatch = -1;
+    // The selection the bar was told to stay within, while it is.
+    bool                     mFindInSelection = false;
+    ALTextRange              mFindScope;
+    std::string              mFindError;
+    LLUIColor                mFindMatchColor;
+
+    bool             mScrollMap        = false;
+    S32              mScrollMapWidth   = 80;
+    bool             mScrollMapPreview = true;
+    bool             mScrollMapLeft    = false;
+    bool             mDraggingMap      = false;
+    std::vector<S32> mMapLines;
 
     std::vector<LLColor4U> mColorScratch;
     changed_signal_t       mChanged;

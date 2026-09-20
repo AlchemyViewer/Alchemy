@@ -49,8 +49,8 @@ namespace
     const S32 FOLD_COLUMN = 12;
     const S32 FOLD_MARKER = 7;
     const S32 FOLD_BOX_GAP = 6;
-    const F32 SQUIGGLE_AMPLITUDE = 1.5f;
-    const F32 SQUIGGLE_WAVE      = 6.f;
+    const F32 SQUIGGLE_AMPLITUDE = 1.f;
+    const F32 SQUIGGLE_WAVE      = 5.f;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
     const S32 COMPLETION_AUTO_AT = 2;
@@ -553,7 +553,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         return;
     }
     const LLRect local = getLocalRect();
-    const LLRect gutter(local.mLeft, local.mTop, local.mLeft + width, local.mBottom);
+    const LLRect gutter(leftEdge(), local.mTop, leftEdge() + width, local.mBottom);
     gl_rect_2d(gutter, gutterColor() % alpha);
 
     const LLFontGL* font   = getFont();
@@ -615,36 +615,6 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
 }
 
 // --- over the rows -------------------------------------------------------------
-
-bool ALCodeEditor::spanOnRow(S32 line, S32 row, const ALTextRange& range_in, F32& x0, F32& x1)
-{
-    const ALTextRange range = range_in.normalised();
-    if (line < range.begin.line || line > range.end.line)
-    {
-        return false;
-    }
-    const ALTextLayout::Line& laid = layout().line(line);
-    if (row < 0 || row >= static_cast<S32>(laid.rows.size()))
-    {
-        return false;
-    }
-    const ALTextLayout::Row& r        = laid.rows[row];
-    const S32                length   = document().lineLength(line);
-    const bool               last_row = (row + 1 == static_cast<S32>(laid.rows.size()));
-    const S32                lo       = llmax(range.begin.line < line ? 0 : range.begin.column, r.begin);
-    const S32                hi       = llmin(range.end.line > line ? length + 1 : range.end.column, last_row ? length + 1 : r.end);
-    if (lo > hi || (lo == hi && !range.empty()))
-    {
-        return false;
-    }
-    x0 = layout().xOf(line, lo);
-    x1 = hi > length ? r.width + 6.f : (hi >= r.end && !last_row ? r.width : layout().xOf(line, hi));
-    if (x1 <= x0)
-    {
-        x1 = x0 + 4.f;
-    }
-    return true;
-}
 
 void ALCodeEditor::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color)
 {
@@ -1372,6 +1342,17 @@ ALTextRange ALCodeEditor::identifierAtCaret() const
     return word;
 }
 
+bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
+{
+    const Mark mark = markAt(line);
+    if (mark == Mark::None)
+    {
+        return false;
+    }
+    color = mMarkColors[static_cast<size_t>(mark)].get();
+    return true;
+}
+
 bool ALCodeEditor::canSymbol(ALEditorCommand command) const
 {
     if (!mSymbolRequest || (command == ALEditorCommand::Rename && isReadOnly()))
@@ -1431,8 +1412,8 @@ bool ALCodeEditor::acceptCompletion()
     {
         // Its parameters as placeholders, where the detail names them;
         // else the caret between the brackets where it takes anything.
-        const std::vector<std::string> names = parameterNames(chosen.detail);
-        const size_t open  = chosen.detail.find('(');
+        const std::vector<std::string> names = parameterNames(chosen.detail, chosen.text);
+        const size_t open  = parameterListAt(chosen.detail, chosen.text);
         size_t       after = open == std::string::npos ? std::string::npos : chosen.detail.find_first_not_of(' ', open + 1);
         const bool   takes = open == std::string::npos || after == std::string::npos || chosen.detail[after] != ')';
         std::string  call  = chosen.text + "(";
@@ -1470,10 +1451,24 @@ bool ALCodeEditor::acceptCompletion()
 // --- placeholders ------------------------------------------------------------------
 
 // static
-std::vector<std::string> ALCodeEditor::parameterNames(std::string_view detail)
+size_t ALCodeEditor::parameterListAt(std::string_view detail, std::string_view name)
+{
+    if (!name.empty())
+    {
+        const std::string called = std::string(name) + "(";
+        if (const size_t at = detail.find(called); at != std::string_view::npos)
+        {
+            return at + name.size();
+        }
+    }
+    return detail.find('(');
+}
+
+// static
+std::vector<std::string> ALCodeEditor::parameterNames(std::string_view detail, std::string_view name)
 {
     std::vector<std::string> names;
-    const size_t             open = detail.find('(');
+    const size_t             open = parameterListAt(detail, name);
     if (open == std::string::npos)
     {
         return names;
@@ -1715,7 +1710,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     closeCompletion();
     clearPlaceholders();
     const LLRect text         = textRect();
-    const S32    gutter_right = getLocalRect().mLeft + gutterWidth();
+    const S32    gutter_right = leftEdge() + gutterWidth();
     if (mShowFoldMarkers && x < gutter_right && x >= gutter_right - FOLD_COLUMN)
     {
         const S32 line = posAtLocal(text.mLeft, y, false).line;
@@ -1832,13 +1827,14 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     // An identifier, as code reads one; the document's word otherwise.
-    const ALTextRange word = textRect().pointInRect(x, y) ? identifierAt(posAtLocal(x, y, false)) : ALTextRange();
+    const ALTextRange word = textRect().pointInRect(x, y) && sameClickSpot(x, y) ? identifierAt(posAtLocal(x, y, false)) : ALTextRange();
     if (word.empty())
     {
         return ALTextView::handleDoubleClick(x, y, mask);
     }
     setFocus(true);
     setSelection(word);
+    armTripleClick();
     return true;
 }
 

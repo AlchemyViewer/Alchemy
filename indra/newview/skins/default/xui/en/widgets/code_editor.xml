@@ -11,6 +11,7 @@
   bg_focus_color="TextBgFocusColor"
   cursor_color="TextCursorColor"
   selection_color="SelectionColor"
+  find_match_color="TextFindMatchColor"
   bracket_match_color="CodeBracketMatchColor"
   context_menu="menu_code_editor.xml"
   h_pad="4"

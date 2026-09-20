@@ -11,6 +11,7 @@
   bg_focus_color="TextBgFocusColor"
   cursor_color="TextCursorColor"
   selection_color="SelectionColor"
+  find_match_color="TextFindMatchColor"
   context_menu="menu_text_view.xml"
   h_pad="4"
   v_pad="2"

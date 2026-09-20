@@ -432,6 +432,8 @@ namespace tut
         ensure("Luau's names", names.size() == 2 && names[0] == "channel" && names[1] == "msg");
         names = ALCodeEditor::parameterNames("float half(integer n)");
         ensure("LSL's names", names.size() == 1 && names[0] == "n");
+        names = ALCodeEditor::parameterNames("() ll.Say(number Channel, string Text)", "Say");
+        ensure("after the name, past a return type with brackets of its own", names.size() == 2 && names[0] == "Channel" && names[1] == "Text");
         ensure("none for none", ALCodeEditor::parameterNames("function").empty() && ALCodeEditor::parameterNames("() -> ()").empty());
 
         type("llS");

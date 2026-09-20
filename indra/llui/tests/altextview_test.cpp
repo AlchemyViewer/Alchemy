@@ -24,6 +24,7 @@
 
 #include "linden_common.h"
 
+#include "../alfindbar.h"
 #include "../altextview.h"
 
 #include "../llfocusmgr.h"
@@ -216,8 +217,16 @@ namespace tut
         v.handleMouseUp(x, y, MASK_SHIFT);
         ensure("anchor kept", v.selection().normalised().begin == ALTextPos(0, 6));
         pointOf(0, 8, x, y);
+        // A double click is a press where the last press was, then the
+        // second press told apart; one somewhere else is a plain click.
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
         ensure("double", v.handleDoubleClick(x, y, MASK_NONE));
         ensure_equals("the word", v.selectedText(), std::string("world"));
+        pointOf(1, 1, x2, y2);
+        ensure("a quick click elsewhere is a click", v.handleDoubleClick(x2, y2, MASK_NONE));
+        ensure("that starts a selection there, not a word", !v.hasSelection() && v.caret() == ALTextPos(1, 1));
+        v.handleMouseUp(x2, y2, MASK_NONE);
     }
 
     template<> template<>
@@ -284,7 +293,7 @@ namespace tut
         ensure_equals("at the left", v.scrollX(), 0.f);
         key(KEY_END);
         ensure("the caret's end scrolls the text", v.scrollX() > 0.f);
-        ensure("the text rect is shorter for the bar", v.textRect().mBottom > 2);
+        ensure("the bar lies over the text rather than taking room", v.textRect().mBottom <= 2);
         key(KEY_HOME);
         ensure_equals("back to the left", v.scrollX(), 0.f);
         v.setWordWrap(true);
@@ -363,5 +372,100 @@ namespace tut
         ensure_equals("marking changed nothing", v.text(), std::string("axb"));
         ime.updatePreedit("Q", { 1 }, { false }, 1);
         ensure_equals("the composition replaced what was marked", v.text(), std::string("Q"));
+    }
+
+    template<> template<>
+    void altextview_object::test<12>()
+    {
+        set_test_name("the find bar lights every match, walks them round the ends, and replaces one or all");
+        ALTextView& v = make("one two one\ntwo one\n");
+        ensure("no bar yet", !v.findShown());
+        v.setSelection(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)));
+        key('F', MASK_CONTROL);
+        ensure("control-F shows the bar", v.findShown());
+        ensure_equals("seeded with the selection", v.findBar()->query(), std::string("two"));
+        v.findBar()->setQuery("one");
+        v.setCaret(ALTextPos(0, 0));
+        v.replaceMatch();  // with no current match, finds the next from the caret
+        ensure_equals("three matches", v.findMatches().size(), size_t(3));
+        ensure("the first selected", v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)) && v.findCurrent() == 0);
+        key(KEY_F3);
+        ensure("F3 goes on", v.selection().normalised() == ALTextRange(ALTextPos(0, 8), ALTextPos(0, 11)));
+        key(KEY_F3);
+        key(KEY_F3);
+        ensure("and round to the first", v.findCurrent() == 0);
+        key(KEY_F3, MASK_SHIFT);
+        ensure("shift-F3 goes back round to the last", v.selection().normalised() == ALTextRange(ALTextPos(1, 4), ALTextPos(1, 7)));
+
+        v.findBar()->setReplacement("1");
+        v.findNext(true);  // the first again
+        ensure("replaces the current and finds the next", v.replaceMatch());
+        ensure_equals("the text", v.text(), std::string("1 two one\ntwo one\n"));
+        ensure_equals("two left", v.findMatches().size(), size_t(2));
+        ensure_equals("all of them, as one step", v.replaceAllMatches(), 2);
+        ensure_equals("replaced", v.text(), std::string("1 two 1\ntwo 1\n"));
+        v.undo();
+        ensure_equals("one step back", v.text(), std::string("1 two one\ntwo one\n"));
+        key(KEY_ESCAPE);
+        ensure("escape closes the bar", !v.findShown() && v.findMatches().empty());
+    }
+
+    template<> template<>
+    void altextview_object::test<13>()
+    {
+        set_test_name("the scrollbar as a map takes its width from the text, on the right or left of the gutter");
+        ALTextView& v = make("a\nb\nc\n", 400, 200);
+        const S32 plain = v.textRect().getWidth();
+        ensure("no map", v.mapRect().isEmpty() && v.leftEdge() == 0);
+        v.setScrollMap(true);
+        v.setScrollMapWidth(80);
+        ensure("the map on the right", v.mapRect() == LLRect(320, 200, 400, 0));
+        ensure_equals("the text narrower by it", v.textRect().getWidth(), plain - 80);
+        ensure("the text still starts at the left", v.leftEdge() == 0);
+        v.setScrollMapOnLeft(true);
+        ensure("the map on the left", v.mapRect() == LLRect(0, 200, 80, 0));
+        ensure("the text starts past it", v.leftEdge() == 80 && v.textRect().mLeft > 80);
+        ensure_equals("and is as narrow", v.textRect().getWidth(), plain - 80);
+        v.setScrollMap(false);
+        ensure("gone", v.mapRect().isEmpty() && v.textRect().getWidth() == plain);
+    }
+
+    template<> template<>
+    void altextview_object::test<14>()
+    {
+        set_test_name("the ruler takes its width once the text is taller than the view, and a press on it scrolls there");
+        std::string tall;
+        for (S32 i = 0; i < 100; ++i)
+        {
+            tall += llformat("line %d\n", i);
+        }
+        ALTextView& v = make(tall.c_str(), 400, 200);
+        const S32   width = v.textRect().getWidth();
+        ensure("the ruler is there", v.textRect().mRight < 400 - 4);
+        ensure_equals("at the start", v.scrollY(), 0);
+        // Pressed near the bottom of the ruler, with the thumb brought to the press.
+        ensure("the press is taken", v.handleMouseDown(394, 10, MASK_NONE));
+        ensure("and scrolls the text down", v.scrollY() > 0);
+        v.handleMouseUp(394, 10, MASK_NONE);
+        v.setText("short\n");
+        ensure("no ruler for a short text", v.textRect().getWidth() > width);
+    }
+
+    template<> template<>
+    void altextview_object::test<15>()
+    {
+        set_test_name("indenting and unindenting keep the caret and the selection where they were, moved by the change");
+        ALTextView& v = make("    x = 1\n    y = 2\n");
+        v.setCaret(ALTextPos(0, 9));
+        key(KEY_TAB, MASK_SHIFT);
+        ensure_equals("unindented", v.text(), std::string("x = 1\n    y = 2\n"));
+        ensure("the caret at the same place in the line, nothing selected", v.caret() == ALTextPos(0, 5) && !v.hasSelection());
+        v.setCaret(ALTextPos(1, 2));
+        key(KEY_TAB, MASK_SHIFT);
+        ensure("a caret inside the taken space lands at the start", v.caret() == ALTextPos(1, 0) && !v.hasSelection());
+        v.setSelection(ALTextRange(ALTextPos(0, 2), ALTextPos(1, 3)));
+        key(KEY_TAB);
+        ensure_equals("both indented", v.text(), std::string("    x = 1\n    y = 2\n"));
+        ensure("the selection moved with the text", v.selection() == ALTextRange(ALTextPos(0, 6), ALTextPos(1, 7)));
     }
 }

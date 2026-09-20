@@ -216,8 +216,12 @@ public:
     void                            clearPlaceholders();
     // The names of a signature's parameters, from how a completion's
     // detail reads: "integer llSay(integer channel, string msg)" or
-    // "(channel: number, msg: string) -> ()".
-    static std::vector<std::string> parameterNames(std::string_view detail);
+    // "(channel: number, msg: string) -> ()". The list is the bracket
+    // after the name where the detail has the name -- a return type may
+    // have brackets of its own before it -- else the first.
+    static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view());
+    // Where that list opens in the detail, or npos.
+    static size_t parameterListAt(std::string_view detail, std::string_view name);
 
     // --- hover -------------------------------------------------------------------
 
@@ -278,14 +282,12 @@ protected:
     bool complete() override;
     bool performSymbol(ALEditorCommand command) override;
     bool canSymbol(ALEditorCommand command) const override;
+    bool mapMark(S32 line, LLColor4& color) const override;
 
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void drawGutter(const LLRect& text, F32 alpha);
     void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color);
-    // The x span of a range on a row, if it touches the row; a range past
-    // the line's end reaches a little past the last glyph.
-    bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
 
     void              ensureRegions();
     void              applyFolds();
