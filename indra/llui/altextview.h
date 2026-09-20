@@ -69,6 +69,9 @@ public:
         Optional<LLUIColor>   text_readonly_color;
         Optional<LLUIColor>   bg_color;
         Optional<LLUIColor>   bg_readonly_color;
+        // Behind the text while it has the keyboard, as the legacy editors
+        // show it.
+        Optional<LLUIColor>   bg_focus_color;
         Optional<LLUIColor>   cursor_color;
         Optional<LLUIColor>   selection_color;
         Optional<bool>        bg_visible;
@@ -118,6 +121,10 @@ public:
     void            setTabWidth(S32 spaces);
     S32             getTabWidth() const { return mTabWidth; }
     void            setSoftTabs(bool soft) { mSoftTabs = soft; }
+    // What is behind the text now -- read-only, focused or neither -- and
+    // what the text is drawn in, for whatever draws beside them.
+    const LLColor4& backgroundColor() const;
+    const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
     // Whether the text has changed since it was set or saved.
     bool            isDirty() const override { return !mUndo.isPristine(); }
     void            resetDirty() override { mUndo.markSaved(); }
@@ -293,6 +300,7 @@ private:
     LLUIColor mTextReadOnlyColor;
     LLUIColor mBgColor;
     LLUIColor mBgReadOnlyColor;
+    LLUIColor mBgFocusColor;
     LLUIColor mCursorColor;
     LLUIColor mSelectionColor;
     std::array<LLUIColor, static_cast<size_t>(ALSyntaxKind::COUNT)> mKindColors;

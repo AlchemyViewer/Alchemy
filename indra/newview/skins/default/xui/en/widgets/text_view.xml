@@ -8,6 +8,7 @@
   text_readonly_color="TextFgReadOnlyColor"
   bg_color="TextBgWriteableColor"
   bg_readonly_color="TextBgReadOnlyColor"
+  bg_focus_color="TextBgFocusColor"
   cursor_color="TextCursorColor"
   selection_color="SelectionColor"
   context_menu="menu_text_view.xml"

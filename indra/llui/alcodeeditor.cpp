@@ -149,7 +149,11 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mLineNumberColor(p.line_number_color),
     mCurrentLineColor(p.current_line_color),
     mBracketMatchColor(p.bracket_match_color),
-    mFoldColor(p.fold_color)
+    mFoldColor(p.fold_color),
+    mGutterColorSet(p.gutter_color.isProvided()),
+    mLineNumberColorSet(p.line_number_color.isProvided()),
+    mCurrentLineColorSet(p.current_line_color.isProvided()),
+    mFoldColorSet(p.fold_color.isProvided())
 {
     for (size_t mark = 0; mark < static_cast<size_t>(Mark::COUNT); ++mark)
     {
@@ -351,6 +355,45 @@ bool ALCodeEditor::matchingBrackets(ALTextPos& open, ALTextPos& close)
     return false;
 }
 
+// --- colours -----------------------------------------------------------------
+
+namespace
+{
+    // So far from the background towards the ink, opaque.
+    LLColor4 towards(const LLColor4& from, const LLColor4& to, F32 amount)
+    {
+        LLColor4 mixed = lerp(from, to, amount);
+        mixed.mV[VALPHA] = 1.f;
+        return mixed;
+    }
+}
+
+LLColor4 ALCodeEditor::gutterColor() const
+{
+    return mGutterColorSet ? mGutterColor.get() : towards(backgroundColor(), textColor(), 0.06f);
+}
+
+LLColor4 ALCodeEditor::lineNumberColor() const
+{
+    return mLineNumberColorSet ? mLineNumberColor.get() : towards(backgroundColor(), textColor(), 0.5f);
+}
+
+LLColor4 ALCodeEditor::currentLineColor() const
+{
+    if (mCurrentLineColorSet)
+    {
+        return mCurrentLineColor.get();
+    }
+    LLColor4 wash = textColor();
+    wash.mV[VALPHA] = 0.06f;
+    return wash;
+}
+
+LLColor4 ALCodeEditor::foldColor() const
+{
+    return mFoldColorSet ? mFoldColor.get() : towards(backgroundColor(), textColor(), 0.6f);
+}
+
 // --- the gutter --------------------------------------------------------------
 
 void ALCodeEditor::setShowLineNumbers(bool show)
@@ -403,14 +446,14 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     }
     const LLRect local = getLocalRect();
     const LLRect gutter(local.mLeft, local.mTop, local.mLeft + width, local.mBottom);
-    gl_rect_2d(gutter, mGutterColor.get() % alpha);
+    gl_rect_2d(gutter, gutterColor() % alpha);
 
     const LLFontGL* font   = getFont();
     const S32       row_h  = layout().rowHeight();
     const S32       ascent = llround(font->getAscenderHeight());
     const S32       numbers_right = gutter.mRight - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
-    const LLColor4  ink    = mLineNumberColor.get() % alpha;
-    const LLColor4  fold   = mFoldColor.get() % alpha;
+    const LLColor4  ink    = lineNumberColor() % alpha;
+    const LLColor4  fold   = foldColor() % alpha;
     if (mShowFoldMarkers)
     {
         ensureRegions();
@@ -458,7 +501,7 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
         S32 row;
         layout().xOf(caret().line, caret().column, &row);
         const S32 top = screenTopOf(text, caret().line, row);
-        gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), mCurrentLineColor.get() % alpha);
+        gl_rect_2d(text.mLeft, top, text.mRight, top - layout().rowHeight(), currentLineColor() % alpha);
     }
     drawGutter(text, alpha);
 }
@@ -568,7 +611,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         const LLRect box = foldBoxOf(line, text);
         if (box.notEmpty())
         {
-            const LLColor4 ink = mFoldColor.get() % alpha;
+            const LLColor4 ink = foldColor() % alpha;
             gl_rect_2d(box, ink, false);
             getFont()->renderUTF8("...", 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE);
         }

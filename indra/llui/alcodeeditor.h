@@ -57,6 +57,10 @@ public:
         Optional<bool>      match_brackets;
         // The list opens on its own once an identifier is two letters in.
         Optional<bool>      auto_complete;
+        // The gutter, its numbers, the band under the caret's row and the
+        // fold markers are mixed from the text's own background and
+        // colour unless a skin names them, so they follow the theme and
+        // the focus as the text does.
         Optional<LLUIColor> gutter_color;
         Optional<LLUIColor> line_number_color;
         Optional<LLUIColor> current_line_color;
@@ -197,6 +201,13 @@ private:
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
     void documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out);
 
+    // The colours as drawn now: a skin's where it gave one, else mixed
+    // from the text's.
+    LLColor4 gutterColor() const;
+    LLColor4 lineNumberColor() const;
+    LLColor4 currentLineColor() const;
+    LLColor4 foldColor() const;
+
     bool mShowLineNumbers      = true;
     bool mShowFoldMarkers      = true;
     bool mHighlightCurrentLine = true;
@@ -208,6 +219,10 @@ private:
     LLUIColor mCurrentLineColor;
     LLUIColor mBracketMatchColor;
     LLUIColor mFoldColor;
+    bool      mGutterColorSet      = false;
+    bool      mLineNumberColorSet  = false;
+    bool      mCurrentLineColorSet = false;
+    bool      mFoldColorSet        = false;
     LLUIColor mMarkColors[static_cast<size_t>(Mark::COUNT)];
 
     boost::signals2::scoped_connection mEditConnection;

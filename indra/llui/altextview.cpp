@@ -105,6 +105,7 @@ ALTextView::Params::Params()
     text_readonly_color("text_readonly_color"),
     bg_color("bg_color"),
     bg_readonly_color("bg_readonly_color"),
+    bg_focus_color("bg_focus_color"),
     cursor_color("cursor_color"),
     selection_color("selection_color"),
     bg_visible("bg_visible", true),
@@ -129,6 +130,7 @@ ALTextView::ALTextView(const Params& p)
     mTextReadOnlyColor(p.text_readonly_color),
     mBgColor(p.bg_color),
     mBgReadOnlyColor(p.bg_readonly_color),
+    mBgFocusColor(p.bg_focus_color.isProvided() ? p.bg_focus_color() : p.bg_color()),
     mCursorColor(p.cursor_color),
     mSelectionColor(p.selection_color),
     mBgVisible(p.bg_visible),
@@ -1466,11 +1468,16 @@ const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
     return mKindColors[static_cast<size_t>(kind)].get();
 }
 
+const LLColor4& ALTextView::backgroundColor() const
+{
+    return mReadOnly ? mBgReadOnlyColor.get() : hasFocus() ? mBgFocusColor.get() : mBgColor.get();
+}
+
 void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha)
 {
     const size_t count = row.glyphEnd - row.glyphBegin;
     mColorScratch.resize(count);
-    const LLColor4                    base   = (mReadOnly ? mTextReadOnlyColor : mTextColor).get() % alpha;
+    const LLColor4                    base   = textColor() % alpha;
     const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
     size_t                            t      = 0;
     for (size_t k = 0; k < count; ++k)
@@ -1496,7 +1503,7 @@ void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_
     static LLUICachedControl<S32> marker_thickness("UIPreeditMarkerThickness", 1);
     static LLUICachedControl<S32> standout_thickness("UIPreeditStandoutThickness", 2);
     const S32      row_h = mLayout.rowHeight();
-    const LLColor4 ink   = (mReadOnly ? mTextReadOnlyColor : mTextColor).get() % alpha;
+    const LLColor4 ink   = textColor() % alpha;
     S32            from  = mPreeditBegin.column;
     for (size_t i = 0; i < mPreeditSegmentEnds.size(); ++i)
     {
@@ -1612,7 +1619,7 @@ void ALTextView::draw()
     const F32 alpha = getDrawContext().mAlpha;
     if (mBgVisible)
     {
-        gl_rect_2d(getLocalRect(), (mReadOnly ? mBgReadOnlyColor : mBgColor).get() % alpha);
+        gl_rect_2d(getLocalRect(), backgroundColor() % alpha);
     }
     const LLRect text = textRect();
     drawBeforeRows(text);
