@@ -160,4 +160,19 @@ namespace tut
         ALSyntaxState plain;
         ensure_equals("text", lexed("text", "hello // world", plain, words), std::string("text:hello // world"));
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<6>()
+    {
+        set_test_name("SLua's tables name ll.Say, and Say after ll. is found by that name");
+        ALSyntaxWords words;
+        words.set("function", { "ll.Say", "print" });
+        ALSyntaxState state;
+        ensure_equals("a member call", lexed("slua", "ll.Say(0, x)", state, words),
+                      std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:,|text: x|punctuation:)"));
+        ensure_equals("the same name alone is not the function", lexed("slua", "Say(1)", state, words),
+                      std::string("text:Say|punctuation:(|number:1|punctuation:)"));
+        ensure_equals("another head is another name", lexed("slua", "t.Say", state, words), std::string("text:t|punctuation:.|text:Say"));
+        ensure_equals("a plain function still is", lexed("slua", "print(t)", state, words), std::string("function:print|punctuation:(|text:t|punctuation:)"));
+    }
 }

@@ -231,6 +231,9 @@ struct ALSyntaxGrammar::Impl
         Then         then      = Then::Stay;
         U16          target    = 0;
         bool         wholeWord = false;
+        // Word: a word right after `head.` is looked up as `head.word`
+        // first, which is how SLua's tables name `ll.Say`.
+        bool         qualified = false;
         // Literal and SpanEscape: the text; Span: the opening; SpanEnd: the
         // end, a regex where endRegex says so, with \1 standing for the
         // capture.
@@ -372,7 +375,8 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     if (in.has("word"))
     {
         ++matchers;
-        rule.match = Rule::Match::Word;
+        rule.match     = Rule::Match::Word;
+        rule.qualified = in["qualified"].asBoolean();
         const LLSD& tables = in["tables"];
         for (LLSD::array_const_iterator it = tables.beginArray(); it != tables.endArray(); ++it)
         {
@@ -568,6 +572,27 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                 ++end;
             }
             const std::string_view word = line.substr(pos, end - pos);
+            // `head.word`, where the rule qualifies and there is a head.
+            if (rule.qualified && pos >= 2 && line[pos - 1] == '.')
+            {
+                size_t head = pos - 1;
+                while (head > 0 && wordContinue.matches(static_cast<unsigned char>(line[head - 1])))
+                {
+                    --head;
+                }
+                if (head < pos - 1 && wordStart.matches(static_cast<unsigned char>(line[head])))
+                {
+                    const std::string_view dotted = line.substr(head, end - head);
+                    for (const auto& [table, table_kind] : rule.tables)
+                    {
+                        if (this->words.has(table, dotted) || words.has(table, dotted))
+                        {
+                            kind = table_kind;
+                            return end;
+                        }
+                    }
+                }
+            }
             for (const auto& [table, table_kind] : rule.tables)
             {
                 if (this->words.has(table, word) || words.has(table, word))
