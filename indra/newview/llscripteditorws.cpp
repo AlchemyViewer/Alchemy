@@ -33,7 +33,6 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
-#include "llchat.h"
 #include "llcompilequeue.h"
 #include "lldate.h"
 #include "llerror.h"
@@ -183,15 +182,20 @@ namespace
 //========================================================================
 LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port, bool local_only):
     LLJSONRPCServer(name, port, local_only),
-    mPublishedObjectManager(
-        this,
-        [this](const LLPublishedObjectMgr::RuntimeChatEvent& event)
-        {
-            sendRuntimeEvent(event);
-        })
+    mPublishedObjectManager(this)
 {
     LL_INFOS("ScriptEditorWS") << "Created JSON-RPC script editor server: " << name
                                << " on port " << port << LL_ENDL;
+
+    // What scripts say reaches the IDE through the workspace, which hears
+    // every object's debug and owner-say chat, when forwarding is on.
+    mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) {
+        static LLCachedControl<bool> forward(gSavedSettings, "ExternalWebsocketForwardDebug", false);
+        if (forward)
+        {
+            sendRuntimeEvent(event);
+        }
+    });
 
     registerCommand({ "viewer.teleport", "Teleport agent to an in-world object",
                       object_id_command_params() },
@@ -2287,26 +2291,17 @@ void LLScriptEditorWSServer::sendCompileResults(const std::string &script_id, co
     notifyScript(script_id, "script.compiled", params);
 }
 
-void LLScriptEditorWSServer::forwardChatToIDE(
-    const LLChat& chat_msg,
-    LLPublishedObjectMgr::RuntimeEventAggregator::Channel channel) const
+void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
 
-    mPublishedObjectManager.ingestRuntimeChat(chat_msg, channel);
-}
-
-void LLScriptEditorWSServer::sendRuntimeEvent(
-    const LLPublishedObjectMgr::RuntimeChatEvent& event) const
-{
-
     std::string script_id;
-    if (event.mItemID.notNull())
+    if (event.item.notNull())
     {
-        script_id = buildScriptSubscriptionId(event.mPrimID, event.mItemID);
+        script_id = buildScriptSubscriptionId(event.prim, event.item);
     }
 
-    if (!isObjectPublished(event.mRootID) &&
+    if (!isObjectPublished(event.root) &&
         (script_id.empty() || mSubscriptions.find(script_id) == mSubscriptions.end()))
     {
         return;
@@ -2317,46 +2312,45 @@ void LLScriptEditorWSServer::sendRuntimeEvent(
     {
         message["script_id"] = script_id;
     }
-    message["object_id"] = event.mRootID;
-    message["prim_id"] = event.mPrimID;
-    message["item_id"] = event.mItemID;
-    message["object_name"] = event.mObjectName;
-    message["message"] = event.mMessage;
+    message["object_id"] = event.root;
+    message["prim_id"] = event.prim;
+    message["item_id"] = event.item;
+    message["object_name"] = event.objectName;
+    message["message"] = event.message;
 
     LLSD item;
-    item["root_id"] = event.mRootID;
-    item["prim_id"] = event.mPrimID;
-    item["item_id"] = event.mItemID;
-    item["name"] = event.mScriptName;
-    item["language"] =
-        event.mVM == LLPublishedObjectMgr::RuntimeEventAggregator::VM::LUAU
-            ? "luau"
-            : "lsl";
+    item["root_id"] = event.root;
+    item["prim_id"] = event.prim;
+    item["item_id"] = event.item;
+    item["name"] = event.scriptName;
+    item["language"] = event.lua ? "luau" : "lsl";
     message["item"] = item;
 
-    switch (event.mChannel)
+    switch (event.channel)
     {
-    case LLPublishedObjectMgr::RuntimeEventAggregator::Channel::DEBUG:
+    case ALScriptWorkspace::RuntimeEvent::Channel::Debug:
         message["channel"] = "debug";
         break;
-    case LLPublishedObjectMgr::RuntimeEventAggregator::Channel::OWNER_SAY:
+    case ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay:
         message["channel"] = "owner_say";
         break;
     }
 
-    if (event.mIsError)
+    if (event.isError)
     {
-        message["error"] = event.mError;
-        message["line"] = event.mLine;
-        message["column"] = event.mColumn;
+        // The protocol counts from one, and says zero for a place the
+        // message did not name.
+        message["error"] = event.error;
+        message["line"] = event.line < 0 ? 0 : event.line + 1;
+        message["column"] = event.column < 0 ? 0 : event.column + 1;
         message["stack"] = LLSD::emptyArray();
-        for (const auto& line : event.mStack)
+        for (const auto& line : event.stack)
         {
             message["stack"].append(line);
         }
     }
 
-    notifyAll(event.mIsError ? "runtime.error" : "runtime.debug", message);
+    notifyAll(event.isError ? "runtime.error" : "runtime.debug", message);
 }
 
 void LLScriptEditorWSServer::notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const

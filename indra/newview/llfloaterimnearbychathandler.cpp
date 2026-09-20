@@ -49,7 +49,7 @@
 #include "llfloaterimcontainer.h"
 #include "llrootview.h"
 #include "lllayoutstack.h"
-#include "llscripteditorws.h"
+#include "alscriptworkspace.h"
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -756,21 +756,11 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         return;
     }
 
-    if (LLScriptEditorWSServer::isEnabled() &&
-        gSavedSettings.getBOOL("ExternalWebsocketForwardDebug") &&
-        (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG ||
-         chat_msg.mChatType == CHAT_TYPE_OWNER))
+    // What scripts say, for Script Studio's output and the external
+    // editor bridge, both of which listen to the workspace.
+    if (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG || chat_msg.mChatType == CHAT_TYPE_OWNER)
     {
-        LLScriptEditorWSServer::ptr_t server =
-            LLScriptEditorWSServer::getServer();
-        if (server)
-        {
-            const auto channel =
-                chat_msg.mChatType == CHAT_TYPE_OWNER
-                    ? LLPublishedObjectMgr::RuntimeEventAggregator::Channel::OWNER_SAY
-                    : LLPublishedObjectMgr::RuntimeEventAggregator::Channel::DEBUG;
-            server->forwardChatToIDE(chat_msg, channel);
-        }
+        ALScriptWorkspace::instance().ingestChat(chat_msg);
     }
 
     // don't show toast and add message to chat history on receive debug message

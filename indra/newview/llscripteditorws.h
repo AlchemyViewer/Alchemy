@@ -27,6 +27,7 @@
 #pragma once
 
 #include "lljsonrpcws.h"
+#include "alscriptworkspace.h"
 #include "llpublishedobjectmgr.h"
 #include "llsd.h"
 #include "lluuid.h"
@@ -46,7 +47,6 @@
 class LLLiveLSLEditor;
 class LLScriptEdContainer;
 class LLScriptEditorWSServer;
-class LLChat;
 class LLPanel;
 class LLViewerObject;
 class LLInventoryItem;
@@ -210,10 +210,6 @@ public:
 
     LLHandle<LLPanel> findEditorForScript(const std::string& script_id) const;
 
-    void forwardChatToIDE(
-        const LLChat& chat_msg,
-        LLPublishedObjectMgr::RuntimeEventAggregator::Channel channel) const;
-
     std::set<std::string> getActiveScripts() const;
 
     // --- Object Content Publishing ---
@@ -309,8 +305,9 @@ protected:
     }
 
 private:
-    void sendRuntimeEvent(
-        const LLPublishedObjectMgr::RuntimeChatEvent& event) const;
+    // What a script said, from the workspace, to whoever published its
+    // object or subscribed to it.
+    void sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const;
 
     struct EditorSubscription
     {
@@ -334,6 +331,7 @@ private:
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
     mutable LLPublishedObjectMgr mPublishedObjectManager;
+    boost::signals2::scoped_connection mRuntimeConnection;
 
     struct WSCommandInfo
     {

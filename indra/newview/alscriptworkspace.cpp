@@ -29,6 +29,9 @@
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
+#include "llchat.h"
+#include "lldate.h"
+#include "lleventtimer.h"
 #include "llfilesystem.h"
 #include "llinventory.h"
 #include "llinventorymodel.h"
@@ -57,7 +60,51 @@ namespace
     const boost::regex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
     const boost::regex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
     const boost::regex DEFAULT_STATE(R"(\s*default\s*\{)");
+
+    // How a script's run-time error starts: the object, the script, and
+    // the words.
+    const boost::regex RUNTIME_ERROR_HEADER(R"(^(.+?)\s+\[script:([^\]]+)\]\s+Script run-time error)");
+    const char* const  RUNTIME_ERROR_MARKER = "Script run-time error";
+    // How long after a line the lines that belong with it may still come,
+    // and how often that is looked at.
+    const F32    BURST_TIMEOUT      = 1.0f;
+    const F32    BURST_FLUSH_PERIOD = 0.25f;
+    const size_t RECENT_RUNTIME     = 500;
+
+    bool endsWith(const std::string& text, const char* suffix)
+    {
+        const size_t n = strlen(suffix);
+        return text.size() >= n && text.compare(text.size() - n, n, suffix) == 0;
+    }
+
+    // The script a message names, in a prim's contents.
+    LLInventoryItem* scriptNamed(LLViewerObject* prim, const std::string& name)
+    {
+        LLInventoryObject::object_list_t contents;
+        prim->getInventoryContents(contents);
+        for (const auto& object : contents)
+        {
+            LLInventoryItem* item = dynamic_cast<LLInventoryItem*>(object.get());
+            if (item && item->getName() == name)
+            {
+                return item;
+            }
+        }
+        return nullptr;
+    }
 }
+
+// The lines one script has said within a moment of each other, not yet
+// delivered.
+struct ALScriptWorkspace::Burst
+{
+    LLUUID                   fromId;
+    std::string              fromName;
+    bool                     lua = false;
+    RuntimeEvent::Channel    channel = RuntimeEvent::Channel::Debug;
+    std::vector<std::string> texts;
+    LLTimer                  timer;
+};
 
 // --- ALScriptRef -------------------------------------------------------------
 
@@ -86,6 +133,8 @@ ALScriptRef ALScriptRef::fromKey(const LLSD& key)
 // --- language ------------------------------------------------------------------
 
 ALScriptWorkspace::ALScriptWorkspace() = default;
+
+ALScriptWorkspace::~ALScriptWorkspace() = default;
 
 bool ALScriptWorkspace::looksLikeLua(std::string_view content)
 {
@@ -409,4 +458,181 @@ bool ALScriptWorkspace::setRunning(const ALScriptRef& ref, bool running)
 bool ALScriptWorkspace::reset(const ALScriptRef& ref)
 {
     return scriptMessage(ref, _PREHASH_ScriptReset, false, false);
+}
+
+// --- what scripts say ------------------------------------------------------------
+
+void ALScriptWorkspace::ingestChat(const LLChat& chat)
+{
+    const RuntimeEvent::Channel channel = chat.mChatType == CHAT_TYPE_OWNER ? RuntimeEvent::Channel::OwnerSay : RuntimeEvent::Channel::Debug;
+    const std::vector<std::string> lines = LLStringUtil::getTokens(chat.mText, "\n");
+    boost::smatch                  match;
+    const bool                     header = !lines.empty() && boost::regex_match(lines.front(), match, RUNTIME_ERROR_HEADER);
+
+    // A line that is not the start of an error, with nothing being
+    // joined, is an event by itself.
+    if (!header && !mBurst)
+    {
+        Burst alone;
+        alone.fromId   = chat.mFromID;
+        alone.fromName = chat.mFromName;
+        alone.channel  = channel;
+        alone.texts.push_back(chat.mText);
+        deliverRuntime(alone);
+        return;
+    }
+
+    // Which VM the script runs on, which its item says.
+    bool lua = mBurst ? mBurst->lua : false;
+    if (header)
+    {
+        if (LLViewerObject* prim = gObjectList.findObject(chat.mFromID))
+        {
+            if (LLInventoryItem* item = scriptNamed(prim, match[2].str()))
+            {
+                lua = item->getRuntime() == "luau";
+            }
+        }
+    }
+    // Another script's line, or another channel's, ends what was being
+    // joined; so does a new error's start.
+    if (mBurst && (header || mBurst->fromId != chat.mFromID || mBurst->fromName != chat.mFromName || mBurst->channel != channel))
+    {
+        flushRuntime();
+    }
+    if (!mBurst)
+    {
+        mBurst           = std::make_unique<Burst>();
+        mBurst->fromId   = chat.mFromID;
+        mBurst->fromName = chat.mFromName;
+        mBurst->lua      = lua;
+        mBurst->channel  = channel;
+    }
+    mBurst->texts.push_back(chat.mText);
+    mBurst->timer.setTimerExpirySec(BURST_TIMEOUT);
+    if (!mBurstTimer)
+    {
+        mBurstTimer.reset(LLEventTimer::run_every(BURST_FLUSH_PERIOD, [this]() { flushExpiredBurst(); }));
+    }
+}
+
+void ALScriptWorkspace::flushExpiredBurst()
+{
+    if (mBurst && mBurst->timer.hasExpired())
+    {
+        flushRuntime();
+    }
+}
+
+void ALScriptWorkspace::flushRuntime()
+{
+    if (!mBurst)
+    {
+        return;
+    }
+    const std::unique_ptr<Burst> burst = std::move(mBurst);
+    deliverRuntime(*burst);
+}
+
+void ALScriptWorkspace::deliverRuntime(const Burst& burst)
+{
+    LLViewerObject* prim = gObjectList.findObject(burst.fromId);
+    LLViewerObject* root = prim ? prim->getRootEdit() : nullptr;
+
+    RuntimeEvent event;
+    event.time       = LLDate::now().secondsSinceEpoch();
+    event.prim       = burst.fromId;
+    event.root       = root ? root->getID() : burst.fromId;
+    event.objectName = burst.fromName;
+    event.lua        = burst.lua;
+    event.channel    = burst.channel;
+    for (const std::string& text : burst.texts)
+    {
+        if (!event.message.empty())
+        {
+            event.message += "\n";
+        }
+        event.message += text;
+    }
+
+    // An error: the header names the object and the script, and the rest
+    // is the stack.
+    std::vector<std::string> lines = LLStringUtil::getTokens(event.message, "\n");
+    if (!lines.empty() && endsWith(lines.front(), RUNTIME_ERROR_MARKER))
+    {
+        event.isError = true;
+        boost::smatch match;
+        if (boost::regex_match(lines.front(), match, RUNTIME_ERROR_HEADER))
+        {
+            event.objectName = match[1].str();
+            event.scriptName = match[2].str();
+            lines.erase(lines.begin());
+        }
+        else
+        {
+            lines.clear();
+        }
+    }
+    if (prim && !event.scriptName.empty())
+    {
+        if (LLInventoryItem* item = scriptNamed(prim, event.scriptName))
+        {
+            event.item = item->getUUID();
+            event.lua  = item->getRuntime() == "luau";
+        }
+    }
+    if (event.isError && !lines.empty())
+    {
+        // Where: Luau names the chunk and a one-based line; LSL gives a
+        // zero-based line and column, or nothing at all, as "Math Error"
+        // comes.
+        bool located = false;
+        for (const std::string& text : burst.texts)
+        {
+            for (const std::string& line : LLStringUtil::getTokens(text, "\n"))
+            {
+                boost::smatch match;
+                if (event.lua && boost::regex_match(line, match, LUAU_LOCATION))
+                {
+                    event.line  = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10)) - 1;
+                    event.error = match[3].str();
+                    located     = true;
+                }
+                else if (!event.lua && boost::regex_match(line, match, LSL_LOCATION))
+                {
+                    event.line   = static_cast<S32>(std::strtol(match[1].str().c_str(), nullptr, 10));
+                    event.column = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10));
+                    event.error  = match[4].str();
+                    located      = true;
+                }
+                if (located)
+                {
+                    break;
+                }
+            }
+            if (located)
+            {
+                break;
+            }
+        }
+        if (!located)
+        {
+            for (const std::string& line : lines)
+            {
+                if (!line.empty() && line.find(RUNTIME_ERROR_MARKER) == std::string::npos)
+                {
+                    event.error = line;
+                    break;
+                }
+            }
+        }
+        event.stack = std::move(lines);
+    }
+
+    mRecent.push_back(event);
+    while (mRecent.size() > RECENT_RUNTIME)
+    {
+        mRecent.pop_front();
+    }
+    mRuntime(event);
 }

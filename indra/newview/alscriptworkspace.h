@@ -31,11 +31,15 @@
 
 #include <boost/signals2.hpp>
 
+#include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
+class LLChat;
+class LLEventTimer;
 class LLInventoryItem;
 
 // Where a script lives: an item of the agent's inventory, or an item of an
@@ -68,14 +72,16 @@ struct ALScriptRef
 
 // What a script is and what happens to it: its language and compile target
 // decided once, its text fetched, its text uploaded and compiled with the
-// result parsed into the one diagnostic convention, and the running state
-// and reset of a script in an object. The legacy floaters decided each of
-// these for themselves, four times over for the compile target; the studio
-// and the bridge are meant to share this instead (doc/SCRIPT_STUDIO.md,
-// section 3.5). Every answer arrives on the main thread.
+// result parsed into the one diagnostic convention, the running state and
+// reset of a script in an object, and what scripts say as they run. The
+// legacy floaters decided each of these for themselves, four times over
+// for the compile target; the studio and the bridge share this instead
+// (doc/SCRIPT_STUDIO.md, section 3.5). Every answer arrives on the main
+// thread.
 class ALScriptWorkspace : public LLSingleton<ALScriptWorkspace>
 {
     LLSINGLETON(ALScriptWorkspace);
+    ~ALScriptWorkspace() override;
 
 public:
     // A script's language, and the target it compiles for: the item's
@@ -169,11 +175,64 @@ public:
     bool setRunning(const ALScriptRef& ref, bool running);
     bool reset(const ALScriptRef& ref);
 
+    // --- what scripts say ------------------------------------------------------
+
+    // What an object's scripts say on the debug channel and to their
+    // owner, as the viewer hears it: the lines that arrive together from
+    // one script are one event, and a run-time error is parsed to its
+    // place and its stack for both VMs. The line and the column are
+    // zero-based, or -1 where the message named none.
+    struct RuntimeEvent
+    {
+        enum class Channel : U8
+        {
+            Debug,
+            OwnerSay
+        };
+        // Seconds since the epoch, as LLDate counts them.
+        F64         time = 0.0;
+        LLUUID      root;
+        LLUUID      prim;
+        // The script, where the message named one the prim holds.
+        LLUUID      item;
+        std::string objectName;
+        std::string scriptName;
+        bool        lua     = false;
+        Channel     channel = Channel::Debug;
+        // The lines as they came.
+        std::string message;
+        bool        isError = false;
+        std::string error;
+        S32         line   = -1;
+        S32         column = -1;
+        std::vector<std::string> stack;
+    };
+    // Every debug-channel and owner-say line the viewer hears from an
+    // object goes through here. A run-time error's lines arrive one
+    // message at a time; they are joined for a moment before they are
+    // delivered.
+    void ingestChat(const LLChat& chat);
+    // Whatever is still being joined, delivered as it is.
+    void flushRuntime();
+    // The last few hundred events, oldest first, for a pane opened late.
+    const std::deque<RuntimeEvent>& recentRuntime() const { return mRecent; }
+
+    typedef boost::signals2::signal<void(const RuntimeEvent&)> runtime_signal_t;
+    boost::signals2::connection onRuntime(const runtime_signal_t::slot_type& slot) { return mRuntime.connect(slot); }
+
 private:
+    struct Burst;
+    void flushExpiredBurst();
+    void deliverRuntime(const Burst& burst);
+
     struct LoadRequest;
     static void onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType type, void* user_data, S32 status, LLExtStat ext_status);
     void        deliver(const CompileResult& result, const compile_callback_t& callback);
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running);
 
-    compiled_signal_t mCompiled;
+    compiled_signal_t             mCompiled;
+    std::unique_ptr<Burst>        mBurst;
+    std::unique_ptr<LLEventTimer> mBurstTimer;
+    std::deque<RuntimeEvent>      mRecent;
+    runtime_signal_t              mRuntime;
 };
