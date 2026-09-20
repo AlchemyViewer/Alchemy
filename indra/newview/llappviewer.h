@@ -98,9 +98,9 @@ public:
     //
     // Main application logic
     //
-    virtual bool init();            // Override to do application initialization
-    virtual bool cleanup();         // Override to do application cleanup
-    virtual bool frame(); // Override for application body logic
+    bool init() override;            // Override to do application initialization
+    bool cleanup() override;         // Override to do application cleanup
+    bool frame() override; // Override for application body logic
 
     // Application control
     void flushLFSIO(); // waits for lfs transfers to complete
@@ -309,7 +309,7 @@ protected:
 
     virtual bool meetsRequirementsForMaximizedStart(); // Used on first login to decide to launch maximized
 
-    virtual void sendOutOfDiskSpaceNotification();
+    void sendOutOfDiskSpaceNotification() override;
 
 protected:
 
