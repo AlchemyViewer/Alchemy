@@ -233,7 +233,7 @@ jobs:
       VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_USERNAME: ${{ github.repository_owner }}
       # VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
-      # VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
+      VCPKG_BINARY_SOURCES: "clear;default,readwrite"
     steps:
       - name: Linux Dependency Install and Disk Cleanup
         if: runner.os == 'Linux'
@@ -302,6 +302,35 @@ jobs:
         if: runner.os == 'macOS' || runner.os == 'Linux'
         run: |
           ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install AWS CLI on macOS
+        if: >-
+          vars.VCPKG_R2_ENABLED == 'true' && runner.os == 'macOS' &&
+          ((github.ref_protected && github.event_name != 'pull_request') ||
+           (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        run: brew install awscli
+
+      - name: Configure R2 binary cache for trusted builds
+        if: vars.VCPKG_R2_ENABLED == 'true' && github.ref_protected && github.event_name != 'pull_request'
+        env:
+          R2_CACHE_MODE: readwrite
+          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_SECRET_ACCESS_KEY }}
+        run: python scripts/vcpkg/configure_r2_cache.py
+
+      - name: Configure R2 binary cache for same-repository PRs
+        if: >-
+          vars.VCPKG_R2_ENABLED == 'true' && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          R2_CACHE_MODE: read
+          R2_ENDPOINT_URL: ${{ vars.VCPKG_R2_ENDPOINT_URL }}
+          R2_BUCKET: ${{ vars.VCPKG_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.VCPKG_R2_READ_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.VCPKG_R2_READ_SECRET_ACCESS_KEY }}
+        run: python scripts/vcpkg/configure_r2_cache.py
 
       # - name: Set up vcpkg nuget caching
       #   shell: bash
