@@ -99,12 +99,27 @@ public:
     // Every row is this tall.
     S32 rowHeight() const;
     S32 lineCount() const { return static_cast<S32>(mLines.size()); }
+    // The widest line, in pixels. A line not yet laid out counts its bytes
+    // at a space's width, which is near enough for a scrollbar.
+    F32 contentWidth();
+
+    // --- hidden lines ----------------------------------------------------------
+
+    // A hidden line is folded away: it keeps its layout and takes no
+    // height, so the line after it sits where it would have. Who hides
+    // what is the view's business; this only lays out around it.
+    void setHidden(S32 first, S32 last, bool hidden);
+    bool hidden(S32 index) const { return index >= 0 && index < static_cast<S32>(mHidden.size()) && mHidden[index]; }
+    bool anyHidden() const { return mHiddenCount > 0; }
+    // The nearest line not hidden, starting at this one and looking in
+    // this direction (1 or -1); -1 where there is none.
+    S32 visibleFrom(S32 index, S32 direction) const;
 
     // --- a line ------------------------------------------------------------
 
     const Line& line(S32 index);
     S32         rowCount(S32 index) { return static_cast<S32>(line(index).rows.size()); }
-    S32         lineHeight(S32 index) { return rowCount(index) * rowHeight(); }
+    S32         lineHeight(S32 index) { return hidden(index) ? 0 : rowCount(index) * rowHeight(); }
 
     // --- the column ----------------------------------------------------------
 
@@ -112,7 +127,8 @@ public:
     // not yet laid out count as one row.
     S32 lineTop(S32 index);
     S32 totalHeight();
-    // The line whose rows cover a y, clamped to the first and the last.
+    // The line whose rows cover a y, clamped to the first and the last;
+    // never a hidden one where any line is not.
     S32 lineAtY(S32 y);
 
     // --- the caret -------------------------------------------------------------
@@ -138,10 +154,14 @@ private:
     S32                                mWrapWidth = 0;
     S32                                mTabWidth  = 4;
     std::vector<Line>                  mLines;
+    std::vector<U8>                    mHidden;
+    S32                                mHiddenCount = 0;
     // mTops[i] is the top of line i; mTops[count] the whole height.
     std::vector<S32>                   mTops;
     bool                               mTopsDirty    = true;
     F32                                mSpaceAdvance = -1.f;
+    // Negative until asked for.
+    F32                                mContentWidth = -1.f;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
     std::vector<ALShapedGlyph>         mShaped;

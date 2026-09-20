@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- The right-click menu of a code editor: the text view's, and what an
+     editor of code has besides. -->
+<context_menu
+ name="Code editor context menu">
+  <menu_item_call label="Undo" layout="topleft" name="undo">
+    <menu_item_call.on_click function="TextView.Perform" parameter="undo" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="undo" />
+  </menu_item_call>
+  <menu_item_call label="Redo" layout="topleft" name="redo">
+    <menu_item_call.on_click function="TextView.Perform" parameter="redo" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="redo" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Cut" layout="topleft" name="cut">
+    <menu_item_call.on_click function="TextView.Perform" parameter="cut" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="cut" />
+  </menu_item_call>
+  <menu_item_call label="Copy" layout="topleft" name="copy">
+    <menu_item_call.on_click function="TextView.Perform" parameter="copy" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="copy" />
+  </menu_item_call>
+  <menu_item_call label="Paste" layout="topleft" name="paste">
+    <menu_item_call.on_click function="TextView.Perform" parameter="paste" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="paste" />
+  </menu_item_call>
+  <menu_item_call label="Delete" layout="topleft" name="delete">
+    <menu_item_call.on_click function="TextView.Perform" parameter="delete" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="delete" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Select All" layout="topleft" name="select_all">
+    <menu_item_call.on_click function="TextView.Perform" parameter="select_all" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="select_all" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment">
+    <menu_item_call.on_click function="TextView.Perform" parameter="toggle_comment" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="toggle_comment" />
+  </menu_item_call>
+  <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line">
+    <menu_item_call.on_click function="TextView.Perform" parameter="duplicate_line" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="duplicate_line" />
+  </menu_item_call>
+  <menu_item_call label="Delete Line" layout="topleft" name="delete_line">
+    <menu_item_call.on_click function="TextView.Perform" parameter="delete_line" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="delete_line" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Fold" layout="topleft" name="fold">
+    <menu_item_call.on_click function="TextView.Perform" parameter="fold" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="fold" />
+  </menu_item_call>
+  <menu_item_call label="Unfold" layout="topleft" name="unfold">
+    <menu_item_call.on_click function="TextView.Perform" parameter="unfold" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="unfold" />
+  </menu_item_call>
+  <menu_item_call label="Fold All" layout="topleft" name="fold_all">
+    <menu_item_call.on_click function="TextView.Perform" parameter="fold_all" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="fold_all" />
+  </menu_item_call>
+  <menu_item_call label="Unfold All" layout="topleft" name="unfold_all">
+    <menu_item_call.on_click function="TextView.Perform" parameter="unfold_all" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="unfold_all" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Complete" layout="topleft" name="complete">
+    <menu_item_call.on_click function="TextView.Perform" parameter="complete" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="complete" />
+  </menu_item_call>
+</context_menu>

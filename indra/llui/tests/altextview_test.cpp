@@ -272,4 +272,96 @@ namespace tut
         ensure("caret at the start", v.caret() == ALTextPos(0, 0));
         ensure("not dirty after a set", !v.isDirty());
     }
+
+    template<> template<>
+    void altextview_object::test<9>()
+    {
+        set_test_name("a line wider than the view brings a horizontal scrollbar, and wrapping takes it away");
+        ALTextView& v = make("short", 120, 100);
+        ensure("no bar for a short line", !v.hasHorizontalScrollbar());
+        v.setText(std::string(200, 'x'));
+        ensure("a bar for a long one", v.hasHorizontalScrollbar());
+        ensure_equals("at the left", v.scrollX(), 0.f);
+        key(KEY_END);
+        ensure("the caret's end scrolls the text", v.scrollX() > 0.f);
+        ensure("the text rect is shorter for the bar", v.textRect().mBottom > 2);
+        key(KEY_HOME);
+        ensure_equals("back to the left", v.scrollX(), 0.f);
+        v.setWordWrap(true);
+        ensure("no bar when wrapped", !v.hasHorizontalScrollbar());
+    }
+
+    template<> template<>
+    void altextview_object::test<10>()
+    {
+        set_test_name("lines move, duplicate and go, with the caret along");
+        ALTextView& v = make("a\nb\nc");
+        v.setCaret(ALTextPos(1, 1));
+        key(KEY_UP, MASK_ALT);
+        ensure_equals("moved up", v.text(), std::string("b\na\nc"));
+        ensure("the caret went with it", v.caret() == ALTextPos(0, 1));
+        key(KEY_UP, MASK_ALT);
+        ensure_equals("no further up", v.text(), std::string("b\na\nc"));
+        key(KEY_DOWN, MASK_ALT);
+        ensure_equals("moved down", v.text(), std::string("a\nb\nc"));
+        ensure("the caret came back", v.caret() == ALTextPos(1, 1));
+        key('D', MASK_CONTROL | MASK_SHIFT);
+        ensure_equals("duplicated", v.text(), std::string("a\nb\nb\nc"));
+        ensure("the caret is on the copy", v.caret() == ALTextPos(2, 1));
+        key('K', MASK_CONTROL | MASK_SHIFT);
+        ensure_equals("the copy is gone", v.text(), std::string("a\nb\nc"));
+        ensure("the caret is on the line that took its place", v.caret() == ALTextPos(2, 1));
+        v.setCaret(ALTextPos(2, 0));
+        key('K', MASK_CONTROL | MASK_SHIFT);
+        ensure_equals("the last line goes with its newline", v.text(), std::string("a\nb"));
+        key('Z', MASK_CONTROL);
+        ensure_equals("and comes back as one step", v.text(), std::string("a\nb\nc"));
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        key(KEY_DOWN, MASK_ALT);
+        ensure_equals("a selection of a whole line moves that line", v.text(), std::string("b\na\nc"));
+    }
+
+    template<> template<>
+    void altextview_object::test<11>()
+    {
+        set_test_name("a composition sits in the text without being an edit, and leaves as it came");
+        ALTextView& v = make("ab");
+        v.setCaret(ALTextPos(0, 1));
+        LLPreeditor& ime = v.preeditor();
+        LLPreeditor::segment_lengths_t lengths = { 3, 3 };
+        LLPreeditor::standouts_t       standouts = { true, false };
+        ime.updatePreedit("\xE3\x81\x8B\xE3\x81\xAA", lengths, standouts, 6);
+        ensure("composing", v.hasPreedit());
+        ensure_equals("the text shows it", v.text(), std::string("a\xE3\x81\x8B\xE3\x81\xAA" "b"));
+        ensure("not an edit", !v.isDirty());
+        ensure("the caret is after it", v.caret() == ALTextPos(0, 7));
+        S32 position = 0, length = 0;
+        ime.getPreeditRange(&position, &length);
+        ensure_equals("where it is, in bytes", position, 1);
+        ensure_equals("how long, in bytes", length, 6);
+        ime.getSelectionRange(&position, &length);
+        ensure_equals("no selection", length, 0);
+        LLCoordGL coord;
+        LLRect    bounds, control;
+        ensure("it has a place on screen", ime.getPreeditLocation(0, &coord, &bounds, &control));
+        ensure("the bounds have width", bounds.getWidth() > 0);
+        ensure_equals("what the window reads is the whole text", ime.getPreeditStringUtf8(), v.text());
+        ime.updatePreedit("\xE3\x81\x8B", { 3 }, { false }, 3);
+        ensure_equals("a shorter composition replaces the first", v.text(), std::string("a\xE3\x81\x8B" "b"));
+        ime.resetPreedit();
+        ensure("gone", !v.hasPreedit());
+        ensure_equals("the text as it was", v.text(), std::string("ab"));
+        ensure("the caret where the composition began", v.caret() == ALTextPos(0, 1));
+        ensure("still not an edit", !v.isDirty());
+        type("x");
+        ensure("typing after is an edit", v.isDirty());
+        // Reconversion: the text is marked as the composition, and what the
+        // input method composes next takes its place.
+        ime.markAsPreedit(0, 3);
+        ensure("marked", v.hasPreedit());
+        ensure("of the marked bytes", v.preeditRange() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        ensure_equals("marking changed nothing", v.text(), std::string("axb"));
+        ime.updatePreedit("Q", { 1 }, { false }, 1);
+        ensure_equals("the composition replaced what was marked", v.text(), std::string("Q"));
+    }
 }

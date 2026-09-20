@@ -74,6 +74,23 @@ namespace tut
             editor->setFocus(true);
             return *editor;
         }
+
+        void key(KEY k, MASK m = MASK_NONE) { ensure("key taken", editor->handleKeyHere(k, m)); }
+
+        void type(const char* text)
+        {
+            for (const char* c = text; *c; ++c)
+            {
+                if (*c == '\n')
+                {
+                    key(KEY_RETURN);
+                }
+                else
+                {
+                    ensure("char taken", editor->handleUnicodeCharHere(static_cast<llwchar>(static_cast<unsigned char>(*c))));
+                }
+            }
+        }
     };
 
     typedef test_group<alcodeeditor_data> alcodeeditor_group;
@@ -96,6 +113,8 @@ namespace tut
         e.setText(many);
         ensure("wider for four digits", e.gutterWidth() > gutter);
         e.setShowLineNumbers(false);
+        ensure("no numbers leaves the fold column", e.gutterWidth() > 0 && e.gutterWidth() < gutter);
+        e.setShowFoldMarkers(false);
         ensure_equals("no gutter", e.gutterWidth(), 0);
         ensure_equals("the text starts at the pad", e.textRect().mLeft, 4);
     }
@@ -161,5 +180,85 @@ namespace tut
         ensure("gone to the line", e.caret() == ALTextPos(1, 0));
         ALCodeEditor& x = make("<a/>", "xml");
         ensure("no line comment in xml", !x.handleKeyHere('/', MASK_CONTROL));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<5>()
+    {
+        set_test_name("blocks fold from their header, the caret cannot stay inside, and an edit above keeps them");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        llSay(0, \"a\");\n    }\n}\nx");
+        const std::vector<ALCodeEditor::FoldRegion>& regions = e.foldRegions();
+        ensure_equals("two blocks", regions.size(), size_t(2));
+        ensure("the state, from its header through its closing brace", regions[0].start == 0 && regions[0].end == 6);
+        ensure("the event, the same", regions[1].start == 2 && regions[1].end == 5);
+
+        ensure("folds", e.foldAt(2));
+        ensure("folded", e.isFolded(2));
+        ensure("its lines are hidden", e.layout().hidden(3) && e.layout().hidden(5) && !e.layout().hidden(6));
+        ensure_equals("five rows in sight", e.layout().totalHeight(), 5 * e.layout().rowHeight());
+        ensure("not twice", !e.foldAt(2));
+        e.setCaret(ALTextPos(4, 0));
+        ensure("the caret in it opens it", !e.isFolded(2) && !e.layout().hidden(4));
+
+        e.foldAll();
+        ensure("everything folded", e.isFolded(0) && e.isFolded(2));
+        ensure("only the header and the last line in sight", !e.layout().hidden(0) && e.layout().hidden(1) && e.layout().hidden(6) && !e.layout().hidden(7));
+        ensure("the caret left the block", e.caret().line == 0);
+        e.unfoldAll();
+        ensure("everything open", !e.layout().anyHidden());
+
+        e.setCaret(ALTextPos(4, 0));
+        key('[', MASK_CONTROL | MASK_SHIFT);
+        ensure("the key folds the block around the caret", e.isFolded(2) && !e.isFolded(0));
+        ensure("and moves the caret to its header", e.caret().line == 2);
+        key(']', MASK_CONTROL | MASK_SHIFT);
+        ensure("the key opens it", !e.isFolded(2));
+
+        ensure("folds again", e.foldAt(2));
+        e.setCaret(ALTextPos(0, 0));
+        type("\n");
+        ensure("an edit above slides the fold", !e.isFolded(2) && e.isFolded(3) && e.layout().hidden(4) && e.layout().hidden(6));
+        e.setCaret(ALTextPos(3, 4));
+        type("_");
+        ensure("typing on the header keeps the fold", e.isFolded(3) && e.layout().hidden(4));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<6>()
+    {
+        set_test_name("completion offers the document's words and the grammar's, and puts the choice in");
+        ALCodeEditor& e = make("integer count;\nllSay(0, co");
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("open", e.completionOpen());
+        ensure("the word from the document", !e.completions().empty() && e.completions()[0].text == "count");
+        type("u");
+        ensure("still open, narrowed", e.completionOpen() && e.completions()[0].text == "count");
+        key(KEY_RETURN);
+        ensure("closed by the choice", !e.completionOpen());
+        ensure_equals("the choice is in", e.text(), std::string("integer count;\nllSay(0, count"));
+        type(", de");
+        ensure("opens on its own two letters in", e.completionOpen());
+        bool has_default = false;
+        for (const ALCodeEditor::Completion& c : e.completions())
+        {
+            has_default = has_default || (c.text == "default" && c.kind == ALSyntaxKind::Control);
+        }
+        ensure("the grammar's word, with its kind", has_default);
+        key(KEY_ESCAPE);
+        ensure("escape closes it", !e.completionOpen());
+        type(")");
+        ensure("a bracket does not open it", !e.completionOpen());
+
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion c;
+            c.text   = std::string(prefix) + "stom";
+            c.detail = "made up";
+            out.push_back(c);
+        });
+        type(" cu");
+        ensure("the provider's word", e.completionOpen() && e.completions()[0].text == "custom" && e.completions()[0].detail == "made up");
+        key(KEY_TAB);
+        ensure_equals("tab takes it", e.text(), std::string("integer count;\nllSay(0, count, de) custom"));
     }
 }

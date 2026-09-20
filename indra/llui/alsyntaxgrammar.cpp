@@ -170,6 +170,34 @@ bool ALSyntaxWords::has(std::string_view table, std::string_view word) const
     return it != mTables.end() && it->second.contains(word);
 }
 
+void ALSyntaxWords::collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const
+{
+    auto begins = [&](const std::string& word) {
+        if (word.size() < prefix.size())
+        {
+            return false;
+        }
+        for (size_t i = 0; i < prefix.size(); ++i)
+        {
+            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (const auto& [table, words] : mTables)
+    {
+        for (const std::string& word : words)
+        {
+            if (begins(word))
+            {
+                out.emplace_back(word, table);
+            }
+        }
+    }
+}
+
 // --- the grammar -------------------------------------------------------------
 
 struct ALSyntaxGrammar::Impl
@@ -752,6 +780,11 @@ const std::vector<std::string>& ALSyntaxGrammar::extensions() const
 const std::vector<std::string>& ALSyntaxGrammar::wordTables() const
 {
     return mImpl->wordTables;
+}
+
+void ALSyntaxGrammar::collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const
+{
+    mImpl->words.collect(prefix, out);
 }
 
 const std::string& ALSyntaxGrammar::lineComment() const

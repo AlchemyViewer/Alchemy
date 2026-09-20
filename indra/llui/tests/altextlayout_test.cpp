@@ -171,4 +171,33 @@ namespace tut
         ensure_equals("one left", layout.lineCount(), 1);
         ensure_equals("which is the last", layout.line(0).glyphs.size(), size_t(5));
     }
+
+    template<> template<>
+    void altextlayout_object::test<5>()
+    {
+        set_test_name("a hidden line takes no height, and an edit above it keeps it hidden");
+        ready("a\nbbbb\nc\nd");
+        const S32 row = layout.rowHeight();
+        ensure("the widest line is the second", near(layout.contentWidth(), layout.line(1).width));
+        layout.setHidden(1, 2, true);
+        ensure("hidden", layout.hidden(1) && layout.hidden(2) && !layout.hidden(3));
+        ensure("any", layout.anyHidden());
+        ensure_equals("no height", layout.lineHeight(1), 0);
+        ensure_equals("the fourth line sits second", layout.lineTop(3), row);
+        ensure_equals("two rows in all", layout.totalHeight(), 2 * row);
+        ensure_equals("the second row is the fourth line", layout.lineAtY(row), 3);
+        ensure_equals("the first row is the first", layout.lineAtY(0), 0);
+        ensure_equals("past the end is the last in sight", layout.lineAtY(10 * row), 3);
+        ensure_equals("down from a hidden line", layout.visibleFrom(1, 1), 3);
+        ensure_equals("up from a hidden line", layout.visibleFrom(2, -1), 0);
+        ensure_equals("none up from the top", layout.visibleFrom(-1, -1), -1);
+        doc.insert(ALTextPos(0, 0), "x");
+        ensure("still hidden after an edit above", layout.hidden(1) && layout.hidden(2));
+        doc.insert(ALTextPos(0, 0), "\n");
+        ensure("slid down by the line the edit made", !layout.hidden(1) && layout.hidden(2) && layout.hidden(3) && !layout.hidden(4));
+        ensure_equals("three rows now", layout.totalHeight(), 3 * row);
+        layout.setHidden(0, 4, false);
+        ensure("none hidden", !layout.anyHidden());
+        ensure_equals("five rows", layout.totalHeight(), 5 * row);
+    }
 }

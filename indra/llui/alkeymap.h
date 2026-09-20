@@ -27,6 +27,8 @@
 #include "stdtypes.h"
 #include "indra_constants.h"
 
+#include <optional>
+#include <string_view>
 #include <vector>
 
 // Everything a text view can be told to do from the keyboard. A keymap
@@ -73,11 +75,22 @@ enum class ALEditorCommand : U8
     Cut,
     Copy,
     Paste,
+    Delete,
     ToggleComment,
+    DuplicateLine,
+    MoveLineUp,
+    MoveLineDown,
+    DeleteLine,
+    Fold,
+    Unfold,
+    FoldAll,
+    UnfoldAll,
+    Complete,
     COUNT
 };
 
-const char* alEditorCommandName(ALEditorCommand command);
+const char*                    alEditorCommandName(ALEditorCommand command);
+std::optional<ALEditorCommand> alEditorCommandFromName(std::string_view name);
 
 class ALKeymap
 {
@@ -100,7 +113,11 @@ public:
     // The viewer's conventions: arrows, home and end, page up and down,
     // shift to select and control for words and the document's ends,
     // control with Z, Y, X, C, V and A. Control is the command key on a
-    // Mac, where alt with an arrow is a word as well.
+    // Mac, where alt with an arrow is a word as well. Then the editor's
+    // own: control-slash comments, alt-up and alt-down move lines,
+    // control-shift-D duplicates one and control-shift-K deletes one,
+    // control-shift with a square bracket folds and unfolds, and
+    // control-space completes.
     static ALKeymap standard();
 
 private:

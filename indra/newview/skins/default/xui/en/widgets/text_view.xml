@@ -10,6 +10,7 @@
   bg_readonly_color="TextBgReadOnlyColor"
   cursor_color="TextCursorColor"
   selection_color="SelectionColor"
+  context_menu="menu_text_view.xml"
   h_pad="4"
   v_pad="2"
   tab_width="4"/>

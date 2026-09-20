@@ -120,6 +120,9 @@ public:
     void clear();
     bool has(std::string_view table, std::string_view word) const;
     bool empty() const { return mTables.empty(); }
+    // Every word beginning with the prefix, case aside, as the word and
+    // its table: what completion offers.
+    void collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
 
 private:
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> set_t;
@@ -158,6 +161,9 @@ public:
     const std::vector<std::string>& wordTables() const;
     // What a comment to the end of the line begins with, or nothing.
     const std::string& lineComment() const;
+    // The words the grammar itself declares that begin with the prefix,
+    // as the word and its table.
+    void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
 
     ALSyntaxState initialState() const;
 

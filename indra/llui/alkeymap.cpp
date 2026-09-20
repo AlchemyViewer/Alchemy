@@ -37,11 +37,26 @@ const char* alEditorCommandName(ALEditorCommand command)
         "select_word_right", "select_line_start", "select_line_end", "select_doc_start", "select_doc_end", "select_page_up",
         "select_page_down", "select_all",   "delete_left",     "delete_right",     "delete_word_left", "delete_word_right",
         "new_line",      "indent",          "unindent",        "undo",             "redo",             "cut",
-        "copy",          "paste",           "toggle_comment",
+        "copy",          "paste",           "delete",          "toggle_comment",   "duplicate_line",   "move_line_up",
+        "move_line_down", "delete_line",    "fold",            "unfold",           "fold_all",         "unfold_all",
+        "complete",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
     return index < static_cast<size_t>(ALEditorCommand::COUNT) ? NAMES[index] : "none";
+}
+
+std::optional<ALEditorCommand> alEditorCommandFromName(std::string_view name)
+{
+    for (size_t i = 1; i < static_cast<size_t>(ALEditorCommand::COUNT); ++i)
+    {
+        const ALEditorCommand command = static_cast<ALEditorCommand>(i);
+        if (name == alEditorCommandName(command))
+        {
+            return command;
+        }
+    }
+    return std::nullopt;
 }
 
 void ALKeymap::bind(KEY key, MASK mask, ALEditorCommand command)
@@ -129,5 +144,17 @@ ALKeymap ALKeymap::standard()
     map.bind('C', MASK_CONTROL, C::Copy);
     map.bind('V', MASK_CONTROL, C::Paste);
     map.bind('/', MASK_CONTROL, C::ToggleComment);
+    map.bind(KEY_UP, MASK_ALT, C::MoveLineUp);
+    map.bind(KEY_DOWN, MASK_ALT, C::MoveLineDown);
+    map.bind('D', MASK_CONTROL | MASK_SHIFT, C::DuplicateLine);
+    map.bind('K', MASK_CONTROL | MASK_SHIFT, C::DeleteLine);
+    map.bind('[', MASK_CONTROL | MASK_SHIFT, C::Fold);
+    map.bind(']', MASK_CONTROL | MASK_SHIFT, C::Unfold);
+    map.bind(' ', MASK_CONTROL, C::Complete);
+#if LL_DARWIN
+    // Command-space belongs to the system; the control key itself does
+    // what it does everywhere else.
+    map.bind(' ', MASK_MAC_CONTROL, C::Complete);
+#endif
     return map;
 }

@@ -26,10 +26,13 @@
 
 #include "altextview.h"
 
+#include "alviewtype.h"
 #include "llclipboard.h"
 #include "lldir.h"
 #include "llfocusmgr.h"
+#include "llkeyboard.h"
 #include "lllocalcliprect.h"
+#include "llmenugl.h"
 #include "llrender2dutils.h"
 #include "llscrollbar.h"
 #include "llstring.h"
@@ -47,6 +50,10 @@ namespace
     const S32 CARET_WIDTH           = 2;
     const F32 TRIPLE_CLICK_INTERVAL = 0.3f;
     const S32 WHEEL_ROWS            = 3;
+    // Room past the widest line before a horizontal scrollbar is needed,
+    // and what the caret keeps between itself and an edge.
+    const S32 H_MARGIN              = 16;
+    const F32 CARET_MARGIN          = 8.f;
 
     // The colour each kind is drawn in, by the name in the colour table;
     // Text is the view's own text colour.
@@ -74,11 +81,22 @@ namespace
             case ALEditorCommand::Redo:
             case ALEditorCommand::Cut:
             case ALEditorCommand::Paste:
+            case ALEditorCommand::Delete:
             case ALEditorCommand::ToggleComment:
+            case ALEditorCommand::DuplicateLine:
+            case ALEditorCommand::MoveLineUp:
+            case ALEditorCommand::MoveLineDown:
+            case ALEditorCommand::DeleteLine:
+            case ALEditorCommand::Complete:
                 return true;
             default:
                 return false;
         }
+    }
+
+    bool identifierByte(char c)
+    {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 }
 
@@ -97,7 +115,8 @@ ALTextView::Params::Params()
     h_pad("h_pad", 4),
     v_pad("v_pad", 2),
     syntax("syntax"),
-    default_text("default_text")
+    default_text("default_text"),
+    context_menu("context_menu")
 {
 }
 
@@ -117,7 +136,8 @@ ALTextView::ALTextView(const Params& p)
     mWordWrap(p.word_wrap),
     mSoftTabs(p.soft_tabs),
     mHPad(p.h_pad),
-    mVPad(p.v_pad)
+    mVPad(p.v_pad),
+    mContextMenuFile(p.context_menu.isProvided() ? p.context_menu() : std::string())
 {
     const S32 tab_width = p.tab_width;
     mTabWidth           = llmax(1, tab_width);
@@ -132,9 +152,10 @@ ALTextView::ALTextView(const Params& p)
     mLayout.setTabWidth(mTabWidth);
 
     static LLUICachedControl<S32> scrollbar_size("UIScrollbarSize", 0);
+    const S32                     size = scrollbar_size;
     LLScrollbar::Params           bar;
     bar.name("scrollbar");
-    bar.rect(LLRect(getRect().getWidth() - scrollbar_size, getRect().getHeight(), getRect().getWidth(), 0));
+    bar.rect(LLRect(getRect().getWidth() - size, getRect().getHeight(), getRect().getWidth(), 0));
     bar.orientation(LLScrollbar::VERTICAL);
     bar.doc_size(0);
     bar.doc_pos(0);
@@ -144,6 +165,19 @@ ALTextView::ALTextView(const Params& p)
     bar.visible(false);
     mScrollbar = LLUICtrlFactory::create<LLScrollbar>(bar);
     addChild(mScrollbar);
+
+    LLScrollbar::Params hbar;
+    hbar.name("h_scrollbar");
+    hbar.rect(LLRect(0, size, getRect().getWidth() - size, 0));
+    hbar.orientation(LLScrollbar::HORIZONTAL);
+    hbar.doc_size(0);
+    hbar.doc_pos(0);
+    hbar.page_size(1);
+    hbar.change_callback(boost::bind(&ALTextView::onScrollChange, this, _1, _2));
+    hbar.follows.flags(FOLLOWS_LEFT | FOLLOWS_RIGHT | FOLLOWS_BOTTOM);
+    hbar.visible(false);
+    mHScrollbar = LLUICtrlFactory::create<LLScrollbar>(hbar);
+    addChild(mHScrollbar);
 
     if (p.syntax.isProvided())
     {
@@ -163,6 +197,15 @@ ALTextView::ALTextView(const Params& p)
 
 ALTextView::~ALTextView()
 {
+    if (LLContextMenu* menu = mContextMenuHandle.get())
+    {
+        menu->die();
+        mContextMenuHandle.markDead();
+    }
+    if (LLWindow* window = getWindow())
+    {
+        window->allowLanguageTextInput(this, false);
+    }
     if (gEditMenuHandler == this)
     {
         gEditMenuHandler = nullptr;
@@ -173,6 +216,10 @@ ALTextView::~ALTextView()
 
 void ALTextView::setText(std::string_view text)
 {
+    mPreeditLength = 0;
+    mPreeditSegmentEnds.clear();
+    mPreeditStandouts.clear();
+    mPreeditOverwritten.clear();
     mDocument.setText(text);
     mUndo.clear();
     mUndo.markSaved();
@@ -230,6 +277,10 @@ void ALTextView::setFont(const LLFontGL* font)
 void ALTextView::setReadOnly(bool read_only)
 {
     mReadOnly = read_only;
+    if (hasFocus())
+    {
+        allowLanguageInput(!read_only);
+    }
 }
 
 void ALTextView::setWordWrap(bool wrap)
@@ -258,6 +309,10 @@ LLRect ALTextView::textRect() const
     if (mScrollbar && mScrollbar->getVisible())
     {
         rect.mRight -= mScrollbar->getRect().getWidth();
+    }
+    if (mHScrollbar && mHScrollbar->getVisible())
+    {
+        rect.mBottom += mHScrollbar->getRect().getHeight();
     }
     return rect;
 }
@@ -296,37 +351,92 @@ ALTextPos ALTextView::posAtLocal(S32 x, S32 y, bool round)
 
 // --- scrolling -----------------------------------------------------------------
 
+bool ALTextView::hasHorizontalScrollbar() const
+{
+    return mHScrollbar && mHScrollbar->getVisible();
+}
+
 void ALTextView::syncScrollbar()
 {
-    if (!mScrollbar)
+    if (!mScrollbar || !mHScrollbar)
     {
         return;
     }
-    const S32  page   = llmax(1, textRect().getHeight());
-    const S32  total  = mLayout.totalHeight();
-    const bool needed = total > page;
-    if (mScrollbar->getVisible() != needed)
+    // Each bar takes room the other's decision depends on, so both are
+    // decided again once the first decision has been applied.
+    for (S32 pass = 0; pass < 2; ++pass)
     {
-        mScrollbar->setVisible(needed);
-        if (mWordWrap)
+        const LLRect text   = textRect();
+        const bool   need_v = mLayout.totalHeight() > llmax(1, text.getHeight());
+        const bool   need_h = !mWordWrap && mLayout.contentWidth() + static_cast<F32>(H_MARGIN) > static_cast<F32>(text.getWidth());
+        bool         changed = false;
+        if (mScrollbar->getVisible() != need_v)
         {
-            mLayout.setWrapWidth(textRect().getWidth());
+            mScrollbar->setVisible(need_v);
+            changed = true;
+        }
+        if (mHScrollbar->getVisible() != need_h)
+        {
+            mHScrollbar->setVisible(need_h);
+            changed = true;
+        }
+        if (!changed)
+        {
+            break;
         }
     }
-    mScrollY = llclamp(mScrollY, 0, llmax(0, mLayout.totalHeight() - page));
+    const LLRect local = getLocalRect();
+    const S32    v_w   = mScrollbar->getRect().getWidth();
+    const S32    h_h   = mHScrollbar->getRect().getHeight();
+    if (mScrollbar->getVisible())
+    {
+        mScrollbar->setShape(LLRect(local.mRight - v_w, local.mTop, local.mRight, mHScrollbar->getVisible() ? h_h : 0));
+    }
+    if (mHScrollbar->getVisible())
+    {
+        mHScrollbar->setShape(LLRect(0, h_h, mScrollbar->getVisible() ? local.mRight - v_w : local.mRight, 0));
+    }
+
+    const LLRect text = textRect();
+    if (mWordWrap)
+    {
+        mLayout.setWrapWidth(text.getWidth());
+    }
+    const S32 page = llmax(1, text.getHeight());
+    mScrollY       = llclamp(mScrollY, 0, llmax(0, mLayout.totalHeight() - page));
     mScrollbar->setDocSize(mLayout.totalHeight());
     mScrollbar->setPageSize(page);
     mScrollbar->setDocPos(mScrollY);
+
+    const S32 width   = llmax(1, text.getWidth());
+    const S32 content = mWordWrap ? 0 : static_cast<S32>(ceilf(mLayout.contentWidth())) + H_MARGIN;
+    mScrollX          = llclamp(mScrollX, 0.f, static_cast<F32>(llmax(0, content - width)));
+    mHScrollbar->setDocSize(content);
+    mHScrollbar->setPageSize(width);
+    mHScrollbar->setDocPos(static_cast<S32>(mScrollX));
 }
 
-void ALTextView::onScrollChange(S32 pos, LLScrollbar*)
+void ALTextView::onScrollChange(S32 pos, LLScrollbar* bar)
 {
-    mScrollY = pos;
+    if (bar == mHScrollbar)
+    {
+        mScrollX = static_cast<F32>(pos);
+    }
+    else
+    {
+        mScrollY = pos;
+    }
 }
 
 void ALTextView::setScrollY(S32 y)
 {
     mScrollY = llmax(0, y);
+    syncScrollbar();
+}
+
+void ALTextView::setScrollX(F32 x)
+{
+    mScrollX = llmax(0.f, x);
     syncScrollbar();
 }
 
@@ -357,15 +467,14 @@ void ALTextView::scrollToCaret()
     }
     else
     {
-        const F32 width  = static_cast<F32>(llmax(1, text.getWidth()));
-        const F32 margin = 8.f;
-        if (x < mScrollX + margin)
+        const F32 width = static_cast<F32>(llmax(1, text.getWidth()));
+        if (x < mScrollX + CARET_MARGIN)
         {
-            mScrollX = llmax(0.f, x - margin);
+            mScrollX = llmax(0.f, x - CARET_MARGIN);
         }
-        else if (x + margin > mScrollX + width)
+        else if (x + CARET_MARGIN > mScrollX + width)
         {
-            mScrollX = x + margin - width;
+            mScrollX = x + CARET_MARGIN - width;
         }
     }
     syncScrollbar();
@@ -391,6 +500,10 @@ void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
     {
         mAnchor = mCaret;
     }
+    if (mLayout.hidden(mCaret.line))
+    {
+        revealLine(mCaret.line);
+    }
     mBlink.reset();
 }
 
@@ -403,11 +516,21 @@ void ALTextView::setCaret(ALTextPos pos, bool extend)
 
 void ALTextView::setSelection(const ALTextRange& range)
 {
-    mAnchor   = mDocument.clamp(range.begin);
-    mCaret    = mDocument.clamp(range.end);
+    mAnchor = mDocument.clamp(range.begin);
+    placeCaret(range.end, true);
     mDesiredX = -1.f;
-    mBlink.reset();
     scrollToCaret();
+}
+
+std::string ALTextView::wordBeforeCaret() const
+{
+    const std::string& line  = mDocument.line(mCaret.line);
+    S32                begin = llmin(mCaret.column, static_cast<S32>(line.size()));
+    while (begin > 0 && identifierByte(line[begin - 1]))
+    {
+        --begin;
+    }
+    return line.substr(begin, mCaret.column - begin);
 }
 
 void ALTextView::moveVertically(S32 rows, bool extend)
@@ -430,10 +553,10 @@ void ALTextView::moveVertically(S32 rows, bool extend)
         {
             --row;
         }
-        else if (line > 0)
+        else if (const S32 above = mLayout.visibleFrom(line - 1, -1); above >= 0)
         {
-            --line;
-            row = mLayout.rowCount(line) - 1;
+            line = above;
+            row  = mLayout.rowCount(line) - 1;
         }
         else
         {
@@ -449,10 +572,10 @@ void ALTextView::moveVertically(S32 rows, bool extend)
         {
             ++row;
         }
-        else if (line + 1 < mDocument.lineCount())
+        else if (const S32 below = mLayout.visibleFrom(line + 1, 1); below >= 0)
         {
-            ++line;
-            row = 0;
+            line = below;
+            row  = 0;
         }
         else
         {
@@ -577,6 +700,67 @@ void ALTextView::indentLines(bool in)
     afterEdit();
 }
 
+void ALTextView::duplicateLines()
+{
+    const auto [first, last] = selectedLines();
+    const std::string block  = mDocument.text(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last)));
+    const ALTextPos   caret  = mCaret;
+    const ALTextPos   anchor = mAnchor;
+    const S32         count  = last - first + 1;
+    mUndo.beginGroup();
+    edit(ALTextRange(mDocument.lineEnd(last), mDocument.lineEnd(last)), "\n" + block);
+    mUndo.endGroup();
+    // The caret and the selection go with the copy.
+    mAnchor = ALTextPos(anchor.line + count, anchor.column);
+    placeCaret(ALTextPos(caret.line + count, caret.column), true);
+    afterEdit();
+}
+
+void ALTextView::moveLines(S32 direction)
+{
+    const auto [first, last] = selectedLines();
+    if ((direction < 0 && first == 0) || (direction > 0 && last + 1 >= mDocument.lineCount()))
+    {
+        return;
+    }
+    const std::string block  = mDocument.text(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last)));
+    const ALTextPos   caret  = mCaret;
+    const ALTextPos   anchor = mAnchor;
+    mUndo.beginGroup();
+    if (direction < 0)
+    {
+        const std::string above = mDocument.line(first - 1);
+        edit(ALTextRange(mDocument.lineStart(first - 1), mDocument.lineEnd(last)), block + "\n" + above);
+    }
+    else
+    {
+        const std::string below = mDocument.line(last + 1);
+        edit(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last + 1)), below + "\n" + block);
+    }
+    mUndo.endGroup();
+    mAnchor = ALTextPos(anchor.line + direction, anchor.column);
+    placeCaret(ALTextPos(caret.line + direction, caret.column), true);
+    afterEdit();
+}
+
+void ALTextView::deleteLines()
+{
+    const auto [first, last] = selectedLines();
+    ALTextRange range(mDocument.lineStart(first), last + 1 < mDocument.lineCount() ? mDocument.lineStart(last + 1) : mDocument.lineEnd(last));
+    if (last + 1 >= mDocument.lineCount() && first > 0)
+    {
+        // The last line goes with the newline before it.
+        range.begin = mDocument.lineEnd(first - 1);
+    }
+    const S32 column = mCaret.column;
+    mUndo.beginGroup();
+    edit(range, std::string_view());
+    mUndo.endGroup();
+    const S32 line = llmin(first, mDocument.lineCount() - 1);
+    placeCaret(ALTextPos(line, llmin(column, mDocument.lineLength(line))), false);
+    afterEdit();
+}
+
 bool ALTextView::perform(ALEditorCommand command)
 {
     typedef ALEditorCommand C;
@@ -596,6 +780,10 @@ bool ALTextView::perform(ALEditorCommand command)
         const ALTextRange range = selection().normalised();
         return move(to_begin ? range.begin : range.end);
     };
+    if (mReadOnly && editsText(command))
+    {
+        return false;
+    }
     switch (command)
     {
         case C::None:
@@ -655,10 +843,6 @@ bool ALTextView::perform(ALEditorCommand command)
             selectAll();
             return true;
         case C::DeleteLeft:
-            if (mReadOnly)
-            {
-                return false;
-            }
             if (hasSelection())
             {
                 deleteRange(selection());
@@ -669,10 +853,6 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             return true;
         case C::DeleteRight:
-            if (mReadOnly)
-            {
-                return false;
-            }
             if (hasSelection())
             {
                 deleteRange(selection());
@@ -683,25 +863,13 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             return true;
         case C::DeleteWordLeft:
-            if (mReadOnly)
-            {
-                return false;
-            }
             deleteRange(hasSelection() ? selection() : ALTextRange(mDocument.prevWord(mCaret), mCaret));
             return true;
         case C::DeleteWordRight:
-            if (mReadOnly)
-            {
-                return false;
-            }
             deleteRange(hasSelection() ? selection() : ALTextRange(mCaret, mDocument.nextWord(mCaret)));
             return true;
         case C::NewLine:
         {
-            if (mReadOnly)
-            {
-                return false;
-            }
             // The new line starts with the indentation of the one it leaves.
             const ALTextPos    at   = selection().normalised().begin;
             const std::string& line = mDocument.line(at.line);
@@ -717,10 +885,6 @@ bool ALTextView::perform(ALEditorCommand command)
         }
         case C::Indent:
         {
-            if (mReadOnly)
-            {
-                return false;
-            }
             const auto [first, last] = selectedLines();
             if (last > first)
             {
@@ -733,10 +897,6 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         }
         case C::Unindent:
-            if (mReadOnly)
-            {
-                return false;
-            }
             indentLines(false);
             return true;
         case C::Undo:
@@ -754,10 +914,63 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::Paste:
             paste();
             return true;
+        case C::Delete:
+            doDelete();
+            return true;
         case C::ToggleComment:
             return toggleComment();
+        case C::DuplicateLine:
+            duplicateLines();
+            return true;
+        case C::MoveLineUp:
+            moveLines(-1);
+            return true;
+        case C::MoveLineDown:
+            moveLines(1);
+            return true;
+        case C::DeleteLine:
+            deleteLines();
+            return true;
+        case C::Fold:
+        case C::Unfold:
+        case C::FoldAll:
+        case C::UnfoldAll:
+            return performFold(command);
+        case C::Complete:
+            return complete();
     }
     return false;
+}
+
+bool ALTextView::canPerform(ALEditorCommand command) const
+{
+    typedef ALEditorCommand C;
+    switch (command)
+    {
+        case C::Undo:
+            return canUndo();
+        case C::Redo:
+            return canRedo();
+        case C::Cut:
+            return canCut();
+        case C::Copy:
+            return canCopy();
+        case C::Paste:
+            return canPaste();
+        case C::Delete:
+            return canDoDelete();
+        case C::SelectAll:
+            return canSelectAll();
+        case C::ToggleComment:
+            return !mReadOnly && mHighlighter.grammar() && !mHighlighter.grammar()->lineComment().empty();
+        case C::Fold:
+        case C::Unfold:
+        case C::FoldAll:
+        case C::UnfoldAll:
+            return canFold(command);
+        default:
+            return !(mReadOnly && editsText(command));
+    }
 }
 
 bool ALTextView::toggleComment()
@@ -862,6 +1075,10 @@ void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(
     const S32 bottom_y = mScrollY + text.getHeight();
     for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
     {
+        if (mLayout.hidden(line))
+        {
+            continue;
+        }
         const S32 rows = mLayout.rowCount(line);
         const S32 top  = mLayout.lineTop(line);
         if (top >= bottom_y)
@@ -974,6 +1191,274 @@ void ALTextView::deselect()
     mAnchor = mCaret;
 }
 
+// --- the input method ----------------------------------------------------------
+
+void ALTextView::allowLanguageInput(bool allow)
+{
+    if (LLWindow* window = getWindow())
+    {
+        window->allowLanguageTextInput(this, allow);
+    }
+}
+
+ALTextRange ALTextView::preeditRange() const
+{
+    return ALTextRange(mPreeditBegin, ALTextPos(mPreeditBegin.line, mPreeditBegin.column + mPreeditLength));
+}
+
+void ALTextView::resetPreedit()
+{
+    if (hasSelection() && !hasPreedit())
+    {
+        deleteRange(selection());
+    }
+    if (!hasPreedit())
+    {
+        return;
+    }
+    // Put back what was there: nothing, or what an overwrite took. None of
+    // this is an edit the journal sees; the composition was never text.
+    mDocument.replace(preeditRange(), mPreeditOverwritten);
+    const ALTextPos begin = mPreeditBegin;
+    mPreeditLength        = 0;
+    mPreeditSegmentEnds.clear();
+    mPreeditStandouts.clear();
+    mPreeditOverwritten.clear();
+    placeCaret(begin, false);
+    mChanged();
+}
+
+void ALTextView::updatePreedit(std::string_view preedit_string, const segment_lengths_t& preedit_segment_lengths,
+                               const standouts_t& preedit_standouts, S32 caret_position)
+{
+    if (mReadOnly)
+    {
+        return;
+    }
+    if (LLWindow* window = getWindow())
+    {
+        window->hideCursorUntilMouseMove();
+    }
+    resetPreedit();
+
+    // A composition is one line of text; a newline in one would put the
+    // rest of it where this cannot count it.
+    std::string composed(preedit_string);
+    std::replace(composed.begin(), composed.end(), '\n', ' ');
+
+    const ALTextPos at = mCaret;
+    ALTextPos       end = at;
+    if (gKeyboard && LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
+    {
+        // As much of the line as the composition covers, in whole
+        // characters, so the overwrite never ends inside one.
+        const size_t want = composed.size();
+        while (end.line == at.line && static_cast<size_t>(end.column - at.column) < want && end.column < mDocument.lineLength(at.line))
+        {
+            const ALTextPos next = mDocument.nextCluster(end);
+            if (next.line != at.line || static_cast<size_t>(next.column - at.column) > want)
+            {
+                break;
+            }
+            end = next;
+        }
+        mPreeditOverwritten = mDocument.text(ALTextRange(at, end));
+    }
+    else
+    {
+        mPreeditOverwritten.clear();
+    }
+    mDocument.replace(ALTextRange(at, end), composed);
+
+    mPreeditBegin  = at;
+    mPreeditLength = static_cast<S32>(composed.size());
+    mPreeditSegmentEnds.clear();
+    S32 sum = 0;
+    for (S32 length : preedit_segment_lengths)
+    {
+        sum += llmax(0, length);
+        mPreeditSegmentEnds.push_back(llmin(sum, mPreeditLength));
+    }
+    if (mPreeditSegmentEnds.empty() || mPreeditSegmentEnds.back() < mPreeditLength)
+    {
+        mPreeditSegmentEnds.push_back(mPreeditLength);
+    }
+    mPreeditStandouts = preedit_standouts;
+    while (mPreeditStandouts.size() < mPreeditSegmentEnds.size())
+    {
+        mPreeditStandouts.push_back(false);
+    }
+
+    placeCaret(ALTextPos(at.line, at.column + llclamp(caret_position, 0, mPreeditLength)), false);
+    mDesiredX = -1.f;
+    scrollToCaret();
+    mChanged();
+}
+
+void ALTextView::markAsPreedit(S32 position, S32 length)
+{
+    if (hasPreedit())
+    {
+        LL_WARNS() << "markAsPreedit with a composition in progress" << LL_ENDL;
+    }
+    const ALTextPos begin = mDocument.posAt(static_cast<size_t>(llmax(0, position)));
+    ALTextPos       end   = mDocument.posAt(static_cast<size_t>(llmax(0, position + length)));
+    if (end.line != begin.line)
+    {
+        end = mDocument.lineEnd(begin.line);
+    }
+    deselect();
+    placeCaret(begin, false);
+    mPreeditSegmentEnds.clear();
+    mPreeditStandouts.clear();
+    mPreeditOverwritten.clear();
+    mPreeditBegin  = begin;
+    mPreeditLength = llmax(0, end.column - begin.column);
+    if (mPreeditLength > 0)
+    {
+        mPreeditSegmentEnds.push_back(mPreeditLength);
+        mPreeditStandouts.push_back(false);
+        if (gKeyboard && LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
+        {
+            mPreeditOverwritten = mDocument.text(preeditRange());
+        }
+    }
+}
+
+void ALTextView::getPreeditRange(S32* position, S32* length) const
+{
+    if (hasPreedit())
+    {
+        *position = static_cast<S32>(mDocument.offsetOf(mPreeditBegin));
+        *length   = mPreeditLength;
+    }
+    else
+    {
+        *position = static_cast<S32>(mDocument.offsetOf(mCaret));
+        *length   = 0;
+    }
+}
+
+void ALTextView::getSelectionRange(S32* position, S32* length) const
+{
+    const ALTextRange range = selection().normalised();
+    *position               = static_cast<S32>(mDocument.offsetOf(range.begin));
+    *length                 = static_cast<S32>(mDocument.offsetOf(range.end)) - *position;
+}
+
+bool ALTextView::getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* bounds, LLRect* control) const
+{
+    const LLRect text = textRect();
+    if (control)
+    {
+        LLRect screen;
+        localRectToScreen(text, &screen);
+        LLUI::getInstance()->screenRectToGL(screen, control);
+    }
+    const ALTextPos begin = hasPreedit() ? mPreeditBegin : mCaret;
+    const ALTextPos query = query_offset >= 0 ? ALTextPos(begin.line, begin.column + query_offset) : mCaret;
+    if (query.line != begin.line || query.column < begin.column || query.column > begin.column + mPreeditLength)
+    {
+        return false;
+    }
+    const S32 row_h = mLayout.rowHeight();
+    if (row_h <= 0)
+    {
+        return false;
+    }
+    S32       row;
+    const F32 qx  = lay().xOf(query.line, query.column, &row);
+    const S32 top = text.mTop - (lay().lineTop(query.line) + row * row_h - mScrollY);
+    if (top > text.mTop || top - row_h < text.mBottom)
+    {
+        return false;
+    }
+    const F32 left = static_cast<F32>(text.mLeft) - mScrollX;
+    if (coord)
+    {
+        S32 sx, sy;
+        localPointToScreen(static_cast<S32>(left + qx), top - row_h / 2, &sx, &sy);
+        LLUI::getInstance()->screenPointToGL(sx, sy, &coord->mX, &coord->mY);
+    }
+    if (bounds)
+    {
+        S32       row_begin, row_end;
+        const F32 x0 = lay().xOf(begin.line, begin.column, &row_begin);
+        F32       x1 = lay().xOf(begin.line, begin.column + mPreeditLength, &row_end);
+        if (row_end != row_begin)
+        {
+            x1 = lay().line(begin.line).rows[row_begin].width;
+        }
+        LLRect local(static_cast<S32>(left + x0), top, static_cast<S32>(left + x1), top - row_h);
+        LLRect screen;
+        localRectToScreen(local, &screen);
+        LLUI::getInstance()->screenRectToGL(screen, bounds);
+    }
+    return true;
+}
+
+S32 ALTextView::getPreeditFontSize() const
+{
+    return mFont ? ll_round(mFont->getLineHeight() * LLUI::getScaleFactor().mV[VY]) : 0;
+}
+
+const std::string& ALTextView::getPreeditStringUtf8() const
+{
+    if (!mWholeTextValid || mWholeTextVersion != mDocument.version())
+    {
+        mWholeText        = mDocument.text();
+        mWholeTextVersion = mDocument.version();
+        mWholeTextValid   = true;
+    }
+    return mWholeText;
+}
+
+// --- the context menu ------------------------------------------------------------
+
+void ALTextView::showContextMenu(S32 x, S32 y)
+{
+    if (mContextMenuFile.empty() || !LLMenuGL::sMenuContainer)
+    {
+        return;
+    }
+    LLContextMenu* menu = mContextMenuHandle.get();
+    if (!menu)
+    {
+        // The menu's actions name commands, and come back to whichever view
+        // showed it; the view may be gone by then, so they hold a handle.
+        const LLHandle<ALTextView>                          self = getDerivedHandle<ALTextView>();
+        LLUICtrl::CommitCallbackRegistry::ScopedRegistrar   commit;
+        LLUICtrl::EnableCallbackRegistry::ScopedRegistrar   enable;
+        commit.add("TextView.Perform", [self](LLUICtrl*, const LLSD& param) {
+            ALTextView* view = self.get();
+            if (std::optional<ALEditorCommand> command = alEditorCommandFromName(param.asStringRef()); view && command)
+            {
+                view->perform(*command);
+            }
+        });
+        enable.add("TextView.Enable", [self](LLUICtrl*, const LLSD& param) {
+            ALTextView* view = self.get();
+            if (std::optional<ALEditorCommand> command = alEditorCommandFromName(param.asStringRef()); view && command)
+            {
+                return view->canPerform(*command);
+            }
+            return false;
+        });
+        menu = LLUICtrlFactory::createFromFile<LLContextMenu>(mContextMenuFile, LLMenuGL::sMenuContainer,
+                                                              LLMenuHolderGL::child_registry_t::instance());
+        if (!menu)
+        {
+            LL_WARNS() << "No context menu from " << mContextMenuFile << " for " << getName() << LL_ENDL;
+            return;
+        }
+        mContextMenuHandle = menu->getHandle();
+    }
+    gEditMenuHandler = this;
+    S32 screen_x, screen_y;
+    localPointToScreen(x, y, &screen_x, &screen_y);
+    menu->show(screen_x, screen_y, this);
+}
+
 // --- drawing -------------------------------------------------------------------
 
 const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
@@ -1006,6 +1491,31 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
     }
 }
 
+void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha)
+{
+    static LLUICachedControl<S32> marker_thickness("UIPreeditMarkerThickness", 1);
+    static LLUICachedControl<S32> standout_thickness("UIPreeditStandoutThickness", 2);
+    const S32      row_h = mLayout.rowHeight();
+    const LLColor4 ink   = (mReadOnly ? mTextReadOnlyColor : mTextColor).get() % alpha;
+    S32            from  = mPreeditBegin.column;
+    for (size_t i = 0; i < mPreeditSegmentEnds.size(); ++i)
+    {
+        const S32 to = mPreeditBegin.column + mPreeditSegmentEnds[i];
+        const S32 lo = llmax(from, row.begin);
+        const S32 hi = llmin(to, row.end);
+        from         = to;
+        if (lo >= hi)
+        {
+            continue;
+        }
+        const F32 x0        = mLayout.xOf(line, lo);
+        const F32 x1        = mLayout.xOf(line, hi);
+        const S32 thickness = llmax(1, static_cast<S32>(i < mPreeditStandouts.size() && mPreeditStandouts[i] ? standout_thickness : marker_thickness));
+        const S32 y         = screen_top - row_h + 1;
+        gl_rect_2d(static_cast<S32>(left + x0), y + thickness, static_cast<S32>(left + x1), y, ink);
+    }
+}
+
 void ALTextView::drawRows(const LLRect& text)
 {
     const S32 row_h = mLayout.rowHeight();
@@ -1028,6 +1538,10 @@ void ALTextView::drawRows(const LLRect& text)
 
     for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
     {
+        if (mLayout.hidden(line))
+        {
+            continue;
+        }
         const ALTextLayout::Line& laid = mLayout.line(line);
         const S32                 top  = mLayout.lineTop(line);
         if (top >= bottom_y)
@@ -1073,6 +1587,11 @@ void ALTextView::drawRows(const LLRect& text)
                 colorRow(line, laid, row, alpha);
                 mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count,
                                     left - row.xStart, static_cast<F32>(screen_top - ascent));
+            }
+
+            if (hasPreedit() && line == mPreeditBegin.line)
+            {
+                drawPreedit(line, row, screen_top, left, alpha);
             }
 
             drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
@@ -1162,6 +1681,26 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     return true;
 }
 
+bool ALTextView::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    if (mContextMenuFile.empty() || !textRect().pointInRect(x, y))
+    {
+        return LLUICtrl::handleRightMouseDown(x, y, mask);
+    }
+    setFocus(true);
+    // The click puts the caret where it landed, unless it landed in the
+    // selection, which is what the menu is then about.
+    const ALTextPos   at  = posAtLocal(x, y, true);
+    const ALTextRange sel = selection().normalised();
+    if (!hasSelection() || at < sel.begin || sel.end < at)
+    {
+        placeCaret(at, false);
+        mDesiredX = -1.f;
+    }
+    showContextMenu(x, y);
+    return true;
+}
+
 bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mSelecting && hasMouseCapture())
@@ -1230,7 +1769,7 @@ bool ALTextView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
     {
         return false;
     }
-    mScrollX = llmax(0.f, mScrollX + static_cast<F32>(delta.mClicks * WHEEL_ROWS * mLayout.rowHeight()));
+    setScrollX(mScrollX + static_cast<F32>(delta.mClicks * WHEEL_ROWS * mLayout.rowHeight()));
     return true;
 }
 
@@ -1247,15 +1786,21 @@ void ALTextView::setFocus(bool focus)
         gEditMenuHandler   = this;
         mChangedSinceFocus = false;
         mBlink.reset();
+        allowLanguageInput(!mReadOnly);
     }
-    else if (gEditMenuHandler == this)
+    else
     {
-        gEditMenuHandler = nullptr;
+        allowLanguageInput(false);
+        if (gEditMenuHandler == this)
+        {
+            gEditMenuHandler = nullptr;
+        }
     }
 }
 
 void ALTextView::onFocusLost()
 {
+    allowLanguageInput(false);
     if (mChangedSinceFocus)
     {
         mChangedSinceFocus = false;

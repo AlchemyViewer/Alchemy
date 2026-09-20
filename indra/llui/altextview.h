@@ -31,6 +31,7 @@
 #include "altextundo.h"
 #include "lleditmenuhandler.h"
 #include "llframetimer.h"
+#include "llpreeditor.h"
 #include "lluicolor.h"
 #include "lluictrl.h"
 
@@ -41,6 +42,7 @@
 #include <string_view>
 #include <vector>
 
+class LLContextMenu;
 class LLScrollbar;
 
 // A view of a document: the lines laid out and drawn, only the ones in
@@ -51,9 +53,12 @@ class LLScrollbar;
 // and the layout are its own, and reachable, for whatever is built over it
 // -- the code editor first.
 //
-// What is not here yet: an input method's composition, a context menu,
-// spell check, a horizontal scrollbar, atoms and display substitutions.
-class ALTextView : public LLUICtrl, public LLEditMenuHandler
+// An input method composes into it through LLPreeditor, as the legacy
+// editors do; a right click shows the menu its file names; lines a
+// subclass hides (folding) take no room and the caret passes over them.
+//
+// What is not here yet: spell check, atoms and display substitutions.
+class ALTextView : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor
 {
 public:
     AL_VIEW_TYPE(ALTextView, LLUICtrl);
@@ -77,6 +82,8 @@ public:
         // The grammar to colour by, by the name in its file.
         Optional<std::string> syntax;
         Optional<std::string> default_text;
+        // The file the right-click menu is built from; none for no menu.
+        Optional<std::string> context_menu;
 
         Params();
     };
@@ -94,6 +101,7 @@ public:
     const ALTextDocument&      document() const { return mDocument; }
     ALTextLayout&              layout() { return mLayout; }
     ALSyntaxHighlighter&       highlighter() { return mHighlighter; }
+    const ALSyntaxHighlighter& highlighter() const { return mHighlighter; }
     ALTextUndo&                undoJournal() { return mUndo; }
 
     // The grammars on disk, read the first time anything asks.
@@ -124,6 +132,9 @@ public:
     bool        hasSelection() const { return mAnchor != mCaret; }
     void        setSelection(const ALTextRange& range);
     std::string selectedText() const { return mDocument.text(selection()); }
+    // The identifier the caret is at the end of: letters, digits and
+    // underscores back from the caret. Empty at anything else.
+    std::string wordBeforeCaret() const;
 
     // --- editing, through the undo journal -----------------------------------
 
@@ -131,6 +142,8 @@ public:
     void insertText(std::string_view text);
     void deleteRange(const ALTextRange& range);
     bool perform(ALEditorCommand command);
+    // Whether a command would do anything now: what a menu asks.
+    bool canPerform(ALEditorCommand command) const;
     ALKeymap&       keymap() { return mKeymap; }
     const ALKeymap& keymap() const { return mKeymap; }
 
@@ -141,9 +154,24 @@ public:
     S32  firstVisibleLine();
     S32  scrollY() const { return mScrollY; }
     void setScrollY(S32 y);
+    F32  scrollX() const { return mScrollX; }
+    void setScrollX(F32 x);
+    bool hasHorizontalScrollbar() const;
 
     typedef boost::signals2::signal<void()> changed_signal_t;
     boost::signals2::connection onTextChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
+
+    // --- the input method ------------------------------------------------------
+
+    bool        hasPreedit() const { return mPreeditLength > 0; }
+    ALTextRange preeditRange() const;
+    // The view as what a window composes into. The window is handed it
+    // when the view takes focus; a test hands itself.
+    LLPreeditor& preeditor() { return *this; }
+
+    // --- the context menu ------------------------------------------------------
+
+    void showContextMenu(S32 x, S32 y);
 
     // --- LLEditMenuHandler ---------------------------------------------------
 
@@ -173,6 +201,7 @@ public:
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
@@ -201,6 +230,14 @@ protected:
     virtual S32  leftInset() const { return 0; }
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
+    // What a subclass does about folding: the caret has landed on a
+    // hidden line and it must be seen; a fold command was given; whether
+    // one could be.
+    virtual void revealLine(S32 line) { mLayout.setHidden(line, line, false); }
+    virtual bool performFold(ALEditorCommand command) { return false; }
+    virtual bool canFold(ALEditorCommand command) const { return false; }
+    // Completion was asked for.
+    virtual bool complete() { return false; }
     // The screen y of the top of a line's row, and every row on screen in
     // turn, for a subclass drawing beside them.
     S32  screenTopOf(const LLRect& text, S32 line, S32 row);
@@ -213,24 +250,44 @@ protected:
     void                 afterEdit();
     void                 placeCaret(const ALTextPos& pos, bool extend);
 
+    // --- LLPreeditor ---------------------------------------------------------
+
+    void resetPreedit() override;
+    void updatePreedit(std::string_view preedit_string, const segment_lengths_t& preedit_segment_lengths,
+                       const standouts_t& preedit_standouts, S32 caret_position) override;
+    void markAsPreedit(S32 position, S32 length) override;
+    void getPreeditRange(S32* position, S32* length) const override;
+    void getSelectionRange(S32* position, S32* length) const override;
+    bool getPreeditLocation(S32 query_offset, LLCoordGL* coord, LLRect* bounds, LLRect* control) const override;
+    S32  getPreeditFontSize() const override;
+    const std::string& getPreeditStringUtf8() const override;
+
 private:
     void                 moveVertically(S32 rows, bool extend);
     std::string          tabText(const ALTextPos& at) const;
     void                 indentLines(bool in);
+    void                 duplicateLines();
+    void                 moveLines(S32 direction);
+    void                 deleteLines();
+    void                 allowLanguageInput(bool allow);
 
     void syncScrollbar();
     void onScrollChange(S32 pos, LLScrollbar* bar);
     void drawRows(const LLRect& text);
+    void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
+    // Laying out is a cache fill, which a const query may cause.
+    ALTextLayout& lay() const { return const_cast<ALTextLayout&>(mLayout); }
 
     ALTextDocument      mDocument;
     ALTextUndo          mUndo;
     ALSyntaxHighlighter mHighlighter;
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
-    LLScrollbar*        mScrollbar = nullptr;
-    const LLFontGL*     mFont      = nullptr;
+    LLScrollbar*        mScrollbar  = nullptr;
+    LLScrollbar*        mHScrollbar = nullptr;
+    const LLFontGL*     mFont       = nullptr;
 
     LLUIColor mTextColor;
     LLUIColor mTextReadOnlyColor;
@@ -258,6 +315,22 @@ private:
     LLFrameTimer mBlink;
     LLFrameTimer mTripleClick;
     bool         mChangedSinceFocus = false;
+
+    // The composition, where one is in progress: where it starts, how many
+    // bytes of it there are, where each clause ends counted from its
+    // start, which clauses stand out, and what it overwrote.
+    ALTextPos        mPreeditBegin;
+    S32              mPreeditLength = 0;
+    std::vector<S32> mPreeditSegmentEnds;
+    standouts_t      mPreeditStandouts;
+    std::string      mPreeditOverwritten;
+    // The whole text, joined for the input method when it asks.
+    mutable std::string mWholeText;
+    mutable U32         mWholeTextVersion = 0;
+    mutable bool        mWholeTextValid   = false;
+
+    std::string             mContextMenuFile;
+    LLHandle<LLContextMenu> mContextMenuHandle;
 
     std::vector<LLColor4U> mColorScratch;
     changed_signal_t       mChanged;

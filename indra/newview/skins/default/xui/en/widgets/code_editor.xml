@@ -14,6 +14,8 @@
   line_number_color="CodeLineNumberColor"
   current_line_color="CodeCurrentLineColor"
   bracket_match_color="CodeBracketMatchColor"
+  fold_color="CodeFoldColor"
+  context_menu="menu_code_editor.xml"
   h_pad="4"
   v_pad="2"
   tab_width="4"/>

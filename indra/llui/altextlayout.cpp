@@ -92,7 +92,15 @@ S32 ALTextLayout::rowHeight() const
 void ALTextLayout::invalidateAll()
 {
     mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
-    mTopsDirty = true;
+    // What is folded stays folded through a change of font; a document of
+    // another length is another document.
+    if (mHidden.size() != mLines.size())
+    {
+        mHidden.assign(mLines.size(), 0);
+        mHiddenCount = 0;
+    }
+    mTopsDirty    = true;
+    mContentWidth = -1.f;
 }
 
 void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
@@ -103,13 +111,69 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     if (first < static_cast<S32>(mLines.size()))
     {
         mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);
+        for (S32 l = first; l <= last; ++l)
+        {
+            mHiddenCount -= mHidden[l] ? 1 : 0;
+        }
+        mHidden.erase(mHidden.begin() + first, mHidden.begin() + last + 1);
     }
     mLines.insert(mLines.begin() + first, made, Line());
+    // The lines an edit makes are in sight: somebody is typing there.
+    mHidden.insert(mHidden.begin() + first, made, 0);
     if (mDocument)
     {
         mLines.resize(mDocument->lineCount());
+        mHidden.resize(mDocument->lineCount(), 0);
     }
-    mTopsDirty = true;
+    mTopsDirty    = true;
+    mContentWidth = -1.f;
+}
+
+F32 ALTextLayout::contentWidth()
+{
+    if (mContentWidth < 0.f)
+    {
+        F32       widest  = 0.f;
+        const F32 per_byte = spaceAdvance();
+        for (size_t i = 0; i < mLines.size(); ++i)
+        {
+            const F32 width = mLines[i].valid ? mLines[i].width
+                                              : (mDocument ? static_cast<F32>(mDocument->lineLength(static_cast<S32>(i))) * per_byte : 0.f);
+            widest = llmax(widest, width);
+        }
+        mContentWidth = widest;
+    }
+    return mContentWidth;
+}
+
+// --- hidden lines --------------------------------------------------------------
+
+void ALTextLayout::setHidden(S32 first, S32 last, bool hidden)
+{
+    first = llmax(first, 0);
+    last  = llmin(last, static_cast<S32>(mHidden.size()) - 1);
+    for (S32 l = first; l <= last; ++l)
+    {
+        if (static_cast<bool>(mHidden[l]) != hidden)
+        {
+            mHidden[l] = hidden ? 1 : 0;
+            mHiddenCount += hidden ? 1 : -1;
+            mTopsDirty = true;
+        }
+    }
+}
+
+S32 ALTextLayout::visibleFrom(S32 index, S32 direction) const
+{
+    const S32 count = static_cast<S32>(mHidden.size());
+    for (S32 l = index; l >= 0 && l < count; l += (direction < 0 ? -1 : 1))
+    {
+        if (!mHidden[l])
+        {
+            return l;
+        }
+    }
+    return -1;
 }
 
 F32 ALTextLayout::spaceAdvance()
@@ -181,6 +245,10 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     }
     shape(piece, text.size());
     out.width = x;
+    if (mContentWidth >= 0.f && x > mContentWidth)
+    {
+        mContentWidth = x;
+    }
 
     // Rows. One, unless the line is wider than the wrap and has somewhere
     // to break.
@@ -308,7 +376,10 @@ void ALTextLayout::ensureTops()
     for (size_t i = 0; i < mLines.size(); ++i)
     {
         mTops[i] = top;
-        top += row * static_cast<S32>(mLines[i].valid ? mLines[i].rows.size() : 1);
+        if (!mHidden[i])
+        {
+            top += row * static_cast<S32>(mLines[i].valid ? mLines[i].rows.size() : 1);
+        }
     }
     mTops[mLines.size()] = top;
     mTopsDirty           = false;
@@ -333,9 +404,26 @@ S32 ALTextLayout::lineAtY(S32 y)
     {
         return 0;
     }
-    // The last line whose top is at or above y.
+    // The last line whose top is at or above y. Hidden lines share a top
+    // with the line after them, so the last of a run is the one in sight
+    // -- unless the run reaches the end, where the nearest in sight is
+    // above it.
     const auto after = std::upper_bound(mTops.begin(), mTops.end() - 1, y);
-    return llclamp(static_cast<S32>(after - mTops.begin()) - 1, 0, lineCount() - 1);
+    const S32  line  = llclamp(static_cast<S32>(after - mTops.begin()) - 1, 0, lineCount() - 1);
+    if (mHidden[line])
+    {
+        const S32 above = visibleFrom(line, -1);
+        if (above >= 0)
+        {
+            return above;
+        }
+        const S32 below = visibleFrom(line, 1);
+        if (below >= 0)
+        {
+            return below;
+        }
+    }
+    return line;
 }
 
 S32 ALTextLayout::rowOf(S32 index, S32 column)
