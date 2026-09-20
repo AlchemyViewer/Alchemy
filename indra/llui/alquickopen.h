@@ -47,6 +47,10 @@ class LLScrollListCtrl;
 //
 // The candidates are the caller's, and so is what choosing one does. This
 // holds no list of files, no history and no idea what it is opening.
+//
+// Or, freeform: what is typed is the answer itself -- a line number, a new
+// name -- and the one row under the field says what return will do with
+// it, told again by the caller as the typing changes.
 class ALQuickOpen : public LLPanel
 {
 public:
@@ -79,6 +83,19 @@ public:
     void setQuery(const std::string& query);
     const std::string& query() const { return mQuery; }
 
+    // Freeform from here on: the candidates are put aside, the one row
+    // says this, and return sends what was typed. Say it again as the
+    // query changes, since what return will do has changed with it.
+    void setHint(const std::string& hint);
+    bool freeform() const { return mFreeform; }
+
+    // The query, as it changes under the keys or by setQuery.
+    typedef boost::signals2::signal<void(const std::string&)> query_signal_t;
+    boost::signals2::connection onQueryChanged(const query_signal_t::slot_type& cb)
+    {
+        return mQueryChanged.connect(cb);
+    }
+
     // The ranking, in order, best first: by the label, or by the other
     // words a tier down. Public because it is the whole of this widget
     // and the only part worth testing without a screen.
@@ -94,8 +111,9 @@ public:
     // the next one.
     void takeFocus();
 
-    // Return, or a row chosen. Nothing is sent for a query that matched
-    // nothing, since there is nothing to send.
+    // Return, or a row chosen; the query itself when freeform. Nothing is
+    // sent for a query that matched nothing, since there is nothing to
+    // send.
     typedef boost::signals2::signal<void(const std::string&)> chose_signal_t;
     boost::signals2::connection onChose(const chose_signal_t::slot_type& cb)
     {
@@ -119,7 +137,10 @@ private:
     std::string             mQuery;
     std::string             mPlaceholder;
     S32                     mRows;
+    bool                    mFreeform = false;
+    std::string             mHint;
     LLLineEditor*           mField = nullptr;
     LLScrollListCtrl*       mList = nullptr;
     chose_signal_t          mChose;
+    query_signal_t          mQueryChanged;
 };

@@ -26,6 +26,12 @@
 
 #include "../alquickopen.h"
 
+#include "../lllineeditor.h"
+#include "../llscrolllistctrl.h"
+#include "../lluictrlfactory.h"
+
+#include "alheadlessui_fixture.h"
+
 #include "../llfloater.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"
@@ -68,6 +74,14 @@ namespace tut
             return order.empty() ? std::string() : all[order.front()].label;
         }
     };
+
+    // Something in the widgets' own library asks the world for this.
+    class LLAvatarName;
+    const std::string gQuickTestAnonName("Anon");
+    const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+    {
+        return gQuickTestAnonName;
+    }
 
     typedef test_group<alquickopen_data> alquickopen_test;
     typedef alquickopen_test::object     alquickopen_object;
@@ -243,5 +257,35 @@ namespace tut
         ensure_equals("both answer", order.size(), size_t(2));
         ensure_equals("the words' whole word before the label's scattered letters",
                       shapes[order.front()].label, std::string("PushButton_Off"));
+    }
+
+    template<> template<>
+    void alquickopen_object::test<8>()
+    {
+        set_test_name("freeform, the one row says what return does, and return sends what was typed");
+        if (!ll_test::HeadlessUI::get().ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name = "quick";
+        p.rect = LLRect(0, 60, 300, 0);
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        std::vector<std::string> typed, chosen;
+        quick->onQueryChanged([&](const std::string& q) { typed.push_back(q); });
+        quick->onChose([&](const std::string& v) { chosen.push_back(v); });
+        quick->setCandidates(files());
+        quick->setHint("Type a line number.");
+        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
+        ensure("freeform", quick->freeform());
+        ensure("one row, the hint", list && list->getItemCount() == 1 && list->getFirstSelected()->getColumn(0)->getValue().asString() == "Type a line number.");
+        quick->setQuery("12");
+        ensure("the query is told", typed.size() == 1 && typed[0] == "12");
+        ensure("the candidates stay aside", list->getItemCount() == 1);
+        quick->setHint("Go to line 12.");
+        ensure_equals("the row says what return does now", list->getFirstSelected()->getColumn(0)->getValue().asString(), std::string("Go to line 12."));
+        quick->findChild<LLLineEditor>("query")->onCommit();
+        ensure("return sends what was typed", chosen.size() == 1 && chosen[0] == "12");
+        quick->die();
     }
 }

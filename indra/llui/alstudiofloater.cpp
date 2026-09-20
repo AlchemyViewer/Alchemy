@@ -115,19 +115,21 @@ void ALStudioFloater::showHistory(ALHistoryList* list, std::vector<ALHistoryList
     }
 }
 
-void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
-                                const std::string& title, std::function<void(const std::string&)> chose,
-                                LLView* anchor, S32 width)
+ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
+                                        const std::string& title, std::function<void(const std::string&)> chose,
+                                        LLView* anchor, S32 width, S32 height, std::function<void()> escaped)
 {
     // Asked for again while it is up -- the same key pressed twice -- it is
-    // what was typed that is wanted back, not a fresh field.
+    // what was typed that is wanted back, not a fresh field. A freeform
+    // one is another question, and is asked afresh.
     if (LLView* up = mQuickPopover.get())
     {
-        if (ALQuickOpen* quick = up->findChild<ALQuickOpen>("quick_open"))
+        ALQuickOpen* quick = up->findChild<ALQuickOpen>("quick_open");
+        if (quick && !quick->freeform())
         {
             quick->setCandidates(std::move(candidates));
             quick->takeFocus();
-            return;
+            return quick;
         }
         if (ALPopover* popover = ALViewType::as<ALPopover>(up))
         {
@@ -145,7 +147,7 @@ void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, 
 
     ALQuickOpen::Params qp(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
     qp.name = "quick_open";
-    qp.rect = LLRect(0, HEIGHT, width > 0 ? width : WIDTH, 0);
+    qp.rect = LLRect(0, height > 0 ? height : HEIGHT, width > 0 ? width : WIDTH, 0);
     qp.placeholder = placeholder;
     ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(qp);
     quick->setCandidates(std::move(candidates));
@@ -154,7 +156,7 @@ void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, 
     ALPopover* popover = ALPopover::show(anchor ? anchor : this, quick, title);
     if (!popover)
     {
-        return;
+        return nullptr;
     }
     mQuickPopover = popover->getHandle();
     LLHandle<ALPopover> held = popover->getDerivedHandle<ALPopover>();
@@ -169,8 +171,15 @@ void ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, 
         }
         chose(value);
     });
-    popover->onClosed([this](bool) { mQuickPopover.markDead(); });
+    popover->onClosed([this, escaped = std::move(escaped)](bool was_escaped) {
+        mQuickPopover.markDead();
+        if (was_escaped && escaped)
+        {
+            escaped();
+        }
+    });
     quick->takeFocus();
+    return quick;
 }
 
 void ALStudioFloater::setStatus(const std::string& text, bool failure)

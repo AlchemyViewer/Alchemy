@@ -1246,21 +1246,43 @@ void ALCodeEditor::openCompletion()
 
 // --- the name at the caret ---------------------------------------------------------
 
-ALTextRange ALCodeEditor::identifierAtCaret() const
+ALTextRange ALCodeEditor::identifierAt(const ALTextPos& at) const
 {
-    const ALTextDocument& doc  = document();
-    ALTextRange           word = doc.wordAt(caret()).normalised();
-    if (word.empty() && caret().column > 0)
-    {
-        // At the end of one.
-        word = doc.wordAt(ALTextPos(caret().line, caret().column - 1)).normalised();
-    }
-    if (word.empty())
+    const ALTextDocument& doc = document();
+    const ALTextPos       pos = doc.clamp(at);
+    const std::string     line = doc.text(ALTextRange(ALTextPos(pos.line, 0), ALTextPos(pos.line, doc.lineLength(pos.line))));
+    const S32             n    = static_cast<S32>(line.size());
+    if (pos.column >= n || !identifierByte(line[pos.column]))
     {
         return ALTextRange();
     }
-    const std::string text = doc.text(word);
-    return !text.empty() && identifierByte(text[0]) && !(text[0] >= '0' && text[0] <= '9') ? word : ALTextRange();
+    S32 begin = pos.column;
+    S32 end   = pos.column + 1;
+    while (begin > 0 && identifierByte(line[begin - 1]))
+    {
+        --begin;
+    }
+    while (end < n && identifierByte(line[end]))
+    {
+        ++end;
+    }
+    if (line[begin] >= '0' && line[begin] <= '9')
+    {
+        // A number.
+        return ALTextRange();
+    }
+    return ALTextRange(ALTextPos(pos.line, begin), ALTextPos(pos.line, end));
+}
+
+ALTextRange ALCodeEditor::identifierAtCaret() const
+{
+    ALTextRange word = identifierAt(caret());
+    if (word.empty() && caret().column > 0)
+    {
+        // At the end of one.
+        word = identifierAt(ALTextPos(caret().line, caret().column - 1));
+    }
+    return word;
 }
 
 bool ALCodeEditor::canSymbol(ALEditorCommand command) const
@@ -1456,30 +1478,23 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             break;
         }
     }
-    if (says.empty() && mHover)
+    const ALTextRange word = identifierAt(at);
+    if (says.empty() && mHover && !word.empty())
     {
-        const ALTextRange word = document().wordAt(at).normalised();
-        if (!word.empty())
+        if (mHover(at, document().text(word), says))
         {
-            const std::string word_text = document().text(word);
-            if (!word_text.empty() && identifierByte(word_text[0]) && mHover(at, word_text, says))
-            {
-                about = word;
-            }
+            about = word;
         }
     }
     if (says.empty())
     {
-        // Somebody may know later.
-        const ALTextRange word = document().wordAt(at).normalised();
+        // Somebody may know later. Asked at the identifier itself: what
+        // is at the start of `ll.Say` is `ll`, and the question is about
+        // `Say`.
         if (mHoverRequest && !word.empty() && word != mHoverAsked)
         {
-            const std::string word_text = document().text(word);
-            if (!word_text.empty() && identifierByte(word_text[0]))
-            {
-                mHoverAsked = word;
-                mHoverRequest(word.begin, word_text);
-            }
+            mHoverAsked = word;
+            mHoverRequest(word.begin, document().text(word));
         }
         return ALTextView::handleToolTip(x, y, mask);
     }
@@ -1519,12 +1534,25 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
         return;
     }
     const ALTextPos   under = posAtLocal(mMouseX, mMouseY, false);
-    const ALTextRange word  = document().wordAt(under).normalised();
+    const ALTextRange word  = identifierAt(under);
     if (word != mHoverAsked)
     {
         return;
     }
     showTip(word, text);
+}
+
+bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    // An identifier, as code reads one; the document's word otherwise.
+    const ALTextRange word = textRect().pointInRect(x, y) ? identifierAt(posAtLocal(x, y, false)) : ALTextRange();
+    if (word.empty())
+    {
+        return ALTextView::handleDoubleClick(x, y, mask);
+    }
+    setFocus(true);
+    setSelection(word);
+    return true;
 }
 
 bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)

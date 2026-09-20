@@ -194,7 +194,11 @@ public:
     // replaceAll. Nothing is asked with the caret on no identifier.
     typedef std::function<void(ALEditorCommand command, const ALTextRange& word)> symbol_request_t;
     void setSymbolRequest(symbol_request_t request) { mSymbolRequest = std::move(request); }
-    // The identifier the caret is on or at the end of, or an empty range.
+    // The identifier at a position -- letters, digits and underscores,
+    // which is narrower than a word to the document, where a dot between
+    // letters joins them as it does in "e.g." -- or an empty range. The
+    // caret's is the one it is on or at the end of.
+    ALTextRange identifierAt(const ALTextPos& pos) const;
     ALTextRange identifierAtCaret() const;
 
     // --- hover -------------------------------------------------------------------
@@ -238,6 +242,7 @@ public:
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onFocusLost() override;

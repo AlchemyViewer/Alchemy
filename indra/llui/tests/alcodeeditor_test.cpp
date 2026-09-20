@@ -368,4 +368,22 @@ namespace tut
         ensure("read-only, a rename cannot be asked", (e.setReadOnly(true), !e.canPerform(ALEditorCommand::Rename)));
         ensure("but a definition can", e.canPerform(ALEditorCommand::GoToDefinition));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<9>()
+    {
+        set_test_name("an identifier is letters, digits and underscores: a dot between names does not join them as it does for a word");
+        ALCodeEditor& e = make("ll.Say(0, count_2) -- 3.5", "slua");
+        ensure("Say alone", e.identifierAt(ALTextPos(0, 4)) == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 6)));
+        ensure("ll alone", e.identifierAt(ALTextPos(0, 1)) == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
+        ensure("nothing on the dot", e.identifierAt(ALTextPos(0, 2)).empty());
+        ensure("with digits and underscores", e.identifierAt(ALTextPos(0, 12)) == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 17)));
+        ensure("not a number", e.identifierAt(ALTextPos(0, 23)).empty());
+        e.setCaret(ALTextPos(0, 6));
+        ensure("the caret at the end of Say", e.identifierAtCaret() == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 6)));
+        std::vector<ALTextRange> asked;
+        e.setSymbolRequest([&](ALEditorCommand, const ALTextRange& word) { asked.push_back(word); });
+        key(KEY_F12);
+        ensure("and asked about Say, not ll", asked.size() == 1 && asked[0].begin == ALTextPos(0, 3));
+    }
 }

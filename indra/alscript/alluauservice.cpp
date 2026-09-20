@@ -106,12 +106,15 @@ namespace
         return Luau::Position(static_cast<unsigned>(std::max(0, line)), static_cast<unsigned>(std::max(0, column)));
     }
 
-    // How a type prints beside a name.
+    // How a type prints beside a name: a table's first few fields and
+    // how many more, since `ll` has hundreds and a tip is one glance.
     std::string typeText(Luau::TypeId type)
     {
         Luau::ToStringOptions options;
         options.functionTypeArguments = true;
         options.hideNamedFunctionTypeParameters = false;
+        options.maxTableLength = 8;
+        options.maxTypeLength  = 1000;
         return Luau::toString(type, options);
     }
 

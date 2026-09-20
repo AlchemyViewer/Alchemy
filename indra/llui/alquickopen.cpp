@@ -275,10 +275,31 @@ void ALQuickOpen::setQuery(const std::string& query)
         mField->setText(query);
     }
     fill();
+    mQueryChanged(mQuery);
+}
+
+void ALQuickOpen::setHint(const std::string& hint)
+{
+    mFreeform = true;
+    mHint     = hint;
+    fill();
 }
 
 void ALQuickOpen::fill()
 {
+    if (mFreeform)
+    {
+        // The one row, saying what return does; chosen, so return takes it.
+        mRanked.clear();
+        mList->deleteAllItems();
+        LLSD row;
+        row["value"]                = mQuery;
+        row["columns"][0]["column"] = "label";
+        row["columns"][0]["value"]  = mHint;
+        mList->addElement(row);
+        mList->selectFirstItem();
+        return;
+    }
     mRanked = rank(mCandidates, mQuery);
     // As many as were asked for: the answer meant is at the top, and a
     // list of seven hundred rows made again on every letter typed is
@@ -309,7 +330,11 @@ void ALQuickOpen::fill()
 
 void ALQuickOpen::chooseSelected()
 {
-    if (const LLScrollListItem* item = mList->getFirstSelected())
+    if (mFreeform)
+    {
+        mChose(mQuery);
+    }
+    else if (const LLScrollListItem* item = mList->getFirstSelected())
     {
         mChose(item->getValue().asString());
     }

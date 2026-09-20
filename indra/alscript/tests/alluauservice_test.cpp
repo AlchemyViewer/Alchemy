@@ -229,6 +229,10 @@ namespace tut
         ensure("a number: " + hover.label, hover.label.find("number") != std::string::npos);
         ensure("bound in the script", hover.hasDefinition && hover.definitionLine == 0);
         ensure("nothing at nothing", !service.hover(script, 2, 0).found);
+        hover = service.hover(script, 1, 0);  // on `ll` itself
+        ensure("the table is found", hover.found);
+        ensure(llformat("and said in a glance, not %d characters", (int)hover.label.size()), hover.label.size() < 1200);
+        ensure("with how many more there are: " + hover.label, hover.label.find("more") != std::string::npos);
     }
 
     template<> template<>

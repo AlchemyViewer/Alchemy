@@ -105,12 +105,16 @@ protected:
 
     // Open quickly: the candidates against a few letters, over the
     // window, gone as soon as one is chosen or the person looks away.
-    // Under `anchor` where one is given, else over the window; as wide as
-    // `width` where one is given. Asked again while it is up, it keeps
-    // what was typed and takes the keyboard back.
-    void quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
-                   const std::string& title, std::function<void(const std::string&)> chose,
-                   LLView* anchor = nullptr, S32 width = 0);
+    // Under `anchor` where one is given, else over the window; as wide
+    // and as tall as given, where given. Asked again while it is up, it
+    // keeps what was typed and takes the keyboard back. The widget comes
+    // back for a caller with more to say to it -- a hint that follows
+    // the typing -- or null where it could not be shown; `escaped` is
+    // told when it goes without a choice.
+    ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
+                           const std::string& title, std::function<void(const std::string&)> chose,
+                           LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
+                           std::function<void()> escaped = {});
 
     // The regions that fold, which the subclass binds.
     ALPaneFolds mFolds;
