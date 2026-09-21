@@ -27,7 +27,9 @@
 #include "alcodeeditor.h"
 #include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
+#include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
+#include "alsourcemap.h"
 #include "alstudiofloater.h"
 
 #include <boost/signals2.hpp>
@@ -109,9 +111,26 @@ private:
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
         bool                                       sourceView = false;
-        // The envelope the asset came in, whose expanded code the editor
-        // holds, and which a save wraps the code back in.
+        // The envelope the asset came in, whose source the editor holds
+        // and whose expanded code the companion tab shows; a save runs
+        // the preprocessor over the source and wraps both again.
         std::optional<ALScriptEnvelope>            envelope;
+        // The preprocessor's run over the text at a version: what the
+        // analyzers see, and what the last save uploaded, each with the
+        // way back to the source and what the run said.
+        struct Expanded
+        {
+            bool             valid    = false;
+            bool             disabled = false;
+            U32              version  = 0;
+            std::string      text;
+            ALSourceMap      map;
+            ALScriptProblems problems;
+        };
+        Expanded                                   expanded;
+        Expanded                                   uploaded;
+        // A save waiting on the preprocessor.
+        bool                                       preprocessing = false;
         // What the compiler said of the last save.
         std::vector<ALScriptWorkspace::Diagnostic> problems;
         // What the script said as it ran, since it was last saved or
@@ -148,6 +167,10 @@ private:
             std::string level;
             std::string origin;
             std::string message;
+            // An included file the problem is in, by identity and by
+            // name; empty for the script itself.
+            std::string file;
+            std::string fileName;
         };
         std::vector<Shown>                         shown;
         // What the analyzer said the script declares, at analysisVersion.
@@ -191,14 +214,28 @@ private:
     // The options every editor shares, put on one, or on all.
     void                      applyEditorOptions(ALCodeEditor& editor) const;
     void                      applyEditorOptions();
-    void                      showSource(Doc& doc);
+    void                      showExpanded(Doc& doc, const std::string& text);
     const std::vector<Vocab>& vocabulary(bool lua);
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
     void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
     void                      answered(const ALScriptAnalysis::Result& result);
-    std::string               textToSave(const Doc& doc) const;
+
+    // The preprocessor: whether it applies to a script; its run over the
+    // text as it stands, for the analyzers, with the way back; and its
+    // run ahead of a save, fetching includes, then the upload in the
+    // envelope. Positions the analyzers answer with are mapped back to
+    // the source, and what falls in an include is listed by its file.
+    bool                          preprocessed(const Doc& doc) const;
+    const Doc::Expanded&          expandedFor(Doc& doc);
+    ALScriptPreprocessor::Request preprocessRequest(const Doc& doc) const;
+    void                          preprocess(Doc& doc, bool then_save);
+    void                          preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result);
+    void                          upload(Doc& doc, const std::string& text);
+    static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
+    std::string                   includeName(const Doc& doc, const std::string& path) const;
+    void                          chooseIncludeFolder();
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void save(Doc& doc);

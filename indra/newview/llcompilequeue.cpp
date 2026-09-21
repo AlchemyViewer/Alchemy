@@ -36,7 +36,12 @@
 
 #include "llcompilequeue.h"
 
+#include "alscriptenvelope.h"
+#include "alscriptpreprocessor.h"
+#include "alscriptworkspace.h"
 #include "llagent.h"
+#include "lldate.h"
+#include "llversioninfo.h"
 #include "llchat.h"
 #include "llfloaterreg.h"
 #include "llviewerwindow.h"
@@ -504,9 +509,95 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         return true;
     }
 
-    std::string url = object->getRegion()->getCapability("UpdateScriptTask");
-
+    // A script the preprocessor wrapped, or any script while the
+    // preprocessor is on, is expanded again from its source, so that its
+    // includes are fresh, and goes up as text through the workspace.
+    bool preprocessed = false;
     {
+        std::string text;
+        if (ALScriptWorkspace::readAsset(assetId, item->getType(), text) &&
+            (ALScriptEnvelope::looksWrapped(text) || ALScriptPreprocessor::enabled()))
+        {
+            preprocessed = true;
+            const ALScriptRef               ref(object->getID(), inventory->getUUID());
+            std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text);
+            ALScriptPreprocessor::Request   request;
+            request.ref     = ref;
+            request.name    = inventory->getName();
+            request.assetId = assetId;
+            request.source  = envelope ? envelope->source : text;
+            request.lua     = script_is_lua;
+            const std::string pumpName = pump.getName();
+            auto              answer   = std::make_shared<ALPreprocessor::Result>();
+            ALScriptPreprocessor::instance().run(request, [pumpName, answer](const ALPreprocessor::Result& r) {
+                *answer = r;
+                LLEventPumps::instance().post(pumpName, LLSDMap("preprocessed", LLSD::Boolean(true)));
+            });
+            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+            floater.check();
+            if (result.has("timeout"))
+            {
+                LLStringUtil::format_map_t args;
+                args["[OBJECT_NAME]"] = inventory->getName();
+                floater->addStringMessage(floater->getString("Timeout", args));
+                return true;
+            }
+            if (answer->hasErrors())
+            {
+                floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
+                for (const ALScriptProblem& problem : answer->problems)
+                {
+                    if (problem.severity == ALScriptProblem::Severity::Error)
+                    {
+                        floater->addStringMessage((problem.file.empty() ? std::string() : problem.file + ": ") + std::to_string(problem.line + 1) + ": " + problem.message);
+                    }
+                }
+                return true;
+            }
+            std::string upload = request.source;
+            if (!answer->disabled)
+            {
+                ALScriptEnvelope wrapped = envelope ? *envelope : ALScriptEnvelope();
+                wrapped.lua              = script_is_lua;
+                wrapped.source           = request.source;
+                wrapped.expanded         = answer->text;
+                wrapped.compileTarget    = compile_target;
+                wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
+                wrapped.lastCompiled     = LLDate::now().asString();
+                upload                   = wrapped.wrap();
+            }
+            ALScriptWorkspace::SaveOptions options;
+            options.compileTarget = compile_target;
+            options.running       = true;
+            options.experience    = experienceId;
+            std::string error;
+            const bool  sent = ALScriptWorkspace::instance().save(
+                ref, upload, options,
+                [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
+                    LLSD out;
+                    out["compiled"] = compiled.success;
+                    LLSD errors     = LLSD::emptyArray();
+                    for (const std::string& message : compiled.messages)
+                    {
+                        errors.append(message);
+                    }
+                    out["errors"] = errors;
+                    LLEventPumps::instance().post(pumpName, out);
+                },
+                error);
+            if (!sent)
+            {
+                floater->addStringMessage(std::string("Upload of \"") + inventory->getName() + std::string("\" failed: ") + error);
+                return true;
+            }
+            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+        }
+    }
+
+    if (!preprocessed)
+    {
+        std::string url = object->getRegion()->getCapability("UpdateScriptTask");
+
         LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(),
             inventory->getUUID(),
             assetId,
@@ -518,9 +609,9 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
 
         LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
-    }
 
-    result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+        result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+    }
 
     floater.check();
 

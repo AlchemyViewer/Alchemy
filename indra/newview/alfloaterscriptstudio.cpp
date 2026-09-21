@@ -27,6 +27,7 @@
 #include "alfloaterscriptstudio.h"
 
 #include "alcodeeditor.h"
+#include "alscriptpreprocessor.h"
 #include "aljumpbar.h"
 #include "aloutputlist.h"
 #include "altabstrip.h"
@@ -39,10 +40,12 @@
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
+#include "lldirpicker.h"
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
 #include "llfilepicker.h"
 #include "llfloaterreg.h"
+#include "llinventorymodel.h"
 #include "lllayoutstack.h"
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
@@ -537,17 +540,18 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         doc.loaded = true;
         doc.editor->setSyntax(answer.language.lua ? "slua" : "lsl");
         teachEditor(doc);
-        // A script the preprocessor wrapped: the editor holds what the
-        // server compiled, and the source goes in a tab of its own.
+        // A script the preprocessor wrapped: the editor holds the source
+        // the author wrote, and what the server compiled goes in a tab
+        // of its own.
         doc.envelope = ALScriptEnvelope::parse(answer.text);
         if (doc.envelope)
         {
-            doc.editor->setText(doc.envelope->expanded);
+            doc.editor->setText(doc.envelope->source);
             if (!doc.envelope->compileTarget.empty())
             {
                 doc.language.compileTarget = doc.envelope->compileTarget;
             }
-            showSource(doc);
+            showExpanded(doc, doc.envelope->expanded);
         }
         else
         {
@@ -559,9 +563,17 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
             }
         }
         doc.editor->setReadOnly(!answer.modifiable);
+        doc.expanded.valid = false;
+        doc.uploaded.valid = false;
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
+        if (preprocessed(doc))
+        {
+            // Its includes fetched now, so that the analyzers have them,
+            // and the expanded code shown as it would be uploaded.
+            preprocess(doc, false);
+        }
         scheduleAnalysis(doc, true);
         if (!doc.ref.inInventory())
         {
@@ -583,9 +595,9 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     }
 }
 
-void ALFloaterScriptStudio::showSource(Doc& doc)
+void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
 {
-    const std::string id    = doc.id + ":source";
+    const std::string id    = doc.id + ":expanded";
     size_t            index = indexOf(id);
     if (index == NONE)
     {
@@ -604,14 +616,214 @@ void ALFloaterScriptStudio::showSource(Doc& doc)
             ++mActive;
         }
     }
-    Doc& source = *mDocs[index];
+    Doc& expanded = *mDocs[index];
     LLStringUtil::format_map_t args;
-    args["[NAME]"]  = doc.name;
-    source.name     = getString("SourceTabName", args);
-    source.language = doc.language;
-    source.editor->setSyntax(doc.language.lua ? "slua" : "lsl");
-    teachEditor(source);
-    source.editor->setText(doc.envelope->source);
+    args["[NAME]"]    = doc.name;
+    expanded.name     = getString("ExpandedTabName", args);
+    expanded.language = doc.language;
+    expanded.editor->setSyntax(doc.language.lua ? "slua" : "lsl");
+    teachEditor(expanded);
+    expanded.editor->setText(text);
+    fillTabs();
+}
+
+// --- the preprocessor ---------------------------------------------------------------
+
+bool ALFloaterScriptStudio::preprocessed(const Doc& doc) const
+{
+    return doc.loaded && !doc.sourceView && (doc.envelope.has_value() || ALScriptPreprocessor::enabled());
+}
+
+ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc& doc) const
+{
+    ALScriptPreprocessor::Request request;
+    request.ref     = doc.ref;
+    request.name    = doc.name;
+    request.assetId = doc.assetId;
+    request.source  = doc.editor->text();
+    request.lua     = doc.language.lua;
+    return request;
+}
+
+const ALFloaterScriptStudio::Doc::Expanded& ALFloaterScriptStudio::expandedFor(Doc& doc)
+{
+    const U32 version = doc.editor->document().version();
+    if (!doc.expanded.valid || doc.expanded.version != version)
+    {
+        ALPreprocessor::Result result = ALScriptPreprocessor::instance().runNow(preprocessRequest(doc));
+        doc.expanded.valid            = true;
+        doc.expanded.disabled         = result.disabled;
+        doc.expanded.version          = version;
+        doc.expanded.text             = std::move(result.text);
+        doc.expanded.map              = std::move(result.map);
+        doc.expanded.problems         = std::move(result.problems);
+    }
+    return doc.expanded;
+}
+
+void ALFloaterScriptStudio::preprocess(Doc& doc, bool then_save)
+{
+    if (doc.preprocessing)
+    {
+        return;
+    }
+    doc.preprocessing = true;
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    setStatus(getString("Preprocessing", args));
+    const LLHandle<LLFloater> handle  = getHandle();
+    const std::string         id      = doc.id;
+    const U32                 version = doc.editor->document().version();
+    ALScriptPreprocessor::instance().run(preprocessRequest(doc), [handle, id, version, then_save](const ALPreprocessor::Result& result) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->preprocessedAnswer(id, version, then_save, result);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc          = *mDocs[index];
+    doc.preprocessing = false;
+    // What the analyzers see from here, with every include in; and what
+    // a save would upload.
+    doc.expanded.valid    = true;
+    doc.expanded.disabled = result.disabled;
+    doc.expanded.version  = version;
+    doc.expanded.text     = result.text;
+    doc.expanded.map      = result.map;
+    doc.expanded.problems = result.problems;
+    showExpanded(doc, result.text);
+    refreshProblems(doc);
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (version != doc.editor->document().version())
+    {
+        // The text moved on while the includes came: analysed again, and
+        // saved again from the start if that was the point.
+        doc.expanded.valid = false;
+        scheduleAnalysis(doc, true);
+        if (then_save)
+        {
+            save(doc);
+        }
+        return;
+    }
+    scheduleAnalysis(doc, true);
+    if (!then_save)
+    {
+        if (!result.pending.empty())
+        {
+            args["[COUNT]"] = std::to_string(result.pending.size());
+            setStatus(getString("PreprocessedPending", args), true);
+        }
+        else
+        {
+            setStatus(getString("Preprocessed", args));
+        }
+        return;
+    }
+    const F64 now = LLTimer::getTotalSeconds();
+    if (result.hasErrors() && doc.saveAnywayUntil <= now)
+    {
+        S32 errors = 0;
+        for (const ALScriptProblem& problem : result.problems)
+        {
+            errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
+        }
+        args["[COUNT]"] = std::to_string(errors);
+        setStatus(getString("PreprocessErrors", args), true);
+        doc.saveAnywayUntil = now + SAVE_ANYWAY;
+        showBottom("problems_tab");
+        return;
+    }
+    doc.uploaded = doc.expanded;
+    if (result.disabled)
+    {
+        // `//fspreprocessor off`: the text goes up as it is, as
+        // Firestorm sends it.
+        upload(doc, doc.editor->text());
+        return;
+    }
+    // In the envelope, with the source as written, so Firestorm opens
+    // what we save; the lines that say who wrote it and when are ours.
+    ALScriptEnvelope envelope;
+    if (doc.envelope)
+    {
+        envelope = *doc.envelope;
+    }
+    envelope.lua           = doc.language.lua;
+    envelope.source        = doc.editor->text();
+    envelope.expanded      = result.text;
+    envelope.compileTarget = mCompileTarget->getValue().asString();
+    if (envelope.compileTarget.empty())
+    {
+        envelope.compileTarget = doc.language.compileTarget;
+    }
+    envelope.programVersion = LLVersionInfo::instance().getChannelAndVersion();
+    envelope.lastCompiled   = LLDate::now().asString();
+    doc.envelope            = envelope;
+    upload(doc, envelope.wrap());
+}
+
+// static
+S32 ALFloaterScriptStudio::mapSpan(const ALSourceMap& map, ALScriptSpan& span)
+{
+    const ALSourceMap::Loc begin = map.toSource(span.line, span.column);
+    if (!begin.found())
+    {
+        return -1;
+    }
+    const ALSourceMap::Loc end = map.toSource(span.endLine, span.endColumn);
+    span.line                  = begin.line;
+    span.column                = begin.column;
+    if (end.found() && end.file == begin.file && (end.line > begin.line || (end.line == begin.line && end.column > begin.column)))
+    {
+        span.endLine   = end.line;
+        span.endColumn = end.column;
+    }
+    else
+    {
+        span.endLine   = begin.line;
+        span.endColumn = begin.column;
+    }
+    return begin.file;
+}
+
+std::string ALFloaterScriptStudio::includeName(const Doc& doc, const std::string& path) const
+{
+    for (const Doc::Expanded* expanded : { &doc.expanded, &doc.uploaded })
+    {
+        const S32 file = expanded->valid ? expanded->map.fileOf(path) : -1;
+        if (file >= 0)
+        {
+            return expanded->map.files()[file].name;
+        }
+    }
+    std::string file;
+    return ALScriptPreprocessor::fileOf(path, file) ? gDirUtilp->getBaseFileName(file) : path;
+}
+
+void ALFloaterScriptStudio::chooseIncludeFolder()
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    (new LLDirPickerThread(
+         [handle](const std::vector<std::string>& folders, std::string) {
+             if (folders.empty() || !ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+             {
+                 return;
+             }
+             gSavedSettings.setString("ALScriptPreprocDiskIncludeFolder", folders.front());
+             gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
+         },
+         gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder")))
+        ->getFile();
 }
 
 // --- the language's words --------------------------------------------------------
@@ -843,6 +1055,23 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     request.text    = doc.editor->text();
     request.line    = at.line;
     request.column  = at.column;
+    if (preprocessed(doc))
+    {
+        // The analyzers see what the compiler would; a position inside a
+        // directive has nothing there to ask about.
+        const Doc::Expanded& expanded = expandedFor(doc);
+        request.text                  = expanded.text;
+        if (kind != ALScriptAnalysis::Kind::Check)
+        {
+            const ALSourceMap::Loc loc = expanded.map.toExpanded(0, at.line, at.column);
+            if (!loc.found())
+            {
+                return;
+            }
+            request.line   = loc.line;
+            request.column = loc.column;
+        }
+    }
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptAnalysis::instance().ask(std::move(request), [handle](const ALScriptAnalysis::Result& result) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -899,8 +1128,23 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
     {
         return;
     }
-    Doc&            doc = *mDocs[index];
-    const ALTextPos at(result.line, result.column);
+    Doc&      doc = *mDocs[index];
+    ALTextPos at(result.line, result.column);
+    if (preprocessed(doc) && result.kind != ALScriptAnalysis::Kind::Check)
+    {
+        // Answered about the expanded text; the editor wants the source's
+        // place, which is where it asked.
+        if (!doc.expanded.valid || doc.expanded.version != result.version)
+        {
+            return;
+        }
+        const ALSourceMap::Loc loc = doc.expanded.map.toSource(result.line, result.column);
+        if (!loc.found() || loc.file != 0)
+        {
+            return;
+        }
+        at = ALTextPos(loc.line, loc.column);
+    }
     switch (result.kind)
     {
         case ALScriptAnalysis::Kind::Check:
@@ -963,26 +1207,6 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
     }
 }
 
-std::string ALFloaterScriptStudio::textToSave(const Doc& doc) const
-{
-    if (!doc.envelope)
-    {
-        return doc.editor->text();
-    }
-    // Back in its envelope, with the source as it was, so Firestorm opens
-    // what we save; the lines that say who wrote it and when are ours.
-    ALScriptEnvelope envelope = *doc.envelope;
-    envelope.expanded         = doc.editor->text();
-    envelope.compileTarget    = mCompileTarget->getValue().asString();
-    if (envelope.compileTarget.empty())
-    {
-        envelope.compileTarget = doc.language.compileTarget;
-    }
-    envelope.programVersion = LLVersionInfo::instance().getChannelAndVersion();
-    envelope.lastCompiled   = LLDate::now().asString();
-    return envelope.wrap();
-}
-
 void ALFloaterScriptStudio::activate(size_t index)
 {
     if (index >= mDocs.size())
@@ -1018,7 +1242,7 @@ void ALFloaterScriptStudio::fillTabs()
         tab.label   = doc.name;
         tab.value   = doc.id;
         tab.dirty   = doc.editor->isDirty();
-        tab.toolTip = doc.sourceView ? getString("TabSourceTip") : doc.ref.inInventory() ? getString("TabInventoryTip") : getString("TabObjectTip");
+        tab.toolTip = doc.sourceView ? getString("TabExpandedTip") : doc.ref.inInventory() ? getString("TabInventoryTip") : getString("TabObjectTip");
         tabs.push_back(std::move(tab));
         if (i == mActive)
         {
@@ -1073,6 +1297,18 @@ void ALFloaterScriptStudio::save(Doc& doc)
     {
         return;
     }
+    if (preprocessed(doc))
+    {
+        // Expanded first, with its includes fetched; the upload follows.
+        preprocess(doc, true);
+        return;
+    }
+    doc.uploaded.valid = false;
+    upload(doc, doc.editor->text());
+}
+
+void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text)
+{
     ALScriptWorkspace::SaveOptions options;
     options.compileTarget = mCompileTarget->getValue().asString();
     if (options.compileTarget.empty())
@@ -1081,12 +1317,13 @@ void ALFloaterScriptStudio::save(Doc& doc)
     }
     options.running = doc.ref.inInventory() || mRunning->get();
     std::string error;
-    if (!ALScriptWorkspace::instance().save(doc.ref, textToSave(doc), options, nullptr, error))
+    if (!ALScriptWorkspace::instance().save(doc.ref, text, options, nullptr, error))
     {
         setStatus(error, true);
         return;
     }
-    doc.saving = true;
+    doc.saveAnywayUntil = 0.0;
+    doc.saving          = true;
     doc.problems.clear();
     refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -1205,6 +1442,42 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
     doc.outline          = result.outline;
+    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version)
+    {
+        // Back to the source: a problem in an include keeps its file, and
+        // what an include declares is the include's to outline.
+        const ALSourceMap& map = doc.expanded.map;
+        for (ALScriptProblem& problem : doc.analysis)
+        {
+            ALScriptSpan span;
+            span.line      = problem.line;
+            span.column    = problem.column;
+            span.endLine   = problem.endLine;
+            span.endColumn = problem.endColumn;
+            const S32 file = mapSpan(map, span);
+            if (file < 0)
+            {
+                continue;
+            }
+            problem.line      = span.line;
+            problem.column    = span.column;
+            problem.endLine   = span.endLine;
+            problem.endColumn = span.endColumn;
+            if (file > 0)
+            {
+                problem.file = map.files()[file].path;
+            }
+        }
+        std::vector<ALScriptOutlineEntry> outline;
+        for (ALScriptOutlineEntry entry : doc.outline)
+        {
+            if (mapSpan(map, entry.nameSpan) == 0 && mapSpan(map, entry.span) == 0)
+            {
+                outline.push_back(std::move(entry));
+            }
+        }
+        doc.outline = std::move(outline);
+    }
     refreshProblems(doc);
     refreshOutline(doc);
     if (doc.saveAfterCheck)
@@ -1227,7 +1500,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     const ALTextDocument&                 text = doc.editor->document();
 
     auto add = [&](S32 line, S32 column, bool has_column, S32 end_line, S32 end_column, ALCodeEditor::Mark mark,
-                   const std::string& level, const std::string& origin, const std::string& message) {
+                   const std::string& level, const std::string& origin, const std::string& message, const std::string& file = std::string()) {
         Doc::Shown row;
         row.line      = line;
         row.column    = column;
@@ -1235,6 +1508,14 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         row.level     = level;
         row.origin    = origin;
         row.message   = message;
+        row.file      = file;
+        if (!file.empty())
+        {
+            // In an include: listed under its name, not marked here.
+            row.fileName = includeName(doc, file);
+            doc.shown.push_back(std::move(row));
+            return;
+        }
         doc.shown.push_back(std::move(row));
         if (doc.editor->markAt(line) < mark)
         {
@@ -1259,9 +1540,35 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 
     for (const ALScriptWorkspace::Diagnostic& problem : doc.problems)
     {
-        const bool error = problem.level != "WARNING";
-        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column,
-            error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning, problem.level, getString("OriginCompiler"), problem.message);
+        const bool  error  = problem.level != "WARNING";
+        S32         line   = problem.line;
+        S32         column = problem.column;
+        std::string file;
+        if (doc.uploaded.valid && !doc.uploaded.disabled)
+        {
+            // The compiler read the expanded text.
+            const ALSourceMap::Loc loc = doc.uploaded.map.toSource(line, column);
+            if (loc.found())
+            {
+                line   = loc.line;
+                column = loc.column;
+                if (loc.file > 0)
+                {
+                    file = doc.uploaded.map.files()[loc.file].path;
+                }
+            }
+        }
+        add(line, column, problem.hasColumn, line, column, error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning, problem.level,
+            getString("OriginCompiler"), problem.message, file);
+    }
+    if (doc.expanded.valid)
+    {
+        for (const ALScriptProblem& problem : doc.expanded.problems)
+        {
+            const bool error = problem.severity == ALScriptProblem::Severity::Error;
+            add(problem.line, problem.column, true, problem.endLine, problem.endColumn, error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning,
+                error ? "ERROR" : "WARNING", getString("OriginPreprocessor"), problem.message, problem.file);
+        }
     }
     for (const ALScriptProblem& problem : doc.analysis)
     {
@@ -1275,7 +1582,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
                                    : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
                                                                                       : getString("OriginLint");
         const std::string message = problem.code.empty() ? problem.message : problem.message + " [" + problem.code + "]";
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level, origin, message);
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level, origin, message, problem.file);
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
@@ -1291,8 +1598,14 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         row.message = doc.definitionsError;
         doc.shown.push_back(std::move(row));
     }
-    std::stable_sort(doc.shown.begin(), doc.shown.end(),
-                     [](const Doc::Shown& a, const Doc::Shown& b) { return a.line != b.line ? a.line < b.line : a.column < b.column; });
+    std::stable_sort(doc.shown.begin(), doc.shown.end(), [](const Doc::Shown& a, const Doc::Shown& b) {
+        // The script's own first, then each include's together.
+        if (a.file != b.file)
+        {
+            return a.file < b.file;
+        }
+        return a.line != b.line ? a.line < b.line : a.column < b.column;
+    });
     doc.editor->setDecorations(std::move(decorations));
     if (&doc == active())
     {
@@ -1313,7 +1626,8 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         LLSD              row;
         row["value"]                = static_cast<S32>(i);
         row["columns"][0]["column"] = "line";
-        row["columns"][0]["value"]  = problem.hasColumn ? llformat("%d:%d", problem.line + 1, problem.column + 1) : llformat("%d", problem.line + 1);
+        row["columns"][0]["value"]  = (problem.fileName.empty() ? std::string() : problem.fileName + ":") +
+                                     (problem.hasColumn ? llformat("%d:%d", problem.line + 1, problem.column + 1) : llformat("%d", problem.line + 1));
         row["columns"][1]["column"] = "level";
         row["columns"][1]["value"]  = problem.level;
         row["columns"][2]["column"] = "source";
@@ -1343,6 +1657,46 @@ void ALFloaterScriptStudio::onProblemSelected()
         return;
     }
     const Doc::Shown& problem = doc->shown[index];
+    if (!problem.file.empty())
+    {
+        // In an include: opened in a tab of its own where it is a script
+        // or a notecard in the world; a file on disk is only named.
+        ALScriptRef ref;
+        std::string file;
+        if (ALScriptPreprocessor::refOf(problem.file, ref))
+        {
+            const LLInventoryItem* item = ref.inInventory() ? gInventory.getItem(ref.item)
+                                          : gObjectList.findObject(ref.object) ? gObjectList.findObject(ref.object)->getInventoryItem(ref.item)
+                                                                               : nullptr;
+            if (!item || item->getType() != LLAssetType::AT_LSL_TEXT)
+            {
+                LLStringUtil::format_map_t args;
+                args["[FILE]"] = problem.fileName;
+                setStatus(getString("IncludeIsNotecard", args));
+                return;
+            }
+            openScript(ref, problem.fileName);
+            if (const size_t opened = indexOf(ref); opened != NONE)
+            {
+                Doc& include = *mDocs[opened];
+                if (include.loaded)
+                {
+                    include.editor->goToLine(problem.line);
+                }
+                else
+                {
+                    include.pendingLine = problem.line;
+                }
+            }
+        }
+        else if (ALScriptPreprocessor::fileOf(problem.file, file))
+        {
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = file;
+            setStatus(getString("IncludeOnDisk", args));
+        }
+        return;
+    }
     doc->editor->setCaret(ALTextPos(problem.line, problem.hasColumn ? problem.column : 0));
     doc->editor->setFocus(true);
 }
@@ -1364,9 +1718,33 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     {
         return;
     }
-    const ALEditorCommand     command = doc.symbolCommand;
-    const ALScriptReferences& refs    = result.references;
-    doc.symbolCommand                 = ALEditorCommand::None;
+    const ALEditorCommand command = doc.symbolCommand;
+    ALScriptReferences    refs    = result.references;
+    doc.symbolCommand             = ALEditorCommand::None;
+    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version)
+    {
+        // Back to the source; what stands in an include is not this
+        // script's to go to or rename.
+        const ALSourceMap& map = doc.expanded.map;
+        if (refs.hasDefinition && mapSpan(map, refs.definition) != 0)
+        {
+            refs.hasDefinition = false;
+            refs.renamable     = false;
+        }
+        std::vector<ALScriptSpan> kept;
+        for (ALScriptSpan span : refs.references)
+        {
+            if (mapSpan(map, span) == 0)
+            {
+                kept.push_back(span);
+            }
+            else
+            {
+                refs.renamable = false;
+            }
+        }
+        refs.references = std::move(kept);
+    }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
     if (!refs.found)
@@ -1999,8 +2377,8 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
     const F64 now = LLTimer::getTotalSeconds();
     if (doc.saveAnywayUntil > now)
     {
-        // Asked twice: over whatever was found.
-        doc.saveAnywayUntil = 0.0;
+        // Asked twice: over whatever was found, by the check here and by
+        // the preprocessor after it; the upload closes the window.
         return true;
     }
     LLStringUtil::format_map_t args;
@@ -2019,6 +2397,16 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
         if (problem.severity == ALScriptProblem::Severity::Error)
         {
             ++errors;
+        }
+    }
+    if (doc.expanded.valid && doc.expanded.version == doc.analysisVersion)
+    {
+        for (const ALScriptProblem& problem : doc.expanded.problems)
+        {
+            if (problem.severity == ALScriptProblem::Severity::Error)
+            {
+                ++errors;
+            }
         }
     }
     if (errors == 0)
@@ -2415,12 +2803,12 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
     {
         return;
     }
-    // A script's source tab goes with the script. Highest index first, so
-    // the other stays where it was found.
+    // A script's expanded tab goes with the script. Highest index first,
+    // so the other stays where it was found.
     std::vector<size_t> going{ index };
     if (!mDocs[index]->sourceView)
     {
-        if (const size_t companion = indexOf(mDocs[index]->id + ":source"); companion != NONE)
+        if (const size_t companion = indexOf(mDocs[index]->id + ":expanded"); companion != NONE)
         {
             going.push_back(companion);
         }
@@ -2644,6 +3032,37 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         gSavedSettings.setBOOL("ALScriptStudioPreflight", !gSavedSettings.getBOOL("ALScriptStudioPreflight"));
     }
+    else if (action == "preprocess")
+    {
+        if (Doc* doc = active(); doc && doc->loaded && !doc->sourceView)
+        {
+            preprocess(*doc, false);
+        }
+    }
+    else if (action == "preproc_enabled" || action == "preproc_switch" || action == "preproc_lazy" || action == "preproc_compress" ||
+             action == "preproc_disk")
+    {
+        const char* setting = action == "preproc_enabled"  ? "ALScriptPreprocEnabled"
+                              : action == "preproc_switch" ? "ALScriptPreprocSwitch"
+                              : action == "preproc_lazy"   ? "ALScriptPreprocLazyLists"
+                              : action == "preproc_compress" ? "ALScriptPreprocCompress"
+                                                             : "ALScriptPreprocDiskIncludes";
+        gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
+        // What the analyzers see changes with the setting.
+        for (std::unique_ptr<Doc>& doc : mDocs)
+        {
+            doc->expanded.valid = false;
+            if (preprocessed(*doc))
+            {
+                preprocess(*doc, false);
+            }
+            scheduleAnalysis(*doc, true);
+        }
+    }
+    else if (action == "preproc_folder")
+    {
+        chooseIncludeFolder();
+    }
 }
 
 bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
@@ -2681,6 +3100,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
             return false;
         }
         return action == "cut" ? handler->canCut() : action == "copy" ? handler->canCopy() : action == "paste" ? handler->canPaste() : handler->canSelectAll();
+    }
+    if (action == "preprocess")
+    {
+        return doc && doc->loaded && !doc->sourceView && !doc->preprocessing;
     }
     if (action == "load_file" || action == "toggle_comment" || action == "complete")
     {
@@ -2789,6 +3212,26 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "preflight")
     {
         return gSavedSettings.getBOOL("ALScriptStudioPreflight");
+    }
+    if (action == "preproc_enabled")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocEnabled");
+    }
+    if (action == "preproc_switch")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocSwitch");
+    }
+    if (action == "preproc_lazy")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocLazyLists");
+    }
+    if (action == "preproc_compress")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocCompress");
+    }
+    if (action == "preproc_disk")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
     }
     return false;
 }

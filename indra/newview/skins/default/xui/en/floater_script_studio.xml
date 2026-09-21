@@ -77,8 +77,15 @@
     <floater.string name="OutputAllObjects">All objects</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
-    <floater.string name="TabSourceTip">The source this script was written as, before the preprocessor expanded it; read-only here</floater.string>
-    <floater.string name="SourceTabName">[NAME] (source)</floater.string>
+    <floater.string name="TabExpandedTip">What the preprocessor made of this script, as the server compiles it; read-only here</floater.string>
+    <floater.string name="ExpandedTabName">[NAME] (preprocessed)</floater.string>
+    <floater.string name="OriginPreprocessor">Preprocessor</floater.string>
+    <floater.string name="Preprocessing">Preprocessing [NAME]...</floater.string>
+    <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
+    <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched.</floater.string>
+    <floater.string name="PreprocessErrors">The preprocessor found [COUNT] error(s) in [NAME]; save again to upload anyway.</floater.string>
+    <floater.string name="IncludeOnDisk">[FILE] is a file on disk.</floater.string>
+    <floater.string name="IncludeIsNotecard">[FILE] is a notecard.</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
     <floater.string name="OriginTypes">Types</floater.string>
@@ -122,6 +129,43 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
             </menu_item_check>
+            <menu
+             label="Preprocessor"
+             layout="topleft"
+             mouse_opaque="false"
+             name="preprocessor_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Preprocess Now" layout="topleft" name="preprocess">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preprocess" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Preprocess on Save" layout="topleft" name="preproc_enabled">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
+                </menu_item_check>
+                <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
+                </menu_item_check>
+                <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
+                </menu_item_check>
+                <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
+                </menu_item_check>
+                <menu_item_call label="Choose Include Folder..." layout="topleft" name="preproc_folder">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
+                </menu_item_call>
+            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Load from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
