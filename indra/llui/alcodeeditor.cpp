@@ -28,7 +28,7 @@
 
 #include "llfocusmgr.h"
 #include "llrender2dutils.h"
-#include "llscrolllistctrl.h"
+#include "alchoicelist.h"
 #include "llstring.h"
 #include "lluicolortable.h"
 #include "llurlaction.h"
@@ -189,36 +189,25 @@ ALCodeEditor::ALCodeEditor(const Params& p)
 
     // The list of completions, made once and shown when there is
     // something to choose; a child, so it draws over the text and goes
-    // where the view goes.
-    LLScrollListCtrl::Params list(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
+    // where the view goes. On the text engine, as the hover card is: the
+    // completions in the editor's face and the colours of their kinds,
+    // their details in the reading face after them.
+    ALChoiceList::Params list(LLUICtrlFactory::getDefaultParams<ALChoiceList>());
     list.name("completions");
     list.rect(LLRect(0, 10, 10, 0));
     list.visible(false);
-    list.tab_stop(false);
     list.follows.flags(FOLLOWS_NONE);
-    list.multi_select(false);
-    list.commit_on_selection_change(false);
-    list.commit_on_keyboard_movement(false);
-    list.draw_heading(false);
-    list.has_border(true);
-    list.background_visible(true);
-    list.can_sort(false);
-    // Over the text, so it must be solid, and the bar must read as one.
-    list.draw_stripes(false);
-    list.bg_writeable_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
+    list.mouse_opaque(true);
+    list.font(getFont());
+    list.bg_visible(true);
+    list.bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
     list.bg_readonly_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    list.scroll_bar_bg_visible(true);
-    list.scroll_bar_bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    LLScrollListColumn::Params text_column;
-    text_column.name("text");
-    text_column.width.pixel_width(150);
-    list.contents.columns.add(text_column);
-    LLScrollListColumn::Params detail_column;
-    detail_column.name("detail");
-    detail_column.width.dynamic_width(true);
-    list.contents.columns.add(detail_column);
-    mCompletionList = LLUICtrlFactory::create<LLScrollListCtrl>(list);
-    mCompletionList->setDoubleClickCallback([this]() { acceptCompletion(); });
+    list.text_readonly_color(textColor());
+    list.context_menu(std::string());
+    list.h_pad(4);
+    list.v_pad(2);
+    mCompletionList = LLUICtrlFactory::create<ALChoiceList>(list);
+    mCompletionList->onPicked([this](S32) { acceptCompletion(); });
     addChild(mCompletionList);
 }
 
@@ -1468,7 +1457,7 @@ void ALCodeEditor::hideCompletionList()
     if (mCompletionList)
     {
         mCompletionList->setVisible(false);
-        mCompletionList->deleteAllItems();
+        mCompletionList->setChoices({});
     }
     mCompletions.clear();
 }
@@ -1482,7 +1471,7 @@ void ALCodeEditor::closeCompletion()
 
 S32 ALCodeEditor::chosenCompletion() const
 {
-    return completionOpen() ? mCompletionList->getFirstSelectedIndex() : -1;
+    return completionOpen() ? mCompletionList->chosen() : -1;
 }
 
 void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out)
@@ -1683,20 +1672,30 @@ void ALCodeEditor::refreshCompletion()
 
 void ALCodeEditor::listCompletions()
 {
-    const S32 was = mCompletionList->getFirstSelectedIndex();
-    mCompletionList->deleteAllItems();
-    for (size_t i = 0; i < mCompletions.size(); ++i)
+    const S32 was = llmax(0, mCompletionList->chosen());
+    if (mCompletionList->getFont() != getFont())
     {
-        const Completion& c = mCompletions[i];
-        LLSD              row;
-        row["id"]                   = static_cast<S32>(i);
-        row["columns"][0]["column"] = "text";
-        row["columns"][0]["value"]  = c.text;
-        row["columns"][1]["column"] = "detail";
-        row["columns"][1]["value"]  = c.detail;
-        mCompletionList->addElement(row);
+        mCompletionList->setFont(getFont());
     }
-    mCompletionList->selectNthItem(llclamp(was, 0, static_cast<S32>(mCompletions.size()) - 1));
+    std::vector<ALChoiceList::Choice> choices;
+    choices.reserve(mCompletions.size());
+    for (const Completion& c : mCompletions)
+    {
+        ALChoiceList::Choice choice;
+        choice.text = c.text;
+        choice.note = c.detail;
+        if (c.kind != ALSyntaxKind::Text)
+        {
+            choice.color = colorForKind(c.kind);
+        }
+        choices.push_back(std::move(choice));
+    }
+    // The list is shaped to the width its column is laid out for, then
+    // to the rows it holds.
+    const LLRect local = getLocalRect();
+    const S32    width = llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8));
+    mCompletionList->setShape(LLRect(0, 40, width, 0));
+    mCompletionList->setChoices(std::move(choices), was);
     placeCompletion();
     mCompletionList->setVisible(true);
 }
@@ -1721,7 +1720,7 @@ void ALCodeEditor::placeCompletion()
     const F32    x      = layout().xOf(mCompletionRange.begin.line, mCompletionRange.begin.column, &row);
     const S32    top    = screenTopOf(text, mCompletionRange.begin.line, row);
     const S32    rows   = llmin(static_cast<S32>(mCompletions.size()), COMPLETION_ROWS);
-    const S32    height = rows * (getFont()->getLineHeight() + 2) + 6;
+    const S32    height = mCompletionList->heightFor(rows);
     const S32    width  = llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8));
     S32          left   = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x);
     left                = llclamp(left, local.mLeft, llmax(local.mLeft, local.mRight - width));
@@ -1831,7 +1830,7 @@ bool ALCodeEditor::acceptCompletion()
     {
         return false;
     }
-    const S32 index = mCompletionList->getFirstSelectedIndex();
+    const S32 index = mCompletionList->chosen();
     if (index < 0 || index >= static_cast<S32>(mCompletions.size()))
     {
         closeCompletion();
@@ -2192,28 +2191,22 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
     }
     if (completionOpen() && mask == MASK_NONE)
     {
-        const S32 count = static_cast<S32>(mCompletions.size());
-        const S32 at    = mCompletionList->getFirstSelectedIndex();
         switch (key)
         {
             case KEY_ESCAPE:
                 closeCompletion();
                 return true;
             case KEY_UP:
-                mCompletionList->selectNthItem((at - 1 + count) % count);
-                mCompletionList->scrollToShowSelected();
+                mCompletionList->moveChoice(-1, true);
                 return true;
             case KEY_DOWN:
-                mCompletionList->selectNthItem((at + 1) % count);
-                mCompletionList->scrollToShowSelected();
+                mCompletionList->moveChoice(1, true);
                 return true;
             case KEY_PAGE_UP:
-                mCompletionList->selectNthItem(llmax(0, at - COMPLETION_ROWS));
-                mCompletionList->scrollToShowSelected();
+                mCompletionList->moveChoice(-COMPLETION_ROWS, false);
                 return true;
             case KEY_PAGE_DOWN:
-                mCompletionList->selectNthItem(llmin(count - 1, at + COMPLETION_ROWS));
-                mCompletionList->scrollToShowSelected();
+                mCompletionList->moveChoice(COMPLETION_ROWS, false);
                 return true;
             case KEY_RETURN:
             case KEY_TAB:
@@ -2543,6 +2536,11 @@ bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     {
         return mCard->handleScrollWheel(x - mCard->getRect().mLeft, y - mCard->getRect().mBottom, delta);
     }
+    if (completionOpen() && mCompletionList->getRect().pointInRect(x, y))
+    {
+        const LLRect& rect = mCompletionList->getRect();
+        return mCompletionList->handleScrollWheel(x - rect.mLeft, y - rect.mBottom, delta);
+    }
     hideCard();
     return ALTextView::handleScrollWheel(x, y, delta);
 }
@@ -2739,11 +2737,6 @@ void ALCodeEditor::draw()
 
 void ALCodeEditor::onFocusLost()
 {
-    // The list is a child: choosing from it with the mouse takes the
-    // keyboard for a moment, and that is not looking away.
-    if (!(mCompletionList && mCompletionList->hasFocus()))
-    {
-        closeCompletion();
-    }
+    closeCompletion();
     ALTextView::onFocusLost();
 }

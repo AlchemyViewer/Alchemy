@@ -32,7 +32,7 @@
 #include <string_view>
 #include <vector>
 
-class LLScrollListCtrl;
+class ALChoiceList;
 
 // The text view configured for code: a gutter with line numbers, a mark
 // per line for what an analyzer said about it and a marker per block that
@@ -469,7 +469,7 @@ private:
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;
     symbol_request_t        mSymbolRequest;
-    LLScrollListCtrl*       mCompletionList = nullptr;
+    ALChoiceList*           mCompletionList = nullptr;
     std::vector<Completion> mCompletions;
     // The identifier the list is narrowing, which the choice replaces;
     // and the name before the dot before it, where there is one, whose

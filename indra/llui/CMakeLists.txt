@@ -135,6 +135,7 @@ target_sources(
     alkeymap.cpp
     alvimkeymap.cpp
     alxuiservice.cpp
+    alchoicelist.cpp
     aloutputview.cpp
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
@@ -314,6 +315,7 @@ target_sources(
         alkeymap.h
         alvimkeymap.h
         alxuiservice.h
+        alchoicelist.h
         aloutputview.h
         alsyntaxgrammar.h
         alsyntaxhighlighter.h
@@ -498,6 +500,7 @@ if(AL_BUILD_TESTS)
     alvimkeymap
     alxuiservice
     aloutputview
+    alchoicelist
   )
     al_add_test(
       ${test}
