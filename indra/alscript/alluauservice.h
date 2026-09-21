@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alluauconfig.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 
@@ -61,12 +62,18 @@ public:
     bool loadDocs(std::string_view json, std::string& error);
     bool hasDocs() const;
 
+    // What the `.luaurc` governing the script says, for every question
+    // asked until told otherwise: the mode a check runs in -- "strict",
+    // "nonstrict" or "nocheck", else nonstrict, as the grid does, and a
+    // `--!strict` comment in the script overrides either -- which lints
+    // are on and which are errors, and the globals the script may use
+    // without declaring. A script with no configuration is given a
+    // default-constructed one.
+    void setConfig(const ALLuauConfig& config);
+
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.
-    // Checked in the mode a `.luaurc` gave the script -- "strict",
-    // "nonstrict" or "nocheck" -- else nonstrict, as the grid does; a
-    // `--!strict` comment in the script overrides either.
-    ALScriptProblems check(std::string_view source, std::string_view mode = std::string_view());
+    ALScriptProblems check(std::string_view source);
 
     // What could go at a position of the script: the keywords, the
     // bindings in scope, the fields of what is being indexed.

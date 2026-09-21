@@ -70,4 +70,23 @@ namespace tut
         ensure("absolute on windows", ALLuauConfig::absolute("C:\\lua") && ALLuauConfig::absolute("c:/lua"));
         ensure("relative", !ALLuauConfig::absolute("./lib") && !ALLuauConfig::absolute("lib"));
     }
+    template<> template<>
+    void alluauconfig_object::test<3>()
+    {
+        set_test_name("the lints and the globals come out as Luau reads them, the lints as its defaults where the file says nothing");
+        ALLuauConfig config;
+        std::string  error;
+        const ALLuauConfig defaults;
+        ensure("parses: " + error, ALLuauConfig::parse("{\n  \"lint\": { \"LocalUnused\": false, \"LocalShadow\": true },\n  \"globals\": [\"Alchemy\", \"grid\"]\n}\n", config, error));
+        ensure_equals("two globals", config.globals.size(), size_t(2));
+        ensure_equals("in order", config.globals[0], std::string("Alchemy"));
+        // LocalUnused is code 7 and LocalShadow code 4 in Luau's numbering;
+        // the second is off by default.
+        ensure("LocalUnused off", (config.lints & (1ull << 7)) == 0);
+        ensure("LocalShadow on", (config.lints & (1ull << 4)) != 0);
+        ensure("the rest as they were", (config.lints & ~((1ull << 7) | (1ull << 4))) == (defaults.lints & ~((1ull << 7) | (1ull << 4))));
+        ensure("none fatal, not every lint an error", config.fatalLints == 0 && !config.lintErrors);
+        ensure("said nothing: the defaults", ALLuauConfig::parse("{}", config, error) && config.lints == defaults.lints && config.fatalLints == 0 && config.globals.empty());
+        ensure("every lint an error where asked", ALLuauConfig::parse("{ \"lintErrors\": true }", config, error) && config.lintErrors);
+    }
 }

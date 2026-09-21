@@ -31,6 +31,13 @@
 #include <algorithm>
 #include <cctype>
 
+ALLuauConfig::ALLuauConfig()
+{
+    Luau::LintOptions defaults;
+    defaults.setDefaults();
+    lints = defaults.warningMask;
+}
+
 // static
 bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& error)
 {
@@ -48,6 +55,10 @@ bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& 
     {
         out.aliases[name] = info.value;
     }
+    out.lints      = config.enabledLint.warningMask;
+    out.fatalLints = config.fatalLint.warningMask;
+    out.lintErrors = config.lintErrors;
+    out.globals    = config.globals;
     switch (config.mode)
     {
         case Luau::Mode::Strict:    out.mode = "strict";    break;

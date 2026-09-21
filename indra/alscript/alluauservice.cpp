@@ -937,12 +937,15 @@ namespace
         }
     };
 
-    // One configuration for the one script, whose mode is set per query:
-    // nonstrict to report what a script author would be told, strict
+    // One configuration for the one script: what its `.luaurc` said,
+    // with the mode set per query -- the script's own for a check, to
+    // report what its author would be told; strict for a question,
     // where the types of everything are wanted.
     struct ModeResolver final : public Luau::ConfigResolver
     {
         Luau::Config config;
+        // The mode the script's configuration asks for.
+        Luau::Mode   checkMode = Luau::Mode::Nonstrict;
 
         const Luau::Config& getConfig(const Luau::ModuleName&, const Luau::TypeCheckLimits&) const override { return config; }
     };
@@ -982,7 +985,7 @@ struct ALLuauService::Impl
         // work out.
         configs.config.mode = Luau::Mode::Strict;
         frontend->check(SCRIPT_MODULE, options);
-        configs.config.mode = Luau::Mode::Nonstrict;
+        configs.config.mode = configs.checkMode;
     }
 
     const Doc* docFor(const std::optional<std::string>& symbol) const
@@ -1098,14 +1101,27 @@ bool ALLuauService::hasDocs() const
     return !mImpl->docs.empty();
 }
 
-ALScriptProblems ALLuauService::check(std::string_view source, std::string_view mode)
+void ALLuauService::setConfig(const ALLuauConfig& config)
+{
+    ModeResolver& configs = mImpl->configs;
+    configs.checkMode     = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    configs.config.mode   = configs.checkMode;
+    configs.config.enabledLint.warningMask = config.lints;
+    configs.config.fatalLint.warningMask   = config.fatalLints;
+    configs.config.lintErrors              = config.lintErrors;
+    configs.config.globals                 = config.globals;
+    // The globals are bound into the environment as the script is
+    // checked; a change to them is a change to the script.
+    mImpl->frontend->markDirty(SCRIPT_MODULE);
+}
+
+ALScriptProblems ALLuauService::check(std::string_view source)
 {
     Impl& impl = *mImpl;
     impl.files.text.assign(source);
     impl.frontend->markDirty(SCRIPT_MODULE);
-    impl.configs.config.mode = mode == "strict" ? Luau::Mode::Strict : mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    impl.configs.config.mode = impl.configs.checkMode;
     Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE);
-    impl.configs.config.mode = Luau::Mode::Nonstrict;
 
     ALScriptProblems problems;
     problems.reserve(result.errors.size() + result.lintResult.errors.size() + result.lintResult.warnings.size());

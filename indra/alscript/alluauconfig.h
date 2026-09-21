@@ -24,24 +24,37 @@
 
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // A `.luaurc`, read by Luau's own parser so that what it takes is what
 // Luau takes: the aliases, each a name and the path it stands for, which
 // is relative to where the file is unless it is absolute, so that
-// `require("@lib/util")` reads as `./lib/util` from beside the file; and
-// the language mode. In the world a `.luaurc` is a notecard so named in
-// the script's folder or the nearest folder above it, or an item so
-// named in its object; on disk it is the file so named in the script's
-// directory or the nearest above.
+// `require("@lib/util")` reads as `./lib/util` from beside the file; the
+// language mode; which lints are on and which are errors; and the
+// globals the script may use without declaring. In the world a
+// `.luaurc` is a notecard so named in the script's folder or the nearest
+// folder above it, or an item so named in its object; on disk it is the
+// file so named in the script's directory or the nearest above.
 struct ALLuauConfig
 {
+    ALLuauConfig();
+
     // By name, in lower case, as Luau matches them.
     std::map<std::string, std::string> aliases;
     // "strict", "nonstrict" or "nocheck", or empty where it does not say.
     std::string mode;
+    // The lints on, and the ones that are errors, as Luau's masks of
+    // its warning codes: Luau's defaults unless the file says.
+    uint64_t lints      = 0;
+    uint64_t fatalLints = 0;
+    // Every lint an error.
+    bool lintErrors = false;
+    // Names the script may use as globals without declaring them.
+    std::vector<std::string> globals;
 
     // False, with Luau's own word on what is wrong, for text that is not
     // a configuration.

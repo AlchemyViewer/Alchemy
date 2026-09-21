@@ -447,4 +447,24 @@ namespace tut
         ensure("types alone, when asked", only_types.size() == 1 && only_types.front().kind == ALScriptInlayHint::Kind::Type);
         ensure("nothing when neither is asked", service.inlayHints(script, false, false).empty());
     }
+    template<> template<>
+    void alluauservice_object::test<18>()
+    {
+        set_test_name("the configuration names the globals a script may use and turns lints off, until it is replaced");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local unused = 1\nAlchemy.log(\"hi\")\n";
+        ALScriptProblems  plain  = service.check(script);
+        ensure("Alchemy unknown without a configuration: " + said(plain), mentions(plain, "Alchemy"));
+        ensure("the unused local warned of: " + said(plain), mentions(plain, "unused"));
+        ALLuauConfig config;
+        std::string  bad;
+        ensure("parses: " + bad, ALLuauConfig::parse("{ \"globals\": [\"Alchemy\"], \"lint\": { \"LocalUnused\": false } }", config, bad));
+        service.setConfig(config);
+        ALScriptProblems configured = service.check(script);
+        ensure("Alchemy known: " + said(configured), !mentions(configured, "Alchemy"));
+        ensure("the unused local let be: " + said(configured), !mentions(configured, "unused"));
+        service.setConfig(ALLuauConfig());
+        ALScriptProblems again = service.check(script);
+        ensure("unknown again: " + said(again), mentions(again, "Alchemy"));
+    }
 }
