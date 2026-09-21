@@ -163,6 +163,9 @@ public:
         std::string  text;
         std::string  detail;
         ALSyntaxKind kind = ALSyntaxKind::Text;
+        // A snippet rather than a word: accepting it puts this body in
+        // place of the prefix, with its placeholders to tab through.
+        std::string  snippet;
     };
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
@@ -185,6 +188,17 @@ public:
     bool                           acceptCompletion();
     const std::vector<Completion>& completions() const { return mCompletions; }
     S32                            chosenCompletion() const;
+    // What accepting does, for whoever has a completion in hand without
+    // the list: the completion in place of the range.
+    void complete(const Completion& chosen, const ALTextRange& range);
+
+    // --- snippets --------------------------------------------------------------------
+
+    // A body in place of the selection, or at the caret: its lines after
+    // the first indented as the caret's line is; `${1:text}`, `${1}` and
+    // `$1` its placeholders, tabbed through in order of their numbers,
+    // and `$0` where the caret lands past the last; `$$` a dollar.
+    void insertSnippet(std::string_view body);
 
     // --- the name at the caret -----------------------------------------------------
 
@@ -370,7 +384,12 @@ private:
     // narrowing until the list closes.
     ALTextPos               mCompletionAsked{ -1, -1 };
     std::vector<Completion> mSupplied;
+    // The word the analyzer was last asked about, and what it answered,
+    // kept for the text at the version it was answered for, so that the
+    // mouse coming back to the word finds the answer waiting.
     ALTextRange             mHoverAsked;
+    U32                     mHoverAskedVersion = 0;
+    std::string             mHoverAnswer;
     S32                     mMouseX = -1;
     S32                     mMouseY = -1;
     std::optional<Signature> mSignature;

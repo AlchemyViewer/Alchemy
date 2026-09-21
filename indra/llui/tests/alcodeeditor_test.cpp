@@ -452,4 +452,40 @@ namespace tut
                e.caret() == ALTextPos(0, 14) && e.placeholders().empty());
         ensure_equals("the text", e.text(), std::string("llSay(0, \"hi\")"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<12>()
+    {
+        set_test_name("a snippet goes in at the caret's indentation, its placeholders tabbed through in number order and $0 last");
+        ALCodeEditor& e = make("    x;", "lsl");
+        e.setCaret(ALTextPos(0, 6));
+        e.insertSnippet("if (${1:condition})\n{\n    $0\n}\n${2}cost: $$5");
+        ensure_equals("the lines follow the caret's indentation", e.text(),
+                      std::string("    x;if (condition)\n    {\n        \n    }\n    cost: $5"));
+        ensure_equals("two placeholders", e.placeholders().size(), size_t(2));
+        ensure_equals("the first selected", e.selectedText(), std::string("condition"));
+        type("a > b");
+        key(KEY_TAB);
+        ensure("the empty second, at the last line's start", e.caret() == ALTextPos(4, 4) && !e.hasSelection());
+        key(KEY_TAB);
+        ensure(llformat("then where $0 stood (not %d:%d)", e.caret().line, e.caret().column), e.caret() == ALTextPos(2, 8) && e.placeholders().empty());
+
+        ALCodeEditor& f = make("", "lsl");
+        f.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            if (std::string_view("for").substr(0, prefix.size()) == prefix)
+            {
+                ALCodeEditor::Completion c;
+                c.text    = "for";
+                c.detail  = "snippet";
+                c.kind    = ALSyntaxKind::Control;
+                c.snippet = "for (${1:i = 0}; ${2:i < n}; ${3:++i})\n{\n    $0\n}";
+                out.push_back(c);
+            }
+        });
+        type("fo");
+        ensure("offered", f.completionOpen());
+        key(KEY_TAB);
+        ensure_equals("the snippet in place of the prefix", f.text(), std::string("for (i = 0; i < n; ++i)\n{\n    \n}"));
+        ensure_equals("its first placeholder selected", f.selectedText(), std::string("i = 0"));
+    }
 }

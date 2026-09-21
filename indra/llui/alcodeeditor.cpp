@@ -37,6 +37,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <cmath>
 
 static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
@@ -1398,7 +1399,19 @@ bool ALCodeEditor::acceptCompletion()
     const Completion  chosen = mCompletions[index];
     const ALTextRange range  = mCompletionRange;
     closeCompletion();
+    complete(chosen, range);
+    return true;
+}
+
+void ALCodeEditor::complete(const Completion& chosen, const ALTextRange& range)
+{
     setSelection(range);
+    if (!chosen.snippet.empty())
+    {
+        insertSnippet(chosen.snippet);
+        setFocus(true);
+        return;
+    }
     // A function called: its brackets, unless they are there already,
     // with the caret between them where it takes anything, and the
     // signature asked for.
@@ -1445,7 +1458,126 @@ bool ALCodeEditor::acceptCompletion()
         }
     }
     setFocus(true);
-    return true;
+}
+
+// --- snippets ------------------------------------------------------------------------
+
+void ALCodeEditor::insertSnippet(std::string_view body)
+{
+    if (isReadOnly())
+    {
+        return;
+    }
+    // Where it goes, and how far in that line is, which every line of
+    // the body after the first follows.
+    const ALTextRange selection = this->selection();
+    const ALTextPos   at        = std::min(selection.begin, selection.end);
+    const std::string& line     = document().line(at.line);
+    const std::string  indent   = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
+    // The body read: the text as it will stand, and each placeholder's
+    // place in it, by number.
+    struct Place
+    {
+        S32         number;
+        ALTextRange range;
+    };
+    std::vector<Place>       places;
+    std::optional<ALTextPos> end;
+    std::string              text;
+    ALTextPos                pos = at;
+    auto                     put = [&](char ch) {
+        text += ch;
+        if (ch == '\n')
+        {
+            ++pos.line;
+            pos.column = 0;
+            text += indent;
+            pos.column += static_cast<S32>(indent.size());
+        }
+        else
+        {
+            ++pos.column;
+        }
+    };
+    for (size_t i = 0; i < body.size(); ++i)
+    {
+        const char ch = body[i];
+        if (ch != '$' || i + 1 >= body.size())
+        {
+            put(ch);
+            continue;
+        }
+        if (body[i + 1] == '$')
+        {
+            put('$');
+            ++i;
+            continue;
+        }
+        // $n, ${n} or ${n:text}
+        size_t      j       = i + 1;
+        const bool  braced  = body[j] == '{';
+        if (braced)
+        {
+            ++j;
+        }
+        size_t      digits  = j;
+        while (digits < body.size() && isdigit(static_cast<unsigned char>(body[digits])))
+        {
+            ++digits;
+        }
+        if (digits == j)
+        {
+            put(ch);
+            continue;
+        }
+        const S32   number  = atoi(std::string(body.substr(j, digits - j)).c_str());
+        std::string content;
+        size_t      after   = digits;
+        if (braced)
+        {
+            const size_t close = body.find('}', digits);
+            if (close == std::string_view::npos)
+            {
+                put(ch);
+                continue;
+            }
+            if (body[digits] == ':')
+            {
+                content = std::string(body.substr(digits + 1, close - digits - 1));
+            }
+            after = close + 1;
+        }
+        if (number == 0)
+        {
+            end = pos;
+        }
+        else
+        {
+            const ALTextPos from = pos;
+            for (char c : content)
+            {
+                put(c);
+            }
+            places.push_back(Place{ number, ALTextRange(from, pos) });
+        }
+        i = after - 1;
+    }
+    insertText(text);
+    std::stable_sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.number < b.number; });
+    std::vector<ALTextRange> ranges;
+    for (const Place& place : places)
+    {
+        ranges.push_back(place.range);
+    }
+    const ALTextPos landing = end.value_or(pos);
+    if (!ranges.empty())
+    {
+        setPlaceholders(std::move(ranges), landing);
+    }
+    else
+    {
+        setCaret(landing);
+    }
 }
 
 // --- placeholders ------------------------------------------------------------------
@@ -1768,16 +1900,31 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             about = word;
         }
     }
-    if (says.empty())
+    if (says.empty() && !word.empty())
     {
-        // Somebody may know later. Asked at the identifier itself: what
-        // is at the start of `ll.Say` is `ll`, and the question is about
-        // `Say`.
-        if (mHoverRequest && !word.empty() && word != mHoverAsked)
+        // What the analyzer said of this word, if it was asked and the
+        // text has not moved on since; else asked now, for an answer
+        // that shows when it comes, or the next time the mouse rests
+        // here.
+        const U32 version = document().version();
+        if (word == mHoverAsked && version == mHoverAskedVersion)
         {
-            mHoverAsked = word;
+            if (!mHoverAnswer.empty())
+            {
+                says  = mHoverAnswer;
+                about = word;
+            }
+        }
+        else if (mHoverRequest)
+        {
+            mHoverAsked        = word;
+            mHoverAskedVersion = version;
+            mHoverAnswer.clear();
             mHoverRequest(word.begin, document().text(word));
         }
+    }
+    if (says.empty())
+    {
         return ALTextView::handleToolTip(x, y, mask);
     }
     showTip(about, says);
@@ -1806,11 +1953,12 @@ void ALCodeEditor::showTip(const ALTextRange& about, const std::string& says)
 
 void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
 {
-    if (text.empty() || mHoverAsked.empty() || at != mHoverAsked.begin)
+    if (text.empty() || mHoverAsked.empty() || at != mHoverAsked.begin || document().version() != mHoverAskedVersion)
     {
         return;
     }
-    // Still over the same word, or the moment has passed.
+    // Kept for the word, and shown now if the mouse is still on it.
+    mHoverAnswer = text;
     if (mMouseX < 0 || !textRect().pointInRect(mMouseX, mMouseY))
     {
         return;
