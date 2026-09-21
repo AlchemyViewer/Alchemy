@@ -87,6 +87,10 @@
     <floater.string name="SavedNotecard">[NAME] saved.</floater.string>
     <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
     <floater.string name="PreflightErrors">[COUNT] error(s) the analyzers found in [NAME]; save again to compile anyway.</floater.string>
+    <floater.string name="VimNormal">-- NORMAL --</floater.string>
+    <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
+    <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
+    <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFound">[COUNT] place(s) where [NAME] stands.</floater.string>
@@ -451,6 +455,11 @@
             <menu_item_check label="Sticky Headers" layout="topleft" name="sticky_headers">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="sticky_headers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="sticky_headers" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Vim Mode" layout="topleft" name="vim_mode">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="vim_mode" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="vim_mode" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Semantic Colouring" layout="topleft" name="semantic_colors">

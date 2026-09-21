@@ -35,6 +35,7 @@
 #include "alscriptkeymap.h"
 #include "altabstrip.h"
 #include "altextsearch.h"
+#include "alvimkeymap.h"
 #include "llagent.h"
 #include "lldate.h"
 #include "lltimer.h"
@@ -549,6 +550,7 @@ void ALFloaterScriptStudio::draw()
     pumpAnalysis();
     pumpCaret();
     pumpExplorer();
+    pumpVim();
     ALStudioFloater::draw();
 }
 
@@ -703,6 +705,28 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
 {
     editor.setFont(editorFont());
     editor.keymap() = ALScriptKeymap::current();
+    // Vim put over the editor, or taken away; one already there keeps
+    // its marks and registers.
+    if (mVimMode && !editor.modalKeymap())
+    {
+        auto                      vim    = std::make_unique<ALVimKeymap>();
+        const LLHandle<LLFloater> handle = getHandle();
+        vim->hooks().command             = [handle](ALTextView& view, const std::string& name, const std::string& args) {
+            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            return studio && studio->vimCommand(view, name, args);
+        };
+        vim->hooks().format = [handle](ALTextView& view, S32 first, S32 last) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->vimFormat(view, first, last);
+            }
+        };
+        editor.setModalKeymap(std::move(vim));
+    }
+    else if (!mVimMode && editor.modalKeymap())
+    {
+        editor.setModalKeymap(nullptr);
+    }
     editor.setWordWrap(mWordWrap);
     editor.setShowLineNumbers(mLineNumbers);
     editor.setShowIndentGuides(mIndentGuides);
@@ -1719,6 +1743,12 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
                 break;
             }
             std::string text = result.hover.label;
+            if (!result.hover.expected.empty())
+            {
+                LLStringUtil::format_map_t args;
+                args["[TYPE]"] = result.hover.expected;
+                text += "\n" + getString("HoverExpected", args);
+            }
             if (!result.hover.documentation.empty())
             {
                 text += "\n" + result.hover.documentation;
@@ -1832,7 +1862,12 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     LLStringUtil::format_map_t args;
     args["[LINE]"]  = std::to_string(caret.line + 1);
     args["[COL]"]   = std::to_string(caret.column + 1);
-    std::vector<std::string> parts{ getString("CaretPosition", args) };
+    std::vector<std::string> parts;
+    if (!mVimBanner.empty())
+    {
+        parts.push_back(mVimBanner);
+    }
+    parts.push_back(getString("CaretPosition", args));
     // What is selected: lines across lines, characters within one.
     const ALTextRange selection = doc.editor->selection().normalised();
     if (!selection.empty())
@@ -1870,6 +1905,186 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         said += (said.empty() ? "" : "   \xC2\xB7   ") + part;
     }
     mBreadcrumb->setTrailer(said);
+}
+
+// --- vim ----------------------------------------------------------------------------------
+
+ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::docOf(const ALTextView& view)
+{
+    for (std::unique_ptr<Doc>& doc : mDocs)
+    {
+        if (doc->editor == &view || doc->expandedEditor == &view)
+        {
+            return doc.get();
+        }
+    }
+    return nullptr;
+}
+
+void ALFloaterScriptStudio::pumpVim()
+{
+    Doc* doc = active();
+    if (!doc)
+    {
+        return;
+    }
+    ALVimKeymap* vim = doc->editor ? dynamic_cast<ALVimKeymap*>(doc->editor->modalKeymap()) : nullptr;
+    if (!vim)
+    {
+        if (!mVimBanner.empty())
+        {
+            mVimBanner.clear();
+            refreshTrailer(*doc);
+        }
+        return;
+    }
+    if (vim->generation() == mVimSeen)
+    {
+        return;
+    }
+    mVimSeen = vim->generation();
+    // The mode in the bottom strip; the : line as it is typed, and what
+    // the mode says, in the status line.
+    const ALVimKeymap::Mode mode   = vim->mode();
+    const bool              typing = mode == ALVimKeymap::Mode::Command || mode == ALVimKeymap::Mode::Search;
+    std::string             banner = typing ? getString("VimNormal") : vim->status();
+    if (mode == ALVimKeymap::Mode::Normal && banner.empty())
+    {
+        banner = getString("VimNormal");
+    }
+    else if (mode == ALVimKeymap::Mode::Normal)
+    {
+        banner = getString("VimNormal") + " " + banner;
+    }
+    if (banner != mVimBanner)
+    {
+        mVimBanner = banner;
+        refreshTrailer(*doc);
+    }
+    if (typing)
+    {
+        setStatus(vim->status());
+    }
+    else if (!vim->message().empty())
+    {
+        setStatus(vim->message(), vim->messageIsError());
+    }
+}
+
+bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name, const std::string& args)
+{
+    Doc* doc = docOf(view);
+    if (!doc)
+    {
+        return false;
+    }
+    if (name == "w" || name == "write" || name == "w!")
+    {
+        save(*doc);
+        return true;
+    }
+    if (name == "q" || name == "quit" || name == "close")
+    {
+        closeDocument(doc->id);
+        return true;
+    }
+    if (name == "q!" || name == "quit!")
+    {
+        const size_t index = indexOf(doc->id);
+        if (index != NONE)
+        {
+            letGoOf(index);
+        }
+        return true;
+    }
+    if (name == "wq" || name == "x" || name == "xit" || name == "wq!" || name == "x!")
+    {
+        if (doc->editor->isDirty() && doc->modifiable)
+        {
+            doc->closeAfterSave = true;
+            save(*doc);
+        }
+        else
+        {
+            closeDocument(doc->id);
+        }
+        return true;
+    }
+    if (name == "wa" || name == "wall")
+    {
+        saveAll();
+        return true;
+    }
+    if (name == "qa" || name == "qall" || name == "qa!" || name == "qall!")
+    {
+        std::vector<std::string> ids;
+        for (const std::unique_ptr<Doc>& each : mDocs)
+        {
+            ids.push_back(each->id);
+        }
+        for (const std::string& id : ids)
+        {
+            if (name.back() == '!')
+            {
+                if (const size_t index = indexOf(id); index != NONE)
+                {
+                    letGoOf(index);
+                }
+            }
+            else
+            {
+                closeDocument(id);
+            }
+        }
+        return true;
+    }
+    if (name == "set")
+    {
+        std::string option = args;
+        const bool  off    = option.compare(0, 2, "no") == 0;
+        if (off)
+        {
+            option.erase(0, 2);
+        }
+        if (option == "number" || option == "nu")
+        {
+            if (mLineNumbers == off)
+            {
+                onMenuAction(LLSD("line_numbers"));
+            }
+            return true;
+        }
+        if (option == "relativenumber" || option == "rnu")
+        {
+            if (mRelativeNumbers == off)
+            {
+                onMenuAction(LLSD("relative_numbers"));
+            }
+            return true;
+        }
+        return false;
+    }
+    // The studio's own, by the names its menu knows.
+    static const std::set<std::string> ours{ "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
+                                             "revert", "external_editor", "save_file", "load_file", "fold_all", "unfold_all", "go_to_line" };
+    if (ours.count(name))
+    {
+        onMenuAction(LLSD(name));
+        return true;
+    }
+    return false;
+}
+
+void ALFloaterScriptStudio::vimFormat(ALTextView& view, S32 first, S32 last)
+{
+    Doc* doc = docOf(view);
+    if (!doc || !doc->loaded || !doc->modifiable || doc->notecard)
+    {
+        return;
+    }
+    const ALTextDocument& text = doc->editor->document();
+    doc->editor->setSelection(ALTextRange(text.lineStart(first), text.lineEnd(llmin(last, text.lineCount() - 1))));
+    format(*doc, true);
 }
 
 void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
@@ -3730,8 +3945,9 @@ void ALFloaterScriptStudio::pumpCaret()
         const U32         version = doc->editor->document().version();
         if (word.empty())
         {
+            // No name here; what is wrong here, if anything, still is.
             doc->inspectAt = ALTextPos(-1, -1);
-            mSymbol->setText(LLStringUtil::null);
+            mSymbol->setText(problemsAt(*doc, caret));
         }
         else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
         {
@@ -3753,6 +3969,21 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     if (result.hover.found)
     {
         text = result.hover.label;
+        LLStringUtil::format_map_t args;
+        if (result.hover.hasDefinition)
+        {
+            args["[LINE]"] = std::to_string(result.hover.definitionLine + 1);
+            text += "\n" + getString("InspectDeclared", args);
+        }
+        if (!result.hover.expected.empty())
+        {
+            args["[TYPE]"] = result.hover.expected;
+            text += "\n" + getString("HoverExpected", args);
+        }
+        if (!result.hover.typeDetail.empty())
+        {
+            text += "\n\n" + result.hover.typeDetail;
+        }
         std::string documentation = result.hover.documentation;
         std::string link          = result.hover.link;
         // What the keyword file says, where the analyzer has no words of
@@ -3775,7 +4006,30 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
             text += "\n" + link;
         }
     }
+    // What is wrong where the caret is, said under the name.
+    const std::string problems = problemsAt(doc, doc.inspectAt);
+    if (!problems.empty())
+    {
+        text += (text.empty() ? "" : "\n\n") + problems;
+    }
     mSymbol->setText(text);
+}
+
+std::string ALFloaterScriptStudio::problemsAt(const Doc& doc, const ALTextPos& at) const
+{
+    // From the checkers and the compiler alike: whatever is squiggled
+    // under the position, with what it says.
+    std::string problems;
+    for (const ALCodeEditor::Decoration& decoration : doc.editor->decorations())
+    {
+        if (decoration.style == ALCodeEditor::Decoration::Style::Squiggle && !decoration.message.empty() && decoration.range.contains(at))
+        {
+            LLStringUtil::format_map_t args;
+            args["[MESSAGE]"] = decoration.message;
+            problems += (problems.empty() ? "" : "\n") + getString("InspectProblem", args);
+        }
+    }
+    return problems;
 }
 
 // --- the reference ----------------------------------------------------------------------
@@ -5862,6 +6116,17 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         mStickyHeaders = !mStickyHeaders;
         applyEditorOptions();
     }
+    else if (action == "vim_mode")
+    {
+        mVimMode = !mVimMode;
+        applyEditorOptions();
+        mVimBanner.clear();
+        if (Doc* each = active())
+        {
+            refreshTrailer(*each);
+        }
+        saveState();
+    }
     else if (action == "semantic_colors" || action == "inlay_parameters" || action == "inlay_types")
     {
         bool& flag = action == "semantic_colors" ? mSemanticColors : action == "inlay_parameters" ? mInlayParameters : mInlayTypes;
@@ -6093,6 +6358,10 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     {
         return mStickyHeaders;
     }
+    if (action == "vim_mode")
+    {
+        return mVimMode;
+    }
     if (action == "semantic_colors")
     {
         return mSemanticColors;
@@ -6308,6 +6577,7 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["relative_numbers"] = mRelativeNumbers;
     state["rainbow_brackets"] = mRainbowBrackets;
     state["sticky_headers"]   = mStickyHeaders;
+    state["vim_mode"]         = mVimMode;
     state["semantic_colors"]  = mSemanticColors;
     state["inlay_parameters"] = mInlayParameters;
     state["inlay_types"]      = mInlayTypes;
@@ -6351,6 +6621,10 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("sticky_headers"))
     {
         mStickyHeaders = state["sticky_headers"].asBoolean();
+    }
+    if (state.has("vim_mode"))
+    {
+        mVimMode = state["vim_mode"].asBoolean();
     }
     if (state.has("semantic_colors"))
     {

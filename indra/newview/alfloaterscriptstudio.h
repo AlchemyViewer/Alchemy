@@ -351,6 +351,12 @@ private:
     // The strip under the editor's right-hand words: the caret's place,
     // what is selected, and how many problems the script has.
     void   refreshTrailer(Doc& doc);
+    // The vim mode's : commands the mode does not answer itself, and
+    // its = over lines; and its mode and its words shown as they change.
+    bool vimCommand(ALTextView& view, const std::string& name, const std::string& args);
+    void vimFormat(ALTextView& view, S32 first, S32 last);
+    void pumpVim();
+    Doc* docOf(const ALTextView& view);
     // The tab pressed with the right button: a menu about it.
     void   showTabMenu(const std::string& value, S32 x, S32 y);
     void   onTabAction(const std::string& action);
@@ -466,6 +472,9 @@ private:
     // it has settled.
     void        pumpCaret();
     void        inspected(Doc& doc, const ALScriptAnalysis::Result& result);
+    // What is squiggled under a position, from the checkers and the
+    // compiler, each with what it says; empty where nothing is.
+    std::string problemsAt(const Doc& doc, const ALTextPos& at) const;
     void        refreshOutline(Doc& doc);
     void        refreshBreadcrumb(Doc& doc);
     void        onCrumbChosen(size_t at, const std::string& value);
@@ -622,6 +631,12 @@ private:
     bool                               mSemanticColors  = true;
     bool                               mInlayParameters = true;
     bool                               mInlayTypes      = true;
+    // Vim over every editor: the mode in the bottom strip, the : line
+    // and what it says in the status line, and w, q and the rest
+    // answered here.
+    bool                               mVimMode      = false;
+    U32                                mVimSeen      = 0;
+    std::string                        mVimBanner;
     bool                               mStickyHeaders   = true;
     // The scrollbar as a map: whether, how wide, whether it previews the
     // lines under the mouse, and on which side.
