@@ -63,7 +63,10 @@ public:
 
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.
-    ALScriptProblems check(std::string_view source);
+    // Checked in the mode a `.luaurc` gave the script -- "strict",
+    // "nonstrict" or "nocheck" -- else nonstrict, as the grid does; a
+    // `--!strict` comment in the script overrides either.
+    ALScriptProblems check(std::string_view source, std::string_view mode = std::string_view());
 
     // What could go at a position of the script: the keywords, the
     // bindings in scope, the fields of what is being indexed.

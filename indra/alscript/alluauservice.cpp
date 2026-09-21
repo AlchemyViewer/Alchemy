@@ -1098,12 +1098,14 @@ bool ALLuauService::hasDocs() const
     return !mImpl->docs.empty();
 }
 
-ALScriptProblems ALLuauService::check(std::string_view source)
+ALScriptProblems ALLuauService::check(std::string_view source, std::string_view mode)
 {
     Impl& impl = *mImpl;
     impl.files.text.assign(source);
     impl.frontend->markDirty(SCRIPT_MODULE);
+    impl.configs.config.mode = mode == "strict" ? Luau::Mode::Strict : mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
     Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE);
+    impl.configs.config.mode = Luau::Mode::Nonstrict;
 
     ALScriptProblems problems;
     problems.reserve(result.errors.size() + result.lintResult.errors.size() + result.lintResult.warnings.size());
