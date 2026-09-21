@@ -27,7 +27,7 @@
 #include "../alcodeeditor.h"
 #include "../aldockpanel.h"
 #include "../aljumpbar.h"
-#include "../aloutputlist.h"
+#include "../aloutputview.h"
 #include "../alscopebar.h"
 #include "../altabstrip.h"
 #include "../llfloater.h"
@@ -70,7 +70,7 @@ namespace tut
             ALCodeEditor::Params editor;
             ALDockPanel::Params  dock;
             ALJumpBar::Params    jump;
-            ALOutputList::Params output;
+            ALOutputView::Params output;
             ALScopeBar::Params   scope;
             ALTabStrip::Params   tabs;
             (void)editor.name;

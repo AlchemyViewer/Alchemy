@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- A log shown as text: read-only, wrapped, in the reading face, with
+     the time stamps dimmer than the words and links in the link colour. -->
+<output_view
+  name="output_view"
+  font="SansSerif"
+  mouse_opaque="true"
+  tab_stop="true"
+  capacity="500"
+  read_only="true"
+  word_wrap="true"
+  text_color="TextFgColor"
+  text_readonly_color="TextFgColor"
+  bg_color="TextBgWriteableColor"
+  bg_readonly_color="TextBgReadOnlyColor"
+  bg_focus_color="TextBgFocusColor"
+  cursor_color="TextCursorColor"
+  selection_color="SelectionColor"
+  find_match_color="TextFindMatchColor"
+  link_color="HTMLLinkColor"
+  context_menu="menu_text_view.xml"
+  h_pad="4"
+  v_pad="2"
+  tab_width="4"/>
