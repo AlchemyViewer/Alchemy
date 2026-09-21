@@ -620,6 +620,323 @@ namespace
 
 namespace
 {
+    // Every name, by what the check found it to be. Types are visited too,
+    // which the visitor does not do on its own.
+    struct Semantics final : public Luau::AstVisitor
+    {
+        const Luau::Module&                module;
+        const Luau::Scope*                 globals;
+        std::vector<ALScriptSemanticToken> out;
+        std::set<Luau::AstLocal*>          parameters;
+        std::set<Luau::AstLocal*>          constants;
+        std::set<Luau::AstLocal*>          functions;
+        // The names of function statements, marked as they are met so
+        // that the visit of the name as an expression knows it is bound
+        // there.
+        std::set<std::pair<unsigned, unsigned>> declared;
+
+        Semantics(const Luau::Module& module_in, const Luau::Scope* globals_in)
+        :   module(module_in),
+            globals(globals_in)
+        {
+        }
+
+        void add(const Luau::Location& where, ALScriptSymbolKind kind, U8 modifiers)
+        {
+            if (where.begin == where.end)
+            {
+                return;
+            }
+            ALScriptSemanticToken token;
+            token.span      = spanOf(where);
+            token.kind      = kind;
+            token.modifiers = modifiers;
+            out.push_back(std::move(token));
+        }
+        bool callable(Luau::AstExpr* expr) const
+        {
+            const Luau::TypeId* type = module.astTypes.find(expr);
+            return type && functionOf(*type) != nullptr;
+        }
+        U8 declaredAt(const Luau::Location& where) const
+        {
+            return declared.count({ where.begin.line, where.begin.column }) ? ALScriptSemanticToken::Declaration : 0;
+        }
+
+        bool visit(Luau::AstType*) override { return true; }
+        bool visit(Luau::AstTypePack*) override { return true; }
+
+        bool visit(Luau::AstExprFunction* function) override
+        {
+            if (function->self)
+            {
+                parameters.insert(function->self);
+                add(function->self->location, ALScriptSymbolKind::Parameter, ALScriptSemanticToken::Declaration);
+            }
+            for (Luau::AstLocal* arg : function->args)
+            {
+                parameters.insert(arg);
+                add(arg->location, ALScriptSymbolKind::Parameter, ALScriptSemanticToken::Declaration);
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocal* stat) override
+        {
+            for (size_t i = 0; i < stat->vars.size; ++i)
+            {
+                Luau::AstLocal* local = stat->vars.data[i];
+                Luau::AstExpr*  value = i < stat->values.size ? stat->values.data[i] : nullptr;
+                const bool      fn    = value && (value->is<Luau::AstExprFunction>() || callable(value));
+                U8              mods  = ALScriptSemanticToken::Declaration;
+                if (local->isConst)
+                {
+                    mods |= ALScriptSemanticToken::ReadOnly;
+                    constants.insert(local);
+                }
+                if (fn)
+                {
+                    functions.insert(local);
+                }
+                add(local->location, fn ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Variable, mods);
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocalFunction* stat) override
+        {
+            functions.insert(stat->name);
+            U8 mods = ALScriptSemanticToken::Declaration;
+            if (stat->isConst)
+            {
+                mods |= ALScriptSemanticToken::ReadOnly;
+                constants.insert(stat->name);
+            }
+            add(stat->name->location, ALScriptSymbolKind::Function, mods);
+            return true;
+        }
+        bool visit(Luau::AstStatFunction* stat) override
+        {
+            Luau::Location where = stat->name->location;
+            if (Luau::AstExprIndexName* index = stat->name->as<Luau::AstExprIndexName>())
+            {
+                where = index->indexLocation;
+            }
+            declared.insert({ where.begin.line, where.begin.column });
+            return true;
+        }
+        bool visit(Luau::AstStatFor* stat) override
+        {
+            add(stat->var->location, ALScriptSymbolKind::Variable, ALScriptSemanticToken::Declaration);
+            return true;
+        }
+        bool visit(Luau::AstStatForIn* stat) override
+        {
+            for (Luau::AstLocal* local : stat->vars)
+            {
+                add(local->location, ALScriptSymbolKind::Variable, ALScriptSemanticToken::Declaration);
+            }
+            return true;
+        }
+        bool visit(Luau::AstExprLocal* expr) override
+        {
+            ALScriptSymbolKind kind = ALScriptSymbolKind::Variable;
+            if (parameters.count(expr->local))
+            {
+                kind = ALScriptSymbolKind::Parameter;
+            }
+            else if (functions.count(expr->local) || callable(expr))
+            {
+                kind = ALScriptSymbolKind::Function;
+            }
+            add(expr->location, kind, constants.count(expr->local) ? ALScriptSemanticToken::ReadOnly : 0);
+            return true;
+        }
+        bool visit(Luau::AstExprGlobal* expr) override
+        {
+            U8 mods = ALScriptSemanticToken::Global | declaredAt(expr->location);
+            if (globals)
+            {
+                const auto bound = globals->bindings.find(Luau::Symbol(expr->name));
+                if (bound != globals->bindings.end())
+                {
+                    mods |= ALScriptSemanticToken::Builtin;
+                    if (bound->second.deprecated)
+                    {
+                        mods |= ALScriptSemanticToken::Deprecated;
+                    }
+                }
+            }
+            add(expr->location, callable(expr) ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Variable, mods);
+            return true;
+        }
+        bool visit(Luau::AstExprIndexName* expr) override
+        {
+            U8 mods = declaredAt(expr->indexLocation);
+            if (const Luau::TypeId* table = module.astTypes.find(expr->expr))
+            {
+                const Luau::TypeId     type = Luau::follow(*table);
+                const Luau::Property*  prop = nullptr;
+                if (const Luau::TableType* t = Luau::getTableType(type))
+                {
+                    const auto it = t->props.find(expr->index.value);
+                    prop          = it == t->props.end() ? nullptr : &it->second;
+                }
+                else if (const Luau::ExternType* cls = Luau::get<Luau::ExternType>(type))
+                {
+                    const auto it = cls->props.find(expr->index.value);
+                    prop          = it == cls->props.end() ? nullptr : &it->second;
+                }
+                if (type->documentationSymbol)
+                {
+                    mods |= ALScriptSemanticToken::Builtin;
+                }
+                if (prop && prop->deprecated)
+                {
+                    mods |= ALScriptSemanticToken::Deprecated;
+                }
+            }
+            add(expr->indexLocation, callable(expr) ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Field, mods);
+            return true;
+        }
+        bool visit(Luau::AstExprTable* table) override
+        {
+            for (const Luau::AstExprTable::Item& item : table->items)
+            {
+                if (item.kind == Luau::AstExprTable::Item::Kind::Record && item.key)
+                {
+                    const bool fn = item.value && (item.value->is<Luau::AstExprFunction>() || callable(item.value));
+                    add(item.key->location, fn ? ALScriptSymbolKind::Function : ALScriptSymbolKind::Field, ALScriptSemanticToken::Declaration);
+                }
+            }
+            return true;
+        }
+        bool visit(Luau::AstTypeReference* type) override
+        {
+            if (type->prefixLocation)
+            {
+                add(*type->prefixLocation, ALScriptSymbolKind::Module, 0);
+            }
+            add(type->nameLocation, ALScriptSymbolKind::Type, 0);
+            return true;
+        }
+        bool visit(Luau::AstStatTypeAlias* stat) override
+        {
+            add(stat->nameLocation, ALScriptSymbolKind::Type, ALScriptSemanticToken::Declaration);
+            return true;
+        }
+    };
+
+    // What the editor may show beside the text.
+    struct Hints final : public Luau::AstVisitor
+    {
+        const Luau::Module&            module;
+        const bool                     parameters;
+        const bool                     types;
+        std::vector<ALScriptInlayHint> out;
+
+        Hints(const Luau::Module& module_in, bool parameters_in, bool types_in)
+        :   module(module_in),
+            parameters(parameters_in),
+            types(types_in)
+        {
+        }
+
+        void add(const Luau::Position& at, ALScriptInlayHint::Kind kind, std::string text)
+        {
+            ALScriptInlayHint hint;
+            hint.line   = static_cast<S32>(at.line);
+            hint.column = static_cast<S32>(at.column);
+            hint.kind   = kind;
+            hint.text   = std::move(text);
+            out.push_back(std::move(hint));
+        }
+
+        bool visit(Luau::AstExprCall* call) override
+        {
+            if (!parameters)
+            {
+                return true;
+            }
+            const Luau::TypeId*       callee   = module.astTypes.find(call->func);
+            const Luau::FunctionType* function = callee ? functionOf(*callee) : nullptr;
+            if (!function)
+            {
+                return true;
+            }
+            // A method's first parameter is the object before the colon.
+            const size_t offset = call->self ? 1 : 0;
+            for (size_t i = 0; i < call->args.size; ++i)
+            {
+                const size_t p = i + offset;
+                if (p >= function->argNames.size())
+                {
+                    break;
+                }
+                Luau::AstExpr* arg = call->args.data[i];
+                if (arg->is<Luau::AstExprVarargs>())
+                {
+                    break;
+                }
+                if (!function->argNames[p])
+                {
+                    continue;
+                }
+                const std::string& name = function->argNames[p]->name;
+                // Nothing where the argument says it already, and nothing
+                // for a name that says nothing.
+                if (name.empty() || name == "_" || name == "self" || nameOf(arg) == name)
+                {
+                    continue;
+                }
+                add(arg->location.begin, ALScriptInlayHint::Kind::Parameter, name + ":");
+            }
+            return true;
+        }
+        bool visit(Luau::AstStatLocal* stat) override
+        {
+            if (!types)
+            {
+                return true;
+            }
+            const Luau::ScopePtr scope = Luau::findScopeAtPosition(module, stat->location.begin);
+            for (size_t i = 0; i < stat->vars.size; ++i)
+            {
+                Luau::AstLocal* local = stat->vars.data[i];
+                Luau::AstExpr*  value = i < stat->values.size ? stat->values.data[i] : nullptr;
+                // A name annotated says its type; a function's is its
+                // signature, which is the line itself.
+                if (local->annotation || !value || value->is<Luau::AstExprFunction>())
+                {
+                    continue;
+                }
+                std::optional<Luau::TypeId> type = scope ? scope->lookup(Luau::Symbol(local)) : std::nullopt;
+                if (!type)
+                {
+                    if (const Luau::TypeId* of_value = module.astTypes.find(value))
+                    {
+                        type = *of_value;
+                    }
+                }
+                if (!type)
+                {
+                    continue;
+                }
+                Luau::ToStringOptions options;
+                options.maxTableLength = 3;
+                options.maxTypeLength  = 40;
+                std::string text = Luau::toString(*type, options);
+                // A glance, not a listing; and nothing where there is
+                // nothing to know.
+                if (text.empty() || text == "any" || text == "nil" || text == "unknown" || text == "*error-type*"
+                    || text.size() > 40 || text.find('\n') != std::string::npos)
+                {
+                    continue;
+                }
+                add(local->location.end, ALScriptInlayHint::Kind::Type, ": " + text);
+            }
+            return true;
+        }
+    };
+
     // One configuration for the one script, whose mode is set per query:
     // nonstrict to report what a script author would be told, strict
     // where the types of everything are wanted.
@@ -1138,4 +1455,53 @@ std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source
     Outliner outliner(module.get());
     module_source->root->visit(&outliner);
     return std::move(outliner.out);
+}
+
+// --- what every name is ------------------------------------------------------------
+
+std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_view source)
+{
+    Impl& impl = *mImpl;
+    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
+    {
+        impl.checked(source, /*for_autocomplete*/ false);
+    }
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    if (!module_source || !module || !module_source->root)
+    {
+        return {};
+    }
+    Semantics semantics(*module, impl.frontend->globals.globalScope.get());
+    module_source->root->visit(&semantics);
+    std::vector<ALScriptSemanticToken>& out = semantics.out;
+    std::stable_sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end(), [](const ALScriptSemanticToken& a, const ALScriptSemanticToken& b) { return a.span == b.span; }),
+              out.end());
+    return std::move(out);
+}
+
+// --- what goes beside the text ----------------------------------------------------
+
+std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source, bool parameters, bool types)
+{
+    Impl& impl = *mImpl;
+    if (!parameters && !types)
+    {
+        return {};
+    }
+    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
+    {
+        impl.checked(source, /*for_autocomplete*/ false);
+    }
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    if (!module_source || !module || !module_source->root)
+    {
+        return {};
+    }
+    Hints hints(*module, parameters, types);
+    module_source->root->visit(&hints);
+    std::stable_sort(hints.out.begin(), hints.out.end());
+    return std::move(hints.out);
 }

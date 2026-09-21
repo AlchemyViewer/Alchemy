@@ -65,6 +65,15 @@ namespace
         // inside a block that is still open is what continues a line;
         // one that a block opened inside does not.
         size_t blocks = 0;
+        // Luau: what kind of block, for the `end` that closes it -- an
+        // `if`'s, a function's, or another's.
+        enum What : U8
+        {
+            Other,
+            If,
+            Function
+        };
+        What what = Other;
     };
 
     bool significant(const Token& t) { return t.kind != Kind::Space && t.kind != Kind::Comment; }
@@ -77,8 +86,9 @@ namespace
 
     bool isLuaKeyword(std::string_view w)
     {
-        static const std::set<std::string_view> words = { "and", "break", "continue", "do", "else", "elseif", "end", "false", "for", "function", "if",
-                                                          "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while" };
+        static const std::set<std::string_view> words = { "and",   "break", "const", "continue", "do",  "else",   "elseif", "end",   "export", "false",
+                                                          "for",   "function", "if", "in",       "local", "nil",  "not",    "or",    "repeat", "return",
+                                                          "then",  "true",  "until", "while" };
         return words.count(w) > 0;
     }
 
@@ -390,11 +400,52 @@ namespace
         return lines;
     }
 
+    // Luau: whether an `if` after this token is an expression -- `x = if
+    // c then a else b` -- rather than a statement. Nothing before it, or
+    // a statement's end, makes it a statement; an assignment, an opening
+    // bracket, a comma, an operator or a word that wants a value makes
+    // it an expression.
+    bool wantsValue(const Token* before)
+    {
+        if (!before)
+        {
+            return false;
+        }
+        if (before->kind == Kind::Punct)
+        {
+            return before->text != ")" && before->text != "]" && before->text != "}" && before->text != ";" && before->text != ":" &&
+                   before->text != "::";
+        }
+        if (before->kind == Kind::Ident)
+        {
+            return before->text == "return" || before->text == "and" || before->text == "or" || before->text == "not" || before->text == "in";
+        }
+        return false;
+    }
+
     // Each line's indentation from what is open at its start.
     void decide(std::vector<Line>& lines, bool lua)
     {
         std::vector<Open> open;
         bool              hang = false;
+        // Luau: each `if` met and not yet done with, statement or
+        // expression -- an expression's `then` and `else` open no block,
+        // and its `else` is its end -- with a function's body marked so
+        // that an `if` inside one starts afresh.
+        enum IfKind : U8
+        {
+            IfStatement,
+            IfExpression,
+            FunctionBody
+        };
+        std::vector<U8> ifs;
+        auto            ifExpression = [&ifs]() { return !ifs.empty() && ifs.back() == IfExpression; };
+        // The line before's last token, which is what an `if` at a
+        // line's start follows.
+        const Token* previousLast = nullptr;
+        // Whether the token before was the `else` of an if-expression,
+        // after which another `if` is the same expression going on.
+        bool afterElseExpression = false;
         auto              blocksOpen = [&open]() {
             size_t n = 0;
             for (const Open& o : open)
@@ -484,7 +535,9 @@ namespace
                 {
                     continue;
                 }
-                controlClosedLast = false;
+                controlClosedLast          = false;
+                const bool wasAfterElse    = afterElseExpression;
+                afterElseExpression        = false;
                 if (t.kind == Kind::Punct)
                 {
                     if (t.text == "{")
@@ -520,11 +573,41 @@ namespace
                 }
                 else if (lua && t.kind == Kind::Ident)
                 {
-                    if (t.text == "then" || t.text == "do" || t.text == "function" || t.text == "repeat")
+                    if (t.text == "if")
+                    {
+                        ifs.push_back(wantsValue(before ? before : previousLast) || wasAfterElse ? IfExpression : IfStatement);
+                    }
+                    else if (t.text == "then")
+                    {
+                        if (!ifExpression())
+                        {
+                            open.push_back(Open{ indent, false, false, 0, Open::If });
+                        }
+                    }
+                    else if (t.text == "function")
+                    {
+                        ifs.push_back(FunctionBody);
+                        open.push_back(Open{ indent, false, false, 0, Open::Function });
+                    }
+                    else if (t.text == "do" || t.text == "repeat")
                     {
                         open.push_back(Open{ indent, false, false, 0 });
                     }
-                    else if (t.text == "end" || t.text == "until" || t.text == "elseif")
+                    else if (t.text == "elseif")
+                    {
+                        if (!ifExpression())
+                        {
+                            while (!open.empty() && open.back().bracket)
+                            {
+                                open.pop_back();
+                            }
+                            if (!open.empty())
+                            {
+                                open.pop_back();
+                            }
+                        }
+                    }
+                    else if (t.text == "end" || t.text == "until")
                     {
                         while (!open.empty() && open.back().bracket)
                         {
@@ -532,24 +615,52 @@ namespace
                         }
                         if (!open.empty())
                         {
+                            const Open::What what = open.back().what;
                             open.pop_back();
+                            if (what == Open::If && !ifs.empty() && ifs.back() == IfStatement)
+                            {
+                                ifs.pop_back();
+                            }
+                            else if (what == Open::Function)
+                            {
+                                // Whatever the body left unfinished goes with it.
+                                while (!ifs.empty() && ifs.back() != FunctionBody)
+                                {
+                                    ifs.pop_back();
+                                }
+                                if (!ifs.empty())
+                                {
+                                    ifs.pop_back();
+                                }
+                            }
                         }
                     }
                     else if (t.text == "else")
                     {
-                        while (!open.empty() && open.back().bracket)
+                        if (ifExpression())
                         {
-                            open.pop_back();
+                            // The expression's last part; an `if` right after
+                            // it goes on with the same expression.
+                            ifs.pop_back();
+                            afterElseExpression = true;
                         }
-                        if (!open.empty())
+                        else
                         {
-                            open.pop_back();
+                            while (!open.empty() && open.back().bracket)
+                            {
+                                open.pop_back();
+                            }
+                            if (!open.empty())
+                            {
+                                open.pop_back();
+                            }
+                            open.push_back(Open{ indent, false, false, 0, Open::If });
                         }
-                        open.push_back(Open{ indent, false, false, 0 });
                     }
                 }
                 before = &t;
             }
+            previousLast = last;
             // A statement may hang off a condition or an else on the line
             // before, without braces; the next line goes in one, and any
             // after it does not.

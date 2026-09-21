@@ -287,6 +287,122 @@ namespace
         }
     };
 
+    // Whether an identifier is where its symbol is declared: the name of
+    // a global, a local, a function, a state, an event handler or a
+    // label, or a parameter in a declaration's list.
+    bool declares(Tailslide::LSLIdentifier* identifier)
+    {
+        Tailslide::LSLASTNode* parent = identifier->getParent();
+        if (!parent)
+        {
+            return false;
+        }
+        switch (parent->getNodeType())
+        {
+            case Tailslide::NODE_GLOBAL_VARIABLE:
+            case Tailslide::NODE_GLOBAL_FUNCTION:
+            case Tailslide::NODE_STATE:
+            case Tailslide::NODE_EVENT_HANDLER:
+                return parent->getChild(0) == identifier;
+            case Tailslide::NODE_FUNCTION_DEC:
+            case Tailslide::NODE_EVENT_DEC:
+                return true;
+            case Tailslide::NODE_STATEMENT:
+                return (parent->getNodeSubType() == Tailslide::NODE_DECLARATION || parent->getNodeSubType() == Tailslide::NODE_LABEL)
+                       && parent->getChild(0) == identifier;
+            default:
+                return false;
+        }
+    }
+
+    // Every identifier bound to a symbol, by what the symbol is.
+    struct Semantics final : public Tailslide::ASTVisitor
+    {
+        std::vector<ALScriptSemanticToken> out;
+
+        bool visit(Tailslide::LSLIdentifier* identifier) override
+        {
+            Tailslide::LSLSymbol* symbol = identifier->getSymbol();
+            if (!symbol || identifier->getLoc()->first_line == 0)
+            {
+                return true;
+            }
+            ALScriptSemanticToken token;
+            token.span = nameSpanOf(*identifier->getLoc(), identifier->getName());
+            token.kind = kindOf(symbol);
+            switch (symbol->getSubType())
+            {
+                case Tailslide::SYM_BUILTIN:
+                    token.modifiers |= ALScriptSemanticToken::Builtin;
+                    if (symbol->getSymbolType() == Tailslide::SYM_VARIABLE)
+                    {
+                        token.modifiers |= ALScriptSemanticToken::ReadOnly;
+                    }
+                    break;
+                case Tailslide::SYM_GLOBAL:
+                    token.modifiers |= ALScriptSemanticToken::Global;
+                    break;
+                default:
+                    break;
+            }
+            if (symbol->getSymbolType() == Tailslide::SYM_EVENT)
+            {
+                token.modifiers |= ALScriptSemanticToken::Builtin;
+            }
+            if (declares(identifier))
+            {
+                token.modifiers |= ALScriptSemanticToken::Declaration;
+            }
+            out.push_back(std::move(token));
+            return true;
+        }
+    };
+
+    // Each argument of each call, by the parameter it fills.
+    struct Hints final : public Tailslide::ASTVisitor
+    {
+        std::vector<ALScriptInlayHint> out;
+
+        bool visit(Tailslide::LSLFunctionExpression* call) override
+        {
+            Tailslide::LSLSymbol* symbol = call->getSymbol();
+            Tailslide::LSLASTNode* args  = call->getArguments();
+            if (!symbol || !symbol->getFunctionDecl() || !args)
+            {
+                return true;
+            }
+            Tailslide::LSLASTNode* param = symbol->getFunctionDecl()->getChild(0);
+            for (Tailslide::LSLASTNode* arg = args->getChild(0); arg && param; arg = arg->getNext(), param = param->getNext())
+            {
+                if (param->getNodeType() != Tailslide::NODE_IDENTIFIER || arg->getLoc()->first_line == 0)
+                {
+                    continue;
+                }
+                const char* name = static_cast<Tailslide::LSLIdentifier*>(param)->getName();
+                if (!name || !*name)
+                {
+                    continue;
+                }
+                // Nothing where the argument is the name already.
+                if (arg->getNodeSubType() == Tailslide::NODE_LVALUE_EXPRESSION)
+                {
+                    Tailslide::LSLIdentifier* given = static_cast<Tailslide::LSLLValueExpression*>(arg)->getIdentifier();
+                    if (given && strcmp(given->getName(), name) == 0 && !static_cast<Tailslide::LSLLValueExpression*>(arg)->getMember())
+                    {
+                        continue;
+                    }
+                }
+                ALScriptInlayHint hint;
+                hint.line   = zeroBased(arg->getLoc()->first_line);
+                hint.column = zeroBased(arg->getLoc()->first_column);
+                hint.kind   = ALScriptInlayHint::Kind::Parameter;
+                hint.text   = std::string(name) + ":";
+                out.push_back(std::move(hint));
+            }
+            return true;
+        }
+    };
+
     // A declaration's identifier, which is its first child.
     Tailslide::LSLIdentifier* identifierOf(Tailslide::LSLASTNode* node)
     {
@@ -672,4 +788,43 @@ std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
         }
     }
     return out;
+}
+
+// --- what every name is ------------------------------------------------------------
+
+std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view source)
+{
+    Tailslide::ScopedScriptParser parser(nullptr);
+    Tailslide::LSLScript*         script = resolved(parser, source);
+    if (!script)
+    {
+        return {};
+    }
+    Semantics semantics;
+    script->visit(&semantics);
+    std::vector<ALScriptSemanticToken>& out = semantics.out;
+    std::stable_sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end(), [](const ALScriptSemanticToken& a, const ALScriptSemanticToken& b) { return a.span == b.span; }),
+              out.end());
+    return std::move(out);
+}
+
+// --- what goes beside the text ----------------------------------------------------
+
+std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source, bool parameters)
+{
+    if (!parameters)
+    {
+        return {};
+    }
+    Tailslide::ScopedScriptParser parser(nullptr);
+    Tailslide::LSLScript*         script = resolved(parser, source);
+    if (!script)
+    {
+        return {};
+    }
+    Hints hints;
+    script->visit(&hints);
+    std::stable_sort(hints.out.begin(), hints.out.end());
+    return std::move(hints.out);
 }

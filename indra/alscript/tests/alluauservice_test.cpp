@@ -329,4 +329,90 @@ namespace tut
         ensure("and suggests Say: " + message, message.find("'Say'") != std::string::npos);
         ensure(llformat("in a glance, not %d characters", (int)message.size()), message.size() < 100);
     }
+
+    template<> template<>
+    void alluauservice_object::test<15>()
+    {
+        set_test_name("every name is told by what it is: parameter, local, global, field, function, type, builtin, deprecated");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local count = 1\n"
+            "local function half(n: number): number\n"
+            "    return n / 2\n"
+            "end\n"
+            "type Pair = { a: number, b: number }\n"
+            "local p: Pair = { a = 1, b = 2 }\n"
+            "ll.Say(0, tostring(p.a + half(count)))\n"
+            "handlers = {}\n";
+        std::vector<ALScriptSemanticToken> tokens = service.semanticTokens(script);
+        auto at = [&](S32 line, S32 column) -> const ALScriptSemanticToken* {
+            for (const ALScriptSemanticToken& t : tokens)
+            {
+                if (t.span.line == line && t.span.column == column) return &t;
+            }
+            return nullptr;
+        };
+        std::string listed;
+        for (const ALScriptSemanticToken& t : tokens) listed += llformat(" %d:%d/%d+%d", t.span.line, t.span.column, (int)t.kind, (int)t.modifiers);
+        const ALScriptSemanticToken* count_decl = at(0, 6);
+        ensure("count declared, a variable:" + listed, count_decl && count_decl->kind == ALScriptSymbolKind::Variable && (count_decl->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* half_decl = at(1, 15);
+        ensure("half declared, a function:" + listed, half_decl && half_decl->kind == ALScriptSymbolKind::Function && (half_decl->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* n_param = at(1, 20);
+        ensure("n, a parameter:" + listed, n_param && n_param->kind == ALScriptSymbolKind::Parameter);
+        const ALScriptSemanticToken* n_type = at(1, 23);
+        ensure("number, a type:" + listed, n_type && n_type->kind == ALScriptSymbolKind::Type);
+        const ALScriptSemanticToken* n_use = at(2, 11);
+        ensure("n used, still a parameter:" + listed, n_use && n_use->kind == ALScriptSymbolKind::Parameter && !(n_use->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* pair = at(4, 5);
+        ensure("Pair declared, a type:" + listed, pair && pair->kind == ALScriptSymbolKind::Type && (pair->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* a_key = at(5, 18);
+        ensure("a in the table, a field declared:" + listed, a_key && a_key->kind == ALScriptSymbolKind::Field && (a_key->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* ll = at(6, 0);
+        ensure("ll, a builtin global:" + listed, ll && (ll->modifiers & ALScriptSemanticToken::Builtin) && (ll->modifiers & ALScriptSemanticToken::Global));
+        const ALScriptSemanticToken* say = at(6, 3);
+        ensure("Say, a builtin function:" + listed, say && say->kind == ALScriptSymbolKind::Function && (say->modifiers & ALScriptSemanticToken::Builtin));
+        const ALScriptSemanticToken* p_a = at(6, 21);
+        ensure("p.a, a field:" + listed, p_a && p_a->kind == ALScriptSymbolKind::Field);
+        const ALScriptSemanticToken* half_call = at(6, 25);
+        ensure("half called, a function:" + listed, half_call && half_call->kind == ALScriptSymbolKind::Function);
+        const ALScriptSemanticToken* handlers = at(7, 0);
+        ensure("handlers, a global the script binds:" + listed, handlers && (handlers->modifiers & ALScriptSemanticToken::Global) && !(handlers->modifiers & ALScriptSemanticToken::Builtin));
+        for (size_t i = 1; i < tokens.size(); ++i)
+        {
+            ensure("in order, each once", tokens[i - 1].span < tokens[i].span);
+        }
+    }
+
+    template<> template<>
+    void alluauservice_object::test<16>()
+    {
+        set_test_name("inlay hints name each argument's parameter and the type a local was given without saying");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local function greet(name: string, times: number) end\n"
+            "local times = 3\n"
+            "local shown: number = 1\n"
+            "greet(\"hi\", times)\n"
+            "ll.Say(0, \"hello\")\n";
+        std::vector<ALScriptInlayHint> hints = service.inlayHints(script, true, true);
+        std::string listed;
+        for (const ALScriptInlayHint& h : hints) listed += llformat(" %d:%d[%s]", h.line, h.column, h.text.c_str());
+        auto has = [&](S32 line, S32 column, const char* text) {
+            for (const ALScriptInlayHint& h : hints)
+            {
+                if (h.line == line && h.column == column && h.text == text) return true;
+            }
+            return false;
+        };
+        ensure("the local's type after its name:" + listed, has(1, 11, ": number"));
+        ensure("not one that says its type:" + listed, !has(2, 11, ": number"));
+        ensure("name: before the string:" + listed, has(3, 6, "name:"));
+        ensure("nothing before an argument that is the name:" + listed, !has(3, 12, "times:"));
+        ensure("the channel's name before the 0:" + listed, has(4, 7, "Channel:") || has(4, 7, "channel:"));
+        ensure("and the text's:" + listed, has(4, 10, "Text:") || has(4, 10, "text:"));
+        std::vector<ALScriptInlayHint> only_types = service.inlayHints(script, false, true);
+        ensure("types alone, when asked", only_types.size() == 1 && only_types.front().kind == ALScriptInlayHint::Kind::Type);
+        ensure("nothing when neither is asked", service.inlayHints(script, false, false).empty());
+    }
 }

@@ -82,6 +82,15 @@ public:
     // The script's globals, functions and states, with each state's
     // events one deeper, in the order written.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);
+    // Every name in the script by what its symbol is: a parameter, a
+    // local, a global, a function, a state, an event, a label, a builtin
+    // constant or function; and whether it is declared there. In order,
+    // each place once.
+    std::vector<ALScriptSemanticToken> semanticTokens(std::string_view source);
+    // Each argument of a call by the parameter's name, builtin or the
+    // script's own, where the argument is not that name already. LSL
+    // says every type, so there are no type hints.
+    std::vector<ALScriptInlayHint> inlayHints(std::string_view source, bool parameters);
 
 private:
     struct Impl;

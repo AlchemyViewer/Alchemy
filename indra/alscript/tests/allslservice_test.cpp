@@ -331,4 +331,95 @@ namespace tut
         ensure("touch_start with its parameter", outline[4].name == "touch_start" && outline[4].detail == "touch_start(integer total)" && outline[4].span.line == 5 && outline[4].span.endLine == 7);
         ensure("the other state", outline[5].name == "other" && outline[5].kind == ALScriptSymbolKind::State);
     }
+
+    template<> template<>
+    void allslservice_object::test<11>()
+    {
+        set_test_name("every name is told by what it is: global, parameter, local, function, builtin, state, event, label");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "integer count = 0;\n"
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    touch_start(integer total)\n"
+            "    {\n"
+            "        float h = half(total);\n"
+            "        llSay(PUBLIC_CHANNEL, (string)h);\n"
+            "        @again;\n"
+            "        if (count) jump again;\n"
+            "        state other;\n"
+            "    }\n"
+            "}\n"
+            "state other { }\n";
+        std::vector<ALScriptSemanticToken> tokens = service.semanticTokens(script);
+        auto at = [&](S32 line, S32 column) -> const ALScriptSemanticToken* {
+            for (const ALScriptSemanticToken& t : tokens)
+            {
+                if (t.span.line == line && t.span.column == column) return &t;
+            }
+            return nullptr;
+        };
+        std::string listed;
+        for (const ALScriptSemanticToken& t : tokens) listed += llformat(" %d:%d/%d+%d", t.span.line, t.span.column, (int)t.kind, (int)t.modifiers);
+        const ALScriptSemanticToken* count = at(0, 8);
+        ensure("count, a global declared:" + listed, count && count->kind == ALScriptSymbolKind::Variable && (count->modifiers & ALScriptSemanticToken::Global) && (count->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* half = at(1, 6);
+        ensure("half, a function declared:" + listed, half && half->kind == ALScriptSymbolKind::Function && (half->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* n = at(1, 19);
+        ensure("n, a parameter declared:" + listed, n && n->kind == ALScriptSymbolKind::Parameter && (n->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* touch = at(4, 4);
+        ensure("touch_start, an event:" + listed, touch && touch->kind == ALScriptSymbolKind::Event);
+        const ALScriptSemanticToken* h = at(6, 14);
+        ensure("h, a local declared:" + listed, h && h->kind == ALScriptSymbolKind::Variable && !(h->modifiers & ALScriptSemanticToken::Global) && (h->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* total = at(6, 23);
+        ensure("total used, a parameter:" + listed, total && total->kind == ALScriptSymbolKind::Parameter && !(total->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* say = at(7, 8);
+        ensure("llSay, a builtin function:" + listed, say && say->kind == ALScriptSymbolKind::Function && (say->modifiers & ALScriptSemanticToken::Builtin));
+        const ALScriptSemanticToken* channel = at(7, 14);
+        ensure("PUBLIC_CHANNEL, a builtin constant:" + listed, channel && channel->kind == ALScriptSymbolKind::Constant && (channel->modifiers & ALScriptSemanticToken::ReadOnly));
+        const ALScriptSemanticToken* label = at(8, 9);
+        ensure("again, a label declared:" + listed, label && label->kind == ALScriptSymbolKind::Label && (label->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* jump = at(9, 24);
+        ensure("jumped to, not declared:" + listed, jump && jump->kind == ALScriptSymbolKind::Label && !(jump->modifiers & ALScriptSemanticToken::Declaration));
+        const ALScriptSemanticToken* other = at(10, 14);
+        ensure("other, a state:" + listed, other && other->kind == ALScriptSymbolKind::State);
+        for (size_t i = 1; i < tokens.size(); ++i)
+        {
+            ensure("in order, each once", tokens[i - 1].span < tokens[i].span);
+        }
+    }
+
+    template<> template<>
+    void allslservice_object::test<12>()
+    {
+        set_test_name("inlay hints name each argument's parameter, builtin or the script's own");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script =
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        integer n = 4;\n"
+            "        llSay(0, (string)half(n));\n"
+            "        llSetTimerEvent(half(2));\n"
+            "    }\n"
+            "}\n";
+        std::vector<ALScriptInlayHint> hints = service.inlayHints(script, true);
+        std::string listed;
+        for (const ALScriptInlayHint& h : hints) listed += llformat(" %d:%d[%s]", h.line, h.column, h.text.c_str());
+        auto has = [&](S32 line, S32 column, const char* text) {
+            for (const ALScriptInlayHint& h : hints)
+            {
+                if (h.line == line && h.column == column && h.text == text) return true;
+            }
+            return false;
+        };
+        ensure("the channel's name before the 0:" + listed, has(6, 14, "Channel:") || has(6, 14, "channel:"));
+        ensure("the text's before the cast:" + listed, has(6, 17, "Text:") || has(6, 17, "text:"));
+        ensure("nothing before n, which is the name:" + listed, !has(6, 30, "n:"));
+        ensure("n: before the 2:" + listed, has(7, 29, "n:"));
+        ensure("nothing when not asked", service.inlayHints(script, false).empty());
+    }
 }

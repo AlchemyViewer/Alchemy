@@ -122,6 +122,53 @@ struct ALScriptReferences
     std::vector<ALScriptSpan> references;
 };
 
+// A stretch of the script coloured by what the analyzer knows it to be,
+// over what the grammar could tell from the words alone: a parameter
+// against a local against a global, a field, a type, a call to something
+// the definitions mark deprecated.
+struct ALScriptSemanticToken
+{
+    enum Modifier : U8
+    {
+        // Where the name is bound, rather than where it is used.
+        Declaration = 1,
+        // A name of the whole script, not of a block.
+        Global      = 2,
+        // From the definitions, not the script.
+        Builtin     = 4,
+        Deprecated  = 8,
+        // Never assigned again: a constant, a `local` that is one.
+        ReadOnly    = 16
+    };
+    ALScriptSpan       span;
+    ALScriptSymbolKind kind      = ALScriptSymbolKind::Variable;
+    U8                 modifiers = 0;
+
+    friend bool operator<(const ALScriptSemanticToken& a, const ALScriptSemanticToken& b) { return a.span < b.span; }
+};
+
+// A word the editor shows beside the text without putting it in: a
+// parameter's name before the argument it is given, a type after a name
+// declared without one.
+struct ALScriptInlayHint
+{
+    enum class Kind : U8
+    {
+        Parameter,
+        Type
+    };
+    S32         line   = 0;
+    S32         column = 0;
+    Kind        kind   = Kind::Parameter;
+    // As shown: `channel:` before an argument, `: number` after a name.
+    std::string text;
+
+    friend bool operator<(const ALScriptInlayHint& a, const ALScriptInlayHint& b)
+    {
+        return a.line != b.line ? a.line < b.line : a.column < b.column;
+    }
+};
+
 // One symbol of the script's outline: what it declares at the top, and
 // what those hold, in the order written.
 struct ALScriptOutlineEntry

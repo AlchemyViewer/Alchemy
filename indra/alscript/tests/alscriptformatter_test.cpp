@@ -184,4 +184,22 @@ namespace tut
         ensure_equals("across, partly", ALScriptFormatter::formatLines(across, options, 1, 2), std::string("x = \"a\nb\";\ny = 2;\n"));
         ensure_equals("across, whole", ALScriptFormatter::formatLines(across, options, 0, 1), std::string("x = \"a\nb\";\ny=2;\n"));
     }
+
+    // Luau's own: an if-expression opens no block, `const` and `export`
+    // read as the keywords they are, and a function's body starts afresh.
+    template<> template<>
+    void alscriptformatter_object::test<6>()
+    {
+        ensure_equals("an if-expression", lua("local x = if a then 1 else 2\ny = 3\n"), std::string("local x = if a then 1 else 2\ny = 3\n"));
+        ensure_equals("chained", lua("local x = if a then 1 elseif b then 2 else 3\ny = 3\n"), std::string("local x = if a then 1 elseif b then 2 else 3\ny = 3\n"));
+        ensure_equals("else if, as one expression", lua("return if a then 1 else if b then 2 else 3\n"), std::string("return if a then 1 else if b then 2 else 3\n"));
+        ensure_equals("across lines", lua("local x =\nif a then 1\nelse 2\ny = 3\n"), std::string("local x =\nif a then 1\nelse 2\ny = 3\n"));
+        ensure_equals("a statement if still opens its block", lua("if a then\nx = 1\nelse\nx = 2\nend\ny = 3\n"),
+                      std::string("if a then\n    x = 1\nelse\n    x = 2\nend\ny = 3\n"));
+        ensure_equals("a statement if inside a function inside an expression",
+                      lua("local f = if a then function()\nif b then\nreturn 1\nend\nend else nil\ny = 3\n"),
+                      std::string("local f = if a then function()\n    if b then\n        return 1\n    end\nend else nil\ny = 3\n"));
+        ensure_equals("const and export", lua("export const n=1\nconst function f(a,b)\nreturn a+b\nend\n"),
+                      std::string("export const n = 1\nconst function f(a, b)\n    return a + b\nend\n"));
+    }
 }

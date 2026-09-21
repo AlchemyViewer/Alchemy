@@ -79,6 +79,15 @@ public:
     // The script's own shape: what it binds at the top and the functions
     // in it, each function's own one deeper.
     std::vector<ALScriptOutlineEntry> outline(std::string_view source);
+    // Every name in the script by what the check found it to be: a
+    // parameter, a local, a global, a field, a function, a type; whether
+    // it is bound there, constant, from the definitions, or deprecated.
+    // In order, each place once.
+    std::vector<ALScriptSemanticToken> semanticTokens(std::string_view source);
+    // What the editor may show beside the text: each argument's
+    // parameter name, where the argument is not that name already, and
+    // the type a `local` was given without saying.
+    std::vector<ALScriptInlayHint> inlayHints(std::string_view source, bool parameters, bool types);
 
 private:
     struct Impl;
