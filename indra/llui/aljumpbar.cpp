@@ -200,10 +200,14 @@ void ALJumpBar::build()
 
     if (!mTrailerText.empty())
     {
+        // At the right end, as said: the room past the path is its, and
+        // the words sit against its far edge.
         LLTextBox::Params tp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
         tp.name = "trailer";
-        tp.rect = LLRect(x + TRAILER_GAP, height - 3, getRect().getWidth(), 0);
+        tp.rect = LLRect(x + TRAILER_GAP, height - 3, getRect().getWidth() - CRUMB_PAD, 0);
         tp.font = font;
+        tp.font_halign = LLFontGL::RIGHT;
+        tp.font_valign = LLFontGL::VCENTER;
         tp.initial_value = mTrailerText;
         mTrailer = LLUICtrlFactory::create<LLTextBox>(tp);
         addChild(mTrailer);

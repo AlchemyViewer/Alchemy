@@ -1743,29 +1743,42 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     LLStringUtil::format_map_t args;
     args["[LINE]"]  = std::to_string(caret.line + 1);
     args["[COL]"]   = std::to_string(caret.column + 1);
-    std::string said = getString("CaretPosition", args);
+    std::vector<std::string> parts{ getString("CaretPosition", args) };
     // What is selected: lines across lines, characters within one.
     const ALTextRange selection = doc.editor->selection().normalised();
     if (!selection.empty())
     {
         if (selection.begin.line != selection.end.line)
         {
-            args["[COUNT]"] = std::to_string(selection.end.line - selection.begin.line + (selection.end.column > 0 ? 1 : 0));
-            said += getString("SelectedLines", args);
+            const S32 lines = selection.end.line - selection.begin.line + (selection.end.column > 0 ? 1 : 0);
+            args["[COUNT]"] = std::to_string(lines);
+            parts.push_back(getString(lines == 1 ? "SelectedLine" : "SelectedLines", args));
         }
         else
         {
-            args["[COUNT]"] = std::to_string(selection.end.column - selection.begin.column);
-            said += getString("SelectedChars", args);
+            const S32 chars = selection.end.column - selection.begin.column;
+            args["[COUNT]"] = std::to_string(chars);
+            parts.push_back(getString(chars == 1 ? "SelectedChar" : "SelectedChars", args));
         }
     }
     S32 errors = 0, warnings = 0;
     problemCounts(doc, errors, warnings);
-    if (errors > 0 || warnings > 0)
+    if (errors > 0)
     {
-        args["[ERRORS]"]   = std::to_string(errors);
-        args["[WARNINGS]"] = std::to_string(warnings);
-        said += getString(errors > 0 && warnings > 0 ? "ProblemsBoth" : errors > 0 ? "ProblemsErrors" : "ProblemsWarnings", args);
+        args["[COUNT]"] = std::to_string(errors);
+        parts.push_back(getString(errors == 1 ? "ProblemError" : "ProblemErrors", args));
+    }
+    if (warnings > 0)
+    {
+        args["[COUNT]"] = std::to_string(warnings);
+        parts.push_back(getString(warnings == 1 ? "ProblemWarning" : "ProblemWarnings", args));
+    }
+    // Joined by a middle dot with air around it; in code, since a
+    // string of the skin's is trimmed of its spaces.
+    std::string said;
+    for (const std::string& part : parts)
+    {
+        said += (said.empty() ? "" : "   \xC2\xB7   ") + part;
     }
     mBreadcrumb->setTrailer(said);
 }
