@@ -304,6 +304,12 @@ namespace ll_test
                 needs_vbos = needs_imagegl = needs_llrender = true;
             }
 
+            // The profile the viewer runs on: core on macOS, where the only
+            // other offer is a 2.1 context on which every entry point past
+            // GL 2 is null and every 3.x query an invalid enum; and core
+            // wherever else, since the viewer's shaders are core's. The
+            // backend reads the flag as the viewer's window does.
+            LLRender::sGLCoreProfile = true;
             // A debug context costs nothing here and turns "the draw came out
             // wrong" into a message naming the call that did it. The backend
             // reads gDebugGL for it, as the viewer's does; raised only for the

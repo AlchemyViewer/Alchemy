@@ -44,6 +44,7 @@
 #include "llrender.h"
 #include "llwindow.h"
 #include "llframetimer.h"
+#include <atomic>
 #include <bit>
 #include <boost/unordered_map.hpp>
 
@@ -58,6 +59,12 @@ const F32 MIN_TEXTURE_LIFETIME = 10.f;
 
 constexpr int DELETE_DELAY = 3; // number of frames to wait before deleting textures
 static std::vector<U32> sFreeList[DELETE_DELAY+1];
+// The GL context the names in a thread's pool were generated on: each
+// thread's pool is emptied when it is next asked after the context went,
+// since a name of the old context is nobody's on the new one -- a core
+// profile refuses to bind it -- and the pool is thread-local, so no one
+// thread can empty the others'.
+static std::atomic<U32> sTextureNameGeneration{ 1 };
 
 // Number of mip levels in a full pyramid for the given level-0 dimensions, counting
 // level 0 itself: 256x256 -> 9 (256,128,...,1). This is a COUNT. Note llvertexbuffer's
@@ -297,6 +304,9 @@ void LLImageGL::cleanupClass()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLImageGLThread::deleteSingleton();
+    // The names pooled on this context are the context's; the next one
+    // starts afresh.
+    sTextureNameGeneration.fetch_add(1, std::memory_order_relaxed);
 
     if (sScratchPBO != 0)
     {
@@ -601,6 +611,8 @@ void LLImageGL::destroyGL()
     {
         gGL.getTextureSlot(stage)->unbind();
     }
+    // What follows is a new context, whose names these were not.
+    sTextureNameGeneration.fetch_add(1, std::memory_order_relaxed);
 }
 
 //static
@@ -1461,7 +1473,14 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
     static constexpr U32 pool_size = 1024;
     static thread_local U32 name_pool[pool_size]; // pool of texture names
     static thread_local U32 name_count = 0; // number of available names in the pool
+    static thread_local U32 name_generation = 0; // the context the pool was filled on
 
+    const U32 generation = sTextureNameGeneration.load(std::memory_order_relaxed);
+    if (name_generation != generation)
+    {
+        name_count      = 0;
+        name_generation = generation;
+    }
     if (name_count == 0)
     {
         LL_PROFILE_ZONE_NAMED("iglgt - reup pool");
