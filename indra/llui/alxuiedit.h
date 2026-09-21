@@ -121,6 +121,21 @@ public:
     bool moveBefore(const path_t& path, const path_t& sibling);
     bool moveAfter(const path_t& path, const path_t& sibling);
 
+    // The whole text, as an editor of the source has it: one step, which
+    // says nothing more than that something changed, since anything may
+    // have. False where the new text does not parse, though it is held
+    // all the same -- a file being typed is seldom whole -- and error()
+    // says where it stops.
+    bool setSource(std::string_view text);
+
+    // An element's path, as the paths here are made: each step the name
+    // attribute with the ordinal among siblings of that name.
+    bool pathOf(pugi::xml_node node, path_t& out) const;
+    // The element that starts on a line, else the nearest one starting
+    // before it, as an editor's caret finds one; false where the text has
+    // no element there.
+    bool elementAtLine(S32 line, path_t& out) const;
+
     // --- undo ----------------------------------------------------------------
     // Every operation keeps the text it started from. A XUI file is small
     // -- the largest of them is a third of a megabyte, and the largest

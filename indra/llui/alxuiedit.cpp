@@ -159,6 +159,89 @@ S32 ALXUIEdit::lineOf(pugi::xml_node node) const
     return mDoc && node ? mDoc->lineOf(node.offset_debug()) : 0;
 }
 
+bool ALXUIEdit::setSource(std::string_view text)
+{
+    if (text == mText)
+    {
+        return mError.empty();
+    }
+    Step step(*this);
+    mError.clear();
+    note(Did::Something, path_t());
+    Span whole;
+    whole.offset = 0;
+    whole.length = mText.size();
+    splice(whole, text);
+    return mError.empty();
+}
+
+bool ALXUIEdit::pathOf(pugi::xml_node node, path_t& out) const
+{
+    out.clear();
+    if (!node || node.type() != pugi::node_element)
+    {
+        return false;
+    }
+    const pugi::xml_node top = root();
+    for (pugi::xml_node at = node; at && at != top; at = at.parent())
+    {
+        if (at.type() != pugi::node_element)
+        {
+            return false;
+        }
+        const char* name    = at.attribute("name").value();
+        S32         ordinal = 0;
+        for (pugi::xml_node sibling = at.parent().first_child(); sibling && sibling != at; sibling = sibling.next_sibling())
+        {
+            if (sibling.type() == pugi::node_element && strcmp(sibling.attribute("name").value(), name) == 0)
+            {
+                ++ordinal;
+            }
+        }
+        out.insert(out.begin(), ALXUISelection::step(name, ordinal));
+    }
+    return true;
+}
+
+bool ALXUIEdit::elementAtLine(S32 line, path_t& out) const
+{
+    // The last element in the file's order that starts on or before the
+    // line, which is the innermost one open there or the one just past.
+    pugi::xml_node best;
+    std::vector<pugi::xml_node> stack{ root() };
+    while (!stack.empty())
+    {
+        pugi::xml_node node = stack.back();
+        stack.pop_back();
+        if (!node || node.type() != pugi::node_element)
+        {
+            continue;
+        }
+        if (lineOf(node) <= line)
+        {
+            best = node;
+        }
+        else
+        {
+            continue;
+        }
+        // Children in order: pushed backwards, so the first is taken first.
+        std::vector<pugi::xml_node> children;
+        for (pugi::xml_node child : node.children())
+        {
+            if (child.type() == pugi::node_element)
+            {
+                children.push_back(child);
+            }
+        }
+        for (auto it = children.rbegin(); it != children.rend(); ++it)
+        {
+            stack.push_back(*it);
+        }
+    }
+    return best && pathOf(best, out);
+}
+
 bool ALXUIEdit::save()
 {
     return saveAs(mPath);

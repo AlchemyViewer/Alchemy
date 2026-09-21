@@ -490,7 +490,8 @@ void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
 
 void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
 {
-    mCaret = mDocument.clamp(pos);
+    const ALTextPos was = mCaret;
+    mCaret              = mDocument.clamp(pos);
     if (!extend)
     {
         mAnchor = mCaret;
@@ -500,6 +501,10 @@ void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
         revealLine(mCaret.line);
     }
     mBlink.reset();
+    if (mCaret != was)
+    {
+        mCaretMoved();
+    }
 }
 
 void ALTextView::setCaret(ALTextPos pos, bool extend)

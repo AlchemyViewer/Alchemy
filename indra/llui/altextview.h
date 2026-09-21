@@ -239,6 +239,8 @@ public:
 
     typedef boost::signals2::signal<void()> changed_signal_t;
     boost::signals2::connection onTextChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
+    // Every time the caret lands somewhere else, however it got there.
+    boost::signals2::connection onCaretMoved(const changed_signal_t::slot_type& slot) { return mCaretMoved.connect(slot); }
 
     // --- the input method ------------------------------------------------------
 
@@ -532,4 +534,5 @@ private:
 
     std::vector<LLColor4U> mColorScratch;
     changed_signal_t       mChanged;
+    changed_signal_t       mCaretMoved;
 };
