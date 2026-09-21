@@ -111,14 +111,12 @@
           <boolean>0</boolean>
         </map>
         <map>
-          <key>span</key>
+          <key>match</key>
           <string>`</string>
-          <key>end</key>
-          <string>`</string>
-          <key>escape</key>
-          <string>\</string>
           <key>kind</key>
           <string>string</string>
+          <key>push</key>
+          <string>template</string>
         </map>
         <map>
           <key>regex</key>
@@ -143,6 +141,24 @@
           <string>@[A-Za-z_][A-Za-z0-9_]*</string>
           <key>kind</key>
           <string>attribute</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(?&lt;![A-Za-z0-9_.:])export(?=\s+(local|const|function|type)\b)</string>
+          <key>kind</key>
+          <string>control</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(?&lt;![A-Za-z0-9_.:])const(?=\s+[A-Za-z_])</string>
+          <key>kind</key>
+          <string>control</string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>(?&lt;![A-Za-z0-9_.:])type(?=\s+[A-Za-z_][A-Za-z0-9_]*\s*[&lt;=])</string>
+          <key>kind</key>
+          <string>control</string>
         </map>
         <map>
           <key>word</key>
@@ -210,6 +226,147 @@
         <string>comment</string>
         <key>rules</key>
         <array>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>template</key>
+      <map>
+        <key>default</key>
+        <string>string</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>regex</key>
+            <string>\\.</string>
+            <key>kind</key>
+            <string>escape</string>
+          </map>
+          <map>
+            <key>match</key>
+            <string>`</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>match</key>
+            <string>{</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>push</key>
+            <string>interpolation</string>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>interpolation</key>
+      <map>
+        <key>default</key>
+        <string>text</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>}</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>'</string>
+            <key>end</key>
+            <string>'</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>string</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>regex</key>
+            <string>0[xX][0-9a-fA-F_]+|0[bB][01_]+|[0-9][0-9_]*(\.[0-9_]*)?([eE][+-]?[0-9_]+)?</string>
+            <key>kind</key>
+            <string>number</string>
+          </map>
+          <map>
+            <key>word</key>
+            <boolean>1</boolean>
+            <key>qualified</key>
+            <boolean>1</boolean>
+            <key>tables</key>
+            <array>
+              <map>
+                <key>table</key>
+                <string>control</string>
+                <key>kind</key>
+                <string>control</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>type</string>
+                <key>kind</key>
+                <string>type</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>function</string>
+                <key>kind</key>
+                <string>function</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>deprecated</string>
+                <key>kind</key>
+                <string>deprecated</string>
+              </map>
+              <map>
+                <key>table</key>
+                <string>constant</string>
+                <key>kind</key>
+                <string>constant</string>
+              </map>
+            </array>
+          </map>
+          <map>
+            <key>chars</key>
+            <string>+\-*/%^#=~&lt;&gt;&amp;|?</string>
+            <key>kind</key>
+            <string>operator</string>
+          </map>
+          <map>
+            <key>chars</key>
+            <string>()[];:,.</string>
+            <key>max</key>
+            <integer>1</integer>
+            <key>kind</key>
+            <string>punctuation</string>
+          </map>
           <map>
             <key>eol</key>
             <boolean>1</boolean>

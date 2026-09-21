@@ -125,7 +125,7 @@ namespace tut
                       std::string("control:local|text: n|punctuation::|text: |type:number|text: |operator:=|text: |number:0x10|text: |comment:--[[ block"));
         ensure_equals("closed", lexed("slua", "still ]] + 1", state, words), std::string("comment:still ]]|text: |operator:+|text: |number:1"));
         ensure_equals("a call with an interpolated string", lexed("slua", "ll.Say(0, `hi {n}`)", state, words),
-                      std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:,|text: |string:`hi {n}`|punctuation:)"));
+                      std::string("text:ll|punctuation:.|function:Say|punctuation:(|number:0|punctuation:,|text: |string:`hi |punctuation:{|text:n|punctuation:}|string:`|punctuation:)"));
         ensure_equals("a long string with a level", lexed("slua", "s = [==[ a ]] b ]==] .. 'c'", state, words),
                       std::string("text:s |operator:=|text: |string:[==[ a ]] b ]==]|text: |punctuation:..|text: |string:'c'"));
         ensure_equals("an attribute and constants", lexed("slua", "@native true nil", state, words),
@@ -174,5 +174,37 @@ namespace tut
                       std::string("text:Say|punctuation:(|number:1|punctuation:)"));
         ensure_equals("another head is another name", lexed("slua", "t.Say", state, words), std::string("text:t|punctuation:.|text:Say"));
         ensure_equals("a plain function still is", lexed("slua", "print(t)", state, words), std::string("function:print|punctuation:(|text:t|punctuation:)"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<7>()
+    {
+        set_test_name("Luau's own words and strings: const, export and type where they are statements, and what an interpolated string holds");
+        ALSyntaxWords words;
+        words.set("function", { "type", "print" });
+        words.set("type", { "number" });
+        ALSyntaxState state;
+        ensure_equals("const", lexed("slua", "const n = 1", state, words), std::string("control:const|text: n |operator:=|text: |number:1"));
+        ensure_equals("export const", lexed("slua", "export const f", state, words), std::string("control:export|text: |control:const|text: f"));
+        ensure_equals("export function", lexed("slua", "export function f()", state, words),
+                      std::string("control:export|text: |control:function|text: f|punctuation:()"));
+        ensure_equals("a type alias", lexed("slua", "type Pair = {}", state, words), std::string("control:type|text: Pair |operator:=|text: |punctuation:{}"));
+        ensure_equals("an exported generic alias", lexed("slua", "export type Box<T> = T", state, words),
+                      std::string("control:export|text: |control:type|text: Box|operator:<|text:T|operator:>|text: |operator:=|text: T"));
+        ensure_equals("type the function is still the function", lexed("slua", "local t = type(x)", state, words),
+                      std::string("control:local|text: t |operator:=|text: |function:type|punctuation:(|text:x|punctuation:)"));
+        ensure("a field called type is no statement", lexed("slua", "t.type = 1", state, words).find("control:type") == std::string::npos);
+        ensure_equals("a local called const is a local", lexed("slua", "const = 2", state, words), std::string("text:const |operator:=|text: |number:2"));
+        ensure_equals("an interpolated string", lexed("slua", "print(`n is {n + 1} and {x}!`)", state, words),
+                      std::string("function:print|punctuation:(|string:`n is |punctuation:{|text:n |operator:+|text: |number:1|punctuation:}|string: and "
+                                  "|punctuation:{|text:x|punctuation:}|string:!`|punctuation:)"));
+        ensure("back in the main state", state.frames.size() == 1);
+        ensure_equals("an escape inside it", lexed("slua", "`a\\{b`", state, words), std::string("string:`a|escape:\\{|string:b`"));
+        ensure_equals("one left open ends with its line", lexed("slua", "`open {x", state, words), std::string("string:`open |punctuation:{|text:x"));
+        ensure_equals("and the next line is code again", lexed("slua", "y = 1", state, words), std::string("text:y |operator:=|text: |number:1"));
+        ensure_equals("a number with separators, and floor division", lexed("slua", "1_000 // 3", state, words),
+                      std::string("number:1_000|text: |operator://|text: |number:3"));
+        ensure_equals("compound assignment and concatenation", lexed("slua", "s ..= \"x\"", state, words),
+                      std::string("text:s |punctuation:..|operator:=|text: |string:\"x\""));
     }
 }
