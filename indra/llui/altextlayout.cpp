@@ -218,6 +218,12 @@ void ALTextLayout::setInlayProvider(inlay_provider_t provider)
     invalidateAll();
 }
 
+void ALTextLayout::setSubstitutionProvider(substitution_provider_t provider)
+{
+    mSubstitutions = std::move(provider);
+    invalidateAll();
+}
+
 void ALTextLayout::invalidateLine(S32 index)
 {
     if (index < 0 || index >= lineCount())
@@ -253,10 +259,32 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         mInlays(index, mInlayScratch);
         std::stable_sort(mInlayScratch.begin(), mInlayScratch.end(), [](const Inlay& a, const Inlay& b) { return a.column < b.column; });
     }
+    // What stretches of the text show as something else: in order, within
+    // the line, none over another.
+    mSubstitutionScratch.clear();
+    if (mSubstitutions)
+    {
+        mSubstitutions(index, mSubstitutionScratch);
+        std::stable_sort(mSubstitutionScratch.begin(), mSubstitutionScratch.end(), [](const Substitution& a, const Substitution& b) { return a.begin < b.begin; });
+        S32 reached = 0;
+        for (size_t i = 0; i < mSubstitutionScratch.size();)
+        {
+            Substitution& sub = mSubstitutionScratch[i];
+            sub.begin         = llclamp(sub.begin, 0, static_cast<S32>(text.size()));
+            sub.end           = llclamp(sub.end, sub.begin, static_cast<S32>(text.size()));
+            if (sub.begin < reached || sub.end == sub.begin)
+            {
+                mSubstitutionScratch.erase(mSubstitutionScratch.begin() + static_cast<std::ptrdiff_t>(i));
+                continue;
+            }
+            reached = sub.end;
+            ++i;
+        }
+    }
     size_t next_inlay = 0;
-    auto   gap        = [&](S32 cluster, F32 width, S32 inlay, bool before) {
+    auto   gap        = [&](S32 cluster, F32 width, S32 inlay, bool before, S32 substitution = -1) {
         out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
-        out.glyphs.push_back(Glyph{ cluster, x * inv_x, width * inv_x, inlay, before });
+        out.glyphs.push_back(Glyph{ cluster, x * inv_x, width * inv_x, inlay, before, substitution });
         x += width;
         if (!subpixel)
         {
@@ -280,16 +308,18 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     // it, rounded after every glyph unless the face keeps a subpixel pen, so
     // that what is laid out here is what renderGlyphs puts on the screen.
     // An inlay splits a piece too, so that its gap goes where its column is.
-    auto shape_run = [&](size_t begin, size_t end) {
+    // A substitution's text is shaped as itself, every glyph of it on the
+    // stretch's first byte; a box is a gap of its width on the same.
+    auto shape_run = [&](const std::string& source, size_t begin, size_t end, S32 substitution) {
         if (!face || end <= begin)
         {
             return;
         }
-        ALFontShaping::shapeRun(face, text, begin, end, mShaped);
+        ALFontShaping::shapeRun(face, source, begin, end, mShaped);
         for (const ALShapedGlyph& sg : mShaped)
         {
             out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, (x + sg.x_offset) * inv_x, sg.y_offset * inv_y });
-            out.glyphs.push_back(Glyph{ sg.cluster, x * inv_x, sg.x_advance * inv_x });
+            out.glyphs.push_back(Glyph{ sg.cluster, x * inv_x, sg.x_advance * inv_x, -1, true, substitution });
             x += sg.x_advance;
             if (!subpixel)
             {
@@ -302,25 +332,60 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         while (next_inlay < mInlayScratch.size() && mInlayScratch[next_inlay].column < static_cast<S32>(end))
         {
             const size_t at = static_cast<size_t>(llmax(mInlayScratch[next_inlay].column, static_cast<S32>(from)));
-            shape_run(from, at);
+            shape_run(text, from, at, -1);
             inlays_at(at);
             from = at;
         }
-        shape_run(from, end);
+        shape_run(text, from, end, -1);
     };
-    size_t piece = 0;
-    for (size_t at = text.find('\t'); at != std::string::npos; at = text.find('\t', piece))
+    auto substitute = [&](const Substitution& sub) {
+        const size_t first = out.glyphs.size();
+        if (sub.shown.empty())
+        {
+            gap(sub.begin, llmax(0.f, sub.width) * mScaleX, -1, true, sub.id);
+        }
+        else
+        {
+            shape_run(sub.shown, 0, sub.shown.size(), sub.id);
+            for (size_t k = first; k < out.glyphs.size(); ++k)
+            {
+                out.glyphs[k].cluster = sub.begin;
+            }
+        }
+    };
+    // Pieces: the text up to the next tab or substitution, whichever is
+    // first, then that; an inlay inside a substitution goes after it.
+    size_t next_sub = 0;
+    size_t piece    = 0;
+    while (true)
     {
+        const size_t sub_at = next_sub < mSubstitutionScratch.size() ? static_cast<size_t>(mSubstitutionScratch[next_sub].begin) : std::string::npos;
+        size_t       tab_at = text.find('\t', piece);
+        if (tab_at != std::string::npos && tab_at >= sub_at)
+        {
+            tab_at = std::string::npos;
+        }
+        const size_t at = llmin(llmin(sub_at, tab_at), text.size());
         shape(piece, at);
         inlays_at(at);
+        if (at >= text.size())
+        {
+            break;
+        }
+        if (at == sub_at)
+        {
+            const Substitution& sub = mSubstitutionScratch[next_sub++];
+            substitute(sub);
+            piece = static_cast<size_t>(sub.end);
+            inlays_at(piece);
+            continue;
+        }
         const F32 stop = (floorf(x / tab_stop) + 1.f) * tab_stop;
         out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
         out.glyphs.push_back(Glyph{ static_cast<S32>(at), x * inv_x, (stop - x) * inv_x });
         x     = stop;
         piece = at + 1;
     }
-    shape(piece, text.size());
-    inlays_at(text.size());
     out.width = x * inv_x;
     if (mContentWidth >= 0.f && x > mContentWidth)
     {

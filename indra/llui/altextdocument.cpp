@@ -154,6 +154,36 @@ ALTextDocument::Edit ALTextDocument::Edit::inverse() const
     return back;
 }
 
+ALTextPos ALTextDocument::Edit::slidPast(const ALTextPos& pos) const
+{
+    const ALTextRange removed   = range.normalised();
+    const ALTextPos   end_after = endAfter();
+    if (pos.line == removed.end.line)
+    {
+        return ALTextPos(end_after.line, end_after.column + (pos.column - removed.end.column));
+    }
+    return ALTextPos(pos.line + (end_after.line - removed.end.line), pos.column);
+}
+
+bool ALTextDocument::Edit::slide(ALTextRange& range_in) const
+{
+    const ALTextRange removed = range.normalised();
+    ALTextRange       r       = range_in.normalised();
+    const bool        cut     = removed.empty() ? (r.begin < removed.begin && removed.begin < r.end)
+                                                : (r.begin < removed.end && removed.begin < r.end);
+    if (cut)
+    {
+        return false;
+    }
+    if (removed.end <= r.begin)
+    {
+        r.begin = slidPast(r.begin);
+        r.end   = slidPast(r.end);
+    }
+    range_in = r;
+    return true;
+}
+
 // --- the text ----------------------------------------------------------------
 
 ALTextDocument::ALTextDocument()

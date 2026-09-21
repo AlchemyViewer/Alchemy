@@ -14,11 +14,16 @@
 
   words: the words the grammar itself puts in its tables; the language
   service adds the rest at runtime.
+
+  prose: the text is writing rather than code, so the spell check looks
+  at all of it rather than only at comments and strings.
 -->
 <llsd>
   <map>
     <key>name</key>
     <string>text</string>
+    <key>prose</key>
+    <boolean>true</boolean>
     <key>extensions</key>
     <array>
       <string>txt</string>

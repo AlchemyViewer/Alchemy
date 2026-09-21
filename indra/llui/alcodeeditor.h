@@ -365,7 +365,6 @@ private:
     // inner; and the number of rows they take.
     std::vector<S32> stickyLines();
     S32              stickyRows();
-    void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color);
 
     void              ensureRegions();
     void              applyFolds();
@@ -442,7 +441,6 @@ private:
     S32                                mGutterHoverLine = -1;
     std::vector<Decoration>            mDecorations;
     std::vector<ALTextRange>           mHighlights;
-    std::vector<LLVector2>             mSquiggleScratch;
     std::vector<SemanticToken>         mSemantics;
     std::vector<InlayHint>             mInlays;
     // What the layout is told about a line's inlays.

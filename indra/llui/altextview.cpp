@@ -35,6 +35,7 @@
 #include "llmenugl.h"
 #include "llrender2dutils.h"
 #include "alfindbar.h"
+#include "llspellcheck.h"
 #include "lltooltip.h"
 #include "llstring.h"
 #include "lltimer.h"
@@ -119,6 +120,46 @@ namespace
     {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
+
+    // The layout knows a substitution and an atom by one id each; atoms
+    // are numbered from here so that the two are told apart.
+    const S32 ATOM_ID_BASE = 1 << 30;
+    S32       atomId(size_t index) { return ATOM_ID_BASE + static_cast<S32>(index); }
+    bool      isAtomId(S32 id) { return id >= ATOM_ID_BASE; }
+
+    // How long the word at the caret is left unmarked after it was typed.
+    const F32 SPELL_SETTLE_SECONDS = 1.5f;
+    const F32 SQUIGGLE_AMPLITUDE   = 1.f;
+    const F32 SQUIGGLE_WAVE        = 5.f;
+
+    // A word the spell check has no business with: code rather than
+    // prose -- a digit in it, an underscore, a capital after the first
+    // letter -- or too short to be wrong.
+    bool proseWord(std::string_view word)
+    {
+        if (word.size() < 3)
+        {
+            return false;
+        }
+        bool lower_seen = false;
+        for (size_t i = 0; i < word.size(); ++i)
+        {
+            const char c = word[i];
+            if ((c >= '0' && c <= '9') || c == '_')
+            {
+                return false;
+            }
+            if (c >= 'A' && c <= 'Z' && lower_seen)
+            {
+                return false;
+            }
+            if (c >= 'a' && c <= 'z')
+            {
+                lower_seen = true;
+            }
+        }
+        return true;
+    }
 }
 
 ALTextView::Params::Params()
@@ -144,7 +185,10 @@ ALTextView::Params::Params()
     scroll_map("scroll_map", false),
     scroll_map_width("scroll_map_width", 80),
     scroll_map_preview("scroll_map_preview", true),
-    scroll_map_left("scroll_map_left", false)
+    scroll_map_left("scroll_map_left", false),
+    link_color("link_color"),
+    spellcheck("spellcheck", false),
+    spell_error_color("spell_error_color")
 {
 }
 
@@ -190,10 +234,20 @@ ALTextView::ALTextView(const Params& p)
         }
     }
 
+    mLinkColor       = p.link_color.isProvided() ? p.link_color() : LLUIColorTable::instance().getColor("HTMLLinkColor", LLColor4(0.4f, 0.6f, 1.f, 1.f));
+    mSpellErrorColor = p.spell_error_color.isProvided() ? p.spell_error_color() : LLUIColorTable::instance().getColor("TextSpellErrorColor", LLColor4(1.f, 0.f, 0.f, 0.8f));
+    mSpellCheck      = p.spellcheck;
+
     mHighlighter.attach(&mDocument);
     mLayout.attach(&mDocument);
     mLayout.setFont(mFont);
     mLayout.setTabWidth(mTabWidth);
+    mLayout.setSubstitutionProvider([this](S32 line, std::vector<ALTextLayout::Substitution>& out) { provideSubstitutions(line, out); });
+    mDocumentConnection = mDocument.onChanged([this](const ALTextDocument::Edit& edit) { onDocumentEdit(edit); });
+    if (mSpellCheck)
+    {
+        mSpellSettingsConnection = LLSpellChecker::setSettingsChangeCallback([this]() { recheckSpelling(); });
+    }
 
     if (p.syntax.isProvided())
     {
@@ -218,6 +272,15 @@ ALTextView::~ALTextView()
         menu->die();
         mContextMenuHandle.markDead();
     }
+    for (Atom& atom : mAtoms)
+    {
+        if (atom.view)
+        {
+            removeChild(atom.view);
+            atom.view->die();
+            atom.view = nullptr;
+        }
+    }
     if (LLWindow* window = getWindow())
     {
         window->allowLanguageTextInput(this, false);
@@ -238,6 +301,11 @@ void ALTextView::setText(std::string_view text)
     mPreeditOverwritten.clear();
     mDocument.setText(text);
     mUndo.clear();
+    // The layers were about the text that was; the edit that replaced
+    // it has dropped what it cut through, which is everything, and a
+    // substitution over an empty text is nothing.
+    setSubstitutions({});
+    setAtoms({});
     // Through the virtual, so that what a subclass keeps about changes
     // since the last save -- the gutter's bars -- starts clean too.
     resetDirty();
@@ -278,6 +346,7 @@ ALSyntaxLibrary& ALTextView::syntaxLibrary()
 void ALTextView::setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar)
 {
     mHighlighter.setGrammar(std::move(grammar));
+    recheckSpelling();
 }
 
 void ALTextView::setSyntax(std::string_view grammar_name)
@@ -491,7 +560,7 @@ void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
 void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
 {
     const ALTextPos was = mCaret;
-    mCaret              = mDocument.clamp(pos);
+    mCaret              = snapped(mDocument.clamp(pos), was);
     if (!extend)
     {
         mAnchor = mCaret;
@@ -531,6 +600,533 @@ std::string ALTextView::wordBeforeCaret() const
         --begin;
     }
     return line.substr(begin, mCaret.column - begin);
+}
+
+// --- what a stretch shows -------------------------------------------------------
+
+void ALTextView::setSubstitutions(std::vector<Substitution> substitutions)
+{
+    for (const Substitution& sub : mSubstitutions)
+    {
+        mLayout.invalidateLine(sub.range.begin.line);
+    }
+    for (Substitution& sub : substitutions)
+    {
+        sub.range = sub.range.normalised();
+    }
+    std::stable_sort(substitutions.begin(), substitutions.end(), [](const Substitution& a, const Substitution& b) { return a.range.begin < b.range.begin; });
+    // Within a line, in order, none over another: a stretch is one line's.
+    mSubstitutions.clear();
+    for (Substitution& sub : substitutions)
+    {
+        if (sub.range.begin.line != sub.range.end.line || sub.range.empty())
+        {
+            continue;
+        }
+        if (!mSubstitutions.empty() && sub.range.begin < mSubstitutions.back().range.end)
+        {
+            continue;
+        }
+        mLayout.invalidateLine(sub.range.begin.line);
+        mSubstitutions.push_back(std::move(sub));
+    }
+    mHoverLink   = -1;
+    mPressedLink = -1;
+}
+
+void ALTextView::addSubstitution(Substitution substitution)
+{
+    substitution.range = substitution.range.normalised();
+    if (substitution.range.begin.line != substitution.range.end.line || substitution.range.empty())
+    {
+        return;
+    }
+    const auto at = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), substitution.range.begin,
+                                     [](const Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
+    if ((at != mSubstitutions.end() && at->range.begin < substitution.range.end) || (at != mSubstitutions.begin() && substitution.range.begin < (at - 1)->range.end))
+    {
+        return;
+    }
+    mLayout.invalidateLine(substitution.range.begin.line);
+    mSubstitutions.insert(at, std::move(substitution));
+    mHoverLink   = -1;
+    mPressedLink = -1;
+}
+
+const ALTextView::Substitution* ALTextView::substitutionAt(const ALTextPos& pos) const
+{
+    auto after = std::upper_bound(mSubstitutions.begin(), mSubstitutions.end(), pos, [](const ALTextPos& p, const Substitution& s) { return p < s.range.begin; });
+    if (after == mSubstitutions.begin())
+    {
+        return nullptr;
+    }
+    const Substitution& sub = *(after - 1);
+    return pos < sub.range.end ? &sub : nullptr;
+}
+
+bool ALTextView::relabel(const ALTextRange& range, const std::string& shown)
+{
+    const ALTextRange wanted = range.normalised();
+    const auto        at     = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), wanted.begin,
+                                                [](const Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
+    if (at == mSubstitutions.end() || at->range.begin != wanted.begin)
+    {
+        return false;
+    }
+    if (at->shown != shown)
+    {
+        at->shown = shown;
+        mLayout.invalidateLine(at->range.begin.line);
+    }
+    return true;
+}
+
+// --- atoms ---------------------------------------------------------------------
+
+// static
+const std::string& ALTextView::atomPlaceholder()
+{
+    static const std::string placeholder("\xEF\xBF\xBC");
+    return placeholder;
+}
+
+void ALTextView::setAtoms(std::vector<Atom> atoms)
+{
+    for (Atom& atom : mAtoms)
+    {
+        mLayout.invalidateLine(atom.at.line);
+        if (atom.view)
+        {
+            // A view given again is kept; the rest go with their atoms.
+            const bool kept = std::any_of(atoms.begin(), atoms.end(), [&](const Atom& a) { return a.view == atom.view; });
+            if (!kept)
+            {
+                removeChild(atom.view);
+                atom.view->die();
+            }
+            atom.view = nullptr;
+        }
+    }
+    std::stable_sort(atoms.begin(), atoms.end(), [](const Atom& a, const Atom& b) { return a.at < b.at; });
+    mAtoms.clear();
+    for (Atom& atom : atoms)
+    {
+        atom.length = llmax(1, atom.length);
+        if (!mAtoms.empty() && atom.at < atomRange(mAtoms.back()).end)
+        {
+            continue;
+        }
+        if (atom.view && atom.view->getParent() != this)
+        {
+            addChild(atom.view);
+        }
+        if (atom.view)
+        {
+            atom.view->setVisible(false);
+        }
+        mLayout.invalidateLine(atom.at.line);
+        mAtoms.push_back(std::move(atom));
+    }
+    mHoverAtom   = -1;
+    mPressedAtom = -1;
+}
+
+void ALTextView::addAtom(Atom atom)
+{
+    atom.length   = llmax(1, atom.length);
+    const auto at = std::lower_bound(mAtoms.begin(), mAtoms.end(), atom.at, [](const Atom& a, const ALTextPos& p) { return a.at < p; });
+    if ((at != mAtoms.end() && at->at < atomRange(atom).end) || (at != mAtoms.begin() && atom.at < atomRange(*(at - 1)).end))
+    {
+        if (atom.view && atom.view->getParent() != this)
+        {
+            atom.view->die();
+        }
+        return;
+    }
+    if (atom.view && atom.view->getParent() != this)
+    {
+        addChild(atom.view);
+    }
+    if (atom.view)
+    {
+        atom.view->setVisible(false);
+    }
+    mLayout.invalidateLine(atom.at.line);
+    mAtoms.insert(at, std::move(atom));
+    mHoverAtom   = -1;
+    mPressedAtom = -1;
+}
+
+const ALTextView::Atom* ALTextView::atomAt(const ALTextPos& pos) const
+{
+    auto after = std::upper_bound(mAtoms.begin(), mAtoms.end(), pos, [](const ALTextPos& p, const Atom& a) { return p < a.at; });
+    if (after == mAtoms.begin())
+    {
+        return nullptr;
+    }
+    const Atom& atom = *(after - 1);
+    return pos < atomRange(atom).end ? &atom : nullptr;
+}
+
+void ALTextView::provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const
+{
+    const S32 length = mDocument.lineLength(line);
+    auto      first  = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), ALTextPos(line, 0),
+                                        [](const Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
+    for (auto it = first; it != mSubstitutions.end() && it->range.begin.line == line; ++it)
+    {
+        if (it->shown.empty())
+        {
+            // The text as it is, which needs nothing of the layout.
+            continue;
+        }
+        ALTextLayout::Substitution sub;
+        sub.begin = it->range.begin.column;
+        sub.end   = llmin(it->range.end.column, length);
+        sub.shown = it->shown;
+        sub.id    = static_cast<S32>(it - mSubstitutions.begin());
+        out.push_back(std::move(sub));
+    }
+    auto first_atom = std::lower_bound(mAtoms.begin(), mAtoms.end(), ALTextPos(line, 0), [](const Atom& a, const ALTextPos& p) { return a.at < p; });
+    for (auto it = first_atom; it != mAtoms.end() && it->at.line == line; ++it)
+    {
+        ALTextLayout::Substitution box;
+        box.begin = it->at.column;
+        box.end   = llmin(it->at.column + it->length, length);
+        box.width = static_cast<F32>(llmax(0, it->width));
+        box.id    = atomId(static_cast<size_t>(it - mAtoms.begin()));
+        out.push_back(std::move(box));
+    }
+}
+
+void ALTextView::placeAtomViews()
+{
+    const LLRect text  = textRect();
+    const S32    row_h = mLayout.rowHeight();
+    for (Atom& atom : mAtoms)
+    {
+        if (!atom.view)
+        {
+            continue;
+        }
+        // Its box: where the row is on the screen, if it is, and where the
+        // layout put the gap on the row.
+        bool placed = false;
+        if (row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line))
+        {
+            S32       row;
+            const F32 x0  = mLayout.xOf(atom.at.line, atom.at.column, &row);
+            const F32 x1  = mLayout.xOf(atom.at.line, atomRange(atom).end.column);
+            const S32 top = screenTopOf(text, atom.at.line, row);
+            if (top > text.mBottom && top - row_h < text.mTop)
+            {
+                const F32    left = static_cast<F32>(text.mLeft) - mScrollX;
+                const LLRect box(static_cast<S32>(left + x0), top, static_cast<S32>(left + x1), top - row_h);
+                if (atom.view->getRect() != box)
+                {
+                    atom.view->setShape(box);
+                }
+                placed = true;
+            }
+        }
+        atom.view->setVisible(placed);
+    }
+}
+
+ALTextPos ALTextView::snapped(const ALTextPos& pos, const ALTextPos& from) const
+{
+    if (const Substitution* sub = substitutionAt(pos); sub && pos != sub->range.begin)
+    {
+        return pos > from ? sub->range.end : sub->range.begin;
+    }
+    if (const Atom* atom = atomAt(pos); atom && pos != atom->at)
+    {
+        return pos > from ? atomRange(*atom).end : atom->at;
+    }
+    return pos;
+}
+
+const ALTextView::Substitution* ALTextView::linkAtLocal(S32 x, S32 y)
+{
+    const LLRect text = textRect();
+    if (mSubstitutions.empty() || !text.pointInRect(x, y) || (text.mTop - y) + mScrollY >= mLayout.totalHeight())
+    {
+        return nullptr;
+    }
+    const ALTextPos     at  = posAtLocal(x, y, false);
+    const Substitution* sub = substitutionAt(at);
+    if (!sub || !sub->link)
+    {
+        return nullptr;
+    }
+    // On its glyphs, not merely on its line past its end.
+    S32       row;
+    const F32 x0 = mLayout.xOf(at.line, sub->range.begin.column, &row);
+    const F32 x1 = mLayout.xOf(at.line, sub->range.end.column);
+    const F32 xr = static_cast<F32>(x - text.mLeft) + mScrollX;
+    return xr >= x0 && xr < x1 ? sub : nullptr;
+}
+
+const ALTextView::Atom* ALTextView::atomAtLocal(S32 x, S32 y)
+{
+    const LLRect text = textRect();
+    if (mAtoms.empty() || !text.pointInRect(x, y) || (text.mTop - y) + mScrollY >= mLayout.totalHeight())
+    {
+        return nullptr;
+    }
+    const ALTextPos at   = posAtLocal(x, y, false);
+    const Atom*     atom = atomAt(at);
+    if (!atom)
+    {
+        return nullptr;
+    }
+    S32       row;
+    const F32 x0 = mLayout.xOf(at.line, atom->at.column, &row);
+    const F32 x1 = mLayout.xOf(at.line, atomRange(*atom).end.column);
+    const F32 xr = static_cast<F32>(x - text.mLeft) + mScrollX;
+    return xr >= x0 && xr < x1 ? atom : nullptr;
+}
+
+// --- the spell check -------------------------------------------------------------
+
+void ALTextView::setSpellCheck(bool check)
+{
+    if (check == mSpellCheck)
+    {
+        return;
+    }
+    mSpellCheck = check;
+    if (check && !mSpellSettingsConnection.connected())
+    {
+        mSpellSettingsConnection = LLSpellChecker::setSettingsChangeCallback([this]() { recheckSpelling(); });
+    }
+    recheckSpelling();
+}
+
+bool ALTextView::getSpellCheck() const
+{
+    return mSpellCheck && !mReadOnly && (mSpellChecker || LLSpellChecker::getUseSpellCheck());
+}
+
+void ALTextView::setSpellChecker(spell_checker_t checker)
+{
+    mSpellChecker = std::move(checker);
+    recheckSpelling();
+}
+
+void ALTextView::recheckSpelling()
+{
+    mSpellLines.clear();
+    mSuggestions.clear();
+    mSuggestedFor = ALTextRange();
+}
+
+void ALTextView::checkLine(S32 line)
+{
+    if (static_cast<size_t>(line) >= mSpellLines.size())
+    {
+        mSpellLines.resize(static_cast<size_t>(mDocument.lineCount()));
+    }
+    SpellLine& checked = mSpellLines[static_cast<size_t>(line)];
+    checked.valid      = true;
+    checked.words.clear();
+    if (!getSpellCheck())
+    {
+        return;
+    }
+    const std::string& text = mDocument.line(line);
+    // What is prose: everything, without a grammar or with one that
+    // says so; comments and strings otherwise.
+    auto check_stretch = [&](S32 begin, S32 end) {
+        size_t at = static_cast<size_t>(begin);
+        while (at < static_cast<size_t>(end))
+        {
+            const auto word = utf8str_next_word_range(text, at);
+            if (word.first >= word.second || word.first >= static_cast<size_t>(end))
+            {
+                break;
+            }
+            const size_t word_end = llmin(word.second, static_cast<size_t>(end));
+            at                    = word.second;
+            const std::string_view piece(text.data() + word.first, word_end - word.first);
+            if (!proseWord(piece))
+            {
+                continue;
+            }
+            const std::string spelled(piece);
+            const bool        ok = mSpellChecker ? mSpellChecker(spelled) : LLSpellChecker::instance().checkSpelling(spelled);
+            if (!ok)
+            {
+                checked.words.emplace_back(static_cast<S32>(word.first), static_cast<S32>(word_end));
+            }
+        }
+    };
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = mHighlighter.grammar();
+    if (!grammar || grammar->prose())
+    {
+        check_stretch(0, static_cast<S32>(text.size()));
+        return;
+    }
+    for (const ALSyntaxToken& token : mHighlighter.tokens(line))
+    {
+        if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment || token.kind == ALSyntaxKind::String)
+        {
+            check_stretch(token.begin, token.end);
+        }
+    }
+}
+
+const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
+{
+    static const std::vector<std::pair<S32, S32>> none;
+    if (line < 0 || line >= mDocument.lineCount())
+    {
+        return none;
+    }
+    if (static_cast<size_t>(line) >= mSpellLines.size() || !mSpellLines[static_cast<size_t>(line)].valid)
+    {
+        checkLine(line);
+    }
+    return mSpellLines[static_cast<size_t>(line)].words;
+}
+
+bool ALTextView::misspelledAt(const ALTextPos& pos, ALTextRange* word)
+{
+    for (const auto& [begin, end] : misspellings(pos.line))
+    {
+        if (begin <= pos.column && pos.column <= end)
+        {
+            if (word)
+            {
+                *word = ALTextRange(ALTextPos(pos.line, begin), ALTextPos(pos.line, end));
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+void ALTextView::gatherSuggestions()
+{
+    mSuggestions.clear();
+    mSuggestedFor = ALTextRange();
+    ALTextRange word;
+    if (!getSpellCheck() || !misspelledAt(mCaret, &word))
+    {
+        return;
+    }
+    mSuggestedFor = word;
+    if (!mSpellChecker && LLSpellChecker::instanceExists())
+    {
+        LLSpellChecker::instance().getSuggestions(mDocument.text(word), mSuggestions);
+    }
+}
+
+const std::string& ALTextView::getSuggestion(U32 index) const
+{
+    return index < mSuggestions.size() ? mSuggestions[index] : LLStringUtil::null;
+}
+
+U32 ALTextView::getSuggestionCount() const
+{
+    return static_cast<U32>(mSuggestions.size());
+}
+
+void ALTextView::replaceWithSuggestion(U32 index)
+{
+    if (index >= mSuggestions.size() || mSuggestedFor.empty() || mReadOnly)
+    {
+        return;
+    }
+    const ALTextRange word       = mSuggestedFor;
+    const std::string suggestion = mSuggestions[index];
+    mSuggestions.clear();
+    mSuggestedFor = ALTextRange();
+    if (!edit(word, suggestion).nothing())
+    {
+        afterEdit();
+    }
+}
+
+void ALTextView::addToDictionary()
+{
+    if (canAddToDictionary())
+    {
+        LLSpellChecker::instance().addToCustomDictionary(mDocument.text(mSuggestedFor));
+        recheckSpelling();
+    }
+}
+
+bool ALTextView::canAddToDictionary() const
+{
+    return getSpellCheck() && !mSuggestedFor.empty() && !mSpellChecker && LLSpellChecker::instanceExists();
+}
+
+void ALTextView::addToIgnore()
+{
+    if (canAddToIgnore())
+    {
+        LLSpellChecker::instance().addToIgnoreList(mDocument.text(mSuggestedFor));
+        recheckSpelling();
+    }
+}
+
+bool ALTextView::canAddToIgnore() const
+{
+    return canAddToDictionary();
+}
+
+void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
+{
+    // The lines the edit touched are checked again when they are next
+    // drawn; the ones below slide.
+    {
+        const S32 count = static_cast<S32>(mSpellLines.size());
+        const S32 first = llclamp(edit.range.begin.line, 0, count);
+        const S32 last  = llclamp(edit.range.end.line, first, count - 1);
+        const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
+        if (first < count)
+        {
+            mSpellLines.erase(mSpellLines.begin() + first, mSpellLines.begin() + last + 1);
+        }
+        mSpellLines.insert(mSpellLines.begin() + llmin(first, static_cast<S32>(mSpellLines.size())), made, SpellLine());
+        mSpellLines.resize(static_cast<size_t>(mDocument.lineCount()));
+        mSpellTimer.reset();
+    }
+    mSuggestions.clear();
+    mSuggestedFor = ALTextRange();
+
+    // The layers: what is after the edit slides with the text, what it
+    // cut through goes.
+    if (!mSubstitutions.empty())
+    {
+        mSubstitutions.erase(std::remove_if(mSubstitutions.begin(), mSubstitutions.end(), [&](Substitution& s) { return !edit.slide(s.range); }), mSubstitutions.end());
+        mHoverLink   = -1;
+        mPressedLink = -1;
+    }
+    if (!mAtoms.empty())
+    {
+        for (size_t i = 0; i < mAtoms.size();)
+        {
+            ALTextRange range = atomRange(mAtoms[i]);
+            if (edit.slide(range))
+            {
+                mAtoms[i].at = range.begin;
+                ++i;
+            }
+            else
+            {
+                if (mAtoms[i].view)
+                {
+                    removeChild(mAtoms[i].view);
+                    mAtoms[i].view->die();
+                }
+                mAtoms.erase(mAtoms.begin() + static_cast<std::ptrdiff_t>(i));
+            }
+        }
+        mHoverAtom   = -1;
+        mPressedAtom = -1;
+    }
 }
 
 void ALTextView::moveVertically(S32 rows, bool extend)
@@ -1571,6 +2167,13 @@ void ALTextView::showContextMenu(S32 x, S32 y)
         mContextMenuHandle = menu->getHandle();
     }
     gEditMenuHandler = this;
+    // The dictionary's items, where the menu has them: the suggestions
+    // show themselves, the rest are shown here.
+    const bool misspelled = getSpellCheck() && !mSuggestedFor.empty();
+    menu->setItemVisible("Suggestion Separator", misspelled && !mSuggestions.empty());
+    menu->setItemVisible("Add to Dictionary", misspelled);
+    menu->setItemVisible("Add to Ignore", misspelled);
+    menu->setItemVisible("Spellcheck Separator", misspelled);
     S32 screen_x, screen_y;
     localPointToScreen(x, y, &screen_x, &screen_y);
     menu->show(screen_x, screen_y, this);
@@ -2263,6 +2866,104 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
             mColorScratch[k] = LLColor4U(base);
         }
     }
+    // A link in its own colour, over whatever the grammar made of it.
+    if (!mSubstitutions.empty())
+    {
+        const LLColor4U link(mLinkColor.get() % alpha);
+        auto            it = std::lower_bound(mSubstitutions.begin(), mSubstitutions.end(), ALTextPos(line, row.begin),
+                                              [](const Substitution& s, const ALTextPos& p) { return s.range.end <= p; });
+        for (; it != mSubstitutions.end() && it->range.begin.line == line && it->range.begin.column < row.end; ++it)
+        {
+            if (!it->link)
+            {
+                continue;
+            }
+            for (size_t k = 0; k < count; ++k)
+            {
+                const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
+                if (cluster >= it->range.begin.column && cluster < it->range.end.column)
+                {
+                    mColorScratch[k] = link;
+                }
+            }
+        }
+    }
+}
+
+void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color)
+{
+    mSquiggleScratch.clear();
+    for (F32 x = x0; x <= x1; x += 1.f)
+    {
+        mSquiggleScratch.emplace_back(x, static_cast<F32>(y) + SQUIGGLE_AMPLITUDE * sinf((x - x0) * (2.f * F_PI / SQUIGGLE_WAVE)));
+    }
+    if (mSquiggleScratch.size() >= 2)
+    {
+        gl_polyline_2d(mSquiggleScratch, color, 1.f);
+    }
+}
+
+void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
+{
+    const ALTextLayout::Row& row   = laid.rows[static_cast<size_t>(r)];
+    const S32                row_h = mLayout.rowHeight();
+    // The link the mouse is on, underlined.
+    if (mHoverLink >= 0 && mHoverLink < static_cast<S32>(mSubstitutions.size()))
+    {
+        const Substitution& sub = mSubstitutions[static_cast<size_t>(mHoverLink)];
+        F32                 x0, x1;
+        if (sub.range.begin.line == line && spanOnRow(line, r, sub.range, x0, x1))
+        {
+            const S32 y = screen_top - llround(mFont->getAscenderHeight()) - 2;
+            gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, mLinkColor.get() % alpha);
+        }
+    }
+    // The atoms on the row, each in its box: an image drawn there, or a
+    // view put there.
+    if (!mAtoms.empty())
+    {
+        for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
+        {
+            const ALTextLayout::Glyph& glyph = laid.glyphs[k];
+            if (!isAtomId(glyph.substitution))
+            {
+                continue;
+            }
+            const size_t index = static_cast<size_t>(glyph.substitution - ATOM_ID_BASE);
+            if (index >= mAtoms.size())
+            {
+                continue;
+            }
+            const Atom& atom = mAtoms[index];
+            if (atom.view || !atom.image)
+            {
+                // A view was put in its box before the rows were drawn.
+                continue;
+            }
+            const S32    x0 = static_cast<S32>(left + glyph.pen - row.xStart);
+            const S32    x1 = static_cast<S32>(left + glyph.pen - row.xStart + glyph.advance);
+            const LLRect box(x0, screen_top, x1, screen_top - row_h);
+            atom.image->draw(box, LLColor4::white % alpha);
+        }
+    }
+    // The words the dictionary lacks, squiggled; the one being typed is
+    // left alone for a moment.
+    if (getSpellCheck())
+    {
+        const bool settling = keyboardOnText() && mSpellTimer.getElapsedTimeF32() < SPELL_SETTLE_SECONDS;
+        for (const auto& [begin, end] : misspellings(line))
+        {
+            if (settling && mCaret.line == line && begin <= mCaret.column && mCaret.column <= end)
+            {
+                continue;
+            }
+            F32 x0, x1;
+            if (spanOnRow(line, r, ALTextRange(ALTextPos(line, begin), ALTextPos(line, end)), x0, x1))
+            {
+                drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha);
+            }
+        }
+    }
 }
 
 void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha)
@@ -2383,6 +3084,7 @@ void ALTextView::drawRows(const LLRect& text)
                 drawPreedit(line, row, screen_top, left, alpha);
             }
 
+            drawLayers(line, laid, static_cast<S32>(r), text, screen_top, left, alpha);
             drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
 
             // The caret.
@@ -2421,6 +3123,7 @@ void ALTextView::draw()
     }
     const LLRect text = textRect();
     drawBeforeRows(text);
+    placeAtomViews();
     {
         LLLocalClipRect clip(text);
         drawRows(text);
@@ -2544,6 +3247,18 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         return true;
     }
     mTripleClick.stop();
+    // A link or an atom under the press is followed on the release, if
+    // the release is on it too.
+    mPressedLink = -1;
+    mPressedAtom = -1;
+    if (const Substitution* link = linkAtLocal(x, y))
+    {
+        mPressedLink = static_cast<S32>(link - mSubstitutions.data());
+    }
+    else if (const Atom* atom = atomAtLocal(x, y); atom && !atom->view)
+    {
+        mPressedAtom = static_cast<S32>(atom - mAtoms.data());
+    }
     placeCaret(posAtLocal(x, y, true), (mask & MASK_SHIFT) != 0);
     mDesiredX  = -1.f;
     mSelecting = true;
@@ -2567,6 +3282,7 @@ bool ALTextView::handleRightMouseDown(S32 x, S32 y, MASK mask)
         placeCaret(at, false);
         mDesiredX = -1.f;
     }
+    gatherSuggestions();
     showContextMenu(x, y);
     return true;
 }
@@ -2613,18 +3329,26 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
     mMapHoverY       = mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y) ? y : -1;
     if (textRect().pointInRect(x, y))
     {
+        const Substitution* link = linkAtLocal(x, y);
+        const Atom*         atom = link ? nullptr : atomAtLocal(x, y);
+        mHoverLink               = link ? static_cast<S32>(link - mSubstitutions.data()) : -1;
+        mHoverAtom               = atom ? static_cast<S32>(atom - mAtoms.data()) : -1;
         if (LLWindow* window = getWindow())
         {
-            window->setCursor(UI_CURSOR_IBEAM);
+            window->setCursor(link || (atom && !atom->view) ? UI_CURSOR_HAND : UI_CURSOR_IBEAM);
         }
         return true;
     }
+    mHoverLink = -1;
+    mHoverAtom = -1;
     return LLUICtrl::handleHover(x, y, mask);
 }
 
 void ALTextView::onMouseLeave(S32 x, S32 y, MASK mask)
 {
     mMapHoverY = -1;
+    mHoverLink = -1;
+    mHoverAtom = -1;
     LLUICtrl::onMouseLeave(x, y, mask);
 }
 
@@ -2646,6 +3370,25 @@ bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
     {
         mSelecting = false;
         gFocusMgr.setMouseCapture(nullptr);
+        // The link or the atom pressed, let go of on the same without a
+        // drag: followed.
+        const S32 pressed_link = mPressedLink;
+        const S32 pressed_atom = mPressedAtom;
+        mPressedLink           = -1;
+        mPressedAtom           = -1;
+        if (!hasSelection())
+        {
+            if (const Substitution* link = linkAtLocal(x, y); link && pressed_link == static_cast<S32>(link - mSubstitutions.data()))
+            {
+                const Substitution followed = *link;
+                mLinkClicked(followed);
+            }
+            else if (const Atom* atom = atomAtLocal(x, y); atom && pressed_atom == static_cast<S32>(atom - mAtoms.data()))
+            {
+                const Atom clicked = *atom;
+                mAtomClicked(clicked);
+            }
+        }
         return true;
     }
     return LLUICtrl::handleMouseUp(x, y, mask);
@@ -2711,6 +3454,40 @@ bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
     const LLRect map = mapRect();
     if (mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y))
     {
+        return true;
+    }
+    // A link or an atom says what it is, while the mouse is on it.
+    std::string says;
+    ALTextRange about;
+    if (const Substitution* link = linkAtLocal(x, y))
+    {
+        says  = link->tooltip;
+        about = link->range;
+    }
+    else if (const Atom* atom = atomAtLocal(x, y))
+    {
+        says  = atom->tooltip;
+        about = atomRange(*atom);
+    }
+    if (!says.empty())
+    {
+        const LLRect text = textRect();
+        S32          row;
+        mLayout.xOf(about.begin.line, about.begin.column, &row);
+        const S32 top = screenTopOf(text, about.begin.line, row);
+        F32       x0, x1;
+        LLRect    local(text.mLeft, top, text.mRight, top - mLayout.rowHeight());
+        if (spanOnRow(about.begin.line, row, about, x0, x1))
+        {
+            local.mLeft  = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x0);
+            local.mRight = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x1);
+        }
+        LLRect sticky;
+        localRectToScreen(local, &sticky);
+        LLToolTip::Params tip;
+        tip.message     = says;
+        tip.sticky_rect = sticky;
+        LLToolTipMgr::instance().show(tip);
         return true;
     }
     return LLUICtrl::handleToolTip(x, y, mask);

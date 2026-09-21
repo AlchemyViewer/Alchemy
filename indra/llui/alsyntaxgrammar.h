@@ -161,6 +161,9 @@ public:
     const std::vector<std::string>& wordTables() const;
     // What a comment to the end of the line begins with, or nothing.
     const std::string& lineComment() const;
+    // Whether the text is prose rather than code: the spell check then
+    // looks at all of it, not only at comments and strings.
+    bool prose() const;
     // The words the grammar itself declares that begin with the prefix,
     // as the word and its table.
     void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;

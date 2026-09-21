@@ -27,6 +27,7 @@
 #include "../alfindbar.h"
 #include "../altextview.h"
 
+#include "../llbutton.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
@@ -467,5 +468,159 @@ namespace tut
         key(KEY_TAB);
         ensure_equals("both indented", v.text(), std::string("    x = 1\n    y = 2\n"));
         ensure("the selection moved with the text", v.selection() == ALTextRange(ALTextPos(0, 6), ALTextPos(1, 7)));
+    }
+
+    template<> template<>
+    void altextview_object::test<16>()
+    {
+        set_test_name("a substitution shows a stretch as other words, a link is followed by a click, and both slide with an edit");
+        ALTextView& v = make("see http://x.example/a-long-path now\nplain");
+        ALTextView::Substitution url;
+        url.range   = ALTextRange(ALTextPos(0, 4), ALTextPos(0, 32));
+        url.shown   = "x.example";
+        url.link    = true;
+        url.tooltip = "http://x.example/a-long-path";
+        url.value   = "opened";
+        v.addSubstitution(url);
+        ensure("held", v.substitutions().size() == 1);
+        ensure("found by a position inside", v.substitutionAt(ALTextPos(0, 10)) != nullptr);
+        ensure("not by one after", v.substitutionAt(ALTextPos(0, 32)) == nullptr);
+        ensure("the text is untouched", v.text().rfind("see http://x.example/a-long-path now", 0) == 0);
+        ensure("the line is narrower than its text", v.layout().line(0).width < v.layout().line(1).width * 6.f);
+        // The caret steps over the stretch as one thing.
+        v.setCaret(ALTextPos(0, 3));
+        key(KEY_RIGHT);
+        ensure("to its start", v.caret() == ALTextPos(0, 4));
+        key(KEY_RIGHT);
+        ensure("over it in one step", v.caret() == ALTextPos(0, 32));
+        key(KEY_LEFT);
+        ensure("and back", v.caret() == ALTextPos(0, 4));
+        // A click on the label follows the link once let go of.
+        std::string followed;
+        v.onLinkClicked([&followed](const ALTextView::Substitution& s) { followed = s.value.asString(); });
+        S32 x, y;
+        pointOf(0, 4, x, y);
+        x += 4;
+        v.handleHover(x, y, MASK_NONE);
+        v.handleMouseDown(x, y, MASK_NONE);
+        ensure("not yet", followed.empty());
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("followed on the release", followed, std::string("opened"));
+        followed.clear();
+        // Let go of somewhere else: a drag, not a click.
+        v.handleMouseDown(x, y, MASK_NONE);
+        S32 x2, y2;
+        pointOf(1, 3, x2, y2);
+        v.handleHover(x2, y2, MASK_NONE);
+        v.handleMouseUp(x2, y2, MASK_NONE);
+        ensure("a drag follows nothing", followed.empty());
+        // A name that arrives later changes what is shown, not the text.
+        ensure("relabelled", v.relabel(url.range, "Example"));
+        ensure_equals("shown", v.substitutions().front().shown, std::string("Example"));
+        ensure("not one that is not there", !v.relabel(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 2)), "x"));
+        // An edit above slides it; one through it drops it.
+        v.setReadOnly(false);
+        v.document().insert(ALTextPos(0, 0), "1\n");
+        ensure("slid down a line", v.substitutions().front().range.begin == ALTextPos(1, 4));
+        v.document().insert(ALTextPos(1, 0), "ab");
+        ensure("slid along", v.substitutions().front().range == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 34)));
+        v.document().remove(ALTextRange(ALTextPos(1, 10), ALTextPos(1, 12)));
+        ensure("cut through: gone", v.substitutions().empty());
+        // Replacing the whole set: two on one line in order, one over the other dropped.
+        ALTextView::Substitution a, b, c;
+        a.range = ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1));
+        b.range = ALTextRange(ALTextPos(2, 0), ALTextPos(2, 2));
+        c.range = ALTextRange(ALTextPos(2, 1), ALTextPos(2, 3));
+        a.shown = b.shown = c.shown = "x";
+        v.setSubstitutions({ b, c, a });
+        ensure_equals("two kept, in order", v.substitutions().size(), size_t(2));
+        ensure("the first first", v.substitutions()[0].range.begin == ALTextPos(0, 0));
+    }
+
+    template<> template<>
+    void altextview_object::test<17>()
+    {
+        set_test_name("an atom stands where a placeholder is, as a box the caret passes over, and a view given is placed in it");
+        const std::string text = "ab" + ALTextView::atomPlaceholder() + "cd";
+        ALTextView&       v    = make(text.c_str());
+        ALTextView::Atom  picture;
+        picture.at      = ALTextPos(0, 2);
+        picture.width   = 30;
+        picture.tooltip = "a picture";
+        picture.value   = 7;
+        v.addAtom(picture);
+        ensure("held", v.atoms().size() == 1);
+        ensure("found inside its placeholder", v.atomAt(ALTextPos(0, 3)) != nullptr);
+        ensure("as wide as asked", v.layout().xOf(0, 5) - v.layout().xOf(0, 2) >= 29.f);
+        v.setCaret(ALTextPos(0, 2));
+        key(KEY_RIGHT);
+        ensure("over the placeholder whole", v.caret() == ALTextPos(0, 5));
+        S32 x, y;
+        pointOf(0, 2, x, y);
+        x += 10;
+        ensure("a click inside lands at a side", v.posAtLocal(x, y, true) == ALTextPos(0, 2) || v.posAtLocal(x, y, true) == ALTextPos(0, 5));
+        S32 clicked = 0;
+        v.onAtomClicked([&clicked](const ALTextView::Atom& a) { clicked = a.value.asInteger(); });
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("clicked", clicked, 7);
+        // A view in the text: a child, shown in the box once drawn.
+        LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+        bp.name  = "inline";
+        bp.label = "Go";
+        bp.rect  = LLRect(0, 20, 40, 0);
+        LLButton*        button = LLUICtrlFactory::create<LLButton>(bp);
+        ALTextView::Atom widget;
+        widget.at    = ALTextPos(0, 2);
+        widget.width = 40;
+        widget.view  = button;
+        v.setAtoms({ widget });
+        ensure("the button is the view's child", button->getParent() == &v);
+        ensure("hidden until placed", !button->getVisible());
+        v.placeAtomViews();
+        ensure("shown once placed, as a frame places it", button->getVisible());
+        ensure("in the box", button->getRect().getWidth() == 40 && button->getRect().getHeight() == v.layout().rowHeight());
+        // An edit that takes the placeholder takes the atom, and the view with it.
+        const LLHandle<LLView> handle = button->getHandle();
+        v.document().remove(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 4)));
+        ensure("gone with its placeholder", v.atoms().empty());
+        ensure("the view is dying, and no longer a child", (handle.isDead() || handle.get()->isDead()) && !v.findChildView("inline", false));
+    }
+
+    template<> template<>
+    void altextview_object::test<18>()
+    {
+        set_test_name("the spell check squiggles the words a dictionary lacks: everywhere in prose, in comments and strings in code");
+        ALTextView& v = make("teh cat\nsecond teh");
+        v.setSpellChecker([](const std::string& word) {
+            std::string lower = word;
+            LLStringUtil::toLower(lower);
+            return lower != "teh";
+        });
+        ensure("off until asked for", !v.getSpellCheck() && v.misspellings(0).empty());
+        v.setSpellCheck(true);
+        ensure("on", v.getSpellCheck());
+        ensure_equals("one on the first line", v.misspellings(0).size(), size_t(1));
+        ensure("the word", v.misspellings(0).front() == std::make_pair(0, 3));
+        ALTextRange word;
+        ensure("found at a position in it", v.misspelledAt(ALTextPos(1, 8), &word) && word == ALTextRange(ALTextPos(1, 7), ALTextPos(1, 10)));
+        ensure("not at one outside", !v.misspelledAt(ALTextPos(0, 5)));
+        // Typing changes the line, which is checked again.
+        v.setCaret(ALTextPos(0, 3));
+        type("n");
+        ensure("the word is now fine", v.misspellings(0).empty());
+        // Code: only what is written to be read.
+        v.setSyntax("lsl");
+        v.setText("teh x; // teh\nstring s = \"teh\";");
+        ensure("the identifier is left alone, the comment is not", v.misspellings(0).size() == 1 && v.misspellings(0).front().first == 10);
+        ensure("and the string", v.misspellings(1).size() == 1);
+        // Words that are code are never checked.
+        v.setSyntax("text");
+        v.setText("llSay my_word x2 ok");
+        ensure("camel case, underscores and digits are code", v.misspellings(0).empty());
+        v.setText("Teh");
+        ensure("a capital first letter is still a word", v.misspellings(0).size() == 1);
+        v.setReadOnly(true);
+        ensure("nothing is checked in a read-only view", !v.getSpellCheck());
     }
 }

@@ -33,8 +33,10 @@
 #include "lleditmenuhandler.h"
 #include "llframetimer.h"
 #include "llpreeditor.h"
+#include "llspellcheckmenuhandler.h"
 #include "lluicolor.h"
 #include "lluictrl.h"
+#include "lluiimage.h"
 
 #include <array>
 #include <functional>
@@ -65,7 +67,13 @@ class LLContextMenu;
 // view. Or the ruler can be a map of the text instead, with the lines
 // drawn small and the rows on screen as a window over it.
 //
-// What is not here yet: spell check, atoms and display substitutions.
+// Three layers over the text besides the grammar's colours: substitutions,
+// which show a stretch as other words or as a link without the text
+// changing under anyone's positions; atoms, which stand an image or a
+// child view in the text where a placeholder is; and the spell check,
+// which squiggles the words the dictionary lacks -- in comments and
+// strings where there is a grammar, everywhere where there is not --
+// and offers the dictionary's suggestions on the right-click menu.
 class ALTextView;
 
 // A keymap with a mind of its own -- a vim mode -- told each key and each
@@ -88,7 +96,7 @@ public:
     virtual U32 generation() const = 0;
 };
 
-class ALTextView : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor
+class ALTextView : public LLUICtrl, public LLEditMenuHandler, public LLSpellCheckMenuHandler, protected LLPreeditor
 {
 public:
     AL_VIEW_TYPE(ALTextView, LLUICtrl);
@@ -131,6 +139,12 @@ public:
         Optional<S32>         scroll_map_width;
         Optional<bool>        scroll_map_preview;
         Optional<bool>        scroll_map_left;
+        // A link is drawn in this, underlined while the mouse is on it.
+        Optional<LLUIColor>   link_color;
+        // Whether the words the dictionary lacks are squiggled, where the
+        // viewer's spell check is on at all.
+        Optional<bool>        spellcheck;
+        Optional<LLUIColor>   spell_error_color;
 
         Params();
     };
@@ -222,6 +236,103 @@ public:
     // view: where a list of places sends it.
     void goTo(const ALTextPos& pos);
     void goTo(const ALTextRange& range);
+
+    // --- what a stretch shows --------------------------------------------------
+
+    // A stretch of the text shown as something other than itself, without
+    // the text changing under anyone's positions: a URL as its label, a
+    // key as the name it resolved to, or the text as it is, as a link.
+    // The caret passes over it whole. Replaced whole, or added one at a
+    // time as a log grows; an edit slides them and drops the ones it
+    // cuts through.
+    struct Substitution
+    {
+        ALTextRange range;
+        // In place of the text; empty leaves the text as it is.
+        std::string shown;
+        bool        link = false;
+        std::string tooltip;
+        // Handed back when the link is followed.
+        LLSD        value;
+    };
+    void                             setSubstitutions(std::vector<Substitution> substitutions);
+    void                             addSubstitution(Substitution substitution);
+    void                             clearSubstitutions() { setSubstitutions({}); }
+    const std::vector<Substitution>& substitutions() const { return mSubstitutions; }
+    // The one over a position, or null.
+    const Substitution*              substitutionAt(const ALTextPos& pos) const;
+    // What the stretch at a range shows, changed: a name that arrived.
+    // False where no substitution starts there.
+    bool                             relabel(const ALTextRange& range, const std::string& shown);
+    typedef boost::signals2::signal<void(const Substitution&)> link_signal_t;
+    // A link followed: clicked, and let go of without a drag.
+    boost::signals2::connection onLinkClicked(const link_signal_t::slot_type& slot) { return mLinkClicked.connect(slot); }
+
+    // --- atoms ---------------------------------------------------------------
+
+    // The object replacement character, U+FFFC: what stands in the text
+    // where an atom is, unless the atom says its placeholder is longer.
+    static const std::string& atomPlaceholder();
+    // Something in the text that is not text: a placeholder the document
+    // holds, shown as an image or as a child view in a box of the atom's
+    // width and a row's height. A view given becomes this view's child,
+    // placed in the box while the box is on screen and hidden while it
+    // is not, and goes with the atom. The caret passes over an atom
+    // whole; an edit that takes its placeholder takes it.
+    struct Atom
+    {
+        ALTextPos    at;
+        // The placeholder's bytes.
+        S32          length = 3;
+        S32          width  = 0;
+        LLUIImagePtr image;
+        LLView*      view = nullptr;
+        std::string  tooltip;
+        // Handed back when the atom is clicked.
+        LLSD         value;
+    };
+    void                     setAtoms(std::vector<Atom> atoms);
+    void                     addAtom(Atom atom);
+    void                     clearAtoms() { setAtoms({}); }
+    const std::vector<Atom>& atoms() const { return mAtoms; }
+    const Atom*              atomAt(const ALTextPos& pos) const;
+    ALTextRange              atomRange(const Atom& atom) const { return ALTextRange(atom.at, ALTextPos(atom.at.line, atom.at.column + atom.length)); }
+    typedef boost::signals2::signal<void(const Atom&)> atom_signal_t;
+    // An atom shown as an image was clicked; one shown as a view takes
+    // its own clicks.
+    boost::signals2::connection onAtomClicked(const atom_signal_t::slot_type& slot) { return mAtomClicked.connect(slot); }
+    // Every atom's view put where its box is on the screen, or hidden
+    // where the box is not: what a frame does before it draws, and what
+    // a click on one needs done before the first frame.
+    void placeAtomViews();
+
+    // --- the spell check -------------------------------------------------------
+
+    void setSpellCheck(bool check);
+    // Whether words are checked here: asked for, and the viewer's spell
+    // check is on. The menu handler's own question.
+    bool getSpellCheck() const override;
+    // Who says whether a word is spelled right; the viewer's dictionary
+    // unless told otherwise, which a test is.
+    typedef std::function<bool(const std::string& word)> spell_checker_t;
+    void setSpellChecker(spell_checker_t checker);
+    // The words the dictionary lacks on a line, as ranges of it, checked
+    // now if they were not.
+    const std::vector<std::pair<S32, S32>>& misspellings(S32 line);
+    // Whether a position is in one, and the word there.
+    bool        misspelledAt(const ALTextPos& pos, ALTextRange* word = nullptr);
+    // Everything is checked again: the dictionary changed.
+    void        recheckSpelling();
+
+    // --- LLSpellCheckMenuHandler ---------------------------------------------
+
+    const std::string& getSuggestion(U32 index) const override;
+    U32                getSuggestionCount() const override;
+    void               replaceWithSuggestion(U32 index) override;
+    void               addToDictionary() override;
+    bool               canAddToDictionary() const override;
+    void               addToIgnore() override;
+    bool               canAddToIgnore() const override;
 
     // --- scrolling -----------------------------------------------------------
 
@@ -377,6 +488,8 @@ protected:
     // The x span of a range on a row, if it touches the row; a range past
     // the line's end reaches a little past the last glyph.
     bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
+    // A wavy line from x0 to x1 with its middle at y.
+    void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color);
     // Something was asked about the name at the caret: its definition,
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
@@ -440,8 +553,27 @@ private:
     void drawMapPreview(F32 alpha);
     void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
+    // The links, the atoms and the misspellings of a row, drawn over its glyphs.
+    void drawLayers(S32 line, const ALTextLayout::Line& laid, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha);
     // Laying out is a cache fill, which a const query may cause.
     ALTextLayout& lay() const { return const_cast<ALTextLayout&>(mLayout); }
+    // The layers through an edit: what is after it slides, what it cut
+    // through goes, and the lines it touched are checked again.
+    void onDocumentEdit(const ALTextDocument::Edit& edit);
+    // What the layout is told of a line's substitutions and atoms.
+    void provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const;
+    // A position inside what is shown as one thing, moved out to the side
+    // it came from -- past it going forward from `from`, before it going
+    // back -- else as it is.
+    ALTextPos snapped(const ALTextPos& pos, const ALTextPos& from) const;
+    // The substitution or the atom under a local point, if the point is
+    // on its glyphs.
+    const Substitution* linkAtLocal(S32 x, S32 y);
+    const Atom*         atomAtLocal(S32 x, S32 y);
+    void                checkLine(S32 line);
+    // The suggestions for the misspelling at the caret, gathered when the
+    // menu is shown.
+    void                gatherSuggestions();
 
     ALTextDocument      mDocument;
     ALTextUndo          mUndo;
@@ -535,4 +667,38 @@ private:
     std::vector<LLColor4U> mColorScratch;
     changed_signal_t       mChanged;
     changed_signal_t       mCaretMoved;
+
+    boost::signals2::scoped_connection mDocumentConnection;
+    // In order of where they start, none over another.
+    std::vector<Substitution>          mSubstitutions;
+    std::vector<Atom>                  mAtoms;
+    LLUIColor                          mLinkColor;
+    link_signal_t                      mLinkClicked;
+    atom_signal_t                      mAtomClicked;
+    // The link or the atom the mouse is on, by index, or -1; and the
+    // link or the atom a press landed on, which a release on the same
+    // follows.
+    S32                                mHoverLink    = -1;
+    S32                                mHoverAtom    = -1;
+    S32                                mPressedLink  = -1;
+    S32                                mPressedAtom  = -1;
+
+    // The spell check: whether it was asked for; who checks a word; the
+    // words each line lacks, found when the line is drawn and kept until
+    // the line changes or the dictionary does; the word at the caret is
+    // left alone for a moment after it was typed.
+    bool                                    mSpellCheck = false;
+    spell_checker_t                         mSpellChecker;
+    struct SpellLine
+    {
+        bool                             valid = false;
+        std::vector<std::pair<S32, S32>> words;
+    };
+    std::vector<SpellLine>                  mSpellLines;
+    LLUIColor                               mSpellErrorColor;
+    LLFrameTimer                            mSpellTimer;
+    std::vector<std::string>                mSuggestions;
+    ALTextRange                             mSuggestedFor;
+    boost::signals2::scoped_connection      mSpellSettingsConnection;
+    std::vector<LLVector2>                  mSquiggleScratch;
 };

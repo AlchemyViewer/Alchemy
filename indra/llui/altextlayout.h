@@ -55,8 +55,13 @@
 // An inlay -- a word the view shows beside the text without its being in
 // the text, such as a parameter's name before an argument -- is the same
 // gap at a column, as wide as whoever provides it says, which the view
-// then draws its word into. An atom -- an image or a view in the text --
-// will be the same gap with a height of its own, when there is one.
+// then draws its word into. A substitution shows a stretch of the line
+// as other text -- a URL as its label, a key as the name it stands for
+// -- or as a box so wide, which is what an atom, an image or a view in
+// the text, is to the layout: the stretch's glyphs all share its first
+// byte as their cluster, so the caret sits before the stretch or after
+// it and nowhere within, and its bytes are never shaped. A box is a
+// row tall; rows of their own height are for when a client needs one.
 class ALTextLayout
 {
 public:
@@ -66,13 +71,15 @@ public:
     // An inlay's gap carries the inlay's id, and whether it stands before
     // the text at its column -- so the caret at the column sits after it
     // -- or after the text before the column, with the caret before it.
+    // A substitution's glyphs carry the substitution's id.
     struct Glyph
     {
-        S32  cluster     = 0;
-        F32  pen         = 0.f;
-        F32  advance     = 0.f;
-        S32  inlay       = -1;
-        bool inlayBefore = true;
+        S32  cluster      = 0;
+        F32  pen          = 0.f;
+        F32  advance      = 0.f;
+        S32  inlay        = -1;
+        bool inlayBefore  = true;
+        S32  substitution = -1;
     };
 
     // What goes beside a line's text: at a byte column, so wide, before
@@ -85,6 +92,21 @@ public:
         S32  id     = -1;
     };
     typedef std::function<void(S32 line, std::vector<Inlay>& out)> inlay_provider_t;
+
+    // What a stretch of a line shows in place of its bytes: other text,
+    // or a box so wide, known to the provider by an id. Stretches that
+    // overlap are taken first come, the rest dropped.
+    struct Substitution
+    {
+        S32         begin = 0;
+        S32         end   = 0;
+        // The text shown; empty for a box.
+        std::string shown;
+        // The box's width, in the UI's pixels, where nothing is shown.
+        F32         width = 0.f;
+        S32         id    = -1;
+    };
+    typedef std::function<void(S32 line, std::vector<Substitution>& out)> substitution_provider_t;
 
     // A row of a line: the bytes it holds, the glyphs it holds, and where in
     // the unwrapped line it starts, since the glyphs keep their unwrapped pen.
@@ -126,6 +148,10 @@ public:
     // in the UI's pixels. Whoever provides them lays a line out again,
     // through invalidateLine, when they change.
     void setInlayProvider(inlay_provider_t provider);
+    // Asked, as each line is laid out, what stretches of it show as
+    // something else; likewise, whoever provides them lays a line out
+    // again when they change.
+    void setSubstitutionProvider(substitution_provider_t provider);
     void invalidateLine(S32 index);
     // A space's advance, in the screen's pixels: what a column is, for
     // whoever draws by columns.
@@ -210,4 +236,6 @@ private:
     std::vector<ALShapedGlyph>         mShaped;
     inlay_provider_t                   mInlays;
     std::vector<Inlay>                 mInlayScratch;
+    substitution_provider_t            mSubstitutions;
+    std::vector<Substitution>          mSubstitutionScratch;
 };

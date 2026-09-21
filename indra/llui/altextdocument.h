@@ -106,6 +106,15 @@ public:
         ALTextRange rangeAfter() const { return ALTextRange(range.begin, endAfter()); }
         Edit        inverse() const;
         bool        nothing() const { return removed.empty() && inserted.empty(); }
+
+        // What the edit does to positions kept beside the text. A position
+        // at or after the end of what was replaced, moved along with the
+        // text; and a range through the edit: false where the edit took
+        // some of it or landed inside it, else the range moved along.
+        // Text put right before a range pushes it along; text put right
+        // after it is not it.
+        ALTextPos slidPast(const ALTextPos& pos) const;
+        bool      slide(ALTextRange& range) const;
     };
 
     typedef boost::signals2::signal<void(const Edit&)> changed_signal_t;

@@ -50,8 +50,6 @@ namespace
     const S32 FOLD_COLUMN = 12;
     const S32 FOLD_MARKER = 7;
     const S32 FOLD_BOX_GAP = 6;
-    const F32 SQUIGGLE_AMPLITUDE = 1.f;
-    const F32 SQUIGGLE_WAVE      = 5.f;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
     const S32 COMPLETION_AUTO_AT = 2;
@@ -83,37 +81,6 @@ namespace
     }
 
     // Where a position past an edit ends up once the edit is made.
-    ALTextPos slidPast(const ALTextPos& pos, const ALTextRange& removed, const ALTextPos& end_after)
-    {
-        if (pos.line == removed.end.line)
-        {
-            return ALTextPos(end_after.line, end_after.column + (pos.column - removed.end.column));
-        }
-        return ALTextPos(pos.line + (end_after.line - removed.end.line), pos.column);
-    }
-
-    // A range through an edit of the text it is over: false where the
-    // edit took some of it or landed inside it, else the range moved
-    // along with the text. Text put right before it pushes it along;
-    // text put right after it is not it.
-    bool slide(ALTextRange& range, const ALTextRange& removed, const ALTextPos& end_after)
-    {
-        ALTextRange r = range.normalised();
-        const bool  cut = removed.empty() ? (r.begin < removed.begin && removed.begin < r.end)
-                                          : (r.begin < removed.end && removed.begin < r.end);
-        if (cut)
-        {
-            return false;
-        }
-        if (removed.end <= r.begin)
-        {
-            r.begin = slidPast(r.begin, removed, end_after);
-            r.end   = slidPast(r.end, removed, end_after);
-        }
-        range = r;
-        return true;
-    }
-
     bool identifierByte(char c)
     {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
@@ -280,15 +247,11 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
-    const S32         delta     = made - (last - first + 1);
-    const ALTextRange removed   = edit.range.normalised();
-    const ALTextPos   end_after = document().clamp(edit.endAfter());
-    mDecorations.erase(std::remove_if(mDecorations.begin(), mDecorations.end(), [&](Decoration& d) { return !slide(d.range, removed, end_after); }),
-                       mDecorations.end());
-    mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !slide(r, removed, end_after); }),
-                      mHighlights.end());
-    mSemantics.erase(std::remove_if(mSemantics.begin(), mSemantics.end(), [&](SemanticToken& t) { return !slide(t.range, removed, end_after); }),
-                     mSemantics.end());
+    const S32         delta   = made - (last - first + 1);
+    const ALTextRange removed = edit.range.normalised();
+    mDecorations.erase(std::remove_if(mDecorations.begin(), mDecorations.end(), [&](Decoration& d) { return !edit.slide(d.range); }), mDecorations.end());
+    mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !edit.slide(r); }), mHighlights.end());
+    mSemantics.erase(std::remove_if(mSemantics.begin(), mSemantics.end(), [&](SemanticToken& t) { return !edit.slide(t.range); }), mSemantics.end());
     // An inlay moves with the text it stands by: one before the text at
     // its position stays put when something is typed there, since what
     // is typed is the start of that text; one after the text before it
@@ -300,13 +263,13 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                                      {
                                          if (removed.begin < h.at || (removed.begin == h.at && !h.before))
                                          {
-                                             h.at = slidPast(h.at, removed, end_after);
+                                             h.at = edit.slidPast(h.at);
                                          }
                                          return false;
                                      }
                                      if (removed.end <= h.at)
                                      {
-                                         h.at = slidPast(h.at, removed, end_after);
+                                         h.at = edit.slidPast(h.at);
                                          return false;
                                      }
                                      return !(h.at <= removed.begin);
@@ -321,10 +284,10 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
             ALTextRange& r = mPlaceholders[i];
             if (i == mPlaceholderAt && r.begin <= removed.begin && removed.end <= r.end)
             {
-                r.end = slidPast(r.end, removed, end_after);
+                r.end = edit.slidPast(r.end);
                 ++i;
             }
-            else if (slide(r, removed, end_after))
+            else if (edit.slide(r))
             {
                 ++i;
             }
@@ -345,7 +308,7 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
         {
             if (removed.end <= mPlaceholdersAfter)
             {
-                mPlaceholdersAfter = slidPast(mPlaceholdersAfter, removed, end_after);
+                mPlaceholdersAfter = edit.slidPast(mPlaceholdersAfter);
             }
         }
         if (mPlaceholders.empty() || mPlaceholderAt < 0)
@@ -1000,19 +963,6 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
 }
 
 // --- over the rows -------------------------------------------------------------
-
-void ALCodeEditor::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color)
-{
-    mSquiggleScratch.clear();
-    for (F32 x = x0; x <= x1; x += 1.f)
-    {
-        mSquiggleScratch.emplace_back(x, static_cast<F32>(y) + SQUIGGLE_AMPLITUDE * sinf((x - x0) * (2.f * F_PI / SQUIGGLE_WAVE)));
-    }
-    if (mSquiggleScratch.size() >= 2)
-    {
-        gl_polyline_2d(mSquiggleScratch, color, 1.f);
-    }
-}
 
 LLRect ALCodeEditor::foldBoxOf(S32 line, const LLRect& text)
 {

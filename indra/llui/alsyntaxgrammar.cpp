@@ -261,6 +261,7 @@ struct ALSyntaxGrammar::Impl
     std::vector<std::string> extensions;
     std::vector<std::string> wordTables;
     std::string              lineComment;
+    bool                     prose = false;
     std::vector<State>       states;
     // The words the grammar declares for its tables, ahead of whatever is
     // filled in at runtime.
@@ -681,6 +682,7 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
         return false;
     }
     impl->lineComment = description["line_comment"].asString();
+    impl->prose       = description["prose"].asBoolean();
     const LLSD& extensions = description["extensions"];
     for (LLSD::array_const_iterator it = extensions.beginArray(); it != extensions.endArray(); ++it)
     {
@@ -815,6 +817,11 @@ void ALSyntaxGrammar::collectWords(std::string_view prefix, std::vector<std::pai
 const std::string& ALSyntaxGrammar::lineComment() const
 {
     return mImpl->lineComment;
+}
+
+bool ALSyntaxGrammar::prose() const
+{
+    return mImpl->prose;
 }
 
 ALSyntaxState ALSyntaxGrammar::initialState() const
