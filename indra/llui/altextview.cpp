@@ -76,16 +76,15 @@ namespace
     const S32 H_MARGIN              = 16;
     const F32 CARET_MARGIN          = 8.f;
 
-    // The colour each kind is drawn in, by the name in the colour table;
-    // Text is the view's own text colour.
-    const char* const KIND_COLOR_NAMES[] = {
-        "TextFgColor",       "SyntaxComment",  "SyntaxDocComment", "SyntaxString",   "SyntaxEscape",      "SyntaxNumber",
-        "SyntaxKeyword",     "SyntaxControl",  "SyntaxType",       "SyntaxConstant", "SyntaxFunction",    "SyntaxEvent",
-        "SyntaxLabel",       "SyntaxOperator", "SyntaxPunctuation", "SyntaxPreprocessor", "SyntaxTag",     "SyntaxAttribute",
-        "SyntaxAttributeValue", "SyntaxEntity", "SyntaxVariable",   "SyntaxParameter", "SyntaxProperty",   "SyntaxDeprecated",
-        "SyntaxInvalid",
+    // What each kind's colour is called in the colour table, after the
+    // prefix; Text is the view's own text colour.
+    const char* const KIND_COLOR_SUFFIXES[] = {
+        "",           "Comment",     "DocComment",   "String",    "Escape",         "Number",    "Keyword",
+        "Control",    "Type",        "Constant",     "Function",  "Event",          "Label",     "Operator",
+        "Punctuation", "Preprocessor", "Tag",        "Attribute", "AttributeValue", "Entity",    "Variable",
+        "Parameter",  "Property",    "Deprecated",   "Invalid",
     };
-    static_assert(sizeof(KIND_COLOR_NAMES) / sizeof(KIND_COLOR_NAMES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
+    static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
 
     bool editsText(ALEditorCommand command)
     {
@@ -138,6 +137,7 @@ ALTextView::Params::Params()
     h_pad("h_pad", 4),
     v_pad("v_pad", 2),
     syntax("syntax"),
+    syntax_color_prefix("syntax_color_prefix", "Syntax"),
     default_text("default_text"),
     context_menu("context_menu"),
     find_match_color("find_match_color"),
@@ -175,9 +175,19 @@ ALTextView::ALTextView(const Params& p)
     mScrollMapWidth     = llmax(20, static_cast<S32>(p.scroll_map_width));
     mScrollMapPreview   = p.scroll_map_preview;
     mScrollMapLeft      = p.scroll_map_left;
-    for (size_t kind = 0; kind < mKindColors.size(); ++kind)
     {
-        mKindColors[kind] = LLUIColorTable::instance().getColor(KIND_COLOR_NAMES[kind], mTextColor.get());
+        const LLUIColorTable& colors = LLUIColorTable::instance();
+        const std::string     prefix = p.syntax_color_prefix();
+        mKindColors[0]               = mTextColor;
+        for (size_t kind = 1; kind < mKindColors.size(); ++kind)
+        {
+            std::string name = kindColorName(prefix, static_cast<ALSyntaxKind>(kind));
+            if (!colors.colorExists(name))
+            {
+                name = kindColorName("Syntax", static_cast<ALSyntaxKind>(kind));
+            }
+            mKindColors[kind] = colors.getColor(name, mTextColor.get());
+        }
     }
 
     mHighlighter.attach(&mDocument);
@@ -2082,6 +2092,17 @@ bool ALTextView::spanOnRow(S32 line, S32 row, const ALTextRange& range_in, F32& 
 const LLColor4& ALTextView::colorForKind(ALSyntaxKind kind) const
 {
     return mKindColors[static_cast<size_t>(kind)].get();
+}
+
+// static
+std::string ALTextView::kindColorName(std::string_view prefix, ALSyntaxKind kind)
+{
+    const size_t index = static_cast<size_t>(kind);
+    if (index == 0 || index >= static_cast<size_t>(ALSyntaxKind::COUNT))
+    {
+        return std::string();
+    }
+    return std::string(prefix) + KIND_COLOR_SUFFIXES[index];
 }
 
 const LLColor4& ALTextView::backgroundColor() const

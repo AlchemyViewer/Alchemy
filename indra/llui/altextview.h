@@ -92,6 +92,11 @@ public:
         Optional<S32>         v_pad;
         // The grammar to colour by, by the name in its file.
         Optional<std::string> syntax;
+        // What the colour table calls each kind's colour: this before the
+        // kind's name, "Syntax" unless a skin says, so that one set of
+        // editors can be themed apart from another. A name the table
+        // lacks falls back to the "Syntax" one.
+        Optional<std::string> syntax_color_prefix;
         Optional<std::string> default_text;
         // The file the right-click menu is built from; none for no menu.
         Optional<std::string> context_menu;
@@ -142,6 +147,10 @@ public:
     // what the text is drawn in, for whatever draws beside them.
     const LLColor4& backgroundColor() const;
     const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
+    // The colour table's name for a kind's colour under a prefix:
+    // "SyntaxComment", "ScriptComment". Text has none, being the view's
+    // own text colour.
+    static std::string kindColorName(std::string_view prefix, ALSyntaxKind kind);
     // Whether the text has changed since it was set or saved.
     bool            isDirty() const override { return !mUndo.isPristine(); }
     void            resetDirty() override { mUndo.markSaved(); }
