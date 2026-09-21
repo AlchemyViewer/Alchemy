@@ -101,11 +101,13 @@ public:
     void openOver(const LLView* anchor);
 
     // Gone, having settled: what a caller calls when the thing in it has been
-    // chosen. The closed signal says it was not escaped.
-    void settle();
+    // chosen, and what a return key does. The closed signal says it was
+    // not escaped. A popover with more to note about settling than that
+    // overrides it, and is reached however the settling came.
+    virtual void settle();
 
     // Gone, keeping nothing.
-    void escape();
+    virtual void escape();
 
     // Told as it goes: true where it was escaped, so a caller that applies on
     // close knows to apply nothing.

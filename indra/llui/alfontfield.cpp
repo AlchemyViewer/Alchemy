@@ -385,7 +385,7 @@ namespace
         // Only OK settles; escape, cancel and looking away keep what the
         // field had, so that what a person sees applied is what they said
         // yes to.
-        void settle()
+        void settle() override
         {
             mSettled = true;
             ALPopover::settle();
