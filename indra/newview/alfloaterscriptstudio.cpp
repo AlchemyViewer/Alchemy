@@ -62,6 +62,9 @@
 #include "lltextbox.h"
 #include "lltexteditor.h"
 #include "lltrans.h"
+#include "llexternaleditor.h"
+#include "lllogchat.h"
+#include "llscripteditorws.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
@@ -867,6 +870,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         }
         takeCarriedText(doc);
         doc.editor->setReadOnly(!answer.modifiable);
+        applyPendingEdits(doc);
         doc.expanded.valid = false;
         doc.uploaded.valid = false;
         LLStringUtil::format_map_t args;
@@ -1595,6 +1599,9 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     request.text    = doc.editor->text();
     request.line    = at.line;
     request.column  = at.column;
+    request.semantics      = mSemanticColors;
+    request.hintParameters = mInlayParameters;
+    request.hintTypes      = mInlayTypes;
     if (preprocessed(doc))
     {
         // The analyzers see what the compiler would; a position inside a
@@ -2201,6 +2208,17 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
         doc.runtime.clear();
     }
     refreshProblems(doc);
+    if (ours && doc.liveFile)
+    {
+        // The editor outside sees what was saved here, and what the
+        // compiler made of it; its own save is not written back to it.
+        if (!doc.externalSave)
+        {
+            syncExternal(doc);
+        }
+        doc.externalSave = false;
+        logExternal(doc, result);
+    }
 
     if (result.success)
     {
@@ -2273,7 +2291,59 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
     doc.outline          = result.outline;
-    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version)
+    // What every name is and what goes beside the text, in the source's
+    // places; what stands in an include is the include's.
+    const bool         mapped = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
+    const ALSourceMap* map    = mapped ? &doc.expanded.map : nullptr;
+    std::vector<ALCodeEditor::SemanticToken> semantics;
+    semantics.reserve(result.semantics.size());
+    for (ALScriptSemanticToken token : result.semantics)
+    {
+        if (map && mapSpan(*map, token.span) != 0)
+        {
+            continue;
+        }
+        ALCodeEditor::SemanticToken one;
+        one.range  = rangeOf(token.span);
+        one.kind   = token.kind == ALScriptSymbolKind::Module ? ALSyntaxKind::Variable : syntaxKindOf(token.kind);
+        one.strike = (token.modifiers & ALScriptSemanticToken::Deprecated) != 0;
+        if (one.kind == ALSyntaxKind::Text)
+        {
+            continue;
+        }
+        if (one.strike)
+        {
+            one.kind = ALSyntaxKind::Deprecated;
+        }
+        else if (token.kind == ALScriptSymbolKind::Variable && (token.modifiers & ALScriptSemanticToken::ReadOnly))
+        {
+            one.kind = ALSyntaxKind::Constant;
+        }
+        semantics.push_back(std::move(one));
+    }
+    doc.editor->setSemanticTokens(std::move(semantics));
+    std::vector<ALCodeEditor::InlayHint> hints;
+    hints.reserve(result.hints.size());
+    for (const ALScriptInlayHint& hint : result.hints)
+    {
+        ALTextPos at(hint.line, hint.column);
+        if (map)
+        {
+            const ALSourceMap::Loc loc = map->toSource(hint.line, hint.column);
+            if (!loc.found() || loc.file != 0)
+            {
+                continue;
+            }
+            at = ALTextPos(loc.line, loc.column);
+        }
+        ALCodeEditor::InlayHint one;
+        one.at     = at;
+        one.text   = hint.text;
+        one.before = hint.kind == ALScriptInlayHint::Kind::Parameter;
+        hints.push_back(std::move(one));
+    }
+    doc.editor->setInlayHints(std::move(hints));
+    if (mapped)
     {
         // Back to the source: a problem in an include keeps its file, and
         // what an include declares is the include's to outline.
@@ -2515,40 +2585,7 @@ void ALFloaterScriptStudio::onProblemSelected()
     {
         // In an include: opened in a tab of its own where it is a script
         // or a notecard in the world; a file on disk is only named.
-        ALScriptRef ref;
-        std::string file;
-        if (ALScriptPreprocessor::refOf(problem.file, ref))
-        {
-            const LLInventoryItem* item = ref.inInventory() ? gInventory.getItem(ref.item)
-                                          : gObjectList.findObject(ref.object) ? gObjectList.findObject(ref.object)->getInventoryItem(ref.item)
-                                                                               : nullptr;
-            if (!item)
-            {
-                LLStringUtil::format_map_t args;
-                args["[FILE]"] = problem.fileName;
-                setStatus(getString("IncludeGone", args));
-                return;
-            }
-            openScript(ref, problem.fileName);
-            if (const size_t opened = indexOf(ref); opened != NONE)
-            {
-                Doc& include = *mDocs[opened];
-                if (include.loaded)
-                {
-                    include.editor->goToLine(problem.line);
-                }
-                else
-                {
-                    include.pendingLine = problem.line;
-                }
-            }
-        }
-        else if (ALScriptPreprocessor::fileOf(problem.file, file))
-        {
-            LLStringUtil::format_map_t args;
-            args["[FILE]"] = file;
-            setStatus(getString("IncludeOnDisk", args));
-        }
+        openIncludeAt(problem.file, problem.fileName, problem.line, problem.hasColumn ? problem.column : -1, 0);
         return;
     }
     doc->editor->setCaret(ALTextPos(problem.line, problem.hasColumn ? problem.column : 0));
@@ -2565,6 +2602,42 @@ void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const A
     askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
 }
 
+namespace
+{
+    // A line of a text, trimmed, for a row of the pane.
+    std::string lineOf(const std::string& text, S32 line)
+    {
+        size_t begin = 0;
+        for (S32 l = 0; l < line && begin != std::string::npos; ++l)
+        {
+            begin = text.find('\n', begin);
+            if (begin != std::string::npos)
+            {
+                ++begin;
+            }
+        }
+        if (begin == std::string::npos)
+        {
+            return std::string();
+        }
+        size_t      end = text.find('\n', begin);
+        std::string out = text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
+        LLStringUtil::trim(out);
+        return out;
+    }
+
+    std::string lineOf(const ALTextDocument& text, S32 line)
+    {
+        if (line < 0 || line >= text.lineCount())
+        {
+            return std::string();
+        }
+        std::string out = text.text(ALTextRange(ALTextPos(line, 0), ALTextPos(line, text.lineLength(line))));
+        LLStringUtil::trim(out);
+        return out;
+    }
+}
+
 void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result)
 {
     // Of another question, or of a text that has moved on.
@@ -2572,33 +2645,9 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     {
         return;
     }
-    const ALEditorCommand command = doc.symbolCommand;
-    ALScriptReferences    refs    = result.references;
-    doc.symbolCommand             = ALEditorCommand::None;
-    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version)
-    {
-        // Back to the source; what stands in an include is not this
-        // script's to go to or rename.
-        const ALSourceMap& map = doc.expanded.map;
-        if (refs.hasDefinition && mapSpan(map, refs.definition) != 0)
-        {
-            refs.hasDefinition = false;
-            refs.renamable     = false;
-        }
-        std::vector<ALScriptSpan> kept;
-        for (ALScriptSpan span : refs.references)
-        {
-            if (mapSpan(map, span) == 0)
-            {
-                kept.push_back(span);
-            }
-            else
-            {
-                refs.renamable = false;
-            }
-        }
-        refs.references = std::move(kept);
-    }
+    const ALEditorCommand     command = doc.symbolCommand;
+    const ALScriptReferences& refs    = result.references;
+    doc.symbolCommand                 = ALEditorCommand::None;
     LLStringUtil::format_map_t args;
     args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
     if (!refs.found)
@@ -2606,68 +2655,384 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
         setStatus(getString("NoReferences", args));
         return;
     }
-    args["[COUNT]"] = std::to_string(refs.references.size());
+    // Back to the source: the declaration and each place in this script
+    // or in an include, which keeps the include's identity.
+    const bool         mapped        = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
+    const ALSourceMap* map           = mapped ? &doc.expanded.map : nullptr;
+    bool               hasDefinition = refs.hasDefinition;
+    ALScriptSpan       definition    = refs.definition;
+    std::string        homePath;
+    std::string        homeName;
+    if (hasDefinition && map)
+    {
+        const S32 file = mapSpan(*map, definition);
+        if (file < 0)
+        {
+            hasDefinition = false;
+        }
+        else if (file > 0)
+        {
+            homePath = map->files()[file].path;
+            homeName = map->files()[file].name;
+        }
+    }
+    std::vector<Doc::Place> places;
+    places.reserve(refs.references.size());
+    for (ALScriptSpan span : refs.references)
+    {
+        const ALScriptSpan raw = span;
+        Doc::Place         place;
+        if (map)
+        {
+            const S32 file = mapSpan(*map, span);
+            if (file < 0)
+            {
+                continue;
+            }
+            if (file > 0)
+            {
+                place.file     = map->files()[file].path;
+                place.fileName = map->files()[file].name;
+                place.text     = lineOf(doc.expanded.text, raw.line);
+            }
+        }
+        place.span = span;
+        if (place.file.empty())
+        {
+            place.text = lineOf(doc.editor->document(), span.line);
+        }
+        places.push_back(std::move(place));
+    }
     switch (command)
     {
         case ALEditorCommand::GoToDefinition:
-            if (refs.hasDefinition)
+            if (!hasDefinition)
             {
-                doc.editor->goTo(rangeOf(refs.definition));
+                setStatus(getString("NoDefinition", args));
+            }
+            else if (homePath.empty())
+            {
+                doc.editor->goTo(rangeOf(definition));
                 doc.editor->setFocus(true);
             }
             else
             {
-                setStatus(getString("NoDefinition", args));
+                openIncludeAt(homePath, homeName, definition.line, definition.column, definition.endColumn - definition.column);
             }
             break;
         case ALEditorCommand::FindReferences:
-        {
-            doc.references = refs;
-            std::vector<ALTextRange> lit;
-            lit.reserve(refs.references.size());
-            for (const ALScriptSpan& span : refs.references)
-            {
-                lit.push_back(rangeOf(span));
-            }
-            doc.editor->setHighlights(std::move(lit));
-            fillReferences(&doc);
-            showBottom("references_tab");
-            setStatus(getString("ReferencesFound", args));
-            break;
-        }
         case ALEditorCommand::Rename:
-            if (refs.renamable)
-            {
-                askNewName(doc, refs);
-            }
-            else
-            {
-                setStatus(getString("NotRenamable", args));
-            }
+            startLookup(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
             break;
         default:
             break;
     }
 }
 
-void ALFloaterScriptStudio::askNewName(Doc& doc, const ALScriptReferences& refs)
+// --- across the object's scripts ------------------------------------------------------
+
+// static
+void ALFloaterScriptStudio::addPlace(Doc::Lookup& lookup, Doc::Place place)
 {
-    const std::string         id       = doc.id;
-    const U32                 version  = doc.symbolVersion;
-    const std::string         old_name = refs.name;
-    std::vector<ALTextRange>  places;
-    places.reserve(refs.references.size());
-    for (const ALScriptSpan& span : refs.references)
+    const std::string key = place.file + llformat(":%d:%d", place.span.line, place.span.column);
+    if (lookup.seen.insert(key).second)
     {
-        places.push_back(rangeOf(span));
+        lookup.places.push_back(std::move(place));
     }
+}
+
+void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
+                                        const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version)
+{
+    Doc::Lookup& lookup   = doc.lookup;
+    lookup                = Doc::Lookup();
+    lookup.generation     = ++mLookupGeneration;
+    lookup.command        = command;
+    lookup.name           = refs.name;
+    lookup.hasDefinition  = has_definition;
+    lookup.homePath       = home_path;
+    lookup.definition     = definition;
+    lookup.renamable      = refs.renamable;
+    lookup.version        = version;
+    lookup.versions[""]   = version;
+    // What every open script's text is now, so that a rename reaching
+    // one knows whether it has moved on since.
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        if (each->loaded && each.get() != &doc)
+        {
+            lookup.versions[ALScriptPreprocessor::pathOf(each->ref)] = each->editor->document().version();
+        }
+    }
+    for (Doc::Place& place : places)
+    {
+        addPlace(lookup, std::move(place));
+    }
+    // Beyond this script: every other script of its object in the same
+    // language, where the name is declared somewhere they can share --
+    // in an include, or in this script, which another may include. Each
+    // is read as it stands in an open tab, else as the region has it,
+    // and passed over where it does not so much as mention the name.
+    if (has_definition && !doc.ref.inInventory())
+    {
+        const LLHandle<LLFloater> handle     = getHandle();
+        const std::string         id         = doc.id;
+        const U32                 generation = lookup.generation;
+        for (const ExplorerObject& object : mExplorerModel)
+        {
+            bool ours = false;
+            for (const ExplorerPrim& prim : object.prims)
+            {
+                ours = ours || prim.id == doc.ref.object;
+            }
+            if (!ours || !object.present)
+            {
+                continue;
+            }
+            for (const ExplorerPrim& prim : object.prims)
+            {
+                for (const ALScriptWorkspace::Item& item : prim.items)
+                {
+                    const ALScriptRef ref(prim.id, item.id);
+                    if (!item.script || item.lua != doc.language.lua || ref == doc.ref)
+                    {
+                        continue;
+                    }
+                    ++lookup.pending;
+                    if (const size_t index = indexOf(ref); index != NONE && mDocs[index]->loaded)
+                    {
+                        const Doc& other = *mDocs[index];
+                        lookupCandidate(id, generation, ref, other.name, other.assetId, other.editor->text());
+                        continue;
+                    }
+                    const std::string name = item.name;
+                    ALScriptWorkspace::instance().load(ref, [handle, id, generation, ref, name](const ALScriptWorkspace::Loaded& loaded) {
+                        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                        if (!studio)
+                        {
+                            return;
+                        }
+                        std::string text = loaded.text;
+                        if (loaded.error.empty() && !loaded.notecard)
+                        {
+                            if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
+                            {
+                                text = envelope->source;
+                            }
+                        }
+                        else
+                        {
+                            text.clear();
+                        }
+                        studio->lookupCandidate(id, generation, ref, name, loaded.assetId, text);
+                    });
+                }
+            }
+        }
+    }
+    if (lookup.pending > 0)
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = lookup.name;
+        args["[COUNT]"] = std::to_string(lookup.pending);
+        setStatus(getString("LookingAcross", args));
+    }
+    lookupSettled(doc);
+}
+
+void ALFloaterScriptStudio::lookupCandidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
+                                            const std::string& text)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE || mDocs[index]->lookup.generation != generation)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    if (text.empty() || text.find(doc.lookup.name) == std::string::npos)
+    {
+        --doc.lookup.pending;
+        lookupSettled(doc);
+        return;
+    }
+    // Expanded as the compiler would see it, its includes fetched.
+    ALScriptPreprocessor::Request request;
+    request.ref           = ref;
+    request.name          = name;
+    request.assetId       = asset_id;
+    request.source        = text;
+    request.lua           = doc.language.lua;
+    request.compileTarget = doc.language.compileTarget;
     const LLHandle<LLFloater> handle = getHandle();
+    ALScriptPreprocessor::instance().run(request, [handle, id, generation, ref, name](const ALPreprocessor::Result& result) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->lookupExpanded(id, generation, ref, name, result);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
+                                           const ALPreprocessor::Result& result)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE || mDocs[index]->lookup.generation != generation)
+    {
+        return;
+    }
+    Doc&              doc  = *mDocs[index];
+    const std::string self = ALScriptPreprocessor::pathOf(ref);
+    const std::string home = doc.lookup.homePath.empty() ? ALScriptPreprocessor::pathOf(doc.ref) : doc.lookup.homePath;
+    // The script declaring the name, in this expansion: the script
+    // itself, or one of its includes; a script that has neither cannot
+    // name it.
+    const S32 file = self == home ? 0 : result.map.fileOf(home);
+    if (file < 0)
+    {
+        --doc.lookup.pending;
+        lookupSettled(doc);
+        return;
+    }
+    const ALSourceMap::Loc at = result.map.toExpanded(file, doc.lookup.definition.line, doc.lookup.definition.column);
+    if (!at.found())
+    {
+        --doc.lookup.pending;
+        lookupSettled(doc);
+        return;
+    }
+    ALScriptAnalysis::Request request;
+    request.kind    = ALScriptAnalysis::Kind::References;
+    request.id      = "lookup:" + ref.id();
+    request.version = generation;
+    request.lua     = doc.language.lua;
+    request.mono    = doc.language.compileTarget != "lsl2";
+    request.text    = result.text;
+    request.line    = at.line;
+    request.column  = at.column;
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptAnalysis::instance().ask(std::move(request),
+                                     [handle, id, generation, ref, name, map = result.map, expanded = result.text](const ALScriptAnalysis::Result& answer) {
+                                         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                                         {
+                                             studio->lookupAnswered(id, generation, ref, name, map, expanded, answer);
+                                         }
+                                     });
+}
+
+void ALFloaterScriptStudio::lookupAnswered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
+                                           const std::string& expanded, const ALScriptAnalysis::Result& result)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE || mDocs[index]->lookup.generation != generation)
+    {
+        return;
+    }
+    Doc&              doc  = *mDocs[index];
+    const std::string self = ALScriptPreprocessor::pathOf(ref);
+    const std::string own  = ALScriptPreprocessor::pathOf(doc.ref);
+    --doc.lookup.pending;
+    if (result.references.found)
+    {
+        for (ALScriptSpan span : result.references.references)
+        {
+            const ALScriptSpan raw  = span;
+            const S32          file = mapSpan(map, span);
+            if (file < 0)
+            {
+                continue;
+            }
+            Doc::Place place;
+            place.span     = span;
+            place.file     = file == 0 ? self : map.files()[file].path;
+            place.fileName = file == 0 ? name : map.files()[file].name;
+            place.text     = lineOf(expanded, raw.line);
+            if (place.file == own)
+            {
+                // This script's own, which its own answer listed.
+                place.file.clear();
+                place.fileName.clear();
+            }
+            addPlace(doc.lookup, std::move(place));
+        }
+    }
+    lookupSettled(doc);
+}
+
+void ALFloaterScriptStudio::lookupSettled(Doc& doc)
+{
+    Doc::Lookup& lookup = doc.lookup;
+    if (lookup.pending > 0 || lookup.command == ALEditorCommand::None)
+    {
+        return;
+    }
+    const ALEditorCommand command = lookup.command;
+    lookup.command                = ALEditorCommand::None;
+    // This script's places first, then each other script's, in order.
+    std::stable_sort(lookup.places.begin(), lookup.places.end(), [](const Doc::Place& a, const Doc::Place& b) {
+        if (a.file.empty() != b.file.empty())
+        {
+            return a.file.empty();
+        }
+        if (a.fileName != b.fileName)
+        {
+            return a.fileName < b.fileName;
+        }
+        if (a.file != b.file)
+        {
+            return a.file < b.file;
+        }
+        return a.span < b.span;
+    });
+    std::set<std::string> files;
+    for (const Doc::Place& place : lookup.places)
+    {
+        files.insert(place.file);
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]  = lookup.name;
+    args["[COUNT]"] = std::to_string(lookup.places.size());
+    args["[FILES]"] = std::to_string(files.size());
+    if (command == ALEditorCommand::FindReferences)
+    {
+        doc.places = lookup.places;
+        std::vector<ALTextRange> lit;
+        for (const Doc::Place& place : doc.places)
+        {
+            if (place.file.empty())
+            {
+                lit.push_back(rangeOf(place.span));
+            }
+        }
+        doc.editor->setHighlights(std::move(lit));
+        fillReferences(&doc);
+        showBottom("references_tab");
+        setStatus(getString(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", args));
+    }
+    else if (command == ALEditorCommand::Rename)
+    {
+        if (lookup.renamable)
+        {
+            askNewName(doc);
+        }
+        else
+        {
+            setStatus(getString("NotRenamable", args));
+        }
+    }
+}
+
+void ALFloaterScriptStudio::askNewName(Doc& doc)
+{
+    const std::string         id         = doc.id;
+    const U32                 generation = doc.lookup.generation;
+    const std::string         old_name   = doc.lookup.name;
+    const LLHandle<LLFloater> handle     = getHandle();
     ALQuickOpen* quick = quickOpen(
         {}, getString("RenamePlaceholder"), getString("RenameTitle"),
-        [handle, id, version, places, old_name](const std::string& typed) {
+        [handle, id, generation](const std::string& typed) {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
             {
-                studio->renameTo(id, version, places, old_name, typed);
+                studio->renameTo(id, generation, typed);
             }
         },
         mEditorHost, 420, 56);
@@ -2676,8 +3041,14 @@ void ALFloaterScriptStudio::askNewName(Doc& doc, const ALScriptReferences& refs)
         return;
     }
     // The row under the field says what return will do with what is typed.
-    const S32 count = static_cast<S32>(places.size());
-    quick->onQueryChanged([handle, quick, count, old_name](const std::string& typed) {
+    const S32             count = static_cast<S32>(doc.lookup.places.size());
+    std::set<std::string> files;
+    for (const Doc::Place& place : doc.lookup.places)
+    {
+        files.insert(place.file);
+    }
+    const S32 scripts = static_cast<S32>(files.size());
+    quick->onQueryChanged([handle, quick, count, scripts, old_name](const std::string& typed) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         if (!studio)
         {
@@ -2689,6 +3060,7 @@ void ALFloaterScriptStudio::askNewName(Doc& doc, const ALScriptReferences& refs)
         args["[NAME]"]  = old_name;
         args["[NEW]"]   = name;
         args["[COUNT]"] = std::to_string(count);
+        args["[FILES]"] = std::to_string(scripts);
         if (name.empty())
         {
             quick->setHint(studio->getString("RenameHint", args));
@@ -2704,22 +3076,24 @@ void ALFloaterScriptStudio::askNewName(Doc& doc, const ALScriptReferences& refs)
         }
         else
         {
-            quick->setHint(studio->getString("RenameTo", args));
+            quick->setHint(studio->getString(scripts > 1 ? "RenameToAcross" : "RenameTo", args));
         }
     });
     quick->setQuery(old_name);
     quick->takeFocus();
 }
 
-void ALFloaterScriptStudio::renameTo(const std::string& id, U32 version, const std::vector<ALTextRange>& places, const std::string& old_name, const std::string& new_name)
+void ALFloaterScriptStudio::renameTo(const std::string& id, U32 generation, const std::string& new_name)
 {
     const size_t index = indexOf(id);
-    if (index == NONE)
+    if (index == NONE || mDocs[index]->lookup.generation != generation)
     {
         return;
     }
-    Doc&        doc  = *mDocs[index];
-    std::string name = new_name;
+    Doc&              doc      = *mDocs[index];
+    const Doc::Lookup& lookup  = doc.lookup;
+    const std::string old_name = lookup.name;
+    std::string       name     = new_name;
     LLStringUtil::trim(name);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = name;
@@ -2733,45 +3107,428 @@ void ALFloaterScriptStudio::renameTo(const std::string& id, U32 version, const s
         doc.editor->setFocus(true);
         return;
     }
-    if (doc.editor->document().version() != version)
+    if (doc.editor->document().version() != lookup.version)
     {
         setStatus(getString("RenameStale", args), true);
         return;
     }
-    std::vector<std::pair<ALTextRange, std::string>> edits;
-    edits.reserve(places.size());
-    for (const ALTextRange& place : places)
+    // Each script's places together: this one's put in as one step;
+    // another's the same where it is open and unchanged since it was
+    // read, else opened with the change waiting for its text.
+    std::map<std::string, std::vector<const Doc::Place*>> by_file;
+    for (const Doc::Place& place : lookup.places)
     {
-        edits.emplace_back(place, name);
+        by_file[place.file].push_back(&place);
     }
-    args["[COUNT]"] = std::to_string(edits.size());
-    if (doc.editor->replaceAll(std::move(edits)))
+    S32 renamed = 0;
+    S32 scripts = 0;
+    S32 opened  = 0;
+    S32 stale   = 0;
+    for (const auto& [file, places] : by_file)
     {
-        doc.editor->undoJournal().label("rename");
-        setStatus(getString("Renamed", args));
+        if (file.empty())
+        {
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            edits.reserve(places.size());
+            for (const Doc::Place* place : places)
+            {
+                edits.emplace_back(rangeOf(place->span), name);
+            }
+            if (doc.editor->replaceAll(std::move(edits)))
+            {
+                doc.editor->undoJournal().label("rename");
+                renamed += static_cast<S32>(places.size());
+                ++scripts;
+            }
+            continue;
+        }
+        ALScriptRef ref;
+        if (!ALScriptPreprocessor::refOf(file, ref))
+        {
+            // On disk: not the studio's to change.
+            ++stale;
+            continue;
+        }
+        const size_t other_index = indexOf(ref);
+        if (other_index != NONE && mDocs[other_index]->loaded)
+        {
+            Doc&       other   = *mDocs[other_index];
+            const auto version = lookup.versions.find(file);
+            if (version == lookup.versions.end() || version->second != other.editor->document().version() || !other.modifiable)
+            {
+                ++stale;
+                continue;
+            }
+            // Each place where the old name still stands, since an open
+            // include may not read as the expansion had it.
+            const ALTextDocument&                            text = other.editor->document();
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const Doc::Place* place : places)
+            {
+                const ALTextRange range = rangeOf(place->span);
+                if (place->span.line < text.lineCount() && text.text(range) == old_name)
+                {
+                    edits.emplace_back(range, name);
+                }
+            }
+            if (!edits.empty())
+            {
+                renamed += static_cast<S32>(edits.size());
+                if (other.editor->replaceAll(std::move(edits)))
+                {
+                    other.editor->undoJournal().label("rename");
+                }
+                ++scripts;
+            }
+            continue;
+        }
+        // Not open: opened, with the change made once its text is in,
+        // where the old name still stands at each place.
+        if (other_index == NONE)
+        {
+            openScript(ref, places.front()->fileName);
+        }
+        const size_t opened_index = indexOf(ref);
+        if (opened_index == NONE)
+        {
+            ++stale;
+            continue;
+        }
+        Doc& other = *mDocs[opened_index];
+        for (const Doc::Place* place : places)
+        {
+            other.pendingEdits.push_back(Doc::PendingEdit{ place->span, old_name, name });
+        }
+        renamed += static_cast<S32>(places.size());
+        ++scripts;
+        ++opened;
     }
+    args["[COUNT]"] = std::to_string(renamed);
+    args["[FILES]"] = std::to_string(scripts);
+    args["[OPENED]"] = std::to_string(opened);
+    args["[STALE]"]  = std::to_string(stale);
+    if (scripts > 1 || opened > 0)
+    {
+        setStatus(getString(stale > 0 ? "RenamedAcrossStale" : "RenamedAcross", args), stale > 0);
+    }
+    else
+    {
+        setStatus(getString(stale > 0 ? "RenamedStale" : "Renamed", args), stale > 0);
+    }
+    activate(index);
     doc.editor->setFocus(true);
+}
+
+void ALFloaterScriptStudio::applyPendingEdits(Doc& doc)
+{
+    if (doc.pendingEdits.empty() || !doc.loaded)
+    {
+        return;
+    }
+    std::vector<Doc::PendingEdit> edits;
+    edits.swap(doc.pendingEdits);
+    const ALTextDocument&                            text = doc.editor->document();
+    std::vector<std::pair<ALTextRange, std::string>> changes;
+    S32                                              missed = 0;
+    for (const Doc::PendingEdit& edit : edits)
+    {
+        const ALTextRange range = rangeOf(edit.span);
+        if (edit.span.line < text.lineCount() && text.text(range) == edit.was)
+        {
+            changes.emplace_back(range, edit.now);
+        }
+        else
+        {
+            ++missed;
+        }
+    }
+    if (!changes.empty() && doc.modifiable)
+    {
+        doc.editor->setReadOnly(false);
+        if (doc.editor->replaceAll(std::move(changes)))
+        {
+            doc.editor->undoJournal().label("rename");
+        }
+    }
+    if (missed > 0)
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = doc.name;
+        args["[COUNT]"] = std::to_string(missed);
+        setStatus(getString("RenameMissed", args), true);
+    }
+}
+
+// --- an editor outside ----------------------------------------------------------------
+
+namespace
+{
+    // The temp file an external editor is given, watched for its saves;
+    // gone from disk with it.
+    class StudioLiveFile final : public LLLiveFile
+    {
+    public:
+        typedef std::function<void(const std::string& filename)> changed_t;
+
+        StudioLiveFile(const std::string& path, changed_t changed)
+        :   LLLiveFile(path, 1.f),
+            mChanged(std::move(changed))
+        {
+        }
+        ~StudioLiveFile() override { LLFile::remove(filename()); }
+
+        // The next change is one made here, not to be taken as the
+        // editor's.
+        void ignoreNextUpdate() { mIgnoreNext = true; }
+
+    protected:
+        bool loadFile() override
+        {
+            if (mIgnoreNext)
+            {
+                mIgnoreNext = false;
+                return true;
+            }
+            if (mChanged)
+            {
+                mChanged(filename());
+            }
+            return true;
+        }
+
+    private:
+        changed_t mChanged;
+        bool      mIgnoreNext = false;
+    };
+
+    bool writeWhole(const std::string& path, const std::string& text)
+    {
+        LLFILE* file = LLFile::fopen(path, LLFILE_MODE("wb"));
+        if (!file)
+        {
+            return false;
+        }
+        // An empty script is stored as one space, as it always was.
+        const std::string& out = text.empty() ? std::string(" ") : text;
+        fputs(out.c_str(), file);
+        fclose(file);
+        return true;
+    }
+}
+
+// static
+std::string ALFloaterScriptStudio::externalFileName(const Doc& doc)
+{
+    // As the old editor named it, so that the bridge's script.list and
+    // whoever reads the temp folder find the same file: the name
+    // without what a file system refuses, the subscription id, and the
+    // language's extension.
+    static const std::set<char> forbidden{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
+    std::string                 name = doc.name;
+    name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return forbidden.count(c) > 0; }), name.end());
+    const std::string hash      = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
+    const std::string extension = doc.language.lua ? ".luau" : ".lsl";
+    return std::string(LLFile::tmpdir()) + "sl_script_" + (name.empty() ? std::string() : name + "_") + hash + extension;
+}
+
+void ALFloaterScriptStudio::editExternally(Doc& doc)
+{
+    if (!doc.loaded || !doc.modifiable || doc.notecard)
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    // The file, written afresh -- the editor may have been closed on an
+    // old one -- and watched.
+    const std::string filename = externalFileName(doc);
+    if (!writeWhole(filename, doc.editor->text()))
+    {
+        args["[FILE]"] = filename;
+        setStatus(getString("ExternalWriteFailed", args), true);
+        return;
+    }
+    if (!doc.liveFile || doc.liveFile->filename() != filename)
+    {
+        doc.liveFile.reset();
+        const LLHandle<LLFloater> handle = getHandle();
+        const std::string         id     = doc.id;
+        auto                      watch  = std::make_unique<StudioLiveFile>(filename, [handle, id](const std::string& file) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->externalChanged(id, file);
+            }
+        });
+        watch->addToEventTimer();
+        doc.liveFile = std::move(watch);
+    }
+    else
+    {
+        static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
+    }
+    doc.liveLog = filename + ".log";
+
+    // The bridge, so that VS Code can subscribe to the script and hear
+    // what the compiler says of it.
+    const bool                       tight  = LLScriptEditorWSServer::isTightIntegration();
+    LLScriptEditorWSServer::ptr_t    server = LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;
+    if (server)
+    {
+        const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
+        doc.subscribed = server->subscribeScriptEditor(doc.ref.object, doc.ref.item, doc.name, getHandle(), script_id, doc.language.lua);
+    }
+    if (tight)
+    {
+        if (!server)
+        {
+            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("ExternalEditorFailedToStart")));
+            return;
+        }
+        LLUUID root_id;
+        if (LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object))
+        {
+            root_id = object->getRootEdit() ? object->getRootEdit()->getID() : object->getID();
+        }
+        if (!LLScriptEditorWSServer::launchVSCode(root_id, doc.ref.item))
+        {
+            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("VSCodeLaunchFailed")));
+            return;
+        }
+        setStatus(getString("ExternalOpenedVSCode", args));
+        return;
+    }
+    LLExternalEditor             editor;
+    LLExternalEditor::EErrorCode status = editor.setCommand("LL_SCRIPT_EDITOR");
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        const std::string message = status == LLExternalEditor::EC_NOT_SPECIFIED ? LLTrans::getString("ExternalEditorNotSet")
+                                                                                   : LLExternalEditor::getErrorMessage(status);
+        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", message));
+        return;
+    }
+    status = editor.run(filename, doc.editor->caret().line + 1);
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLExternalEditor::getErrorMessage(status)));
+        return;
+    }
+    setStatus(getString("ExternalOpened", args));
+}
+
+void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::string& file)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    if (!doc.loaded || !doc.modifiable)
+    {
+        return;
+    }
+    std::string text = readWholeFile(file);
+    if (text.empty())
+    {
+        // Gone, or empty: an editor saving a file in two steps leaves it
+        // so for a moment; nothing to take yet.
+        return;
+    }
+    if (text != doc.editor->text())
+    {
+        // The editor's text, as one step to undo; then saved from here,
+        // over whatever a check finds, since the editor outside is where
+        // the author is looking.
+        doc.carriedText = text;
+        takeCarriedText(doc);
+    }
+    if (!doc.editor->isDirty() && doc.assetId.notNull())
+    {
+        return;
+    }
+    doc.externalSave    = true;
+    doc.saveAnywayUntil = LLTimer::getTotalSeconds() + 3600.0;
+    save(doc);
+}
+
+void ALFloaterScriptStudio::syncExternal(Doc& doc)
+{
+    if (!doc.liveFile)
+    {
+        return;
+    }
+    const std::string filename = doc.liveFile->filename();
+    if (!gDirUtilp->fileExists(filename))
+    {
+        return;
+    }
+    static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
+    writeWhole(filename, doc.editor->text());
+}
+
+void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result)
+{
+    if (doc.liveLog.empty())
+    {
+        return;
+    }
+    llofstream file(doc.liveLog.c_str());
+    if (!file.is_open())
+    {
+        return;
+    }
+    file << "// " << LLLogChat::timestamp2LogString(0, true) << "\n\n";
+    if (result.success)
+    {
+        file << LLTrans::getString("CompileSuccessful") << "\n" << LLTrans::getString("SaveComplete") << "\n";
+    }
+    for (const std::string& message : result.messages)
+    {
+        std::string line = message;
+        LLStringUtil::stripNonprintable(line);
+        file << line << "\n";
+    }
+}
+
+void ALFloaterScriptStudio::stopExternal(Doc& doc)
+{
+    if (doc.subscribed)
+    {
+        if (LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer())
+        {
+            const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
+            server->sendUnsubscribeScriptEditor(script_id);
+            server->unsubscribeEditor(script_id);
+        }
+        doc.subscribed = false;
+    }
+    doc.liveFile.reset();
+    if (!doc.liveLog.empty())
+    {
+        LLFile::remove(doc.liveLog);
+        doc.liveLog.clear();
+    }
+    doc.externalSave = false;
 }
 
 void ALFloaterScriptStudio::fillReferences(const Doc* doc)
 {
     mReferences->deleteAllItems();
-    if (!doc || !doc->references.found)
+    if (!doc || doc->places.empty())
     {
         return;
     }
-    const ALTextDocument& text = doc->editor->document();
-    for (size_t i = 0; i < doc->references.references.size(); ++i)
+    for (size_t i = 0; i < doc->places.size(); ++i)
     {
-        const ALScriptSpan& span = doc->references.references[i];
-        std::string         line = text.text(ALTextRange(ALTextPos(span.line, 0), ALTextPos(span.line, text.lineLength(span.line))));
-        LLStringUtil::trim(line);
-        LLSD row;
+        const Doc::Place& place = doc->places[i];
+        LLSD              row;
         row["value"]                = static_cast<S32>(i);
-        row["columns"][0]["column"] = "line";
-        row["columns"][0]["value"]  = llformat("%d:%d", span.line + 1, span.column + 1);
-        row["columns"][1]["column"] = "text";
-        row["columns"][1]["value"]  = line;
+        row["columns"][0]["column"] = "where";
+        row["columns"][0]["value"]  = place.file.empty() ? doc->name : place.fileName;
+        row["columns"][1]["column"] = "line";
+        row["columns"][1]["value"]  = llformat("%d:%d", place.span.line + 1, place.span.column + 1);
+        row["columns"][2]["column"] = "text";
+        row["columns"][2]["value"]  = place.text;
         mReferences->addElement(row);
     }
 }
@@ -2785,12 +3542,48 @@ void ALFloaterScriptStudio::onReferenceChosen()
         return;
     }
     const size_t index = static_cast<size_t>(item->getValue().asInteger());
-    if (index < doc->references.references.size())
+    if (index >= doc->places.size())
     {
-        doc->editor->goTo(rangeOf(doc->references.references[index]));
+        return;
+    }
+    const Doc::Place& place = doc->places[index];
+    if (place.file.empty())
+    {
+        doc->editor->goTo(rangeOf(place.span));
         doc->editor->setFocus(true);
     }
+    else
+    {
+        openIncludeAt(place.file, place.fileName, place.span.line, place.span.column, place.span.endColumn - place.span.column);
+    }
 }
+
+void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length)
+{
+    ALScriptRef ref;
+    std::string file;
+    if (ALScriptPreprocessor::refOf(path, ref))
+    {
+        const LLInventoryItem* item = ref.inInventory() ? gInventory.getItem(ref.item)
+                                      : gObjectList.findObject(ref.object) ? gObjectList.findObject(ref.object)->getInventoryItem(ref.item)
+                                                                           : nullptr;
+        if (!item)
+        {
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = name;
+            setStatus(getString("IncludeGone", args));
+            return;
+        }
+        goToPlace(ref, name, line, column, length);
+    }
+    else if (ALScriptPreprocessor::fileOf(path, file))
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = file;
+        setStatus(getString("IncludeOnDisk", args));
+    }
+}
+
 
 void ALFloaterScriptStudio::goToLine()
 {
@@ -3543,7 +4336,14 @@ void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string&
     Doc& doc = *mDocs[index];
     if (doc.loaded)
     {
-        doc.editor->goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
+        if (column < 0)
+        {
+            doc.editor->goToLine(line);
+        }
+        else
+        {
+            doc.editor->goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
+        }
         doc.editor->setFocus(true);
     }
     else
@@ -4807,6 +5607,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
     }
     {
         Doc& doc = *mDocs[index];
+        stopExternal(doc);
         doc.changed.release();
         mEditorHost->removeChild(doc.editor);
         doc.editor->die();
@@ -4858,6 +5659,13 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         if (doc)
         {
             revert(*doc);
+        }
+    }
+    else if (action == "external_editor")
+    {
+        if (doc)
+        {
+            editExternally(*doc);
         }
     }
     else if (action == "close")
@@ -5054,6 +5862,25 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         mStickyHeaders = !mStickyHeaders;
         applyEditorOptions();
     }
+    else if (action == "semantic_colors" || action == "inlay_parameters" || action == "inlay_types")
+    {
+        bool& flag = action == "semantic_colors" ? mSemanticColors : action == "inlay_parameters" ? mInlayParameters : mInlayTypes;
+        flag       = !flag;
+        // Off at once; on with the next check, which is now.
+        for (std::unique_ptr<Doc>& each : mDocs)
+        {
+            if (!mSemanticColors)
+            {
+                each->editor->setSemanticTokens({});
+            }
+            if (!mInlayParameters && !mInlayTypes)
+            {
+                each->editor->setInlayHints({});
+            }
+            scheduleAnalysis(*each, true);
+        }
+        saveState();
+    }
     else if (doc && (action == "format" || action == "format_selection"))
     {
         format(*doc, action == "format_selection");
@@ -5130,6 +5957,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "save" || action == "revert" || action == "save_file")
     {
         return doc && doc->loaded && (action == "save_file" || doc->modifiable);
+    }
+    if (action == "external_editor")
+    {
+        return doc && doc->loaded && doc->modifiable && !doc->notecard;
     }
     if (action == "save_all")
     {
@@ -5261,6 +6092,18 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "sticky_headers")
     {
         return mStickyHeaders;
+    }
+    if (action == "semantic_colors")
+    {
+        return mSemanticColors;
+    }
+    if (action == "inlay_parameters")
+    {
+        return mInlayParameters;
+    }
+    if (action == "inlay_types")
+    {
+        return mInlayTypes;
     }
     if (action == "line_numbers")
     {
@@ -5465,6 +6308,9 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["relative_numbers"] = mRelativeNumbers;
     state["rainbow_brackets"] = mRainbowBrackets;
     state["sticky_headers"]   = mStickyHeaders;
+    state["semantic_colors"]  = mSemanticColors;
+    state["inlay_parameters"] = mInlayParameters;
+    state["inlay_types"]      = mInlayTypes;
     state["scroll_map"]   = mScrollMap;
     state["map_width"]    = mScrollMapWidth;
     state["map_preview"]  = mScrollMapPreview;
@@ -5505,6 +6351,18 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("sticky_headers"))
     {
         mStickyHeaders = state["sticky_headers"].asBoolean();
+    }
+    if (state.has("semantic_colors"))
+    {
+        mSemanticColors = state["semantic_colors"].asBoolean();
+    }
+    if (state.has("inlay_parameters"))
+    {
+        mInlayParameters = state["inlay_parameters"].asBoolean();
+    }
+    if (state.has("inlay_types"))
+    {
+        mInlayTypes = state["inlay_types"].asBoolean();
     }
     if (state.has("scroll_map"))
     {

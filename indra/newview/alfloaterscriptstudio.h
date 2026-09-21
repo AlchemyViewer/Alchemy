@@ -31,12 +31,14 @@
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
+#include "lllivefile.h"
 
 #include <boost/signals2.hpp>
 
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -250,8 +252,61 @@ private:
         ALEditorCommand                            symbolCommand = ALEditorCommand::None;
         U32                                        symbolVersion = 0;
         ALTextPos                                  symbolAt;
+        // A place a name stands: in this script, or in another -- an
+        // include of it, or a script that includes it -- named by the
+        // identity the source map gives the other and what to call it,
+        // with the line as it reads there.
+        struct Place
+        {
+            ALScriptSpan span;
+            std::string  file;
+            std::string  fileName;
+            std::string  text;
+        };
         // The places last found, listed in the pane.
-        ALScriptReferences                         references;
+        std::vector<Place>                         places;
+        // The name being looked up across the object's scripts: what
+        // was asked, the script that declares it (this one, or the
+        // include, by identity) and where, how many scripts are still
+        // to answer, the places gathered so far, each once, and the
+        // version of each open script's text as it was read, so that a
+        // rename knows it still holds.
+        struct Lookup
+        {
+            U32                            generation = 0;
+            ALEditorCommand                command    = ALEditorCommand::None;
+            std::string                    name;
+            bool                           hasDefinition = false;
+            std::string                    homePath;
+            ALScriptSpan                   definition;
+            bool                           renamable = false;
+            U32                            version   = 0;
+            S32                            pending   = 0;
+            std::vector<Place>             places;
+            std::set<std::string>          seen;
+            std::map<std::string, U32>     versions;
+        };
+        Lookup                                     lookup;
+        // Edits to make once the script has loaded: a rename that reached
+        // it from another script, each place with the name that must
+        // still stand there and the one to put in its stead.
+        struct PendingEdit
+        {
+            ALScriptSpan span;
+            std::string  was;
+            std::string  now;
+        };
+        std::vector<PendingEdit>                   pendingEdits;
+        // The script held open in an external editor: the file under
+        // the temp folder the editor was given, watched for the editor's
+        // saves, and the log beside it the compiler's words go to;
+        // whether the bridge was told, so that VS Code can subscribe;
+        // and whether the save under way came from the editor, which
+        // does not write the file back.
+        std::unique_ptr<LLLiveFile>                liveFile;
+        std::string                                liveLog;
+        bool                                       subscribed   = false;
+        bool                                       externalSave = false;
         // Where the caret was last seen; when the inspector is due to be
         // told what it is on, or zero; and what it was last told about.
         ALTextPos                                  caretSeen{ -1, -1 };
@@ -361,13 +416,46 @@ private:
     // name and putting it everywhere as one step.
     void askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word);
     void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result);
+    // A name looked for beyond the script: in every other script of the
+    // object that includes the script declaring it, or is that script,
+    // each expanded as the compiler would see it and asked where the
+    // name stands, then answered together -- the places listed, or the
+    // new name asked for and put in every script, the ones not open
+    // opened with the change unsaved.
+    void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
+                     const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version);
+    void lookupCandidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
+                         const std::string& text);
+    void lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALPreprocessor::Result& result);
+    void lookupAnswered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
+                        const std::string& expanded, const ALScriptAnalysis::Result& result);
+    void lookupSettled(Doc& doc);
+    static void addPlace(Doc::Lookup& lookup, Doc::Place place);
     // The new name asked for in a popover over the window, with a row
     // saying what return will do as it is typed, and put everywhere as
     // one step if the text has not moved on.
-    void askNewName(Doc& doc, const ALScriptReferences& refs);
-    void renameTo(const std::string& id, U32 version, const std::vector<ALTextRange>& places, const std::string& old_name, const std::string& new_name);
+    void askNewName(Doc& doc);
+    void renameTo(const std::string& id, U32 generation, const std::string& new_name);
+    void applyPendingEdits(Doc& doc);
+    // The script handed to an external editor: written to a file under
+    // the temp folder and watched, so that the editor's saves are taken
+    // as the text and saved from here; the bridge told, so that VS Code
+    // can subscribe to it and hear the compiler; and the editor launched
+    // -- VS Code itself under tight integration, else the command the
+    // ExternalEditor setting gives. A save made here writes the file
+    // again, and what the compiler says goes in a log beside it, as the
+    // old editor did. Closing the tab ends it.
+    void               editExternally(Doc& doc);
+    void               externalChanged(const std::string& id, const std::string& file);
+    void               syncExternal(Doc& doc);
+    void               logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result);
+    void               stopExternal(Doc& doc);
+    static std::string externalFileName(const Doc& doc);
     void fillReferences(const Doc* doc);
     void onReferenceChosen();
+    // A place in an include opened in a tab of its own where the include
+    // is a script or a notecard in the world; one on disk is only named.
+    void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length);
     // A line, or line:column, typed into the same popover, the editor
     // showing the line as it is typed and going back on escape.
     void goToLine();
@@ -529,6 +617,11 @@ private:
     bool                               mIndentGuides    = true;
     bool                               mRelativeNumbers = false;
     bool                               mRainbowBrackets = true;
+    // What the analyzers add to the picture: every name coloured by what
+    // it is, and the words shown beside the text.
+    bool                               mSemanticColors  = true;
+    bool                               mInlayParameters = true;
+    bool                               mInlayTypes      = true;
     bool                               mStickyHeaders   = true;
     // The scrollbar as a map: whether, how wide, whether it previews the
     // lines under the mouse, and on which side.
@@ -554,6 +647,7 @@ private:
     // words last searched for, so that a changed dropdown asks again
     // about the same words while typing waits for return.
     U32                                mSearchGeneration = 0;
+    U32                                mLookupGeneration = 0;
     S32                                mSearchPending    = 0;
     S32                                mSearchHits       = 0;
     S32                                mSearchFiles      = 0;

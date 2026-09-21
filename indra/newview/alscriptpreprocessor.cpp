@@ -69,6 +69,80 @@ namespace
         return out;
     }
 
+    // The folders an include name asks for, before the item's name: the
+    // parts of `lib/util` before `util`, with `.` and `..` kept as they
+    // were, so that a relative name can be taken from the asking file's
+    // folder.
+    std::vector<std::string> foldersOf(const std::string& name)
+    {
+        std::vector<std::string> parts;
+        size_t                   from = 0;
+        while (true)
+        {
+            const size_t slash = name.find_first_of("/\\", from);
+            if (slash == std::string::npos)
+            {
+                break;
+            }
+            if (slash > from)
+            {
+                parts.push_back(name.substr(from, slash - from));
+            }
+            from = slash + 1;
+        }
+        return parts;
+    }
+
+    // Whether an inventory item sits where the folders of a name say:
+    // under the asking item's folder, where the name is relative, or
+    // under folders so named, wherever they are.
+    bool inFolders(const LLViewerInventoryItem* item, const std::vector<std::string>& folders, const LLUUID& asking_folder)
+    {
+        if (folders.empty())
+        {
+            return true;
+        }
+        const bool relative = folders.front() == "." || folders.front() == "..";
+        // The folders that must be the item's nearest, innermost last.
+        std::vector<std::string> named;
+        LLUUID                   base = asking_folder;
+        for (const std::string& part : folders)
+        {
+            if (part == ".")
+            {
+                continue;
+            }
+            if (part == "..")
+            {
+                if (!named.empty())
+                {
+                    named.pop_back();
+                }
+                else if (const LLViewerInventoryCategory* folder = gInventory.getCategory(base))
+                {
+                    base = folder->getParentUUID();
+                }
+                continue;
+            }
+            named.push_back(part);
+        }
+        if (relative && base.isNull())
+        {
+            return false;
+        }
+        LLUUID at = item->getParentUUID();
+        for (auto it = named.rbegin(); it != named.rend(); ++it)
+        {
+            const LLViewerInventoryCategory* folder = gInventory.getCategory(at);
+            if (!folder || folder->getName() != *it)
+            {
+                return false;
+            }
+            at = folder->getParentUUID();
+        }
+        return !relative || at == base;
+    }
+
     class NamedScriptOrNotecard : public LLInventoryCollectFunctor
     {
     public:
@@ -139,6 +213,16 @@ bool ALScriptPreprocessor::refOf(const std::string& path, ALScriptRef& ref)
 }
 
 // static
+std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
+{
+    if (ref.inInventory())
+    {
+        return std::string(INVENTORY_PREFIX) + ref.item.asString();
+    }
+    return std::string(OBJECT_PREFIX) + ref.object.asString() + ":" + ref.item.asString();
+}
+
+// static
 bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
 {
     if (path.compare(0, DISK_PREFIX.size(), DISK_PREFIX) == 0)
@@ -197,7 +281,36 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
             LLInventoryModel::item_array_t items;
             NamedScriptOrNotecard          named(item_name);
             gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, LLInventoryModel::EXCLUDE_TRASH, named);
-            // A script before a notecard of the same name.
+            // The folders the name gives, where it gives any, choose among
+            // items of the name: the ones under such folders -- under the
+            // asking file's, for a name that starts from there -- and no
+            // other where there is one; then a script before a notecard
+            // of the same name.
+            const std::vector<std::string> folders = foldersOf(ask.name);
+            if (!folders.empty())
+            {
+                LLUUID      asking_folder;
+                ALScriptRef asking;
+                if (refOf(ask.from, asking) && asking.inInventory())
+                {
+                    if (const LLViewerInventoryItem* from = gInventory.getItem(asking.item))
+                    {
+                        asking_folder = from->getParentUUID();
+                    }
+                }
+                LLInventoryModel::item_array_t placed;
+                for (const LLPointer<LLViewerInventoryItem>& item : items)
+                {
+                    if (inFolders(item, folders, asking_folder))
+                    {
+                        placed.push_back(item);
+                    }
+                }
+                if (!placed.empty())
+                {
+                    items.swap(placed);
+                }
+            }
             std::stable_sort(items.begin(), items.end(), [](const LLPointer<LLViewerInventoryItem>& a, const LLPointer<LLViewerInventoryItem>& b) {
                 return a->getType() == LLAssetType::AT_LSL_TEXT && b->getType() != LLAssetType::AT_LSL_TEXT;
             });

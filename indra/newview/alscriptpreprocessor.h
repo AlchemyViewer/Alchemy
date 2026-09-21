@@ -81,9 +81,11 @@ public:
     // analyzers, which cannot wait.
     ALPreprocessor::Result runNow(const Request& request);
 
-    // An include's identity back to the item it names, or the file.
-    static bool refOf(const std::string& path, ALScriptRef& ref);
-    static bool fileOf(const std::string& path, std::string& file);
+    // An include's identity back to the item it names, or the file; and
+    // an item's identity, as the source map would name it.
+    static bool        refOf(const std::string& path, ALScriptRef& ref);
+    static bool        fileOf(const std::string& path, std::string& file);
+    static std::string pathOf(const ALScriptRef& ref);
 
 private:
     struct Job;

@@ -172,6 +172,11 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                 case Kind::Check:
                     result.problems = mWorker->luau.check(request.text);
                     result.outline  = mWorker->luau.outline(request.text);
+                    if (request.semantics)
+                    {
+                        result.semantics = mWorker->luau.semanticTokens(request.text);
+                    }
+                    result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->luau.complete(request.text, request.line, request.column);
@@ -197,6 +202,11 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                 case Kind::Check:
                     result.problems = mWorker->lsl.check(request.text, request.mono);
                     result.outline  = mWorker->lsl.outline(request.text);
+                    if (request.semantics)
+                    {
+                        result.semantics = mWorker->lsl.semanticTokens(request.text);
+                    }
+                    result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);

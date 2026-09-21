@@ -90,10 +90,16 @@
     <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFound">[COUNT] place(s) where [NAME] stands.</floater.string>
+    <floater.string name="LookingAcross">Looking for [NAME] across [COUNT] other script(s) of the object...</floater.string>
+    <floater.string name="ReferencesFoundAcross">[COUNT] place(s) where [NAME] stands, in [FILES] scripts.</floater.string>
     <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
     <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
     <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
     <floater.string name="Renamed">[COUNT] place(s) renamed to [NAME].</floater.string>
+    <floater.string name="RenamedStale">[COUNT] place(s) renamed to [NAME]; [STALE] script(s) changed since they were read, or are on disk, and were left alone.</floater.string>
+    <floater.string name="RenamedAcross">[COUNT] place(s) renamed to [NAME] in [FILES] scripts; [OPENED] opened with the change unsaved.</floater.string>
+    <floater.string name="RenamedAcrossStale">[COUNT] place(s) renamed to [NAME] in [FILES] scripts; [OPENED] opened with the change unsaved; [STALE] left alone, changed since they were read or on disk.</floater.string>
+    <floater.string name="RenameMissed">[COUNT] place(s) in [NAME] no longer read as they did, and were not renamed.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLine">1 line selected</floater.string>
     <floater.string name="SelectedLines">[COUNT] lines selected</floater.string>
@@ -118,6 +124,7 @@
     <floater.string name="RenameHint">Type the new name for [NAME].</floater.string>
     <floater.string name="RenameSame">[NAME] is its name already.</floater.string>
     <floater.string name="RenameTo">Rename [COUNT] place(s) of [NAME] to [NEW].</floater.string>
+    <floater.string name="RenameToAcross">Rename [COUNT] place(s) of [NAME] to [NEW] across [FILES] scripts; any not open opens with the change unsaved.</floater.string>
     <floater.string name="KindKeyword">keyword</floater.string>
     <floater.string name="KindVariable">variable</floater.string>
     <floater.string name="KindParameter">parameter</floater.string>
@@ -143,6 +150,9 @@
     <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
     <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched.</floater.string>
     <floater.string name="PreprocessErrors">The preprocessor found [COUNT] error(s) in [NAME]; save again to upload anyway.</floater.string>
+    <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
+    <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
+    <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; its saves are saved from here.</floater.string>
     <floater.string name="IncludeOnDisk">[FILE] is a file on disk.</floater.string>
     <floater.string name="IncludeGone">[FILE] is not there any more.</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
@@ -246,6 +256,10 @@
             <menu_item_call label="Save to File..." layout="topleft" name="save_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
+            </menu_item_call>
+            <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="external_editor" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">
@@ -437,6 +451,19 @@
             <menu_item_check label="Sticky Headers" layout="topleft" name="sticky_headers">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="sticky_headers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="sticky_headers" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Semantic Colouring" layout="topleft" name="semantic_colors">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="semantic_colors" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="semantic_colors" />
+            </menu_item_check>
+            <menu_item_check label="Parameter Name Hints" layout="topleft" name="inlay_parameters">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_parameters" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_parameters" />
+            </menu_item_check>
+            <menu_item_check label="Type Hints" layout="topleft" name="inlay_types">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_types" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_types" />
             </menu_item_check>
             <menu_item_call label="Preferences..." layout="topleft" name="preferences">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
@@ -919,9 +946,10 @@
                              layout="topleft"
                              left="0"
                              name="references"
-                             tool_tip="Every place the name last looked up stands; choosing one goes there"
+                             tool_tip="Every place the name last looked up stands, in this script and in the object's others; choosing one goes there"
                              top="0"
                              width="574">
+                                <scroll_list.columns label="Script" name="where" width="130" />
                                 <scroll_list.columns label="Line" name="line" width="70" />
                                 <scroll_list.columns dynamic_width="true" label="Text" name="text" />
                             </scroll_list>

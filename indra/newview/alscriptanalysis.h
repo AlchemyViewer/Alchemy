@@ -81,6 +81,11 @@ public:
         // Where, for anything but a check.
         S32         line   = 0;
         S32         column = 0;
+        // What a check says beyond the problems and the outline: what
+        // every name is, and what the editor may show beside the text.
+        bool        semantics      = false;
+        bool        hintParameters = false;
+        bool        hintTypes      = false;
     };
     struct Result
     {
@@ -90,8 +95,10 @@ public:
         bool                            lua     = false;
         S32                             line    = 0;
         S32                             column  = 0;
-        ALScriptProblems                  problems;
-        std::vector<ALScriptOutlineEntry> outline;
+        ALScriptProblems                   problems;
+        std::vector<ALScriptOutlineEntry>  outline;
+        std::vector<ALScriptSemanticToken> semantics;
+        std::vector<ALScriptInlayHint>     hints;
         std::vector<ALScriptCompletion>   completions;
         ALScriptHover                     hover;
         ALScriptSignature                 signature;
