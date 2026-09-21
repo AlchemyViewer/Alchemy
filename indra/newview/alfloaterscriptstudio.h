@@ -663,12 +663,21 @@ private:
     void saveToFile();
     void fileChosenToLoad(const std::vector<std::string>& files);
     void fileChosenToSave(const std::vector<std::string>& files);
+    // A disk tab saved under another name: the tab is that file from
+    // then on.
+    void saveFileAs();
+    void fileChosenToSaveAs(const std::vector<std::string>& files);
+    // The files opened from disk lately, newest first, under File ▸
+    // Open Recent; kept with the state.
+    void noteRecentFile(const std::string& path);
+    void fillRecentMenu();
 
     void writeState(LLSD& state) const override;
     void readState(const LLSD& state) override;
 
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
+    std::vector<std::string>           mRecentFiles;
     std::vector<Snippet>               mSnippets[2];
     bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;

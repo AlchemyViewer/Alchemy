@@ -1247,6 +1247,7 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
             teachEditor(*mDocs[already]);
         }
         watchFile(*mDocs[already]);
+        noteRecentFile(path);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = mDocs[already]->name;
         setStatus(getString("Loaded", args));
@@ -2189,7 +2190,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     // The studio's own, by the names its menu knows.
     static const std::set<std::string> ours{ "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
-                                             "revert", "external_editor", "save_file", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
+                                             "revert", "external_editor", "save_file", "save_as", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
     if (ours.count(name))
     {
         onMenuAction(LLSD(name));
@@ -6269,6 +6270,16 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         saveToFile();
     }
+    else if (action == "save_as")
+    {
+        saveFileAs();
+    }
+    else if (action == "clear_recent")
+    {
+        mRecentFiles.clear();
+        fillRecentMenu();
+        saveState();
+    }
     else if (action == "undo")
     {
         undo();
@@ -6559,6 +6570,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "save" || action == "revert" || action == "save_file")
     {
         return doc && doc->loaded && (action == "save_file" || doc->modifiable);
+    }
+    if (action == "save_as")
+    {
+        return doc && doc->loaded && !doc->file.empty();
     }
     if (action == "external_editor")
     {
@@ -6924,6 +6939,134 @@ void ALFloaterScriptStudio::fileChosenToSave(const std::vector<std::string>& fil
     setStatus(getString(out.good() ? "SavedToFile" : "SaveToFileFailed", args), !out.good());
 }
 
+void ALFloaterScriptStudio::saveFileAs()
+{
+    Doc* doc = active();
+    if (!doc || doc->file.empty())
+    {
+        return;
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    LLFilePickerReplyThread::startPicker(
+        [handle](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->fileChosenToSaveAs(files);
+            }
+        },
+        LLFilePicker::FFSAVE_SCRIPT, doc->name);
+}
+
+void ALFloaterScriptStudio::fileChosenToSaveAs(const std::vector<std::string>& files)
+{
+    Doc* doc = active();
+    if (!doc || doc->file.empty() || files.empty())
+    {
+        return;
+    }
+    const std::string path = files.front();
+    if (path == doc->file)
+    {
+        saveFile(*doc);
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[PATH]"] = path;
+    if (indexOf("disk:" + path) != NONE)
+    {
+        // Open in another tab already: that tab is the file, not this one.
+        args["[FILE]"] = path;
+        setStatus(getString("FileOpenElsewhere", args), true);
+        return;
+    }
+    std::ofstream out(path, std::ios::binary);
+    out << doc->editor->text();
+    if (!out.good())
+    {
+        setStatus(getString("SaveToFileFailed", args), true);
+        return;
+    }
+    // The tab is the new file from here on: keyed by it, named after
+    // it, watched for changes to it, its problems its own.
+    mProblemStore.forget(doc->id);
+    doc->liveFile.reset();
+    doc->file = path;
+    doc->id   = "disk:" + path;
+    doc->name = gDirUtilp->getBaseFileName(path);
+    watchFile(*doc);
+    noteRecentFile(path);
+    setStatus(getString("SavedToFile", args));
+    fileSettled(*doc);
+    scheduleAnalysis(*doc, true);
+}
+
+void ALFloaterScriptStudio::noteRecentFile(const std::string& path)
+{
+    const size_t MOST = 10;
+    mRecentFiles.erase(std::remove(mRecentFiles.begin(), mRecentFiles.end(), path), mRecentFiles.end());
+    mRecentFiles.insert(mRecentFiles.begin(), path);
+    if (mRecentFiles.size() > MOST)
+    {
+        mRecentFiles.resize(MOST);
+    }
+    fillRecentMenu();
+    saveState();
+}
+
+void ALFloaterScriptStudio::fillRecentMenu()
+{
+    LLMenuGL* menu = menuBar() ? menuBar()->findChild<LLMenuGL>("open_recent") : nullptr;
+    if (!menu)
+    {
+        return;
+    }
+    menu->empty();
+    if (mRecentFiles.empty())
+    {
+        LLMenuItemCallGL::Params none;
+        none.name  = "no_recent";
+        none.label = getString("NoRecentFiles");
+        LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(none);
+        item->setEnabled(false);
+        menu->addChild(item);
+        return;
+    }
+    // Each file by its name, the folder after it where two share a name;
+    // the callback bound here rather than looked up by name, since the
+    // registry answers for whichever studio registered last.
+    const LLHandle<LLFloater> handle = getHandle();
+    for (const std::string& path : mRecentFiles)
+    {
+        const std::string name  = gDirUtilp->getBaseFileName(path);
+        const bool        twice = std::count_if(mRecentFiles.begin(), mRecentFiles.end(),
+                                                [&name](const std::string& other) { return gDirUtilp->getBaseFileName(other) == name; }) > 1;
+        LLMenuItemCallGL::Params p;
+        p.name  = "recent_" + path;
+        p.label = twice ? name + "  (" + gDirUtilp->getDirName(path) + ")" : name;
+        LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
+        item->setClickCallback([handle, path](LLUICtrl*, const LLSD&) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->openFile(path, false);
+            }
+        });
+        menu->addChild(item);
+    }
+    LLMenuItemSeparatorGL::Params sep;
+    menu->addChild(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sep));
+    LLMenuItemCallGL::Params clear;
+    clear.name  = "clear_recent";
+    clear.label = getString("ClearRecentFiles");
+    LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(clear);
+    item->setClickCallback([handle](LLUICtrl*, const LLSD&) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->onMenuAction(LLSD("clear_recent"));
+        }
+    });
+    menu->addChild(item);
+}
+
 // --- state ---------------------------------------------------------------------
 
 void ALFloaterScriptStudio::writeState(LLSD& state) const
@@ -6952,6 +7095,12 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
         pinned.append(one);
     }
     state["pinned"] = pinned;
+    LLSD recent = LLSD::emptyArray();
+    for (const std::string& path : mRecentFiles)
+    {
+        recent.append(path);
+    }
+    state["recent_files"] = recent;
 }
 
 void ALFloaterScriptStudio::readState(const LLSD& state)
@@ -7028,4 +7177,17 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
             }
         }
     }
+    if (state.has("recent_files"))
+    {
+        mRecentFiles.clear();
+        for (LLSD::array_const_iterator it = state["recent_files"].beginArray(); it != state["recent_files"].endArray(); ++it)
+        {
+            const std::string path = it->asString();
+            if (!path.empty() && std::find(mRecentFiles.begin(), mRecentFiles.end(), path) == mRecentFiles.end())
+            {
+                mRecentFiles.push_back(path);
+            }
+        }
+    }
+    fillRecentMenu();
 }

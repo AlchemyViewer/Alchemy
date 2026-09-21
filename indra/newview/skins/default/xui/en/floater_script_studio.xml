@@ -164,6 +164,9 @@
     <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
     <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; its saves are saved from here.</floater.string>
     <floater.string name="IncludeGone">[FILE] is not there any more.</floater.string>
+    <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
+    <floater.string name="NoRecentFiles">No Recent Files</floater.string>
+    <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
     <floater.string name="OriginTypes">Types</floater.string>
@@ -261,6 +264,13 @@
             <menu_item_call label="Open File..." layout="topleft" name="open_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="open_file" />
             </menu_item_call>
+            <menu
+             label="Open Recent"
+             layout="topleft"
+             mouse_opaque="false"
+             name="open_recent"
+             tear_off="false"
+             width="200" />
             <menu_item_call label="Load from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
@@ -268,6 +278,10 @@
             <menu_item_call label="Save to File..." layout="topleft" name="save_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
+            </menu_item_call>
+            <menu_item_call label="Save As..." layout="topleft" name="save_as">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_as" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_as" />
             </menu_item_call>
             <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
