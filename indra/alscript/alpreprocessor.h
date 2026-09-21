@@ -145,4 +145,29 @@ public:
     };
 
     static Result run(std::string_view source, const Options& options);
+
+    // The preprocessor's own tokenizer, for whoever else works over a
+    // script's tokens: every byte of the text in one token or another, as
+    // written -- a string across lines stays one string, a backslash at a
+    // line's end stays where it is -- with where each starts, zero-based.
+    struct Token
+    {
+        enum class Kind : U8
+        {
+            Ident,
+            Number,
+            String,
+            Punct,
+            Space,
+            Newline,
+            Comment,
+            // A byte the language has no use for.
+            Other
+        };
+        Kind        kind = Kind::Other;
+        std::string text;
+        S32         line   = 0;
+        S32         column = 0;
+    };
+    static std::vector<Token> tokenize(std::string_view text, bool lua);
 };

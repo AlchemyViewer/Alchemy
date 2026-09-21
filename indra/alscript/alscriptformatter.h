@@ -1,0 +1,67 @@
+/**
+ * @file alscriptformatter.h
+ * @brief A script's layout put right: indentation from its structure, spaces where the language reads better with them.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "stdtypes.h"
+
+#include <string>
+#include <string_view>
+
+// A formatter over the tokens of a script rather than its tree, so that
+// every comment, string and line break the author wrote is still there
+// afterwards; what changes is the whitespace. Each line is indented by
+// the depth of the blocks and brackets open at its start -- braces for
+// LSL, `then`, `do`, `function`, `repeat` and their `end` for Luau,
+// brackets and parentheses in both, and a statement hanging off an `if`
+// or `else` without braces -- and within a line the spaces are put
+// where the language reads best: one around a binary operator, none
+// around a unary one or inside brackets, one after a comma, none
+// before it. What the author spaced deliberately is left alone: the
+// gap before a trailing comment, a preprocessor line, anything inside
+// a string or a comment. Runs of blank lines are shortened and trailing
+// whitespace dropped, unless only some lines are asked for, in which
+// case every line keeps its number.
+class ALScriptFormatter
+{
+public:
+    struct Options
+    {
+        bool lua = false;
+        // How far each level goes in, in spaces; or one tab.
+        S32  indent = 4;
+        bool tabs   = false;
+        // How many blank lines in a row may stay.
+        S32  maxBlankLines = 2;
+        // Whether the spaces within a line are touched at all, or only
+        // the indentation.
+        bool spacing = true;
+    };
+
+    // The whole text.
+    static std::string format(std::string_view text, const Options& options);
+    // Only the lines from `first` to `last`, zero-based and inclusive,
+    // changed; the rest as it was, and every line where it was.
+    static std::string formatLines(std::string_view text, const Options& options, S32 first, S32 last);
+};

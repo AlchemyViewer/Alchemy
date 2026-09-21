@@ -145,7 +145,9 @@ namespace
     class Lexer
     {
     public:
-        Lexer(bool lua, S32 file) : mLua(lua), mFile(file) {}
+        // Verbatim: every byte kept as written, for a reader that is not
+        // the preprocessor -- no lines joined, no string rewritten.
+        Lexer(bool lua, S32 file, bool verbatim = false) : mLua(lua), mFile(file), mVerbatim(verbatim) {}
 
         Tokens run(std::string_view text)
         {
@@ -206,7 +208,7 @@ namespace
         // the lines after keep their numbers.
         bool continuation()
         {
-            if (at(mPos) == '\\' && at(mPos + 1) == '\n')
+            if (!mVerbatim && at(mPos) == '\\' && at(mPos + 1) == '\n')
             {
                 mPos += 2;
                 ++mLine;
@@ -368,6 +370,19 @@ namespace
             while (mPos < mText.size())
             {
                 const char c = at(mPos);
+                if (mVerbatim)
+                {
+                    if (c == '\\' && mPos + 1 < mText.size())
+                    {
+                        take();
+                    }
+                    take();
+                    if (c == '"')
+                    {
+                        break;
+                    }
+                    continue;
+                }
                 if (c == '\\' && mPos + 1 < mText.size())
                 {
                     take();
@@ -567,6 +582,7 @@ namespace
 
         bool             mLua;
         S32              mFile;
+        bool             mVerbatim;
         std::string_view mText;
         size_t           mPos    = 0;
         S32              mLine   = 0;
@@ -2838,4 +2854,29 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         result.text = std::move(squeezed.text);
     }
     return result;
+}
+
+std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view text, bool lua)
+{
+    std::vector<Token> out;
+    for (const ::Token& t : Lexer(lua, 0, true).run(text))
+    {
+        Token one;
+        switch (t.kind)
+        {
+            case Kind::Ident:   one.kind = Token::Kind::Ident; break;
+            case Kind::Number:  one.kind = Token::Kind::Number; break;
+            case Kind::String:  one.kind = Token::Kind::String; break;
+            case Kind::Punct:   one.kind = Token::Kind::Punct; break;
+            case Kind::Space:   one.kind = Token::Kind::Space; break;
+            case Kind::Newline: one.kind = Token::Kind::Newline; break;
+            case Kind::Comment: one.kind = Token::Kind::Comment; break;
+            default:            one.kind = Token::Kind::Other; break;
+        }
+        one.text   = t.text;
+        one.line   = t.line;
+        one.column = t.column;
+        out.push_back(std::move(one));
+    }
+    return out;
 }

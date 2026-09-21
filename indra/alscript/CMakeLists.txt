@@ -14,6 +14,7 @@ target_sources(
     allslservice.cpp
     alpreprocessor.cpp
     alscriptenvelope.cpp
+    alscriptformatter.cpp
     alsourcemap.cpp
 )
 
@@ -28,6 +29,7 @@ target_sources(
         allslservice.h
         alpreprocessor.h
         alscriptenvelope.h
+        alscriptformatter.h
         alscriptproblem.h
         alscriptsymbol.h
         alsourcemap.h
@@ -55,6 +57,7 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines}
   )
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   # The optimizer's golden files under tests/optimizer/, checked with the
   # grid's builtins loaded.
   al_add_test(
