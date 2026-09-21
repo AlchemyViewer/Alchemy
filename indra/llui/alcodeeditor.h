@@ -71,6 +71,11 @@ public:
         // Behind every place a name stands, once its references were
         // asked for; mixed from the text's unless a skin names it.
         Optional<LLUIColor> highlight_color;
+        // The bar beside a line changed since the text was last saved.
+        Optional<LLUIColor> changed_color;
+        // Brackets by depth, one colour per level, round again after the
+        // last; none given leaves brackets in the punctuation colour.
+        Optional<LLUIColor> bracket_color_1, bracket_color_2, bracket_color_3;
 
         Params();
     };
@@ -127,8 +132,29 @@ public:
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
+    // Whether a line was changed since the text was last saved: the
+    // gutter bars it, and a save clears them all.
+    bool lineChanged(S32 line) const;
+    void resetDirty() override;
     void setShowFoldMarkers(bool show);
     bool getShowFoldMarkers() const { return mShowFoldMarkers; }
+    // A faint line down each level of indentation, so that a block's
+    // extent is seen without counting spaces.
+    void setShowIndentGuides(bool show) { mShowIndentGuides = show; }
+    bool getShowIndentGuides() const { return mShowIndentGuides; }
+    // Line numbers counted from the caret's line, which is numbered as
+    // itself: what a jump of so many lines reads off.
+    void setRelativeLineNumbers(bool relative) { mRelativeLineNumbers = relative; }
+    bool getRelativeLineNumbers() const { return mRelativeLineNumbers; }
+    // Each pair of brackets in the colour of its depth, so that which
+    // closes which is read by colour.
+    void setColorBrackets(bool color) { mColorBrackets = color; }
+    bool getColorBrackets() const { return mColorBrackets; }
+    // The line that opens the block the top of the view is inside,
+    // pinned at the top while the block runs on below: the function, the
+    // state, the event, the loop, outermost first, up to a few.
+    void setStickyHeaders(bool sticky) { mStickyHeaders = sticky; }
+    bool getStickyHeaders() const { return mStickyHeaders; }
     S32  gutterWidth() const;
 
     // Zero-based; the caret goes to the start of the line and the line
@@ -280,6 +306,7 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onFocusLost() override;
 
@@ -301,6 +328,15 @@ protected:
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void drawGutter(const LLRect& text, F32 alpha);
+    void drawAfterRows(const LLRect& text) override;
+    void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) override;
+    // The depth of brackets open at a line's start, found from the top
+    // and kept until an edit above it.
+    S32  bracketDepthBefore(S32 line);
+    // The lines pinned at the top for the view as scrolled now, outer to
+    // inner; and the number of rows they take.
+    std::vector<S32> stickyLines();
+    S32              stickyRows();
     void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color);
 
     void              ensureRegions();
@@ -310,6 +346,10 @@ private:
     // The box drawn after a folded block's first line, in local
     // coordinates, or an empty rect.
     LLRect foldBoxOf(S32 line, const LLRect& text);
+    std::string foldBoxText(S32 line);
+    // How far a line is indented, in columns; a blank line as the next
+    // line that is not, so that the guides run through it.
+    S32 indentOf(S32 line) const;
 
     void openCompletion();
     void refreshCompletion();
@@ -330,6 +370,7 @@ private:
     LLColor4 currentLineColor() const;
     LLColor4 foldColor() const;
     LLColor4 highlightColor() const;
+    LLColor4 changedColor() const;
 
     bool mShowLineNumbers      = true;
     bool mShowFoldMarkers      = true;
@@ -343,16 +384,34 @@ private:
     LLUIColor mBracketMatchColor;
     LLUIColor mFoldColor;
     LLUIColor mHighlightColor;
+    LLUIColor mChangedColor;
+    bool      mShowIndentGuides    = true;
+    bool      mRelativeLineNumbers = false;
+    bool      mColorBrackets       = true;
+    bool      mStickyHeaders       = true;
+    LLUIColor mBracketColors[3];
+    bool      mBracketColorsSet    = false;
+    // Depth entering each line, valid for the first mDepthValid lines.
+    std::vector<S32> mDepthBefore;
+    S32              mDepthValid = 0;
     bool      mGutterColorSet      = false;
     bool      mLineNumberColorSet  = false;
     bool      mCurrentLineColorSet = false;
     bool      mFoldColorSet        = false;
     bool      mHighlightColorSet   = false;
+    bool      mChangedColorSet     = false;
     LLUIColor mMarkColors[static_cast<size_t>(Mark::COUNT)];
 
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
     std::vector<Mark>                  mMarks;
+    // One per line: changed since the last save.
+    std::vector<U8>                    mChanged;
+    // The mouse over the gutter, and the line it is on there: the fold
+    // markers of open blocks show while it is, and the block under it
+    // shows its extent.
+    bool                               mGutterHover     = false;
+    S32                                mGutterHoverLine = -1;
     std::vector<Decoration>            mDecorations;
     std::vector<ALTextRange>           mHighlights;
     std::vector<LLVector2>             mSquiggleScratch;

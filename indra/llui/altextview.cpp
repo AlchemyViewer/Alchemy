@@ -238,7 +238,9 @@ void ALTextView::setText(std::string_view text)
     mPreeditOverwritten.clear();
     mDocument.setText(text);
     mUndo.clear();
-    mUndo.markSaved();
+    // Through the virtual, so that what a subclass keeps about changes
+    // since the last save -- the gutter's bars -- starts clean too.
+    resetDirty();
     mCaret = mAnchor = mDocument.start();
     mDesiredX         = -1.f;
     mScrollY          = 0;
@@ -1919,6 +1921,90 @@ S32 ALTextView::mapLineAt(S32 y)
     return mMapLines.empty() ? -1 : mMapLines[ordinal];
 }
 
+void ALTextView::drawMapPreview(F32 alpha)
+{
+    const LLRect map  = mapRect();
+    const S32    line = mapLineAt(mMapHoverY);
+    if (map.isEmpty() || line < 0 || !mFont)
+    {
+        return;
+    }
+    // Seven lines around the one under the mouse, in a box beside the
+    // map, on the view's ground a shade towards its ink, the line under
+    // the mouse washed as the caret's line is; kept on screen.
+    const S32 PAD    = 6;
+    const S32 GUTTER = 8;
+    const S32 count  = mDocument.lineCount();
+    const S32 first  = llmax(0, line - 3);
+    const S32 last   = llmin(count - 1, line + 3);
+    const S32 row_h  = mLayout.rowHeight();
+    const S32 rows   = last - first + 1;
+    const LLRect local = getLocalRect();
+    const S32    width = llmin(560, llmax(160, local.getWidth() - map.getWidth() - 3 * PAD));
+    const S32    height = rows * row_h + 2 * PAD;
+    S32          top    = llmin(local.mTop - PAD, mMapHoverY + height / 2);
+    top                 = llmax(top, local.mBottom + PAD + height);
+    const S32    right  = map.mLeft - PAD;
+    const LLRect box(right - width, top, right, top - height);
+    const LLColor4& bg  = backgroundColor();
+    const LLColor4& ink = textColor();
+    LLColor4 ground, faint, wash;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        ground.mV[i] = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.06f;
+        faint.mV[i]  = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.45f;
+        wash.mV[i]   = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.14f;
+    }
+    ground.mV[VALPHA] = 0.97f * alpha;
+    faint.mV[VALPHA]  = alpha;
+    wash.mV[VALPHA]   = alpha;
+    gl_rect_2d(box, ground, true);
+    gl_rect_2d(box, faint % 0.6f, false);
+    LLLocalClipRect clip(LLRect(box.mLeft + 1, box.mTop - 1, box.mRight - 1, box.mBottom + 1));
+    // The numbers take the room the widest needs.
+    const std::string widest  = std::to_string(last + 1);
+    const S32         numbers = static_cast<S32>(mFont->getWidth(widest)) + GUTTER;
+    S32               y       = box.mTop - PAD;
+    for (S32 l = first; l <= last; ++l, y -= row_h)
+    {
+        if (l == line)
+        {
+            gl_rect_2d(LLRect(box.mLeft + 1, y, box.mRight - 1, y - row_h), wash, true);
+        }
+        const S32 baseline = y - row_h + static_cast<S32>(mFont->getDescenderHeight()) + 1;
+        mFont->renderUTF8(std::to_string(l + 1), 0, static_cast<F32>(box.mLeft + PAD + numbers - GUTTER), static_cast<F32>(baseline),
+                          faint, LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        // The line in its colours, token by token, tabs as spaces.
+        const std::string&                text   = mDocument.line(l);
+        const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(l);
+        F32                               x      = static_cast<F32>(box.mLeft + PAD + numbers);
+        const F32                         limit  = static_cast<F32>(box.mRight - PAD);
+        auto                              run    = [&](S32 begin, S32 end, const LLColor4& color) {
+            if (begin >= end || x >= limit)
+            {
+                return;
+            }
+            std::string piece = text.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin));
+            for (size_t at = piece.find('\t'); at != std::string::npos; at = piece.find('\t', at + 4))
+            {
+                piece.replace(at, 1, "    ");
+            }
+            F32 right_x = x;
+            mFont->renderUTF8(piece, 0, x, static_cast<F32>(baseline), color % alpha, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
+                              LLFontGL::NO_SHADOW, S32_MAX, static_cast<S32>(limit - x), &right_x, false);
+            x = right_x;
+        };
+        S32 at = 0;
+        for (const ALSyntaxToken& token : tokens)
+        {
+            run(at, token.begin, ink);
+            run(token.begin, token.end, token.kind == ALSyntaxKind::Text ? ink : colorForKind(token.kind));
+            at = token.end;
+        }
+        run(at, static_cast<S32>(text.size()), ink);
+    }
+}
+
 void ALTextView::scrollToMapY(S32 y)
 {
     const S32 line = mapLineAt(y);
@@ -2110,6 +2196,34 @@ const LLColor4& ALTextView::backgroundColor() const
     return mReadOnly ? mBgReadOnlyColor.get() : hasFocus() ? mBgFocusColor.get() : mBgColor.get();
 }
 
+bool ALTextView::keyboardOnText() const
+{
+    return gFocusMgr.getKeyboardFocus() == this;
+}
+
+void ALTextView::drawRowAt(S32 line, S32 r, F32 left, S32 screen_top, F32 alpha)
+{
+    if (!mFont || line < 0 || line >= mDocument.lineCount())
+    {
+        return;
+    }
+    const ALTextLayout::Line& laid = mLayout.line(line);
+    if (r < 0 || r >= static_cast<S32>(laid.rows.size()))
+    {
+        return;
+    }
+    const ALTextLayout::Row& row         = laid.rows[static_cast<size_t>(r)];
+    const size_t             glyph_count = row.glyphEnd - row.glyphBegin;
+    if (!glyph_count)
+    {
+        return;
+    }
+    colorRow(line, laid, row, alpha);
+    tintRow(line, laid, row, alpha, mColorScratch);
+    mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count, left - row.xStart,
+                        static_cast<F32>(screen_top - llround(mFont->getAscenderHeight())));
+}
+
 void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha)
 {
     const size_t count = row.glyphEnd - row.glyphBegin;
@@ -2171,7 +2285,7 @@ void ALTextView::drawRows(const LLRect& text)
     const S32  ascent      = llround(mFont->getAscenderHeight());
     const S32  count       = mDocument.lineCount();
     const S32  bottom_y    = mScrollY + text.getHeight();
-    const bool show_caret  = hasFocus() && gFocusMgr.getAppHasFocus() && !mReadOnly;
+    const bool show_caret  = keyboardOnText() && gFocusMgr.getAppHasFocus() && !mReadOnly;
     const F32  blink       = mBlink.getElapsedTimeF32();
     const bool caret_on    = show_caret && (blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
     const ALTextRange sel  = selection().normalised();
@@ -2243,6 +2357,7 @@ void ALTextView::drawRows(const LLRect& text)
             if (glyph_count)
             {
                 colorRow(line, laid, row, alpha);
+                tintRow(line, laid, row, alpha, mColorScratch);
                 mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count,
                                     left - row.xStart, static_cast<F32>(screen_top - ascent));
             }
@@ -2277,6 +2392,7 @@ void ALTextView::draw()
     {
         LLLocalClipRect clip(text);
         drawRows(text);
+        drawAfterRows(text);
     }
     if (mScrollMap)
     {
@@ -2288,6 +2404,10 @@ void ALTextView::draw()
         placeFindBar();
     }
     LLUICtrl::draw();
+    if (mMapHoverY >= 0 && !mDraggingMap)
+    {
+        drawMapPreview(alpha);
+    }
 }
 
 // --- input ---------------------------------------------------------------------
@@ -2442,6 +2562,9 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         mDesiredX = -1.f;
         return true;
     }
+    // Resting on the map previews the lines there, as long as it rests.
+    const LLRect map = mapRect();
+    mMapHoverY       = mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y) ? y : -1;
     if (textRect().pointInRect(x, y))
     {
         if (LLWindow* window = getWindow())
@@ -2451,6 +2574,12 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         return true;
     }
     return LLUICtrl::handleHover(x, y, mask);
+}
+
+void ALTextView::onMouseLeave(S32 x, S32 y, MASK mask)
+{
+    mMapHoverY = -1;
+    LLUICtrl::onMouseLeave(x, y, mask);
 }
 
 bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
@@ -2532,39 +2661,25 @@ void ALTextView::onMouseCaptureLost()
 
 bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
 {
-    // Resting on the map shows the lines there.
+    // The map has its preview drawn as the mouse moves; no tip there.
     const LLRect map = mapRect();
     if (mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y))
     {
-        const S32 line = mapLineAt(y);
-        if (line >= 0)
-        {
-            std::string preview;
-            const S32   count = mDocument.lineCount();
-            for (S32 l = llmax(0, line - 3); l <= llmin(count - 1, line + 3); ++l)
-            {
-                std::string text = mDocument.line(l);
-                for (size_t at = text.find('\t'); at != std::string::npos; at = text.find('\t', at + 4))
-                {
-                    text.replace(at, 1, "    ");
-                }
-                if (text.size() > 120)
-                {
-                    text.resize(120);
-                }
-                preview += (l == line ? "> " : "  ") + text + "\n";
-            }
-            LLRect sticky;
-            localRectToScreen(LLRect(map.mLeft, y + MAP_LINE_H, map.mRight, y - MAP_LINE_H), &sticky);
-            LLToolTipMgr::instance().show(LLToolTip::Params().message(preview).sticky_rect(sticky));
-            return true;
-        }
+        return true;
     }
     return LLUICtrl::handleToolTip(x, y, mask);
 }
 
 void ALTextView::setFocus(bool focus)
 {
+    // The keyboard to the view itself: a control with a child that has
+    // the keyboard counts as having it, which is right for a panel and
+    // wrong here, where the find bar's field is the child and a click in
+    // the text means the text.
+    if (focus && getEnabled() && gFocusMgr.getKeyboardFocus() != this)
+    {
+        gFocusMgr.setKeyboardFocus(this);
+    }
     LLUICtrl::setFocus(focus);
     if (focus)
     {

@@ -170,7 +170,11 @@ ALCodeEditor::Params::Params()
     current_line_color("current_line_color"),
     bracket_match_color("bracket_match_color"),
     fold_color("fold_color"),
-    highlight_color("highlight_color")
+    highlight_color("highlight_color"),
+    changed_color("changed_color"),
+    bracket_color_1("bracket_color_1"),
+    bracket_color_2("bracket_color_2"),
+    bracket_color_3("bracket_color_3")
 {
 }
 
@@ -187,12 +191,21 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mBracketMatchColor(p.bracket_match_color),
     mFoldColor(p.fold_color),
     mHighlightColor(p.highlight_color),
+    mChangedColor(p.changed_color),
     mGutterColorSet(p.gutter_color.isProvided()),
     mLineNumberColorSet(p.line_number_color.isProvided()),
     mCurrentLineColorSet(p.current_line_color.isProvided()),
     mFoldColorSet(p.fold_color.isProvided()),
-    mHighlightColorSet(p.highlight_color.isProvided())
+    mHighlightColorSet(p.highlight_color.isProvided()),
+    mChangedColorSet(p.changed_color.isProvided())
 {
+    mBracketColorsSet = p.bracket_color_1.isProvided() && p.bracket_color_2.isProvided() && p.bracket_color_3.isProvided();
+    if (mBracketColorsSet)
+    {
+        mBracketColors[0] = p.bracket_color_1;
+        mBracketColors[1] = p.bracket_color_2;
+        mBracketColors[2] = p.bracket_color_3;
+    }
     for (size_t mark = 0; mark < static_cast<size_t>(Mark::COUNT); ++mark)
     {
         mMarkColors[mark] = LLUIColorTable::instance().getColor(MARK_COLOR_NAMES[mark], LLColor4::red);
@@ -256,6 +269,13 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     }
     mMarks.insert(mMarks.begin() + first, made, Mark::None);
     mMarks.resize(document().lineCount(), Mark::None);
+    // What is known of bracket depth below the edit is known no more.
+    mDepthValid = llmin(mDepthValid, first);
+    // The lines the edit touched are changed until the next save.
+    mChanged.resize(llmax(mChanged.size(), static_cast<size_t>(last + 1)), 0);
+    mChanged.erase(mChanged.begin() + first, mChanged.begin() + last + 1);
+    mChanged.insert(mChanged.begin() + first, made, 1);
+    mChanged.resize(document().lineCount(), 0);
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
@@ -492,6 +512,22 @@ LLColor4 ALCodeEditor::foldColor() const
     return mFoldColorSet ? mFoldColor.get() : towards(backgroundColor(), textColor(), 0.6f);
 }
 
+LLColor4 ALCodeEditor::changedColor() const
+{
+    return mChangedColorSet ? mChangedColor.get() : towards(backgroundColor(), LLColor4(0.35f, 0.6f, 0.95f, 1.f), 0.9f);
+}
+
+bool ALCodeEditor::lineChanged(S32 line) const
+{
+    return line >= 0 && line < static_cast<S32>(mChanged.size()) && mChanged[static_cast<size_t>(line)] != 0;
+}
+
+void ALCodeEditor::resetDirty()
+{
+    ALTextView::resetDirty();
+    std::fill(mChanged.begin(), mChanged.end(), 0);
+}
+
 LLColor4 ALCodeEditor::highlightColor() const
 {
     if (mHighlightColorSet)
@@ -561,20 +597,40 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const S32       row_h  = layout().rowHeight();
     const S32       ascent = llround(font->getAscenderHeight());
     const S32       numbers_right = gutter.mRight - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
-    const LLColor4  ink    = lineNumberColor() % alpha;
-    const LLColor4  fold   = foldColor() % alpha;
+    const LLColor4  ink     = lineNumberColor() % alpha;
+    const LLColor4  lit     = textColor() % alpha;
+    const LLColor4  fold    = foldColor() % alpha;
+    const LLColor4  changed = changedColor() % alpha;
+    const S32       caret_line = caret().line;
     if (mShowFoldMarkers)
     {
         ensureRegions();
     }
+    // The block under the mouse in the fold column shows how far it
+    // runs: a line down the column from its first row to its last.
+    const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? regionStartingAt(mGutterHoverLine) : nullptr;
+    S32               guide_top = 0, guide_bottom = 0;
     forEachVisibleRow(text, [&](S32 line, S32 row, S32 screen_top) {
+        if (lineChanged(line))
+        {
+            gl_rect_2d(gutter.mLeft, screen_top, gutter.mLeft + 2, screen_top - row_h, changed);
+        }
+        if (shown && line >= shown->start && line <= shown->end)
+        {
+            guide_top    = guide_top == 0 ? screen_top : guide_top;
+            guide_bottom = screen_top - row_h;
+        }
         if (row != 0)
         {
             return;
         }
         if (mShowLineNumbers)
         {
-            font->renderUTF8(std::to_string(line + 1), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent), ink, LLFontGL::RIGHT, LLFontGL::BASELINE);
+            // The caret's line in the text's own ink, the rest quieter;
+            // counted from the caret's line where that is asked for.
+            const S32 shown = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
+            font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
+                             line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE);
             const Mark mark = markAt(line);
             if (mark != Mark::None)
             {
@@ -583,10 +639,11 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
                            mMarkColors[static_cast<size_t>(mark)].get() % alpha);
             }
         }
-        if (mShowFoldMarkers && regionStartingAt(line))
+        // A marker at a block's first line: pointing right at a folded
+        // one, always; pointing down at an open one, while the mouse is
+        // over the gutter, so that the gutter is quiet otherwise.
+        if (mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover))
         {
-            // A triangle: pointing down at an open block, right at a
-            // folded one.
             const S32 cx = gutter.mRight - FOLD_COLUMN / 2;
             const S32 cy = screen_top - row_h / 2;
             const S32 h  = FOLD_MARKER / 2;
@@ -600,12 +657,196 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             }
         }
     });
+    if (shown && guide_top != 0 && !isFolded(shown->start))
+    {
+        const S32 cx = gutter.mRight - FOLD_COLUMN / 2;
+        gl_rect_2d(cx, guide_top - row_h + FOLD_MARKER / 2, cx + 1, guide_bottom, fold);
+    }
+    // The headers pinned over the text have their numbers pinned over
+    // the gutter, on the same band.
+    const std::vector<S32> pinned = stickyLines();
+    if (!pinned.empty() && mShowLineNumbers)
+    {
+        const S32    rows = static_cast<S32>(pinned.size());
+        const LLRect band(gutter.mLeft, text.mTop, gutter.mRight, text.mTop - rows * row_h);
+        gl_rect_2d(band, towards(backgroundColor(), textColor(), 0.06f) % alpha, true);
+        gl_rect_2d(band.mLeft, band.mBottom, band.mRight, band.mBottom - 1, fold % 0.6f, true);
+        for (S32 i = 0; i < rows; ++i)
+        {
+            const S32 line  = pinned[static_cast<size_t>(i)];
+            const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
+            font->renderUTF8(std::to_string(shown_number), 0, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink,
+                             LLFontGL::RIGHT, LLFontGL::BASELINE);
+        }
+    }
+}
+
+// --- brackets by depth --------------------------------------------------------------
+
+namespace
+{
+    // Whether a byte is a bracket, and which way it faces.
+    S32 bracketDelta(char c)
+    {
+        switch (c)
+        {
+            case '(': case '[': case '{': return 1;
+            case ')': case ']': case '}': return -1;
+            default: return 0;
+        }
+    }
+}
+
+S32 ALCodeEditor::bracketDepthBefore(S32 line)
+{
+    const S32 count = document().lineCount();
+    if (line <= 0 || line > count)
+    {
+        return 0;
+    }
+    mDepthBefore.resize(static_cast<size_t>(count) + 1, 0);
+    if (mDepthValid == 0)
+    {
+        mDepthBefore[0] = 0;
+        mDepthValid     = 1;
+    }
+    // Carried on from the last line known, over what the grammar calls
+    // punctuation or an operator; a bracket in a string or a comment is
+    // none.
+    for (S32 l = mDepthValid - 1; l < line; ++l)
+    {
+        S32                               depth  = mDepthBefore[static_cast<size_t>(l)];
+        const std::string&                text   = document().line(l);
+        const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
+        for (const ALSyntaxToken& token : tokens)
+        {
+            if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
+            {
+                continue;
+            }
+            for (S32 b = token.begin; b < token.end && b < static_cast<S32>(text.size()); ++b)
+            {
+                depth = llmax(0, depth + bracketDelta(text[static_cast<size_t>(b)]));
+            }
+        }
+        mDepthBefore[static_cast<size_t>(l) + 1] = depth;
+        mDepthValid                             = l + 2;
+    }
+    return mDepthBefore[static_cast<size_t>(line)];
+}
+
+void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors)
+{
+    if (!mColorBrackets || !mBracketColorsSet)
+    {
+        return;
+    }
+    // The depth at each bracket of the line, then the row's glyphs that
+    // are brackets in their depth's colour.
+    const std::string&                text   = document().line(line);
+    const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(line);
+    S32                               depth  = bracketDepthBefore(line);
+    std::vector<std::pair<S32, S32>>  at;
+    for (const ALSyntaxToken& token : tokens)
+    {
+        if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
+        {
+            continue;
+        }
+        for (S32 b = token.begin; b < token.end && b < static_cast<S32>(text.size()); ++b)
+        {
+            const S32 delta = bracketDelta(text[static_cast<size_t>(b)]);
+            if (delta > 0)
+            {
+                at.emplace_back(b, depth);
+                ++depth;
+            }
+            else if (delta < 0)
+            {
+                depth = llmax(0, depth - 1);
+                at.emplace_back(b, depth);
+            }
+        }
+    }
+    if (at.empty())
+    {
+        return;
+    }
+    size_t next = 0;
+    for (size_t k = 0; k < colors.size(); ++k)
+    {
+        const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
+        while (next < at.size() && at[next].first < cluster)
+        {
+            ++next;
+        }
+        if (next < at.size() && at[next].first == cluster)
+        {
+            colors[k] = LLColor4U(mBracketColors[static_cast<size_t>(at[next].second % 3)].get() % alpha);
+        }
+    }
+}
+
+// --- headers pinned at the top ------------------------------------------------------
+
+std::vector<S32> ALCodeEditor::stickyLines()
+{
+    std::vector<S32> lines;
+    if (!mStickyHeaders)
+    {
+        return lines;
+    }
+    // The first row on screen, and the blocks around its line that start
+    // above it: their first lines, outermost first, the innermost few.
+    const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
+    ensureRegions();
+    for (const FoldRegion& region : mRegions)
+    {
+        if (region.start < top_line && region.end >= top_line && !isFolded(region.start))
+        {
+            lines.push_back(region.start);
+        }
+    }
+    // Nested blocks start later: the list is already outer to inner; the
+    // innermost three are the ones worth the room.
+    if (lines.size() > 3)
+    {
+        lines.erase(lines.begin(), lines.end() - 3);
+    }
+    return lines;
+}
+
+S32 ALCodeEditor::stickyRows()
+{
+    return static_cast<S32>(stickyLines().size());
+}
+
+void ALCodeEditor::drawAfterRows(const LLRect& text)
+{
+    const std::vector<S32> lines = stickyLines();
+    if (lines.empty())
+    {
+        return;
+    }
+    const F32 alpha = getDrawContext().mAlpha;
+    const S32 row_h = layout().rowHeight();
+    const S32 rows  = static_cast<S32>(lines.size());
+    // On the gutter's ground, a shade off the text's, with a line under
+    // the last; each header's first row, at the left as the text is.
+    const LLRect band(text.mLeft, text.mTop, text.mRight, text.mTop - rows * row_h);
+    gl_rect_2d(band, towards(backgroundColor(), textColor(), 0.06f) % alpha, true);
+    gl_rect_2d(band.mLeft, band.mBottom, band.mRight, band.mBottom - 1, foldColor() % (0.6f * alpha), true);
+    const F32 left = static_cast<F32>(text.mLeft) - scrollX();
+    for (S32 i = 0; i < rows; ++i)
+    {
+        drawRowAt(lines[static_cast<size_t>(i)], 0, left, text.mTop - i * row_h, alpha);
+    }
 }
 
 void ALCodeEditor::drawBeforeRows(const LLRect& text)
 {
     const F32 alpha = getDrawContext().mAlpha;
-    if (mHighlightCurrentLine && hasFocus() && !hasSelection())
+    if (mHighlightCurrentLine && keyboardOnText() && !hasSelection())
     {
         S32 row;
         layout().xOf(caret().line, caret().column, &row);
@@ -646,13 +887,74 @@ LLRect ALCodeEditor::foldBoxOf(S32 line, const LLRect& text)
     const S32                top   = screenTopOf(text, line, row);
     const S32                row_h = layout().rowHeight();
     const S32                x0    = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + last.xStart + last.width) + FOLD_BOX_GAP;
-    const S32                w     = getFont()->getWidth("...") + 8;
+    const S32                w     = getFont()->getWidth(foldBoxText(line)) + 8;
     return LLRect(x0, top - 1, x0 + w, top - row_h + 1);
+}
+
+// What a folded block's box says: how many lines are folded away.
+std::string ALCodeEditor::foldBoxText(S32 line)
+{
+    const FoldRegion* region = regionStartingAt(line);
+    const S32         hidden = region ? region->end - region->start : 0;
+    return hidden > 0 ? "... " + std::to_string(hidden) : std::string("...");
+}
+
+S32 ALCodeEditor::indentOf(S32 line) const
+{
+    const S32 count = document().lineCount();
+    for (S32 l = line; l < count && l < line + 200; ++l)
+    {
+        const std::string& text = document().line(l);
+        S32                columns = 0;
+        bool               blank   = true;
+        for (char c : text)
+        {
+            if (c == ' ')
+            {
+                ++columns;
+            }
+            else if (c == '\t')
+            {
+                columns += getTabWidth() - columns % getTabWidth();
+            }
+            else
+            {
+                blank = false;
+                break;
+            }
+        }
+        if (!blank)
+        {
+            return columns;
+        }
+    }
+    return 0;
 }
 
 void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
 {
     const S32 row_h = layout().rowHeight();
+    if (mShowIndentGuides && row == 0)
+    {
+        // One faint line per level within the indentation, at the tab
+        // stops; a blank line takes the next line's, so a block's guides
+        // run unbroken through it.
+        const S32 indent = indentOf(line);
+        const S32 tab    = getTabWidth();
+        if (indent >= tab && tab > 0)
+        {
+            const LLColor4 guide = foldColor() % (0.35f * alpha);
+            const F32      space = layout().columnWidth();
+            for (S32 column = tab; column < indent; column += tab)
+            {
+                const S32 x = static_cast<S32>(left + space * static_cast<F32>(column));
+                if (x >= text.mLeft && x < text.mRight)
+                {
+                    gl_rect_2d(x, screen_top, x + 1, screen_top - row_h, guide);
+                }
+            }
+        }
+    }
     if (!mHighlights.empty())
     {
         const LLColor4 wash = highlightColor() % alpha;
@@ -693,7 +995,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha);
         }
     }
-    if (mMatchBrackets && hasFocus())
+    if (mMatchBrackets && keyboardOnText())
     {
         ALTextPos open, close;
         if (matchingBrackets(open, close))
@@ -716,7 +1018,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         {
             const LLColor4 ink = foldColor() % alpha;
             gl_rect_2d(box, ink, false);
-            getFont()->renderUTF8("...", 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE);
+            getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE);
         }
     }
 }
@@ -1859,6 +2161,37 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
             return true;
         }
     }
+    if (text.pointInRect(x, y))
+    {
+        // A header pinned at the top goes to its line.
+        const std::vector<S32> pinned = stickyLines();
+        const S32              row    = (text.mTop - y) / llmax(1, layout().rowHeight());
+        if (row >= 0 && row < static_cast<S32>(pinned.size()))
+        {
+            goToLine(pinned[static_cast<size_t>(row)]);
+            return true;
+        }
+    }
+    if (x >= leftEdge() && x < gutter_right && text.mBottom <= y && y <= text.mTop)
+    {
+        // A line number chooses its line, whole; with shift, from the
+        // selection's anchor to it.
+        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        const S32 last = document().lineCount() - 1;
+        const ALTextPos from(line, 0);
+        const ALTextPos to = line < last ? ALTextPos(line + 1, 0) : ALTextPos(line, static_cast<S32>(document().line(line).size()));
+        setFocus(true);
+        if ((mask & MASK_SHIFT) && hasSelection())
+        {
+            const ALTextRange was = selection();
+            setSelection(ALTextRange(was.begin, was.begin <= from ? to : from));
+        }
+        else
+        {
+            setSelection(ALTextRange(from, to));
+        }
+        return true;
+    }
     if (!mFolded.empty() && text.pointInRect(x, y))
     {
         const S32 line = posAtLocal(x, y, false).line;
@@ -1874,6 +2207,26 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
 {
     const LLRect text = textRect();
+    // A mark in the gutter says what is on its line: every problem there.
+    if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
+    {
+        const S32   line = posAtLocal(text.mLeft, y, false).line;
+        std::string says;
+        for (const Decoration& d : mDecorations)
+        {
+            const ALTextRange range = d.range.normalised();
+            if (!d.message.empty() && range.begin.line <= line && line <= range.end.line)
+            {
+                says += (says.empty() ? "" : "\n") + d.message;
+            }
+        }
+        if (says.empty())
+        {
+            return ALTextView::handleToolTip(x, y, mask);
+        }
+        showTip(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), says);
+        return true;
+    }
     if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
     {
         return ALTextView::handleToolTip(x, y, mask);
@@ -1948,7 +2301,40 @@ void ALCodeEditor::showTip(const ALTextRange& about, const std::string& says)
     }
     LLRect sticky;
     localRectToScreen(local, &sticky);
-    LLToolTipMgr::instance().show(LLToolTip::Params().message(says).sticky_rect(sticky));
+    // A card rather than a line: the first line -- a declaration, a
+    // signature, a problem -- in the editor's own face, whatever follows
+    // in the reading face under it, a note about deprecation in the
+    // warning colour, and room enough that a sentence is not folded
+    // into a column.
+    static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
+    LLToolTip::Params      tip;
+    tip.max_width = 560;
+    tip.padding   = 8;
+    const size_t  nl    = says.find('\n');
+    const std::string head = says.substr(0, nl);
+    std::string       rest = nl == std::string::npos ? std::string() : says.substr(nl + 1);
+    {
+        LLToolTip::StyledText first;
+        first.text       = head;
+        first.style.font = getFont();
+        tip.styled_message.add(first);
+    }
+    while (!rest.empty())
+    {
+        const size_t   end  = rest.find('\n');
+        std::string    line = rest.substr(0, end);
+        rest                = end == std::string::npos ? std::string() : rest.substr(end + 1);
+        LLToolTip::StyledText more;
+        more.text       = "\n" + line;
+        more.style.font = LLFontGL::getFontSansSerif();
+        if (line.find("(deprecated)") != std::string::npos)
+        {
+            more.style.color = warning;
+        }
+        tip.styled_message.add(more);
+    }
+    tip.sticky_rect = sticky;
+    LLToolTipMgr::instance().show(tip);
 }
 
 void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
@@ -1990,7 +2376,17 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
 {
     mMouseX = x;
     mMouseY = y;
+    const S32 gutter_right = leftEdge() + gutterWidth();
+    mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;
+    mGutterHoverLine       = mGutterHover ? posAtLocal(textRect().mLeft, y, false).line : -1;
     return ALTextView::handleHover(x, y, mask);
+}
+
+void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
+{
+    mGutterHover     = false;
+    mGutterHoverLine = -1;
+    ALTextView::onMouseLeave(x, y, mask);
 }
 
 // --- signature help -------------------------------------------------------------

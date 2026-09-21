@@ -146,6 +146,10 @@ public:
     // What is behind the text now -- read-only, focused or neither -- and
     // what the text is drawn in, for whatever draws beside them.
     const LLColor4& backgroundColor() const;
+    // Whether the keyboard is on the text itself, rather than on the
+    // find bar's field inside the view: what the caret, the caret's
+    // line and the matched bracket follow. hasFocus counts a child.
+    bool keyboardOnText() const;
     const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
     // The colour table's name for a kind's colour under a prefix:
     // "SyntaxComment", "ScriptComment". Text has none, being the view's
@@ -281,6 +285,7 @@ public:
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
@@ -311,6 +316,15 @@ protected:
     virtual S32  leftInset() const { return 0; }
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
+    // Over every row, still clipped to the text: what floats above the
+    // text, such as headers pinned at the top.
+    virtual void drawAfterRows(const LLRect& text) {}
+    // A row's glyph colours, after the kinds have coloured them, for a
+    // subclass with colours of its own for some glyphs.
+    virtual void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) {}
+    // A line's row drawn at a place, coloured as it is in the text: what
+    // a header pinned at the top is drawn with.
+    void drawRowAt(S32 line, S32 row, F32 left, S32 screen_top, F32 alpha);
     // What a subclass does about folding: the caret has landed on a
     // hidden line and it must be seen; a fold command was given; whether
     // one could be.
@@ -388,6 +402,9 @@ private:
     S32  mapLineAt(S32 y);
     void scrollToMapY(S32 y);
     void drawMap(F32 alpha);
+    // The lines around the one under the mouse on the map, drawn beside
+    // it in the view's own face and colours while the mouse is there.
+    void drawMapPreview(F32 alpha);
     void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
@@ -399,6 +416,8 @@ private:
     ALSyntaxHighlighter mHighlighter;
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
+    // Where the mouse rests on the map, or -1: what the preview is of.
+    S32                 mMapHoverY = -1;
     const LLFontGL*     mFont       = nullptr;
     // Whether the text needs a bar each way; since when the bars were
     // last wanted in sight; and which one a drag has hold of, by how far

@@ -102,6 +102,9 @@ public:
     // In spaces.
     void setTabWidth(S32 spaces);
     S32  tabWidth() const { return mTabWidth; }
+    // A space's advance, in the screen's pixels: what a column is, for
+    // whoever draws by columns.
+    F32  columnWidth() { return spaceAdvance(); }
 
     // Every row is this tall.
     S32 rowHeight() const;
