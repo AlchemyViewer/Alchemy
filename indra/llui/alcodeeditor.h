@@ -303,6 +303,16 @@ public:
     typedef std::function<void(const ALTextPos& at, std::string_view word)> hover_request_t;
     void setHoverRequest(hover_request_t request) { mHoverRequest = std::move(request); }
     void supplyHover(const ALTextPos& at, const std::string& text);
+    // What is said of the word or the problem the mouse rests on, in a
+    // card over the text: the first line in the editor's own face,
+    // whatever follows in the reading face under it, a note about
+    // deprecation in the warning colour, and every URL in it a link. It
+    // stays while the mouse is on what it is about or on the card, and
+    // goes with a key, an edit, a scroll or a click elsewhere.
+    void        showCard(const ALTextRange& about, const std::string& says);
+    void        hideCard();
+    bool        cardShown() const;
+    ALTextView* card() const { return mCard; }
 
     // --- signature help ------------------------------------------------------------
 
@@ -336,6 +346,7 @@ public:
     bool handleHover(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     void onFocusLost() override;
 
 protected:
@@ -386,7 +397,6 @@ private:
     // answer that may yet come.
     void hideCompletionList();
     void drawSignature(const LLRect& text);
-    void showTip(const ALTextRange& about, const std::string& says);
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
     void documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out);
 
@@ -484,4 +494,10 @@ private:
     S32                     mMouseY = -1;
     std::optional<Signature> mSignature;
     ALTextPos               mSignatureAt;
+    // The card, made the first time it is wanted; what it is about, and
+    // that as a rect of the view, which the mouse may rest on as on the
+    // card.
+    ALTextView*             mCard = nullptr;
+    ALTextRange             mCardAbout;
+    LLRect                  mCardAnchor;
 };

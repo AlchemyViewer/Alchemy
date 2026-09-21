@@ -574,12 +574,18 @@ namespace tut
         widget.at    = ALTextPos(0, 2);
         widget.width = 40;
         widget.view  = button;
+        widget.height = v.layout().rowHeight() * 2;
         v.setAtoms({ widget });
         ensure("the button is the view's child", button->getParent() == &v);
         ensure("hidden until placed", !button->getVisible());
         v.placeAtomViews();
         ensure("shown once placed, as a frame places it", button->getVisible());
-        ensure("in the box", button->getRect().getWidth() == 40 && button->getRect().getHeight() == v.layout().rowHeight());
+        ensure("in the box, which is as tall as asked", button->getRect().getWidth() == 40 && button->getRect().getHeight() == v.layout().rowHeight() * 2);
+        ensure("the row grew to it", v.layout().lineHeight(0) == v.layout().rowHeight() * 2);
+        // A click in the taller row's upper part is still on the row.
+        S32 cx, cy;
+        pointOf(0, 0, cx, cy);
+        ensure("the top of the row hits the first line", v.posAtLocal(cx, v.textRect().mTop - 2, false).line == 0);
         // An edit that takes the placeholder takes the atom, and the view with it.
         const LLHandle<LLView> handle = button->getHandle();
         v.document().remove(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 4)));
@@ -588,15 +594,48 @@ namespace tut
     }
 
     template<> template<>
+    void altextview_object::test<19>()
+    {
+        set_test_name("a style puts a stretch in a font or a colour of its own, and slides with an edit");
+        ALTextView&     v   = make("Heading\nbody text\n");
+        const LLFontGL* big = LLFontGL::getFontSansSerifHuge();
+        if (!big || !big->getFontFreetype() || big->getLineSpacing() <= v.layout().rowHeight())
+        {
+            skip("no larger face to style in");
+        }
+        ALTextView::Style head;
+        head.range = ALTextRange(ALTextPos(0, 0), ALTextPos(0, 7));
+        head.font  = big;
+        ALTextView::Style note;
+        note.range = ALTextRange(ALTextPos(1, 5), ALTextPos(1, 9));
+        note.color = LLColor4::yellow;
+        ALTextView::Style nothing;
+        nothing.range = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 2));
+        v.setStyles({ note, head, nothing });
+        ensure_equals("two kept, in order; one with neither font nor colour dropped", v.styles().size(), size_t(2));
+        ensure("the heading first", v.styles()[0].font == big);
+        ensure_equals("the heading's row is the font's height", v.layout().rowHeightOf(0, 0), big->getLineSpacing());
+        ensure_equals("the body's is not", v.layout().rowHeightOf(1, 0), v.layout().rowHeight());
+        v.document().insert(ALTextPos(0, 0), "\n");
+        ensure("slid down a line", v.styles()[0].range.begin == ALTextPos(1, 0) && v.styles()[1].range.begin == ALTextPos(2, 5));
+        ensure_equals("the empty line above is plain", v.layout().rowHeightOf(0, 0), v.layout().rowHeight());
+        ensure_equals("the heading's row followed", v.layout().rowHeightOf(1, 0), big->getLineSpacing());
+        v.document().remove(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 4)));
+        ensure("cut through: gone, the row plain again", v.styles().size() == 1 && v.layout().rowHeightOf(1, 0) == v.layout().rowHeight());
+    }
+
+    template<> template<>
     void altextview_object::test<18>()
     {
         set_test_name("the spell check squiggles the words a dictionary lacks: everywhere in prose, in comments and strings in code");
         ALTextView& v = make("teh cat\nsecond teh");
-        v.setSpellChecker([](const std::string& word) {
-            std::string lower = word;
-            LLStringUtil::toLower(lower);
-            return lower != "teh";
-        });
+        v.setSpellChecker(
+            [](const std::string& word) {
+                std::string lower = word;
+                LLStringUtil::toLower(lower);
+                return lower != "teh";
+            },
+            [](const std::string& word, std::vector<std::string>& out) { out.push_back(word == "Teh" ? "The" : "the"); });
         ensure("off until asked for", !v.getSpellCheck() && v.misspellings(0).empty());
         v.setSpellCheck(true);
         ensure("on", v.getSpellCheck());
@@ -605,6 +644,19 @@ namespace tut
         ALTextRange word;
         ensure("found at a position in it", v.misspelledAt(ALTextPos(1, 8), &word) && word == ALTextRange(ALTextPos(1, 7), ALTextPos(1, 10)));
         ensure("not at one outside", !v.misspelledAt(ALTextPos(0, 5)));
+        // The suggestions for the word at the caret, as the menu offers
+        // them, and one taken in place of the word.
+        v.setCaret(ALTextPos(0, 1));
+        v.refreshSuggestions();
+        ensure_equals("one suggestion", v.getSuggestionCount(), U32(1));
+        ensure_equals("what it is", v.getSuggestion(0), std::string("the"));
+        ensure("the dictionary alone takes words in", !v.canAddToDictionary() && !v.canAddToIgnore());
+        v.replaceWithSuggestion(0);
+        ensure_equals("put in place of the word", v.document().line(0), std::string("the cat"));
+        ensure("the caret after it", v.caret() == ALTextPos(0, 3));
+        ensure("undone as one step", v.canUndo());
+        v.undo();
+        ensure_equals("back", v.document().line(0), std::string("teh cat"));
         // Typing changes the line, which is checked again.
         v.setCaret(ALTextPos(0, 3));
         type("n");

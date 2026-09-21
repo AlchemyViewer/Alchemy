@@ -560,4 +560,52 @@ namespace tut
         ensure_equals("the first, cut through, is gone", e.semanticTokens().size(), size_t(1));
         ensure("the survivor is the struck one", e.semanticTokens()[0].strike);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<15>()
+    {
+        set_test_name("the hover card shows what is said of a word, in the editor's face then the reading face, with its links; and goes when the mouse or the keys move on");
+        ALCodeEditor& e = make("llSay(0, x);\nsecond line\n");
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& text) {
+            if (word != "llSay")
+            {
+                return false;
+            }
+            text = "llSay(integer channel, string msg)\nSays something. (deprecated)\nhttps://wiki.secondlife.com/wiki/LlSay";
+            return true;
+        });
+        const LLRect text = e.textRect();
+        S32          row;
+        const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text.mTop - e.layout().rowHeight() / 2;
+        ensure("nothing shown yet", !e.cardShown());
+        ensure("the rest is taken", e.handleToolTip(x, y, MASK_NONE));
+        ensure("the card is shown", e.cardShown());
+        ALTextView& card = *e.card();
+        ensure_equals("with the words", card.document().lineCount(), 3);
+        ensure("the head in the editor's face", !card.styles().empty() && card.styles()[0].font == e.getFont() && card.styles()[0].range.begin == ALTextPos(0, 0));
+        ensure("the deprecation in a colour", card.styles().size() >= 2 && card.styles()[1].color.has_value());
+        ensure("the wiki page a link", card.substitutions().size() == 1 && card.substitutions()[0].link && card.substitutions()[0].url == "https://wiki.secondlife.com/wiki/LlSay");
+        ensure("the card is a child, over the text, and not the keyboard's", card.getParent() == &e && card.getRect().getWidth() > 40 && !card.hasFocus());
+        ensure("under the word", card.getRect().mTop < y);
+        // The mouse on the word keeps it; on the card keeps it; elsewhere lets it go.
+        e.handleHover(x + 3, y, MASK_NONE);
+        ensure("kept on the word", e.cardShown());
+        const LLRect where = card.getRect();
+        e.handleHover(where.getCenterX(), where.getCenterY(), MASK_NONE);
+        ensure("kept on the card", e.cardShown());
+        e.handleHover(text.mRight - 5, text.mBottom + 5, MASK_NONE);
+        ensure("gone off both", !e.cardShown());
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("shown again", e.cardShown());
+        key(KEY_RIGHT);
+        ensure("a key hides it", !e.cardShown());
+        // A problem's message comes the same way, from the gutter.
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 6));
+        d.message = "something is wrong here";
+        e.setDecorations({ d });
+        e.handleToolTip(e.leftEdge() + 2, text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2, MASK_NONE);
+        ensure("the gutter's card", e.cardShown() && e.card()->text() == "something is wrong here");
+    }
 }

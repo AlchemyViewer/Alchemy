@@ -28,8 +28,6 @@
 
 #include "alviewtype.h"
 #include "llurlaction.h"
-#include "llurlmatch.h"
-#include "llurlregistry.h"
 #include "lluicolortable.h"
 
 static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
@@ -149,79 +147,24 @@ void ALOutputView::show(const Entry& entry, U32 serial)
         source.value   = LLSD(static_cast<S32>(serial));
         addSubstitution(std::move(source));
     }
-    linkUrls(first, laid.textBegin);
+    linkUrlsOn(first, laid.textBegin);
     for (S32 line = first + 1; line < first + shown.lines; ++line)
     {
-        linkUrls(line, 0);
-    }
-}
-
-void ALOutputView::linkUrls(S32 line, S32 from)
-{
-    const std::string& text = document().line(line);
-    if (from >= static_cast<S32>(text.size()))
-    {
-        return;
-    }
-    const LLHandle<ALOutputView> self = getDerivedHandle<ALOutputView>();
-    // A name that arrives later goes to every link of the URL it is for.
-    const auto relabelled = [self](const std::string& url, const std::string& label, const std::string&) {
-        ALOutputView* view = self.get();
-        if (!view)
-        {
-            return;
-        }
-        for (const Substitution& sub : view->substitutions())
-        {
-            if (sub.link && sub.value.isMap() && sub.value["url"].asStringRef() == url)
-            {
-                view->relabel(sub.range, label);
-            }
-        }
-    };
-    std::string rest = text.substr(static_cast<size_t>(from));
-    S32         at   = from;
-    LLUrlMatch  match;
-    while (!rest.empty() && LLUrlRegistry::instance().findUrl(rest, match, relabelled))
-    {
-        const S32 begin = at + static_cast<S32>(match.getStart());
-        const S32 end   = at + static_cast<S32>(match.getEnd()) + 1;
-        if (end <= begin)
-        {
-            break;
-        }
-        Substitution link;
-        link.range        = ALTextRange(ALTextPos(line, begin), ALTextPos(line, end));
-        link.link         = true;
-        link.tooltip      = match.getTooltip();
-        link.value["url"] = match.getUrl();
-        const std::string matched = text.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin));
-        if (!match.getLabel().empty() && match.getLabel() != matched)
-        {
-            link.shown = match.getLabel();
-        }
-        addSubstitution(std::move(link));
-        rest = rest.substr(match.getEnd() + 1);
-        at   = end;
+        linkUrlsOn(line);
     }
 }
 
 void ALOutputView::followed(const Substitution& link)
 {
-    if (link.value.isMap())
+    if (!link.url.empty())
     {
-        const std::string url = link.value["url"].asString();
-        if (url.empty())
-        {
-            return;
-        }
         if (mUrlChosen.empty())
         {
-            LLUrlAction::clickAction(url, false);
+            LLUrlAction::clickAction(link.url, false);
         }
         else
         {
-            mUrlChosen(url);
+            mUrlChosen(link.url);
         }
         return;
     }

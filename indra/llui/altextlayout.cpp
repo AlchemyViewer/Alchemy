@@ -224,6 +224,12 @@ void ALTextLayout::setSubstitutionProvider(substitution_provider_t provider)
     invalidateAll();
 }
 
+void ALTextLayout::setRunProvider(run_provider_t provider)
+{
+    mRuns = std::move(provider);
+    invalidateAll();
+}
+
 void ALTextLayout::invalidateLine(S32 index)
 {
     if (index < 0 || index >= lineCount())
@@ -240,8 +246,9 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     out.placed.clear();
     out.glyphs.clear();
     out.rows.clear();
-    out.width = 0.f;
-    out.valid = true;
+    out.width  = 0.f;
+    out.height = 0;
+    out.valid  = true;
 
     const std::string&    text = mDocument ? mDocument->line(index) : LLStringUtil::null;
     const LLFontFreetype* face = mFont ? mFont->getFontFreetype() : nullptr;
@@ -281,6 +288,31 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
             ++i;
         }
     }
+    // What stretches are shaped in a font of their own: in order, within
+    // the line, none over another, each with a face to shape by.
+    mRunScratch.clear();
+    if (mRuns)
+    {
+        mRuns(index, mRunScratch);
+        std::stable_sort(mRunScratch.begin(), mRunScratch.end(), [](const Run& a, const Run& b) { return a.begin < b.begin; });
+        S32 reached = 0;
+        for (size_t i = 0; i < mRunScratch.size();)
+        {
+            Run& run  = mRunScratch[i];
+            run.begin = llclamp(run.begin, 0, static_cast<S32>(text.size()));
+            run.end   = llclamp(run.end, run.begin, static_cast<S32>(text.size()));
+            if (run.begin < reached || run.end == run.begin || !run.font || !run.font->getFontFreetype() || run.font == mFont)
+            {
+                mRunScratch.erase(mRunScratch.begin() + static_cast<std::ptrdiff_t>(i));
+                continue;
+            }
+            reached = run.end;
+            ++i;
+        }
+    }
+    // The fonts the glyphs were shaped in, by glyph, where not the
+    // document's own: what a row's text is tall for.
+    std::vector<std::pair<size_t, const LLFontGL*>> font_spans;
     size_t next_inlay = 0;
     auto   gap        = [&](S32 cluster, F32 width, S32 inlay, bool before, S32 substitution = -1) {
         out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
@@ -310,12 +342,12 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     // An inlay splits a piece too, so that its gap goes where its column is.
     // A substitution's text is shaped as itself, every glyph of it on the
     // stretch's first byte; a box is a gap of its width on the same.
-    auto shape_run = [&](const std::string& source, size_t begin, size_t end, S32 substitution) {
-        if (!face || end <= begin)
+    auto shape_with = [&](const LLFontFreetype* in, const std::string& source, size_t begin, size_t end, S32 substitution) {
+        if (!in || end <= begin)
         {
             return;
         }
-        ALFontShaping::shapeRun(face, source, begin, end, mShaped);
+        ALFontShaping::shapeRun(in, source, begin, end, mShaped);
         for (const ALShapedGlyph& sg : mShaped)
         {
             out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, (x + sg.x_offset) * inv_x, sg.y_offset * inv_y });
@@ -325,6 +357,36 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
             {
                 x = static_cast<F32>(ll_round(x));
             }
+        }
+    };
+    // A piece of the text, shaped run by run where runs cross it.
+    size_t next_run  = 0;
+    auto   shape_run = [&](const std::string& source, size_t begin, size_t end, S32 substitution) {
+        if (&source != &text)
+        {
+            shape_with(face, source, begin, end, substitution);
+            return;
+        }
+        size_t from = begin;
+        while (from < end)
+        {
+            while (next_run < mRunScratch.size() && static_cast<size_t>(mRunScratch[next_run].end) <= from)
+            {
+                ++next_run;
+            }
+            if (next_run >= mRunScratch.size() || static_cast<size_t>(mRunScratch[next_run].begin) >= end)
+            {
+                shape_with(face, text, from, end, substitution);
+                break;
+            }
+            const Run&   run      = mRunScratch[next_run];
+            const size_t run_from = llmax(from, static_cast<size_t>(run.begin));
+            const size_t run_to   = llmin(end, static_cast<size_t>(run.end));
+            shape_with(face, text, from, run_from, substitution);
+            font_spans.emplace_back(out.glyphs.size(), run.font);
+            shape_with(run.font->getFontFreetype(), text, run_from, run_to, substitution);
+            font_spans.emplace_back(out.glyphs.size(), nullptr);
+            from = run_to;
         }
     };
     auto shape = [&](size_t begin, size_t end) {
@@ -338,10 +400,17 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         }
         shape_run(text, from, end, -1);
     };
+    // The boxes on the line, by glyph, with their heights: what a row
+    // may be taller for.
+    std::vector<std::pair<size_t, S32>> boxes;
     auto substitute = [&](const Substitution& sub) {
         const size_t first = out.glyphs.size();
         if (sub.shown.empty())
         {
+            if (sub.height > 0)
+            {
+                boxes.emplace_back(first, sub.height);
+            }
             gap(sub.begin, llmax(0.f, sub.width) * mScaleX, -1, true, sub.id);
         }
         else
@@ -393,9 +462,13 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     }
 
     // Rows. One, unless the line is wider than the wrap and has somewhere
-    // to break.
+    // to break. Each as tall as its text -- the document's font, or the
+    // tallest font on it -- or as the tallest box on it, and stacked
+    // under the line's top.
     const size_t glyph_count = out.glyphs.size();
     const S32    length      = static_cast<S32>(text.size());
+    const S32    row_height  = rowHeight();
+    const S32    row_ascent  = mFont ? llround(mFont->getAscenderHeight()) : 0;
     auto add_row = [&](size_t glyph_begin, size_t glyph_end) {
         Row row;
         row.glyphBegin = glyph_begin;
@@ -404,6 +477,42 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         row.end        = glyph_end < glyph_count ? out.glyphs[glyph_end].cluster : length;
         row.xStart     = glyph_begin < glyph_count ? out.glyphs[glyph_begin].pen : out.width;
         row.width      = (glyph_end < glyph_count ? out.glyphs[glyph_end].pen : out.width) - row.xStart;
+        row.top        = out.height;
+        row.textHeight = row_height;
+        row.ascent     = row_ascent;
+        // The fonts in force over the row: each span starts a font at a
+        // glyph, or ends one with null, and a stretch under a font that
+        // reaches into the row makes the row as tall as the font asks.
+        const LLFontGL* current = nullptr;
+        auto            tall_as = [&](const LLFontGL* used) {
+            row.textHeight = llmax(row.textHeight, used->getLineSpacing());
+            row.ascent     = llmax(row.ascent, llround(used->getAscenderHeight()));
+        };
+        for (const auto& [glyph, font] : font_spans)
+        {
+            if (glyph >= glyph_end)
+            {
+                break;
+            }
+            if (current && glyph > glyph_begin)
+            {
+                tall_as(current);
+            }
+            current = font;
+        }
+        if (current)
+        {
+            tall_as(current);
+        }
+        row.height = row.textHeight;
+        for (const auto& [glyph, height] : boxes)
+        {
+            if (glyph >= glyph_begin && glyph < glyph_end)
+            {
+                row.height = llmax(row.height, height);
+            }
+        }
+        out.height += row.height;
         out.rows.push_back(row);
     };
     if (mWrapWidth <= 0 || out.width <= static_cast<F32>(mWrapWidth) || glyph_count == 0)
@@ -497,9 +606,10 @@ const ALTextLayout::Line& ALTextLayout::line(S32 index)
     Line& entry = mLines[index];
     if (!entry.valid)
     {
-        const size_t rows_before = entry.rows.size();
+        // What the line counted as before: its last height, or a row's.
+        const S32 before = entry.height > 0 ? entry.height : rowHeight();
         layoutLine(index, entry);
-        if (entry.rows.size() != llmax(rows_before, size_t(1)))
+        if (entry.height != before)
         {
             mTopsDirty = true;
         }
@@ -522,7 +632,7 @@ void ALTextLayout::ensureTops()
         mTops[i] = top;
         if (!mHidden[i])
         {
-            top += row * static_cast<S32>(mLines[i].valid ? mLines[i].rows.size() : 1);
+            top += mLines[i].valid ? mLines[i].height : row;
         }
     }
     mTops[mLines.size()] = top;
@@ -568,6 +678,39 @@ S32 ALTextLayout::lineAtY(S32 y)
         }
     }
     return line;
+}
+
+S32 ALTextLayout::rowTop(S32 index, S32 row)
+{
+    const Line& entry = line(index);
+    if (entry.rows.empty())
+    {
+        return 0;
+    }
+    return entry.rows[static_cast<size_t>(llclamp(row, 0, static_cast<S32>(entry.rows.size()) - 1))].top;
+}
+
+S32 ALTextLayout::rowHeightOf(S32 index, S32 row)
+{
+    const Line& entry = line(index);
+    if (entry.rows.empty())
+    {
+        return rowHeight();
+    }
+    return entry.rows[static_cast<size_t>(llclamp(row, 0, static_cast<S32>(entry.rows.size()) - 1))].height;
+}
+
+S32 ALTextLayout::rowAtY(S32 index, S32 y)
+{
+    const Line& entry = line(index);
+    for (size_t r = 0; r + 1 < entry.rows.size(); ++r)
+    {
+        if (y < entry.rows[r].top + entry.rows[r].height)
+        {
+            return static_cast<S32>(r);
+        }
+    }
+    return entry.rows.empty() ? 0 : static_cast<S32>(entry.rows.size()) - 1;
 }
 
 S32 ALTextLayout::rowOf(S32 index, S32 column)

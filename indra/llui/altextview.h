@@ -41,6 +41,7 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -145,6 +146,9 @@ public:
         // viewer's spell check is on at all.
         Optional<bool>        spellcheck;
         Optional<LLUIColor>   spell_error_color;
+        // Whether a click gives the view the keyboard; a card over an
+        // editor leaves it where it was.
+        Optional<bool>        takes_focus;
 
         Params();
     };
@@ -247,11 +251,21 @@ public:
     // cuts through.
     struct Substitution
     {
+        enum class Underline : U8
+        {
+            Hover,
+            Always,
+            Never
+        };
         ALTextRange range;
         // In place of the text; empty leaves the text as it is.
         std::string shown;
         bool        link = false;
+        Underline   underline = Underline::Hover;
         std::string tooltip;
+        // The URL a link is, where it is one: a right click on it shows
+        // the registry's menu for the URL, with the actions bound to it.
+        std::string url;
         // Handed back when the link is followed.
         LLSD        value;
     };
@@ -267,6 +281,27 @@ public:
     typedef boost::signals2::signal<void(const Substitution&)> link_signal_t;
     // A link followed: clicked, and let go of without a drag.
     boost::signals2::connection onLinkClicked(const link_signal_t::slot_type& slot) { return mLinkClicked.connect(slot); }
+    // Every URL on a line, from a column on, made a link through the URL
+    // registry: labelled as it labels it, relabelled when a name arrives,
+    // with its tooltip, its underline and its URL. How many were made.
+    S32 linkUrlsOn(S32 line, S32 from = 0);
+
+    // --- styles ----------------------------------------------------------------
+
+    // A stretch in a font of its own, a colour of its own, or both: a
+    // heading in a heavier face, a note in the reading face, a warning
+    // in the warning colour. The rows it reaches are as tall as it asks,
+    // every font on a row sharing its baseline. Replaced whole; an edit
+    // slides them and drops the ones it cuts through.
+    struct Style
+    {
+        ALTextRange             range;
+        const LLFontGL*         font = nullptr;
+        std::optional<LLColor4> color;
+    };
+    void                      setStyles(std::vector<Style> styles);
+    void                      clearStyles() { setStyles({}); }
+    const std::vector<Style>& styles() const { return mStyles; }
 
     // --- atoms ---------------------------------------------------------------
 
@@ -284,7 +319,10 @@ public:
         ALTextPos    at;
         // The placeholder's bytes.
         S32          length = 3;
+        // The box, in pixels; a height of zero is the row's own, and a
+        // taller one makes the row taller, the text sitting at its bottom.
         S32          width  = 0;
+        S32          height = 0;
         LLUIImagePtr image;
         LLView*      view = nullptr;
         std::string  tooltip;
@@ -312,10 +350,15 @@ public:
     // Whether words are checked here: asked for, and the viewer's spell
     // check is on. The menu handler's own question.
     bool getSpellCheck() const override;
-    // Who says whether a word is spelled right; the viewer's dictionary
-    // unless told otherwise, which a test is.
-    typedef std::function<bool(const std::string& word)> spell_checker_t;
-    void setSpellChecker(spell_checker_t checker);
+    // Who says whether a word is spelled right, and what it might have
+    // been: the viewer's dictionary unless told otherwise, which a test
+    // is. Only the dictionary takes a word in or lets one pass.
+    typedef std::function<bool(const std::string& word)>                             spell_checker_t;
+    typedef std::function<void(const std::string& word, std::vector<std::string>& out)> spell_suggester_t;
+    void setSpellChecker(spell_checker_t checker, spell_suggester_t suggester = nullptr);
+    // The dictionary's suggestions for the misspelling at the caret,
+    // gathered again: what the right-click menu offers.
+    void refreshSuggestions();
     // The words the dictionary lacks on a line, as ranges of it, checked
     // now if they were not.
     const std::vector<std::pair<S32, S32>>& misspellings(S32 line);
@@ -364,6 +407,9 @@ public:
     // --- the context menu ------------------------------------------------------
 
     void showContextMenu(S32 x, S32 y);
+    // The URL registry's menu for a URL, at a point: what a right click
+    // on a link shows. False where the registry has no menu for it.
+    bool showUrlMenu(S32 x, S32 y, const std::string& url);
 
     // --- find and replace ------------------------------------------------------
 
@@ -456,7 +502,8 @@ protected:
 
     // What a subclass adds to the picture: room at the left of the text
     // for a gutter, whatever it draws there and under the rows before they
-    // are drawn, and whatever it draws over each row after its glyphs.
+    // are drawn, and whatever it draws over each row after its glyphs --
+    // given the top of the row's text band, which is a font line tall.
     virtual S32  leftInset() const { return 0; }
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
@@ -494,8 +541,10 @@ protected:
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
     virtual bool canSymbol(ALEditorCommand command) const { return false; }
-    // The screen y of the top of a line's row, and every row on screen in
-    // turn, for a subclass drawing beside them.
+    // The screen y of the top of a line's row -- the row's own top; a row
+    // a box made taller than the font's line holds its text at its
+    // bottom -- and every row on screen in turn, for a subclass drawing
+    // beside them.
     S32  screenTopOf(const LLRect& text, S32 line, S32 row);
     void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
     // The lines a selection covers, as commands over whole lines count them.
@@ -560,8 +609,10 @@ private:
     // The layers through an edit: what is after it slides, what it cut
     // through goes, and the lines it touched are checked again.
     void onDocumentEdit(const ALTextDocument::Edit& edit);
-    // What the layout is told of a line's substitutions and atoms.
+    // What the layout is told of a line's substitutions and atoms, and
+    // of its stretches in fonts of their own.
     void provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const;
+    void provideRuns(S32 line, std::vector<ALTextLayout::Run>& out) const;
     // A position inside what is shown as one thing, moved out to the side
     // it came from -- past it going forward from `from`, before it going
     // back -- else as it is.
@@ -571,9 +622,6 @@ private:
     const Substitution* linkAtLocal(S32 x, S32 y);
     const Atom*         atomAtLocal(S32 x, S32 y);
     void                checkLine(S32 line);
-    // The suggestions for the misspelling at the caret, gathered when the
-    // menu is shown.
-    void                gatherSuggestions();
 
     ALTextDocument      mDocument;
     ALTextUndo          mUndo;
@@ -608,8 +656,9 @@ private:
     LLUIColor mSelectionColor;
     std::array<LLUIColor, static_cast<size_t>(ALSyntaxKind::COUNT)> mKindColors;
 
-    bool mBgVisible = true;
-    bool mReadOnly  = false;
+    bool mBgVisible  = true;
+    bool mTakesFocus = true;
+    bool mReadOnly   = false;
     bool mWordWrap  = false;
     bool mSoftTabs  = false;
     S32  mTabWidth  = 4;
@@ -647,6 +696,7 @@ private:
 
     std::string             mContextMenuFile;
     LLHandle<LLContextMenu> mContextMenuHandle;
+    LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
     std::vector<ALTextRange> mMatches;
@@ -672,6 +722,7 @@ private:
     // In order of where they start, none over another.
     std::vector<Substitution>          mSubstitutions;
     std::vector<Atom>                  mAtoms;
+    std::vector<Style>                 mStyles;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     atom_signal_t                      mAtomClicked;
@@ -689,6 +740,7 @@ private:
     // left alone for a moment after it was typed.
     bool                                    mSpellCheck = false;
     spell_checker_t                         mSpellChecker;
+    spell_suggester_t                       mSpellSuggester;
     struct SpellLine
     {
         bool                             valid = false;

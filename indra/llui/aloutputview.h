@@ -125,7 +125,6 @@ private:
     // The shown entry a line is in, or null.
     const Shown* shownAt(S32 line, S32* first_line) const;
     const Entry* entryOf(U32 serial) const;
-    void         linkUrls(S32 line, S32 from);
     void         followed(const Substitution& link);
 
     std::deque<Entry> mEntries;

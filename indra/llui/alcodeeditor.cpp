@@ -30,8 +30,8 @@
 #include "llrender2dutils.h"
 #include "llscrolllistctrl.h"
 #include "llstring.h"
-#include "lltooltip.h"
 #include "lluicolortable.h"
+#include "llurlaction.h"
 #include "lluictrlfactory.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -228,6 +228,7 @@ ALCodeEditor::~ALCodeEditor() = default;
 
 void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
+    hideCard();
     const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mMarks.size()));
     const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mMarks.size()) - 1);
     const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
@@ -2173,6 +2174,7 @@ void ALCodeEditor::clearPlaceholders()
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
+    hideCard();
     if (!mPlaceholders.empty() && !completionOpen())
     {
         if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT))
@@ -2279,6 +2281,11 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
+    if (cardShown() && mCard->getRect().pointInRect(x, y))
+    {
+        return LLUICtrl::handleMouseDown(x, y, mask);
+    }
+    hideCard();
     closeCompletion();
     clearPlaceholders();
     const LLRect text         = textRect();
@@ -2362,7 +2369,12 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         {
             return ALTextView::handleToolTip(x, y, mask);
         }
-        showTip(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), says);
+        showCard(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), says);
+        return true;
+    }
+    if (cardShown() && mCard->getRect().pointInRect(x, y))
+    {
+        // Resting on the card itself: it stays, and says nothing more.
         return true;
     }
     if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
@@ -2418,61 +2430,135 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     {
         return ALTextView::handleToolTip(x, y, mask);
     }
-    showTip(about, says);
+    showCard(about, says);
     return true;
 }
 
-void ALCodeEditor::showTip(const ALTextRange& about, const std::string& says)
+void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says)
 {
-    // The tip stays while the mouse stays over what it is about.
-    const LLRect text = textRect();
-    S32          row;
-    layout().xOf(about.begin.line, about.begin.column, &row);
-    const S32 top = screenTopOf(text, about.begin.line, row);
-    F32       x0, x1;
-    LLRect    local(text.mLeft, top, text.mRight, top - layout().rowHeight());
-    if (spanOnRow(about.begin.line, row, about, x0, x1))
-    {
-        const F32 left = static_cast<F32>(text.mLeft) - scrollX();
-        local.mLeft    = static_cast<S32>(left + x0);
-        local.mRight   = static_cast<S32>(left + x1);
-    }
-    LLRect sticky;
-    localRectToScreen(local, &sticky);
-    // A card rather than a line: the first line -- a declaration, a
-    // signature, a problem -- in the editor's own face, whatever follows
-    // in the reading face under it, a note about deprecation in the
-    // warning colour, and room enough that a sentence is not folded
-    // into a column.
     static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
-    LLToolTip::Params      tip;
-    tip.max_width = 560;
-    tip.padding   = 8;
-    const size_t  nl    = says.find('\n');
-    const std::string head = says.substr(0, nl);
-    std::string       rest = nl == std::string::npos ? std::string() : says.substr(nl + 1);
+    static const LLUIColor ground  = LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black);
+    const S32              MAX_WIDTH = 560;
+    const S32              PAD       = 6;
+    if (!mCard)
     {
-        LLToolTip::StyledText first;
-        first.text       = head;
-        first.style.font = getFont();
-        tip.styled_message.add(first);
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name        = "hover_card";
+        p.rect        = LLRect(0, 20, MAX_WIDTH, 0);
+        p.read_only   = true;
+        p.word_wrap   = true;
+        p.tab_stop    = false;
+        p.takes_focus = false;
+        p.mouse_opaque = true;
+        p.font        = LLFontGL::getFontSansSerif();
+        p.bg_visible  = true;
+        p.bg_color    = ground;
+        p.bg_readonly_color = ground;
+        p.text_readonly_color = textColor();
+        p.h_pad       = PAD;
+        p.v_pad       = PAD - 2;
+        p.context_menu = std::string();
+        mCard         = LLUICtrlFactory::create<ALTextView>(p);
+        mCard->setVisible(false);
+        mCard->onLinkClicked([](const ALTextView::Substitution& link) {
+            if (!link.url.empty())
+            {
+                LLUrlAction::clickAction(link.url, false);
+            }
+        });
+        addChild(mCard);
     }
-    while (!rest.empty())
+    if (cardShown() && about == mCardAbout && says == mCard->text())
     {
-        const size_t   end  = rest.find('\n');
-        std::string    line = rest.substr(0, end);
-        rest                = end == std::string::npos ? std::string() : rest.substr(end + 1);
-        LLToolTip::StyledText more;
-        more.text       = "\n" + line;
-        more.style.font = LLFontGL::getFontSansSerif();
-        if (line.find("(deprecated)") != std::string::npos)
+        // The mouse resting on again: the card is up already.
+        return;
+    }
+    mCardAbout = about;
+    // The words: the first line in the editor's face, a note about
+    // deprecation in the warning colour, every URL a link.
+    mCard->setText(says);
+    std::vector<ALTextView::Style> styles;
+    ALTextView::Style              head;
+    head.range = ALTextRange(ALTextPos(0, 0), mCard->document().lineEnd(0));
+    head.font  = getFont();
+    styles.push_back(head);
+    const S32 lines = mCard->document().lineCount();
+    for (S32 line = 0; line < lines; ++line)
+    {
+        if (mCard->document().line(line).find("(deprecated)") != std::string::npos)
         {
-            more.style.color = warning;
+            ALTextView::Style note;
+            note.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+            note.color = warning.get();
+            styles.push_back(note);
         }
-        tip.styled_message.add(more);
     }
-    tip.sticky_rect = sticky;
-    LLToolTipMgr::instance().show(tip);
+    mCard->setStyles(std::move(styles));
+    for (S32 line = 0; line < lines; ++line)
+    {
+        mCard->linkUrlsOn(line);
+    }
+    // Its size: as wide as its widest line up to the limit, and as tall
+    // as the lines wrapped at that width come to.
+    const LLRect text  = textRect();
+    const S32    limit = llmin(MAX_WIDTH, llmax(80, text.getWidth() - 2 * PAD));
+    mCard->setShape(LLRect(0, 40, limit, 0));
+    mCard->setWordWrap(false);
+    const S32 widest = static_cast<S32>(mCard->layout().contentWidth()) + 2 * PAD + 2;
+    mCard->setWordWrap(true);
+    const S32 width = llmin(limit, llmax(40, widest));
+    mCard->setShape(LLRect(0, 40, width, 0));
+    for (S32 line = 0; line < lines; ++line)
+    {
+        mCard->layout().line(line);
+    }
+    const S32 height = mCard->layout().totalHeight() + 2 * (PAD - 2) + 2;
+    // Where: under the row of what it is about, at its start; above it
+    // where under would run off the bottom; within the text's width.
+    S32       row;
+    layout().xOf(about.begin.line, about.begin.column, &row);
+    const S32 top   = screenTopOf(text, about.begin.line, row);
+    const S32 row_h = layout().rowHeightOf(about.begin.line, row);
+    F32       x0, x1;
+    mCardAnchor = LLRect(text.mLeft, top, text.mRight, top - row_h);
+    if (spanOnRow(about.begin.line, row, about, x0, x1) && !about.empty())
+    {
+        const F32 left     = static_cast<F32>(text.mLeft) - scrollX();
+        mCardAnchor.mLeft  = static_cast<S32>(left + x0);
+        mCardAnchor.mRight = static_cast<S32>(left + x1);
+    }
+    S32 x = llclamp(mCardAnchor.mLeft, text.mLeft, llmax(text.mLeft, text.mRight - width));
+    S32 y = mCardAnchor.mBottom - 2;
+    if (y - height < text.mBottom && mCardAnchor.mTop + 2 + height <= text.mTop)
+    {
+        y = mCardAnchor.mTop + 2 + height;
+    }
+    mCard->setShape(LLRect(x, y, x + width, y - height));
+    mCard->setVisible(true);
+}
+
+bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (cardShown() && mCard->getRect().pointInRect(x, y))
+    {
+        return mCard->handleScrollWheel(x - mCard->getRect().mLeft, y - mCard->getRect().mBottom, delta);
+    }
+    hideCard();
+    return ALTextView::handleScrollWheel(x, y, delta);
+}
+
+void ALCodeEditor::hideCard()
+{
+    if (mCard && mCard->getVisible())
+    {
+        mCard->setVisible(false);
+    }
+    mCardAnchor = LLRect();
+}
+
+bool ALCodeEditor::cardShown() const
+{
+    return mCard && mCard->getVisible();
 }
 
 void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
@@ -2493,7 +2579,7 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
     {
         return;
     }
-    showTip(word, text);
+    showCard(word, text);
 }
 
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
@@ -2514,6 +2600,20 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
 {
     mMouseX = x;
     mMouseY = y;
+    if (cardShown())
+    {
+        const LLRect card = mCard->getRect();
+        if (card.pointInRect(x, y))
+        {
+            // On the card: its links light up, its cursor shows.
+            mCard->handleHover(x - card.mLeft, y - card.mBottom, mask);
+            return true;
+        }
+        if (!mCardAnchor.pointInRect(x, y))
+        {
+            hideCard();
+        }
+    }
     const S32 gutter_right = leftEdge() + gutterWidth();
     mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;
     mGutterHoverLine       = mGutterHover ? posAtLocal(textRect().mLeft, y, false).line : -1;
@@ -2524,6 +2624,7 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
 {
     mGutterHover     = false;
     mGutterHoverLine = -1;
+    hideCard();
     ALTextView::onMouseLeave(x, y, mask);
 }
 

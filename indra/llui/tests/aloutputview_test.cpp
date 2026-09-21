@@ -143,7 +143,7 @@ namespace tut
         ensure_equals("with the tooltip", source.tooltip, std::string("Open Thing"));
         const ALTextView::Substitution& url = v.substitutions()[1];
         ensure("the URL where it is", url.range == ALTextRange(ALTextPos(0, 22), ALTextPos(0, 45)) && url.link);
-        ensure_equals("the URL itself", url.value["url"].asString(), std::string("http://example.com/page"));
+        ensure_equals("the URL itself", url.url, std::string("http://example.com/page"));
         std::string chosen;
         v.onEntryChosen([&chosen](const ALOutputView::Entry& picked) { chosen = picked.text; });
         std::string opened;

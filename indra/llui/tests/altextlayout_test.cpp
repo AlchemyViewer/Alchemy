@@ -256,6 +256,18 @@ namespace tut
         ensure_equals("the box carries the atom's id", second.glyphs[2].substitution, 11);
         ensure("the caret after the box is past the placeholder's bytes", near(layout.xOf(1, 5), layout.xOf(1, 2) + 40.f));
         ensure("the tab after still reaches a stop", layout.xOf(1, 8) > layout.xOf(1, 7));
+        ensure_equals("a box without a height leaves the row a font line tall", second.height, layout.rowHeight());
+
+        // A tall box makes its row taller, and the lines below sit lower.
+        const S32 row = layout.rowHeight();
+        box.height    = row * 3;
+        subs          = { url, box };
+        layout.invalidateLine(1);
+        ensure_equals("the row is the box's height", layout.rowHeightOf(1, 0), row * 3);
+        ensure_equals("and so is the line", layout.lineHeight(1), row * 3);
+        ensure_equals("the whole is the two", layout.totalHeight(), row + row * 3);
+        ensure_equals("a y in the tall row is its row", layout.rowAtY(1, row * 2), 0);
+        ensure_equals("the second line covers the y", layout.lineAtY(row * 2), 1);
 
         // Two that overlap: the first is kept, the second dropped.
         ALTextLayout::Substitution over;
@@ -273,5 +285,47 @@ namespace tut
         layout.invalidateLine(0);
         ensure("the label is not broken across rows", layout.rowOf(0, 4) == layout.rowOf(0, 31));
         ensure("but the text after it goes to the next row", layout.rowOf(0, 32) > layout.rowOf(0, 4) || layout.rowCount(0) >= 2);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<7>()
+    {
+        set_test_name("a stretch shaped in a font of its own makes its row as tall as the font, sharing the baseline");
+        ready("small then LARGE words here\nplain");
+        const LLFontGL* big = LLFontGL::getFontSansSerifHuge();
+        if (!big || !big->getFontFreetype() || big->getLineSpacing() <= layout.rowHeight())
+        {
+            skip("no larger face to shape in");
+        }
+        const S32 row = layout.rowHeight();
+        std::vector<ALTextLayout::Run> runs;
+        layout.setRunProvider([&runs](S32 line, std::vector<ALTextLayout::Run>& out) {
+            if (line == 0)
+            {
+                out = runs;
+            }
+        });
+        ensure_equals("no runs: a font line tall", layout.rowHeightOf(0, 0), row);
+        ALTextLayout::Run run;
+        run.begin = 11;
+        run.end   = 16;
+        run.font  = big;
+        runs      = { run };
+        layout.invalidateLine(0);
+        const ALTextLayout::Line& line = layout.line(0);
+        ensure_equals("the row's text is as tall as the larger font", line.rows[0].textHeight, big->getLineSpacing());
+        ensure("and its ascent the larger", line.rows[0].ascent >= llround(big->getAscenderHeight()));
+        ensure("the stretch's glyphs came from the larger face", line.placed[11].face != line.placed[0].face && line.placed[11].face == big->getFontFreetype());
+        ensure("the glyphs after are the document's again", line.placed[17].face == line.placed[0].face);
+        ensure("the stretch is wider than it was", layout.xOf(0, 16) - layout.xOf(0, 11) > layout.xOf(0, 5) - layout.xOf(0, 0));
+        ensure_equals("the line below is a plain row tall", layout.rowHeightOf(1, 0), row);
+        ensure_equals("the tops follow", layout.lineTop(1), big->getLineSpacing());
+        // Wrapped so that the stretch falls on the second row: only that
+        // row is taller.
+        layout.setWrapWidth(static_cast<S32>(layout.xOf(0, 11)) + 4);
+        layout.invalidateLine(0);
+        ensure("two rows", layout.rowCount(0) >= 2);
+        ensure_equals("the first is plain", layout.rowHeightOf(0, 0), row);
+        ensure_equals("the second holds the stretch", layout.rowHeightOf(0, layout.rowOf(0, 12)), big->getLineSpacing());
     }
 }

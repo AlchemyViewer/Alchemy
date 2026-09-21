@@ -40,12 +40,15 @@
 // throws away the lines it touched and nothing else; a change of font, tab
 // width or wrap width throws away everything.
 //
-// Fonts: one face for the whole document for now. The runs a line is
-// shaped in are where a second face would enter, and the glyphs already
-// carry the face they came from. A font reload swaps the faces under
-// their LLFontGL and bumps LLFontGL::sResolutionGeneration; the layout
-// checks it whenever it is asked for anything, and shapes everything
-// again, since the glyph ids and the faces it kept are the old font's.
+// Fonts: one for the document, and any other over a stretch of a line
+// where a provider says so -- a heading in a heavier face, a note in the
+// reading face inside a code view -- each stretch shaped in its own
+// face, the glyphs carrying the face they came from, and every face on a
+// row sharing the row's baseline, which is as high as the tallest of
+// them asks. A font reload swaps the faces under their LLFontGL and
+// bumps LLFontGL::sResolutionGeneration; the layout checks it whenever
+// it is asked for anything, and shapes everything again, since the
+// glyph ids and the faces it kept are the old font's.
 //
 // Positions are in the UI's pixels, as every other font measurement the
 // widgets see: shaping answers in the screen's, which the UI scale
@@ -60,8 +63,9 @@
 // -- or as a box so wide, which is what an atom, an image or a view in
 // the text, is to the layout: the stretch's glyphs all share its first
 // byte as their cluster, so the caret sits before the stretch or after
-// it and nowhere within, and its bytes are never shaped. A box is a
-// row tall; rows of their own height are for when a client needs one.
+// it and nowhere within, and its bytes are never shaped. A row is as
+// tall as the font's line, or as the tallest box on it; the text of a
+// taller row sits at the bottom, on the baseline the boxes stand on.
 class ALTextLayout
 {
 public:
@@ -102,14 +106,29 @@ public:
         S32         end   = 0;
         // The text shown; empty for a box.
         std::string shown;
-        // The box's width, in the UI's pixels, where nothing is shown.
-        F32         width = 0.f;
-        S32         id    = -1;
+        // The box's width and height, in the UI's pixels, where nothing
+        // is shown; a height of zero is the row's own.
+        F32         width  = 0.f;
+        S32         height = 0;
+        S32         id     = -1;
     };
     typedef std::function<void(S32 line, std::vector<Substitution>& out)> substitution_provider_t;
 
-    // A row of a line: the bytes it holds, the glyphs it holds, and where in
-    // the unwrapped line it starts, since the glyphs keep their unwrapped pen.
+    // A stretch of a line shaped in a font of its own.
+    struct Run
+    {
+        S32             begin = 0;
+        S32             end   = 0;
+        const LLFontGL* font  = nullptr;
+    };
+    typedef std::function<void(S32 line, std::vector<Run>& out)> run_provider_t;
+
+    // A row of a line: the bytes it holds, the glyphs it holds, where in
+    // the unwrapped line it starts, since the glyphs keep their unwrapped
+    // pen; where it sits under the line's top and how tall it is, since
+    // a box may make it taller than its text; and its text's own height
+    // and ascent, from the tallest font on it, the text sitting at the
+    // bottom of the row with its baseline that far under the text's top.
     struct Row
     {
         S32    begin      = 0;
@@ -118,6 +137,12 @@ public:
         size_t glyphEnd   = 0;
         F32    xStart     = 0.f;
         F32    width      = 0.f;
+        S32    top        = 0;
+        S32    height     = 0;
+        S32    textHeight = 0;
+        S32    ascent     = 0;
+        // The top of the text within the row, under the row's top.
+        S32    textTop() const { return height - textHeight; }
     };
 
     struct Line
@@ -125,8 +150,9 @@ public:
         std::vector<LLFontGL::Placed> placed;
         std::vector<Glyph>            glyphs;
         std::vector<Row>              rows;
-        F32                           width = 0.f;
-        bool                          valid = false;
+        F32                           width  = 0.f;
+        S32                           height = 0;
+        bool                          valid  = false;
     };
 
     ALTextLayout();
@@ -152,12 +178,16 @@ public:
     // something else; likewise, whoever provides them lays a line out
     // again when they change.
     void setSubstitutionProvider(substitution_provider_t provider);
+    // Asked, as each line is laid out, what stretches of it are shaped in
+    // a font of their own; likewise.
+    void setRunProvider(run_provider_t provider);
     void invalidateLine(S32 index);
     // A space's advance, in the screen's pixels: what a column is, for
     // whoever draws by columns.
     F32  columnWidth() { return spaceAdvance(); }
 
-    // Every row is this tall.
+    // The font's line height: what a row is tall unless a box on it is
+    // taller, and what a line not yet laid out counts as.
     S32 rowHeight() const;
     S32 lineCount() const { return static_cast<S32>(mLines.size()); }
     // The widest line, in pixels. A line not yet laid out counts its bytes
@@ -180,7 +210,12 @@ public:
 
     const Line& line(S32 index);
     S32         rowCount(S32 index) { return static_cast<S32>(line(index).rows.size()); }
-    S32         lineHeight(S32 index) { return hidden(index) ? 0 : rowCount(index) * rowHeight(); }
+    S32         lineHeight(S32 index) { return hidden(index) ? 0 : line(index).height; }
+    // A row's top under its line's top, and its height; the row a y
+    // under the line's top falls in, clamped to the first and the last.
+    S32         rowTop(S32 index, S32 row);
+    S32         rowHeightOf(S32 index, S32 row);
+    S32         rowAtY(S32 index, S32 y);
 
     // --- the column ----------------------------------------------------------
 
@@ -238,4 +273,6 @@ private:
     std::vector<Inlay>                 mInlayScratch;
     substitution_provider_t            mSubstitutions;
     std::vector<Substitution>          mSubstitutionScratch;
+    run_provider_t                     mRuns;
+    std::vector<Run>                   mRunScratch;
 };
