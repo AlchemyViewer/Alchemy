@@ -50,6 +50,7 @@
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
 #include "llfilepicker.h"
+#include "llfiltereditor.h"
 #include "llfloaterreg.h"
 #include "llinventorymodel.h"
 #include "lllayoutstack.h"
@@ -449,6 +450,23 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs->onReordered(boost::bind(&ALFloaterScriptStudio::onTabsReordered, this, _1));
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
+    // The pane's filters: which levels, which source, which words.
+    mProblemErrors   = getChild<LLCheckBoxCtrl>("problems_errors");
+    mProblemWarnings = getChild<LLCheckBoxCtrl>("problems_warnings");
+    mProblemNotes    = getChild<LLCheckBoxCtrl>("problems_notes");
+    mProblemOrigin   = getChild<LLComboBox>("problems_origin");
+    mProblemFilter   = getChild<LLFilterEditor>("problems_filter");
+    mProblemOrigin->add(getString("OriginAny"), LLSD(""));
+    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions" })
+    {
+        mProblemOrigin->add(getString(origin), LLSD(getString(origin)));
+    }
+    mProblemOrigin->selectFirstItem();
+    for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mProblemErrors), static_cast<LLUICtrl*>(mProblemWarnings), static_cast<LLUICtrl*>(mProblemNotes),
+                              static_cast<LLUICtrl*>(mProblemOrigin), static_cast<LLUICtrl*>(mProblemFilter) })
+    {
+        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillProblems(active()); });
+    }
     mReferences->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReferenceChosen, this));
     mOutline->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutlineChosen, this));
     mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
@@ -2743,6 +2761,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         }
         return a.line != b.line ? a.line < b.line : a.column < b.column;
     });
+    mProblemStore.replace(doc.id, doc.shown);
     doc.editor->setDecorations(std::move(decorations));
     if (&doc == active())
     {
@@ -2752,6 +2771,19 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     fillTabs();
 }
 
+ALFindings<ALFloaterScriptStudio::Doc::Shown, ALFloaterScriptStudio::ProblemTraits>::Query ALFloaterScriptStudio::problemQuery(const Doc& doc) const
+{
+    ALFindings<Doc::Shown, ProblemTraits>::Query query;
+    query.file     = doc.id;
+    query.errors   = !mProblemErrors || mProblemErrors->get();
+    query.warnings = !mProblemWarnings || mProblemWarnings->get();
+    query.notes    = !mProblemNotes || mProblemNotes->get();
+    query.rule     = mProblemOrigin ? mProblemOrigin->getValue().asString() : std::string();
+    query.text     = mProblemFilter ? mProblemFilter->getText() : std::string();
+    LLStringUtil::trim(query.text);
+    return query;
+}
+
 void ALFloaterScriptStudio::fillProblems(const Doc* doc)
 {
     mProblems->deleteAllItems();
@@ -2759,26 +2791,44 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     {
         return;
     }
-    for (size_t i = 0; i < doc->shown.size(); ++i)
+    const auto selected = mProblemStore.select(problemQuery(*doc));
+    for (const Doc::Shown* problem : selected.found)
     {
-        const Doc::Shown& problem = doc->shown[i];
-        LLSD              row;
-        row["value"]                = static_cast<S32>(i);
+        // The row carries the place, so that choosing it needs no index
+        // into anything that a filter reorders.
+        LLSD value;
+        value["line"]      = problem->line;
+        value["column"]    = problem->column;
+        value["hasColumn"] = problem->hasColumn;
+        value["file"]      = problem->file;
+        value["fileName"]  = problem->fileName;
+        value["level"]     = problem->level;
+        value["origin"]    = problem->origin;
+        LLSD row;
+        row["value"]                = value;
         row["columns"][0]["column"] = "line";
-        row["columns"][0]["value"]  = (problem.fileName.empty() ? std::string() : problem.fileName + ":") +
-                                     (problem.hasColumn ? llformat("%d:%d", problem.line + 1, problem.column + 1) : llformat("%d", problem.line + 1));
+        row["columns"][0]["value"]  = (problem->fileName.empty() ? std::string() : problem->fileName + ":") +
+                                     (problem->hasColumn ? llformat("%d:%d", problem->line + 1, problem->column + 1) : llformat("%d", problem->line + 1));
         row["columns"][1]["column"] = "level";
-        row["columns"][1]["value"]  = problem.level;
+        row["columns"][1]["value"]  = problem->level;
         row["columns"][2]["column"] = "source";
-        row["columns"][2]["value"]  = problem.origin;
+        row["columns"][2]["value"]  = problem->origin;
         row["columns"][3]["column"] = "message";
-        row["columns"][3]["value"]  = problem.message;
+        row["columns"][3]["value"]  = problem->message;
         mProblems->addElement(row);
     }
-    if (doc->shown.empty())
+    const S32 held = mProblemStore.countIn(doc->id);
+    if (held == 0)
     {
         const bool current = doc->loaded && doc->analysisVersion == doc->editor->document().version();
         mProblems->setCommentText(current ? getString("NoProblems") : std::string());
+    }
+    else if (selected.found.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[SHOWN]"] = "0";
+        args["[TOTAL]"] = std::to_string(held);
+        mProblems->setCommentText(getString("ProblemsShown", args));
     }
 }
 
@@ -2790,20 +2840,22 @@ void ALFloaterScriptStudio::onProblemSelected()
     {
         return;
     }
-    const size_t index = static_cast<size_t>(item->getValue().asInteger());
-    if (index >= doc->shown.size())
+    const LLSD& problem = item->getValue();
+    if (!problem.isMap())
     {
         return;
     }
-    const Doc::Shown& problem = doc->shown[index];
-    if (!problem.file.empty())
+    const S32  line       = problem["line"].asInteger();
+    const S32  column     = problem["column"].asInteger();
+    const bool has_column = problem["hasColumn"].asBoolean();
+    if (!problem["file"].asString().empty())
     {
         // In an include: opened in a tab of its own where it is a script
         // or a notecard in the world; a file on disk is only named.
-        openIncludeAt(problem.file, problem.fileName, problem.line, problem.hasColumn ? problem.column : -1, 0);
+        openIncludeAt(problem["file"].asString(), problem["fileName"].asString(), line, has_column ? column : -1, 0);
         return;
     }
-    doc->editor->setCaret(ALTextPos(problem.line, problem.hasColumn ? problem.column : 0));
+    doc->editor->setCaret(ALTextPos(line, has_column ? column : 0));
     doc->editor->setFocus(true);
 }
 
@@ -4908,9 +4960,14 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
     doc.saveAnywayUntil = now + SAVE_ANYWAY;
     // The first of them, in sight.
     showBottom("problems_tab");
-    for (size_t i = 0; i < doc.shown.size(); ++i)
+    // The first of the checkers' errors among the rows as the filters
+    // have them; where a filter hides them all, the row is the first error
+    // the store holds.
+    const std::vector<LLScrollListItem*> rows = mProblems->getAllData();
+    for (size_t i = 0; i < rows.size(); ++i)
     {
-        if (doc.shown[i].level == "ERROR" && doc.shown[i].origin != getString("OriginCompiler"))
+        const LLSD& value = rows[i]->getValue();
+        if (value.isMap() && value["level"].asString() == "ERROR" && value["origin"].asString() != getString("OriginCompiler"))
         {
             mProblems->selectNthItem(static_cast<S32>(i));
             onProblemSelected();
@@ -5862,6 +5919,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
     {
         Doc& doc = *mDocs[index];
         stopExternal(doc);
+        mProblemStore.forget(doc.id);
         doc.changed.release();
         mEditorHost->removeChild(doc.editor);
         doc.editor->die();

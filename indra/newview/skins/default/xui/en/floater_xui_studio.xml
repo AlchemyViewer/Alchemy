@@ -215,7 +215,7 @@
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
     <floater.string name="SourceEdited">Source edited: [FILE]</floater.string>
-    <floater.string name="SourceEditedBroken">Source edited: [FILE] does not parse as it stands</floater.string>
+    <floater.string name="SourceEditedBroken">[FILE] does not parse yet (line [LINE]: [MESSAGE]); the last text that did stays in force until it does</floater.string>
     <floater.string name="Yes">yes</floater.string>
     <floater.string name="No">no</floater.string>
     <floater.string name="LayoutSize">size</floater.string>

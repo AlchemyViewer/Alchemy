@@ -9778,15 +9778,25 @@ void ALFloaterXUIStudio::showSourceFile(const std::string& path, S32 line)
         return;
     }
     ALXUIEdit* document = mDocuments.find(path);
-    const std::string text = document ? document->text() : LLFile::getContents(path);
+    std::string text = document ? document->text() : LLFile::getContents(path);
+    // What was typed into this file and does not parse yet stands in for
+    // the document's text until it does.
+    if (const auto draft = mSourceDrafts.find(path); draft != mSourceDrafts.end())
+    {
+        text = draft->second;
+    }
     if (mSourceShown != path || (!mSourceEditPending && mSourceText->text() != text))
     {
-        // Set from the document, keeping the place where it is the same
-        // file; a selection change does not lose what was typed and not
-        // yet taken, which flushSourceEdit takes first.
-        if (mSourceEditPending && mSourceShown == path)
+        // Leaving a file: what was typed and not yet taken is taken, or
+        // kept as a draft where it does not parse.
+        if (mSourceEditPending && !mSourceShown.empty())
         {
             flushSourceEdit();
+            if (mSourceEditPending)
+            {
+                mSourceDrafts[mSourceShown] = mSourceText->text();
+                mSourceEditPending          = false;
+            }
         }
         const bool      same   = mSourceShown == path;
         const ALTextPos caret  = mSourceText->caret();
@@ -9799,6 +9809,13 @@ void ALFloaterXUIStudio::showSourceFile(const std::string& path, S32 line)
         {
             mSourceText->setCaret(mSourceText->document().clamp(caret));
             mSourceText->setScrollY(scroll);
+        }
+        if (mSourceDrafts.count(path))
+        {
+            // Shown as the draft it is: taken once it parses.
+            mSourceEditPending = true;
+            mSourceEditTimer.reset();
+            mSourceEditTimer.setTimerExpirySec(REREAD_SECONDS);
         }
     }
     mSourceText->setReadOnly(false);
@@ -9868,15 +9885,34 @@ void ALFloaterXUIStudio::decorateSource()
     {
         squiggle(where.line, where.column, message, ALXUILint::Severity::Error);
     }
-    // Then what the lint said of this file.
+    // Then what the lint said of this file's elements: each finding on
+    // the line its element starts on in the layer shown, where that layer
+    // writes the element; a finding that names a layer rather than an
+    // element -- a layer applied to nothing -- on the line it names.
+    ALXUIEdit* shown = mDocuments.find(mSourceShown);
     for (const ALXUILint::Finding* f : mFindingStore.select(ALXUIFindings::Query()).found)
     {
-        const std::string in_file = f->file.empty() ? mSourcePath : f->file;
-        if (in_file != mSourceShown || f->line <= 0)
+        if (!f->file.empty() && f->file != mFile && f->file != mSourceShown)
         {
             continue;
         }
-        squiggle(f->line - 1, 0, f->message, f->severity);
+        S32 line = 0;
+        if (shown && !f->path.empty())
+        {
+            if (const pugi::xml_node node = shown->resolve(f->path))
+            {
+                line = shown->lineOf(node);
+            }
+        }
+        else if (f->file == mSourceShown || (f->path.empty() && mSourceShown == mSourcePath))
+        {
+            line = f->line;
+        }
+        if (line <= 0)
+        {
+            continue;
+        }
+        squiggle(line - 1, 0, f->message, f->severity);
     }
     mSourceText->setDecorations(std::move(decorations));
 }
@@ -9910,21 +9946,38 @@ void ALFloaterXUIStudio::flushSourceEdit()
     {
         return;
     }
-    mSourceEditPending = false;
     ALXUIEdit* document = mDocuments.open(mSourceShown);
     if (!document)
     {
+        mSourceEditPending = false;
         return;
     }
     const std::string text = mSourceText->text();
+    LLStringUtil::format_map_t args;
+    args["[FILE]"] = fileNameOf(mSourceShown);
+    // Text that does not parse is not the document's yet: the last text
+    // that did stays in force, the tree and the preview with it, and the
+    // editor keeps what was typed until it parses. Still pending, so the
+    // next pause tries again.
+    ALTextPos   where;
+    std::string message;
+    if (!ALXUIService::parses(text, where, message))
+    {
+        args["[LINE]"]    = std::to_string(where.line + 1);
+        args["[MESSAGE]"] = message;
+        setStatus(getString("SourceEditedBroken", args), true);
+        mSourceEditTimer.reset();
+        mSourceEditTimer.setTimerExpirySec(REREAD_SECONDS * 4.f);
+        return;
+    }
+    mSourceEditPending = false;
+    mSourceDrafts.erase(mSourceShown);
     if (text == document->text())
     {
         return;
     }
     document->setSource(text);
-    LLStringUtil::format_map_t args;
-    args["[FILE]"] = fileNameOf(mSourceShown);
-    documentChanged(getString(document->error().empty() ? "SourceEdited" : "SourceEditedBroken", args));
+    documentChanged(getString("SourceEdited", args));
 }
 
 void ALFloaterXUIStudio::pumpSource()

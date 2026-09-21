@@ -144,6 +144,8 @@
     <floater.string name="KindOwnerSay">owner</floater.string>
     <floater.string name="KindError">error</floater.string>
     <floater.string name="OriginRuntime">Runtime</floater.string>
+    <floater.string name="OriginAny">Every source</floater.string>
+    <floater.string name="ProblemsShown">[SHOWN] of [TOTAL] problems shown; the filters hide the rest.</floater.string>
     <floater.string name="OutputAllObjects">All objects</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
@@ -927,20 +929,99 @@
                          layout="topleft"
                          name="problems_tab"
                          width="574">
-                            <scroll_list
+                            <layout_stack
+                             animate="false"
                              follows="all"
                              height="108"
                              layout="topleft"
                              left="0"
-                             name="problems"
-                             tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
+                             name="problems_stack"
+                             orientation="vertical"
                              top="0"
                              width="574">
-                                <scroll_list.columns label="Line" name="line" width="70" />
-                                <scroll_list.columns label="Level" name="level" width="80" />
-                                <scroll_list.columns label="Source" name="source" width="90" />
-                                <scroll_list.columns dynamic_width="true" label="Message" name="message" />
-                            </scroll_list>
+                                <layout_panel
+                                 auto_resize="false"
+                                 height="24"
+                                 layout="topleft"
+                                 min_dim="24"
+                                 name="problems_filter_panel"
+                                 width="574">
+                                    <check_box
+                                     follows="left|top"
+                                     height="18"
+                                     initial_value="true"
+                                     label="Errors"
+                                     layout="topleft"
+                                     left="4"
+                                     name="problems_errors"
+                                     tool_tip="Show what stops the script from compiling or running"
+                                     top="3"
+                                     width="70" />
+                                    <check_box
+                                     follows="left|top"
+                                     height="18"
+                                     initial_value="true"
+                                     label="Warnings"
+                                     layout="topleft"
+                                     left_pad="6"
+                                     name="problems_warnings"
+                                     tool_tip="Show what probably does not do what was written"
+                                     top_delta="0"
+                                     width="82" />
+                                    <check_box
+                                     follows="left|top"
+                                     height="18"
+                                     initial_value="true"
+                                     label="Notes"
+                                     layout="topleft"
+                                     left_pad="6"
+                                     name="problems_notes"
+                                     tool_tip="Show what is worth a look: the optimizer's changes, the lint's advice"
+                                     top_delta="0"
+                                     width="64" />
+                                    <combo_box
+                                     follows="left|top"
+                                     height="20"
+                                     layout="topleft"
+                                     left_pad="10"
+                                     name="problems_origin"
+                                     tool_tip="Only what one source said: the checkers, the compiler, the preprocessor, the optimizer, the script as it ran"
+                                     top_delta="-1"
+                                     width="120" />
+                                    <filter_editor
+                                     follows="left|top|right"
+                                     height="20"
+                                     label="Filter"
+                                     layout="topleft"
+                                     left_pad="8"
+                                     name="problems_filter"
+                                     tool_tip="Only problems with these words in them"
+                                     top_delta="0"
+                                     width="180" />
+                                </layout_panel>
+                                <layout_panel
+                                 auto_resize="true"
+                                 height="84"
+                                 layout="topleft"
+                                 min_dim="20"
+                                 name="problems_list_panel"
+                                 width="574">
+                                    <scroll_list
+                                     follows="all"
+                                     height="84"
+                                     layout="topleft"
+                                     left="0"
+                                     name="problems"
+                                     tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
+                                     top="0"
+                                     width="574">
+                                        <scroll_list.columns label="Line" name="line" width="70" />
+                                        <scroll_list.columns label="Level" name="level" width="80" />
+                                        <scroll_list.columns label="Source" name="source" width="90" />
+                                        <scroll_list.columns dynamic_width="true" label="Message" name="message" />
+                                    </scroll_list>
+                                </layout_panel>
+                            </layout_stack>
                         </panel>
                         <panel
                          follows="all"

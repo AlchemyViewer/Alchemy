@@ -723,6 +723,10 @@ private:
     // the document rather than typed.
     std::string         mSourceShown;
     std::string         mSourceChosen;
+    // Typed text that does not parse yet, by file: kept in the editor and
+    // put back when the file is shown again, while the document keeps
+    // the last text that did.
+    std::map<std::string, std::string> mSourceDrafts;
     LLFrameTimer        mSourceEditTimer;
     LLFrameTimer        mSourceSyncTimer;
     bool                mSourceEditPending = false;

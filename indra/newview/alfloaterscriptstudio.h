@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alfindings.h"
 #include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
@@ -49,6 +50,7 @@ class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
+class LLFilterEditor;
 class LLPanel;
 class LLScrollListCtrl;
 class LLContextMenu;
@@ -316,6 +318,20 @@ private:
         boost::signals2::scoped_connection         changed;
     };
     static constexpr size_t NONE = static_cast<size_t>(-1);
+    // The problems of every open script, in the store all the studios'
+    // findings live in, keyed by the script's id; the pane lists the
+    // active script's through its filters.
+    struct ProblemTraits
+    {
+        static ALFindingLevel level(const Doc::Shown& p) { return p.level == "ERROR" ? ALFindingLevel::Error : (p.level == "WARNING" || p.level == "WARN") ? ALFindingLevel::Warning : ALFindingLevel::Note; }
+        static std::string    rule(const Doc::Shown& p) { return p.origin; }
+        static bool           fixable(const Doc::Shown&) { return false; }
+        static bool           mentions(const Doc::Shown& p, std::string_view text)
+        {
+            return ALStringMatch::containsNoCase(p.message, text) || ALStringMatch::containsNoCase(p.fileName, text) ||
+                   ALStringMatch::containsNoCase(p.origin, text) || ALStringMatch::containsNoCase(p.level, text);
+        }
+    };
 
     // A snippet: a body with placeholders, offered by name from the
     // Insert menu and by prefix among the completions. From the files
@@ -404,6 +420,8 @@ private:
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
     void fillProblems(const Doc* doc);
+    // The pane's filters as a query over the store, for one script.
+    ALFindings<Doc::Shown, ProblemTraits>::Query problemQuery(const Doc& doc) const;
     void onProblemSelected();
 
     // The analyzers: a check is due a moment after the last keystroke,
@@ -649,6 +667,12 @@ private:
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
     LLScrollListCtrl*                  mProblems      = nullptr;
+    ALFindings<Doc::Shown, ProblemTraits> mProblemStore;
+    LLCheckBoxCtrl*                    mProblemErrors   = nullptr;
+    LLCheckBoxCtrl*                    mProblemWarnings = nullptr;
+    LLCheckBoxCtrl*                    mProblemNotes    = nullptr;
+    LLComboBox*                        mProblemOrigin   = nullptr;
+    LLFilterEditor*                    mProblemFilter   = nullptr;
     LLScrollListCtrl*                  mReferences    = nullptr;
     LLScrollListCtrl*                  mOutline       = nullptr;
     LLTextEditor*                      mSymbol        = nullptr;
