@@ -6,13 +6,23 @@
 
 add_library(alscript STATIC)
 
-target_sources(alscript PRIVATE alluauservice.cpp allslservice.cpp alscriptenvelope.cpp)
+target_sources(
+  alscript
+  PRIVATE alluauservice.cpp allslservice.cpp alpreprocessor.cpp alscriptenvelope.cpp alsourcemap.cpp
+)
 
 target_sources(
   alscript
   PUBLIC
     FILE_SET HEADERS
-      FILES alluauservice.h allslservice.h alscriptenvelope.h alscriptproblem.h alscriptsymbol.h
+      FILES
+        alluauservice.h
+        allslservice.h
+        alpreprocessor.h
+        alscriptenvelope.h
+        alscriptproblem.h
+        alscriptsymbol.h
+        alsourcemap.h
 )
 
 target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide PUBLIC llcommon)
@@ -37,4 +47,12 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines}
   )
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  # The golden files under tests/preprocessor/: every test_*.lsl beside
+  # its expected output.
+  al_add_test(
+    alpreprocessor
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+  )
 endif()

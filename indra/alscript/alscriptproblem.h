@@ -43,12 +43,14 @@ struct ALScriptProblem
         Warning,
         Note
     };
-    // Which pass said it: the parser, the type checker, or the linter.
+    // Which pass said it: the parser, the type checker, the linter, or
+    // the preprocessor ahead of them all.
     enum class Source : U8
     {
         Parser,
         Types,
-        Lint
+        Lint,
+        Preprocessor
     };
 
     Severity    severity = Severity::Error;
@@ -62,6 +64,9 @@ struct ALScriptProblem
     // has only its words.
     std::string code;
     std::string message;
+    // The included file the problem is in, by the identity the source
+    // map's files carry, or empty for the script itself.
+    std::string file;
 };
 
 typedef std::vector<ALScriptProblem> ALScriptProblems;
