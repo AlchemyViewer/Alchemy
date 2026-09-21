@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "allsloptimizer.h"
 #include "alscriptproblem.h"
 #include "alsourcemap.h"
 
@@ -33,8 +34,8 @@
 #include <string_view>
 #include <vector>
 
-// The preprocessor scripts written for Firestorm rely on, as
-// doc/SCRIPT_STUDIO.md section 3.9 has it: a C preprocessor over a
+// The preprocessor scripts written for Firestorm rely on: a C
+// preprocessor over a
 // tokenizer of the script's own language, so that strings, comments and
 // vector literals are what LSL says they are and long strings and `..`
 // what Luau does. Object-like and function-like macros with `__VA_ARGS__`,
@@ -101,6 +102,10 @@ public:
         bool switches  = false;
         bool lazyLists = false;
         bool compress  = false;
+        // The optimizer over the expanded text, LSL only, with its own
+        // options; it needs the builtins loaded.
+        bool                    optimize = false;
+        ALLSLOptimizer::Options optimizer;
         S32  includeDepth = 32;
         // The predefined macros' values. An empty agent id leaves the
         // agent macros undefined; an empty asset id says NOT_IN_WORLD.
@@ -133,6 +138,8 @@ public:
         // What the run did, whether asked or by the script's own defines.
         bool usedSwitches  = false;
         bool usedLazyLists = false;
+        // The optimizer ran and its text is what came out.
+        bool optimized     = false;
 
         bool hasErrors() const;
     };

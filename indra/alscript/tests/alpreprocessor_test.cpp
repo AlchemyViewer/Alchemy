@@ -25,6 +25,7 @@
 
 #include "linden_common.h"
 
+#include "../allslservice.h"
 #include "../alpreprocessor.h"
 
 #include "../test/lltut.h"
@@ -504,6 +505,42 @@ namespace tut
         ensure_equals("the include's x", loc.line, 3);
         loc = r.map.toExpanded(0, 1, 100);
         ensure_equals("past the end forward", loc.column, 19);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<13>()
+    {
+        set_test_name("the optimizer runs over the expanded text, and its notes come back to the source");
+        {
+            ALLSLService service;
+            std::string  error;
+            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        }
+        add("consts.lsl", "#define CHANNEL 7\ninteger unused = 1;\n");
+        ALPreprocessor::Options o = options();
+        o.optimize                = true;
+        o.compress                = true;
+        const std::string source  = "#include \"consts.lsl\"\n#define TWICE(x) ((x) * 2)\ndefault\n{\n    state_entry()\n    {\n        llSay(CHANNEL, (string)TWICE(21));\n    }\n}\n";
+        ALPreprocessor::Result r  = ALPreprocessor::run(source, o);
+        ensure("optimized", r.optimized);
+        ensure_equals("text", r.text, std::string("default\n{\nstate_entry()\n{\nllSay(7,\"42\");\n}\n}\n"));
+        // The unused global was in the include, and the note says so.
+        bool noted = false;
+        for (const ALScriptProblem& p : r.problems)
+        {
+            if (p.message.find("removed the unused global unused") != std::string::npos)
+            {
+                noted = true;
+                ensure_equals("in the include", p.file, std::string("consts.lsl"));
+                ensure_equals("on its line there", p.line, 1);
+            }
+        }
+        ensure("noted", noted);
+        // The llSay is on output line 4, which came from source line 6.
+        const ALSourceMap::Loc loc = r.map.toSource(4, 0);
+        ensure("found", loc.found());
+        ensure_equals("main file", loc.file, 0);
+        ensure_equals("line", loc.line, 6);
     }
 
     template<> template<>

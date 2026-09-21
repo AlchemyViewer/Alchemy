@@ -32,7 +32,7 @@
 // What the LSL and SLua analyzers report: a range in the script, how bad it
 // is, which pass said it, and the words. Lines and columns are zero-based
 // and a column counts bytes of UTF-8 -- the one convention every boundary
-// converts to, as doc/SCRIPT_STUDIO.md section 3.8 has it. The interface
+// converts to. The interface
 // this belongs to, ALLanguageService, arrives with the editor in phase 1;
 // until then this is the library's own.
 struct ALScriptProblem
@@ -50,7 +50,9 @@ struct ALScriptProblem
         Parser,
         Types,
         Lint,
-        Preprocessor
+        Preprocessor,
+        // What the optimizer did, as notes, or why it could not.
+        Optimizer
     };
 
     Severity    severity = Severity::Error;

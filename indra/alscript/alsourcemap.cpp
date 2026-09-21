@@ -86,6 +86,29 @@ void ALSourceMap::finish()
     });
 }
 
+ALSourceMap ALSourceMap::composed(const ALSourceMap& inner) const
+{
+    ALSourceMap out;
+    out.mFiles = inner.mFiles;
+    for (const Segment& s : mSegments)
+    {
+        const Loc loc = inner.toSource(s.line, s.column);
+        if (!loc.found())
+        {
+            continue;
+        }
+        Segment through  = s;
+        through.file     = loc.file;
+        through.line     = loc.line;
+        through.column   = loc.column;
+        // Exact only where both maps are.
+        through.verbatim = s.verbatim && inner.toSource(s.line, s.column + 1).column == loc.column + 1;
+        out.mSegments.push_back(through);
+    }
+    out.finish();
+    return out;
+}
+
 ALSourceMap::Loc ALSourceMap::toSource(S32 line, S32 column) const
 {
     Loc loc;

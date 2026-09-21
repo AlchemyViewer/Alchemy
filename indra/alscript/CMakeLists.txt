@@ -2,13 +2,19 @@
 #
 # The script analyzers: Luau's front end from Second Life's fork for SLua,
 # Tailslide for LSL. Language-neutral and free of UI; what the studio's
-# language services are built on (doc/SCRIPT_STUDIO.md, section 4.1).
+# language services are built on.
 
 add_library(alscript STATIC)
 
 target_sources(
   alscript
-  PRIVATE alluauservice.cpp allslservice.cpp alpreprocessor.cpp alscriptenvelope.cpp alsourcemap.cpp
+  PRIVATE
+    allsloptimizer.cpp
+    alluauservice.cpp
+    allslservice.cpp
+    alpreprocessor.cpp
+    alscriptenvelope.cpp
+    alsourcemap.cpp
 )
 
 target_sources(
@@ -16,6 +22,8 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        allsloptimizer.h
+        allsltraits.inc
         alluauservice.h
         allslservice.h
         alpreprocessor.h
@@ -47,12 +55,20 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines}
   )
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  # The optimizer's golden files under tests/optimizer/, checked with the
+  # grid's builtins loaded.
+  al_add_test(
+    allsloptimizer
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+  )
   # The golden files under tests/preprocessor/: every test_*.lsl beside
   # its expected output.
   al_add_test(
     alpreprocessor
     PROJECT alscript
     LIBRARIES alscript llcommon
-    DEFINES "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
+    DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
 endif()

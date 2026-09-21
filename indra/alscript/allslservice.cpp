@@ -29,6 +29,8 @@
 #include "llfile.h"
 
 #include <tailslide/tailslide.hh>
+
+#include <atomic>
 #include <tailslide/visitor.hh>
 
 #include <algorithm>
@@ -36,6 +38,8 @@
 
 namespace
 {
+    std::atomic<bool> sBuiltinsLoaded{ false };
+
     // Which of Tailslide's numbers the parser itself reports; the rest are
     // the semantic passes'.
     bool fromParser(Tailslide::ErrorCode code)
@@ -355,6 +359,7 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
     fclose(file);
     Tailslide::tailslide_init_builtins(path.c_str());
     mImpl->builtins = true;
+    sBuiltinsLoaded = true;
     error.clear();
     return true;
 }
@@ -362,6 +367,12 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
 bool ALLSLService::hasBuiltins() const
 {
     return mImpl->builtins;
+}
+
+// static
+bool ALLSLService::builtinsLoaded()
+{
+    return sBuiltinsLoaded;
 }
 
 ALScriptProblems ALLSLService::check(std::string_view source, bool mono)

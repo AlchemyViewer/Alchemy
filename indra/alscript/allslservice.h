@@ -56,6 +56,9 @@ public:
     // reason, for a file that cannot be opened.
     bool loadBuiltins(const std::string& path, std::string& error);
     bool hasBuiltins() const;
+    // Whether any service has loaded them, which is what the optimizer,
+    // parsing on its own, needs to know: the table is the process's.
+    static bool builtinsLoaded();
 
     // Everything Tailslide has to say about one script, in the order it
     // was said. `mono` chooses Mono's rules for what a global initialiser

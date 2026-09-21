@@ -30,7 +30,7 @@
 #include <vector>
 
 // Positions are zero-based lines and byte columns, as everything the
-// analyzers answer is (doc/SCRIPT_STUDIO.md section 3.8).
+// analyzers answer is.
 
 enum class ALScriptSymbolKind : U8
 {

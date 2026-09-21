@@ -97,6 +97,12 @@ public:
     // its line, and a line that made no output goes nowhere.
     Loc toExpanded(S32 file, S32 line, S32 column) const;
 
+    // This map over another: this one's origins are positions in the text
+    // the other maps, so the result maps this one's output straight to
+    // the other's files. A segment whose origin the other map has nothing
+    // for is dropped.
+    ALSourceMap composed(const ALSourceMap& inner) const;
+
 private:
     std::vector<File>        mFiles;
     std::vector<Segment>     mSegments;

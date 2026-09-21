@@ -2620,6 +2620,33 @@ namespace
 
     // ---- the text and its map -----------------------------------------------------------
 
+    // A problem positioned in the output, moved back to the source.
+    void mapProblem(ALScriptProblem& p, const ALSourceMap& map)
+    {
+        const ALSourceMap::Loc loc = map.toSource(p.line, p.column);
+        if (!loc.found())
+        {
+            return;
+        }
+        const ALSourceMap::Loc end = map.toSource(p.endLine, p.endColumn);
+        p.line                     = loc.line;
+        p.column                   = loc.column;
+        if (end.found() && end.file == loc.file && (end.line > loc.line || (end.line == loc.line && end.column >= loc.column)))
+        {
+            p.endLine   = end.line;
+            p.endColumn = end.column;
+        }
+        else
+        {
+            p.endLine   = loc.line;
+            p.endColumn = loc.column;
+        }
+        if (loc.file > 0 && loc.file < S32(map.files().size()))
+        {
+            p.file = map.files()[loc.file].path;
+        }
+    }
+
     void assemble(const Tokens& tokens, ALPreprocessor::Result& result)
     {
         S32 line   = 0;
@@ -2772,11 +2799,43 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             result.usedSwitches = true;
             tokens              = Switches(engine).run(tokens);
         }
-        if (options.compress)
-        {
-            tokens = compress(tokens, false);
-        }
     }
     assemble(tokens, result);
+    if (options.lua)
+    {
+        return result;
+    }
+    if (options.optimize)
+    {
+        // Over the expanded text, as Firestorm ran its own; what it says
+        // is said of the expanded text and brought back to the source.
+        ALLSLOptimizer::Result optimized = ALLSLOptimizer::run(result.text, options.optimizer);
+        for (ALScriptProblem p : optimized.problems)
+        {
+            mapProblem(p, result.map);
+            result.problems.push_back(std::move(p));
+        }
+        if (optimized.optimized)
+        {
+            ALScriptProblem sizes;
+            sizes.severity = ALScriptProblem::Severity::Note;
+            sizes.source   = ALScriptProblem::Source::Optimizer;
+            sizes.message  = "optimized from " + std::to_string(optimized.sizeBefore) + " to " + std::to_string(optimized.sizeAfter) +
+                            " bytes of source; script memory is the simulator's to say";
+            result.problems.push_back(std::move(sizes));
+            result.map       = optimized.map.composed(result.map);
+            result.text      = std::move(optimized.text);
+            result.optimized = true;
+        }
+    }
+    if (options.compress)
+    {
+        // Over whatever the text is by now, mapped back through it.
+        Tokens                 again = compress(Lexer(false, 0).run(result.text), false);
+        ALPreprocessor::Result squeezed;
+        assemble(again, squeezed);
+        result.map  = squeezed.map.composed(result.map);
+        result.text = std::move(squeezed.text);
+    }
     return result;
 }
