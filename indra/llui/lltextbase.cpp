@@ -195,9 +195,6 @@ LLTextBase::Params::Params()
 LLTextBase::LLTextBase(const LLTextBase::Params &p)
 :   LLUICtrl(p, LLTextViewModelPtr(new LLTextViewModel)),
     mURLClickSignal(NULL),
-    mIsFriendSignal(NULL),
-    mIsObjectBlockedSignal(NULL),
-    mIsObjectReachableSignal(NULL),
     mMaxTextByteLength( p.max_text_length ),
     mFont(p.font),
     mFontShadow(p.font_shadow),
@@ -311,9 +308,6 @@ LLTextBase::~LLTextBase()
         mPopupMenuHandle.markDead();
     }
     delete mURLClickSignal;
-    delete mIsFriendSignal;
-    delete mIsObjectBlockedSignal;
-    delete mIsObjectReachableSignal;
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
     delete mHighlightsSignal;
 // [/SL:KB]
@@ -2415,44 +2409,9 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
     if (menu)
     {
         mPopupMenuHandle = menu->getHandle();
-
-        if (mIsFriendSignal)
-        {
-            LLView* addFriendButton = menu->findChild<LLView>("add_friend");
-            LLView* removeFriendButton = menu->findChild<LLView>("remove_friend");
-
-            if (addFriendButton && removeFriendButton)
-            {
-                bool isFriend = *(*mIsFriendSignal)(LLUUID(LLUrlAction::getUserID(url)));
-                addFriendButton->setEnabled(!isFriend);
-                removeFriendButton->setEnabled(isFriend);
-            }
-        }
-
-        if (mIsObjectBlockedSignal)
-        {
-            LLView* blockButton = menu->findChild<LLView>("block_object");
-            LLView* unblockButton = menu->findChild<LLView>("unblock_object");
-
-            if (blockButton && unblockButton)
-            {
-                bool is_blocked = *(*mIsObjectBlockedSignal)(LLUUID(LLUrlAction::getObjectId(url)), LLUrlAction::getObjectName(url));
-                blockButton->setVisible(!is_blocked);
-                unblockButton->setVisible(is_blocked);
-            }
-        }
-
-        if (mIsObjectReachableSignal)
-        {
-            bool is_reachable = *(*mIsObjectReachableSignal)(LLUUID(LLUrlAction::getObjectId(url)));
-            if (LLView* zoom_btn = menu->getChild<LLView>("zoom_in"))
-            {
-                zoom_btn->setEnabled(is_reachable);
-            }
-        }
-        // What the widget has no answer of its own to, the viewer's
-        // answer decides, where it has installed one.
-        LLUrlAction::adjustMenu(menu, url, !mIsFriendSignal, !mIsObjectBlockedSignal, !mIsObjectReachableSignal);
+        // Whether the agent is a friend, the object blocked or near: the
+        // viewer's answers, where it has installed them.
+        LLUrlAction::adjustMenu(menu, url);
         menu->show(x, y);
         LLMenuGL::showPopup(this, menu, x, y);
     }
@@ -3878,33 +3837,6 @@ boost::signals2::connection LLTextBase::setURLClickedCallback(const commit_signa
         mURLClickSignal = new commit_signal_t();
     }
     return mURLClickSignal->connect(cb);
-}
-
-boost::signals2::connection LLTextBase::setIsFriendCallback(const is_friend_signal_t::slot_type& cb)
-{
-    if (!mIsFriendSignal)
-    {
-        mIsFriendSignal = new is_friend_signal_t();
-    }
-    return mIsFriendSignal->connect(cb);
-}
-
-boost::signals2::connection LLTextBase::setIsObjectBlockedCallback(const is_blocked_signal_t::slot_type& cb)
-{
-    if (!mIsObjectBlockedSignal)
-    {
-        mIsObjectBlockedSignal = new is_blocked_signal_t();
-    }
-    return mIsObjectBlockedSignal->connect(cb);
-}
-
-boost::signals2::connection LLTextBase::setIsObjectReachableCallback(const is_obj_reachable_signal_t::slot_type& cb)
-{
-    if (!mIsObjectReachableSignal)
-    {
-        mIsObjectReachableSignal = new is_obj_reachable_signal_t();
-    }
-    return mIsObjectReachableSignal->connect(cb);
 }
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)

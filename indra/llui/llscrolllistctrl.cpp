@@ -231,7 +231,6 @@ LLScrollListCtrl::LLScrollListCtrl(const LLScrollListCtrl::Params& p)
     mRowPadding(p.row_padding),
     mAlternateSort(false),
     mContextMenuType(MENU_NONE),
-    mIsFriendSignal(nullptr),
     mFilterColumn(-1),
     mIsFiltered(false)
 {
@@ -357,7 +356,6 @@ LLScrollListCtrl::~LLScrollListCtrl()
     std::for_each(mItemList.begin(), mItemList.end(), DeletePointer());
     mItemList.clear();
     clearColumns(); //clears columns and deletes headers
-    delete mIsFriendSignal;
 
     auto menu = mPopupMenuHandle.get();
     if (menu)
@@ -2135,19 +2133,9 @@ bool LLScrollListCtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
             if (menu)
             {
                 mPopupMenuHandle = menu->getHandle();
-                if (mIsFriendSignal)
-                {
-                    bool isFriend = *(*mIsFriendSignal)(uuid);
-                    LLView* addFriendButton = menu->getChild<LLView>("add_friend");
-                    LLView* removeFriendButton = menu->getChild<LLView>("remove_friend");
-
-                    if (addFriendButton && removeFriendButton)
-                    {
-                        addFriendButton->setEnabled(!isFriend);
-                        removeFriendButton->setEnabled(isFriend);
-                    }
-                }
-
+                // Whether the agent is a friend: the viewer's answer, where
+                // it has installed one.
+                LLUrlAction::adjustMenu(menu, "secondlife:///app/" + std::string(is_group ? "group" : "agent") + "/" + id + "/about");
                 menu->show(x, y);
                 LLMenuGL::showPopup(this, menu, x, y);
                 return true;
@@ -3564,15 +3552,6 @@ void LLScrollListCtrl::onFocusLost()
     mSearchString.clear();
 
     LLUICtrl::onFocusLost();
-}
-
-boost::signals2::connection LLScrollListCtrl::setIsFriendCallback(const is_friend_signal_t::slot_type& cb)
-{
-    if (!mIsFriendSignal)
-    {
-        mIsFriendSignal = new is_friend_signal_t();
-    }
-    return mIsFriendSignal->connect(cb);
 }
 
 bool LLScrollListCtrl::highlightMatchingItems(const std::string& filter_str)
