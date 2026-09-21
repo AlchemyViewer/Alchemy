@@ -86,6 +86,7 @@
 #include "llviewermessage.h"
 #include "llviewerobjectlist.h"
 #include "llworldmap.h"
+#include "llavataractions.h"
 #include "llmutelist.h"
 #include "llviewerhelp.h"
 #include "lluicolortable.h"
@@ -972,6 +973,14 @@ bool LLAppViewer::init()
     LLUrlAction::setOpenURLInternalCallback(boost::bind(&LLWeb::loadURLInternal, _1, LLStringUtil::null, LLStringUtil::null, false));
     LLUrlAction::setOpenURLExternalCallback(boost::bind(&LLWeb::loadURLExternal, _1, true, LLStringUtil::null));
     LLUrlAction::setExecuteSLURLCallback(&LLURLDispatcher::dispatchFromTextEditor);
+    // And with what a URL's menu asks of the viewer: whether the agent
+    // is a friend, the object blocked, the object near enough to zoom to.
+    LLUrlAction::setIsFriendCallback(&LLAvatarActions::isFriend);
+    LLUrlAction::setIsObjectBlockedCallback([](const LLUUID& id, const std::string& name) { return LLMuteList::getInstance()->isMuted(id, name, 0); });
+    LLUrlAction::setIsObjectReachableCallback([](const LLUUID& id) {
+        LLViewerObject* object = gObjectList.findObject(id);
+        return object && object->isReachable();
+    });
 
     // Let code in llui access the viewer help floater
     LLUI::getInstance()->mHelpImpl = LLViewerHelp::getInstance();
