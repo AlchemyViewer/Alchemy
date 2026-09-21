@@ -2593,6 +2593,10 @@ bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
     setFocus(true);
     setSelection(word);
     armTripleClick();
+    if (modalKeymap())
+    {
+        modalKeymap()->mouseChanged(*this);
+    }
     return true;
 }
 

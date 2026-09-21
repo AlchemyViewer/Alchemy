@@ -95,6 +95,9 @@ public:
     virtual std::string status() const = 0;
     // Goes up with every change of state, for whoever shows the status.
     virtual U32 generation() const = 0;
+    // The mouse put the caret somewhere, or dragged a selection: the
+    // keymap's own idea of where things are is told.
+    virtual void mouseChanged(ALTextView& view) {}
 };
 
 class ALTextView : public LLUICtrl, public LLEditMenuHandler, public LLSpellCheckMenuHandler, protected LLPreeditor

@@ -29,6 +29,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Vim over the text view, as a keymap with state: normal, insert, replace,
@@ -40,9 +41,12 @@
 // again; registers, the unnamed one being the system clipboard, with 0
 // for the last yank and a-z by name (A-Z to add); marks a-z, ` and '; a
 // search line for / and ?; and a : line for a line number, s///, set,
-// and whatever the hooks take -- w, q, wq, x, q! and the studio's own.
-// It works the view through what the view exposes and nothing more, so
-// the same keys drive any text view.
+// g and v over the lines a pattern picks out, normal, and whatever the
+// hooks take -- w, q, wq, x, q! and the studio's own. Macros: q to
+// record keys into a register, @ to play them. Ctrl-A and Ctrl-X on a
+// number. The mouse: a click puts the caret on a character, a drag is
+// a visual selection. It works the view through what the view exposes
+// and nothing more, so the same keys drive any text view.
 class ALVimKeymap final : public ALModalKeymap
 {
 public:
@@ -86,8 +90,12 @@ public:
     bool        inserting() const override;
     std::string status() const override;
     U32         generation() const override { return mGeneration; }
+    void        mouseChanged(ALTextView& view) override;
 
-private:
+    // Whether keys are being recorded into a register, and which.
+    bool recording() const { return mRecording != 0; }
+    char recordingInto() const { return mRecording; }
+
     // One thing typed: a character, or a key with its modifiers.
     struct Input
     {
@@ -96,6 +104,15 @@ private:
         KEY     key    = KEY_NONE;
         MASK    mask   = MASK_NONE;
     };
+    // Keys as text, the way a macro's register holds them: characters
+    // as themselves, `<` as `<lt>`, keys by name -- <Esc>, <CR>, <BS>,
+    // <Tab>, <Del>, <Up>, <Down>, <Left>, <Right>, <Home>, <End>,
+    // <PageUp>, <PageDown> -- with C-, S- and A- before a modified one;
+    // and back again.
+    static std::string        encodeInputs(const std::vector<Input>& inputs);
+    static std::vector<Input> decodeInputs(std::string_view text);
+
+private:
     struct Register
     {
         std::string text;
@@ -160,6 +177,27 @@ private:
     // The : line.
     void runCommand(ALTextView& view, const std::string& line);
     bool substitute(ALTextView& view, S32 first, S32 last, const std::string& spec);
+    // g and v: the command over every line the pattern picks out, or
+    // every line it does not.
+    bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
+    // Keys fed as typed, for :normal and for a macro; false where they
+    // ended in an error message.
+    bool play(ALTextView& view, const std::vector<Input>& inputs);
+    // The number at or after the caret on its line, changed by so much;
+    // false where there is none.
+    bool addToNumber(ALTextView& view, S64 by);
+    // The last visual operation, for `.`: the extent it covered and the
+    // keys from the operator on.
+    struct VisualExtent
+    {
+        bool valid   = false;
+        Mode mode    = Mode::Normal;
+        S32  lines   = 0;
+        S32  columns = 0;
+        // Where in the command's inputs the operator was typed.
+        size_t opAt = 0;
+    };
+    void noteVisualOperation(const Span& span, S32 lines_hint = -1);
 
     void say(const std::string& message, bool error = false);
     void bump() { ++mGeneration; }
@@ -225,6 +263,19 @@ private:
     std::vector<Input> mCommandInputs;
     std::vector<Input> mLastChange;
     bool               mReplaying = false;
+    // The last change, where it was an operator over a visual
+    // selection: `.` selects as much again from the caret and does
+    // the operator over it.
+    VisualExtent       mVisualPending;
+    VisualExtent       mLastVisual;
+
+    // Macros: the register being recorded into, or 0, and what has
+    // been typed since; the last one played, for @@; and how deep the
+    // playing goes, so that a macro playing itself stops.
+    char               mRecording = 0;
+    std::vector<Input> mRecorded;
+    char               mLastPlayed = 0;
+    S32                mPlaying    = 0;
 
     std::string mMessage;
     bool        mMessageError = false;

@@ -3477,6 +3477,10 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         mAnchor    = mDocument.lineStart(mCaret.line);
         mCaret     = mCaret.line + 1 < mDocument.lineCount() ? mDocument.lineStart(mCaret.line + 1) : mDocument.lineEnd(mCaret.line);
         mSelecting = false;
+        if (mModal)
+        {
+            mModal->mouseChanged(*this);
+        }
         return true;
     }
     mTripleClick.stop();
@@ -3496,6 +3500,10 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     mDesiredX  = -1.f;
     mSelecting = true;
     gFocusMgr.setMouseCapture(this);
+    if (mModal)
+    {
+        mModal->mouseChanged(*this);
+    }
     return true;
 }
 
@@ -3570,6 +3578,10 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         }
         placeCaret(posAtLocal(x, y, true), true);
         mDesiredX = -1.f;
+        if (mModal)
+        {
+            mModal->mouseChanged(*this);
+        }
         return true;
     }
     // Resting on the map previews the lines there, as long as it rests.
@@ -3660,6 +3672,10 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
     mDesiredX              = -1.f;
     mSelecting             = false;
     armTripleClick();
+    if (mModal)
+    {
+        mModal->mouseChanged(*this);
+    }
     return true;
 }
 

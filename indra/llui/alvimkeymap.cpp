@@ -32,6 +32,8 @@
 #include "llstring.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 namespace
 {
@@ -201,6 +203,141 @@ namespace
 ALVimKeymap::ALVimKeymap() = default;
 ALVimKeymap::~ALVimKeymap() = default;
 
+// --- keys as text ------------------------------------------------------------------
+
+namespace
+{
+    struct KeyName
+    {
+        KEY         key;
+        const char* name;
+    };
+    const KeyName KEY_NAMES[] = {
+        { KEY_ESCAPE, "Esc" },     { KEY_RETURN, "CR" },     { KEY_BACKSPACE, "BS" }, { KEY_TAB, "Tab" },        { KEY_DELETE, "Del" },
+        { KEY_UP, "Up" },          { KEY_DOWN, "Down" },     { KEY_LEFT, "Left" },    { KEY_RIGHT, "Right" },    { KEY_HOME, "Home" },
+        { KEY_END, "End" },        { KEY_PAGE_UP, "PageUp" }, { KEY_PAGE_DOWN, "PageDown" }, { KEY_INSERT, "Ins" },
+    };
+
+    std::string keyName(KEY key)
+    {
+        for (const KeyName& known : KEY_NAMES)
+        {
+            if (known.key == key)
+            {
+                return known.name;
+            }
+        }
+        if (key >= 0x20 && key < 0x7F)
+        {
+            return std::string(1, static_cast<char>(std::tolower(key)));
+        }
+        return std::string();
+    }
+
+    bool keyFromName(const std::string& name, KEY& key)
+    {
+        for (const KeyName& known : KEY_NAMES)
+        {
+            if (name == known.name)
+            {
+                key = known.key;
+                return true;
+            }
+        }
+        if (name.size() == 1)
+        {
+            key = static_cast<KEY>(std::toupper(static_cast<unsigned char>(name[0])));
+            return true;
+        }
+        return false;
+    }
+}
+
+// static
+std::string ALVimKeymap::encodeInputs(const std::vector<Input>& inputs)
+{
+    std::string out;
+    for (const Input& in : inputs)
+    {
+        if (in.isChar)
+        {
+            out += in.ch == '<' ? std::string("<lt>") : utf8Of(in.ch);
+            continue;
+        }
+        const std::string name = keyName(in.key);
+        if (name.empty())
+        {
+            continue;
+        }
+        std::string spelt;
+        if (in.mask & MASK_CONTROL)
+        {
+            spelt += "C-";
+        }
+        if (in.mask & MASK_ALT)
+        {
+            spelt += "A-";
+        }
+        if (in.mask & MASK_SHIFT)
+        {
+            spelt += "S-";
+        }
+        out += "<" + spelt + name + ">";
+    }
+    return out;
+}
+
+// static
+std::vector<ALVimKeymap::Input> ALVimKeymap::decodeInputs(std::string_view text)
+{
+    std::vector<Input> out;
+    size_t             at = 0;
+    while (at < text.size())
+    {
+        if (text[at] == '<')
+        {
+            const size_t close = text.find('>', at + 1);
+            if (close != std::string_view::npos && close > at + 1)
+            {
+                std::string name(text.substr(at + 1, close - at - 1));
+                if (name == "lt")
+                {
+                    Input in;
+                    in.isChar = true;
+                    in.ch     = '<';
+                    out.push_back(in);
+                    at = close + 1;
+                    continue;
+                }
+                MASK mask = MASK_NONE;
+                while (name.size() > 2 && name[1] == '-' && (name[0] == 'C' || name[0] == 'A' || name[0] == 'M' || name[0] == 'S'))
+                {
+                    mask |= name[0] == 'C' ? MASK_CONTROL : name[0] == 'S' ? MASK_SHIFT : MASK_ALT;
+                    name.erase(0, 2);
+                }
+                KEY key;
+                if (keyFromName(name, key))
+                {
+                    Input in;
+                    in.key  = key;
+                    in.mask = mask;
+                    out.push_back(in);
+                    at = close + 1;
+                    continue;
+                }
+            }
+        }
+        // A character, whole.
+        const LLCodepointAt cp = utf8str_decode_at(text, at);
+        Input               in;
+        in.isChar = true;
+        in.ch     = cp.cp;
+        out.push_back(in);
+        at = llmax(cp.next, at + 1);
+    }
+    return out;
+}
+
 // --- what the outside sees -------------------------------------------------------------
 
 bool ALVimKeymap::inserting() const
@@ -210,13 +347,14 @@ bool ALVimKeymap::inserting() const
 
 std::string ALVimKeymap::status() const
 {
+    const std::string recording = mRecording ? std::string("recording @") + mRecording + " " : std::string();
     switch (mMode)
     {
-        case Mode::Insert:      return "-- INSERT --";
-        case Mode::Replace:     return "-- REPLACE --";
-        case Mode::Visual:      return "-- VISUAL --";
-        case Mode::VisualLine:  return "-- VISUAL LINE --";
-        case Mode::VisualBlock: return "-- VISUAL BLOCK --";
+        case Mode::Insert:      return recording + "-- INSERT --";
+        case Mode::Replace:     return recording + "-- REPLACE --";
+        case Mode::Visual:      return recording + "-- VISUAL --";
+        case Mode::VisualLine:  return recording + "-- VISUAL LINE --";
+        case Mode::VisualBlock: return recording + "-- VISUAL BLOCK --";
         case Mode::Command:
         case Mode::Search:      return utf8Of(mLineKind) + mLine;
         case Mode::Normal:
@@ -248,9 +386,70 @@ std::string ALVimKeymap::status() const
             {
                 pending += utf8Of(mObjectKind);
             }
-            return pending;
+            return recording + pending;
         }
     }
+}
+
+void ALVimKeymap::mouseChanged(ALTextView& view)
+{
+    // Insert mode stays insert mode wherever the click lands; a line
+    // being typed is not the mouse's.
+    if (mMode == Mode::Insert || mMode == Mode::Replace || mMode == Mode::Command || mMode == Mode::Search)
+    {
+        return;
+    }
+    const ALTextDocument& d = view.document();
+    if (view.hasSelection())
+    {
+        // A drag is a visual selection, charwise, the character under
+        // either end included as the view's selection reaches past it.
+        const ALTextRange sel = view.selection();
+        if (sel.end > sel.begin)
+        {
+            mVisualAnchor = sel.begin;
+            mVisualCaret  = d.prevCluster(sel.end);
+        }
+        else
+        {
+            mVisualAnchor = d.prevCluster(sel.begin);
+            mVisualCaret  = sel.end;
+        }
+        if (mMode == Mode::Normal)
+        {
+            mMode = Mode::Visual;
+        }
+        else if (mMode == Mode::VisualBlock)
+        {
+            mMode = Mode::Visual;
+            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+            {
+                editor->clearHighlights();
+            }
+        }
+    }
+    else
+    {
+        // A click: normal mode, the caret on the character it landed on.
+        if (isVisual())
+        {
+            mVisualLast       = mMode;
+            mVisualLastAnchor = mVisualAnchor;
+            mVisualLastCaret  = mVisualCaret;
+            mMode             = Mode::Normal;
+            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+            {
+                editor->clearHighlights();
+            }
+        }
+        const ALTextPos last = lastCharOf(d, view.caret().line);
+        if (view.caret().column > last.column)
+        {
+            view.setCaret(last);
+        }
+    }
+    clearPending();
+    bump();
 }
 
 std::string ALVimKeymap::registerText(char name) const
@@ -285,6 +484,10 @@ bool ALVimKeymap::handleChar(ALTextView& view, llwchar ch)
 
 bool ALVimKeymap::feed(ALTextView& view, const Input& input)
 {
+    if (mRecording && !mReplaying && mPlaying == 0)
+    {
+        mRecorded.push_back(input);
+    }
     if (!mReplaying)
     {
         mMessage.clear();
@@ -314,8 +517,43 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
             taken = normal(view, input);
             break;
     }
+    // A key nobody took is not part of what was typed: its character
+    // follows, and is.
+    if (!taken && !input.isChar)
+    {
+        if (!mReplaying && !mCommandInputs.empty())
+        {
+            mCommandInputs.pop_back();
+        }
+        if (mRecording && !mReplaying && mPlaying == 0 && !mRecorded.empty())
+        {
+            mRecorded.pop_back();
+        }
+    }
     bump();
     return taken;
+}
+
+bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs)
+{
+    if (mPlaying >= 100)
+    {
+        say("E169: Command too recursive", true);
+        return false;
+    }
+    ++mPlaying;
+    bool ok = true;
+    for (const Input& in : inputs)
+    {
+        feed(view, in);
+        if (mMessageError)
+        {
+            ok = false;
+            break;
+        }
+    }
+    --mPlaying;
+    return ok;
 }
 
 void ALVimKeymap::clearPending()
@@ -333,8 +571,32 @@ void ALVimKeymap::finishCommand(bool changed)
     clearPending();
     if (changed && !mReplaying)
     {
-        mLastChange = mCommandInputs;
+        if (mVisualPending.valid)
+        {
+            // A visual operation: what `.` repeats is the operator and
+            // whatever followed it, over as much again.
+            mLastVisual = mVisualPending;
+            mLastChange.assign(mCommandInputs.begin() + static_cast<std::ptrdiff_t>(llmin(mVisualPending.opAt, mCommandInputs.size())), mCommandInputs.end());
+        }
+        else
+        {
+            mLastVisual.valid = false;
+            mLastChange       = mCommandInputs;
+        }
     }
+    mVisualPending.valid = false;
+}
+
+void ALVimKeymap::noteVisualOperation(const Span& span, S32 lines_hint)
+{
+    mVisualPending.valid   = true;
+    mVisualPending.mode    = span.linewise ? Mode::VisualLine : span.block ? Mode::VisualBlock : Mode::Visual;
+    mVisualPending.lines   = lines_hint >= 0 ? lines_hint : span.range.end.line - span.range.begin.line;
+    mVisualPending.columns = span.block ? span.range.end.column - span.range.begin.column
+                             : span.linewise ? 0
+                                             : span.range.end.column - (span.range.end.line == span.range.begin.line ? span.range.begin.column : 0);
+    // The operator is the key being handled: the last one typed.
+    mVisualPending.opAt = mCommandInputs.empty() ? 0 : mCommandInputs.size() - 1;
 }
 
 ALTextPos ALVimKeymap::cursor(const ALTextView& view) const
@@ -430,6 +692,10 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
                     moveTo(view, view.caret());
                     clearPending();
                     return true;
+                case 'A':
+                case 'X':
+                    finishCommand(!view.isReadOnly() && addToNumber(view, (input.key == 'A' ? 1 : -1) * static_cast<S64>(countOr(mCount))));
+                    return true;
                 case 'E':
                     view.setScrollY(view.scrollY() + countOr(mCount) * view.layout().rowHeight());
                     clearPending();
@@ -484,6 +750,42 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 }
                 clearPending();
                 return true;
+            case 'q':
+                // Recording into a register: a-z afresh, A-Z onto what
+                // is there.
+                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
+                {
+                    mRecording = static_cast<char>(ch);
+                    mRecorded.clear();
+                }
+                clearPending();
+                return true;
+            case '@':
+            {
+                // A register's keys played, the count times over; @@ the
+                // last one again.
+                char name = static_cast<char>(ch);
+                if (name == '@')
+                {
+                    name = mLastPlayed;
+                }
+                if (!((name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || name == '"' || name == '0'))
+                {
+                    clearPending();
+                    return true;
+                }
+                const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name))).text);
+                mLastPlayed                     = static_cast<char>(std::tolower(name));
+                clearPending();
+                for (S32 n = 0; n < count; ++n)
+                {
+                    if (!play(view, inputs))
+                    {
+                        break;
+                    }
+                }
+                return true;
+            }
             case 'r':
             {
                 if (!editing)
@@ -596,7 +898,9 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     case 'U':
                         if (visual)
                         {
-                            applyOperator(view, ch, visualSpan(view), 1);
+                            const Span span = visualSpan(view);
+                            noteVisualOperation(span);
+                            applyOperator(view, ch, span, 1);
                             leaveVisual(view);
                             finishCommand(true);
                             return true;
@@ -888,6 +1192,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 }
                 const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
                 const S32     n  = count;
+                noteVisualOperation(span);
                 leaveVisual(view);
                 applyOperator(view, op, span, n);
                 finishCommand(op != 'y');
@@ -938,6 +1243,34 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mOperator      = ch;
             mOperatorCount = mCount;
             mCount         = 0;
+            return true;
+        case 'q':
+            if (mRecording)
+            {
+                // The q that stops is not part of what was recorded.
+                if (!mRecorded.empty())
+                {
+                    mRecorded.pop_back();
+                }
+                const char        into    = mRecording;
+                const std::string keys    = encodeInputs(mRecorded);
+                const bool        append  = into >= 'A' && into <= 'Z';
+                const char        lower   = static_cast<char>(std::tolower(into));
+                mRecording                = 0;
+                mRecorded.clear();
+                // Into its register alone: what was typed is not what the
+                // clipboard holds.
+                Register& reg = mRegisters[lower];
+                reg.text      = append ? reg.text + keys : keys;
+                reg.linewise  = false;
+                reg.block     = false;
+                clearPending();
+                return true;
+            }
+            mPending = 'q';
+            return true;
+        case '@':
+            mPending = '@';
             return true;
         case 'g':
         case 'z':
@@ -1170,7 +1503,31 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             clearPending();
             mReplaying = true;
             size_t     from = 0;
-            if (given > 0)
+            if (mLastVisual.valid)
+            {
+                // As much again from the caret, selected as it was, then
+                // the operator and what followed it.
+                const ALTextPos from_here = view.caret();
+                enterVisual(view, mLastVisual.mode);
+                ALTextPos to = from_here;
+                to.line      = llmin(d.lineCount() - 1, from_here.line + mLastVisual.lines);
+                if (mLastVisual.mode == Mode::VisualBlock)
+                {
+                    to.column = from_here.column + mLastVisual.columns;
+                }
+                else if (mLastVisual.mode == Mode::Visual)
+                {
+                    to.column = (mLastVisual.lines == 0 ? from_here.column : 0) + mLastVisual.columns;
+                    to        = d.prevCluster(d.clamp(to));
+                    if (to < from_here)
+                    {
+                        to = from_here;
+                    }
+                }
+                mVisualCaret = d.clamp(to);
+                showVisual(view);
+            }
+            else if (given > 0)
             {
                 // The count given takes the place of the one recorded.
                 while (from < change.size() && change[from].isChar && isDigit(change[from].ch))
@@ -2366,7 +2723,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             view.deleteRange(ALTextRange(d.lineStart(view.caret().line), view.caret()));
             return true;
         }
-        if (mReplaying)
+        if (mReplaying || mPlaying > 0)
         {
             // Nobody else will: the view's own keymap does what the key
             // would have done when it was typed.
@@ -2398,8 +2755,9 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         return true;
     }
     mTyped += utf8Of(input.ch);
-    if (mReplaying)
+    if (mReplaying || mPlaying > 0)
     {
+        // Fed by hand -- `.`, a macro, :normal -- so nobody else will.
         view.insertText(utf8Of(input.ch));
         return true;
     }
@@ -2795,6 +3153,43 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         finishCommand(true);
         return;
     }
+    if (name == "g" || name == "global" || name == "v" || name == "vglobal" || name == "g!" || name == "global!")
+    {
+        if (global(view, first, last, ranged, args, name[0] == 'v' || name.back() == '!'))
+        {
+            finishCommand(true);
+        }
+        return;
+    }
+    if (name == "normal" || name == "norm" || name == "normal!" || name == "norm!")
+    {
+        // The keys as if typed in normal mode, on each line of the range
+        // in turn, from the line's first character; whatever mode they
+        // leave behind is left.
+        const std::vector<Input> inputs = decodeInputs(args);
+        for (S32 line = first; line <= last && line < d.lineCount(); ++line)
+        {
+            if (mMode != Mode::Normal)
+            {
+                Input escape;
+                escape.key = KEY_ESCAPE;
+                feed(view, escape);
+            }
+            view.setCaret(ALTextPos(line, 0));
+            moveTo(view, view.caret());
+            if (!play(view, inputs))
+            {
+                break;
+            }
+        }
+        if (mMode == Mode::Insert || mMode == Mode::Replace || isVisual())
+        {
+            Input escape;
+            escape.key = KEY_ESCAPE;
+            feed(view, escape);
+        }
+        return;
+    }
     if (name == "noh" || name == "nohlsearch")
     {
         if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
@@ -2845,6 +3240,153 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         return;
     }
     say("E492: Not an editor command: " + line, true);
+}
+
+bool ALVimKeymap::addToNumber(ALTextView& view, S64 by)
+{
+    const ALTextDocument& d     = view.document();
+    const ALTextPos       caret = view.caret();
+    const std::string&    text  = d.line(caret.line);
+    auto                  digit = [&](size_t i) { return i < text.size() && text[i] >= '0' && text[i] <= '9'; };
+    // The number under the caret, or the first one after it on the line;
+    // a minus right before the digits is the number's.
+    size_t start = static_cast<size_t>(caret.column);
+    if (digit(start))
+    {
+        while (start > 0 && digit(start - 1))
+        {
+            --start;
+        }
+    }
+    else
+    {
+        while (start < text.size() && !digit(start))
+        {
+            ++start;
+        }
+        if (start >= text.size())
+        {
+            return false;
+        }
+    }
+    size_t end = start;
+    while (digit(end))
+    {
+        ++end;
+    }
+    const bool negative = start > 0 && text[start - 1] == '-';
+    if (end - start > 18)
+    {
+        return false;
+    }
+    S64 value = std::strtoll(text.substr(start, end - start).c_str(), nullptr, 10);
+    if (negative)
+    {
+        --start;
+        value = -value;
+    }
+    value += by;
+    const std::string with = std::to_string(value);
+    view.setSelection(ALTextRange(ALTextPos(caret.line, static_cast<S32>(start)), ALTextPos(caret.line, static_cast<S32>(end))));
+    view.insertText(with);
+    // The caret on the last digit.
+    moveTo(view, ALTextPos(caret.line, static_cast<S32>(start + with.size()) - 1));
+    return true;
+}
+
+bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert)
+{
+    // g/pattern/command over the whole text unless a range was given;
+    // the command the : line's own, run on each line the pattern picks
+    // out, from the last up so that a deletion moves nothing still to
+    // come.
+    if (spec.empty())
+    {
+        say("E35: No previous regular expression", true);
+        return false;
+    }
+    const ALTextDocument& d   = view.document();
+    const char            sep = spec[0];
+    size_t                p1  = 1;
+    std::string           pattern;
+    while (p1 < spec.size() && spec[p1] != sep)
+    {
+        if (spec[p1] == '\\' && p1 + 1 < spec.size() && spec[p1 + 1] == sep)
+        {
+            pattern += sep;
+            p1 += 2;
+            continue;
+        }
+        pattern += spec[p1++];
+    }
+    std::string command = p1 < spec.size() ? spec.substr(p1 + 1) : std::string();
+    LLStringUtil::trim(command);
+    if (pattern.empty())
+    {
+        pattern = mSearchPattern;
+    }
+    if (pattern.empty())
+    {
+        say("E35: No previous regular expression", true);
+        return false;
+    }
+    mSearchPattern   = pattern;
+    mSearchWholeWord = false;
+    if (!ranged)
+    {
+        first = 0;
+        last  = d.lineCount() - 1;
+    }
+    ALTextSearchOptions options;
+    options.regex         = true;
+    options.caseSensitive = std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
+    std::string              error;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, &scope, &error);
+    if (!error.empty())
+    {
+        say("E486: " + error, true);
+        return false;
+    }
+    std::vector<S32> lines;
+    for (S32 line = first; line <= last; ++line)
+    {
+        const bool hit = std::any_of(matches.begin(), matches.end(), [line](const ALTextRange& m) { return m.begin.line == line; });
+        if (hit != invert)
+        {
+            lines.push_back(line);
+        }
+    }
+    if (lines.empty())
+    {
+        say("E486: Pattern not found: " + pattern, true);
+        return false;
+    }
+    if (command.empty())
+    {
+        // Nothing to do to them: the last one is where the caret goes,
+        // and how many there were is said.
+        moveTo(view, ALTextPos(lines.back(), firstNonBlankColumn(d, lines.back())));
+        say(std::to_string(lines.size()) + " line" + (lines.size() == 1 ? "" : "s"));
+        return true;
+    }
+    // One step to undo for the lot.
+    view.undoJournal().beginGroup();
+    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    {
+        const S32 line = *it;
+        if (line >= d.lineCount())
+        {
+            continue;
+        }
+        runCommand(view, std::to_string(line + 1) + command);
+        if (mMessageError)
+        {
+            break;
+        }
+    }
+    view.undoJournal().endGroup();
+    return !mMessageError;
 }
 
 bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::string& spec)

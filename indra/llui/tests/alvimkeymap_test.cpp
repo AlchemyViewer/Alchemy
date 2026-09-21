@@ -141,6 +141,32 @@ namespace tut
         }
 
         std::string caretText() const { return llformat("%d:%d", editor->caret().line, editor->caret().column); }
+
+        // The local point of a column on a line, in the middle of its row.
+        void pointOf(S32 line, S32 column, S32& x, S32& y)
+        {
+            const LLRect text = editor->textRect();
+            S32          row;
+            const F32    xrel = editor->layout().xOf(line, column, &row);
+            x                 = text.mLeft + static_cast<S32>(xrel) + 1;
+            y                 = text.mTop - (editor->layout().lineTop(line) + row * editor->layout().rowHeight()) - editor->layout().rowHeight() / 2;
+        }
+        void click(S32 line, S32 column)
+        {
+            S32 x, y;
+            pointOf(line, column, x, y);
+            editor->handleMouseDown(x, y, MASK_NONE);
+            editor->handleMouseUp(x, y, MASK_NONE);
+        }
+        void drag(S32 line, S32 column, S32 to_line, S32 to_column)
+        {
+            S32 x, y, x2, y2;
+            pointOf(line, column, x, y);
+            pointOf(to_line, to_column, x2, y2);
+            editor->handleMouseDown(x, y, MASK_NONE);
+            editor->handleHover(x2, y2, MASK_NONE);
+            editor->handleMouseUp(x2, y2, MASK_NONE);
+        }
         // The text on one line, for a message that shows it whole.
         static std::string flat(std::string text)
         {
@@ -364,5 +390,145 @@ namespace tut
         keys("<Esc>3d");
         ensure_equals("what is pending shows", vim->status(), std::string("3d"));
         keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<8>()
+    {
+        set_test_name("the mouse: a click puts the caret on a character, a drag is a visual selection an operator takes, a click leaves visual");
+        ALCodeEditor& e = make("one two\nthree four\nfive six\n");
+        click(0, 7);
+        ensure_equals("past the end of a line lands on its last character", caretText(), std::string("0:6"));
+        ensure("still normal", vim->mode() == ALVimKeymap::Mode::Normal);
+        drag(1, 0, 1, 5);
+        ensure("a drag is visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("d");
+        ensure_equals("and the operator takes what was dragged, up to where the drag stopped", flat(e.text()), std::string("one two| four|five six|"));
+        ensure("back to normal", vim->mode() == ALVimKeymap::Mode::Normal);
+        drag(2, 4, 2, 0);
+        ensure("dragged backwards is visual too", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("y");
+        ensure_equals("yanked, as far as the drag reached", vim->registerText('"'), std::string("five"));
+        keys("V");
+        ensure("visual line", vim->mode() == ALVimKeymap::Mode::VisualLine);
+        click(0, 1);
+        ensure("a click leaves visual for normal, at the click", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:1" && !e.hasSelection());
+        keys("i");
+        click(1, 2);
+        ensure("a click in insert mode stays in insert mode", vim->mode() == ALVimKeymap::Mode::Insert && caretText() == "1:2");
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<9>()
+    {
+        set_test_name(". after a visual operation does it over as much again from the caret, however the selection was made");
+        ALCodeEditor& e = make("aaaa\nbbbb\ncccc\ndddd\neeee\nffff\n");
+        keys("Vjd");
+        ensure_equals("two lines gone", flat(e.text()), std::string("cccc|dddd|eeee|ffff|"));
+        keys(".");
+        ensure_equals(". takes two more", flat(e.text()), std::string("eeee|ffff|"));
+        keys("u.");
+        e.setText("abcdef\nghijkl\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("gg0vlld");
+        ensure_equals("three characters gone", flat(e.text()), std::string("def|ghijkl|"));
+        keys("j0.");
+        ensure_equals(". takes three from the caret", flat(e.text()), std::string("def|jkl|"));
+        keys("gg0vlc-<Esc>");
+        ensure_equals("a change over the selection", flat(e.text()), std::string("-f|jkl|"));
+        keys("j0.");
+        ensure_equals(". changes as much again with the same text", flat(e.text()), std::string("-f|-l|"));
+        // A selection the mouse made repeats the same way.
+        e.setText("one two\nthree four\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        drag(0, 0, 0, 3);
+        keys("d");
+        ensure_equals("the dragged three gone", flat(e.text()), std::string(" two|three four|"));
+        keys("j0.");
+        ensure_equals(". takes three from the caret", flat(e.text()), std::string(" two|ee four|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<10>()
+    {
+        set_test_name("macros: q records keys into a register as text, @ plays them with a count, @@ again, qA adds");
+        ALCodeEditor& e = make("one\ntwo\nthree\nfour\n");
+        keys("qaA;<Esc>jq");
+        ensure("recording stopped", !vim->recording());
+        ensure_equals("the register holds the keys as text", vim->registerText('a'), std::string("A;<Esc>j"));
+        ensure_equals("the recording ran as it was typed", flat(e.text()), std::string("one;|two|three|four|"));
+        ensure("recording says so while it runs", true);
+        keys("@a");
+        ensure_equals("played once", flat(e.text()), std::string("one;|two;|three|four|"));
+        keys("2@@");
+        ensure_equals("@@ plays the last again, the count times", flat(e.text()), std::string("one;|two;|three;|four;|"));
+        keys("qbI-<Esc>q");
+        keys("qBA!<Esc>q");
+        ensure_equals("qB adds to b", vim->registerText('b'), std::string("I-<Esc>A!<Esc>"));
+        keys("gg@b");
+        // The recordings ran where they were typed, on the empty last line.
+        ensure_equals("both halves played", flat(e.text()), std::string("-one;!|two;|three;|four;|-!"));
+        // Playing a register that plays itself stops rather than running away.
+        keys("qc@cq");
+        keys("@c");
+        ensure("too recursive is said", vim->messageIsError());
+        keys("qa");
+        ensure("recording shows in the status", vim->status().find("recording @a") == 0);
+        keys("q");
+        // The keys decode as they were encoded.
+        const std::vector<ALVimKeymap::Input> back = ALVimKeymap::decodeInputs("a<lt>b<C-r><Esc>");
+        ensure_equals("five inputs", back.size(), size_t(5));
+        ensure("a literal <", back[1].isChar && back[1].ch == '<');
+        ensure("a control chord", !back[3].isChar && back[3].key == 'R' && (back[3].mask & MASK_CONTROL));
+        ensure_equals("and encode back", ALVimKeymap::encodeInputs(back), std::string("a<lt>b<C-r><Esc>"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<11>()
+    {
+        set_test_name("control-A and control-X change the number under or after the caret, with counts and a minus");
+        ALCodeEditor& e = make("x = 5; y = 10\nn = -3\nnone here\n");
+        keys("<C-a>");
+        ensure_equals("the first number after the caret, up one", e.document().line(0), std::string("x = 6; y = 10"));
+        ensure_equals("the caret on its last digit", caretText(), std::string("0:4"));
+        keys("5<C-x>");
+        ensure_equals("down five", e.document().line(0), std::string("x = 1; y = 10"));
+        keys("w<C-a>");
+        ensure_equals("the number after the caret", e.document().line(0), std::string("x = 1; y = 11"));
+        keys("<C-a>");
+        ensure_equals("under the caret still", e.document().line(0), std::string("x = 1; y = 12"));
+        keys("j0<C-a>");
+        ensure_equals("a minus is the number's", e.document().line(1), std::string("n = -2"));
+        keys("3<C-a>");
+        ensure_equals("through zero", e.document().line(1), std::string("n = 1"));
+        keys("j<C-a>");
+        ensure_equals("nothing to change is left alone", e.document().line(2), std::string("none here"));
+        keys("k.");
+        ensure_equals(". repeats it", e.document().line(1), std::string("n = 4"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<12>()
+    {
+        set_test_name(":g and :v run a command on the lines a pattern picks out, as one undo; :normal types on a range");
+        ALCodeEditor& e = make("keep 1\ndrop 2\nkeep 3\ndrop 4\nkeep 5\n");
+        keys(":g/drop/d<CR>");
+        ensure_equals("the dropped lines gone", flat(e.text()), std::string("keep 1|keep 3|keep 5|"));
+        keys("u");
+        ensure_equals("undone as one", flat(e.text()), std::string("keep 1|drop 2|keep 3|drop 4|keep 5|"));
+        keys(":v/drop/d<CR>");
+        ensure_equals(":v takes the others, the empty last line among them", flat(e.text()), std::string("drop 2|drop 4"));
+        keys("u:g/drop/s/drop/held/<CR>");
+        ensure_equals("a substitution on the lines picked out", flat(e.text()), std::string("keep 1|held 2|keep 3|held 4|keep 5|"));
+        keys(":g/keep/normal A;<CR>");
+        ensure_equals(":normal types on each", flat(e.text()), std::string("keep 1;|held 2|keep 3;|held 4|keep 5;|"));
+        ensure("and ends in normal mode", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys(":2,3g/held/d<CR>");
+        ensure_equals("a range narrows it", flat(e.text()), std::string("keep 1;|keep 3;|held 4|keep 5;|"));
+        keys(":g/zzz/d<CR>");
+        ensure("nothing matching is said", vim->messageIsError());
+        keys(":g/keep/<CR>");
+        ensure("with no command, how many is said", !vim->messageIsError() && vim->message() == "3 lines");
     }
 }
