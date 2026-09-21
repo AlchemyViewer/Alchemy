@@ -26,6 +26,7 @@
 
 #include "alfontfield.h"
 
+#include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "alpopover.h"
 #include "alstringmatch.h"
@@ -44,6 +45,7 @@
 #include "lluictrlfactory.h"
 
 #include <algorithm>
+#include <functional>
 
 static LLDefaultChildRegistry::Register<ALFontField> r("font_field");
 
@@ -91,11 +93,34 @@ namespace
 
         typedef std::function<void(const std::string&)> chose_t;
 
-        ALFontList(const LLPanel::Params& p, chose_t chose)
+        ALFontList(const LLPanel::Params& p, ALFontField::Families families, const std::string& current, chose_t chose)
         :   LLPanel(p),
             mChose(std::move(chose))
         {
-            mAll = LLFontGL::getDeclaredFontNames();
+            if (families == ALFontField::Families::Declared)
+            {
+                mAll = LLFontGL::getDeclaredFontNames();
+                mLabels = mAll;
+            }
+            else
+            {
+                // The families marked for choosing, by the labels fonts.xml
+                // gives them; and the name the field has now, should it be
+                // one the list would not offer, so that it can be kept.
+                const LLFontRegistry::FamilyFilter filter = families == ALFontField::Families::Monospace    ? LLFontRegistry::FamilyFilter::MONOSPACE
+                                                            : families == ALFontField::Families::Proportional ? LLFontRegistry::FamilyFilter::PROPORTIONAL
+                                                                                                              : LLFontRegistry::FamilyFilter::ANY;
+                for (const LLFontRegistry::FamilyInfo& family : LLFontGL::getAvailableFamilies(filter))
+                {
+                    mAll.push_back(family.name);
+                    mLabels.push_back(family.label.empty() ? family.name : family.label);
+                }
+                if (!current.empty() && std::find(mAll.begin(), mAll.end(), current) == mAll.end())
+                {
+                    mAll.insert(mAll.begin(), current);
+                    mLabels.insert(mLabels.begin(), current);
+                }
+            }
             // Each name's face, found once: a registry lookup builds a
             // descriptor of three strings, and the list is drawn every frame.
             mFonts.reserve(mAll.size());
@@ -108,12 +133,25 @@ namespace
 
         void setChosen(const std::string& name) { mChosen = name; }
 
+        // What the row for a name says, or the name itself.
+        std::string labelOf(const std::string& name) const
+        {
+            for (size_t i = 0; i < mAll.size(); ++i)
+            {
+                if (mAll[i] == name)
+                {
+                    return mLabels[i];
+                }
+            }
+            return name;
+        }
+
         void filter(const std::string& text)
         {
             mShown.clear();
             for (size_t i = 0; i < mAll.size(); ++i)
             {
-                if (ALStringMatch::containsNoCase(mAll[i], text))
+                if (ALStringMatch::containsNoCase(mAll[i], text) || ALStringMatch::containsNoCase(mLabels[i], text))
                 {
                     mShown.push_back(i);
                 }
@@ -135,7 +173,7 @@ namespace
                 {
                     gl_rect_2d(row, picked.get(), name == mChosen);
                 }
-                label_font->renderUTF8(name, 0, row.mLeft + 4, row.mBottom + 5,
+                label_font->renderUTF8(mLabels[mShown[i]], 0, row.mLeft + 4, row.mBottom + 5,
                                        ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
                 // The specimen: the same letters on every row, so that what
                 // differs between two of them is the only thing that differs.
@@ -162,6 +200,25 @@ namespace
             return LLPanel::handleMouseDown(x, y, mask);
         }
 
+        // A double-click is the choice and the yes together.
+        bool handleDoubleClick(S32 x, S32 y, MASK mask) override
+        {
+            const S32 which = at(x, y);
+            if (which >= 0)
+            {
+                mChosen = mAll[mShown[which]];
+                mChose(mChosen);
+                if (mSettle)
+                {
+                    mSettle();
+                }
+                return true;
+            }
+            return LLPanel::handleDoubleClick(x, y, mask);
+        }
+
+        void onDoubleClickSettle(std::function<void()> settle) { mSettle = std::move(settle); }
+
     private:
         LLRect rectOf(S32 index) const
         {
@@ -182,10 +239,12 @@ namespace
         }
 
         std::vector<std::string>            mAll;
+        std::vector<std::string>            mLabels;    // one per name, what the row says
         std::vector<const LLFontGL*>        mFonts;     // one per name, found once
         std::vector<size_t>                 mShown;     // into mAll
         std::string                         mChosen;
         chose_t                             mChose;
+        std::function<void()>               mSettle;
         S32                                 mHover = -1;
     };
 
@@ -199,7 +258,7 @@ namespace
     public:
         AL_VIEW_TYPE(ALFontPopover, ALPopover);
 
-        ALFontPopover(const LLFloater::Params& p, const std::string& name, const std::string& size,
+        ALFontPopover(const LLFloater::Params& p, ALFontField::Families families, const std::string& name, const std::string& size,
                       const std::string& style)
         :   ALPopover(p),
             mName(name),
@@ -231,12 +290,13 @@ namespace
             lp.name = "fonts";
             lp.rect = LLRect(0, LIST_HEIGHT, right - 4 - 20, 0);
             lp.background_visible = false;
-            mList = new ALFontList(lp, [this](const std::string& chosen)
+            mList = new ALFontList(lp, families, mName, [this](const std::string& chosen)
             {
                 mName = chosen;
                 refreshPreview();
             });
             mList->setChosen(mName);
+            mList->onDoubleClickSettle([this]() { settle(); });
             scroll->addChild(mList);
             top -= LIST_HEIGHT + 6;
 
@@ -303,8 +363,34 @@ namespace
             pp.h_pad = 6;
             mPreview = LLUICtrlFactory::create<LLTextBox>(pp);
             addChild(mPreview);
+            top -= PREVIEW_HEIGHT + 6;
+
+            // The way out that keeps what was picked, and the one that
+            // does not; looking away is the second.
+            LLButton::Params ok;
+            ok.name = "ok";
+            ok.label = LLTrans::getString("FontFieldOK");
+            ok.rect = LLRect(right - 80, top, right, top - ROW);
+            ok.commit_callback.function = [this](LLUICtrl*, const LLSD&) { settle(); };
+            addChild(LLUICtrlFactory::create<LLButton>(ok));
+            LLButton::Params cancel;
+            cancel.name = "cancel";
+            cancel.label = LLTrans::getString("FontFieldCancel");
+            cancel.rect = LLRect(right - 80 - 6 - 80, top, right - 80 - 6, top - ROW);
+            cancel.commit_callback.function = [this](LLUICtrl*, const LLSD&) { escape(); };
+            addChild(LLUICtrlFactory::create<LLButton>(cancel));
             refreshPreview();
         }
+
+        // Only OK settles; escape, cancel and looking away keep what the
+        // field had, so that what a person sees applied is what they said
+        // yes to.
+        void settle()
+        {
+            mSettled = true;
+            ALPopover::settle();
+        }
+        bool settled() const { return mSettled; }
 
         // What was picked, as the three attributes it is.
         const std::string& name() const { return mName; }
@@ -312,14 +398,26 @@ namespace
         const std::string& style() const { return mStyle; }
 
     private:
+        // The preview says what is chosen, in it: the name, the size and
+        // the style as words, then the specimen.
         void refreshPreview()
         {
             mList->setChosen(mName);
             LLStyle::Params style;
             style.font = fontOf(mName, mSize, mStyle);
-            mPreview->setText(SPECIMEN, style);
+            std::string said = mList->labelOf(mName);
+            if (!mSize.empty())
+            {
+                said += " " + mSize;
+            }
+            if (!mStyle.empty())
+            {
+                said += " " + mStyle;
+            }
+            mPreview->setText(said + "  " + SPECIMEN, style);
         }
 
+        bool                mSettled = false;
         std::string         mName;
         std::string         mSize;
         std::string         mStyle;
@@ -331,7 +429,9 @@ namespace
 }
 
 ALFontField::Params::Params()
-:   sample_width("sample_width", 26)
+:   sample_width("sample_width", 26),
+    families("families", "declared"),
+    editable("editable", true)
 {
 }
 
@@ -339,14 +439,23 @@ ALFontField::ALFontField(const Params& p)
 :   LLUICtrl(p),
     mSampleWidth(p.sample_width)
 {
-    LLLineEditor::Params ep;
-    ep.name = "text";
-    ep.rect = LLRect(mSampleWidth + 3, getRect().getHeight(), getRect().getWidth(), 0);
-    ep.follows.flags = FOLLOWS_ALL;
-    ep.commit_on_focus_lost = true;
-    mEditor = LLUICtrlFactory::create<LLLineEditor>(ep);
-    mEditor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onTextCommit(); });
-    addChild(mEditor);
+    const std::string& families = p.families();
+    mFamilies = families == "selectable"   ? Families::Selectable
+                : families == "monospace"    ? Families::Monospace
+                : families == "proportional" ? Families::Proportional
+                                             : Families::Declared;
+    mEditable = p.editable;
+    if (mEditable)
+    {
+        LLLineEditor::Params ep;
+        ep.name = "text";
+        ep.rect = LLRect(mSampleWidth + 3, getRect().getHeight(), getRect().getWidth(), 0);
+        ep.follows.flags = FOLLOWS_ALL;
+        ep.commit_on_focus_lost = true;
+        mEditor = LLUICtrlFactory::create<LLLineEditor>(ep);
+        mEditor->setCommitCallback([this](LLUICtrl*, const LLSD&) { onTextCommit(); });
+        addChild(mEditor);
+    }
     refreshText();
 }
 
@@ -398,6 +507,28 @@ void ALFontField::refreshText()
     mFont = fontOf(mName, mSize, mStyle);
 }
 
+std::string ALFontField::describe() const
+{
+    std::string said = mName;
+    for (const LLFontRegistry::FamilyInfo& family : LLFontGL::getAvailableFamilies())
+    {
+        if (family.name == mName && !family.label.empty())
+        {
+            said = family.label;
+            break;
+        }
+    }
+    if (!mSize.empty())
+    {
+        said += " " + mSize;
+    }
+    if (!mStyle.empty())
+    {
+        said += " " + mStyle;
+    }
+    return said;
+}
+
 void ALFontField::draw()
 {
     static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
@@ -406,12 +537,20 @@ void ALFontField::draw()
     gl_rect_2d(sample, edge.get(), false);
     font()->renderUTF8(SAMPLE, 0, sample.mLeft + 3, sample.mBottom + 2,
                        ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM);
+    if (!mEditable)
+    {
+        // The choice, said in itself, where the name would be typed.
+        const LLRect box(mSampleWidth + 3, getRect().getHeight() - 2, getRect().getWidth(), 2);
+        gl_rect_2d(box, edge.get(), false);
+        font()->renderUTF8(describe(), 0, box.mLeft + 6, box.mBottom + 2, ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, box.getWidth() - 8, nullptr, true);
+    }
     LLUICtrl::draw();
 }
 
 bool ALFontField::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    if (x < mSampleWidth)
+    if (!mEditable || x < mSampleWidth)
     {
         openPopover();
         return true;
@@ -456,15 +595,16 @@ void ALFontField::openPopover()
 {
     closePopover();
 
-    static constexpr S32 POPOVER_HEIGHT = 4 + ROW + 4 + LIST_HEIGHT + 6 + ROW + 4 + ROW + 4 + PREVIEW_HEIGHT + 4;
+    static constexpr S32 POPOVER_HEIGHT = 4 + ROW + 4 + LIST_HEIGHT + 6 + ROW + 4 + ROW + 4 + PREVIEW_HEIGHT + 6 + ROW + 4;
     ALFontPopover* popover = new ALFontPopover(ALPopover::paramsFor(POPOVER_WIDTH, POPOVER_HEIGHT),
-                                               mName, mSize, mStyle);
+                                               mFamilies, mName, mSize, mStyle);
     mPopover = popover->getDerivedHandle<ALPopover>();
-    // Told as it goes, while it still holds what was picked; escaped is
-    // the one way out that keeps what the field had.
-    popover->onClosed([this, held = popover->getDerivedHandle<ALFontPopover>()](bool escaped)
+    // Told as it goes, while it still holds what was picked; only OK, or
+    // a double-click on a font, is a yes -- escape, cancel and looking
+    // away keep what the field had.
+    popover->onClosed([this, held = popover->getDerivedHandle<ALFontPopover>()](bool)
     {
-        if (ALFontPopover* said = held.get(); said && !escaped)
+        if (ALFontPopover* said = held.get(); said && said->settled())
         {
             apply(said->name(), said->size(), said->style());
         }

@@ -40,19 +40,38 @@ class LLLineEditor;
 // So this shows what the three come to, drawn in the font they name, and
 // opens the three lists over whatever is under it.
 //
-// The popover is a floater of its own, closed by clicking away or by
-// escape, because a field in a property grid inside a scroll container has
-// no room to drop a list. Choosing is not committing: the three are picked
-// against a preview and written when the popover goes, so one visit to it
-// is one change to the file rather than three.
+// The popover is a floater of its own, because a field in a property
+// grid inside a scroll container has no room to drop a list. Choosing is
+// not committing: the three are picked against a preview that says what
+// is chosen, and written together when OK is pressed (or a font
+// double-clicked), so one visit to it is one change to the file rather
+// than three; escape, Cancel and clicking away keep what the field had.
 class ALFontField : public LLUICtrl
 {
 public:
     AL_VIEW_TYPE(ALFontField, LLUICtrl);
 
+    // Which names the list offers. A file may write any declared name,
+    // which is what a XUI author needs; a preference offers the families
+    // fonts.xml marks for people to choose from, and some only the
+    // monospace ones, or only the proportional.
+    enum class Families : U8
+    {
+        Declared,
+        Selectable,
+        Monospace,
+        Proportional
+    };
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
-        Optional<S32> sample_width;
+        Optional<S32>         sample_width;
+        // "declared", "selectable", "monospace" or "proportional".
+        Optional<std::string> families;
+        // Whether the name may be typed, as a XUI author types one; a
+        // preference shows the choice instead, drawn in the font, and
+        // opens the popover wherever it is clicked.
+        Optional<bool>        editable;
         Params();
     };
 
@@ -94,11 +113,15 @@ private:
     void apply(const std::string& name, const std::string& size, const std::string& style);
     void onTextCommit();
     void refreshText();
+    // The choice as words: the family's label, the size and the style.
+    std::string describe() const;
 
     std::string             mName;
     std::string             mSize;
     std::string             mStyle;
     S32                     mSampleWidth;
+    Families                mFamilies = Families::Declared;
+    bool                    mEditable = true;
     // The face the three parts name, found when one of them changes.
     const LLFontGL*         mFont = nullptr;
     LLLineEditor*           mEditor = nullptr;

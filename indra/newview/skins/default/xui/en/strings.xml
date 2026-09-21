@@ -347,6 +347,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="FontFieldBold">Bold</string>
 	<string name="FontFieldItalic">Italic</string>
 	<string name="FontFieldUnderline">Underline</string>
+	<string name="FontFieldOK">OK</string>
+	<string name="FontFieldCancel">Cancel</string>
 
 	<!-- A setting row's button back to its default, alsettingrow.cpp -->
 	<string name="SettingRowReset">Reset to [VALUE]</string>
