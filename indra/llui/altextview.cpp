@@ -2364,6 +2364,9 @@ bool ALTextView::showUrlMenu(S32 x, S32 y, const std::string& url)
         return false;
     }
     mUrlMenuHandle = menu->getHandle();
+    // Whether the agent is a friend, the object blocked or near: what
+    // the viewer installed says.
+    LLUrlAction::adjustMenu(menu, url);
     S32 screen_x, screen_y;
     localPointToScreen(x, y, &screen_x, &screen_y);
     menu->show(screen_x, screen_y, this);

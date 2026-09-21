@@ -38,6 +38,9 @@ LLUrlAction::url_callback_t         LLUrlAction::sOpenURLCallback;
 LLUrlAction::url_callback_t         LLUrlAction::sOpenURLInternalCallback;
 LLUrlAction::url_callback_t         LLUrlAction::sOpenURLExternalCallback;
 LLUrlAction::execute_url_callback_t LLUrlAction::sExecuteSLURLCallback;
+LLUrlAction::id_query_t             LLUrlAction::sIsFriendCallback;
+LLUrlAction::named_query_t          LLUrlAction::sIsObjectBlockedCallback;
+LLUrlAction::id_query_t             LLUrlAction::sIsObjectReachableCallback;
 
 
 void LLUrlAction::setOpenURLCallback(url_callback_t cb)
@@ -58,6 +61,92 @@ void LLUrlAction::setOpenURLExternalCallback(url_callback_t cb)
 void LLUrlAction::setExecuteSLURLCallback(execute_url_callback_t cb)
 {
     sExecuteSLURLCallback = cb;
+}
+
+void LLUrlAction::setIsFriendCallback(id_query_t cb)
+{
+    sIsFriendCallback = std::move(cb);
+}
+
+void LLUrlAction::setIsObjectBlockedCallback(named_query_t cb)
+{
+    sIsObjectBlockedCallback = std::move(cb);
+}
+
+void LLUrlAction::setIsObjectReachableCallback(id_query_t cb)
+{
+    sIsObjectReachableCallback = std::move(cb);
+}
+
+std::optional<bool> LLUrlAction::isFriend(const std::string& url)
+{
+    if (!sIsFriendCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsFriendCallback(LLUUID(getUserID(url)));
+}
+
+std::optional<bool> LLUrlAction::isObjectBlocked(const std::string& url)
+{
+    if (!sIsObjectBlockedCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsObjectBlockedCallback(LLUUID(getObjectId(url)), getObjectName(url));
+}
+
+std::optional<bool> LLUrlAction::isObjectReachable(const std::string& url)
+{
+    if (!sIsObjectReachableCallback)
+    {
+        return std::nullopt;
+    }
+    return sIsObjectReachableCallback(LLUUID(getObjectId(url)));
+}
+
+void LLUrlAction::adjustMenu(LLView* menu, const std::string& url, bool friends, bool blocked, bool reachable)
+{
+    if (!menu)
+    {
+        return;
+    }
+    if (friends)
+    {
+        LLView* add    = menu->findChild<LLView>("add_friend");
+        LLView* remove = menu->findChild<LLView>("remove_friend");
+        if (add && remove)
+        {
+            if (const std::optional<bool> is_friend = isFriend(url))
+            {
+                add->setEnabled(!*is_friend);
+                remove->setEnabled(*is_friend);
+            }
+        }
+    }
+    if (blocked)
+    {
+        LLView* block   = menu->findChild<LLView>("block_object");
+        LLView* unblock = menu->findChild<LLView>("unblock_object");
+        if (block && unblock)
+        {
+            if (const std::optional<bool> is_blocked = isObjectBlocked(url))
+            {
+                block->setVisible(!*is_blocked);
+                unblock->setVisible(*is_blocked);
+            }
+        }
+    }
+    if (reachable)
+    {
+        if (LLView* zoom = menu->findChild<LLView>("zoom_in"))
+        {
+            if (const std::optional<bool> is_reachable = isObjectReachable(url))
+            {
+                zoom->setEnabled(*is_reachable);
+            }
+        }
+    }
 }
 
 void LLUrlAction::openURL(std::string url)

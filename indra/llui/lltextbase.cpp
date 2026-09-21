@@ -2450,6 +2450,9 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
                 zoom_btn->setEnabled(is_reachable);
             }
         }
+        // What the widget has no answer of its own to, the viewer's
+        // answer decides, where it has installed one.
+        LLUrlAction::adjustMenu(menu, url, !mIsFriendSignal, !mIsObjectBlockedSignal, !mIsObjectReachableSignal);
         menu->show(x, y);
         LLMenuGL::showPopup(this, menu, x, y);
     }

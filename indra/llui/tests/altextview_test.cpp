@@ -29,7 +29,9 @@
 
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
+#include "../llpanel.h"
 #include "../lluictrlfactory.h"
+#include "../llurlaction.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -674,5 +676,53 @@ namespace tut
         ensure("a capital first letter is still a word", v.misspellings(0).size() == 1);
         v.setReadOnly(true);
         ensure("nothing is checked in a read-only view", !v.getSpellCheck());
+    }
+
+    template<> template<>
+    void altextview_object::test<20>()
+    {
+        set_test_name("a URL's menu is put right by what the viewer installed once: friend, blocked, near; and left alone where nothing is known");
+        if (!ui.ok())
+        {
+            skip("no UI");
+        }
+        LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        pp.name = "menu";
+        pp.rect = LLRect(0, 100, 100, 0);
+        LLPanel* menu = LLUICtrlFactory::create<LLPanel>(pp);
+        for (const char* name : { "add_friend", "remove_friend", "block_object", "unblock_object", "zoom_in" })
+        {
+            LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+            bp.name = name;
+            bp.rect = LLRect(0, 10, 50, 0);
+            menu->addChild(LLUICtrlFactory::create<LLButton>(bp));
+        }
+        const std::string agent  = "secondlife:///app/agent/11111111-1111-1111-1111-111111111111/about";
+        const std::string object = "secondlife:///app/objectim/22222222-2222-2222-2222-222222222222?name=Thing";
+        // Nothing installed: nothing changes.
+        LLUrlAction::setIsFriendCallback(nullptr);
+        LLUrlAction::setIsObjectBlockedCallback(nullptr);
+        LLUrlAction::setIsObjectReachableCallback(nullptr);
+        ensure("unknown without a callback", !LLUrlAction::isFriend(agent).has_value());
+        LLUrlAction::adjustMenu(menu, agent);
+        ensure("both friend items stay enabled", menu->getChild<LLView>("add_friend")->getEnabled() && menu->getChild<LLView>("remove_friend")->getEnabled());
+        // Installed: the menu follows the answers.
+        LLUrlAction::setIsFriendCallback([](const LLUUID& id) { return id == LLUUID("11111111-1111-1111-1111-111111111111"); });
+        LLUrlAction::setIsObjectBlockedCallback([](const LLUUID&, const std::string& name) { return name == "Thing"; });
+        LLUrlAction::setIsObjectReachableCallback([](const LLUUID&) { return false; });
+        ensure("a friend", LLUrlAction::isFriend(agent) == std::optional<bool>(true));
+        LLUrlAction::adjustMenu(menu, agent);
+        ensure("add is off, remove on", !menu->getChild<LLView>("add_friend")->getEnabled() && menu->getChild<LLView>("remove_friend")->getEnabled());
+        LLUrlAction::adjustMenu(menu, object);
+        ensure("blocked: unblock shown, block hidden", !menu->getChild<LLView>("block_object")->getVisible() && menu->getChild<LLView>("unblock_object")->getVisible());
+        ensure("out of reach: no zoom", !menu->getChild<LLView>("zoom_in")->getEnabled());
+        // A widget with an answer of its own to one keeps it.
+        menu->getChild<LLView>("zoom_in")->setEnabled(true);
+        LLUrlAction::adjustMenu(menu, object, true, true, false);
+        ensure("the zoom item left alone when not asked", menu->getChild<LLView>("zoom_in")->getEnabled());
+        LLUrlAction::setIsFriendCallback(nullptr);
+        LLUrlAction::setIsObjectBlockedCallback(nullptr);
+        LLUrlAction::setIsObjectReachableCallback(nullptr);
+        menu->die();
     }
 }

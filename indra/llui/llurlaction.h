@@ -29,7 +29,11 @@
 #define LL_LLURLACTION_H
 
 #include <functional>
+#include <optional>
 #include <string>
+
+class LLUUID;
+class LLView;
 
 ///
 /// The LLUrlAction class provides a number of static functions that
@@ -105,6 +109,29 @@ public:
     static void setOpenURLExternalCallback(url_callback_t cb);
     static void setExecuteSLURLCallback(execute_url_callback_t cb);
 
+    // What the viewer knows of who and what a URL names, for the menus a
+    // URL offers: whether the agent is a friend, whether the object is
+    // blocked, whether it is near enough to zoom to. Installed once by
+    // the viewer, as the openers are, rather than by every text widget
+    // that might show a menu; nothing is known until they are.
+    typedef std::function<bool(const LLUUID& id)>                          id_query_t;
+    typedef std::function<bool(const LLUUID& id, const std::string& name)> named_query_t;
+
+    static void setIsFriendCallback(id_query_t cb);
+    static void setIsObjectBlockedCallback(named_query_t cb);
+    static void setIsObjectReachableCallback(id_query_t cb);
+
+    static std::optional<bool> isFriend(const std::string& url);
+    static std::optional<bool> isObjectBlocked(const std::string& url);
+    static std::optional<bool> isObjectReachable(const std::string& url);
+
+    // A URL's menu put right by what is known: add_friend and
+    // remove_friend enabled by whether the agent is one, block_object
+    // and unblock_object shown by whether the object is, zoom_in
+    // enabled by whether it is near. Each only where asked and known;
+    // a widget with an answer of its own leaves that one out.
+    static void adjustMenu(LLView* menu, const std::string& url, bool friends = true, bool blocked = true, bool reachable = true);
+
 private:
     // callbacks for operations we can perform on Urls
     static url_callback_t sOpenURLCallback;
@@ -112,6 +139,10 @@ private:
     static url_callback_t sOpenURLExternalCallback;
 
     static execute_url_callback_t sExecuteSLURLCallback;
+
+    static id_query_t    sIsFriendCallback;
+    static named_query_t sIsObjectBlockedCallback;
+    static id_query_t    sIsObjectReachableCallback;
 };
 
 #endif
