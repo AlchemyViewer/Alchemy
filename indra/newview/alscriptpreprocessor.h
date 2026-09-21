@@ -91,6 +91,15 @@ public:
     // Runs with what is in hand, the rest noted as pending: for the
     // analyzers, which cannot wait.
     ALPreprocessor::Result runNow(const Request& request);
+    // The language mode the `.luaurc` governing a SLua script gives it,
+    // from what is in hand: "strict", "nonstrict" or "nocheck", or
+    // nothing where there is no configuration, or it is not in yet. A
+    // run fetches the configuration along with the includes.
+    std::string modeFor(const Request& request);
+    // The configuration fetched where it is in the world and not in hand,
+    // and `fetched` called once it is; nothing where it is in hand, or
+    // there is none.
+    void fetchConfig(const Request& request, std::function<void()> fetched);
 
     // An include's identity back to the item it names, or the file; and
     // an item's identity, as the source map would name it.
@@ -129,6 +138,9 @@ private:
     ALPreprocessor::Result attempt(const Request& request, std::set<std::string>* wanted, bool optimize);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
     void                    attemptJob(const std::shared_ptr<Job>& job);
+    // An include by its identity, loaded into the cache -- or noted as
+    // failed -- and `done` called either way.
+    void                    fetch(const std::string& path, std::function<void()> done);
 
     std::map<std::string, Cached>                          mTexts;
     std::set<std::string>                                  mFailed;

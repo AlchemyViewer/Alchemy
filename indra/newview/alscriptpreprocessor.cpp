@@ -593,7 +593,30 @@ ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std
     options.resolve                 = [this, &request, wanted](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
         return resolve(ask, out, request, wanted);
     };
+    if (request.lua && wanted)
+    {
+        // The script's own `.luaurc` fetched with its includes, whether
+        // or not a require goes through it: its mode is wanted anyway.
+        std::string path, text;
+        configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, wanted, path, text);
+    }
     return ALPreprocessor::run(request.source, options);
+}
+
+std::string ALScriptPreprocessor::modeFor(const Request& request)
+{
+    if (!request.lua)
+    {
+        return std::string();
+    }
+    std::string path, text;
+    if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, nullptr, path, text) != ALPreprocessor::Found::Yes)
+    {
+        return std::string();
+    }
+    ALLuauConfig config;
+    std::string  error;
+    return ALLuauConfig::parse(text, config, error) ? config.mode : std::string();
 }
 
 ALPreprocessor::Result ALScriptPreprocessor::runNow(const Request& request)
@@ -640,38 +663,60 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     job->outstanding = S32(wanted.size());
     for (const std::string& path : wanted)
     {
-        ALScriptRef ref;
-        if (!refOf(path, ref))
-        {
-            mFailed.insert(path);
-            if (--job->outstanding == 0)
-            {
-                attemptJob(job);
-            }
-            continue;
-        }
-        ALScriptWorkspace::instance().load(ref, [this, job, path](const ALScriptWorkspace::Loaded& loaded) {
-            if (!loaded.error.empty())
-            {
-                mFailed.insert(path);
-            }
-            else
-            {
-                // An include saved with the preprocessor on is its source.
-                Cached cached;
-                cached.assetId = loaded.assetId;
-                cached.text    = loaded.text;
-                if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(loaded.text))
-                {
-                    cached.text = envelope->source;
-                }
-                mTexts[path] = std::move(cached);
-                mFailed.erase(path);
-            }
+        fetch(path, [this, job]() {
             if (--job->outstanding == 0)
             {
                 attemptJob(job);
             }
         });
+    }
+}
+
+void ALScriptPreprocessor::fetch(const std::string& path, std::function<void()> done)
+{
+    ALScriptRef ref;
+    if (!refOf(path, ref))
+    {
+        mFailed.insert(path);
+        done();
+        return;
+    }
+    ALScriptWorkspace::instance().load(ref, [this, path, done](const ALScriptWorkspace::Loaded& loaded) {
+        if (!loaded.error.empty())
+        {
+            mFailed.insert(path);
+        }
+        else
+        {
+            // An include saved with the preprocessor on is its source.
+            Cached cached;
+            cached.assetId = loaded.assetId;
+            cached.text    = loaded.text;
+            if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(loaded.text))
+            {
+                cached.text = envelope->source;
+            }
+            mTexts[path] = std::move(cached);
+            mFailed.erase(path);
+        }
+        done();
+    });
+}
+
+void ALScriptPreprocessor::fetchConfig(const Request& request, std::function<void()> fetched)
+{
+    if (!request.lua)
+    {
+        return;
+    }
+    std::set<std::string> wanted;
+    std::string           path, text;
+    if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, &wanted, path, text) != ALPreprocessor::Found::Pending || wanted.empty())
+    {
+        return;
+    }
+    for (const std::string& want : wanted)
+    {
+        fetch(want, fetched);
     }
 }

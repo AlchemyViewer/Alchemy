@@ -170,7 +170,7 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             switch (request.kind)
             {
                 case Kind::Check:
-                    result.problems = mWorker->luau.check(request.text);
+                    result.problems = mWorker->luau.check(request.text, request.mode);
                     result.outline  = mWorker->luau.outline(request.text);
                     if (request.semantics)
                     {

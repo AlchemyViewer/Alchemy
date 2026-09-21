@@ -207,6 +207,9 @@ private:
         Expanded                                   uploaded;
         // A save waiting on the preprocessor.
         bool                                       preprocessing = false;
+        // Whether the script's `.luaurc` was asked for once, so that a
+        // script with none is not asked for it at every check.
+        bool                                       configAsked = false;
         // What the compiler said of the last save.
         std::vector<ALScriptWorkspace::Diagnostic> problems;
         // What the script said as it ran, since it was last saved or
@@ -431,6 +434,16 @@ private:
     // A file's text is what is on disk now, however it got there: the
     // editor is clean, and the scripts that include it are expanded again.
     void                          fileSettled(Doc& doc);
+    // The file watched for changes made outside the studio: taken in
+    // where the editor is clean, told of where it is not.
+    void                          watchFile(Doc& doc);
+    void                          fileChangedOutside(const std::string& id, const std::string& file);
+    // A file chosen from disk, opened in a tab of its own.
+    void                          openFileFromDisk();
+    // The inspector's words about the symbol at the caret: the text, with
+    // every URL in it a link, and the line it says the symbol is
+    // declared on a link to the line, where it says one.
+    void                          showSymbol(const std::string& text, S32 declared_line = -1);
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void takeCarriedText(Doc& doc);
@@ -696,7 +709,7 @@ private:
     LLFilterEditor*                    mProblemFilter   = nullptr;
     LLScrollListCtrl*                  mReferences    = nullptr;
     LLScrollListCtrl*                  mOutline       = nullptr;
-    LLTextEditor*                      mSymbol        = nullptr;
+    ALTextView*                        mSymbol        = nullptr;
     ALOutputView*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;

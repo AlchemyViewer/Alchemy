@@ -427,7 +427,16 @@ bool ALFloaterScriptStudio::postBuild()
     mProblems      = getChild<LLScrollListCtrl>("problems");
     mReferences    = getChild<LLScrollListCtrl>("references");
     mOutline       = getChild<LLScrollListCtrl>("outline");
-    mSymbol        = getChild<LLTextEditor>("symbol");
+    mSymbol        = getChild<ALTextView>("symbol");
+    mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) {
+        // The declaration's line, in the script the inspector is about.
+        Doc* doc = active();
+        if (doc && link.value.has("line"))
+        {
+            doc->editor->goToLine(link.value["line"].asInteger());
+            doc->editor->setFocus(true);
+        }
+    });
     mOutput        = getChild<ALOutputView>("output");
     mOutputFilter  = getChild<LLComboBox>("output_filter");
     mExplorer      = getChild<LLScrollListCtrl>("explorer");
@@ -1209,12 +1218,16 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         doc->file = path;
         doc->id   = id;
         doc->name = gDirUtilp->getBaseFileName(path);
-        // The language its extension says, else the one it was asked for from.
-        const std::string extension = gDirUtilp->getExtension(path);
+        // The language its extension says; else the one it was asked for
+        // from, where it was; else plain text.
+        std::string extension = gDirUtilp->getExtension(path);
+        LLStringUtil::toLower(extension);
+        const bool script           = extension == "lsl" || extension == "lua" || extension == "luau" || lua;
         doc->language.lua           = extension == "lua" || extension == "luau" || (extension != "lsl" && lua);
         doc->language.compileTarget = doc->language.lua ? "luau" : "mono";
+        doc->notecard               = !script;
         doc->editor                 = makeEditor(doc->id, false);
-        doc->editor->setSyntax(doc->language.lua ? "slua" : "lsl");
+        doc->editor->setSyntax(!script ? "text" : doc->language.lua ? "slua" : "lsl");
         doc->editor->setText(buffer.str());
         doc->loaded     = true;
         doc->modifiable = true;
@@ -1226,7 +1239,11 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         });
         mDocs.push_back(std::move(doc));
         already = mDocs.size() - 1;
-        teachEditor(*mDocs[already]);
+        if (script)
+        {
+            teachEditor(*mDocs[already]);
+        }
+        watchFile(*mDocs[already]);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = mDocs[already]->name;
         setStatus(getString("Loaded", args));
@@ -1708,6 +1725,27 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     request.semantics      = mSemanticColors;
     request.hintParameters = mInlayParameters;
     request.hintTypes      = mInlayTypes;
+    if (doc.language.lua && kind == ALScriptAnalysis::Kind::Check)
+    {
+        // The mode the script's `.luaurc` gives it, where it has one; one
+        // not in hand yet is fetched, and the check made again when it is.
+        const ALScriptPreprocessor::Request root = preprocessRequest(doc);
+        request.mode                             = ALScriptPreprocessor::instance().modeFor(root);
+        if (request.mode.empty() && !doc.configAsked)
+        {
+            doc.configAsked                  = true;
+            const LLHandle<LLFloater> handle = getHandle();
+            const std::string         id     = doc.id;
+            ALScriptPreprocessor::instance().fetchConfig(root, [handle, id]() {
+                ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                const size_t           index  = studio ? studio->indexOf(id) : NONE;
+                if (index != NONE)
+                {
+                    studio->scheduleAnalysis(*studio->mDocs[index], true);
+                }
+            });
+        }
+    }
     if (preprocessed(doc))
     {
         // The analyzers see what the compiler would; a position inside a
@@ -2148,7 +2186,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     // The studio's own, by the names its menu knows.
     static const std::set<std::string> ours{ "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
-                                             "revert", "external_editor", "save_file", "load_file", "fold_all", "unfold_all", "go_to_line" };
+                                             "revert", "external_editor", "save_file", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
     if (ours.count(name))
     {
         onMenuAction(LLSD(name));
@@ -3703,7 +3741,13 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
         setStatus(getString("ExternalWriteFailed", args), true);
         return;
     }
-    if (!doc.liveFile || doc.liveFile->filename() != filename)
+    if (on_disk)
+    {
+        // Watched since it was opened; a save there comes in as any
+        // outside change does.
+        watchFile(doc);
+    }
+    else if (!doc.liveFile || doc.liveFile->filename() != filename)
     {
         doc.liveFile.reset();
         const LLHandle<LLFloater> handle = getHandle();
@@ -3716,7 +3760,7 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
                     studio->externalChanged(id, file);
                 }
             },
-            !on_disk);
+            true);
         watch->addToEventTimer();
         doc.liveFile = std::move(watch);
     }
@@ -3800,12 +3844,6 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
         doc.carriedText = text;
         takeCarriedText(doc);
     }
-    if (!doc.file.empty())
-    {
-        // The file is what the editor outside saved: nothing to write.
-        fileSettled(doc);
-        return;
-    }
     if (!doc.editor->isDirty() && doc.assetId.notNull())
     {
         return;
@@ -3875,11 +3913,62 @@ void ALFloaterScriptStudio::stopExternal(Doc& doc)
     doc.externalSave = false;
 }
 
+void ALFloaterScriptStudio::watchFile(Doc& doc)
+{
+    if (doc.file.empty() || doc.liveFile)
+    {
+        return;
+    }
+    // The file watched for changes made outside, whoever makes them: an
+    // editor the studio started, or anything else.
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    auto                      watch  = std::make_unique<StudioLiveFile>(
+        doc.file,
+        [handle, id](const std::string& file) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->fileChangedOutside(id, file);
+            }
+        },
+        false);
+    watch->addToEventTimer();
+    doc.liveFile = std::move(watch);
+}
+
+void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std::string& file)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (doc.editor->isDirty())
+    {
+        // What is typed here is not thrown away for it; the author is told.
+        setStatus(getString("FileChangedOutside", args), true);
+        return;
+    }
+    const std::string text = readWholeFile(file);
+    if (text == doc.editor->text())
+    {
+        return;
+    }
+    // Taken as one step to undo, and clean, since it is what the file is.
+    doc.carriedText = text;
+    takeCarriedText(doc);
+    fileSettled(doc);
+    setStatus(getString("FileReloaded", args));
+}
+
 void ALFloaterScriptStudio::saveFile(Doc& doc)
 {
     if (doc.liveFile)
     {
-        // The editor outside watching the file: this write is not its.
+        // The watcher on the file: this write is not an outside change.
         static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
     }
     std::ofstream out(doc.file, std::ios::binary);
@@ -4144,7 +4233,7 @@ void ALFloaterScriptStudio::pumpCaret()
         {
             // No name here; what is wrong here, if anything, still is.
             doc->inspectAt = ALTextPos(-1, -1);
-            mSymbol->setText(problemsAt(*doc, caret));
+            showSymbol(problemsAt(*doc, caret));
         }
         else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
         {
@@ -4209,7 +4298,27 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     {
         text += (text.empty() ? "" : "\n\n") + problems;
     }
+    showSymbol(text, result.hover.found && result.hover.hasDefinition ? result.hover.definitionLine : -1);
+}
+
+void ALFloaterScriptStudio::showSymbol(const std::string& text, S32 declared_line)
+{
     mSymbol->setText(text);
+    const S32 lines = mSymbol->document().lineCount();
+    for (S32 line = 0; line < lines; ++line)
+    {
+        mSymbol->linkUrlsOn(line);
+    }
+    // The declaration's line comes right after the name.
+    if (declared_line >= 0 && lines > 1 && mSymbol->document().lineLength(1) > 0)
+    {
+        ALTextView::Substitution to_line;
+        to_line.range         = ALTextRange(ALTextPos(1, 0), mSymbol->document().lineEnd(1));
+        to_line.link          = true;
+        to_line.tooltip       = getString("InspectDeclaredTip");
+        to_line.value["line"] = declared_line;
+        mSymbol->addSubstitution(std::move(to_line));
+    }
 }
 
 std::string ALFloaterScriptStudio::problemsAt(const Doc& doc, const ALTextPos& at) const
@@ -4288,7 +4397,7 @@ void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
         text += "\n\n" + word.tooltip;
     }
     text += "\n" + helpUrl(lua, word.text);
-    mSymbol->setText(text);
+    showSymbol(text);
 }
 
 void ALFloaterScriptStudio::reference(Doc& doc)
@@ -6149,6 +6258,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         loadFromFile();
     }
+    else if (action == "open_file")
+    {
+        openFileFromDisk();
+    }
     else if (action == "save_file")
     {
         saveToFile();
@@ -6729,6 +6842,22 @@ void ALFloaterScriptStudio::revert(Doc& doc)
             studio->loaded(answer);
         }
     });
+}
+
+void ALFloaterScriptStudio::openFileFromDisk()
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    LLFilePickerReplyThread::startPicker(
+        [handle](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                for (const std::string& file : files)
+                {
+                    studio->openFile(file, false);
+                }
+            }
+        },
+        LLFilePicker::FFLOAD_SCRIPT, true);
 }
 
 void ALFloaterScriptStudio::loadFromFile()

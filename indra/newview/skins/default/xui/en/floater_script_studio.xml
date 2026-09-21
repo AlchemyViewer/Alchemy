@@ -21,6 +21,8 @@
     <floater.string name="CompileFailed">[NAME] did not compile: [COUNT] problem(s).</floater.string>
     <floater.string name="SaveFailed">[NAME] was not saved: [ERROR]</floater.string>
     <floater.string name="SavedToFile">Written to [PATH]</floater.string>
+    <floater.string name="FileReloaded">[NAME] changed on disk and was read again.</floater.string>
+    <floater.string name="FileChangedOutside">[NAME] changed on disk while it was being edited here; saving will overwrite it.</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
@@ -90,6 +92,7 @@
     <floater.string name="VimNormal">-- NORMAL --</floater.string>
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
+    <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
@@ -255,6 +258,9 @@
                 </menu_item_call>
             </menu>
             <menu_item_separator layout="topleft" />
+            <menu_item_call label="Open File..." layout="topleft" name="open_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="open_file" />
+            </menu_item_call>
             <menu_item_call label="Load from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
@@ -1178,13 +1184,13 @@
                  name="symbol_panel"
                  user_resize="true"
                  width="250">
-                    <text_editor
+                    <text_view
                      follows="all"
+                     font="SansSerif"
                      height="154"
                      layout="topleft"
                      left="0"
                      name="symbol"
-                     parse_urls="true"
                      read_only="true"
                      tool_tip="The symbol at the caret: its declaration, its documentation and its page on the wiki; F1 asks for a word, and the Help menu browses the whole reference"
                      top="0"
