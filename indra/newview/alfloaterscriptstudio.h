@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alfindings.h"
+#include "aloutputview.h"
 #include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
@@ -45,7 +46,6 @@
 #include <vector>
 
 class ALJumpBar;
-class ALOutputList;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -160,7 +160,15 @@ private:
     struct Doc
     {
         ALScriptRef                                ref;
-        // The script's id, or the script's id and ":source".
+        // A file on disk rather than an item in the world -- an include
+        // the preprocessor read from a folder -- by its path; `ref` is
+        // then nobody's. Its tab is its base name, a save writes it
+        // back and expands the scripts that include it again, and
+        // nothing in the world hears of it. A Lua file is analysed as
+        // the module it is; an LSL one is a fragment, and is not.
+        std::string                                file;
+        // The script's id, or the script's id and ":source"; a file's
+        // is `disk:` and its path.
         std::string                                id;
         std::string                                name;
         ALCodeEditor*                              editor = nullptr;
@@ -413,6 +421,16 @@ private:
     static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
     std::string                   includeName(const Doc& doc, const std::string& path) const;
     void                          chooseIncludeFolder();
+    // A file on disk opened in a tab of its own, or brought forward, at
+    // a place in it where one is given; read as the language its
+    // extension says, or the one it was included from.
+    void                          openFile(const std::string& path, bool lua, S32 line = -1, S32 column = -1, S32 length = 0);
+    // A file's text written back where it came from; the scripts that
+    // include it are expanded again.
+    void                          saveFile(Doc& doc);
+    // A file's text is what is on disk now, however it got there: the
+    // editor is clean, and the scripts that include it are expanded again.
+    void                          fileSettled(Doc& doc);
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void takeCarriedText(Doc& doc);
@@ -504,7 +522,7 @@ private:
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
     void onOutputFilter();
-    void onOutputChosen();
+    void onOutputChosen(const ALOutputView::Entry& entry);
 
     // The explorer: the objects in hand -- pinned, selected in world, or
     // holding a script that is open -- each prim's scripts and notecards
@@ -649,6 +667,9 @@ private:
     bool                               mSemanticColors  = true;
     bool                               mInlayParameters = true;
     bool                               mInlayTypes      = true;
+    // The words the dictionary lacks squiggled: in comments and strings
+    // of a script, throughout a notecard.
+    bool                               mSpellCheck      = true;
     // Vim over every editor: the mode in the bottom strip, the : line
     // and what it says in the status line, and w, q and the rest
     // answered here.
@@ -676,7 +697,7 @@ private:
     LLScrollListCtrl*                  mReferences    = nullptr;
     LLScrollListCtrl*                  mOutline       = nullptr;
     LLTextEditor*                      mSymbol        = nullptr;
-    ALOutputList*                      mOutput        = nullptr;
+    ALOutputView*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;
     LLScrollListCtrl*                  mSearchResults = nullptr;

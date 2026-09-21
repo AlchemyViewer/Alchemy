@@ -49,6 +49,13 @@
 //
 // An include's identity, as the source map names it, says where it came
 // from: `object:<prim>:<item>`, `inventory:<item>`, or `disk:<path>`.
+//
+// A SLua `require("@name/rest")` goes through the `.luaurc` that governs
+// the asking file -- the notecard so named in its folder or the nearest
+// folder above, in inventory; the item so named in its object; the file
+// so named in its directory or the nearest above, on disk -- whose
+// alias `name` stands for a path from beside it, so that the name reads
+// as `./path/rest` from the configuration's own folder.
 class ALScriptPreprocessor : public LLSingleton<ALScriptPreprocessor>
 {
     LLSINGLETON(ALScriptPreprocessor);
@@ -63,6 +70,10 @@ public:
     struct Request
     {
         ALScriptRef ref;
+        // The script's own identity, where it is not the item `ref`
+        // names: a file on disk, as `disk:<path>`. A name relative to
+        // the script itself is taken from here.
+        std::string path;
         // The script's name and asset, for `__SHORTFILE__` and `__ASSETID__`.
         std::string name;
         LLUUID      assetId;
@@ -108,6 +119,13 @@ private:
     // a name not found may still be there.
     std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown) const;
     ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, std::set<std::string>* wanted);
+    // The `.luaurc` that governs a file, by the file's identity: its own
+    // identity and its text, fetched like an include where it is in the
+    // world. No where there is none.
+    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, std::set<std::string>* wanted, std::string& path, std::string& text);
+    // An include's text, from the cache or a file; Pending, and wanted,
+    // where it is in the world and not in hand yet.
+    ALPreprocessor::Found  textOf(const Candidate& candidate, std::set<std::string>* wanted, std::string& text, std::string& assetId);
     ALPreprocessor::Result attempt(const Request& request, std::set<std::string>* wanted, bool optimize);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
     void                    attemptJob(const std::shared_ptr<Job>& job);

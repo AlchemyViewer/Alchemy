@@ -140,13 +140,14 @@
     <floater.string name="KindState">state</floater.string>
     <floater.string name="KindLabel">label</floater.string>
     <floater.string name="KindModule">module</floater.string>
-    <floater.string name="KindDebug">debug</floater.string>
     <floater.string name="KindOwnerSay">owner</floater.string>
     <floater.string name="KindError">error</floater.string>
     <floater.string name="OriginRuntime">Runtime</floater.string>
     <floater.string name="OriginAny">Every source</floater.string>
     <floater.string name="ProblemsShown">[SHOWN] of [TOTAL] problems shown; the filters hide the rest.</floater.string>
     <floater.string name="OutputAllObjects">All objects</floater.string>
+    <floater.string name="OutputOpen">Open [NAME]</floater.string>
+    <floater.string name="OutputOpenAtLine">Open [NAME] at line [LINE]</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
@@ -159,7 +160,6 @@
     <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
     <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
     <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; its saves are saved from here.</floater.string>
-    <floater.string name="IncludeOnDisk">[FILE] is a file on disk.</floater.string>
     <floater.string name="IncludeGone">[FILE] is not there any more.</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
@@ -475,6 +475,10 @@
             <menu_item_check label="Type Hints" layout="topleft" name="inlay_types">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_types" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_types" />
+            </menu_item_check>
+            <menu_item_check label="Spell Check" layout="topleft" name="spell_check">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="spell_check" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="spell_check" />
             </menu_item_check>
             <menu_item_call label="Preferences..." layout="topleft" name="preferences">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
@@ -1070,20 +1074,15 @@
                              tool_tip="Forget what was said so far"
                              top_delta="0"
                              width="60" />
-                            <output_list
+                            <output_view
                              follows="all"
                              height="82"
                              layout="topleft"
                              left="0"
                              name="output"
-                             tool_tip="What the scripts said on the debug channel and to their owner; choosing a run-time error goes to its line, opening the script if need be"
+                             tool_tip="What the scripts said on the debug channel and to their owner; a script's name is a link to it, at the line of a run-time error, and a URL in what was said is one too"
                              top_pad="2"
-                             width="574">
-                                <output_list.columns label="Time" name="time" width="70" />
-                                <output_list.columns label="Object" name="source" width="180" />
-                                <output_list.columns label="Kind" name="kind" width="60" />
-                                <output_list.columns dynamic_width="true" label="Text" name="text" />
-                            </output_list>
+                             width="574" />
                         </panel>
                         <panel
                          follows="all"

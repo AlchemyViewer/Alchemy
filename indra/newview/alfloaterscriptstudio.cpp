@@ -29,7 +29,7 @@
 #include "alcodeeditor.h"
 #include "alscriptpreprocessor.h"
 #include "aljumpbar.h"
-#include "aloutputlist.h"
+#include "aloutputview.h"
 #include "alscopebar.h"
 #include "alscriptformatter.h"
 #include "alscriptkeymap.h"
@@ -428,7 +428,7 @@ bool ALFloaterScriptStudio::postBuild()
     mReferences    = getChild<LLScrollListCtrl>("references");
     mOutline       = getChild<LLScrollListCtrl>("outline");
     mSymbol        = getChild<LLTextEditor>("symbol");
-    mOutput        = getChild<ALOutputList>("output");
+    mOutput        = getChild<ALOutputView>("output");
     mOutputFilter  = getChild<LLComboBox>("output_filter");
     mExplorer      = getChild<LLScrollListCtrl>("explorer");
     mSearchBar     = getChild<ALScopeBar>("search_bar");
@@ -471,7 +471,7 @@ bool ALFloaterScriptStudio::postBuild()
     mOutline->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutlineChosen, this));
     mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
     mOutputFilter->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputFilter, this));
-    mOutput->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputChosen, this));
+    mOutput->onEntryChosen([this](const ALOutputView::Entry& entry) { onOutputChosen(entry); });
     getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) { mOutput->clearEntries(); });
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
@@ -499,7 +499,7 @@ bool ALFloaterScriptStudio::postBuild()
         getChild<LLButton>(std::string("explorer_") + action)->setCommitCallback([this, action](LLUICtrl*, const LLSD&) { onExplorerAction(action); });
     }
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) { runningState(state); });
-    for (LLScrollListCtrl* list : { mProblems, mReferences, static_cast<LLScrollListCtrl*>(mOutput), mSearchResults })
+    for (LLScrollListCtrl* list : { mProblems, mReferences, mSearchResults })
     {
         listMenuFor(list);
     }
@@ -633,7 +633,7 @@ size_t ALFloaterScriptStudio::indexOf(const ALScriptRef& ref) const
 {
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
-        if (mDocs[i]->ref == ref)
+        if (mDocs[i]->ref == ref && mDocs[i]->file.empty())
         {
             return i;
         }
@@ -755,6 +755,7 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     editor.setScrollMapPreview(mScrollMapPreview);
     editor.setScrollMapOnLeft(mScrollMapLeft);
     editor.setScrollMap(mScrollMap);
+    editor.setSpellCheck(mSpellCheck);
 }
 
 void ALFloaterScriptStudio::applyEditorOptions()
@@ -1009,6 +1010,7 @@ ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc
 {
     ALScriptPreprocessor::Request request;
     request.ref     = doc.ref;
+    request.path    = doc.file.empty() ? std::string() : "disk:" + doc.file;
     request.name    = doc.name;
     request.assetId = doc.assetId;
     request.source  = doc.editor->text();
@@ -1184,6 +1186,68 @@ std::string ALFloaterScriptStudio::includeName(const Doc& doc, const std::string
     }
     std::string file;
     return ALScriptPreprocessor::fileOf(path, file) ? gDirUtilp->getBaseFileName(file) : path;
+}
+
+void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line, S32 column, S32 length)
+{
+    const std::string id      = "disk:" + path;
+    size_t            already = indexOf(id);
+    if (already == NONE)
+    {
+        std::ifstream in(path, std::ios::binary);
+        if (!in)
+        {
+            LLStringUtil::format_map_t args;
+            args["[FILE]"] = path;
+            setStatus(getString("IncludeGone", args), true);
+            return;
+        }
+        std::stringstream buffer;
+        buffer << in.rdbuf();
+
+        auto doc  = std::make_unique<Doc>();
+        doc->file = path;
+        doc->id   = id;
+        doc->name = gDirUtilp->getBaseFileName(path);
+        // The language its extension says, else the one it was asked for from.
+        const std::string extension = gDirUtilp->getExtension(path);
+        doc->language.lua           = extension == "lua" || extension == "luau" || (extension != "lsl" && lua);
+        doc->language.compileTarget = doc->language.lua ? "luau" : "mono";
+        doc->editor                 = makeEditor(doc->id, false);
+        doc->editor->setSyntax(doc->language.lua ? "slua" : "lsl");
+        doc->editor->setText(buffer.str());
+        doc->loaded     = true;
+        doc->modifiable = true;
+        Doc* raw        = doc.get();
+        doc->changed    = doc->editor->onTextChanged([this, raw]() {
+            fillTabs();
+            refreshToolbar();
+            scheduleAnalysis(*raw);
+        });
+        mDocs.push_back(std::move(doc));
+        already = mDocs.size() - 1;
+        teachEditor(*mDocs[already]);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = mDocs[already]->name;
+        setStatus(getString("Loaded", args));
+        scheduleAnalysis(*mDocs[already], true);
+    }
+    activate(already);
+    Doc& doc = *mDocs[already];
+    if (line >= 0)
+    {
+        if (column < 0)
+        {
+            doc.editor->goToLine(line);
+        }
+        else
+        {
+            doc.editor->goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
+        }
+    }
+    doc.editor->setFocus(true);
+    fillTabs();
+    refreshToolbar();
 }
 
 void ALFloaterScriptStudio::chooseIncludeFolder()
@@ -1843,7 +1907,7 @@ void ALFloaterScriptStudio::fillTabs()
             static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
             tab.badge                            = errors > 0 ? error_color.get() : warning_color.get();
         }
-        tab.toolTip = doc.notecard ? getString("TabNotecardTip") : doc.ref.inInventory() ? getString("TabInventoryTip") : getString("TabObjectTip");
+        tab.toolTip = !doc.file.empty() ? doc.file : doc.notecard ? getString("TabNotecardTip") : doc.ref.inInventory() ? getString("TabInventoryTip") : getString("TabObjectTip");
         tabs.push_back(std::move(tab));
         if (i == mActive)
         {
@@ -2211,6 +2275,11 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
         mStickyHeaders = !mStickyHeaders;
         applyEditorOptions();
     }
+    else if (action == "spell_check")
+    {
+        mSpellCheck = !mSpellCheck;
+        applyEditorOptions();
+    }
     else if (action == "reveal")
     {
         // Its row in the explorer, chosen and in view.
@@ -2276,7 +2345,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     Doc*       doc     = active();
     const bool have    = doc && doc->loaded;
     const bool task    = doc && !doc->ref.inInventory() && !doc->notecard;
-    mCompileTarget->setEnabled(have && doc->modifiable && !doc->notecard);
+    mCompileTarget->setEnabled(have && doc->modifiable && !doc->notecard && doc->file.empty());
     mSaveButton->setEnabled(have && doc->modifiable && !doc->saving);
     bool anyDirty = false;
     for (const std::unique_ptr<Doc>& each : mDocs)
@@ -2322,6 +2391,11 @@ void ALFloaterScriptStudio::save(Doc& doc)
 {
     if (!doc.loaded || !doc.modifiable || doc.saving)
     {
+        return;
+    }
+    if (!doc.file.empty())
+    {
+        saveFile(doc);
         return;
     }
     if (doc.notecard)
@@ -2481,7 +2555,10 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
 
 void ALFloaterScriptStudio::scheduleAnalysis(Doc& doc, bool now)
 {
-    if (!doc.loaded || doc.notecard)
+    // An LSL file on disk is a fragment -- functions and globals for an
+    // include -- which is no script to the parser; a Lua one is a module,
+    // which is.
+    if (!doc.loaded || doc.notecard || (!doc.file.empty() && !doc.language.lua))
     {
         return;
     }
@@ -3537,12 +3614,21 @@ namespace
     public:
         typedef std::function<void(const std::string& filename)> changed_t;
 
-        StudioLiveFile(const std::string& path, changed_t changed)
+        // A temp file of the studio's own goes with the watch; a file
+        // the author keeps on disk stays.
+        StudioLiveFile(const std::string& path, changed_t changed, bool ours)
         :   LLLiveFile(path, 1.f),
-            mChanged(std::move(changed))
+            mChanged(std::move(changed)),
+            mOurs(ours)
         {
         }
-        ~StudioLiveFile() override { LLFile::remove(filename()); }
+        ~StudioLiveFile() override
+        {
+            if (mOurs)
+            {
+                LLFile::remove(filename());
+            }
+        }
 
         // The next change is one made here, not to be taken as the
         // editor's.
@@ -3565,6 +3651,7 @@ namespace
 
     private:
         changed_t mChanged;
+        bool      mOurs;
         bool      mIgnoreNext = false;
     };
 
@@ -3607,9 +3694,10 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
     // The file, written afresh -- the editor may have been closed on an
-    // old one -- and watched.
-    const std::string filename = externalFileName(doc);
-    if (!writeWhole(filename, doc.editor->text()))
+    // old one -- and watched. A file on disk is edited where it is.
+    const bool        on_disk  = !doc.file.empty();
+    const std::string filename = on_disk ? doc.file : externalFileName(doc);
+    if (!on_disk && !writeWhole(filename, doc.editor->text()))
     {
         args["[FILE]"] = filename;
         setStatus(getString("ExternalWriteFailed", args), true);
@@ -3620,12 +3708,15 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
         doc.liveFile.reset();
         const LLHandle<LLFloater> handle = getHandle();
         const std::string         id     = doc.id;
-        auto                      watch  = std::make_unique<StudioLiveFile>(filename, [handle, id](const std::string& file) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->externalChanged(id, file);
-            }
-        });
+        auto                      watch  = std::make_unique<StudioLiveFile>(
+            filename,
+            [handle, id](const std::string& file) {
+                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                {
+                    studio->externalChanged(id, file);
+                }
+            },
+            !on_disk);
         watch->addToEventTimer();
         doc.liveFile = std::move(watch);
     }
@@ -3633,12 +3724,12 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
     {
         static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
     }
-    doc.liveLog = filename + ".log";
+    doc.liveLog = on_disk ? std::string() : filename + ".log";
 
     // The bridge, so that VS Code can subscribe to the script and hear
-    // what the compiler says of it.
-    const bool                       tight  = LLScriptEditorWSServer::isTightIntegration();
-    LLScriptEditorWSServer::ptr_t    server = LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;
+    // what the compiler says of it; a file on disk is nothing to it.
+    const bool                       tight  = !on_disk && LLScriptEditorWSServer::isTightIntegration();
+    LLScriptEditorWSServer::ptr_t    server = !on_disk && LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;
     if (server)
     {
         const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
@@ -3709,6 +3800,12 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
         doc.carriedText = text;
         takeCarriedText(doc);
     }
+    if (!doc.file.empty())
+    {
+        // The file is what the editor outside saved: nothing to write.
+        fileSettled(doc);
+        return;
+    }
     if (!doc.editor->isDirty() && doc.assetId.notNull())
     {
         return;
@@ -3778,6 +3875,55 @@ void ALFloaterScriptStudio::stopExternal(Doc& doc)
     doc.externalSave = false;
 }
 
+void ALFloaterScriptStudio::saveFile(Doc& doc)
+{
+    if (doc.liveFile)
+    {
+        // The editor outside watching the file: this write is not its.
+        static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
+    }
+    std::ofstream out(doc.file, std::ios::binary);
+    out << doc.editor->text();
+    LLStringUtil::format_map_t args;
+    args["[PATH]"] = doc.file;
+    if (!out.good())
+    {
+        setStatus(getString("SaveToFileFailed", args), true);
+        return;
+    }
+    setStatus(getString("SavedToFile", args));
+    fileSettled(doc);
+}
+
+void ALFloaterScriptStudio::fileSettled(Doc& doc)
+{
+    doc.editor->resetDirty();
+    // The scripts that include it see the file as it is now.
+    for (std::unique_ptr<Doc>& each : mDocs)
+    {
+        if (each.get() != &doc && each->file.empty() && preprocessed(*each))
+        {
+            each->expanded.valid = false;
+            preprocess(*each, false);
+            scheduleAnalysis(*each);
+        }
+    }
+    fillTabs();
+    refreshToolbar();
+    if (doc.closeAfterSave)
+    {
+        const size_t index = indexOf(doc.id);
+        if (index != NONE)
+        {
+            letGoOf(index);
+        }
+        if (mClosingWindow)
+        {
+            continueClosing();
+        }
+    }
+}
+
 void ALFloaterScriptStudio::fillReferences(const Doc* doc)
 {
     mReferences->deleteAllItems();
@@ -3845,9 +3991,8 @@ void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::st
     }
     else if (ALScriptPreprocessor::fileOf(path, file))
     {
-        LLStringUtil::format_map_t args;
-        args["[FILE]"] = file;
-        setStatus(getString("IncludeOnDisk", args));
+        const Doc* asking = active();
+        openFile(file, asking && asking->language.lua, line, column, length);
     }
 }
 
@@ -4827,11 +4972,17 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
         mOutputFilter->add(event.objectName, LLSD(event.root));
     }
 
-    ALOutputList::Entry entry;
+    // One line of the log, or more where the script said more; the
+    // script's name a link to it, at the line of a run-time error.
+    ALOutputView::Entry entry;
     entry.time   = clockOf(event.time);
     entry.source = event.scriptName.empty() ? event.objectName : event.objectName + " / " + event.scriptName;
-    entry.kind   = getString(event.isError ? "KindError" : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? "KindOwnerSay" : "KindDebug");
-    entry.text   = oneLine(event.isError && !event.error.empty() ? event.error : event.message);
+    entry.kind   = event.isError ? getString("KindError") : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? getString("KindOwnerSay") : std::string();
+    entry.text   = event.isError && !event.error.empty() ? event.error : event.message;
+    while (!entry.text.empty() && (entry.text.back() == '\n' || entry.text.back() == '\r'))
+    {
+        entry.text.pop_back();
+    }
     if (event.isError)
     {
         entry.color = runtime_color.get();
@@ -4840,12 +4991,20 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
             entry.text += llformat(" (line %d)", event.line + 1);
         }
     }
-    entry.key             = event.root;
-    entry.value["prim"]   = event.prim;
-    entry.value["item"]   = event.item;
-    entry.value["name"]   = event.scriptName;
-    entry.value["line"]   = event.line;
-    entry.value["column"] = event.column;
+    entry.key = event.root;
+    if (event.item.notNull())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = event.scriptName;
+        args["[LINE]"] = llformat("%d", event.line + 1);
+        entry.link            = true;
+        entry.tooltip         = getString(event.isError && event.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
+        entry.value["prim"]   = event.prim;
+        entry.value["item"]   = event.item;
+        entry.value["name"]   = event.scriptName;
+        entry.value["line"]   = event.line;
+        entry.value["column"] = event.column;
+    }
     mOutput->append(std::move(entry));
 
     // A run-time error in a script that is open marks its line.
@@ -4873,25 +5032,24 @@ void ALFloaterScriptStudio::onOutputFilter()
     }
     else
     {
-        mOutput->setFilter([root](const ALOutputList::Entry& entry) { return entry.key.asUUID() == root; });
+        mOutput->setFilter([root](const ALOutputView::Entry& entry) { return entry.key.asUUID() == root; });
     }
 }
 
-void ALFloaterScriptStudio::onOutputChosen()
+void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
 {
-    const ALOutputList::Entry* entry = mOutput->chosen();
-    if (!entry || entry->value["item"].asUUID().isNull())
+    if (entry.value["item"].asUUID().isNull())
     {
         return;
     }
-    const ALScriptRef ref(entry->value["prim"].asUUID(), entry->value["item"].asUUID());
-    const S32         line   = entry->value["line"].asInteger();
-    const S32         column = entry->value["column"].asInteger();
+    const ALScriptRef ref(entry.value["prim"].asUUID(), entry.value["item"].asUUID());
+    const S32         line   = entry.value["line"].asInteger();
+    const S32         column = entry.value["column"].asInteger();
     size_t            index  = indexOf(ref);
     if (index == NONE)
     {
         // The script it names, opened; the line once it has loaded.
-        openScript(ref, entry->value["name"].asString());
+        openScript(ref, entry.value["name"].asString());
         index = indexOf(ref);
         if (index != NONE)
         {
@@ -6174,6 +6332,11 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         mStickyHeaders = !mStickyHeaders;
         applyEditorOptions();
     }
+    else if (action == "spell_check")
+    {
+        mSpellCheck = !mSpellCheck;
+        applyEditorOptions();
+    }
     else if (action == "vim_mode")
     {
         mVimMode = !mVimMode;
@@ -6420,6 +6583,10 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     {
         return mVimMode;
     }
+    if (action == "spell_check")
+    {
+        return mSpellCheck;
+    }
     if (action == "semantic_colors")
     {
         return mSemanticColors;
@@ -6636,6 +6803,7 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["rainbow_brackets"] = mRainbowBrackets;
     state["sticky_headers"]   = mStickyHeaders;
     state["vim_mode"]         = mVimMode;
+    state["spell_check"]      = mSpellCheck;
     state["semantic_colors"]  = mSemanticColors;
     state["inlay_parameters"] = mInlayParameters;
     state["inlay_types"]      = mInlayTypes;
@@ -6683,6 +6851,10 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("vim_mode"))
     {
         mVimMode = state["vim_mode"].asBoolean();
+    }
+    if (state.has("spell_check"))
+    {
+        mSpellCheck = state["spell_check"].asBoolean();
     }
     if (state.has("semantic_colors"))
     {

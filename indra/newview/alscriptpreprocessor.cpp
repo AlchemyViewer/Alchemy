@@ -28,6 +28,7 @@
 #include "alscriptpreprocessor.h"
 
 #include "allslservice.h"
+#include "alluauconfig.h"
 #include "alscriptenvelope.h"
 #include "llagent.h"
 #include "lldir.h"
@@ -347,11 +348,17 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
             {
                 names.push_back(ask.name + ".lsl");
             }
+            if (ALLuauConfig::absolute(ask.name))
+            {
+                // A path from a root, which an alias may stand for: the
+                // file itself, wherever it is.
+                dirs.assign(1, std::string());
+            }
             for (const std::string& dir : dirs)
             {
                 for (const std::string& name : names)
                 {
-                    const std::string file = gDirUtilp->add(dir, name);
+                    const std::string file = dir.empty() ? name : gDirUtilp->add(dir, name);
                     if (gDirUtilp->fileExists(file))
                     {
                         Candidate c;
@@ -367,42 +374,186 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
     return out;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request,
+ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, std::set<std::string>* wanted, std::string& text, std::string& assetId)
+{
+    if (!c.file.empty())
+    {
+        assetId.clear();
+        return readFile(c.file, text) ? ALPreprocessor::Found::Yes : ALPreprocessor::Found::No;
+    }
+    auto cached = mTexts.find(c.path);
+    if (cached != mTexts.end() && cached->second.assetId == c.assetId)
+    {
+        text    = cached->second.text;
+        assetId = c.assetId.isNull() ? std::string() : c.assetId.asString();
+        return ALPreprocessor::Found::Yes;
+    }
+    if (mFailed.count(c.path))
+    {
+        return ALPreprocessor::Found::No;
+    }
+    if (wanted)
+    {
+        wanted->insert(c.path);
+    }
+    return ALPreprocessor::Found::Pending;
+}
+
+ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, const Request& request, std::set<std::string>* wanted, std::string& path, std::string& text)
+{
+    static const std::string CONFIG_NAME(".luaurc");
+    Candidate                candidate;
+    ALScriptRef              asking;
+    std::string              file;
+    if (refOf(from, asking) && asking.inInventory())
+    {
+        // Up the folders from the item's own, the first notecard so named.
+        const LLViewerInventoryItem* item = gInventory.getItem(asking.item);
+        LLUUID                       folder = item ? item->getParentUUID() : LLUUID::null;
+        while (folder.notNull() && candidate.path.empty())
+        {
+            LLInventoryModel::cat_array_t*  cats  = nullptr;
+            LLInventoryModel::item_array_t* items = nullptr;
+            gInventory.getDirectDescendentsOf(folder, cats, items);
+            if (items)
+            {
+                for (const LLPointer<LLViewerInventoryItem>& held : *items)
+                {
+                    if (held->getName() == CONFIG_NAME && (held->getType() == LLAssetType::AT_NOTECARD || held->getType() == LLAssetType::AT_LSL_TEXT))
+                    {
+                        candidate.ref     = ALScriptRef(LLUUID::null, held->getUUID());
+                        candidate.name    = CONFIG_NAME;
+                        candidate.path    = std::string(INVENTORY_PREFIX) + held->getUUID().asString();
+                        candidate.assetId = held->getAssetUUID();
+                        break;
+                    }
+                }
+            }
+            const LLViewerInventoryCategory* category = gInventory.getCategory(folder);
+            folder = category ? category->getParentUUID() : LLUUID::null;
+        }
+    }
+    else if (refOf(from, asking))
+    {
+        // An object has no folders: the item so named among its contents.
+        auto listed = mContents.find(asking.object);
+        if (listed == mContents.end())
+        {
+            return ALPreprocessor::Found::Pending;
+        }
+        LLViewerObject* object = gObjectList.findObject(asking.object);
+        for (const ALScriptWorkspace::Item& item : listed->second)
+        {
+            if (item.name == CONFIG_NAME)
+            {
+                candidate.ref  = ALScriptRef(asking.object, item.id);
+                candidate.name = CONFIG_NAME;
+                candidate.path = std::string(OBJECT_PREFIX) + asking.object.asString() + ":" + item.id.asString();
+                if (LLInventoryItem* held = object ? object->getInventoryItem(item.id) : nullptr)
+                {
+                    candidate.assetId = held->getAssetUUID();
+                }
+                break;
+            }
+        }
+    }
+    else if (fileOf(from, file))
+    {
+        // Up the directories from the file's own.
+        std::string dir = gDirUtilp->getDirName(file);
+        while (!dir.empty() && candidate.path.empty())
+        {
+            const std::string config = gDirUtilp->add(dir, CONFIG_NAME);
+            if (gDirUtilp->fileExists(config))
+            {
+                candidate.name = CONFIG_NAME;
+                candidate.path = std::string(DISK_PREFIX) + config;
+                candidate.file = config;
+                break;
+            }
+            const std::string above = gDirUtilp->getDirName(dir);
+            if (above == dir)
+            {
+                break;
+            }
+            dir = above;
+        }
+    }
+    if (candidate.path.empty())
+    {
+        return ALPreprocessor::Found::No;
+    }
+    std::string                 asset;
+    const ALPreprocessor::Found found = textOf(candidate, wanted, text, asset);
+    if (found == ALPreprocessor::Found::Yes)
+    {
+        path = candidate.path;
+    }
+    return found;
+}
+
+ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Request& request,
                                                     std::set<std::string>* wanted)
 {
+    ALPreprocessor::Ask ask = ask_in;
+    if (ask.from.empty())
+    {
+        // The script itself asking: a relative name is taken from where
+        // it is.
+        ask.from = request.path.empty() ? pathOf(request.ref) : request.path;
+    }
+    std::string alias, rest;
+    if (request.lua && ask.require && ALLuauConfig::aliasOf(ask.name, alias, rest))
+    {
+        // Through the `.luaurc` that governs the asking file: the alias's
+        // path from beside the configuration, so the name is asked for
+        // from there.
+        std::string                 config_path, config_text;
+        const ALPreprocessor::Found config = configFor(ask.from, request, wanted, config_path, config_text);
+        if (config != ALPreprocessor::Found::Yes)
+        {
+            return config;
+        }
+        ALLuauConfig parsed;
+        std::string  error;
+        if (!ALLuauConfig::parse(config_text, parsed, error))
+        {
+            LL_WARNS("ScriptPreprocessor") << config_path << " is not a configuration: " << error << LL_ENDL;
+            return ALPreprocessor::Found::No;
+        }
+        const auto found = parsed.aliases.find(alias);
+        if (found == parsed.aliases.end())
+        {
+            return ALPreprocessor::Found::No;
+        }
+        std::string value = found->second;
+        if (!ALLuauConfig::absolute(value) && value.compare(0, 2, "./") != 0 && value.compare(0, 3, "../") != 0)
+        {
+            value = "./" + value;
+        }
+        while (!value.empty() && (value.back() == '/' || value.back() == '\\'))
+        {
+            value.pop_back();
+        }
+        ask.name = rest.empty() ? value : value + "/" + rest;
+        ask.from = config_path;
+    }
+
     bool                         unknown    = false;
     const std::vector<Candidate> candidates = candidatesFor(ask, request, unknown);
     for (const Candidate& c : candidates)
     {
-        if (!c.file.empty())
-        {
-            if (!readFile(c.file, out.text))
-            {
-                continue;
-            }
-            out.name = c.name;
-            out.path = c.path;
-            out.assetId.clear();
-            return ALPreprocessor::Found::Yes;
-        }
-        auto cached = mTexts.find(c.path);
-        if (cached != mTexts.end() && cached->second.assetId == c.assetId)
-        {
-            out.text    = cached->second.text;
-            out.name    = c.name;
-            out.path    = c.path;
-            out.assetId = c.assetId.isNull() ? std::string() : c.assetId.asString();
-            return ALPreprocessor::Found::Yes;
-        }
-        if (mFailed.count(c.path))
+        const ALPreprocessor::Found found = textOf(c, wanted, out.text, out.assetId);
+        if (found == ALPreprocessor::Found::No)
         {
             continue;
         }
-        if (wanted)
+        if (found == ALPreprocessor::Found::Yes)
         {
-            wanted->insert(c.path);
+            out.name = c.name;
+            out.path = c.path;
         }
-        return ALPreprocessor::Found::Pending;
+        return found;
     }
     // Not found anywhere listed; the object may still hold it.
     return unknown ? ALPreprocessor::Found::Pending : ALPreprocessor::Found::No;
