@@ -777,7 +777,14 @@ void ALTextView::setStyles(std::vector<Style> styles)
     mStyles.clear();
     for (Style& style : styles)
     {
-        if (style.range.empty() || (!style.font && !style.color))
+        // Bold and italic are the registry's face for them, of the font
+        // the style names or the view's own; where the registry has no
+        // such face the text stays in the font it was.
+        if (const U8 face = style.flags & (LLFontGL::BOLD | LLFontGL::ITALIC); face && (style.font || mFont))
+        {
+            style.font = (style.font ? style.font : mFont)->faceFor(face);
+        }
+        if (style.range.empty() || (!style.font && !style.color && !(style.flags & LLFontGL::UNDERLINE)))
         {
             continue;
         }
@@ -3144,6 +3151,24 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
                 const S32 y = screen_top - row.ascent - 2;
                 gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, mLinkColor.get() % alpha);
             }
+        }
+    }
+    // The styles that underline, in the style's colour or the text's.
+    for (const Style& style : mStyles)
+    {
+        if (style.range.begin.line > line)
+        {
+            break;
+        }
+        if (!(style.flags & LLFontGL::UNDERLINE) || style.range.end.line < line)
+        {
+            continue;
+        }
+        F32 x0, x1;
+        if (spanOnRow(line, r, style.range, x0, x1))
+        {
+            const S32 y = screen_top - row.ascent - 2;
+            gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, (style.color ? *style.color : textColor()) % alpha);
         }
     }
     // The atoms on the row, each in its box: an image drawn there, or a

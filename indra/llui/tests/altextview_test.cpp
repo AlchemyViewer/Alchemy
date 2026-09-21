@@ -725,4 +725,27 @@ namespace tut
         LLUrlAction::setIsObjectReachableCallback(nullptr);
         menu->die();
     }
+    template<> template<>
+    void altextview_object::test<21>()
+    {
+        set_test_name("a style's flags are resolved to the registry's face for them, and an underline alone keeps a style");
+        ALTextView& v = make("bold italic under\n");
+        v.setFont(LLFontGL::getFontSansSerif());
+        const LLFontGL* base = v.getFont();
+        ALTextView::Style bold;
+        bold.range = ALTextRange(ALTextPos(0, 0), ALTextPos(0, 4));
+        bold.flags = LLFontGL::BOLD;
+        ALTextView::Style italic;
+        italic.range = ALTextRange(ALTextPos(0, 5), ALTextPos(0, 11));
+        italic.flags = LLFontGL::ITALIC;
+        italic.font  = LLFontGL::getFontMonospace();
+        ALTextView::Style under;
+        under.range = ALTextRange(ALTextPos(0, 12), ALTextPos(0, 17));
+        under.flags = LLFontGL::UNDERLINE;
+        v.setStyles({ bold, italic, under });
+        ensure_equals("all three kept", v.styles().size(), size_t(3));
+        ensure("bold is the view's font's bold face", v.styles()[0].font == base->faceFor(LLFontGL::BOLD));
+        ensure("italic of the font given is that font's italic face", v.styles()[1].font == LLFontGL::getFontMonospace()->faceFor(LLFontGL::ITALIC));
+        ensure("the underline keeps no font of its own", v.styles()[2].font == nullptr && (v.styles()[2].flags & LLFontGL::UNDERLINE));
+    }
 }

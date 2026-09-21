@@ -195,6 +195,7 @@ public:
     // line and the matched bracket follow. hasFocus counts a child.
     bool keyboardOnText() const;
     const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
+    const LLColor4& selectionColor() const { return mSelectionColor.get(); }
     // The colour a kind is drawn in here.
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
     // The colour table's name for a kind's colour under a prefix:
@@ -293,14 +294,20 @@ public:
 
     // A stretch in a font of its own, a colour of its own, or both: a
     // heading in a heavier face, a note in the reading face, a warning
-    // in the warning colour. The rows it reaches are as tall as it asks,
-    // every font on a row sharing its baseline. Replaced whole; an edit
-    // slides them and drops the ones it cuts through.
+    // in the warning colour. Or a stretch bold, italic or underlined,
+    // by LLFontGL's flags, which the view resolves to the registry's
+    // face for the style -- the bold face of the view's font, or of the
+    // font given -- and draws the underline of itself; a chat's names
+    // and emotes ask this way. The rows it reaches are as tall as it
+    // asks, every font on a row sharing its baseline. Replaced whole;
+    // an edit slides them and drops the ones it cuts through.
     struct Style
     {
         ALTextRange             range;
         const LLFontGL*         font = nullptr;
         std::optional<LLColor4> color;
+        // LLFontGL::BOLD, ITALIC and UNDERLINE, or none.
+        U8                      flags = 0;
     };
     void                      setStyles(std::vector<Style> styles);
     void                      clearStyles() { setStyles({}); }
