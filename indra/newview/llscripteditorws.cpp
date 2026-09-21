@@ -36,6 +36,7 @@
 #include "llagentcamera.h"
 #include "llappviewer.h"
 #include "llcompilequeue.h"
+#include "llinventorymodel.h"
 #include "lldate.h"
 #include "llerror.h"
 #include "lleventcoro.h"
@@ -198,6 +199,10 @@ LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port
             sendRuntimeEvent(event);
         }
     });
+    // And what the compiler said of a script saved through it, whichever
+    // editor saved it: the workspace owns the compile, so a result is not
+    // lost with a closed floater.
+    mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { sendCompiled(result); });
 
     registerCommand({ "viewer.teleport", "Teleport agent to an in-world object",
                       object_id_command_params() },
@@ -493,7 +498,7 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
 }
 
 bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
-    const LLHandle<LLPanel>& editor_handle, const std::string& script_id)
+    const LLHandle<LLPanel>& editor_handle, const std::string& script_id, bool lua)
 {
     if (editor_handle.isDead())
     {
@@ -509,12 +514,13 @@ bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, cons
             item_ref.mItemID = item_id;
             item_ref.mScriptName = script_name;
             mSubscriptions.emplace(script_id,
-                EditorSubscription(item_ref, editor_handle));
+                EditorSubscription(item_ref, editor_handle, lua));
     }
     else
     {
         // Refresh existing subscription with the new editor handle
         it->second.mEditorHandle = editor_handle;
+        it->second.mLua          = lua;
     }
     return true;
 }
@@ -2206,92 +2212,102 @@ void LLScriptEditorWSServer::sendUnsubscribeScriptEditor(const std::string& scri
 void LLScriptEditorWSServer::sendCompileResults(const std::string &script_id, const LLSD &results) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLHandle<LLPanel> editor_handle = findEditorForScript(script_id);
-    if (editor_handle.isDead())
+    auto it = mSubscriptions.find(script_id);
+    if (it == mSubscriptions.end())
     {
         return;
     }
-    LLScriptEdContainer* editor = ALViewType::as<LLScriptEdContainer>(editor_handle.get());
-    if (!editor)
-    {
-        return;
-    }
-    LLScriptEdCore* core = editor->getScriptEdCore();
-    bool is_lua = core && (core->isLuauLanguage());
+    const bool lua = it->second.mLua;
+    notifyScript(script_id, "script.compiled",
+                 compiledMessage(script_id, results["compiled"].asBoolean(), results["is_running"].asBoolean(),
+                                 ALScriptWorkspace::parseDiagnostics(results["errors"], lua), lua));
+}
 
+// static
+LLSD LLScriptEditorWSServer::compiledMessage(const std::string& script_id, bool success, bool running,
+                                             const std::vector<ALScriptWorkspace::Diagnostic>& diagnostics, bool lua)
+{
     LLSD params;
-    params["script_id"] = script_id;
-    params["success"]  = results["compiled"].asBoolean();
-    params["running"]  = results["is_running"].asBoolean();
-    if (results.has("errors"))
+    params["script_id"]   = script_id;
+    params["success"]     = success;
+    params["running"]     = running;
+    params["diagnostics"] = LLSD::emptyArray();
+    for (const ALScriptWorkspace::Diagnostic& diagnostic : diagnostics)
     {
-        params["diagnostics"] = LLSD::emptyArray();
-
-        if (is_lua)
-        {   // lua errors: ":line: message", line is 1-based
-            for (const auto& err : llsd::inArray(results["errors"]))
-            {
-                boost::smatch match;
-                LLSD err_entry;
-
-                err_entry["column"] = 0; // TODO: Lua compiler does not provide column info
-                err_entry["level"]  = "ERROR";
-
-                S32 line_number = 0;
-                if (boost::regex_match(err.asString(), match, LUAU_LOCATION_PATTERN) &&
-                    LLStringUtil::convertToS32(match[2].str(), line_number))
-                {
-                    std::string message = match[3].str();
-
-                    err_entry["row"] = line_number;
-                    err_entry["message"] = message;
-                }
-                else
-                {
-                    err_entry["row"] = 0;
-                    err_entry["message"] = err.asString();
-                }
-                params["diagnostics"].append(err_entry);
-            }
+        // The protocol counts from one, and says zero for a place the
+        // compiler did not name.
+        LLSD entry;
+        entry["row"]     = diagnostic.line + 1;
+        entry["column"]  = diagnostic.hasColumn ? diagnostic.column + 1 : 0;
+        entry["level"]   = diagnostic.level.empty() ? std::string("ERROR") : diagnostic.level;
+        entry["message"] = diagnostic.message;
+        if (!lua)
+        {
+            entry["format"] = "lsl";
         }
-        else
-        {   // lsl errors: "(line, column) : SEVERITY : message", line and column are 0-based
-            for (const auto& err : llsd::inArray(results["errors"]))
-            {
-                boost::smatch match;
-                LLSD err_entry;
+        params["diagnostics"].append(entry);
+    }
+    return params;
+}
 
-                S32 line_number = 0;
-                S32 col_number = 0;
-                if (boost::regex_match(err.asString(), match, LSL_LOCATION_PATTERN) &&
-                    LLStringUtil::convertToS32(match[1].str(), line_number) &&
-                    LLStringUtil::convertToS32(match[2].str(), col_number) &&
-                    line_number < S32_MAX &&
-                    col_number < S32_MAX)
-                {
-                    std::string severity = match[3].str();
-                    std::string message = match[4].str();
+namespace
+{
+    // Whether an item is a Luau script.
+    bool isLuaItem(const LLInventoryItem* item)
+    {
+        return item && item->getType() == LLAssetType::AT_LSL_TEXT && item->getInventorySubType() == SST_LUA;
+    }
+}
 
-                    err_entry["row"]     = line_number + 1;
-                    err_entry["column"]  = col_number + 1;
-                    err_entry["level"]   = severity;
-                    err_entry["message"] = message;
-                    err_entry["format"]  = "lsl";
-                }
-                else
-                {
-                    err_entry["row"]     = 0;
-                    err_entry["column"]  = 0;
-                    err_entry["level"]   = "ERROR";
-                    err_entry["message"] = err.asString();
-                    err_entry["format"]  = "lsl";
-                }
-                params["diagnostics"].append(err_entry);
-            }
-        }
+void LLScriptEditorWSServer::sendCompiled(const ALScriptWorkspace::CompileResult& result)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    // Nothing compiled: a notecard, or an upload that failed.
+    if (result.notecard || !result.error.empty() || result.ref.item.isNull())
+    {
+        return;
+    }
+    const std::string script_id = buildScriptSubscriptionId(result.ref.object, result.ref.item);
+    const auto        subscribed = mSubscriptions.find(script_id);
+
+    LLViewerObject* prim = result.ref.inInventory() ? nullptr : gObjectList.findObject(result.ref.object);
+    LLUUID          root_id;
+    if (prim)
+    {
+        root_id = prim->getRootEdit() ? prim->getRootEdit()->getID() : prim->getID();
+    }
+    const bool published = root_id.notNull() && isObjectPublished(root_id);
+    if (subscribed == mSubscriptions.end() && !published)
+    {
+        return;
+    }
+    const LLInventoryItem* item = result.ref.inInventory() ? gInventory.getItem(result.ref.item) : prim ? prim->getInventoryItem(result.ref.item) : nullptr;
+    const bool             lua  = subscribed != mSubscriptions.end() ? subscribed->second.mLua : isLuaItem(item);
+
+    LLSD message = compiledMessage(script_id, result.success, result.running, result.diagnostics, lua);
+    if (prim)
+    {
+        message["object_id"] = root_id;
+        message["prim_id"]   = result.ref.object;
+    }
+    message["item_id"] = result.ref.item;
+    if (subscribed != mSubscriptions.end())
+    {
+        notifyScript(script_id, "script.compiled", message);
+    }
+    else
+    {
+        notifyAll("script.compiled", message);
     }
 
-    notifyScript(script_id, "script.compiled", params);
+    // The item's asset is another now: the prim's inventory fetched
+    // again, so that the object.update that follows says so.
+    if (published && prim && result.success && !mPublishedObjectManager.hasInventoryRequestStart(prim->getID()))
+    {
+        prim->dirtyInventory();
+        mPublishedObjectManager.setInventoryRequestStart(prim->getID(), LLTimer::getTotalSeconds().value());
+        prim->requestInventory();
+    }
 }
 
 void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const

@@ -334,6 +334,15 @@ LLSD LLPublishedObjectMgr::buildPrimInventoryLLSD(LLViewerObject* object) const
         entry["description"] = item->getDescription();
         entry["type"]        = (type == LLAssetType::AT_LSL_TEXT) ? "script" : "notecard";
 
+        // The revision goes up with the asset, which is never sent itself.
+        Revision& revision = mRevisions[item->getUUID()];
+        if (revision.number == 0 || revision.asset != item->getAssetUUID())
+        {
+            revision.asset = item->getAssetUUID();
+            ++revision.number;
+        }
+        entry["revision"] = static_cast<S32>(revision.number);
+
         if (type == LLAssetType::AT_LSL_TEXT)
         {
             U8 subtype = item->getInventorySubType();

@@ -843,7 +843,7 @@ interface Diagnostic {
 **Fields:**
 
 - `row`: Line number where the error occurred (1-based for both LSL and Luau)
-- `column`: Column position of the error (1-based for LSL; always `0` for Luau as the compiler does not provide column information)
+- `column`: Column position of the error (1-based for LSL; `0` for Luau, whose compiler does not name a column)
 - `level`: Compiler severity string (e.g. `"ERROR"`, `"WARNING"`)
 - `message`: Error description
 - `format` (optional): Present and set to `"lsl"` for LSL compilation errors; absent for Luau errors
@@ -860,6 +860,9 @@ interface CompilationResult {
   success: boolean;
   running: boolean;
   diagnostics?: Diagnostic[];
+  object_id?: string;  // Root prim of the script's object, for a script in an object
+  prim_id?: string;    // The prim holding the script, for a script in an object
+  item_id?: string;    // The script's inventory item
 }
 ```
 
@@ -869,25 +872,25 @@ interface CompilationResult {
 - `success`: Whether the compilation was successful
 - `running`: Whether the compiled script is currently running
 - `diagnostics` (optional): Array of `Diagnostic` records if any occurred
+- `object_id`, `prim_id`, `item_id` (optional): the script's place, so that a client holding the
+  item through the object explorer can match the result to it without a subscription
 
-**Delivery:** routed only to the connection subscribed to that script. This differs from
-`runtime.debug` and `runtime.error`, which are broadcast to every connection.
+**Delivery:** to the connection subscribed to that script when there is one; otherwise, when the
+script's object is published, broadcast to every connection, as `runtime.debug` and
+`runtime.error` are.
 
 **Two compile-feedback paths.** Compilation results reach a client by one of two routes,
 depending on how the save was made:
 
 | Save route | Feedback |
 | ---------- | -------- |
-| `object.content.save` (object explorer) | `compiled` and `diagnostics` returned inline in the response |
-| Live-sync editing of a subscribed script | `script.compiled` notification |
+| `object.content.save` (object explorer) | `compiled` and `diagnostics` returned inline in the response; no `script.compiled` follows |
+| A save made in the viewer -- Script Studio, the legacy editor with a subscribed script, the compile queue | `script.compiled` notification |
 
-A client using only the object explorer never receives `script.compiled`; a client waiting for
-`script.compiled` after an `object.content.save` will wait indefinitely. Consolidating these two
-paths is tracked separately.
-
-**Known limitation.** `script.compiled` is produced only while the viewer's script editor for that
-script is open. If that editor has closed, compilation results are dropped without notice — no
-result, no error, and not necessarily a preceding `script.unsubscribe`. Tracked separately.
+The viewer's compiles are owned by its script workspace rather than by an editor window, so a
+result is reported whether or not the editor that saved is still open. A viewer-side save of a
+script in a published object is also followed by an `object.update` in which the item's
+`revision` has gone up.
 
 ## Runtime Event Interfaces
 
@@ -1057,7 +1060,7 @@ interface ItemPermissions {
 
 /**
  * Inventory item within an object or linked prim.
- * asset_id is intentionally never transmitted.
+ * asset_id is intentionally never transmitted; revision stands in for it.
  */
 interface ObjectInventoryItem {
   item_id: string;         // Inventory item UUID
@@ -1070,6 +1073,7 @@ interface ObjectInventoryItem {
   faulted?: boolean;       // Scripts only: whether the script has a runtime fault
   permissions?: ItemPermissions;
   creator_id?: string;
+  revision?: number;       // Goes up whenever the item's content changes; fetch again when it does
 }
 
 /** A linked (child) prim within a linkset */
@@ -1235,6 +1239,7 @@ Sent when an explored object's inventory, properties, or linkset membership chan
 | ------- | ------- |
 | Root prim inventory changed | `object_id`, `inventory` (complete replacement array) |
 | Child prim inventory changed | `object_id`, `changes.linked_objects.modified[]` with `link_id` and `inventory` (complete replacement array for that child) |
+| An item's content changed (a script saved in the viewer, a notecard written) | one of the two above, with the item's `revision` gone up |
 | Root prim name/description changed | `object_id`, `object_name` and/or `object_description` |
 | Child prim name/description changed | `object_id`, `changes.linked_objects.modified[]` with `link_id` and `link_name` and/or `link_description` |
 | Linkset membership changed | `object_id`, `linked_objects` (complete replacement array covering every child prim) |

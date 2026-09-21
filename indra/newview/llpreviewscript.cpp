@@ -1794,7 +1794,7 @@ void LLScriptEdContainer::startWebsocketServer()
     }
 
     std::string script_id_hash_str(getUniqueHash());
-    server->subscribeScriptEditor(mObjectUUID, mItemUUID, mScriptEd->mScriptName, getHandle(), script_id_hash_str);
+    server->subscribeScriptEditor(mObjectUUID, mItemUUID, mScriptEd->mScriptName, getHandle(), script_id_hash_str, mScriptEd->isLuauLanguage());
     mWebSocketServer = server;
 }
 

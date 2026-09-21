@@ -204,8 +204,20 @@ private:
     using linkset_flush_timer_map_t = std::map<LLUUID, std::weak_ptr<LLEventTimer>>;
     using inventory_request_start_map_t = std::map<LLUUID, F64>;
 
+    // Each item's revision: a count that goes up whenever the item's asset
+    // is another, so that a client holding the item's content knows to
+    // fetch it again without being told the asset itself. Kept as the
+    // inventory is listed, which is why a const listing may change it.
+    struct Revision
+    {
+        LLUUID asset;
+        U32    number{ 0 };
+    };
+    using revision_map_t = std::map<LLUUID, Revision>;
+
     published_map_t mPublishedObjects;
     pending_publish_map_t mPendingPublishes;
+    mutable revision_map_t mRevisions;
     pending_item_create_map_t mPendingItemCreates;
     new_child_prims_map_t mNewChildPrims;
     linkset_flush_timer_map_t mLinksetFlushTimers;

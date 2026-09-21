@@ -200,12 +200,17 @@ public:
     void onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
     void onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
 
+    // A viewer editor holding a script open for live sync, by the
+    // subscription id; `lua` says which compiler's words to expect in
+    // its results.
     bool subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
-        const LLHandle<LLPanel>& editor_handle, const std::string &script_id);
+        const LLHandle<LLPanel>& editor_handle, const std::string &script_id, bool lua = false);
     void unsubscribeEditor(const std::string &script_id);
 
     void notifyScript(const std::string& script_id, const std::string& method, const LLSD& message) const;
     void sendUnsubscribeScriptEditor(const std::string& script_id);
+    // What the compiler said of a script, as the legacy editors report
+    // it: the raw response with `compiled`, `is_running` and `errors`.
     void sendCompileResults(const std::string& script_id, const LLSD& results) const;
 
     LLHandle<LLPanel> findEditorForScript(const std::string& script_id) const;
@@ -308,18 +313,30 @@ private:
     // What a script said, from the workspace, to whoever published its
     // object or subscribed to it.
     void sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const;
+    // What the compiler said of a script saved through the workspace --
+    // by Script Studio, the compile queue, anything but a client's own
+    // object.content.save, which is answered inline -- to the connection
+    // subscribed to it, else to everyone with its object published; and
+    // the prim's inventory fetched again, so that the object.update
+    // that follows carries the item's new revision.
+    void sendCompiled(const ALScriptWorkspace::CompileResult& result);
+    // The script.compiled message for a result, in the protocol's terms.
+    static LLSD compiledMessage(const std::string& script_id, bool success, bool running,
+                                const std::vector<ALScriptWorkspace::Diagnostic>& diagnostics, bool lua);
 
     struct EditorSubscription
     {
-        EditorSubscription(const ItemRef& item_ref, LLHandle<LLPanel> editor_handle):
+        EditorSubscription(const ItemRef& item_ref, LLHandle<LLPanel> editor_handle, bool lua):
             mItemRef(item_ref),
-            mEditorHandle(editor_handle)
+            mEditorHandle(editor_handle),
+            mLua(lua)
         {
         }
         U32 mConnectionID{ 0 };
         ItemRef mItemRef;
         LLScriptEditorWSConnection::wptr_t mConnection;
         LLHandle<LLPanel> mEditorHandle;
+        bool mLua{ false };
     };
     using subscriptions_t = std::unordered_map<std::string, EditorSubscription>;
 
@@ -332,6 +349,7 @@ private:
 
     mutable LLPublishedObjectMgr mPublishedObjectManager;
     boost::signals2::scoped_connection mRuntimeConnection;
+    boost::signals2::scoped_connection mCompiledConnection;
 
     struct WSCommandInfo
     {
