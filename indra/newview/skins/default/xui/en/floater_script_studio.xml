@@ -24,7 +24,28 @@
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
-    <floater.string name="PaneBottom">Problems, references and output</floater.string>
+    <floater.string name="PaneBottom">Problems, references, output and search</floater.string>
+    <floater.string name="SearchFind">Find</floater.string>
+    <floater.string name="SearchPlaceholder">words</floater.string>
+    <floater.string name="SearchQueryTip">What to look for; return runs the search</floater.string>
+    <floater.string name="SearchAs">as</floater.string>
+    <floater.string name="SearchHowTip">How the words have to match: anywhere in the text, as a whole word, or as a regular expression</floater.string>
+    <floater.string name="SearchText">text</floater.string>
+    <floater.string name="SearchWord">a whole word</floater.string>
+    <floater.string name="SearchPattern">a pattern</floater.string>
+    <floater.string name="SearchCaseTip">Whether capitals matter</floater.string>
+    <floater.string name="SearchAnyCase">ignoring case</floater.string>
+    <floater.string name="SearchThisCase">matching case</floater.string>
+    <floater.string name="SearchIn">in</floater.string>
+    <floater.string name="SearchScopeTip">Where to look: the scripts and notecards open, the contents of this script's object, or of every object the explorer lists</floater.string>
+    <floater.string name="SearchOpen">open scripts</floater.string>
+    <floater.string name="SearchThisObject">this object</floater.string>
+    <floater.string name="SearchListed">every object listed</floater.string>
+    <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
+    <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
+    <floater.string name="SearchCount">[HITS] in [FILES] file(s)</floater.string>
+    <floater.string name="SearchNone">nothing found</floater.string>
+    <floater.string name="SearchBadPattern">the pattern does not parse</floater.string>
     <floater.string name="PaneInspector">Inspector</floater.string>
     <floater.string name="KindObject">object</floater.string>
     <floater.string name="KindPrim">prim</floater.string>
@@ -268,6 +289,9 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_previous" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_previous" />
             </menu_item_call>
+            <menu_item_call label="Find in Files..." layout="topleft" name="find_in_files" shortcut="control|shift|F">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_in_files" />
+            </menu_item_call>
         </menu>
         <menu
          label="Go"
@@ -380,6 +404,10 @@
             <menu_item_check label="Output" layout="topleft" name="output" shortcut="control|alt|3">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
+            </menu_item_check>
+            <menu_item_check label="Search" layout="topleft" name="search">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
             </menu_item_check>
             <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|4">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
@@ -753,6 +781,36 @@
                                 <output_list.columns label="Kind" name="kind" width="60" />
                                 <output_list.columns dynamic_width="true" label="Text" name="text" />
                             </output_list>
+                        </panel>
+                        <panel
+                         follows="all"
+                         height="108"
+                         label="Search"
+                         layout="topleft"
+                         name="search_tab"
+                         width="574">
+                            <scope_bar
+                             follows="left|top|right"
+                             height="26"
+                             layout="topleft"
+                             left="0"
+                             name="search_bar"
+                             tool_tip="A search said as a sentence: the words, how they have to match, and where to look. Return runs it, and changing a word runs it again."
+                             top="0"
+                             width="574" />
+                            <scroll_list
+                             follows="all"
+                             height="82"
+                             layout="topleft"
+                             left="0"
+                             name="search_results"
+                             tool_tip="Every place the words were found; double-click one to open its script there"
+                             top_pad="0"
+                             width="574">
+                                <scroll_list.columns label="Where" name="where" width="200" />
+                                <scroll_list.columns label="Line" name="line" width="50" />
+                                <scroll_list.columns dynamic_width="true" label="Text" name="text" />
+                            </scroll_list>
                         </panel>
                     </tab_container>
                 </layout_panel>

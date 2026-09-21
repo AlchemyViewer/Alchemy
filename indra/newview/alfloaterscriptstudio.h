@@ -50,6 +50,7 @@ class LLComboBox;
 class LLPanel;
 class LLScrollListCtrl;
 class LLContextMenu;
+class ALScopeBar;
 class LLEditMenuHandler;
 class LLTabContainer;
 class LLTextEditor;
@@ -146,8 +147,11 @@ private:
             std::string message;
         };
         std::vector<RuntimeProblem>                runtime;
-        // A line to go to once the script has loaded, or -1.
-        S32                                        pendingLine = -1;
+        // A line to go to once the script has loaded, or -1; and a
+        // stretch of it to select, where a column is given.
+        S32                                        pendingLine   = -1;
+        S32                                        pendingColumn = -1;
+        S32                                        pendingLength = 0;
         // Whether the script runs in its object, as the region last
         // said: -1 until it has.
         S32                                        running = -1;
@@ -359,6 +363,23 @@ private:
     void togglePinned(const LLUUID& root, const std::string& name);
     void runningState(const ALScriptWorkspace::RunningState& state);
 
+    // Find in files: words looked for across the scripts open, one
+    // object's contents or every object the explorer lists, said as a
+    // sentence over the Search tab; each place found a row, which opens
+    // its script there. A script that is open is searched as it stands
+    // in the editor, any other as the region has it, fetched if need be;
+    // what arrives after another search has begun is dropped.
+    void buildSearchBar();
+    void findInFiles();
+    void onSearchChanged();
+    void search();
+    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text);
+    void searchLoaded(U32 generation, const std::string& where, const ALScriptWorkspace::Loaded& loaded);
+    void searchSettled();
+    void onSearchResult();
+    // Where to go in a script once it is open, or now.
+    void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length);
+
     // Whether a save may go ahead: the analyzers' check of the text as it
     // stands found no errors, or the person asked twice.
     bool preflight(Doc& doc);
@@ -411,6 +432,18 @@ private:
     LLTextEditor*                      mSymbol        = nullptr;
     ALOutputList*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
+    ALScopeBar*                        mSearchBar     = nullptr;
+    LLScrollListCtrl*                  mSearchResults = nullptr;
+    LLTextBox*                         mSearchCount   = nullptr;
+    // Which search the answers arriving belong to; how many files are
+    // still to answer; what was found so far, and in how many files; the
+    // words last searched for, so that a changed dropdown asks again
+    // about the same words while typing waits for return.
+    U32                                mSearchGeneration = 0;
+    S32                                mSearchPending    = 0;
+    S32                                mSearchHits       = 0;
+    S32                                mSearchFiles      = 0;
+    std::string                        mSearchQuery;
     LLScrollListCtrl*                  mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
     std::vector<Pinned>                mPinned;
