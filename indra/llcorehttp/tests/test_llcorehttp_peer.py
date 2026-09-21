@@ -274,6 +274,13 @@ class Server(HTTPServer):
     # operation of freeport() absolutely depends on it being off.
     allow_reuse_address = False
 
+    # The listen backlog. The server answers one request at a time, and a
+    # test fires half a dozen at once, some of which retry; the default
+    # of five is fewer than that, and where the kernel refuses a SYN the
+    # backlog cannot hold rather than dropping it -- macOS -- the client
+    # sees a connection refused and the test a failure that is nobody's.
+    request_queue_size = 128
+
     # Override of BaseServer.handle_error().  Not too interested
     # in errors and the default handler emits a scary traceback
     # to stderr which annoys some.  Disable this override to get
