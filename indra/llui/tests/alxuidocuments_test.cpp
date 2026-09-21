@@ -343,6 +343,7 @@ namespace tut
         LLFile::remove(path);
         ensure_equals("nothing was read again", open.rereadClean(), 0);
         ensure_equals("and the text is what it was", held->text(), was);
+        ensure("and reading it did not put it back", !LLFile::isfile(path));
         ensure("which the merge is still given", open.textFor(path) != nullptr);
         ensure("and the document says why", !held->error().empty());
     }

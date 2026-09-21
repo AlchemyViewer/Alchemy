@@ -24,6 +24,12 @@
 
 #include "linden_common.h"
 
+#include "../alcodeeditor.h"
+#include "../aldockpanel.h"
+#include "../aljumpbar.h"
+#include "../aloutputlist.h"
+#include "../alscopebar.h"
+#include "../altabstrip.h"
 #include "../llfloater.h"
 #include "../lllayoutstack.h"
 #include "../llresizebar.h"
@@ -54,6 +60,26 @@ namespace tut
     struct alxuifill_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+
+        // The studio's own widgets, made reachable: a static library links
+        // a widget's registrar only with the object file that holds its
+        // block, and a tag nothing registered builds nothing, which leaves
+        // a page short of a child and the rule below reading it wrongly.
+        alxuifill_data()
+        {
+            ALCodeEditor::Params editor;
+            ALDockPanel::Params  dock;
+            ALJumpBar::Params    jump;
+            ALOutputList::Params output;
+            ALScopeBar::Params   scope;
+            ALTabStrip::Params   tabs;
+            (void)editor.name;
+            (void)dock.name;
+            (void)jump.name;
+            (void)output.name;
+            (void)scope.name;
+            (void)tabs.name;
+        }
 
         // A file built the way the studio builds one to look at it: as a
         // child of a panel, so nothing it does reaches the floater view.
@@ -264,10 +290,25 @@ namespace tut
         ensure("the band of problems is in it", main->findChild<LLLayoutPanel>("bottom_panel", true) != nullptr);
         LLLayoutPanel* editor = main->findChild<LLLayoutPanel>("editor_host", true);
         ensure("the editor is in it", editor != nullptr);
-        // The bar between the editor and the band belongs to the panel above
-        // the boundary, so it is the editor's bar that drags the band.
-        ensure("and the band can be dragged",
-               editor->getResizeBar() && editor->getResizeBar()->getVisible());
+        // The bar between the band and what is above it belongs to the panel
+        // above the boundary -- the strip under the editor, since the
+        // breadcrumb moved there -- so it is that panel's bar that drags
+        // the band.
+        LLLayoutPanel* above = nullptr;
+        for (LLView* child : *main->getChildList())
+        {
+            if (LLLayoutPanel* panel = child->as<LLLayoutPanel>())
+            {
+                if (panel->getName() == "bottom_panel")
+                {
+                    break;
+                }
+                above = panel;
+            }
+        }
+        ensure("something sits above the band", above != nullptr);
+        ensure("and the band can be dragged from " + above->getName(),
+               above->getResizeBar() && above->getResizeBar()->getVisible());
 
         stage->die();
     }

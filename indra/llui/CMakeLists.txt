@@ -152,7 +152,6 @@ target_sources(
     alxuidiagnostics.cpp
     alxuiedit.cpp
     alxuidocuments.cpp
-    alxuifindings.cpp
     alxuilint.cpp
     alxuinotes.cpp
     alxuioverlay.cpp
@@ -310,6 +309,7 @@ target_sources(
         alundostack.h
         alstringmatch.h
         alcodeeditor.h
+        alfindings.h
         alfindbar.h
         alkeymap.h
         alvimkeymap.h
