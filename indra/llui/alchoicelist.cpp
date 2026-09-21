@@ -30,6 +30,9 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
+#include <algorithm>
+#include <cmath>
+
 static LLDefaultChildRegistry::Register<ALChoiceList> r("choice_list");
 
 namespace
@@ -38,6 +41,10 @@ namespace
     // and never past this share of the list's width.
     const S32 NOTE_GAP        = 2;
     const F32 NOTE_COLUMN_MAX = 0.6f;
+    // A mark's square is inset this far from the row's edges, and the
+    // text starts this far past the square.
+    const S32 MARK_INSET = 2;
+    const S32 MARK_GAP   = 4;
 }
 
 ALChoiceList::Params::Params()
@@ -59,6 +66,19 @@ ALChoiceList::ALChoiceList(const Params& p)
     mBorderColor(p.border_color.isProvided() ? p.border_color() : LLUIColorTable::instance().getColor("CodeCompletionBorderColor", LLColor4::grey))
 {
     setReadOnly(true);
+    // The marks' column: room before every line's text while any choice
+    // has a mark, which drawRowExtras fills.
+    layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) {
+        if (mMarks && line < count())
+        {
+            ALTextLayout::Inlay mark;
+            mark.column = 0;
+            mark.width  = mMarkWidth;
+            mark.before = true;
+            mark.id     = line;
+            out.push_back(mark);
+        }
+    });
 }
 
 // --- the choices --------------------------------------------------------------
@@ -66,6 +86,10 @@ ALChoiceList::ALChoiceList(const Params& p)
 void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
 {
     mChoices = std::move(choices);
+    // The marks' column, a row's height square and a gap, while any
+    // choice has one.
+    mMarks     = std::any_of(mChoices.begin(), mChoices.end(), [](const Choice& c) { return c.icon || !c.badge.empty(); });
+    mMarkWidth = mMarks ? static_cast<F32>(layout().rowHeight() + MARK_GAP) : 0.f;
     // The text: each choice on a line, its note after a tab. A choice
     // without a note has a space in the note's face there, so that every
     // row is as tall as one with.
@@ -89,9 +113,9 @@ void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
     // The notes' column: one tab stop, past the widest text up to a
     // share of the width. A text wider still runs its note on to the
     // next stop.
-    const F32 cell  = llmax(1.f, layout().columnWidth() / llmax(0.01f, LLFontGL::sScaleX));
+    const F32 cell  = llmax(1.f, layout().columnWidth());
     const F32 limit = static_cast<F32>(getLocalRect().getWidth()) * NOTE_COLUMN_MAX;
-    setTabWidth(llmax(1, static_cast<S32>(std::ceil(llmin(widest, limit) / cell)) + NOTE_GAP));
+    setTabWidth(llmax(1, static_cast<S32>(std::ceil((llmin(widest, limit) + mMarkWidth) / cell)) + NOTE_GAP));
     setText(text);
     // The styles: the text in its own ink where it has one, the note in
     // the reading face and its colour.
@@ -172,6 +196,38 @@ void ALChoiceList::drawBeforeRows(const LLRect& text)
     const S32    top   = screenTopOf(text, mChosen, 0);
     const S32    h     = layout().rowHeightOf(mChosen, 0);
     gl_rect_2d(local.mLeft + 1, top, local.mRight - 1, top - h, selectionColor() % alpha);
+}
+
+void ALChoiceList::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
+{
+    if (!mMarks || row != 0 || line < 0 || line >= count())
+    {
+        return;
+    }
+    const Choice& choice = mChoices[static_cast<size_t>(line)];
+    if (!choice.icon && choice.badge.empty())
+    {
+        return;
+    }
+    // The square: a row's height less the inset, at the row's top left,
+    // in the gap the layout left before the text.
+    const S32    top  = screenTopOf(text, line, 0);
+    const S32    side = layout().rowHeight() - 2 * MARK_INSET;
+    const S32    x0   = static_cast<S32>(left) + MARK_INSET;
+    const LLRect box(x0, top - MARK_INSET, x0 + side, top - MARK_INSET - side);
+    if (choice.icon)
+    {
+        choice.icon->draw(box, LLColor4::white % alpha);
+        return;
+    }
+    const LLColor4 ink = choice.color ? *choice.color : textColor();
+    gl_rect_2d(box, lerp(backgroundColor(), ink, 0.25f) % alpha);
+    if (const LLFontGL* font = getFont())
+    {
+        const F32 x = static_cast<F32>(box.mLeft + box.mRight) * 0.5f;
+        const F32 y = static_cast<F32>(box.mBottom) + (static_cast<F32>(side) - font->getLineHeight()) * 0.5f + font->getDescenderHeight();
+        font->renderUTF8(choice.badge, 0, x, y, ink % alpha, LLFontGL::HCENTER, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+    }
 }
 
 void ALChoiceList::draw()

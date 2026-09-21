@@ -1670,6 +1670,33 @@ void ALCodeEditor::refreshCompletion()
     listCompletions();
 }
 
+// static
+const char* ALCodeEditor::badgeOf(const Completion& completion)
+{
+    if (!completion.snippet.empty())
+    {
+        return "s";
+    }
+    switch (completion.kind)
+    {
+        case ALSyntaxKind::Function:     return "f";
+        case ALSyntaxKind::Event:        return "e";
+        case ALSyntaxKind::Constant:     return "c";
+        case ALSyntaxKind::Keyword:
+        case ALSyntaxKind::Control:      return "k";
+        case ALSyntaxKind::Type:         return "T";
+        case ALSyntaxKind::Variable:     return "v";
+        case ALSyntaxKind::Parameter:    return "p";
+        case ALSyntaxKind::Property:     return ".";
+        case ALSyntaxKind::Label:        return "L";
+        case ALSyntaxKind::Preprocessor: return "#";
+        case ALSyntaxKind::Tag:          return "<";
+        case ALSyntaxKind::Attribute:    return "@";
+        case ALSyntaxKind::Deprecated:   return "!";
+        default:                         return "w";
+    }
+}
+
 void ALCodeEditor::listCompletions()
 {
     const S32 was = llmax(0, mCompletionList->chosen());
@@ -1682,8 +1709,10 @@ void ALCodeEditor::listCompletions()
     for (const Completion& c : mCompletions)
     {
         ALChoiceList::Choice choice;
-        choice.text = c.text;
-        choice.note = c.detail;
+        choice.text  = c.text;
+        choice.note  = c.detail;
+        choice.icon  = c.icon;
+        choice.badge = badgeOf(c);
         if (c.kind != ALSyntaxKind::Text)
         {
             choice.color = colorForKind(c.kind);

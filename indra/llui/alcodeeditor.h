@@ -220,7 +220,12 @@ public:
         // A snippet rather than a word: accepting it puts this body in
         // place of the prefix, with its placeholders to tab through.
         std::string  snippet;
+        // The mark before it on the list, where the provider has one;
+        // else a badge for its kind.
+        LLUIImagePtr icon;
     };
+    // The badge a kind wears on the list until it has an icon: a letter.
+    static const char* badgeOf(const Completion& completion);
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
     // words of the document itself are added after whatever it answers,

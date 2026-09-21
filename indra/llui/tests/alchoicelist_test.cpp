@@ -155,4 +155,18 @@ namespace tut
         v.choose(0);
         ensure_equals("and back", v.scrollY(), 0);
     }
+    template<> template<>
+    void alchoicelist_object::test<3>()
+    {
+        set_test_name("a mark before the text -- an icon or a badge -- gives every line a column for it, and none takes it away");
+        ALChoiceList& v = make();
+        ALChoiceList::Choice marked = choice("llSay", "(integer, string)");
+        marked.badge                = "f";
+        v.setChoices({ marked, choice("plain", "") });
+        const F32 with = v.layout().xOf(0, 0);
+        ensure("the text starts past the marks' column", with >= static_cast<F32>(v.layout().rowHeight()));
+        ensure("on every line alike", std::abs(v.layout().xOf(1, 0) - with) < 1.f);
+        v.setChoices({ choice("llSay", ""), choice("plain", "") });
+        ensure("no marks, no column", v.layout().xOf(0, 0) < 1.f);
+    }
 }
