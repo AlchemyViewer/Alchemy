@@ -426,7 +426,14 @@ inline int decode_access_mode(std::ios_base::openmode omode)
 
 inline int decode_open_mode(std::ios_base::openmode omode)
 {
-    int flags = O_CREAT | decode_access_mode(omode);
+    // Created only where it is opened for writing, as the Windows path
+    // decides it: a file opened to be read, and not there, is an error,
+    // not an empty file left behind.
+    int flags = decode_access_mode(omode);
+    if ((omode & LLFile::out) || (omode & LLFile::app) || (omode & LLFile::noreplace))
+    {
+        flags |= O_CREAT;
+    }
     if (omode & LLFile::app)
     {
         flags |= O_APPEND;
