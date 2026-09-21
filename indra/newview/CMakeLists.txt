@@ -170,7 +170,10 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
+    alfloaterscriptpreferences.cpp
+    alscriptkeymap.cpp
     alscriptpreprocessor.cpp
+    alscripttheme.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
     alfloaterscriptstudio.cpp
@@ -961,7 +964,10 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h
+    alfloaterscriptpreferences.h
+    alscriptkeymap.h
     alscriptpreprocessor.h
+    alscripttheme.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
     altexturetable.h

@@ -376,6 +376,61 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptStudioFontFamily</key>
+        <map>
+            <key>Comment</key>
+            <string>The font family Script Studio's editors use, by its name in fonts.xml; empty for the Monospace family, which follows the UI font overrides.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioFontSize</key>
+        <map>
+            <key>Comment</key>
+            <string>The size Script Studio's editors use, by its name in fonts.xml; empty for the Monospace size.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioFontStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>The style Script Studio's editors' font is drawn in: empty, BOLD, ITALIC or BOLD|ITALIC.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioTheme</key>
+        <map>
+            <key>Comment</key>
+            <string>The theme Script Studio's editor colours were last set from, by name; empty once a colour is changed by hand.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptStudioKeymap</key>
+        <map>
+            <key>Comment</key>
+            <string>The editor commands Script Studio's keyboard map rebound, each to the keys given; a command not named keeps the standard keys.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
         <key>ALScriptStudioPreflight</key>
         <map>
             <key>Comment</key>

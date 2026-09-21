@@ -25,6 +25,19 @@
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
     <floater.string name="PaneBottom">Problems, references, output and search</floater.string>
+    <floater.string name="NoReference">Nothing at the caret to look up.</floater.string>
+    <floater.string name="ReferenceTitle">Reference</floater.string>
+    <floater.string name="ReferencePlaceholder">A function, event or constant by name</floater.string>
+    <floater.string name="SnippetDetail">snippet</floater.string>
+    <floater.string name="Deprecated">deprecated</floater.string>
+    <floater.string name="InsertTitle">Insert</floater.string>
+    <floater.string name="InsertSnippetPlaceholder">A snippet by name</floater.string>
+    <floater.string name="InsertFunctionPlaceholder">A function by name</floater.string>
+    <floater.string name="InsertEventPlaceholder">An event by name</floater.string>
+    <floater.string name="InsertConstantPlaceholder">A constant by name</floater.string>
+    <floater.string name="Formatted">[NAME] formatted.</floater.string>
+    <floater.string name="FormattedSelection">The selection in [NAME] formatted.</floater.string>
+    <floater.string name="FormattedAlready">[NAME] was formatted already.</floater.string>
     <floater.string name="SearchFind">Find</floater.string>
     <floater.string name="SearchPlaceholder">words</floater.string>
     <floater.string name="SearchQueryTip">What to look for; return runs the search</floater.string>
@@ -273,6 +286,15 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu_item_call label="Format Document" layout="topleft" name="format" shortcut="shift|alt|F">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format" />
+            </menu_item_call>
+            <menu_item_call label="Format Selection" layout="topleft" name="format_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format_selection" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_call label="Find..." layout="topleft" name="find" shortcut="control|F">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find" />
@@ -291,6 +313,30 @@
             </menu_item_call>
             <menu_item_call label="Find in Files..." layout="topleft" name="find_in_files" shortcut="control|shift|F">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_in_files" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="Insert"
+         layout="topleft"
+         mouse_opaque="false"
+         name="insert"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Snippet..." layout="topleft" name="insert_snippet" shortcut="control|shift|I">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_snippet" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_snippet" />
+            </menu_item_call>
+            <menu_item_call label="Function..." layout="topleft" name="insert_function">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_function" />
+            </menu_item_call>
+            <menu_item_call label="Event Handler..." layout="topleft" name="insert_event">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_event" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_event" />
+            </menu_item_call>
+            <menu_item_call label="Constant..." layout="topleft" name="insert_constant">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_constant" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_constant" />
             </menu_item_call>
         </menu>
         <menu
@@ -319,6 +365,25 @@
             </menu_item_call>
         </menu>
         <menu
+         label="Help"
+         layout="topleft"
+         mouse_opaque="false"
+         name="help"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Reference for the Word at the Caret" layout="topleft" name="reference" shortcut="F1">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="reference" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="reference" />
+            </menu_item_call>
+            <menu_item_call label="Browse the Reference..." layout="topleft" name="browse_reference">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="browse_reference" />
+            </menu_item_call>
+            <menu_item_call label="Open in the Wiki" layout="topleft" name="wiki">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="wiki" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="wiki" />
+            </menu_item_call>
+        </menu>
+        <menu
          label="View"
          layout="topleft"
          mouse_opaque="false"
@@ -333,6 +398,10 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
             </menu_item_check>
+            <menu_item_call label="Preferences..." layout="topleft" name="preferences">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu
              label="Scrollbar"
              layout="topleft"
@@ -882,8 +951,9 @@
                      layout="topleft"
                      left="0"
                      name="symbol"
+                     parse_urls="true"
                      read_only="true"
-                     tool_tip="The symbol at the caret: its declaration and its documentation"
+                     tool_tip="The symbol at the caret: its declaration, its documentation and its page on the wiki; F1 asks for a word, and the Help menu browses the whole reference"
                      top="0"
                      width="250"
                      word_wrap="true" />

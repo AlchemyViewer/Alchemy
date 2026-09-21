@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's preferences: Colours, with a theme to pick and every
+     colour to change by hand against a live preview, and the font;
+     Editor, with the ways of saving and preprocessing; and Keys, the
+     keyboard map. -->
+<floater
+ legacy_header_height="18"
+ can_minimize="false"
+ can_resize="true"
+ height="560"
+ layout="topleft"
+ min_height="420"
+ min_width="640"
+ name="script_studio_prefs"
+ reuse_instance="true"
+ save_rect="true"
+ title="SCRIPT STUDIO PREFERENCES"
+ width="820">
+    <floater.string name="ThemeCustom">Custom</floater.string>
+    <floater.string name="ThemeOwn">(yours)</floater.string>
+    <floater.string name="ThemeNewName">My Theme</floater.string>
+    <floater.string name="HeadingEditor">Editor</floater.string>
+    <floater.string name="HeadingSyntax">Syntax</floater.string>
+    <floater.string name="NoFolder">(no folder chosen)</floater.string>
+    <floater.string name="PreviewLSL">// Every kind of token, to see the colours by
+#define GREETING "Hello"
+integer count = 0;
+string  name  = "Avatar\n";
+
+float half(integer n)
+{
+    return (float)n / 2.0;
+}
+
+default
+{
+    state_entry()
+    {
+        llSay(PUBLIC_CHANNEL, GREETING + " " + name);
+        llSetTimerEvent(half(count) + 1.0);
+        vector where = &lt;1.0, 0.0, 0.5&gt;;
+        @again;
+        if (++count &lt; 3) jump again;
+        llSound("", 1.0, TRUE, FALSE);
+        state other;
+    }
+}</floater.string>
+    <floater.string name="PreviewSLua">--!strict
+-- Every kind of token, to see the colours by
+local count: number = 0
+local name = "Avatar\n"
+
+local function half(n: number): number
+    return n / 2
+end
+
+LLEvents.touch_start = function(detected)
+    ll.Say(PUBLIC_CHANNEL, `Hello {name}`)
+    for i = 1, #detected do
+        count += 1
+    end
+    if count &gt; 3 then
+        LLTimers:once(half(count), function()
+            ll.OwnerSay(tostring(math.pi))
+        end)
+    end
+end</floater.string>
+    <tab_container
+     follows="all"
+     height="500"
+     layout="topleft"
+     left="8"
+     name="tabs"
+     tab_min_width="80"
+     tab_position="top"
+     top="24"
+     width="804">
+        <panel
+         follows="all"
+         height="478"
+         label="Colours"
+         layout="topleft"
+         name="colors_tab"
+         width="804">
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="8"
+             name="theme_label"
+             top="10"
+             width="50">
+                Theme
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="theme"
+             tool_tip="A set of colours for every part of the editor; Custom is whatever the swatches say"
+             top_delta="-3"
+             width="220" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Save as..."
+             layout="topleft"
+             left_pad="6"
+             name="save_theme"
+             tool_tip="The colours as they stand, kept as a theme of your own"
+             top_delta="0"
+             width="90" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Skin Colours"
+             layout="topleft"
+             left_pad="4"
+             name="restore_skin"
+             tool_tip="Every colour back to what the skin declares"
+             top_delta="0"
+             width="100" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="8"
+             name="font_label"
+             top_pad="12"
+             width="50">
+                Font
+            </text>
+            <font_field
+             editable="false"
+             families="monospace"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="font"
+             tool_tip="The editors' font, shown in itself; click to pick the face, the size and the style against a sample"
+             top_delta="-3"
+             width="320" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left_pad="20"
+             name="preview_label"
+             top_delta="3"
+             width="60">
+                Preview
+            </text>
+            <combo_box
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="preview_language"
+             tool_tip="Which language the preview shows"
+             top_delta="-3"
+             width="100">
+                <combo_box.item label="LSL" name="lsl" value="lsl" />
+                <combo_box.item label="SLua" name="slua" value="slua" />
+            </combo_box>
+            <layout_stack
+             animate="false"
+             follows="all"
+             height="430"
+             layout="topleft"
+             left="8"
+             name="colors_stack"
+             orientation="horizontal"
+             top_pad="10"
+             width="788">
+                <layout_panel
+                 auto_resize="false"
+                 height="430"
+                 layout="topleft"
+                 min_dim="200"
+                 name="swatch_panel"
+                 user_resize="true"
+                 width="260">
+                    <scroll_container
+                     follows="all"
+                     height="430"
+                     layout="topleft"
+                     left="0"
+                     name="swatch_scroll"
+                     top="0"
+                     width="260">
+                        <panel
+                         follows="left|top|right"
+                         height="430"
+                         layout="topleft"
+                         left="0"
+                         name="swatches"
+                         top="0"
+                         width="240" />
+                    </scroll_container>
+                </layout_panel>
+                <layout_panel
+                 auto_resize="true"
+                 height="430"
+                 layout="topleft"
+                 min_dim="200"
+                 name="preview_panel"
+                 width="518">
+                    <code_editor
+                     bg_color="ScriptBackground"
+                     bg_focus_color="ScriptBackground"
+                     bg_readonly_color="ScriptBgReadOnlyColor"
+                     bracket_match_color="ScriptBracketMatchColor"
+                     current_line_color="ScriptCurrentLineColor"
+                     cursor_color="ScriptCursorColor"
+                     find_match_color="ScriptFindMatchColor"
+                     fold_color="ScriptFoldColor"
+                     follows="all"
+                     gutter_color="ScriptGutterColor"
+                     height="430"
+                     highlight_color="ScriptHighlightColor"
+                     layout="topleft"
+                     left="0"
+                     line_number_color="ScriptLineNumberColor"
+                     name="preview"
+                     selection_color="ScriptSelectionColor"
+                     show_line_numbers="true"
+                     syntax="lsl"
+                     syntax_color_prefix="Script"
+                     text_color="ScriptText"
+                     text_readonly_color="ScriptText"
+                     tool_tip="How the editors will look; type here freely, nothing is kept"
+                     top="0"
+                     width="518" />
+                </layout_panel>
+            </layout_stack>
+        </panel>
+        <panel
+         follows="all"
+         height="478"
+         label="Editor"
+         layout="topleft"
+         name="editor_tab"
+         width="804">
+            <check_box
+             control_name="ALScriptStudioEnabled"
+             follows="left|top"
+             height="20"
+             label="Open scripts in Script Studio rather than the old editor"
+             layout="topleft"
+             left="12"
+             name="studio_enabled"
+             top="12"
+             width="400" />
+            <check_box
+             control_name="ALScriptStudioPreflight"
+             follows="left|top"
+             height="20"
+             label="Check a script before saving it, and ask again to save over errors"
+             layout="topleft"
+             left="12"
+             name="preflight"
+             top_pad="4"
+             width="400" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="preproc_heading"
+             top_pad="16"
+             width="400">
+                Preprocessor
+            </text>
+            <check_box
+             control_name="ALScriptPreprocEnabled"
+             follows="left|top"
+             height="20"
+             label="Preprocess every script on save (a wrapped script always is)"
+             layout="topleft"
+             left="12"
+             name="preproc_enabled"
+             top_pad="6"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocSwitch"
+             follows="left|top"
+             height="20"
+             label="Switch statements"
+             layout="topleft"
+             left="12"
+             name="preproc_switch"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocLazyLists"
+             follows="left|top"
+             height="20"
+             label="Lazy lists"
+             layout="topleft"
+             left="12"
+             name="preproc_lazy"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocCompress"
+             follows="left|top"
+             height="20"
+             label="Compress the output"
+             layout="topleft"
+             left="12"
+             name="preproc_compress"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocOptimizer"
+             follows="left|top"
+             height="20"
+             label="Optimize LSL: fold constants, drop what is unused, and say what changed"
+             layout="topleft"
+             left="12"
+             name="preproc_optimize"
+             top_pad="4"
+             width="500" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerShrinkNames"
+             follows="left|top"
+             height="20"
+             label="Shrink names when optimizing"
+             layout="topleft"
+             left="32"
+             name="preproc_shrink"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerAddStrings"
+             follows="left|top"
+             height="20"
+             label="Join string constants when optimizing"
+             layout="topleft"
+             left="32"
+             name="preproc_addstrings"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocDiskIncludes"
+             follows="left|top"
+             height="20"
+             label="Include files from a folder on disk"
+             layout="topleft"
+             left="12"
+             name="preproc_disk"
+             top_pad="10"
+             width="400" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="32"
+             name="include_folder"
+             top_pad="4"
+             width="500"
+             use_ellipses="true">
+                (no folder chosen)
+            </text>
+            <button
+             follows="left|top"
+             height="22"
+             label="Choose Folder..."
+             layout="topleft"
+             left="32"
+             name="choose_folder"
+             top_pad="4"
+             width="130" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="12"
+             name="order_label"
+             top_pad="14"
+             width="400">
+                Where an include is looked for first, in order:
+            </text>
+            <line_editor
+             control_name="ALScriptPreprocIncludeOrder"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left="12"
+             name="include_order"
+             tool_tip="Any of inventory, object and disk, separated by spaces"
+             top_pad="4"
+             width="300" />
+        </panel>
+        <panel
+         class="al_panel_script_keymap"
+         filename="panel_script_studio_keys.xml"
+         follows="all"
+         height="478"
+         label="Keys"
+         layout="topleft"
+         name="keys_tab"
+         width="804" />
+    </tab_container>
+    <button
+     follows="right|bottom"
+     height="22"
+     label="OK"
+     layout="topleft"
+     name="ok"
+     right="-8"
+     tool_tip="Keep what was changed"
+     top_pad="6"
+     width="90" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="Cancel"
+     layout="topleft"
+     name="cancel"
+     right="-104"
+     tool_tip="Every colour and setting back to what it was when this window opened"
+     top_delta="0"
+     width="90" />
+</floater>

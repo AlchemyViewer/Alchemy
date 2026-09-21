@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Script Studio's keyboard map, a tab of its preferences: every
+     command of the editor with the keys it answers to, to read, to
+     search, and to change. The menus keep the shortcuts they show; these
+     are the editor's own. -->
+<panel
+ follows="all"
+ height="440"
+ layout="topleft"
+ name="keys_panel"
+ width="480">
+    <panel.string name="NoKeys">(none)</panel.string>
+    <panel.string name="Changed">changed</panel.string>
+    <panel.string name="cmd_move_left">Move left</panel.string>
+    <panel.string name="cmd_move_right">Move right</panel.string>
+    <panel.string name="cmd_move_up">Move up</panel.string>
+    <panel.string name="cmd_move_down">Move down</panel.string>
+    <panel.string name="cmd_move_word_left">Move a word left</panel.string>
+    <panel.string name="cmd_move_word_right">Move a word right</panel.string>
+    <panel.string name="cmd_move_line_start">Move to the line's start</panel.string>
+    <panel.string name="cmd_move_line_end">Move to the line's end</panel.string>
+    <panel.string name="cmd_move_doc_start">Move to the top</panel.string>
+    <panel.string name="cmd_move_doc_end">Move to the end</panel.string>
+    <panel.string name="cmd_move_page_up">Move a page up</panel.string>
+    <panel.string name="cmd_move_page_down">Move a page down</panel.string>
+    <panel.string name="cmd_select_left">Select left</panel.string>
+    <panel.string name="cmd_select_right">Select right</panel.string>
+    <panel.string name="cmd_select_up">Select up</panel.string>
+    <panel.string name="cmd_select_down">Select down</panel.string>
+    <panel.string name="cmd_select_word_left">Select a word left</panel.string>
+    <panel.string name="cmd_select_word_right">Select a word right</panel.string>
+    <panel.string name="cmd_select_line_start">Select to the line's start</panel.string>
+    <panel.string name="cmd_select_line_end">Select to the line's end</panel.string>
+    <panel.string name="cmd_select_doc_start">Select to the top</panel.string>
+    <panel.string name="cmd_select_doc_end">Select to the end</panel.string>
+    <panel.string name="cmd_select_page_up">Select a page up</panel.string>
+    <panel.string name="cmd_select_page_down">Select a page down</panel.string>
+    <panel.string name="cmd_select_all">Select all</panel.string>
+    <panel.string name="cmd_delete_left">Delete left</panel.string>
+    <panel.string name="cmd_delete_right">Delete right</panel.string>
+    <panel.string name="cmd_delete_word_left">Delete the word left</panel.string>
+    <panel.string name="cmd_delete_word_right">Delete the word right</panel.string>
+    <panel.string name="cmd_new_line">New line</panel.string>
+    <panel.string name="cmd_indent">Indent</panel.string>
+    <panel.string name="cmd_unindent">Unindent</panel.string>
+    <panel.string name="cmd_undo">Undo</panel.string>
+    <panel.string name="cmd_redo">Redo</panel.string>
+    <panel.string name="cmd_cut">Cut</panel.string>
+    <panel.string name="cmd_copy">Copy</panel.string>
+    <panel.string name="cmd_paste">Paste</panel.string>
+    <panel.string name="cmd_delete">Delete</panel.string>
+    <panel.string name="cmd_toggle_comment">Toggle comment</panel.string>
+    <panel.string name="cmd_duplicate_line">Duplicate the line</panel.string>
+    <panel.string name="cmd_move_line_up">Move the line up</panel.string>
+    <panel.string name="cmd_move_line_down">Move the line down</panel.string>
+    <panel.string name="cmd_delete_line">Delete the line</panel.string>
+    <panel.string name="cmd_fold">Fold</panel.string>
+    <panel.string name="cmd_unfold">Unfold</panel.string>
+    <panel.string name="cmd_fold_all">Fold all</panel.string>
+    <panel.string name="cmd_unfold_all">Unfold all</panel.string>
+    <panel.string name="cmd_complete">Complete</panel.string>
+    <panel.string name="cmd_go_to_definition">Go to definition</panel.string>
+    <panel.string name="cmd_find_references">Find references</panel.string>
+    <panel.string name="cmd_rename">Rename symbol</panel.string>
+    <panel.string name="cmd_find">Find</panel.string>
+    <panel.string name="cmd_replace">Replace</panel.string>
+    <panel.string name="cmd_find_next">Find next</panel.string>
+    <panel.string name="cmd_find_previous">Find previous</panel.string>
+    <line_editor
+     follows="left|top|right"
+     height="22"
+     label="Filter by command or key"
+     layout="topleft"
+     left="8"
+     name="filter"
+     tool_tip="Only the commands whose names or keys carry this"
+     top="8"
+     width="464" />
+    <scroll_list
+     follows="all"
+     height="372"
+     layout="topleft"
+     left="8"
+     name="keys"
+     tool_tip="Every command and its keys; double-click one to press a new key for it"
+     top_pad="4"
+     width="464">
+        <scroll_list.columns dynamic_width="true" label="Command" name="command" />
+        <scroll_list.columns label="Keys" name="keys" width="170" />
+        <scroll_list.columns label="" name="changed" width="60" />
+    </scroll_list>
+    <button
+     follows="left|bottom"
+     height="22"
+     label="Change..."
+     layout="topleft"
+     left="8"
+     name="change"
+     tool_tip="Press a key to answer for the chosen command, in place of its keys"
+     top_pad="6"
+     width="80" />
+    <button
+     follows="left|bottom"
+     height="22"
+     label="Add..."
+     layout="topleft"
+     left_pad="4"
+     name="add"
+     tool_tip="Press another key to answer for the chosen command, beside its keys"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="left|bottom"
+     height="22"
+     label="Clear"
+     layout="topleft"
+     left_pad="4"
+     name="clear"
+     tool_tip="No key for the chosen command"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="left|bottom"
+     height="22"
+     label="Standard"
+     layout="topleft"
+     left_pad="4"
+     name="restore"
+     tool_tip="The chosen command's standard keys again"
+     top_delta="0"
+     width="80" />
+    <button
+     follows="right|bottom"
+     height="22"
+     label="All Standard"
+     layout="topleft"
+     name="restore_all"
+     right="-8"
+     tool_tip="Every command's standard keys again"
+     top_delta="0"
+     width="100" />
+</panel>

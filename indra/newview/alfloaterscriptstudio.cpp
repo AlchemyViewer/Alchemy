@@ -31,6 +31,8 @@
 #include "aljumpbar.h"
 #include "aloutputlist.h"
 #include "alscopebar.h"
+#include "alscriptformatter.h"
+#include "alscriptkeymap.h"
 #include "altabstrip.h"
 #include "altextsearch.h"
 #include "llagent.h"
@@ -42,6 +44,7 @@
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
+#include "lldir.h"
 #include "lldirpicker.h"
 #include "lleditmenuhandler.h"
 #include "llfocusmgr.h"
@@ -53,14 +56,17 @@
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
+#include "llsdserialize.h"
 #include "llselectmgr.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
 #include "lltexteditor.h"
 #include "lltrans.h"
+#include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
+#include "llweb.h"
 #include "llviewermenufile.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
@@ -365,7 +371,7 @@ bool ALFloaterScriptStudio::postBuild()
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
         ALScriptAnalysis::instance().definitionsChanged();
-        mVocabularyBuilt[0] = mVocabularyBuilt[1] = false;
+        forgetVocabulary();
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
             if (doc->loaded)
@@ -469,6 +475,27 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     p.word_wrap         = mWordWrap;
     p.show_line_numbers = mLineNumbers;
     p.soft_tabs         = true;
+    // The studio's own colours, which a theme sets as one: the legacy
+    // script colours for the text and the ground, and every kind under
+    // the Script prefix. By name, as a XUI file gives them, so that the
+    // editor holds a handle to the table's colour and follows it; a
+    // colour given as a value is copied into its components and stays
+    // what it was.
+    p.syntax_color_prefix        = "Script";
+    p.text_color.control         = "ScriptText";
+    p.text_readonly_color.control = "ScriptText";
+    p.bg_color.control           = "ScriptBackground";
+    p.bg_focus_color.control     = "ScriptBackground";
+    p.bg_readonly_color.control  = "ScriptBgReadOnlyColor";
+    p.cursor_color.control       = "ScriptCursorColor";
+    p.selection_color.control    = "ScriptSelectionColor";
+    p.find_match_color.control   = "ScriptFindMatchColor";
+    p.bracket_match_color.control = "ScriptBracketMatchColor";
+    p.gutter_color.control       = "ScriptGutterColor";
+    p.line_number_color.control  = "ScriptLineNumberColor";
+    p.current_line_color.control = "ScriptCurrentLineColor";
+    p.fold_color.control         = "ScriptFoldColor";
+    p.highlight_color.control    = "ScriptHighlightColor";
     ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
     editor->setVisible(false);
     applyEditorOptions(*editor);
@@ -476,8 +503,34 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     return editor;
 }
 
+// static
+const LLFontGL* ALFloaterScriptStudio::editorFont()
+{
+    static LLCachedControl<std::string> family(gSavedSettings, "ALScriptStudioFontFamily", "");
+    static LLCachedControl<std::string> size(gSavedSettings, "ALScriptStudioFontSize", "");
+    static LLCachedControl<std::string> style(gSavedSettings, "ALScriptStudioFontStyle", "");
+    const std::string                   name = family().empty() ? std::string("Monospace") : family();
+    const std::string                   how  = size().empty() ? std::string("Monospace") : size();
+    const LLFontGL*                     font = LLFontGL::getFont(LLFontDescriptor(name, how, LLFontGL::getStyleFromString(style())));
+    return font ? font : LLFontGL::getFontMonospace();
+}
+
+// static
+void ALFloaterScriptStudio::refreshAll()
+{
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(floater))
+        {
+            studio->applyEditorOptions();
+        }
+    }
+}
+
 void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
 {
+    editor.setFont(editorFont());
+    editor.keymap() = ALScriptKeymap::current();
     editor.setWordWrap(mWordWrap);
     editor.setShowLineNumbers(mLineNumbers);
     editor.setScrollMapWidth(mScrollMapWidth);
@@ -894,14 +947,29 @@ void ALFloaterScriptStudio::chooseIncludeFolder()
 
 // --- the language's words --------------------------------------------------------
 
+namespace
+{
+    // The words of each language, built once from the definitions and
+    // kept until they change.
+    std::vector<ALFloaterScriptStudio::Vocab> sVocabulary[2];
+    bool                                      sVocabularyBuilt[2] = { false, false };
+}
+
+// static
+void ALFloaterScriptStudio::forgetVocabulary()
+{
+    sVocabularyBuilt[0] = sVocabularyBuilt[1] = false;
+}
+
+// static
 const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabulary(bool lua)
 {
-    std::vector<Vocab>& out = mVocabulary[lua ? 1 : 0];
-    if (mVocabularyBuilt[lua ? 1 : 0])
+    std::vector<Vocab>& out = sVocabulary[lua ? 1 : 0];
+    if (sVocabularyBuilt[lua ? 1 : 0])
     {
         return out;
     }
-    mVocabularyBuilt[lua ? 1 : 0] = true;
+    sVocabularyBuilt[lua ? 1 : 0] = true;
     out.clear();
     const LLSD keywords = lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
     if (!keywords.isMap())
@@ -1019,11 +1087,10 @@ const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabula
     return out;
 }
 
-void ALFloaterScriptStudio::teachEditor(Doc& doc)
+// static
+void ALFloaterScriptStudio::teachWords(ALCodeEditor& editor, bool lua)
 {
-    ALCodeEditor&             editor = *doc.editor;
-    const bool                lua    = doc.language.lua;
-    const std::vector<Vocab>& words  = vocabulary(lua);
+    const std::vector<Vocab>& words = vocabulary(lua);
     std::vector<std::string>  functions, events, types, controls, constants, deprecated;
     for (const Vocab& word : words)
     {
@@ -1050,6 +1117,13 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     tables.set("constant", std::move(constants));
     tables.set("deprecated", std::move(deprecated));
     editor.highlighter().wordsChanged();
+}
+
+void ALFloaterScriptStudio::teachEditor(Doc& doc)
+{
+    ALCodeEditor& editor = *doc.editor;
+    const bool    lua    = doc.language.lua;
+    teachWords(editor, lua);
 
     // The analyzer answers what the vocabulary cannot: the script's own
     // symbols, the types of things, what a call takes.
@@ -1058,52 +1132,241 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
     editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
-    editor.setHoverProvider([this, lua](const ALTextPos&, std::string_view word, std::string& text) {
-        const std::vector<Vocab>& words = vocabulary(lua);
-        // A member of ll or a local is the analyzer's to explain.
-        if (lua)
+    editor.setHoverProvider([lua, raw](const ALTextPos& at, std::string_view word, std::string& text) {
+        // The word as the vocabulary knows it: `Say` under the mouse in
+        // `ll.Say` is asked about as `ll.Say`, and `pi` in `math.pi` as
+        // `math.pi`. A local, a parameter or a member the definitions do
+        // not name is the analyzer's to explain.
+        std::string        name(word);
+        const std::string& line = raw->editor->document().line(at.line);
+        S32                from = at.column;
+        while (from > 0 && line[from - 1] != '.' && (isalnum(static_cast<unsigned char>(line[from - 1])) || line[from - 1] == '_'))
+        {
+            --from;
+        }
+        while (from > 0 && line[from - 1] == '.')
+        {
+            S32 head = from - 1;
+            while (head > 0 && (isalnum(static_cast<unsigned char>(line[head - 1])) || line[head - 1] == '_'))
+            {
+                --head;
+            }
+            if (head == from - 1)
+            {
+                break;
+            }
+            name = line.substr(head, from - 1 - head) + "." + name;
+            from = head;
+        }
+        const Vocab* known = vocabWord(lua, name);
+        if (!known)
+        {
+            known = vocabWord(lua, word);
+        }
+        if (!known)
         {
             return false;
         }
-        const auto it = std::lower_bound(words.begin(), words.end(), word,
-                                         [](const Vocab& v, std::string_view w) { return v.text < w; });
-        if (it == words.end() || it->text != word)
+        text = known->detail.empty() ? known->text : known->detail;
+        if (!known->tooltip.empty())
         {
-            return false;
+            text += "\n" + known->tooltip;
         }
-        text = it->detail.empty() ? it->text : it->detail;
-        if (!it->tooltip.empty())
-        {
-            text += "\n" + it->tooltip;
-        }
-        if (it->deprecated)
+        if (known->deprecated)
         {
             text += "\n(deprecated)";
         }
         return true;
     });
     editor.setCompletionProvider([this, lua](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+        auto begins = [&prefix](const std::string& word) {
+            if (word.size() < prefix.size())
+            {
+                return false;
+            }
+            for (size_t i = 0; i < prefix.size(); ++i)
+            {
+                if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
         for (const Vocab& word : vocabulary(lua))
         {
-            if (word.text.size() < prefix.size())
+            if (begins(word.text))
             {
-                continue;
+                out.push_back(completionFor(word, lua));
             }
-            bool match = true;
-            for (size_t i = 0; i < prefix.size() && match; ++i)
+        }
+        // A snippet by its prefix, where a bare word is being typed
+        // rather than a member.
+        if (prefix.find('.') == std::string_view::npos)
+        {
+            for (const Snippet& snippet : snippets(lua))
             {
-                match = LLStringOps::toLower(word.text[i]) == LLStringOps::toLower(prefix[i]);
-            }
-            if (match)
-            {
-                ALCodeEditor::Completion c;
-                c.text   = word.text;
-                c.detail = word.detail;
-                c.kind   = word.deprecated ? ALSyntaxKind::Deprecated : word.kind;
-                out.push_back(std::move(c));
+                if (begins(snippet.prefix))
+                {
+                    ALCodeEditor::Completion c;
+                    c.text    = snippet.prefix;
+                    c.detail  = getString("SnippetDetail") + "  " + snippet.name;
+                    c.kind    = ALSyntaxKind::Control;
+                    c.snippet = snippet.body;
+                    out.push_back(std::move(c));
+                }
             }
         }
     });
+}
+
+ALCodeEditor::Completion ALFloaterScriptStudio::completionFor(const Vocab& word, bool lua) const
+{
+    ALCodeEditor::Completion c;
+    c.text   = word.text;
+    c.detail = word.detail;
+    c.kind   = word.deprecated ? ALSyntaxKind::Deprecated : word.kind;
+    if (word.kind == ALSyntaxKind::Event)
+    {
+        // A handler to fill in: LSL's with its typed parameters as the
+        // detail reads them, SLua's as a function set on LLEvents.
+        if (lua)
+        {
+            std::string params;
+            for (const std::string& name : ALCodeEditor::parameterNames(word.detail, word.text))
+            {
+                params += (params.empty() ? "" : ", ") + name;
+            }
+            c.snippet = "LLEvents." + word.text + " = function(" + params + ")\n    $0\nend";
+        }
+        else
+        {
+            c.snippet = word.detail + "\n{\n    $0\n}";
+        }
+    }
+    return c;
+}
+
+const std::vector<ALFloaterScriptStudio::Snippet>& ALFloaterScriptStudio::snippets(bool lua)
+{
+    std::vector<Snippet>& out = mSnippets[lua ? 1 : 0];
+    if (mSnippetsLoaded[lua ? 1 : 0])
+    {
+        return out;
+    }
+    mSnippetsLoaded[lua ? 1 : 0] = true;
+    const std::string file = std::string("snippets") + gDirUtilp->getDirDelimiter() + (lua ? "slua.xml" : "lsl.xml");
+    for (const std::string& path : { gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, file), gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, file) })
+    {
+        llifstream in(path.c_str());
+        if (!in.is_open())
+        {
+            continue;
+        }
+        LLSD list;
+        if (LLSDSerialize::fromXML(list, in) == LLSDParser::PARSE_FAILURE || !list.isArray())
+        {
+            LL_WARNS("ScriptStudio") << "The snippets at " << path << " could not be read" << LL_ENDL;
+            continue;
+        }
+        for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
+        {
+            Snippet one;
+            one.name   = (*it)["name"].asString();
+            one.prefix = (*it)["prefix"].asString();
+            one.detail = (*it)["detail"].asString();
+            one.body   = (*it)["body"].asString();
+            if (!one.name.empty() && !one.body.empty())
+            {
+                out.push_back(std::move(one));
+            }
+        }
+    }
+    return out;
+}
+
+void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
+{
+    Doc* doc = active();
+    if (!doc || !doc->loaded || !doc->modifiable || doc->notecard)
+    {
+        return;
+    }
+    const bool                          lua = doc->language.lua;
+    std::vector<ALQuickOpen::Candidate> candidates;
+    auto                                firstLine = [](const std::string& text) {
+        const size_t end = text.find('\n');
+        return end == std::string::npos ? text : text.substr(0, end);
+    };
+    if (what == "snippet")
+    {
+        const std::vector<Snippet>& list = snippets(lua);
+        for (size_t i = 0; i < list.size(); ++i)
+        {
+            ALQuickOpen::Candidate one;
+            one.label  = list[i].name;
+            one.detail = list[i].detail;
+            one.also   = list[i].prefix;
+            one.value  = std::to_string(i);
+            candidates.push_back(std::move(one));
+        }
+    }
+    else
+    {
+        const ALSyntaxKind         kind  = what == "function" ? ALSyntaxKind::Function : what == "event" ? ALSyntaxKind::Event : ALSyntaxKind::Constant;
+        const std::vector<Vocab>&  words = vocabulary(lua);
+        for (size_t i = 0; i < words.size(); ++i)
+        {
+            if (words[i].kind != kind)
+            {
+                continue;
+            }
+            ALQuickOpen::Candidate one;
+            one.label  = words[i].text;
+            one.detail = words[i].deprecated ? getString("Deprecated") : firstLine(words[i].tooltip);
+            one.also   = words[i].detail;
+            one.value  = std::to_string(i);
+            candidates.push_back(std::move(one));
+        }
+    }
+    if (candidates.empty())
+    {
+        return;
+    }
+    const std::string         placeholder = getString(what == "snippet" ? "InsertSnippetPlaceholder" : what == "function" ? "InsertFunctionPlaceholder" : what == "event" ? "InsertEventPlaceholder" : "InsertConstantPlaceholder");
+    const LLHandle<LLFloater> handle      = getHandle();
+    quickOpen(std::move(candidates), placeholder, getString("InsertTitle"), [handle, what, lua](const std::string& value) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        Doc*                   doc    = studio ? studio->active() : nullptr;
+        if (!doc || !doc->loaded || !doc->modifiable)
+        {
+            return;
+        }
+        const size_t             index = static_cast<size_t>(atoi(value.c_str()));
+        ALCodeEditor::Completion chosen;
+        if (what == "snippet")
+        {
+            const std::vector<Snippet>& list = studio->snippets(lua);
+            if (index >= list.size())
+            {
+                return;
+            }
+            chosen.text    = list[index].prefix;
+            chosen.snippet = list[index].body;
+        }
+        else
+        {
+            const std::vector<Vocab>& words = studio->vocabulary(lua);
+            if (index >= words.size())
+            {
+                return;
+            }
+            chosen = studio->completionFor(words[index], lua);
+        }
+        // In place of the selection, or at the caret.
+        const ALTextRange selection = doc->editor->selection();
+        doc->editor->complete(chosen, ALTextRange(std::min(selection.begin, selection.end), std::max(selection.begin, selection.end)));
+    }, mEditorHost);
 }
 
 void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)
@@ -2228,16 +2491,157 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     if (result.hover.found)
     {
         text = result.hover.label;
-        if (!result.hover.documentation.empty())
+        std::string documentation = result.hover.documentation;
+        std::string link          = result.hover.link;
+        // What the keyword file says, where the analyzer has no words of
+        // its own: LSL's declarations come without any.
+        const Vocab* word = documentation.empty() ? vocabWord(doc.language.lua, doc.editor->document().text(doc.editor->identifierAtCaret())) : nullptr;
+        if (word)
         {
-            text += "\n\n" + result.hover.documentation;
+            documentation = word->tooltip;
+            if (link.empty())
+            {
+                link = helpUrl(doc.language.lua, word->text);
+            }
         }
-        if (!result.hover.link.empty())
+        if (!documentation.empty())
         {
-            text += "\n" + result.hover.link;
+            text += "\n\n" + documentation;
+        }
+        if (!link.empty())
+        {
+            text += "\n" + link;
         }
     }
     mSymbol->setText(text);
+}
+
+// --- the reference ----------------------------------------------------------------------
+
+// static
+const ALFloaterScriptStudio::Vocab* ALFloaterScriptStudio::vocabWord(bool lua, std::string_view name)
+{
+    if (name.empty())
+    {
+        return nullptr;
+    }
+    for (const Vocab& word : vocabulary(lua))
+    {
+        if (word.text == name)
+        {
+            return &word;
+        }
+    }
+    return nullptr;
+}
+
+// static
+std::string ALFloaterScriptStudio::helpUrl(bool lua, const std::string& word)
+{
+    // The wiki's page for an LSL name, which a SLua ll.Name shares; the
+    // Luau library's own page for its libraries; the SLua portal for the
+    // rest.
+    if (!lua || word.compare(0, 3, "ll.") == 0)
+    {
+        std::string page = word;
+        if (lua)
+        {
+            page.erase(2, 1);
+        }
+        LLUIString url(gSavedSettings.getString("LSLHelpURL"));
+        url.setArg("[LSL_STRING]", page.empty() ? std::string("LSL_Portal") : page);
+        return url.getString();
+    }
+    for (const char* library : { "bit32.", "buffer.", "coroutine.", "debug.", "math.", "os.", "string.", "table.", "utf8." })
+    {
+        if (word.compare(0, strlen(library), library) == 0)
+        {
+            return "https://luau.org/library";
+        }
+    }
+    return "https://wiki.secondlife.com/wiki/Lua_Alpha";
+}
+
+void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
+{
+    mFolds.setCollapsed("inspector", false);
+    std::string text = word.detail.empty() ? word.text : word.detail;
+    if (word.deprecated)
+    {
+        text += "  (" + getString("Deprecated") + ")";
+    }
+    if (!word.tooltip.empty())
+    {
+        text += "\n\n" + word.tooltip;
+    }
+    text += "\n" + helpUrl(lua, word.text);
+    mSymbol->setText(text);
+}
+
+void ALFloaterScriptStudio::reference(Doc& doc)
+{
+    mFolds.setCollapsed("inspector", false);
+    const ALTextRange word = doc.editor->identifierAtCaret();
+    const std::string name = doc.editor->document().text(word);
+    if (const Vocab* known = vocabWord(doc.language.lua, name))
+    {
+        showReference(*known, doc.language.lua);
+        return;
+    }
+    // A word of the script's own: what the analyzer knows of it, asked
+    // for now rather than a moment after the caret settles.
+    if (!word.empty())
+    {
+        doc.inspectAt      = word.begin;
+        doc.inspectVersion = doc.editor->document().version();
+        doc.inspectDue     = 0.0;
+        askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, word.begin);
+    }
+    else
+    {
+        setStatus(getString("NoReference"));
+    }
+}
+
+void ALFloaterScriptStudio::browseReference()
+{
+    Doc*       doc = active();
+    const bool lua = doc ? doc->language.lua : false;
+    std::vector<ALQuickOpen::Candidate> candidates;
+    const std::vector<Vocab>&           words = vocabulary(lua);
+    for (size_t i = 0; i < words.size(); ++i)
+    {
+        if (words[i].kind != ALSyntaxKind::Function && words[i].kind != ALSyntaxKind::Event && words[i].kind != ALSyntaxKind::Constant)
+        {
+            continue;
+        }
+        ALQuickOpen::Candidate one;
+        one.label  = words[i].text;
+        one.detail = kindName(words[i].kind == ALSyntaxKind::Function ? ALScriptSymbolKind::Function
+                              : words[i].kind == ALSyntaxKind::Event  ? ALScriptSymbolKind::Event
+                                                                       : ALScriptSymbolKind::Constant);
+        one.also   = words[i].tooltip.substr(0, words[i].tooltip.find('\n'));
+        one.value  = std::to_string(i);
+        candidates.push_back(std::move(one));
+    }
+    if (candidates.empty())
+    {
+        return;
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    quickOpen(std::move(candidates), getString("ReferencePlaceholder"), getString("ReferenceTitle"), [handle, lua](const std::string& value) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (!studio)
+        {
+            return;
+        }
+        const std::vector<Vocab>& words = studio->vocabulary(lua);
+        const size_t              index = static_cast<size_t>(atoi(value.c_str()));
+        if (index < words.size())
+        {
+            studio->showReference(words[index], lua);
+        }
+    }, mEditorHost);
 }
 
 std::string ALFloaterScriptStudio::kindName(ALScriptSymbolKind kind) const
@@ -2681,6 +3085,102 @@ void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string&
         doc.pendingColumn = column;
         doc.pendingLength = length;
     }
+}
+
+// --- formatting ------------------------------------------------------------------------
+
+void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
+{
+    if (!doc.loaded || !doc.modifiable || doc.notecard)
+    {
+        return;
+    }
+    const ALTextDocument& document = doc.editor->document();
+    const S32             count    = document.lineCount();
+    S32                   first    = 0;
+    S32                   last     = count - 1;
+    if (selection_only)
+    {
+        const ALTextRange selection = doc.editor->selection();
+        const ALTextPos   from      = std::min(selection.begin, selection.end);
+        const ALTextPos   to        = std::max(selection.begin, selection.end);
+        first                       = from.line;
+        // A selection ending at a line's start does not mean that line.
+        last = to.line > from.line && to.column == 0 ? to.line - 1 : to.line;
+    }
+    ALScriptFormatter::Options options;
+    options.lua = doc.language.lua;
+    const std::string text      = document.text();
+    const std::string formatted = ALScriptFormatter::formatLines(text, options, first, last);
+    // Line for line, since only some lines were asked for and the
+    // formatter keeps every line's number that way; each line that
+    // changed is one edit, and the whole one step.
+    std::vector<std::string> lines;
+    {
+        size_t at = 0;
+        while (at <= formatted.size())
+        {
+            const size_t nl = formatted.find('\n', at);
+            if (nl == std::string::npos)
+            {
+                lines.push_back(formatted.substr(at));
+                break;
+            }
+            lines.push_back(formatted.substr(at, nl - at));
+            at = nl + 1;
+        }
+    }
+    if (static_cast<S32>(lines.size()) != count)
+    {
+        LL_WARNS("ScriptStudio") << "The formatter changed the line count: " << lines.size() << " for " << count << LL_ENDL;
+        return;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    std::vector<bool>                                 gone(static_cast<size_t>(count), false);
+    if (!selection_only)
+    {
+        // Runs of blank lines beyond a few, and every blank line at the
+        // end, taken out.
+        auto blank = [&lines](S32 i) { return lines[static_cast<size_t>(i)].find_first_not_of(" \t") == std::string::npos; };
+        S32  run   = 0;
+        for (S32 i = 0; i < count; ++i)
+        {
+            run = blank(i) ? run + 1 : 0;
+            if (run > options.maxBlankLines && i + 1 < count)
+            {
+                gone[static_cast<size_t>(i)] = true;
+            }
+        }
+        for (S32 i = count - 1; i > 0 && blank(i); --i)
+        {
+            // The last line is what follows the final newline; blank
+            // lines before it go, and it stays as the file's end.
+            if (i + 1 < count)
+            {
+                gone[static_cast<size_t>(i)] = true;
+            }
+        }
+    }
+    for (S32 i = first; i <= last; ++i)
+    {
+        const std::string& was = document.line(i);
+        if (gone[static_cast<size_t>(i)])
+        {
+            edits.emplace_back(ALTextRange(ALTextPos(i, 0), ALTextPos(i + 1, 0)), std::string());
+        }
+        else if (was != lines[static_cast<size_t>(i)])
+        {
+            edits.emplace_back(ALTextRange(ALTextPos(i, 0), ALTextPos(i, static_cast<S32>(was.size()))), lines[static_cast<size_t>(i)]);
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (edits.empty() || !doc.editor->replaceAll(std::move(edits)))
+    {
+        setStatus(getString("FormattedAlready", args));
+        return;
+    }
+    setStatus(getString(selection_only ? "FormattedSelection" : "Formatted", args));
 }
 
 // --- what scripts say ---------------------------------------------------------------
@@ -3913,6 +4413,22 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->editor->perform(ALEditorCommand::FindPrevious);
     }
+    else if (action == "preferences")
+    {
+        LLFloaterReg::showInstance("script_studio_prefs");
+    }
+    else if (doc && action == "reference")
+    {
+        reference(*doc);
+    }
+    else if (action == "browse_reference")
+    {
+        browseReference();
+    }
+    else if (doc && action == "wiki")
+    {
+        LLWeb::loadURL(helpUrl(doc->language.lua, doc->editor->document().text(doc->editor->identifierAtCaret())));
+    }
     else if (action == "word_wrap")
     {
         mWordWrap = !mWordWrap;
@@ -3946,6 +4462,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     else if (action == "find_in_files")
     {
         findInFiles();
+    }
+    else if (doc && (action == "format" || action == "format_selection"))
+    {
+        format(*doc, action == "format_selection");
+    }
+    else if (action == "insert_snippet" || action == "insert_function" || action == "insert_event" || action == "insert_constant")
+    {
+        insertFromLibrary(action.substr(7));
     }
     else if (action == "problems" || action == "references" || action == "output" || action == "search")
     {
@@ -4051,6 +4575,18 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "load_file" || action == "toggle_comment" || action == "complete")
     {
         return doc && doc->modifiable;
+    }
+    if (action == "reference" || action == "wiki")
+    {
+        return doc && doc->loaded && !doc->notecard;
+    }
+    if (action == "format" || action == "insert_snippet" || action == "insert_function" || action == "insert_event" || action == "insert_constant")
+    {
+        return doc && doc->loaded && doc->modifiable && !doc->notecard;
+    }
+    if (action == "format_selection")
+    {
+        return doc && doc->loaded && doc->modifiable && !doc->notecard && !doc->editor->selection().empty();
     }
     if (action == "fold")
     {

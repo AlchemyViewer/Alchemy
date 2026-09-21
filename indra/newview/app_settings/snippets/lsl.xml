@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  Script Studio's snippets for LSL: what Insert > Snippet offers, and
+  what completing the prefix offers among the words. Each is a name, the
+  prefix that completes to it, a line about it, and the body, where
+  ${1:text} is a placeholder to tab through (numbered in the order
+  they are visited, with text to type over or none), $0 is where the
+  caret lands past the last, and $$ is a dollar. The lines after the
+  first are indented as the line the snippet goes into is.
+
+  A file of the same name under the settings folder's snippets/ adds a
+  person's own.
+-->
+<llsd>
+  <array>
+    <map>
+      <key>name</key>
+      <string>default state</string>
+      <key>prefix</key>
+      <string>default</string>
+      <key>detail</key>
+      <string>The default state with its state_entry</string>
+      <key>body</key>
+      <string>default
+{
+    state_entry()
+    {
+        $0
+    }
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>state</string>
+      <key>prefix</key>
+      <string>state</string>
+      <key>detail</key>
+      <string>A named state with its state_entry</string>
+      <key>body</key>
+      <string>state ${1:name}
+{
+    state_entry()
+    {
+        $0
+    }
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>if</string>
+      <key>prefix</key>
+      <string>if</string>
+      <key>detail</key>
+      <string>An if with braces</string>
+      <key>body</key>
+      <string>if (${1:condition})
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>if / else</string>
+      <key>prefix</key>
+      <string>ifelse</string>
+      <key>detail</key>
+      <string>An if and an else</string>
+      <key>body</key>
+      <string>if (${1:condition})
+{
+    $2
+}
+else
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>else if</string>
+      <key>prefix</key>
+      <string>elseif</string>
+      <key>detail</key>
+      <string>An else if</string>
+      <key>body</key>
+      <string>else if (${1:condition})
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>for</string>
+      <key>prefix</key>
+      <string>for</string>
+      <key>detail</key>
+      <string>A counted loop</string>
+      <key>body</key>
+      <string>for (${1:i = 0}; ${2:i &lt; count}; ${3:++i})
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>while</string>
+      <key>prefix</key>
+      <string>while</string>
+      <key>detail</key>
+      <string>A while loop</string>
+      <key>body</key>
+      <string>while (${1:condition})
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>do / while</string>
+      <key>prefix</key>
+      <string>do</string>
+      <key>detail</key>
+      <string>A do loop, tested after</string>
+      <key>body</key>
+      <string>do
+{
+    $0
+}
+while (${1:condition});</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>function</string>
+      <key>prefix</key>
+      <string>function</string>
+      <key>detail</key>
+      <string>A user function</string>
+      <key>body</key>
+      <string>${1:integer} ${2:name}(${3})
+{
+    $0
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>switch</string>
+      <key>prefix</key>
+      <string>switch</string>
+      <key>detail</key>
+      <string>A switch, which the preprocessor turns into jumps</string>
+      <key>body</key>
+      <string>switch (${1:value})
+{
+    case ${2:1}:
+        $0
+        break;
+    default:
+        break;
+}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>#include</string>
+      <key>prefix</key>
+      <string>include</string>
+      <key>detail</key>
+      <string>An include, from the object, inventory or disk</string>
+      <key>body</key>
+      <string>#include "${1:file.lsl}"</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>#define</string>
+      <key>prefix</key>
+      <string>define</string>
+      <key>detail</key>
+      <string>A macro</string>
+      <key>body</key>
+      <string>#define ${1:NAME} ${2:value}</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>#ifdef</string>
+      <key>prefix</key>
+      <string>ifdef</string>
+      <key>detail</key>
+      <string>A block kept only when a macro is defined</string>
+      <key>body</key>
+      <string>#ifdef ${1:NAME}
+$0
+#endif</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>listen</string>
+      <key>prefix</key>
+      <string>listen</string>
+      <key>detail</key>
+      <string>Open a channel; a listen event hears it</string>
+      <key>body</key>
+      <string>llListen(${1:0}, "", NULL_KEY, "");$0</string>
+    </map>
+    <map>
+      <key>name</key>
+      <string>timer</string>
+      <key>prefix</key>
+      <string>timer</string>
+      <key>detail</key>
+      <string>Start the timer; a timer event fires</string>
+      <key>body</key>
+      <string>llSetTimerEvent(${1:1.0});$0</string>
+    </map>
+  </array>
+</llsd>

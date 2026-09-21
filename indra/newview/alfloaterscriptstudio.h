@@ -91,6 +91,30 @@ public:
     bool redo() override;
 
     void openScript(const ALScriptRef& ref, const std::string& name);
+    // The options every editor shares -- font, keys, wrap, gutter, map --
+    // put on all of them again, when a setting behind one changes; and
+    // on every studio open, which the preferences ask for.
+    void        applyEditorOptions();
+    static void refreshAll();
+
+    // A word of the language, as the region defines it: what colours and
+    // completes.
+    struct Vocab
+    {
+        std::string  text;
+        std::string  detail;
+        std::string  tooltip;
+        ALSyntaxKind kind = ALSyntaxKind::Text;
+        bool         deprecated = false;
+    };
+    static const std::vector<Vocab>& vocabulary(bool lua);
+    // Built again on the next ask: the definitions changed.
+    static void forgetVocabulary();
+    // The region's words put in an editor's tables, so that they colour:
+    // what the studio's editors and the preferences' preview share.
+    static void teachWords(ALCodeEditor& editor, bool lua);
+    // The font the settings name, or the monospace default.
+    static const LLFontGL* editorFont();
 
 private:
     ALFloaterScriptStudio(const LLSD& key);
@@ -200,16 +224,24 @@ private:
     };
     static constexpr size_t NONE = static_cast<size_t>(-1);
 
-    // A word of the language, as the region defines it: what colours and
-    // completes.
-    struct Vocab
+    // A snippet: a body with placeholders, offered by name from the
+    // Insert menu and by prefix among the completions. From the files
+    // under app_settings/snippets/, and a person's own under the
+    // settings folder.
+    struct Snippet
     {
-        std::string  text;
-        std::string  detail;
-        std::string  tooltip;
-        ALSyntaxKind kind = ALSyntaxKind::Text;
-        bool         deprecated = false;
+        std::string name;
+        std::string prefix;
+        std::string detail;
+        std::string body;
     };
+    const std::vector<Snippet>& snippets(bool lua);
+    // A word of the vocabulary as a completion: a function with its
+    // call, an event as a handler to fill in, a constant as itself.
+    ALCodeEditor::Completion completionFor(const Vocab& word, bool lua) const;
+    // The Insert menu: snippets, functions, events or constants picked
+    // by name and put in at the caret.
+    void insertFromLibrary(const std::string& what);
 
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
@@ -219,11 +251,9 @@ private:
     void   refreshToolbar();
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
-    // The options every editor shares, put on one, or on all.
+    // The options every editor shares, put on one.
     void                      applyEditorOptions(ALCodeEditor& editor) const;
-    void                      applyEditorOptions();
     void                      showExpanded(Doc& doc, const std::string& text);
-    const std::vector<Vocab>& vocabulary(bool lua);
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
@@ -380,6 +410,21 @@ private:
     // Where to go in a script once it is open, or now.
     void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length);
 
+    // The reference, in the inspector rather than a web page: a word of
+    // the vocabulary shown with its declaration, the keyword file's
+    // words about it and a link to its wiki page; F1 for the word at the
+    // caret, or any word picked by name.
+    void        showReference(const Vocab& word, bool lua);
+    void        reference(Doc& doc);
+    void        browseReference();
+    static const Vocab* vocabWord(bool lua, std::string_view name);
+    static std::string helpUrl(bool lua, const std::string& word);
+
+    // The formatter over the text as it stands, or the lines selected:
+    // every line put right as one step to undo, the caret keeping its
+    // place.
+    void format(Doc& doc, bool selection_only);
+
     // Whether a save may go ahead: the analyzers' check of the text as it
     // stands found no errors, or the person asked twice.
     bool preflight(Doc& doc);
@@ -412,8 +457,8 @@ private:
 
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
-    std::vector<Vocab>                 mVocabulary[2];
-    bool                               mVocabularyBuilt[2] = { false, false };
+    std::vector<Snippet>               mSnippets[2];
+    bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
     // The scrollbar as a map: whether, how wide, whether it previews the

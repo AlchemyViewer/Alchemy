@@ -1786,6 +1786,35 @@ A new name for &quot;[NAME]&quot;:
 
   <notification
    icon="alertmodal.tga"
+   label="Save Theme"
+   name="ScriptStudioSaveTheme"
+   type="alertmodal">
+A name for the theme, which the colours as they stand are kept under:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioThemeNotSaved"
+   type="alertmodal">
+The theme could not be written to [PATH].
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioDeleteItem"
    type="alertmodal">
 Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.
