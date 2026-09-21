@@ -80,17 +80,35 @@ public:
     // ALScriptStudioEnabled setting, which is how the two share a viewer
     // for a release.
     static bool wantsScripts();
-    // The studio, with this script open in it.
+    // The studio, with this script open in it: the window that has it
+    // open already, else the main one.
     static ALFloaterScriptStudio* open(const ALScriptRef& ref, const std::string& name = std::string());
+    // Whether this is the main window, which keeps the state and is
+    // hidden rather than destroyed when closed; the others are the
+    // scripts popped out into windows of their own, gone when closed.
+    bool isMainWindow() const { return mMain; }
 
     bool postBuild() override;
+    bool matchesKey(const LLSD& key) override;
+    // A popped-out window closes once every script in it has been closed,
+    // each asked about if it has unsaved changes; the main window hides.
+    bool canClose() override;
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool undo() override;
     bool redo() override;
 
-    void openScript(const ALScriptRef& ref, const std::string& name);
+    // A script opened here; with text carried from another window, put
+    // in place of what the server has once that has loaded, as one step
+    // to undo, and the caret at a line.
+    void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1);
+    // The active script moved to a window of its own, its unsaved text
+    // going with it.
+    void popOut();
+    // The next script closed on the way to closing the window, or the
+    // window closed once none is left.
+    void continueClosing();
     // The options every editor shares -- font, keys, wrap, gutter, map --
     // put on all of them again, when a setting behind one changes; and
     // on every studio open, which the preferences ask for.
@@ -135,13 +153,17 @@ private:
         bool                                       modifiable = false;
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
-        bool                                       sourceView = false;
+        // What the preprocessor made of the source, in a read-only editor
+        // of its own that the pane can swap to and back; made once there
+        // is expanded text to show.
+        ALCodeEditor*                              expandedEditor  = nullptr;
+        bool                                       showingExpanded = false;
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.
         bool                                       notecard = false;
         std::vector<LLPointer<LLInventoryItem>>    embedded;
         // The envelope the asset came in, whose source the editor holds
-        // and whose expanded code the companion tab shows; a save runs
+        // and whose expanded code the other editor shows; a save runs
         // the preprocessor over the source and wraps both again.
         std::optional<ALScriptEnvelope>            envelope;
         // The preprocessor's run over the text at a version: what the
@@ -171,6 +193,9 @@ private:
             std::string message;
         };
         std::vector<RuntimeProblem>                runtime;
+        // Text brought from another window, put in place of the server's
+        // once that has loaded.
+        std::optional<std::string>                 carriedText;
         // A line to go to once the script has loaded, or -1; and a
         // stretch of it to select, where a column is given.
         S32                                        pendingLine   = -1;
@@ -243,17 +268,41 @@ private:
     // by name and put in at the caret.
     void insertFromLibrary(const std::string& what);
 
+    // The base's quick open, in the active editor's colours: what floats
+    // over the text reads as the text's.
+    ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
+                           std::function<void(const std::string&)> chose, LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
+                           std::function<void()> escaped = {});
+
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
     size_t indexOf(std::string_view id) const;
     void   activate(size_t index);
     void   fillTabs();
     void   refreshToolbar();
+    // The strip under the editor's right-hand words: the caret's place,
+    // what is selected, and how many problems the script has.
+    void   refreshTrailer(Doc& doc);
+    // The tab pressed with the right button: a menu about it.
+    void   showTabMenu(const std::string& value, S32 x, S32 y);
+    void   onTabAction(const std::string& action);
+    // The tab after or before the active one, round the ends.
+    void   cycleTab(S32 direction);
+    // The documents in the order the tabs were dragged into.
+    void   onTabsReordered(const std::vector<std::string>& order);
+    // How many errors and warnings a script shows.
+    void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const;
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
     // The options every editor shares, put on one.
     void                      applyEditorOptions(ALCodeEditor& editor) const;
+    // The expanded text put in the document's other editor, and the pane
+    // swapped between the two.
     void                      showExpanded(Doc& doc, const std::string& text);
+    void                      toggleExpanded();
+    // Which editor the pane shows for the active document, and every
+    // other editor hidden.
+    void                      showEditors();
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
@@ -276,6 +325,7 @@ private:
     void                          chooseIncludeFolder();
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
+    void takeCarriedText(Doc& doc);
     void save(Doc& doc);
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
@@ -461,6 +511,10 @@ private:
     bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
+    bool                               mIndentGuides    = true;
+    bool                               mRelativeNumbers = false;
+    bool                               mRainbowBrackets = true;
+    bool                               mStickyHeaders   = true;
     // The scrollbar as a map: whether, how wide, whether it previews the
     // lines under the mouse, and on which side.
     bool                               mScrollMap        = false;
@@ -498,11 +552,14 @@ private:
     LLUUID                             mOpenWhenListedItem;
     std::string                        mOpenWhenListedName;
     LLHandle<LLContextMenu>            mExplorerMenuHandle;
+    LLHandle<LLContextMenu>            mTabMenuHandle;
     // The roots selected in world when last looked, and when.
     std::vector<LLUUID>                mExplorerRoots;
     F64                                mExplorerPolled = 0.0;
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
+    bool                               mMain = true;
+    bool                               mClosingWindow = false;
     LLHandle<LLContextMenu>            mListMenuHandle;
     LLScrollListCtrl*                  mListMenuFor   = nullptr;
     // The objects heard from, offered in the filter.
@@ -511,6 +568,12 @@ private:
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLButton*                          mResetButton   = nullptr;
     LLButton*                          mSaveButton    = nullptr;
+    LLButton*                          mSaveAllButton = nullptr;
+    LLButton*                          mUndoButton    = nullptr;
+    LLButton*                          mRedoButton    = nullptr;
+    LLButton*                          mFindButton    = nullptr;
+    LLButton*                          mFormatButton  = nullptr;
+    LLButton*                          mExpandedButton = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
     boost::signals2::scoped_connection mRuntimeConnection;

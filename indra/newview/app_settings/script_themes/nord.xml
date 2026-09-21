@@ -38,6 +38,14 @@
       <array><real>0.298</real><real>0.3373</real><real>0.4157</real><real>1</real></array>
       <key>ScriptHighlightColor</key>
       <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>0.3</real></array>
+      <key>ScriptChangedColor</key>
+      <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>1</real></array>
+      <key>ScriptBracket1Color</key>
+      <array><real>0.5608</real><real>0.7373</real><real>0.7333</real><real>1</real></array>
+      <key>ScriptBracket2Color</key>
+      <array><real>0.5059</real><real>0.6314</real><real>0.7569</real><real>1</real></array>
+      <key>ScriptBracket3Color</key>
+      <array><real>0.5333</real><real>0.7529</real><real>0.8157</real><real>1</real></array>
       <key>ScriptComment</key>
       <array><real>0.298</real><real>0.3373</real><real>0.4157</real><real>1</real></array>
       <key>ScriptDocComment</key>

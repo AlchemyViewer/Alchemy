@@ -55,6 +55,10 @@ namespace
         { "ScriptFindMatchColor", "Find match" },
         { "ScriptFoldColor", "Fold marks" },
         { "ScriptHighlightColor", "References" },
+        { "ScriptChangedColor", "Changed lines" },
+        { "ScriptBracket1Color", "Brackets, level 1" },
+        { "ScriptBracket2Color", "Brackets, level 2" },
+        { "ScriptBracket3Color", "Brackets, level 3" },
     };
 
     // A kind's name split for reading: "DocComment" as "Doc comment".

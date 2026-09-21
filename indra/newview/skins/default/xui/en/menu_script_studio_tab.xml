@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- The right-click menu of a tab in Script Studio: the tab pressed is
+     the one shown, and everything here is about it. -->
+<context_menu
+ name="Script studio tab menu">
+  <menu_item_call label="Close" layout="topleft" name="close">
+    <menu_item_call.on_click function="Tab.Action" parameter="close" />
+  </menu_item_call>
+  <menu_item_call label="Close Others" layout="topleft" name="close_others">
+    <menu_item_call.on_click function="Tab.Action" parameter="close_others" />
+    <menu_item_call.on_enable function="Tab.Enable" parameter="close_others" />
+  </menu_item_call>
+  <menu_item_call label="Close Saved" layout="topleft" name="close_saved">
+    <menu_item_call.on_click function="Tab.Action" parameter="close_saved" />
+    <menu_item_call.on_enable function="Tab.Enable" parameter="close_saved" />
+  </menu_item_call>
+  <menu_item_call label="Close All" layout="topleft" name="close_all">
+    <menu_item_call.on_click function="Tab.Action" parameter="close_all" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">
+    <menu_item_call.on_click function="Tab.Action" parameter="pop_out" />
+  </menu_item_call>
+  <menu_item_call label="Show in Explorer" layout="topleft" name="reveal">
+    <menu_item_call.on_click function="Tab.Action" parameter="reveal" />
+    <menu_item_call.on_enable function="Tab.Enable" parameter="reveal" />
+  </menu_item_call>
+  <menu_item_call label="Copy Name" layout="topleft" name="copy_name">
+    <menu_item_call.on_click function="Tab.Action" parameter="copy_name" />
+  </menu_item_call>
+</context_menu>

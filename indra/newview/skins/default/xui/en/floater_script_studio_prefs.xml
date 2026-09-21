@@ -212,6 +212,10 @@ end</floater.string>
                      bg_focus_color="ScriptBackground"
                      bg_readonly_color="ScriptBgReadOnlyColor"
                      bracket_match_color="ScriptBracketMatchColor"
+                     changed_color="ScriptChangedColor"
+                     bracket_color_1="ScriptBracket1Color"
+                     bracket_color_2="ScriptBracket2Color"
+                     bracket_color_3="ScriptBracket3Color"
                      current_line_color="ScriptCurrentLineColor"
                      cursor_color="ScriptCursorColor"
                      find_match_color="ScriptFindMatchColor"
@@ -251,6 +255,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="studio_enabled"
+             tool_tip="Double-clicking a script in inventory or an object opens it here rather than in the old editor"
              top="12"
              width="400" />
             <check_box
@@ -261,6 +266,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preflight"
+             tool_tip="The analyzers look the script over before every save; errors they find hold the save until it is asked for again"
              top_pad="4"
              width="400" />
             <text
@@ -282,6 +288,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_enabled"
+             tool_tip="Every script goes through the preprocessor when saved, with its source kept in the envelope Firestorm's uses; a script already in that envelope always does"
              top_pad="6"
              width="400" />
             <check_box
@@ -292,6 +299,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_switch"
+             tool_tip="LSL gains a switch statement, turned into jumps before compiling"
              top_pad="4"
              width="400" />
             <check_box
@@ -302,6 +310,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_lazy"
+             tool_tip="Writing list[i] in LSL reads an element, as Firestorm's preprocessor allows"
              top_pad="4"
              width="400" />
             <check_box
@@ -312,6 +321,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_compress"
+             tool_tip="What is compiled has its comments and spare spaces taken out, which makes for a smaller asset"
              top_pad="4"
              width="400" />
             <check_box
@@ -322,6 +332,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_optimize"
+             tool_tip="Constants folded, unused code dropped, and every change reported among the problems; the compile target chooses the arithmetic"
              top_pad="4"
              width="500" />
             <check_box
@@ -332,6 +343,7 @@ end</floater.string>
              layout="topleft"
              left="32"
              name="preproc_shrink"
+             tool_tip="Global names made as short as they can be in what is compiled; the source keeps the real ones"
              top_pad="4"
              width="400" />
             <check_box
@@ -342,6 +354,7 @@ end</floater.string>
              layout="topleft"
              left="32"
              name="preproc_addstrings"
+             tool_tip="Adjacent string constants joined into one, which LSL does not do on its own"
              top_pad="4"
              width="400" />
             <check_box
@@ -352,6 +365,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_disk"
+             tool_tip="An #include may name a file in the folder below, looked for after the object and inventory unless the order says otherwise"
              top_pad="10"
              width="400" />
             <text
@@ -372,6 +386,7 @@ end</floater.string>
              layout="topleft"
              left="32"
              name="choose_folder"
+             tool_tip="The folder on disk that #include files are read from"
              top_pad="4"
              width="130" />
             <text
