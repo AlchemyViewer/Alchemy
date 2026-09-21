@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <optional>
 
 namespace
 {
@@ -3247,50 +3248,134 @@ bool ALVimKeymap::addToNumber(ALTextView& view, S64 by)
     const ALTextDocument& d     = view.document();
     const ALTextPos       caret = view.caret();
     const std::string&    text  = d.line(caret.line);
-    auto                  digit = [&](size_t i) { return i < text.size() && text[i] >= '0' && text[i] <= '9'; };
-    // The number under the caret, or the first one after it on the line;
-    // a minus right before the digits is the number's.
-    size_t start = static_cast<size_t>(caret.column);
-    if (digit(start))
+    // The numbers on the line, as vim's nrformats=bin,hex reads them:
+    // 0x1f and 0b101 as what they are, anything else in decimal; the
+    // one under the caret, or the first after it, is the one changed.
+    enum class Base : U8
     {
-        while (start > 0 && digit(start - 1))
+        Decimal,
+        Hex,
+        Binary
+    };
+    struct Number
+    {
+        size_t begin = 0;
+        size_t end   = 0;
+        Base   base  = Base::Decimal;
+    };
+    auto is_digit = [&](size_t i) { return i < text.size() && text[i] >= '0' && text[i] <= '9'; };
+    auto is_hex   = [&](size_t i) { return i < text.size() && std::isxdigit(static_cast<unsigned char>(text[i])); };
+    auto is_bin   = [&](size_t i) { return i < text.size() && (text[i] == '0' || text[i] == '1'); };
+    std::optional<Number> found;
+    for (size_t i = 0; i < text.size() && !found;)
+    {
+        if (!is_digit(i))
         {
-            --start;
+            ++i;
+            continue;
+        }
+        Number number;
+        number.begin = i;
+        if (text[i] == '0' && (text[i + 1] == 'x' || text[i + 1] == 'X') && is_hex(i + 2))
+        {
+            number.base = Base::Hex;
+            i += 2;
+            while (is_hex(i))
+            {
+                ++i;
+            }
+        }
+        else if (text[i] == '0' && (text[i + 1] == 'b' || text[i + 1] == 'B') && is_bin(i + 2))
+        {
+            number.base = Base::Binary;
+            i += 2;
+            while (is_bin(i))
+            {
+                ++i;
+            }
+        }
+        else
+        {
+            while (is_digit(i))
+            {
+                ++i;
+            }
+        }
+        number.end = i;
+        if (number.end > static_cast<size_t>(caret.column))
+        {
+            found = number;
+        }
+    }
+    if (!found)
+    {
+        return false;
+    }
+    Number      number = *found;
+    std::string with;
+    if (number.base == Base::Decimal)
+    {
+        // A minus right before the digits is the number's; leading
+        // zeros keep the number's width.
+        const bool        negative = number.begin > 0 && text[number.begin - 1] == '-';
+        const std::string digits   = text.substr(number.begin, number.end - number.begin);
+        if (digits.size() > 18)
+        {
+            return false;
+        }
+        S64 value = std::strtoll(digits.c_str(), nullptr, 10);
+        if (negative)
+        {
+            --number.begin;
+            value = -value;
+        }
+        value += by;
+        with = std::to_string(std::llabs(value));
+        if (digits.size() > 1 && digits[0] == '0' && with.size() < digits.size())
+        {
+            with.insert(0, digits.size() - with.size(), '0');
+        }
+        if (value < 0)
+        {
+            with.insert(0, "-");
         }
     }
     else
     {
-        while (start < text.size() && !digit(start))
-        {
-            ++start;
-        }
-        if (start >= text.size())
+        // Unsigned, wrapping, the width kept, hex in the case its
+        // letters were in.
+        const std::string digits = text.substr(number.begin + 2, number.end - number.begin - 2);
+        if (digits.size() > (number.base == Base::Hex ? 16u : 64u))
         {
             return false;
         }
+        U64 value = std::strtoull(digits.c_str(), nullptr, number.base == Base::Hex ? 16 : 2);
+        value += static_cast<U64>(by);
+        std::string spelt;
+        if (number.base == Base::Hex)
+        {
+            const bool upper = std::any_of(digits.begin(), digits.end(), [](char c) { return c >= 'A' && c <= 'F'; });
+            char       buffer[24];
+            snprintf(buffer, sizeof(buffer), upper ? "%llX" : "%llx", static_cast<unsigned long long>(value));
+            spelt = buffer;
+        }
+        else
+        {
+            for (U64 v = value; v > 0 || spelt.empty(); v >>= 1)
+            {
+                spelt.insert(spelt.begin(), static_cast<char>('0' + (v & 1)));
+            }
+        }
+        if (spelt.size() < digits.size())
+        {
+            spelt.insert(0, digits.size() - spelt.size(), '0');
+        }
+        with = text.substr(number.begin, 2) + spelt;
     }
-    size_t end = start;
-    while (digit(end))
-    {
-        ++end;
-    }
-    const bool negative = start > 0 && text[start - 1] == '-';
-    if (end - start > 18)
-    {
-        return false;
-    }
-    S64 value = std::strtoll(text.substr(start, end - start).c_str(), nullptr, 10);
-    if (negative)
-    {
-        --start;
-        value = -value;
-    }
-    value += by;
-    const std::string with = std::to_string(value);
-    view.setSelection(ALTextRange(ALTextPos(caret.line, static_cast<S32>(start)), ALTextPos(caret.line, static_cast<S32>(end))));
+    view.setSelection(ALTextRange(ALTextPos(caret.line, static_cast<S32>(number.begin)), ALTextPos(caret.line, static_cast<S32>(number.end))));
     view.insertText(with);
     // The caret on the last digit.
-    moveTo(view, ALTextPos(caret.line, static_cast<S32>(start + with.size()) - 1));
+    moveTo(view, ALTextPos(caret.line, static_cast<S32>(number.begin + with.size()) - 1));
     return true;
 }
 
@@ -3334,8 +3419,14 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     mSearchWholeWord = false;
     if (!ranged)
     {
+        // The whole text; the empty line after a final newline is no
+        // line of the text's, as vim has none, so it is not picked out.
         first = 0;
         last  = d.lineCount() - 1;
+        if (last > 0 && d.lineLength(last) == 0)
+        {
+            --last;
+        }
     }
     ALTextSearchOptions options;
     options.regex         = true;

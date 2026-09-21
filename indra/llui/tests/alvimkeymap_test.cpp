@@ -506,6 +506,20 @@ namespace tut
         ensure_equals("nothing to change is left alone", e.document().line(2), std::string("none here"));
         keys("k.");
         ensure_equals(". repeats it", e.document().line(1), std::string("n = 4"));
+        // Hex and binary as vim's nrformats reads them, the width and the
+        // case kept; leading zeros keep a decimal's width too.
+        e.setText("a = 0x0fF; b = 0b0111; c = 007; d = 0x9");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("0<C-a>");
+        ensure_equals("hex, wrapping over its width, in the case it had", e.document().line(0), std::string("a = 0x100; b = 0b0111; c = 007; d = 0x9"));
+        keys("w<C-a>");
+        ensure_equals("binary", e.document().line(0), std::string("a = 0x100; b = 0b1000; c = 007; d = 0x9"));
+        keys("f7<C-a>");
+        ensure_equals("leading zeros kept", e.document().line(0), std::string("a = 0x100; b = 0b1000; c = 008; d = 0x9"));
+        keys("$<C-a>");
+        ensure_equals("a hex digit becomes a letter", e.document().line(0), std::string("a = 0x100; b = 0b1000; c = 008; d = 0xa"));
+        keys("0fF<C-x>");
+        ensure_equals("under the caret inside a hex number", e.document().line(0), std::string("a = 0x0ff; b = 0b1000; c = 008; d = 0xa"));
     }
 
     template<> template<>
@@ -518,7 +532,7 @@ namespace tut
         keys("u");
         ensure_equals("undone as one", flat(e.text()), std::string("keep 1|drop 2|keep 3|drop 4|keep 5|"));
         keys(":v/drop/d<CR>");
-        ensure_equals(":v takes the others, the empty last line among them", flat(e.text()), std::string("drop 2|drop 4"));
+        ensure_equals(":v takes the others, the empty line after the final newline not among them", flat(e.text()), std::string("drop 2|drop 4|"));
         keys("u:g/drop/s/drop/held/<CR>");
         ensure_equals("a substitution on the lines picked out", flat(e.text()), std::string("keep 1|held 2|keep 3|held 4|keep 5|"));
         keys(":g/keep/normal A;<CR>");
