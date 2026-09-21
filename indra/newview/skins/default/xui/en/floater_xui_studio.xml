@@ -214,6 +214,8 @@
     <floater.string name="EditNoNestedFile">This element does not name a file of its own.</floater.string>
     <floater.string name="EditNestedMissing">[FILE] is named here but is not in the catalog.</floater.string>
     <floater.string name="LayerMissing">-</floater.string>
+    <floater.string name="SourceEdited">Source edited: [FILE]</floater.string>
+    <floater.string name="SourceEditedBroken">Source edited: [FILE] does not parse as it stands</floater.string>
     <floater.string name="Yes">yes</floater.string>
     <floater.string name="No">no</floater.string>
     <floater.string name="LayoutSize">size</floater.string>
@@ -2367,8 +2369,7 @@
                              layout="topleft"
                              left="0"
                              name="source_text"
-                             tool_tip="The element as each layer of the file writes it, in the order they are merged"
-                             read_only="true"
+                             tool_tip="The layer's file as it stands, to edit: what is typed goes into the document once the typing pauses, the tree and the preview following; the schema completes tags, attributes and values, and the findings on this file are marked"
                              syntax="xml"
                              top="0"
                              width="476"

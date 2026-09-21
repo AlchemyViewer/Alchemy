@@ -594,6 +594,18 @@ private:
     void revealInContainers(LLView* view);
     void refreshLayout(LLView* view);
     void refreshSource(LLView* view);
+    // The Source tab's editor, over one layer's whole file: the text set
+    // from the document when they differ, the element's line shown, the
+    // findings of that file squiggled, and what is typed there put into
+    // the document once the typing pauses. A caret moving in it selects
+    // the element it is on.
+    void showSourceFile(const std::string& path, S32 line);
+    void decorateSource();
+    void onSourceTyped();
+    void onSourceCaret();
+    void flushSourceEdit();
+    void pumpSource();
+    bool sourceEditorFocused() const;
     // The selected element in a layer and its line, out of the document
     // where the layer is held and out of the catalog where it is not.
     void elementIn(const ALXUICatalog::Layer& layer, const ALXUISelection::path_t& path,
@@ -705,6 +717,17 @@ private:
     LLFrameTimer        mStateTimer;
     std::string         mSourcePath;     // what the jump button opens
     S32                 mSourceLine = 0;
+    // The Source tab's editor: which layer's file it holds, the layer a
+    // person chose to look at, when what was typed there is next put
+    // into the document, and whether the editor's text is being set from
+    // the document rather than typed.
+    std::string         mSourceShown;
+    std::string         mSourceChosen;
+    LLFrameTimer        mSourceEditTimer;
+    LLFrameTimer        mSourceSyncTimer;
+    bool                mSourceEditPending = false;
+    bool                mSourceSyncing     = false;
+    bool                mSourceCaretPending = false;
 
     LLScrollListCtrl*               mMenuList = nullptr;    // the list the right button was over
     std::string                     mMenuCell;      // the cell it was over
