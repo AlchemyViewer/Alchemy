@@ -10,6 +10,7 @@ target_sources(
   alscript
   PRIVATE
     allsloptimizer.cpp
+    alluauconfig.cpp
     alluauservice.cpp
     allslservice.cpp
     alpreprocessor.cpp
@@ -25,6 +26,7 @@ target_sources(
       FILES
         allsloptimizer.h
         allsltraits.inc
+        alluauconfig.h
         alluauservice.h
         allslservice.h
         alpreprocessor.h
@@ -57,6 +59,7 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines}
   )
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   # The optimizer's golden files under tests/optimizer/, checked with the
   # grid's builtins loaded.

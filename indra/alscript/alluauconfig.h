@@ -1,0 +1,55 @@
+/**
+ * @file alluauconfig.h
+ * @brief What a .luaurc says, as far as a require needs it: its aliases and its mode.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include <map>
+#include <string>
+#include <string_view>
+
+// A `.luaurc`, read by Luau's own parser so that what it takes is what
+// Luau takes: the aliases, each a name and the path it stands for, which
+// is relative to where the file is unless it is absolute, so that
+// `require("@lib/util")` reads as `./lib/util` from beside the file; and
+// the language mode. In the world a `.luaurc` is a notecard so named in
+// the script's folder or the nearest folder above it, or an item so
+// named in its object; on disk it is the file so named in the script's
+// directory or the nearest above.
+struct ALLuauConfig
+{
+    // By name, in lower case, as Luau matches them.
+    std::map<std::string, std::string> aliases;
+    // "strict", "nonstrict" or "nocheck", or empty where it does not say.
+    std::string mode;
+
+    // False, with Luau's own word on what is wrong, for text that is not
+    // a configuration.
+    static bool parse(std::string_view text, ALLuauConfig& out, std::string& error);
+
+    // The alias a require name starts with -- `@lib/util` names `lib`,
+    // in lower case -- and what follows it; false where the name has none.
+    static bool aliasOf(std::string_view name, std::string& alias, std::string& rest);
+    // Whether a path is absolute: from a root, on any platform.
+    static bool absolute(std::string_view path);
+};
