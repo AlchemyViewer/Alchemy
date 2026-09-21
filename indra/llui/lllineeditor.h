@@ -241,6 +241,10 @@ public:
 
     void setCursorColor(const LLUIColor& c)          { mCursorColor = c; }
     const LLColor4& getCursorColor() const          { return mCursorColor.get(); }
+    // A flat background in a colour rather than the skin's image, for a
+    // field that sits inside something with colours of its own.
+    void setBgColor(const LLUIColor& c)              { mBgColor = c; mUseBgColor = true; }
+    void setHighlightColor(const LLUIColor& c)       { mHighlightColor = c; }
 
     void setFgColor( const LLUIColor& c )            { mFgColor = c; }
     void setReadOnlyFgColor( const LLUIColor& c )    { mReadOnlyFgColor = c; }

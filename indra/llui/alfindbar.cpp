@@ -319,6 +319,27 @@ void ALFindBar::setColors(const LLColor4& background, const LLColor4& ink)
         glyph->setInk(ink);
     }
     mCount->setColor(ink);
+    // The fields in the view's own colours: its ground behind the text,
+    // its ink for the text and the caret, and a shade between them for
+    // the label and the selection.
+    LLColor4 faint = background;
+    LLColor4 lit   = background;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        faint.mV[i] = background.mV[i] + (ink.mV[i] - background.mV[i]) * 0.45f;
+        lit.mV[i]   = background.mV[i] + (ink.mV[i] - background.mV[i]) * 0.25f;
+    }
+    faint.mV[VALPHA] = lit.mV[VALPHA] = 1.f;
+    for (LLLineEditor* field : { mFind, mReplaceField })
+    {
+        LLColor4 ground = background;
+        ground.mV[VALPHA] = 1.f;
+        field->setBgColor(ground);
+        field->setFgColor(ink);
+        field->setCursorColor(ink);
+        field->setTentativeFgColor(faint);
+        field->setHighlightColor(lit);
+    }
 }
 
 S32 ALFindBar::wantedHeight() const

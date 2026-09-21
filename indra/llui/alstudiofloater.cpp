@@ -251,6 +251,10 @@ void ALStudioFloater::rememberShape()
 
 void ALStudioFloater::saveState()
 {
+    if (mStateSetting.empty())
+    {
+        return;
+    }
     LLSD state;
     writeState(state);
     // Which regions are folded, how big each is, and which are out in
@@ -266,6 +270,13 @@ void ALStudioFloater::saveState()
     state["rect"].append(r.mTop);
     mShapeRect = r;
     mShapeDims = mFolds.dims();
+    // What the next open puts back is the shape as it is now, not as it
+    // was when the state was read: a window closed and opened again
+    // stays where it was left.
+    if (!isMinimized())
+    {
+        mRestoredRect = r;
+    }
     if (LLControlGroup* settings = LLUI::getInstance()->getSettingGroup("config"))
     {
         settings->setLLSD(mStateSetting, state);
@@ -274,6 +285,10 @@ void ALStudioFloater::saveState()
 
 void ALStudioFloater::loadState()
 {
+    if (mStateSetting.empty())
+    {
+        return;
+    }
     LLControlGroup* settings = LLUI::getInstance()->getSettingGroup("config");
     const LLSD state = settings ? settings->getLLSD(mStateSetting) : LLSD();
     if (!state.isMap())

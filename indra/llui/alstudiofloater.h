@@ -73,7 +73,9 @@ public:
     virtual bool redo() { return false; }
 
 protected:
-    // The setting the state is kept under, which a subclass declares.
+    // The setting the state is kept under, which a subclass declares;
+    // none for a window that keeps no state, such as a second window of
+    // the same studio.
     ALStudioFloater(const LLSD& key, std::string state_setting);
 
     // What the window is built of, told once it is built. The menu bar's

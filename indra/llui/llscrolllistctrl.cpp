@@ -2155,6 +2155,13 @@ bool LLScrollListCtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
         }
         return LLUICtrl::handleRightMouseDown(x, y, mask);
     }
+    // Off every row: whoever asked to hear the list's right-clicks hears
+    // this one too, for a menu with things to offer that need no row.
+    if (rightMouseDownSignal())
+    {
+        LLUICtrl::handleRightMouseDown(x, y, mask);
+        return true;
+    }
     return false;
 }
 

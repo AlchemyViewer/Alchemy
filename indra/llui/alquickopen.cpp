@@ -27,6 +27,7 @@
 #include "alquickopen.h"
 
 #include "lllineeditor.h"
+#include "llrender2dutils.h"
 #include "llscrolllistctrl.h"
 #include "lluictrlfactory.h"
 
@@ -38,6 +39,8 @@ namespace
 {
     constexpr S32 FIELD_HEIGHT = 24;
     constexpr S32 GAP = 4;
+    // The inset from the frame, once there is one.
+    constexpr S32 INSET = 6;
 
     // What each degree of meaning it is worth. The gaps are wide because
     // these are kinds and not amounts: no number of scattered letters adds up
@@ -340,6 +343,44 @@ void ALQuickOpen::chooseSelected()
     }
 }
 
+void ALQuickOpen::setColors(const LLColor4& background, const LLColor4& ink)
+{
+    auto between = [&](F32 how) {
+        LLColor4 c = background;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            c.mV[i] = background.mV[i] + (ink.mV[i] - background.mV[i]) * how;
+        }
+        c.mV[VALPHA] = 1.f;
+        return c;
+    };
+    const LLColor4 ground = between(0.f);
+    const LLColor4 faint  = between(0.45f);
+    const LLColor4 lit    = between(0.2f);
+    const LLColor4 dim    = between(0.7f);
+    mThemed = true;
+    mGround = between(0.06f);
+    mInk    = ink;
+    mInk.mV[VALPHA] = 1.f;
+    setBackgroundVisible(false);
+    layout();
+    mField->setBgColor(ground);
+    mField->setFgColor(ink);
+    mField->setCursorColor(ink);
+    mField->setTentativeFgColor(faint);
+    mField->setHighlightColor(lit);
+    mList->setBackgroundVisible(true);
+    mList->setBgWriteableColor(ground);
+    mList->setReadOnlyBgColor(ground);
+    mList->setBgStripeColor(ground);
+    mList->setBgSelectedColor(lit);
+    mList->setHighlightedColor(between(0.12f));
+    mList->setHoveredColor(between(0.12f));
+    mList->setFgUnselectedColor(ink);
+    mList->setFgSelectedColor(ink);
+    mList->setFgDisableColor(dim);
+}
+
 void ALQuickOpen::takeFocus()
 {
     if (mField)
@@ -373,8 +414,30 @@ void ALQuickOpen::layout()
     }
     const S32 width = getRect().getWidth();
     const S32 height = getRect().getHeight();
-    mField->setShape(LLRect(0, height, width, height - FIELD_HEIGHT));
-    mList->setShape(LLRect(0, height - FIELD_HEIGHT - GAP, width, 0));
+    const S32 in = mThemed ? INSET : 0;
+    mField->setShape(LLRect(in, height - in, width - in, height - in - FIELD_HEIGHT));
+    mList->setShape(LLRect(in, height - in - FIELD_HEIGHT - GAP, width - in, in));
+}
+
+void ALQuickOpen::draw()
+{
+    if (mThemed)
+    {
+        // The card: its ground, a frame in a quarter of the ink as the
+        // find bar's, and the field outlined a shade stronger so that
+        // where to type is plain.
+        const F32    alpha = getDrawContext().mAlpha;
+        const LLRect local = getLocalRect();
+        gl_rect_2d(local, mGround % alpha, true);
+        gl_rect_2d(local, mInk % (0.25f * alpha), false);
+        if (mField)
+        {
+            LLRect field = mField->getRect();
+            field.stretch(1);
+            gl_rect_2d(field, mInk % (0.35f * alpha), false);
+        }
+    }
+    LLPanel::draw();
 }
 
 void ALQuickOpen::reshape(S32 width, S32 height, bool called_from_parent)

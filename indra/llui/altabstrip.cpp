@@ -26,6 +26,8 @@
 
 #include "altabstrip.h"
 
+#include "llfocusmgr.h"
+
 #include "llfontgl.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
@@ -187,11 +189,15 @@ void ALTabStrip::draw()
         gl_rect_2d(r, edge.get() % alpha, false);
 
         S32 x = r.mLeft + PAD;
-        if (tab.dirty)
+        const bool badged = tab.badge.mV[VALPHA] > 0.f;
+        if (tab.dirty || badged)
         {
+            // The dot: a problem's colour where there is one, else the
+            // ink for unsaved changes; filled for unsaved, a ring for a
+            // problem in a saved tab.
             gGL.getTextureSlot(0)->unbind();
-            gGL.color4fv((ink.get() % alpha).mV);
-            gl_circle_2d((F32)x + DOT, (F32)height * 0.5f, DOT, 12, true);
+            gGL.color4fv(((badged ? tab.badge : ink.get()) % alpha).mV);
+            gl_circle_2d((F32)x + DOT, (F32)height * 0.5f, DOT, 12, tab.dirty);
         }
         x += MARK;
 
@@ -249,7 +255,56 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
         mChosen = tab.value;
         mChosenSignal(tab.value);
     }
+    // Held, so that a drag along the strip may reorder.
+    mPressed  = which;
+    mPressX   = x;
+    mDragging = false;
+    gFocusMgr.setMouseCapture(this);
     return true;
+}
+
+bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    if (hasMouseCapture())
+    {
+        gFocusMgr.setMouseCapture(nullptr);
+        if (mDragging)
+        {
+            std::vector<std::string> order;
+            for (const Tab& tab : mTabs)
+            {
+                order.push_back(tab.value);
+            }
+            mReorderedSignal(order);
+        }
+        mPressed  = -1;
+        mDragging = false;
+        return true;
+    }
+    return LLUICtrl::handleMouseUp(x, y, mask);
+}
+
+void ALTabStrip::onMouseCaptureLost()
+{
+    mPressed  = -1;
+    mDragging = false;
+}
+
+bool ALTabStrip::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    const S32 which = at(x, y);
+    if (which >= 0)
+    {
+        // Chosen first, so that the menu is about what is in view.
+        if (mTabs[which].value != mChosen)
+        {
+            mChosen = mTabs[which].value;
+            mChosenSignal(mChosen);
+        }
+        mMenuSignal(mTabs[which].value, x, y);
+        return true;
+    }
+    return LLUICtrl::handleRightMouseDown(x, y, mask);
 }
 
 bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
@@ -265,6 +320,41 @@ bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (mPressed >= 0 && hasMouseCapture())
+    {
+        // A press that has travelled is a drag: the tab moves past a
+        // neighbour once the mouse is past that neighbour's middle.
+        if (!mDragging && std::abs(x - mPressX) > 4)
+        {
+            mDragging = true;
+        }
+        if (mDragging)
+        {
+            bool moved = true;
+            while (moved)
+            {
+                moved = false;
+                if (mPressed > 0 && x < rectOf((size_t)mPressed - 1).getCenterX())
+                {
+                    std::swap(mTabs[(size_t)mPressed], mTabs[(size_t)mPressed - 1]);
+                    --mPressed;
+                    layout();
+                    moved = true;
+                }
+                else if (mPressed + 1 < (S32)mTabs.size() && x > rectOf((size_t)mPressed + 1).getCenterX())
+                {
+                    std::swap(mTabs[(size_t)mPressed], mTabs[(size_t)mPressed + 1]);
+                    ++mPressed;
+                    layout();
+                    moved = true;
+                }
+            }
+        }
+        mHover = mPressed;
+        mHoverX = x;
+        mHoverY = y;
+        return true;
+    }
     mHover = at(x, y);
     mHoverX = x;
     mHoverY = y;

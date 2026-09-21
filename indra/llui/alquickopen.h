@@ -111,6 +111,11 @@ public:
     // the next one.
     void takeFocus();
 
+    // The colours of what it is over -- an editor's ground and ink -- on
+    // its field, its list and its own back, so that it reads as part of
+    // that rather than of the skin.
+    void setColors(const LLColor4& background, const LLColor4& ink);
+
     // Return, or a row chosen; the query itself when freeform. Nothing is
     // sent for a query that matched nothing, since there is nothing to
     // send.
@@ -121,6 +126,7 @@ public:
     }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
 
 protected:
@@ -139,6 +145,12 @@ private:
     S32                     mRows;
     bool                    mFreeform = false;
     std::string             mHint;
+    // Given colours of its own: framed in them, its parts inset from the
+    // frame, so that it reads as a card over the text and not as more
+    // of the text.
+    bool                    mThemed = false;
+    LLColor4                mGround;
+    LLColor4                mInk;
     LLLineEditor*           mField = nullptr;
     LLScrollListCtrl*       mList = nullptr;
     chose_signal_t          mChose;

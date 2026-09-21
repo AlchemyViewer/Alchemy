@@ -76,6 +76,11 @@ public:
         std::string toolTip;
         bool        dirty = false;
         bool        preview = false;
+        // A colour for the dot at the tab's left, where the caller has
+        // something to say about the tab -- a problem in it -- and no
+        // alpha where it has not. A dirty tab's dot is the ink unless a
+        // badge says otherwise.
+        LLColor4    badge = LLColor4::transparent;
     };
 
     // The tabs in order, and which of them is shown, by value.
@@ -105,10 +110,27 @@ public:
     {
         return mClosedSignal.connect(cb);
     }
+    // The tabs dragged into a new order, given as their values in it:
+    // the caller keeps its own list in that order.
+    typedef boost::signals2::signal<void(const std::vector<std::string>&)> order_signal_t;
+    boost::signals2::connection onReordered(const order_signal_t::slot_type& cb)
+    {
+        return mReorderedSignal.connect(cb);
+    }
+    // A tab pressed with the right button, by its value and where: for
+    // a menu about it.
+    typedef boost::signals2::signal<void(const std::string&, S32, S32)> tab_menu_signal_t;
+    boost::signals2::connection onMenu(const tab_menu_signal_t::slot_type& cb)
+    {
+        return mMenuSignal.connect(cb);
+    }
 
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    void onMouseCaptureLost() override;
     bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
@@ -138,4 +160,12 @@ private:
     S32                 mGap;
     tab_signal_t        mChosenSignal;
     tab_signal_t        mClosedSignal;
+    tab_menu_signal_t   mMenuSignal;
+    order_signal_t      mReorderedSignal;
+    // A tab pressed and perhaps being dragged along the strip: which,
+    // where it was pressed, and whether it has moved far enough to be a
+    // drag rather than a press.
+    S32                 mPressed  = -1;
+    S32                 mPressX   = 0;
+    bool                mDragging = false;
 };
