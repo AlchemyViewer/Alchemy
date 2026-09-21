@@ -1,0 +1,2943 @@
+/**
+ * @file alvimkeymap.cpp
+ * @brief A vim mode over the text view.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alvimkeymap.h"
+
+#include "alcodeeditor.h"
+#include "altextsearch.h"
+#include "llclipboard.h"
+#include "llstring.h"
+
+#include <algorithm>
+
+namespace
+{
+    // --- the text, a character at a time ------------------------------------------------
+
+    // The byte at a position, or 0 at a line's end.
+    char at(const ALTextDocument& d, const ALTextPos& p)
+    {
+        const std::string& line = d.line(p.line);
+        return p.column >= 0 && p.column < static_cast<S32>(line.size()) ? line[p.column] : '\0';
+    }
+
+    bool isSpace(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\0'; }
+    bool isWordByte(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || static_cast<unsigned char>(c) >= 0x80; }
+
+    // vim's classes: blank, word, and everything else -- or, for a WORD,
+    // blank and everything else.
+    S32 classOf(char c, bool big)
+    {
+        if (isSpace(c))
+        {
+            return 0;
+        }
+        return big || isWordByte(c) ? 1 : 2;
+    }
+
+    bool atLineEnd(const ALTextDocument& d, const ALTextPos& p) { return p.column >= d.lineLength(p.line); }
+    bool lineBlank(const ALTextDocument& d, S32 line)
+    {
+        for (const char c : d.line(line))
+        {
+            if (!isSpace(c))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    S32 firstNonBlankColumn(const ALTextDocument& d, S32 line)
+    {
+        const std::string& text = d.line(line);
+        S32                c    = 0;
+        while (c < static_cast<S32>(text.size()) && isSpace(text[c]))
+        {
+            ++c;
+        }
+        return c;
+    }
+    std::string indentOf(const ALTextDocument& d, S32 line) { return d.line(line).substr(0, firstNonBlankColumn(d, line)); }
+
+    // One cluster on, across a line's end onto the next line's start;
+    // false at the end of the text.
+    bool stepOn(const ALTextDocument& d, ALTextPos& p)
+    {
+        if (atLineEnd(d, p))
+        {
+            if (p.line + 1 >= d.lineCount())
+            {
+                return false;
+            }
+            p = ALTextPos(p.line + 1, 0);
+            return true;
+        }
+        p = d.nextCluster(p);
+        return true;
+    }
+    // One cluster back, across a line's start onto the previous line's
+    // end; false at the start of the text.
+    bool stepBack(const ALTextDocument& d, ALTextPos& p)
+    {
+        if (p.column <= 0)
+        {
+            if (p.line <= 0)
+            {
+                return false;
+            }
+            p = d.lineEnd(p.line - 1);
+            return true;
+        }
+        p = d.prevCluster(p);
+        return true;
+    }
+
+    // The last character's position on a line, which normal mode's
+    // caret never goes past; the start of an empty line.
+    ALTextPos lastCharOf(const ALTextDocument& d, S32 line)
+    {
+        const ALTextPos end = d.lineEnd(line);
+        return end.column > 0 ? d.prevCluster(end) : end;
+    }
+
+    bool isBracket(char c) { return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'; }
+    char partnerOf(char c)
+    {
+        switch (c)
+        {
+            case '(': return ')';
+            case ')': return '(';
+            case '[': return ']';
+            case ']': return '[';
+            case '{': return '}';
+            case '}': return '{';
+            case '<': return '>';
+            case '>': return '<';
+            default:  return '\0';
+        }
+    }
+    bool opensOf(char c) { return c == '(' || c == '[' || c == '{' || c == '<'; }
+
+    // The bracket that matches the one at a position, nesting counted.
+    bool matchBracket(const ALTextDocument& d, ALTextPos from, ALTextPos& match)
+    {
+        const char c       = at(d, from);
+        const char partner = partnerOf(c);
+        if (!partner)
+        {
+            return false;
+        }
+        const bool forward = opensOf(c);
+        S32        depth   = 0;
+        ALTextPos  p       = from;
+        do
+        {
+            const char here = at(d, p);
+            if (here == c)
+            {
+                ++depth;
+            }
+            else if (here == partner && --depth == 0)
+            {
+                match = p;
+                return true;
+            }
+        } while (forward ? stepOn(d, p) : stepBack(d, p));
+        return false;
+    }
+
+    std::string utf8Of(llwchar ch) { return utf8str_from_cp(ch); }
+
+    // The case of a stretch changed: swapped, lowered or raised.
+    std::string recased(std::string text, llwchar how)
+    {
+        for (char& c : text)
+        {
+            if (how == '~')
+            {
+                c = (c >= 'a' && c <= 'z') ? c - 32 : (c >= 'A' && c <= 'Z') ? c + 32 : c;
+            }
+            else if (how == 'u')
+            {
+                c = (c >= 'A' && c <= 'Z') ? c + 32 : c;
+            }
+            else if (how == 'U')
+            {
+                c = (c >= 'a' && c <= 'z') ? c - 32 : c;
+            }
+        }
+        return text;
+    }
+
+    bool isDigit(llwchar ch) { return ch >= '0' && ch <= '9'; }
+
+    // A count typed before a command: the digits as a number, at least one.
+    S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
+}
+
+ALVimKeymap::ALVimKeymap() = default;
+ALVimKeymap::~ALVimKeymap() = default;
+
+// --- what the outside sees -------------------------------------------------------------
+
+bool ALVimKeymap::inserting() const
+{
+    return mMode == Mode::Insert || mMode == Mode::Replace;
+}
+
+std::string ALVimKeymap::status() const
+{
+    switch (mMode)
+    {
+        case Mode::Insert:      return "-- INSERT --";
+        case Mode::Replace:     return "-- REPLACE --";
+        case Mode::Visual:      return "-- VISUAL --";
+        case Mode::VisualLine:  return "-- VISUAL LINE --";
+        case Mode::VisualBlock: return "-- VISUAL BLOCK --";
+        case Mode::Command:
+        case Mode::Search:      return utf8Of(mLineKind) + mLine;
+        case Mode::Normal:
+        default:
+        {
+            // What is pending, as vim's showcmd has it.
+            std::string pending;
+            if (mRegister)
+            {
+                pending += std::string("\"") + mRegister;
+            }
+            if (mOperatorCount > 0)
+            {
+                pending += std::to_string(mOperatorCount);
+            }
+            if (mOperator)
+            {
+                pending += utf8Of(mOperator);
+            }
+            if (mCount > 0)
+            {
+                pending += std::to_string(mCount);
+            }
+            if (mPending)
+            {
+                pending += utf8Of(mPending);
+            }
+            if (mObjectKind)
+            {
+                pending += utf8Of(mObjectKind);
+            }
+            return pending;
+        }
+    }
+}
+
+std::string ALVimKeymap::registerText(char name) const
+{
+    return fetch(name).text;
+}
+
+void ALVimKeymap::say(const std::string& message, bool error)
+{
+    mMessage      = message;
+    mMessageError = error;
+    bump();
+}
+
+bool ALVimKeymap::handleKey(ALTextView& view, KEY key, MASK mask)
+{
+    Input input;
+    input.key  = key;
+    input.mask = mask;
+    return feed(view, input);
+}
+
+bool ALVimKeymap::handleChar(ALTextView& view, llwchar ch)
+{
+    Input input;
+    input.isChar = true;
+    input.ch     = ch;
+    return feed(view, input);
+}
+
+// --- the dispatch ------------------------------------------------------------------
+
+bool ALVimKeymap::feed(ALTextView& view, const Input& input)
+{
+    if (!mReplaying)
+    {
+        mMessage.clear();
+        // A command starts where nothing is pending in normal mode; what
+        // it is typed as is kept until it is done, for `.`.
+        if (mMode == Mode::Normal && mCount == 0 && !mRegister && !mOperator && !mPending)
+        {
+            mCommandInputs.clear();
+            // Each command is a step of its own to undo, however close on
+            // the last it came.
+            view.undoJournal().breakRun();
+        }
+        mCommandInputs.push_back(input);
+    }
+    bool taken = false;
+    switch (mMode)
+    {
+        case Mode::Insert:
+        case Mode::Replace:
+            taken = insert(view, input);
+            break;
+        case Mode::Command:
+        case Mode::Search:
+            taken = commandLine(view, input);
+            break;
+        default:
+            taken = normal(view, input);
+            break;
+    }
+    bump();
+    return taken;
+}
+
+void ALVimKeymap::clearPending()
+{
+    mCount         = 0;
+    mRegister      = 0;
+    mOperator      = 0;
+    mOperatorCount = 0;
+    mPending       = 0;
+    mObjectKind    = 0;
+}
+
+void ALVimKeymap::finishCommand(bool changed)
+{
+    clearPending();
+    if (changed && !mReplaying)
+    {
+        mLastChange = mCommandInputs;
+    }
+}
+
+ALTextPos ALVimKeymap::cursor(const ALTextView& view) const
+{
+    return isVisual() ? view.document().clamp(mVisualCaret) : view.caret();
+}
+
+void ALVimKeymap::moveTo(ALTextView& view, const ALTextPos& to)
+{
+    const ALTextDocument& d = view.document();
+    ALTextPos             p = d.clamp(to);
+    if (isVisual())
+    {
+        mVisualCaret = p;
+        showVisual(view);
+        return;
+    }
+    // Normal mode's caret sits on a character, never past the last.
+    const ALTextPos last = lastCharOf(d, p.line);
+    if (p.column > last.column)
+    {
+        p = last;
+    }
+    view.setCaret(p);
+}
+
+// --- normal mode -------------------------------------------------------------------------
+
+bool ALVimKeymap::normal(ALTextView& view, const Input& input)
+{
+    if (!input.isChar)
+    {
+        // Keys: the ones vim gives a meaning, and the rest left to the
+        // view's own keymap.
+        const bool ctrl = (input.mask & MASK_CONTROL) != 0;
+        switch (input.key)
+        {
+            case KEY_ESCAPE:
+                if (mMode != Mode::Normal)
+                {
+                    leaveVisual(view);
+                }
+                clearPending();
+                return true;
+            case KEY_LEFT:      return command(view, 'h');
+            case KEY_RIGHT:     return command(view, 'l');
+            case KEY_UP:        return command(view, 'k');
+            case KEY_DOWN:      return command(view, 'j');
+            case KEY_HOME:      return command(view, '0');
+            case KEY_END:       return command(view, '$');
+            case KEY_RETURN:    return command(view, '+');
+            case KEY_BACKSPACE: return command(view, 'h');
+            case KEY_DELETE:    return command(view, 'x');
+            case KEY_PAGE_DOWN: view.perform(ALEditorCommand::MovePageDown); moveTo(view, view.caret()); clearPending(); return true;
+            case KEY_PAGE_UP:   view.perform(ALEditorCommand::MovePageUp); moveTo(view, view.caret()); clearPending(); return true;
+            default:
+                break;
+        }
+        if (ctrl && !(input.mask & MASK_ALT))
+        {
+            switch (input.key)
+            {
+                case 'R':
+                    for (S32 n = countOr(mCount); n > 0; --n)
+                    {
+                        view.perform(ALEditorCommand::Redo);
+                    }
+                    moveTo(view, view.caret());
+                    clearPending();
+                    return true;
+                case 'V':
+                    enterVisual(view, Mode::VisualBlock);
+                    clearPending();
+                    return true;
+                case 'D':
+                case 'U':
+                {
+                    const S32 half = llmax(1, view.rowsPerPage() / 2) * countOr(mCount);
+                    ALTextPos p    = view.caret();
+                    p.line         = llclamp(p.line + (input.key == 'D' ? half : -half), 0, view.document().lineCount() - 1);
+                    view.setScrollY(view.scrollY() + (input.key == 'D' ? half : -half) * view.layout().rowHeight());
+                    moveTo(view, p);
+                    clearPending();
+                    return true;
+                }
+                case 'F':
+                    view.perform(ALEditorCommand::MovePageDown);
+                    moveTo(view, view.caret());
+                    clearPending();
+                    return true;
+                case 'B':
+                    view.perform(ALEditorCommand::MovePageUp);
+                    moveTo(view, view.caret());
+                    clearPending();
+                    return true;
+                case 'E':
+                    view.setScrollY(view.scrollY() + countOr(mCount) * view.layout().rowHeight());
+                    clearPending();
+                    return true;
+                case 'Y':
+                    view.setScrollY(view.scrollY() - countOr(mCount) * view.layout().rowHeight());
+                    clearPending();
+                    return true;
+                case '[':
+                    if (mMode != Mode::Normal)
+                    {
+                        leaveVisual(view);
+                    }
+                    clearPending();
+                    return true;
+                default:
+                    break;
+            }
+        }
+        return false;
+    }
+    return command(view, input.ch);
+}
+
+bool ALVimKeymap::command(ALTextView& view, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+
+    // Something waiting for this character.
+    if (mPending)
+    {
+        const llwchar pending = mPending;
+        mPending              = 0;
+        const S32 count       = countOr(mCount);
+        switch (pending)
+        {
+            case '"':
+                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || ch == '0' || ch == '_')
+                {
+                    mRegister = static_cast<char>(ch);
+                    mCount    = 0;
+                    return true;
+                }
+                clearPending();
+                return true;
+            case 'm':
+                if (ch >= 'a' && ch <= 'z')
+                {
+                    mMarks[static_cast<char>(ch)] = cursor(view);
+                }
+                clearPending();
+                return true;
+            case 'r':
+            {
+                if (!editing)
+                {
+                    clearPending();
+                    return true;
+                }
+                if (visual)
+                {
+                    // Every character of the selection becomes this one.
+                    const Span                                        span = visualSpan(view);
+                    std::vector<std::pair<ALTextRange, std::string>> edits;
+                    for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
+                    {
+                        const S32 c0 = span.linewise ? 0 : (span.block || line == span.range.begin.line) ? span.range.begin.column : 0;
+                        const S32 c1 = span.linewise ? d.lineLength(line)
+                                       : span.block ? llmin(d.lineLength(line), span.range.end.column + 1)
+                                       : line == span.range.end.line ? span.range.end.column : d.lineLength(line);
+                        const S32 lo = llmin(c0, d.lineLength(line));
+                        const S32 hi = llmin(llmax(lo, c1), d.lineLength(line));
+                        if (hi > lo)
+                        {
+                            std::string with;
+                            for (S32 c = lo; c < hi; ++c)
+                            {
+                                with += utf8Of(ch);
+                            }
+                            edits.emplace_back(ALTextRange(ALTextPos(line, lo), ALTextPos(line, hi)), with);
+                        }
+                    }
+                    const ALTextPos start = span.range.begin;
+                    leaveVisual(view);
+                    view.replaceAll(std::move(edits));
+                    moveTo(view, start);
+                    finishCommand(true);
+                    return true;
+                }
+                // The character under the caret, and the count after it,
+                // replaced; a return breaks the line.
+                ALTextPos from = view.caret();
+                ALTextPos to   = from;
+                for (S32 n = 0; n < count; ++n)
+                {
+                    if (atLineEnd(d, to))
+                    {
+                        clearPending();
+                        return true;
+                    }
+                    to = d.nextCluster(to);
+                }
+                std::string with;
+                for (S32 n = 0; n < count; ++n)
+                {
+                    with += ch == '\r' ? std::string("\n") : utf8Of(ch);
+                }
+                view.setSelection(ALTextRange(from, to));
+                view.insertText(with);
+                moveTo(view, ch == '\r' ? view.caret() : d.prevCluster(view.caret()));
+                finishCommand(true);
+                return true;
+            }
+            case 'g':
+                switch (ch)
+                {
+                    case 'g':
+                        return command(view, 0x01);  // gg, as a motion the table knows
+                    case 'v':
+                        if (mVisualLast != Mode::Normal)
+                        {
+                            mVisualAnchor = mVisualLastAnchor;
+                            mVisualCaret  = mVisualLastCaret;
+                            mMode         = mVisualLast;
+                            showVisual(view);
+                        }
+                        clearPending();
+                        return true;
+                    case 'J':
+                    {
+                        // Lines joined as they are.
+                        if (!editing)
+                        {
+                            clearPending();
+                            return true;
+                        }
+                        const S32 first = visual ? llmin(mVisualAnchor.line, cursor(view).line) : view.caret().line;
+                        const S32 last  = visual ? llmax(mVisualAnchor.line, cursor(view).line) : first;
+                        S32       until = visual ? last : llmin(d.lineCount() - 1, first + llmax(1, count - 1));
+                        if (!visual && until == first)
+                        {
+                            until = llmin(d.lineCount() - 1, first + 1);
+                        }
+                        std::vector<std::pair<ALTextRange, std::string>> edits;
+                        for (S32 line = first; line < until; ++line)
+                        {
+                            edits.emplace_back(ALTextRange(d.lineEnd(line), d.lineStart(line + 1)), std::string());
+                        }
+                        if (visual)
+                        {
+                            leaveVisual(view);
+                        }
+                        if (!edits.empty())
+                        {
+                            view.replaceAll(std::move(edits));
+                        }
+                        finishCommand(true);
+                        return true;
+                    }
+                    case '~':
+                    case 'u':
+                    case 'U':
+                        if (visual)
+                        {
+                            applyOperator(view, ch, visualSpan(view), 1);
+                            leaveVisual(view);
+                            finishCommand(true);
+                            return true;
+                        }
+                        mOperator      = ch;
+                        mOperatorCount = mCount;
+                        mCount         = 0;
+                        return true;
+                    case 'e':
+                    case 'E':
+                    {
+                        // The end of the previous word.
+                        ALTextPos p = cursor(view);
+                        for (S32 n = 0; n < count; ++n)
+                        {
+                            stepBack(d, p);
+                            while (classOf(at(d, p), ch == 'E') == 0 && stepBack(d, p)) {}
+                        }
+                        moveTo(view, p);
+                        clearPending();
+                        return true;
+                    }
+                    default:
+                        clearPending();
+                        return true;
+                }
+            case 'z':
+            {
+                const S32 line = cursor(view).line;
+                const S32 row  = view.layout().rowHeight();
+                const S32 top  = view.layout().lineTop(line);
+                if (ch == 't')
+                {
+                    view.setScrollY(top);
+                }
+                else if (ch == 'z')
+                {
+                    view.setScrollY(top - (view.rowsPerPage() / 2) * row);
+                }
+                else if (ch == 'b')
+                {
+                    view.setScrollY(top - (view.rowsPerPage() - 1) * row);
+                }
+                clearPending();
+                return true;
+            }
+            case 'Z':
+                if (ch == 'Z')
+                {
+                    runCommand(view, "x");
+                }
+                else if (ch == 'Q')
+                {
+                    runCommand(view, "q!");
+                }
+                clearPending();
+                return true;
+            case 'i':
+            case 'a':
+            {
+                // A text object, for the operator or the visual selection.
+                Span span;
+                if (textObject(view, pending, ch, count, span))
+                {
+                    if (visual)
+                    {
+                        mVisualAnchor = span.range.begin;
+                        mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
+                        mMode         = span.linewise ? Mode::VisualLine : Mode::Visual;
+                        showVisual(view);
+                        clearPending();
+                        return true;
+                    }
+                    const llwchar op = mOperator;
+                    applyOperator(view, op, span, 1);
+                    finishCommand(op != 'y');
+                    return true;
+                }
+                clearPending();
+                return true;
+            }
+            default:
+            {
+                // f, F, t, T, ` and ': motions with an argument.
+                Motion m = motion(view, pending, count, ch);
+                if (!m.ok)
+                {
+                    clearPending();
+                    return true;
+                }
+                if (mOperator)
+                {
+                    Span span;
+                    const ALTextPos from = cursor(view);
+                    span.range           = ALTextRange(from, m.to).normalised();
+                    if (m.inclusive)
+                    {
+                        span.range.end = d.nextCluster(span.range.end);
+                    }
+                    span.linewise = m.linewise;
+                    const llwchar op = mOperator;
+                    applyOperator(view, op, span, 1);
+                    finishCommand(op != 'y');
+                    return true;
+                }
+                moveTo(view, m.to);
+                clearPending();
+                return true;
+            }
+        }
+    }
+
+    // A count.
+    if (isDigit(ch) && !(ch == '0' && mCount == 0))
+    {
+        mCount = llmin(mCount * 10 + static_cast<S32>(ch - '0'), 100000);
+        return true;
+    }
+    if (ch == '"' && !mOperator)
+    {
+        mPending = '"';
+        return true;
+    }
+
+    // An operator, or its motion.
+    const S32 count = countOr(mCount);
+    if (mOperator)
+    {
+        const llwchar op = mOperator;
+        // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
+        // the count more.
+        if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U'))
+        {
+            const S32 lines = countOr(mOperatorCount) * count;
+            Span      span;
+            span.linewise    = true;
+            const S32 first  = cursor(view).line;
+            const S32 last   = llmin(d.lineCount() - 1, first + lines - 1);
+            span.range       = ALTextRange(d.lineStart(first), d.lineEnd(last));
+            applyOperator(view, op, span, 1);
+            finishCommand(op != 'y');
+            return true;
+        }
+        if (ch == 'i' || ch == 'a')
+        {
+            mPending = ch;
+            return true;
+        }
+        if (ch == 'f' || ch == 'F' || ch == 't' || ch == 'T' || ch == '`' || ch == '\'' || ch == 'g')
+        {
+            mPending = ch;
+            return true;
+        }
+        // cw on a word is ce: the space after it is not eaten.
+        llwchar m_ch = ch;
+        if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, cursor(view)), ch == 'W') != 0)
+        {
+            m_ch = ch == 'w' ? 'e' : 'E';
+        }
+        Motion m = motion(view, m_ch, countOr(mOperatorCount) * count, 0);
+        if (!m.ok || !m.moved)
+        {
+            clearPending();
+            return m.ok;
+        }
+        Span            span;
+        const ALTextPos from = cursor(view);
+        span.range           = ALTextRange(from, m.to).normalised();
+        // A word motion under an operator stops at the line's end rather
+        // than reaching the next line's first word.
+        if ((ch == 'w' || ch == 'W') && span.range.end.line > from.line && !m.linewise)
+        {
+            span.range.end = d.lineEnd(from.line);
+        }
+        if (m.inclusive)
+        {
+            span.range.end = d.nextCluster(span.range.end);
+        }
+        span.linewise = m.linewise;
+        applyOperator(view, op, span, 1);
+        finishCommand(op != 'y');
+        return true;
+    }
+
+    // Visual mode's own commands.
+    if (visual)
+    {
+        switch (ch)
+        {
+            case 'd':
+            case 'x':
+            case 'y':
+            case 'c':
+            case 's':
+            case '>':
+            case '<':
+            case '=':
+            case '~':
+            case 'u':
+            case 'U':
+            case 'J':
+            case 'r':
+            case 'p':
+            case 'P':
+            case 'I':
+            case 'A':
+            case 'D':
+            case 'X':
+            case 'Y':
+            case 'C':
+            case 'S':
+            case 'R':
+            {
+                if (ch == 'r')
+                {
+                    mPending = 'r';
+                    return true;
+                }
+                Span span = visualSpan(view);
+                if (ch == 'D' || ch == 'X' || ch == 'Y' || ch == 'C' || ch == 'S' || ch == 'R')
+                {
+                    // The lines whole, whatever was selected.
+                    span.linewise = true;
+                    span.block    = false;
+                    span.range    = ALTextRange(d.lineStart(span.range.begin.line), d.lineEnd(span.range.end.line));
+                }
+                if (ch == 'J')
+                {
+                    const S32 first = span.range.begin.line;
+                    const S32 last  = llmax(span.range.end.line, first + 1);
+                    leaveVisual(view);
+                    mCount = last - first + 1;
+                    view.setCaret(d.lineStart(first));
+                    return command(view, 'J');
+                }
+                if (ch == 'p' || ch == 'P')
+                {
+                    // The selection replaced by the register, which keeps
+                    // what was there for a further put.
+                    const Register put_this = fetch(mRegister);
+                    leaveVisual(view);
+                    if (!editing)
+                    {
+                        clearPending();
+                        return true;
+                    }
+                    view.undoJournal().beginGroup();
+                    view.deleteRange(span.range);
+                    view.setCaret(span.range.begin);
+                    if (put_this.linewise)
+                    {
+                        view.insertText(put_this.text + "\n");
+                    }
+                    else
+                    {
+                        view.insertText(put_this.text);
+                    }
+                    view.undoJournal().endGroup();
+                    moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
+                    finishCommand(true);
+                    return true;
+                }
+                if (ch == 'I' || ch == 'A')
+                {
+                    // Typed onto every line of the block, once insert mode
+                    // is left.
+                    const bool block = span.block;
+                    const S32  first = span.range.begin.line;
+                    const S32  last  = span.range.end.line;
+                    S32        column = ch == 'A' ? span.range.end.column : span.range.begin.column;
+                    if (!block)
+                    {
+                        column = ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first);
+                    }
+                    leaveVisual(view);
+                    if (!editing)
+                    {
+                        clearPending();
+                        return true;
+                    }
+                    mBlockInsert = block && last > first;
+                    mBlockFirst  = first;
+                    mBlockLast   = last;
+                    mBlockColumn = column;
+                    mBlockAppend = ch == 'A';
+                    view.setCaret(d.clamp(ALTextPos(first, column)));
+                    enterInsert(view, 1);
+                    return true;
+                }
+                const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
+                const S32     n  = count;
+                leaveVisual(view);
+                applyOperator(view, op, span, n);
+                finishCommand(op != 'y');
+                return true;
+            }
+            case 'o':
+            {
+                std::swap(mVisualAnchor, mVisualCaret);
+                showVisual(view);
+                clearPending();
+                return true;
+            }
+            case 'v':
+            case 'V':
+            case 0x16:
+            {
+                const Mode which = ch == 'v' ? Mode::Visual : ch == 'V' ? Mode::VisualLine : Mode::VisualBlock;
+                if (mMode == which)
+                {
+                    leaveVisual(view);
+                }
+                else
+                {
+                    mMode = which;
+                    showVisual(view);
+                }
+                clearPending();
+                return true;
+            }
+            case 'i':
+            case 'a':
+                mPending = ch;
+                return true;
+            default:
+                break;
+        }
+    }
+
+    // Commands.
+    switch (ch)
+    {
+        case 'd':
+        case 'c':
+        case 'y':
+        case '>':
+        case '<':
+        case '=':
+            mOperator      = ch;
+            mOperatorCount = mCount;
+            mCount         = 0;
+            return true;
+        case 'g':
+        case 'z':
+        case 'Z':
+        case 'm':
+        case 'f':
+        case 'F':
+        case 't':
+        case 'T':
+        case '`':
+        case '\'':
+            mPending = ch;
+            return true;
+        case 'r':
+            if (visual)
+            {
+                mPending = 'r';
+                return true;
+            }
+            mPending = 'r';
+            return true;
+        case 'i':
+            if (editing)
+            {
+                enterInsert(view, count);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'a':
+            if (editing)
+            {
+                if (!atLineEnd(d, view.caret()))
+                {
+                    view.setCaret(d.nextCluster(view.caret()));
+                }
+                enterInsert(view, count);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'I':
+            if (editing)
+            {
+                view.setCaret(ALTextPos(view.caret().line, firstNonBlankColumn(d, view.caret().line)));
+                enterInsert(view, count);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'A':
+            if (editing)
+            {
+                view.setCaret(d.lineEnd(view.caret().line));
+                enterInsert(view, count);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'o':
+        case 'O':
+        {
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            const S32         line   = view.caret().line;
+            const std::string indent = indentOf(d, line);
+            view.undoJournal().beginGroup();
+            if (ch == 'o')
+            {
+                view.setCaret(d.lineEnd(line));
+                view.insertText("\n" + indent);
+            }
+            else
+            {
+                view.setCaret(d.lineStart(line));
+                view.insertText(indent + "\n");
+                view.setCaret(ALTextPos(line, static_cast<S32>(indent.size())));
+            }
+            enterInsert(view, count);
+            return true;
+        }
+        case 'x':
+        case 'X':
+        case 's':
+        {
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            const ALTextPos from = view.caret();
+            Span            span;
+            if (ch == 'X')
+            {
+                ALTextPos begin = from;
+                for (S32 n = 0; n < count && begin.column > 0; ++n)
+                {
+                    begin = d.prevCluster(begin);
+                }
+                span.range = ALTextRange(begin, from);
+            }
+            else
+            {
+                ALTextPos end = from;
+                for (S32 n = 0; n < count && !atLineEnd(d, end); ++n)
+                {
+                    end = d.nextCluster(end);
+                }
+                span.range = ALTextRange(from, end);
+            }
+            if (span.range.empty())
+            {
+                clearPending();
+                return true;
+            }
+            applyOperator(view, ch == 's' ? 'c' : 'd', span, 1);
+            finishCommand(true);
+            return true;
+        }
+        case 'D':
+        case 'C':
+        case 'Y':
+        {
+            if (ch != 'Y' && !editing)
+            {
+                clearPending();
+                return true;
+            }
+            Span span;
+            if (ch == 'Y')
+            {
+                const S32 first = view.caret().line;
+                const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
+                span.linewise   = true;
+                span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
+            }
+            else
+            {
+                const S32 last = llmin(d.lineCount() - 1, view.caret().line + count - 1);
+                span.range     = ALTextRange(view.caret(), d.lineEnd(last));
+            }
+            applyOperator(view, ch == 'D' ? 'd' : ch == 'C' ? 'c' : 'y', span, 1);
+            finishCommand(ch != 'Y');
+            return true;
+        }
+        case 'S':
+        {
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            Span      span;
+            const S32 first = view.caret().line;
+            const S32 last  = llmin(d.lineCount() - 1, first + count - 1);
+            span.linewise   = true;
+            span.range      = ALTextRange(d.lineStart(first), d.lineEnd(last));
+            applyOperator(view, 'c', span, 1);
+            finishCommand(true);
+            return true;
+        }
+        case 'p':
+        case 'P':
+            if (editing)
+            {
+                put(view, mRegister, ch == 'p', count);
+                finishCommand(true);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'J':
+        {
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            // Lines joined with one space, their leading blanks gone.
+            const S32 first = view.caret().line;
+            const S32 until = llmin(d.lineCount() - 1, first + llmax(1, count - 1));
+            if (until == first)
+            {
+                clearPending();
+                return true;
+            }
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (S32 line = first; line < until; ++line)
+            {
+                const ALTextPos next_text(line + 1, firstNonBlankColumn(d, line + 1));
+                const bool      empty = d.lineLength(line + 1) == next_text.column || at(d, next_text) == ')';
+                edits.emplace_back(ALTextRange(d.lineEnd(line), next_text), empty ? std::string() : std::string(" "));
+            }
+            ALTextPos caret = d.lineEnd(first);
+            view.replaceAll(std::move(edits));
+            moveTo(view, caret);
+            finishCommand(true);
+            return true;
+        }
+        case 'u':
+            for (S32 n = 0; n < count; ++n)
+            {
+                view.perform(ALEditorCommand::Undo);
+            }
+            moveTo(view, view.caret());
+            clearPending();
+            return true;
+        case '.':
+        {
+            if (mLastChange.empty() || mReplaying)
+            {
+                clearPending();
+                return true;
+            }
+            const std::vector<Input> change = mLastChange;
+            const S32                given  = mCount;
+            clearPending();
+            mReplaying = true;
+            size_t     from = 0;
+            if (given > 0)
+            {
+                // The count given takes the place of the one recorded.
+                while (from < change.size() && change[from].isChar && isDigit(change[from].ch))
+                {
+                    ++from;
+                }
+                for (const char digit : std::to_string(given))
+                {
+                    Input in;
+                    in.isChar = true;
+                    in.ch     = static_cast<llwchar>(digit);
+                    feed(view, in);
+                }
+            }
+            for (size_t i = from; i < change.size(); ++i)
+            {
+                feed(view, change[i]);
+            }
+            mReplaying = false;
+            return true;
+        }
+        case '~':
+        {
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            ALTextPos from = view.caret();
+            ALTextPos to   = from;
+            for (S32 n = 0; n < count && !atLineEnd(d, to); ++n)
+            {
+                to = d.nextCluster(to);
+            }
+            if (to == from)
+            {
+                clearPending();
+                return true;
+            }
+            view.replaceAll({ { ALTextRange(from, to), recased(d.text(ALTextRange(from, to)), '~') } });
+            moveTo(view, to);
+            finishCommand(true);
+            return true;
+        }
+        case 'v':
+            enterVisual(view, Mode::Visual);
+            clearPending();
+            return true;
+        case 'V':
+            enterVisual(view, Mode::VisualLine);
+            clearPending();
+            return true;
+        case ':':
+            mMode     = Mode::Command;
+            mLineKind = ':';
+            mLine     = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
+            if (visual)
+            {
+                leaveVisual(view);
+                mMode = Mode::Command;
+            }
+            return true;
+        case '/':
+        case '?':
+            mMode     = Mode::Search;
+            mLineKind = ch;
+            mLine.clear();
+            return true;
+        case 'n':
+        case 'N':
+            if (mSearchPattern.empty())
+            {
+                say("E35: No previous regular expression", true);
+            }
+            else
+            {
+                search(view, mSearchPattern, ch == 'n' ? mSearchForward : !mSearchForward, count, mSearchWholeWord);
+            }
+            clearPending();
+            return true;
+        case '*':
+        case '#':
+        {
+            const ALTextRange word = d.wordAt(view.caret());
+            if (word.empty())
+            {
+                clearPending();
+                return true;
+            }
+            mSearchPattern   = d.text(word);
+            mSearchForward   = ch == '*';
+            mSearchWholeWord = true;
+            search(view, mSearchPattern, mSearchForward, count, true);
+            clearPending();
+            return true;
+        }
+        case 'R':
+            if (editing)
+            {
+                enterInsert(view, count);
+                mMode = Mode::Replace;
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 0x16:  // control-V typed as a character on some platforms
+            enterVisual(view, Mode::VisualBlock);
+            clearPending();
+            return true;
+        default:
+            break;
+    }
+
+    // A motion on its own.
+    Motion m = motion(view, ch, count, 0);
+    if (m.ok)
+    {
+        if (m.moved || true)
+        {
+            moveTo(view, m.to);
+        }
+        clearPending();
+        return true;
+    }
+    clearPending();
+    return true;
+}
+
+// --- motions -----------------------------------------------------------------------------
+
+ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count, llwchar arg)
+{
+    const ALTextDocument& d = view.document();
+    const ALTextPos       from = cursor(view);
+    Motion                m;
+    m.ok = true;
+    m.to = from;
+    switch (ch)
+    {
+        case 'h':
+            for (S32 n = 0; n < count && m.to.column > 0; ++n)
+            {
+                m.to = d.prevCluster(m.to);
+            }
+            m.moved = m.to != from;
+            return m;
+        case 'l':
+        case ' ':
+            for (S32 n = 0; n < count && !atLineEnd(d, m.to); ++n)
+            {
+                m.to = d.nextCluster(m.to);
+            }
+            m.moved = m.to != from;
+            return m;
+        case 'j':
+        case 'k':
+        case '+':
+        case '-':
+        case 0x01:  // gg
+        case 'G':
+        {
+            S32 line = from.line;
+            if (ch == 'j' || ch == '+')
+            {
+                line = llmin(d.lineCount() - 1, from.line + count);
+            }
+            else if (ch == 'k' || ch == '-')
+            {
+                line = llmax(0, from.line - count);
+            }
+            else if (ch == 0x01)
+            {
+                line = llclamp(mCount > 0 || count > 1 ? count - 1 : 0, 0, d.lineCount() - 1);
+            }
+            else
+            {
+                line = llclamp(mCount > 0 ? count - 1 : d.lineCount() - 1, 0, d.lineCount() - 1);
+            }
+            m.linewise = true;
+            m.moved    = line != from.line || ch == 0x01 || ch == 'G';
+            if (ch == 'j' || ch == 'k')
+            {
+                // The column kept, by where it is drawn.
+                const S32 shown = d.displayColumn(from, view.getTabWidth());
+                m.to            = d.posAtDisplayColumn(line, shown, view.getTabWidth());
+            }
+            else
+            {
+                m.to = ALTextPos(line, firstNonBlankColumn(d, line));
+            }
+            return m;
+        }
+        case '0':
+            m.to = d.lineStart(from.line);
+            return m;
+        case '^':
+            m.to = ALTextPos(from.line, firstNonBlankColumn(d, from.line));
+            return m;
+        case '$':
+        {
+            const S32 line = llmin(d.lineCount() - 1, from.line + count - 1);
+            m.to           = d.lineEnd(line);
+            m.inclusive    = false;
+            // To the line's end, taken with the last character: an
+            // operator reaches the end, the caret sits on the last.
+            if (!mOperator && m.to.column > 0)
+            {
+                m.to = d.prevCluster(m.to);
+            }
+            return m;
+        }
+        case '|':
+            m.to = d.clamp(ALTextPos(from.line, mCount > 0 ? count - 1 : 0));
+            return m;
+        case 'w':
+        case 'W':
+        {
+            const bool big = ch == 'W';
+            for (S32 n = 0; n < count; ++n)
+            {
+                const S32 cls = classOf(at(d, m.to), big);
+                if (cls != 0)
+                {
+                    while (!atLineEnd(d, m.to) && classOf(at(d, m.to), big) == cls)
+                    {
+                        m.to = d.nextCluster(m.to);
+                    }
+                }
+                // Over the blanks, onto the next line if need be; an empty
+                // line is a word of its own.
+                while (true)
+                {
+                    if (atLineEnd(d, m.to))
+                    {
+                        if (m.to.line + 1 >= d.lineCount())
+                        {
+                            break;
+                        }
+                        m.to = ALTextPos(m.to.line + 1, 0);
+                        if (d.lineLength(m.to.line) == 0)
+                        {
+                            break;
+                        }
+                        continue;
+                    }
+                    if (classOf(at(d, m.to), big) != 0)
+                    {
+                        break;
+                    }
+                    m.to = d.nextCluster(m.to);
+                }
+            }
+            m.moved = m.to != from;
+            return m;
+        }
+        case 'e':
+        case 'E':
+        {
+            const bool big = ch == 'E';
+            for (S32 n = 0; n < count; ++n)
+            {
+                if (!stepOn(d, m.to))
+                {
+                    break;
+                }
+                while (classOf(at(d, m.to), big) == 0 && stepOn(d, m.to)) {}
+                const S32 cls = classOf(at(d, m.to), big);
+                ALTextPos next = m.to;
+                while (!atLineEnd(d, next) && classOf(at(d, next), big) == cls)
+                {
+                    m.to = next;
+                    next = d.nextCluster(next);
+                }
+            }
+            m.inclusive = true;
+            m.moved     = m.to != from;
+            return m;
+        }
+        case 'b':
+        case 'B':
+        {
+            const bool big = ch == 'B';
+            for (S32 n = 0; n < count; ++n)
+            {
+                if (!stepBack(d, m.to))
+                {
+                    break;
+                }
+                while (classOf(at(d, m.to), big) == 0 && stepBack(d, m.to)) {}
+                const S32 cls = classOf(at(d, m.to), big);
+                while (m.to.column > 0 && classOf(at(d, d.prevCluster(m.to)), big) == cls)
+                {
+                    m.to = d.prevCluster(m.to);
+                }
+            }
+            m.moved = m.to != from;
+            return m;
+        }
+        case '}':
+        case '{':
+        {
+            S32 line = from.line;
+            for (S32 n = 0; n < count; ++n)
+            {
+                const S32 step = ch == '}' ? 1 : -1;
+                // Off the blank lines first, then to the next blank.
+                while (line + step >= 0 && line + step < d.lineCount() && lineBlank(d, line))
+                {
+                    line += step;
+                }
+                while (line + step >= 0 && line + step < d.lineCount() && !lineBlank(d, line + step))
+                {
+                    line += step;
+                }
+                if (line + step >= 0 && line + step < d.lineCount())
+                {
+                    line += step;
+                }
+            }
+            m.to    = lineBlank(d, line) ? d.lineStart(line) : (ch == '}' ? d.lineEnd(line) : d.lineStart(line));
+            m.moved = m.to != from;
+            return m;
+        }
+        case '%':
+        {
+            // The bracket under the caret or the first after it on the line.
+            ALTextPos p = from;
+            while (!atLineEnd(d, p) && !isBracket(at(d, p)))
+            {
+                p = d.nextCluster(p);
+            }
+            ALTextPos match;
+            if (atLineEnd(d, p) || !matchBracket(d, p, match))
+            {
+                m.moved = false;
+                return m;
+            }
+            m.to        = match;
+            m.inclusive = true;
+            return m;
+        }
+        case 'f':
+        case 'F':
+        case 't':
+        case 'T':
+        case ';':
+        case ',':
+        {
+            llwchar want    = arg;
+            bool    forward = ch == 'f' || ch == 't';
+            bool    till    = ch == 't' || ch == 'T';
+            if (ch == ';' || ch == ',')
+            {
+                if (!mFindChar)
+                {
+                    m.moved = false;
+                    return m;
+                }
+                want    = mFindChar;
+                forward = ch == ';' ? mFindForward : !mFindForward;
+                till    = mFindTill;
+            }
+            else
+            {
+                mFindChar    = want;
+                mFindForward = forward;
+                mFindTill    = till;
+            }
+            const std::string needle = utf8Of(want);
+            const std::string& line  = d.line(from.line);
+            S32                col   = from.column;
+            for (S32 n = 0; n < count; ++n)
+            {
+                size_t found;
+                if (forward)
+                {
+                    const S32 start = col + 1 + ((till && n == 0) ? 1 : 0);
+                    found           = start < static_cast<S32>(line.size()) ? line.find(needle, start) : std::string::npos;
+                }
+                else
+                {
+                    const S32 start = col - 1 - ((till && n == 0) ? 1 : 0);
+                    found           = start >= 0 ? line.rfind(needle, start) : std::string::npos;
+                }
+                if (found == std::string::npos)
+                {
+                    m.moved = false;
+                    return m;
+                }
+                col = static_cast<S32>(found);
+            }
+            if (till)
+            {
+                col += forward ? -1 : static_cast<S32>(needle.size());
+            }
+            m.to        = ALTextPos(from.line, col);
+            m.inclusive = forward;
+            return m;
+        }
+        case 'H':
+        case 'M':
+        case 'L':
+        {
+            const S32 first = view.firstVisibleLine();
+            const S32 last  = view.lastVisibleLine();
+            S32       line  = ch == 'H' ? llmin(last, first + count - 1) : ch == 'L' ? llmax(first, last - count + 1) : (first + last) / 2;
+            line            = llclamp(line, 0, d.lineCount() - 1);
+            m.to            = ALTextPos(line, firstNonBlankColumn(d, line));
+            m.linewise      = true;
+            return m;
+        }
+        case '`':
+        case '\'':
+        {
+            const auto mark = mMarks.find(static_cast<char>(arg));
+            if (mark == mMarks.end())
+            {
+                say("E20: Mark not set", true);
+                m.moved = false;
+                return m;
+            }
+            const ALTextPos p = d.clamp(mark->second);
+            m.to              = ch == '\'' ? ALTextPos(p.line, firstNonBlankColumn(d, p.line)) : p;
+            m.linewise        = ch == '\'';
+            return m;
+        }
+        case 'n':
+        case 'N':
+            m.ok = false;
+            return m;
+        default:
+            m.ok = false;
+            return m;
+    }
+}
+
+// --- text objects ----------------------------------------------------------------------
+
+bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 count, Span& out)
+{
+    const ALTextDocument& d      = view.document();
+    const ALTextPos       from   = cursor(view);
+    const bool            around = kind == 'a';
+    out                          = Span();
+    switch (what)
+    {
+        case 'w':
+        case 'W':
+        {
+            const bool big = what == 'W';
+            ALTextPos  begin = from;
+            ALTextPos  end   = from;
+            const S32  cls   = classOf(at(d, from), big);
+            while (begin.column > 0 && classOf(at(d, d.prevCluster(begin)), big) == cls)
+            {
+                begin = d.prevCluster(begin);
+            }
+            while (!atLineEnd(d, end) && classOf(at(d, end), big) == cls)
+            {
+                end = d.nextCluster(end);
+            }
+            for (S32 n = 1; n < count && !atLineEnd(d, end); ++n)
+            {
+                const S32 next = classOf(at(d, end), big);
+                while (!atLineEnd(d, end) && classOf(at(d, end), big) == next)
+                {
+                    end = d.nextCluster(end);
+                }
+            }
+            if (around)
+            {
+                // The blanks after it, or before it where there are none after.
+                ALTextPos after = end;
+                while (!atLineEnd(d, after) && isSpace(at(d, after)))
+                {
+                    after = d.nextCluster(after);
+                }
+                if (after != end)
+                {
+                    end = after;
+                }
+                else
+                {
+                    while (begin.column > 0 && isSpace(at(d, d.prevCluster(begin))))
+                    {
+                        begin = d.prevCluster(begin);
+                    }
+                }
+            }
+            if (begin == end)
+            {
+                return false;
+            }
+            out.range = ALTextRange(begin, end);
+            return true;
+        }
+        case '"':
+        case '\'':
+        case '`':
+        {
+            const std::string& line  = d.line(from.line);
+            const char         quote = static_cast<char>(what);
+            // The pair around the caret: the first quote before or at it
+            // that opens, and its close after.
+            S32 open = -1;
+            S32 close = -1;
+            S32 col   = 0;
+            while (col < static_cast<S32>(line.size()))
+            {
+                if (line[col] == quote)
+                {
+                    const size_t next = line.find(quote, col + 1);
+                    if (next == std::string::npos)
+                    {
+                        break;
+                    }
+                    if (from.column >= col && from.column <= static_cast<S32>(next))
+                    {
+                        open  = col;
+                        close = static_cast<S32>(next);
+                        break;
+                    }
+                    col = static_cast<S32>(next) + 1;
+                    continue;
+                }
+                ++col;
+            }
+            if (open < 0)
+            {
+                // The first pair after the caret, as vim allows.
+                const size_t first = line.find(quote, from.column);
+                const size_t next  = first == std::string::npos ? std::string::npos : line.find(quote, first + 1);
+                if (next == std::string::npos)
+                {
+                    return false;
+                }
+                open  = static_cast<S32>(first);
+                close = static_cast<S32>(next);
+            }
+            if (around)
+            {
+                S32 end = close + 1;
+                while (end < static_cast<S32>(line.size()) && isSpace(line[end]))
+                {
+                    ++end;
+                }
+                out.range = ALTextRange(ALTextPos(from.line, open), ALTextPos(from.line, end));
+            }
+            else
+            {
+                out.range = ALTextRange(ALTextPos(from.line, open + 1), ALTextPos(from.line, close));
+            }
+            return true;
+        }
+        case '(':
+        case ')':
+        case 'b':
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case 'B':
+        case '<':
+        case '>':
+        {
+            const char opener = (what == '(' || what == ')' || what == 'b') ? '(' : (what == '[' || what == ']') ? '[' : (what == '{' || what == '}' || what == 'B') ? '{' : '<';
+            const char closer = partnerOf(opener);
+            // Back to the opener that holds the caret, counting nesting.
+            ALTextPos open  = from;
+            S32       depth = 0;
+            bool      found = at(d, open) == opener;
+            while (!found)
+            {
+                if (!stepBack(d, open))
+                {
+                    return false;
+                }
+                const char c = at(d, open);
+                if (c == closer)
+                {
+                    ++depth;
+                }
+                else if (c == opener)
+                {
+                    if (depth == 0)
+                    {
+                        found = true;
+                    }
+                    else
+                    {
+                        --depth;
+                    }
+                }
+            }
+            for (S32 n = 1; n < count; ++n)
+            {
+                ALTextPos outer = open;
+                depth           = 0;
+                bool more       = false;
+                while (stepBack(d, outer))
+                {
+                    const char c = at(d, outer);
+                    if (c == closer)
+                    {
+                        ++depth;
+                    }
+                    else if (c == opener)
+                    {
+                        if (depth == 0)
+                        {
+                            more = true;
+                            break;
+                        }
+                        --depth;
+                    }
+                }
+                if (!more)
+                {
+                    break;
+                }
+                open = outer;
+            }
+            ALTextPos close;
+            if (!matchBracket(d, open, close))
+            {
+                return false;
+            }
+            if (around)
+            {
+                out.range = ALTextRange(open, d.nextCluster(close));
+            }
+            else
+            {
+                out.range = ALTextRange(d.nextCluster(open), close);
+            }
+            return true;
+        }
+        case 't':
+        {
+            // The tag around the caret: back to a <name, on to its </name>.
+            const std::string text = d.text();
+            const size_t      here = static_cast<size_t>(d.lineStart(from.line).column) + [&] {
+                size_t offset = 0;
+                for (S32 l = 0; l < from.line; ++l)
+                {
+                    offset += d.lineLength(l) + 1;
+                }
+                return offset + from.column;
+            }();
+            size_t open = text.rfind('<', here);
+            while (open != std::string::npos)
+            {
+                if (open + 1 < text.size() && text[open + 1] != '/')
+                {
+                    size_t name_end = open + 1;
+                    while (name_end < text.size() && (isWordByte(text[name_end]) || text[name_end] == '-' || text[name_end] == ':'))
+                    {
+                        ++name_end;
+                    }
+                    const std::string name = text.substr(open + 1, name_end - open - 1);
+                    const size_t      gt   = text.find('>', open);
+                    const size_t      end  = name.empty() ? std::string::npos : text.find("</" + name + ">", open);
+                    if (gt != std::string::npos && end != std::string::npos && end >= here - (here > gt ? 0 : 0) && gt < end)
+                    {
+                        const size_t close_end = end + name.size() + 3;
+                        out.range              = around ? ALTextRange(d.posAt(open), d.posAt(close_end)) : ALTextRange(d.posAt(gt + 1), d.posAt(end));
+                        return true;
+                    }
+                }
+                if (open == 0)
+                {
+                    break;
+                }
+                open = text.rfind('<', open - 1);
+            }
+            return false;
+        }
+        case 'p':
+        {
+            // The paragraph: the lines around this one up to the blank
+            // ones, and with them for `ap`.
+            S32 first = from.line;
+            S32 last  = from.line;
+            const bool blank = lineBlank(d, from.line);
+            while (first > 0 && lineBlank(d, first - 1) == blank)
+            {
+                --first;
+            }
+            while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == blank)
+            {
+                ++last;
+            }
+            for (S32 n = 1; n < count && last + 1 < d.lineCount(); ++n)
+            {
+                const bool next_blank = lineBlank(d, last + 1);
+                while (last + 1 < d.lineCount() && lineBlank(d, last + 1) == next_blank)
+                {
+                    ++last;
+                }
+            }
+            if (around && !blank)
+            {
+                while (last + 1 < d.lineCount() && lineBlank(d, last + 1))
+                {
+                    ++last;
+                }
+            }
+            out.linewise = true;
+            out.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+// --- operators ---------------------------------------------------------------------------
+
+void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_in, S32 count)
+{
+    const ALTextDocument& d    = view.document();
+    Span                  span = span_in;
+    span.range                 = span.range.normalised();
+    const S32 first            = span.range.begin.line;
+    const S32 last             = span.range.end.line;
+    const bool editing         = !view.isReadOnly();
+
+    // The text the operator works on: whole lines, a block's columns
+    // line by line, or the stretch as it is.
+    std::vector<ALTextRange> pieces;
+    if (span.block)
+    {
+        const S32 c0 = llmin(span.range.begin.column, span.range.end.column);
+        const S32 c1 = llmax(span.range.begin.column, span.range.end.column) + 1;
+        for (S32 line = first; line <= last; ++line)
+        {
+            const S32 length = d.lineLength(line);
+            pieces.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
+        }
+    }
+    else if (span.linewise)
+    {
+        pieces.emplace_back(d.lineStart(first), d.lineEnd(last));
+    }
+    else
+    {
+        pieces.push_back(span.range);
+    }
+    std::string text;
+    for (size_t i = 0; i < pieces.size(); ++i)
+    {
+        if (i > 0)
+        {
+            text += '\n';
+        }
+        text += d.text(pieces[i]);
+    }
+
+    switch (op)
+    {
+        case 'y':
+            store(mRegister, text, span.linewise, span.block, true);
+            if (span.linewise)
+            {
+                if (pieces.size() == 1 && last > first)
+                {
+                    say(std::to_string(last - first + 1) + " lines yanked");
+                }
+                moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
+            }
+            else
+            {
+                moveTo(view, span.range.begin);
+            }
+            return;
+        case 'd':
+        case 'c':
+        {
+            if (!editing)
+            {
+                return;
+            }
+            store(mRegister, text, span.linewise, span.block, false);
+            if (op == 'c')
+            {
+                view.undoJournal().beginGroup();
+            }
+            if (span.block)
+            {
+                std::vector<std::pair<ALTextRange, std::string>> edits;
+                for (const ALTextRange& piece : pieces)
+                {
+                    edits.emplace_back(piece, std::string());
+                }
+                view.replaceAll(std::move(edits));
+                view.setCaret(d.clamp(pieces.front().begin));
+            }
+            else if (span.linewise)
+            {
+                if (op == 'c')
+                {
+                    // The lines' text goes; the first line's indentation
+                    // stays for what is typed.
+                    view.deleteRange(ALTextRange(ALTextPos(first, firstNonBlankColumn(d, first)), d.lineEnd(last)));
+                    view.setCaret(d.lineEnd(first));
+                }
+                else
+                {
+                    ALTextRange whole;
+                    if (last + 1 < d.lineCount())
+                    {
+                        whole = ALTextRange(d.lineStart(first), d.lineStart(last + 1));
+                    }
+                    else if (first > 0)
+                    {
+                        whole = ALTextRange(d.lineEnd(first - 1), d.lineEnd(last));
+                    }
+                    else
+                    {
+                        whole = ALTextRange(d.lineStart(first), d.lineEnd(last));
+                    }
+                    view.deleteRange(whole);
+                    const S32 line = llmin(first, d.lineCount() - 1);
+                    view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
+                    if (last > first)
+                    {
+                        say(std::to_string(last - first + 1) + " fewer lines");
+                    }
+                }
+            }
+            else
+            {
+                view.deleteRange(span.range);
+                view.setCaret(span.range.begin);
+            }
+            if (op == 'c')
+            {
+                if (span.block && last > first)
+                {
+                    mBlockInsert = true;
+                    mBlockFirst  = first;
+                    mBlockLast   = last;
+                    mBlockColumn = pieces.front().begin.column;
+                    mBlockAppend = false;
+                }
+                enterInsert(view, 1);
+                // The group closes when insert mode is left.
+            }
+            else
+            {
+                moveTo(view, view.caret());
+            }
+            return;
+        }
+        case '>':
+        case '<':
+        {
+            if (!editing)
+            {
+                return;
+            }
+            // Each line one step further in, or one back: a tab, or the
+            // tab's width in spaces where tabs are soft; a blank line is
+            // left alone going in.
+            const S32         width = llmax(1, view.getTabWidth());
+            const std::string unit  = view.getSoftTabs() ? std::string(width, ' ') : std::string("\t");
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (S32 line = first; line <= last; ++line)
+            {
+                if (op == '>')
+                {
+                    if (lineBlank(d, line))
+                    {
+                        continue;
+                    }
+                    std::string in;
+                    for (S32 n = 0; n < llmax(1, count); ++n)
+                    {
+                        in += unit;
+                    }
+                    edits.emplace_back(ALTextRange(d.lineStart(line), d.lineStart(line)), in);
+                }
+                else
+                {
+                    const std::string& text = d.line(line);
+                    S32                cut  = 0;
+                    for (S32 n = 0; n < llmax(1, count); ++n)
+                    {
+                        if (cut < static_cast<S32>(text.size()) && text[cut] == '\t')
+                        {
+                            ++cut;
+                            continue;
+                        }
+                        S32 spaces = 0;
+                        while (cut + spaces < static_cast<S32>(text.size()) && text[cut + spaces] == ' ' && spaces < width)
+                        {
+                            ++spaces;
+                        }
+                        if (spaces == 0)
+                        {
+                            break;
+                        }
+                        cut += spaces;
+                    }
+                    if (cut > 0)
+                    {
+                        edits.emplace_back(ALTextRange(d.lineStart(line), ALTextPos(line, cut)), std::string());
+                    }
+                }
+            }
+            if (!edits.empty())
+            {
+                view.replaceAll(std::move(edits));
+            }
+            moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
+            if (last > first)
+            {
+                say(std::to_string(last - first + 1) + " lines " + (op == '>' ? ">" : "<") + "ed 1 time");
+            }
+            return;
+        }
+        case '=':
+            if (mHooks.format)
+            {
+                mHooks.format(view, first, last);
+            }
+            moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
+            return;
+        case '~':
+        case 'u':
+        case 'U':
+        {
+            if (!editing)
+            {
+                return;
+            }
+            std::vector<std::pair<ALTextRange, std::string>> edits;
+            for (const ALTextRange& piece : pieces)
+            {
+                edits.emplace_back(piece, recased(d.text(piece), op));
+            }
+            view.replaceAll(std::move(edits));
+            moveTo(view, span.range.begin);
+            return;
+        }
+        default:
+            return;
+    }
+}
+
+// --- registers --------------------------------------------------------------------------
+
+void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked)
+{
+    Register reg;
+    reg.text     = std::move(text);
+    reg.linewise = linewise;
+    reg.block    = block;
+    if (name == '_')
+    {
+        return;
+    }
+    if (name >= 'A' && name <= 'Z')
+    {
+        // Added to the named register, a line or straight on.
+        Register& into = mRegisters[static_cast<char>(name - 'A' + 'a')];
+        if (into.linewise || linewise)
+        {
+            into.text += (into.text.empty() ? "" : "\n") + reg.text;
+            into.linewise = true;
+        }
+        else
+        {
+            into.text += reg.text;
+        }
+        mUnnamed = into;
+        LLClipboard::instance().copyToClipboard(into.text, 0, static_cast<S32>(into.text.size()));
+        return;
+    }
+    if (name >= 'a' && name <= 'z')
+    {
+        mRegisters[name] = reg;
+    }
+    else if (yanked)
+    {
+        mRegisters['0'] = reg;
+    }
+    // The unnamed register is the clipboard, which the world shares.
+    mUnnamed = reg;
+    LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+}
+
+ALVimKeymap::Register ALVimKeymap::fetch(char name) const
+{
+    if (name >= 'A' && name <= 'Z')
+    {
+        name = static_cast<char>(name - 'A' + 'a');
+    }
+    if ((name >= 'a' && name <= 'z') || name == '0')
+    {
+        const auto it = mRegisters.find(name);
+        return it == mRegisters.end() ? Register() : it->second;
+    }
+    // What the clipboard holds now: ours, with how it was taken, or
+    // somebody else's, taken as characters.
+    Register    reg;
+    std::string text;
+    if (LLClipboard::instance().pasteFromClipboard(text))
+    {
+        reg.text = text;
+        if (text == mUnnamed.text)
+        {
+            reg.linewise = mUnnamed.linewise;
+            reg.block    = mUnnamed.block;
+        }
+    }
+    return reg;
+}
+
+void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
+{
+    const ALTextDocument& d   = view.document();
+    const Register        reg = fetch(name);
+    if (reg.text.empty())
+    {
+        say("E353: Nothing in register " + std::string(1, name ? name : '"'), true);
+        return;
+    }
+    const ALTextPos from = view.caret();
+    if (reg.block)
+    {
+        // Each line of the block onto a line of its own, from the column.
+        std::vector<std::string> lines;
+        size_t                   at_ = 0;
+        while (true)
+        {
+            const size_t nl = reg.text.find('\n', at_);
+            lines.push_back(reg.text.substr(at_, nl == std::string::npos ? std::string::npos : nl - at_));
+            if (nl == std::string::npos)
+            {
+                break;
+            }
+            at_ = nl + 1;
+        }
+        const S32 column = after && !atLineEnd(d, from) ? from.column + 1 : from.column;
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        std::string                                       tail;
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            const S32 line = from.line + static_cast<S32>(i);
+            std::string piece;
+            for (S32 n = 0; n < count; ++n)
+            {
+                piece += lines[i];
+            }
+            if (line < d.lineCount())
+            {
+                const S32   length = d.lineLength(line);
+                std::string pad    = length < column ? std::string(column - length, ' ') : std::string();
+                edits.emplace_back(ALTextRange(ALTextPos(line, llmin(column, length)), ALTextPos(line, llmin(column, length))), pad + piece);
+            }
+            else
+            {
+                tail += "\n" + std::string(column, ' ') + piece;
+            }
+        }
+        if (!tail.empty())
+        {
+            edits.emplace_back(ALTextRange(d.end(), d.end()), tail);
+        }
+        view.replaceAll(std::move(edits));
+        moveTo(view, ALTextPos(from.line, column));
+        return;
+    }
+    std::string text;
+    for (S32 n = 0; n < count; ++n)
+    {
+        text += reg.linewise && n > 0 ? "\n" + reg.text : reg.text;
+    }
+    if (reg.linewise)
+    {
+        if (after)
+        {
+            view.setCaret(d.lineEnd(from.line));
+            view.insertText("\n" + text);
+        }
+        else
+        {
+            view.setCaret(d.lineStart(from.line));
+            view.insertText(text + "\n");
+        }
+        const S32 line = after ? from.line + 1 : from.line;
+        moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
+        return;
+    }
+    ALTextPos where = from;
+    if (after && !atLineEnd(d, from))
+    {
+        where = d.nextCluster(from);
+    }
+    view.setCaret(where);
+    view.insertText(text);
+    // On the last character put, as vim leaves it.
+    moveTo(view, text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
+}
+
+// --- insert mode ------------------------------------------------------------------------
+
+void ALVimKeymap::enterInsert(ALTextView& view, S32 count)
+{
+    if (mMode == Mode::Normal)
+    {
+        view.undoJournal().beginGroup();
+    }
+    else if (mMode != Mode::Insert && mMode != Mode::Replace)
+    {
+        // From an operator: the group is the operator's, opened by it.
+    }
+    mMode        = Mode::Insert;
+    mInsertCount = llmax(1, count);
+    mTyped.clear();
+    mInsertStart = view.caret();
+    mCount       = 0;
+    mRegister    = 0;
+    mOperator    = 0;
+    mOperatorCount = 0;
+    mPending     = 0;
+    mObjectKind  = 0;
+    bump();
+}
+
+void ALVimKeymap::leaveInsert(ALTextView& view)
+{
+    const ALTextDocument& d = view.document();
+    // What was typed, again as many times as the count said.
+    for (S32 n = 1; n < mInsertCount; ++n)
+    {
+        view.insertText(mTyped);
+    }
+    // And onto every other line of a block.
+    if (mBlockInsert && !mTyped.empty() && mTyped.find('\n') == std::string::npos)
+    {
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (S32 line = mBlockFirst + 1; line <= llmin(mBlockLast, d.lineCount() - 1); ++line)
+        {
+            const S32 length = d.lineLength(line);
+            const S32 column = mBlockAppend ? llmin(mBlockColumn, length) : mBlockColumn;
+            if (!mBlockAppend && column > length)
+            {
+                continue;
+            }
+            const std::string pad = length < column ? std::string(column - length, ' ') : std::string();
+            const S32         at_ = llmin(column, length);
+            edits.emplace_back(ALTextRange(ALTextPos(line, at_), ALTextPos(line, at_)), pad + mTyped);
+        }
+        if (!edits.empty())
+        {
+            const ALTextPos keep = view.caret();
+            view.replaceAll(std::move(edits));
+            view.setCaret(d.clamp(keep));
+        }
+    }
+    mBlockInsert = false;
+    view.undoJournal().endGroup();
+    mMode = Mode::Normal;
+    // The caret steps back onto the last character typed.
+    const ALTextPos caret = view.caret();
+    moveTo(view, caret.column > 0 ? d.prevCluster(caret) : caret);
+    finishCommand(true);
+    bump();
+}
+
+bool ALVimKeymap::insert(ALTextView& view, const Input& input)
+{
+    const ALTextDocument& d = view.document();
+    if (!input.isChar)
+    {
+        const bool ctrl = (input.mask & MASK_CONTROL) != 0;
+        if (input.key == KEY_ESCAPE || (ctrl && input.key == '[') || (ctrl && input.key == 'C'))
+        {
+            leaveInsert(view);
+            return true;
+        }
+        if (ctrl && input.key == 'W')
+        {
+            view.perform(ALEditorCommand::DeleteWordLeft);
+            return true;
+        }
+        if (ctrl && input.key == 'U')
+        {
+            view.deleteRange(ALTextRange(d.lineStart(view.caret().line), view.caret()));
+            return true;
+        }
+        if (mReplaying)
+        {
+            // Nobody else will: the view's own keymap does what the key
+            // would have done when it was typed.
+            const ALEditorCommand command = view.keymap().lookup(input.key, input.mask);
+            if (command != ALEditorCommand::None)
+            {
+                view.perform(command);
+            }
+            return true;
+        }
+        if (input.key == KEY_RETURN || input.key == KEY_BACKSPACE || input.key == KEY_DELETE || input.key == KEY_TAB)
+        {
+            // Typed text with a break in it is no longer one block's.
+            mTyped += input.key == KEY_RETURN ? "\n" : "";
+        }
+        // The rest is the view's: arrows, return, backspace, the keymap.
+        return false;
+    }
+    if (mMode == Mode::Replace)
+    {
+        // Over the character under the caret, if there is one.
+        const ALTextPos from = view.caret();
+        if (!atLineEnd(d, from))
+        {
+            view.setSelection(ALTextRange(from, d.nextCluster(from)));
+        }
+        view.insertText(utf8Of(input.ch));
+        mTyped += utf8Of(input.ch);
+        return true;
+    }
+    mTyped += utf8Of(input.ch);
+    if (mReplaying)
+    {
+        view.insertText(utf8Of(input.ch));
+        return true;
+    }
+    // The view puts the character in.
+    return false;
+}
+
+// --- visual mode ------------------------------------------------------------------------
+
+void ALVimKeymap::enterVisual(ALTextView& view, Mode which)
+{
+    if (mMode == Mode::Normal)
+    {
+        mVisualAnchor = view.caret();
+        mVisualCaret  = view.caret();
+    }
+    mMode = which;
+    showVisual(view);
+    bump();
+}
+
+void ALVimKeymap::leaveVisual(ALTextView& view)
+{
+    if (mMode == Mode::Visual || mMode == Mode::VisualLine || mMode == Mode::VisualBlock)
+    {
+        mVisualLast       = mMode;
+        mVisualLastAnchor = mVisualAnchor;
+        mVisualLastCaret  = mVisualCaret;
+    }
+    const ALTextPos caret = cursor(view);
+    mMode                 = Mode::Normal;
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    {
+        editor->clearHighlights();
+    }
+    view.setCaret(caret);
+    moveTo(view, caret);
+    bump();
+}
+
+ALVimKeymap::Span ALVimKeymap::visualSpan(const ALTextView& view) const
+{
+    const ALTextDocument& d     = view.document();
+    const ALTextPos       caret = d.clamp(mVisualCaret);
+    const ALTextPos       a     = std::min(mVisualAnchor, caret);
+    const ALTextPos       b     = std::max(mVisualAnchor, caret);
+    Span                  span;
+    if (mMode == Mode::VisualLine)
+    {
+        span.linewise = true;
+        span.range    = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
+    }
+    else if (mMode == Mode::VisualBlock)
+    {
+        span.block = true;
+        span.range = ALTextRange(ALTextPos(a.line, llmin(mVisualAnchor.column, caret.column)), ALTextPos(b.line, llmax(mVisualAnchor.column, caret.column)));
+    }
+    else
+    {
+        span.range = ALTextRange(a, atLineEnd(d, b) ? b : d.nextCluster(b));
+    }
+    return span;
+}
+
+void ALVimKeymap::showVisual(ALTextView& view)
+{
+    // The selection as the view draws it: from the anchor's side to the
+    // caret's, the character under each end included.
+    const ALTextDocument& d     = view.document();
+    const ALTextPos       caret = d.clamp(mVisualCaret);
+    if (mMode == Mode::VisualLine)
+    {
+        const S32 a = llmin(mVisualAnchor.line, caret.line);
+        const S32 b = llmax(mVisualAnchor.line, caret.line);
+        if (caret.line >= mVisualAnchor.line)
+        {
+            view.setSelection(ALTextRange(d.lineStart(a), d.lineEnd(b)));
+        }
+        else
+        {
+            view.setSelection(ALTextRange(d.lineEnd(b), d.lineStart(a)));
+        }
+    }
+    else if (mMode == Mode::VisualBlock)
+    {
+        // The rows between, each lit over the block's columns where the
+        // view can; the selection itself the corners.
+        const Span span = visualSpan(view);
+        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        {
+            std::vector<ALTextRange> lit;
+            const S32                c0 = span.range.begin.column;
+            const S32                c1 = span.range.end.column + 1;
+            for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
+            {
+                const S32 length = d.lineLength(line);
+                lit.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
+            }
+            editor->setHighlights(std::move(lit));
+        }
+        view.setCaret(caret);
+    }
+    else
+    {
+        if (caret >= mVisualAnchor)
+        {
+            view.setSelection(ALTextRange(mVisualAnchor, atLineEnd(d, caret) ? caret : d.nextCluster(caret)));
+        }
+        else
+        {
+            view.setSelection(ALTextRange(atLineEnd(d, mVisualAnchor) ? mVisualAnchor : d.nextCluster(mVisualAnchor), caret));
+        }
+    }
+    if (mMode != Mode::VisualBlock)
+    {
+        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        {
+            editor->clearHighlights();
+        }
+    }
+}
+
+// --- searching --------------------------------------------------------------------------
+
+bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word)
+{
+    const ALTextDocument& d = view.document();
+    ALTextSearchOptions   options;
+    options.regex     = !whole_word;
+    options.wholeWord = whole_word;
+    // Sensitive to case where the pattern has any, as smartcase has it.
+    options.caseSensitive = std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    std::string                    error;
+    const std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, nullptr, &error);
+    if (!error.empty())
+    {
+        say("E486: " + error, true);
+        return false;
+    }
+    if (matches.empty())
+    {
+        say("E486: Pattern not found: " + pattern, true);
+        return false;
+    }
+    ALTextPos from = cursor(view);
+    for (S32 n = 0; n < count; ++n)
+    {
+        const S32 index = ALTextSearch::nearest(matches, forward ? d.nextCluster(from) : from, forward);
+        if (index < 0)
+        {
+            break;
+        }
+        from = matches[static_cast<size_t>(index)].begin;
+    }
+    // Every match lit, as hlsearch has it, until :noh or the caret
+    // leaves them.
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual())
+    {
+        editor->setHighlights(matches);
+    }
+    moveTo(view, from);
+    return true;
+}
+
+// --- the : and / lines --------------------------------------------------------------------
+
+bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
+{
+    if (!input.isChar)
+    {
+        switch (input.key)
+        {
+            case KEY_ESCAPE:
+                mLine.clear();
+                mMode = Mode::Normal;
+                moveTo(view, view.caret());
+                return true;
+            case KEY_BACKSPACE:
+                if (mLine.empty())
+                {
+                    mMode = Mode::Normal;
+                }
+                else
+                {
+                    // The last character, whole.
+                    size_t cut = mLine.size() - 1;
+                    while (cut > 0 && (static_cast<unsigned char>(mLine[cut]) & 0xC0) == 0x80)
+                    {
+                        --cut;
+                    }
+                    mLine.erase(cut);
+                }
+                return true;
+            case KEY_RETURN:
+            {
+                const std::string line = mLine;
+                const llwchar     kind = mLineKind;
+                mLine.clear();
+                mMode = Mode::Normal;
+                if (kind == ':')
+                {
+                    runCommand(view, line);
+                }
+                else if (!line.empty())
+                {
+                    mSearchPattern   = line;
+                    mSearchForward   = kind == '/';
+                    mSearchWholeWord = false;
+                    search(view, line, mSearchForward, 1, false);
+                }
+                else if (!mSearchPattern.empty())
+                {
+                    search(view, mSearchPattern, kind == '/', 1, mSearchWholeWord);
+                }
+                if (mMode == Mode::Normal)
+                {
+                    moveTo(view, view.caret());
+                }
+                finishCommand(false);
+                return true;
+            }
+            case KEY_TAB:
+                return true;
+            default:
+                // A plain key's character follows; a control chord is
+                // nobody's while the line is being typed.
+                return (input.mask & (MASK_CONTROL | MASK_ALT)) != 0;
+        }
+    }
+    if (input.ch == '\r' || input.ch == '\n')
+    {
+        Input as_key;
+        as_key.key = KEY_RETURN;
+        return commandLine(view, as_key);
+    }
+    mLine += utf8Of(input.ch);
+    return true;
+}
+
+void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
+{
+    const ALTextDocument& d    = view.document();
+    std::string           line = line_in;
+    LLStringUtil::trim(line);
+    if (line.empty())
+    {
+        return;
+    }
+    // A range first: %, '<,'>, a number, ., $, or two of those with a
+    // comma; then the command.
+    S32    first = view.caret().line;
+    S32    last  = first;
+    bool   ranged = false;
+    size_t at_   = 0;
+    auto   lineNumber = [&](S32& out) {
+        if (at_ >= line.size())
+        {
+            return false;
+        }
+        if (line[at_] == '.')
+        {
+            out = view.caret().line;
+            ++at_;
+        }
+        else if (line[at_] == '$')
+        {
+            out = d.lineCount() - 1;
+            ++at_;
+        }
+        else if (line.compare(at_, 2, "'<") == 0 || line.compare(at_, 2, "'>") == 0)
+        {
+            const ALTextPos a = std::min(mVisualLastAnchor, mVisualLastCaret);
+            const ALTextPos b = std::max(mVisualLastAnchor, mVisualLastCaret);
+            out               = line[at_ + 1] == '<' ? a.line : b.line;
+            at_ += 2;
+        }
+        else if (isDigit(line[at_]))
+        {
+            S32 n = 0;
+            while (at_ < line.size() && isDigit(line[at_]))
+            {
+                n = n * 10 + (line[at_++] - '0');
+            }
+            out = n - 1;
+        }
+        else
+        {
+            return false;
+        }
+        // An offset: .+3, $-1.
+        if (at_ < line.size() && (line[at_] == '+' || line[at_] == '-'))
+        {
+            const bool plus = line[at_++] == '+';
+            S32        n    = 0;
+            bool       any  = false;
+            while (at_ < line.size() && isDigit(line[at_]))
+            {
+                n   = n * 10 + (line[at_++] - '0');
+                any = true;
+            }
+            out += (plus ? 1 : -1) * (any ? n : 1);
+        }
+        out = llclamp(out, 0, d.lineCount() - 1);
+        return true;
+    };
+    if (line[0] == '%')
+    {
+        first  = 0;
+        last   = d.lineCount() - 1;
+        ranged = true;
+        at_    = 1;
+    }
+    else if (lineNumber(first))
+    {
+        last   = first;
+        ranged = true;
+        if (at_ < line.size() && line[at_] == ',')
+        {
+            ++at_;
+            if (!lineNumber(last))
+            {
+                last = first;
+            }
+        }
+        if (last < first)
+        {
+            std::swap(first, last);
+        }
+    }
+    std::string rest = line.substr(at_);
+    LLStringUtil::trim(rest);
+    if (rest.empty())
+    {
+        if (ranged)
+        {
+            // A line number alone goes there.
+            moveTo(view, ALTextPos(last, firstNonBlankColumn(d, last)));
+        }
+        return;
+    }
+    // The command's name: letters, or one symbol.
+    size_t name_end = 0;
+    while (name_end < rest.size() && ((rest[name_end] >= 'a' && rest[name_end] <= 'z') || (rest[name_end] >= 'A' && rest[name_end] <= 'Z')))
+    {
+        ++name_end;
+    }
+    if (name_end == 0)
+    {
+        name_end = 1;
+    }
+    std::string name = rest.substr(0, name_end);
+    std::string args = rest.substr(name_end);
+    // The bang belongs to the name: q!, w!.
+    if (!args.empty() && args[0] == '!')
+    {
+        name += '!';
+        args.erase(0, 1);
+    }
+    LLStringUtil::trim(args);
+
+    if (name == "s" || name == "substitute")
+    {
+        if (!substitute(view, first, last, args))
+        {
+            return;
+        }
+        finishCommand(true);
+        return;
+    }
+    if (name == "d" || name == "delete")
+    {
+        Span span;
+        span.linewise = true;
+        span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        applyOperator(view, 'd', span, 1);
+        finishCommand(true);
+        return;
+    }
+    if (name == "y" || name == "yank")
+    {
+        Span span;
+        span.linewise = true;
+        span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        applyOperator(view, 'y', span, 1);
+        return;
+    }
+    if (name == ">" || name == "<")
+    {
+        Span span;
+        span.linewise = true;
+        span.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        applyOperator(view, name[0], span, 1);
+        finishCommand(true);
+        return;
+    }
+    if (name == "noh" || name == "nohlsearch")
+    {
+        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        {
+            editor->clearHighlights();
+        }
+        return;
+    }
+    if (name == "set" || name == "se")
+    {
+        // The view's own settings; the rest the host's.
+        std::string option = args;
+        std::string value;
+        if (const size_t eq = option.find('='); eq != std::string::npos)
+        {
+            value = option.substr(eq + 1);
+            option.erase(eq);
+        }
+        const bool off = option.compare(0, 2, "no") == 0;
+        if (off)
+        {
+            option.erase(0, 2);
+        }
+        if (option == "wrap")
+        {
+            view.setWordWrap(!off);
+            return;
+        }
+        if (option == "et" || option == "expandtab")
+        {
+            view.setSoftTabs(!off);
+            return;
+        }
+        if ((option == "ts" || option == "tabstop" || option == "sw" || option == "shiftwidth") && !value.empty())
+        {
+            view.setTabWidth(llclamp(std::atoi(value.c_str()), 1, 16));
+            return;
+        }
+        if (mHooks.command && mHooks.command(view, "set", args))
+        {
+            return;
+        }
+        say("E518: Unknown option: " + args, true);
+        return;
+    }
+    if (mHooks.command && mHooks.command(view, name, args))
+    {
+        return;
+    }
+    say("E492: Not an editor command: " + line, true);
+}
+
+bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::string& spec)
+{
+    // s/pattern/replacement/flags, with whatever follows s as the
+    // separator; g for every match on a line, i for any case.
+    if (spec.empty())
+    {
+        say("E35: No previous regular expression", true);
+        return false;
+    }
+    const char sep = spec[0];
+    size_t     p1  = 1;
+    auto       part = [&](std::string& out) {
+        out.clear();
+        while (p1 < spec.size() && spec[p1] != sep)
+        {
+            if (spec[p1] == '\\' && p1 + 1 < spec.size() && spec[p1 + 1] == sep)
+            {
+                out += sep;
+                p1 += 2;
+                continue;
+            }
+            out += spec[p1++];
+        }
+        const bool closed = p1 < spec.size();
+        if (closed)
+        {
+            ++p1;
+        }
+        return closed;
+    };
+    std::string pattern, with, flags;
+    part(pattern);
+    if (part(with))
+    {
+        flags = spec.substr(p1);
+    }
+    if (pattern.empty())
+    {
+        pattern = mSearchPattern;
+    }
+    if (pattern.empty())
+    {
+        say("E35: No previous regular expression", true);
+        return false;
+    }
+    mSearchPattern      = pattern;
+    mSearchWholeWord    = false;
+    const bool every    = flags.find('g') != std::string::npos;
+    const bool anycase  = flags.find('i') != std::string::npos;
+    const ALTextDocument& d = view.document();
+    ALTextSearchOptions   options;
+    options.regex         = true;
+    options.caseSensitive = !anycase && std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
+    std::string           error;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, &scope, &error);
+    if (!error.empty())
+    {
+        say("E486: " + error, true);
+        return false;
+    }
+    if (matches.empty())
+    {
+        say("E486: Pattern not found: " + pattern, true);
+        return false;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    S32                                              seen_line = -1;
+    S32                                              lines     = 0;
+    for (const ALTextRange& match : matches)
+    {
+        if (!every && match.begin.line == seen_line)
+        {
+            continue;
+        }
+        if (match.begin.line != seen_line)
+        {
+            ++lines;
+        }
+        seen_line = match.begin.line;
+        edits.emplace_back(match, ALTextSearch::replacement(d, match, pattern, options, with));
+    }
+    const S32 count = static_cast<S32>(edits.size());
+    if (view.isReadOnly() || !view.replaceAll(std::move(edits)))
+    {
+        return false;
+    }
+    moveTo(view, ALTextPos(seen_line, firstNonBlankColumn(d, seen_line)));
+    if (count > 1)
+    {
+        say(std::to_string(count) + " substitutions on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));
+    }
+    return true;
+}

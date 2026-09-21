@@ -133,6 +133,7 @@ target_sources(
     alcodeeditor.cpp
     alfindbar.cpp
     alkeymap.cpp
+    alvimkeymap.cpp
     aloutputlist.cpp
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
@@ -310,6 +311,7 @@ target_sources(
         alcodeeditor.h
         alfindbar.h
         alkeymap.h
+        alvimkeymap.h
         aloutputlist.h
         alsyntaxgrammar.h
         alsyntaxhighlighter.h
@@ -491,6 +493,7 @@ if(AL_BUILD_TESTS)
     altextsearch
     altextview
     alcodeeditor
+    alvimkeymap
     aloutputlist
   )
     al_add_test(

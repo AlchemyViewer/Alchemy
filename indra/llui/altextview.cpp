@@ -475,6 +475,17 @@ S32 ALTextView::firstVisibleLine()
     return mLayout.lineAtY(mScrollY);
 }
 
+S32 ALTextView::lastVisibleLine()
+{
+    const S32 row = mLayout.rowHeight();
+    return mLayout.lineAtY(mScrollY + llmax(0, textRect().getHeight() - (row > 0 ? row : 1)));
+}
+
+void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
+{
+    mModal = std::move(keymap);
+}
+
 // --- the caret ---------------------------------------------------------------
 
 void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
@@ -2373,7 +2384,23 @@ void ALTextView::drawRows(const LLRect& text)
             if (caret_on && line == mCaret.line && static_cast<S32>(r) == caret_row)
             {
                 const S32 x = static_cast<S32>(left + caret_x);
-                gl_rect_2d(x, screen_top, x + CARET_WIDTH, screen_top - row_h, mCursorColor.get() % alpha);
+                if (mModal && !mModal->inserting())
+                {
+                    // A block over the cluster the caret is on, as a modal
+                    // editor's is; a space's width past the line's end.
+                    const ALTextPos next  = mDocument.nextCluster(mCaret);
+                    const F32       cell  = llmax(4.f, mLayout.columnWidth());
+                    F32             right = next.line == mCaret.line && next != mCaret ? mLayout.xOf(mCaret.line, next.column) : caret_x + cell;
+                    if (right <= caret_x)
+                    {
+                        right = caret_x + cell;
+                    }
+                    gl_rect_2d(x, screen_top, static_cast<S32>(left + right), screen_top - row_h, mCursorColor.get() % (0.55f * alpha));
+                }
+                else
+                {
+                    gl_rect_2d(x, screen_top, x + CARET_WIDTH, screen_top - row_h, mCursorColor.get() % alpha);
+                }
             }
         }
     }
@@ -2419,6 +2446,11 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
         hideFind();
         return true;
     }
+    if (mModal && mModal->handleKey(*this, key, mask))
+    {
+        mBlink.reset();
+        return true;
+    }
     const ALEditorCommand command = mKeymap.lookup(key, mask);
     if (command == ALEditorCommand::None)
     {
@@ -2439,7 +2471,16 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
 
 bool ALTextView::handleUnicodeCharHere(llwchar uni_char)
 {
-    if (mReadOnly || uni_char < 0x20 || uni_char == 0x7F)
+    if (uni_char < 0x20 || uni_char == 0x7F)
+    {
+        return false;
+    }
+    if (mModal && mModal->handleChar(*this, uni_char))
+    {
+        mBlink.reset();
+        return true;
+    }
+    if (mReadOnly)
     {
         return false;
     }

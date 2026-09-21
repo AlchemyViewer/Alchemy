@@ -66,6 +66,28 @@ class LLContextMenu;
 // drawn small and the rows on screen as a window over it.
 //
 // What is not here yet: spell check, atoms and display substitutions.
+class ALTextView;
+
+// A keymap with a mind of its own -- a vim mode -- told each key and each
+// character typed before the plain keymap and the text see them, keeping
+// whatever state it needs and working the view through what it exposes.
+// The view draws a block for the caret while such a keymap is not
+// putting what is typed into the text.
+class ALModalKeymap
+{
+public:
+    virtual ~ALModalKeymap() = default;
+    // True where the key or the character was taken.
+    virtual bool handleKey(ALTextView& view, KEY key, MASK mask) = 0;
+    virtual bool handleChar(ALTextView& view, llwchar ch)        = 0;
+    // Whether typed characters go into the text.
+    virtual bool inserting() const = 0;
+    // What a status line says of it: the mode, and what is pending.
+    virtual std::string status() const = 0;
+    // Goes up with every change of state, for whoever shows the status.
+    virtual U32 generation() const = 0;
+};
+
 class ALTextView : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor
 {
 public:
@@ -143,6 +165,7 @@ public:
     void            setTabWidth(S32 spaces);
     S32             getTabWidth() const { return mTabWidth; }
     void            setSoftTabs(bool soft) { mSoftTabs = soft; }
+    bool            getSoftTabs() const { return mSoftTabs; }
     // What is behind the text now -- read-only, focused or neither -- and
     // what the text is drawn in, for whatever draws beside them.
     const LLColor4& backgroundColor() const;
@@ -190,6 +213,10 @@ public:
     bool canPerform(ALEditorCommand command) const;
     ALKeymap&       keymap() { return mKeymap; }
     const ALKeymap& keymap() const { return mKeymap; }
+    // A keymap with state, ahead of the plain one; none puts the plain
+    // one first again.
+    void           setModalKeymap(std::unique_ptr<ALModalKeymap> keymap);
+    ALModalKeymap* modalKeymap() const { return mModal.get(); }
 
     // The caret put at a place, or a stretch selected, and brought into
     // view: where a list of places sends it.
@@ -201,6 +228,9 @@ public:
     void scrollToCaret();
     void scrollToLine(S32 line);
     S32  firstVisibleLine();
+    S32  lastVisibleLine();
+    // The rows a page holds.
+    S32  rowsPerPage() const;
     S32  scrollY() const { return mScrollY; }
     void setScrollY(S32 y);
     F32  scrollX() const { return mScrollX; }
@@ -299,8 +329,7 @@ public:
     void onFocusLost() override;
     bool acceptsTextInput() const override { return !mReadOnly; }
 
-    // The rows a page holds, and the rect the text is drawn in.
-    S32    rowsPerPage() const;
+    // The rect the text is drawn in.
     LLRect textRect() const;
     // The position under a point of the view, on a cluster boundary.
     ALTextPos posAtLocal(S32 x, S32 y, bool round);
@@ -417,6 +446,7 @@ private:
     ALSyntaxHighlighter mHighlighter;
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
+    std::unique_ptr<ALModalKeymap> mModal;
     // Where the mouse rests on the map, or -1: what the preview is of.
     S32                 mMapHoverY = -1;
     const LLFontGL*     mFont       = nullptr;
