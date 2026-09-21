@@ -738,7 +738,8 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     {
         auto                      vim    = std::make_unique<ALVimKeymap>();
         const LLHandle<LLFloater> handle = getHandle();
-        vim->hooks().command             = [handle](ALTextView& view, const std::string& name, const std::string& args) {
+        vim->shareHistory(mVimHistory);
+        vim->hooks().command = [handle](ALTextView& view, const std::string& name, const std::string& args) {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
             return studio && studio->vimCommand(view, name, args);
         };
@@ -1223,14 +1224,12 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         doc->name = gDirUtilp->getBaseFileName(path);
         // The language its extension says; else the one it was asked for
         // from, where it was; else plain text.
-        std::string extension = gDirUtilp->getExtension(path);
-        LLStringUtil::toLower(extension);
-        const bool script           = extension == "lsl" || extension == "lua" || extension == "luau" || lua;
-        doc->language.lua           = extension == "lua" || extension == "luau" || (extension != "lsl" && lua);
-        doc->language.compileTarget = doc->language.lua ? "luau" : "mono";
-        doc->notecard               = !script;
-        doc->editor                 = makeEditor(doc->id, false);
-        doc->editor->setSyntax(!script ? "text" : doc->language.lua ? "slua" : "lsl");
+        const FileLanguage language  = languageOfFile(path, lua);
+        doc->language.lua            = language.lua;
+        doc->language.compileTarget  = language.lua ? "luau" : "mono";
+        doc->notecard                = !language.script;
+        doc->editor                  = makeEditor(doc->id, false);
+        doc->editor->setSyntax(!language.script ? "text" : language.lua ? "slua" : "lsl");
         doc->editor->setText(buffer.str());
         doc->loaded     = true;
         doc->modifiable = true;
@@ -1242,7 +1241,7 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         });
         mDocs.push_back(std::move(doc));
         already = mDocs.size() - 1;
-        if (script)
+        if (language.script)
         {
             teachEditor(*mDocs[already]);
         }
@@ -1269,6 +1268,54 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
     doc.editor->setFocus(true);
     fillTabs();
     refreshToolbar();
+}
+
+// static
+ALFloaterScriptStudio::FileLanguage ALFloaterScriptStudio::languageOfFile(const std::string& path, bool lua_hint)
+{
+    std::string extension = gDirUtilp->getExtension(path);
+    LLStringUtil::toLower(extension);
+    FileLanguage language;
+    language.said   = !extension.empty();
+    language.script = extension == "lsl" || extension == "lua" || extension == "luau" || lua_hint;
+    language.lua    = extension == "lua" || extension == "luau" || (extension != "lsl" && lua_hint);
+    return language;
+}
+
+void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& language)
+{
+    if (doc.notecard == !language.script && doc.language.lua == language.lua)
+    {
+        return;
+    }
+    doc.language.lua           = language.lua;
+    doc.language.compileTarget = language.lua ? "luau" : "mono";
+    doc.notecard               = !language.script;
+    doc.editor->setSyntax(!language.script ? "text" : language.lua ? "slua" : "lsl");
+    if (language.script)
+    {
+        teachEditor(doc);
+    }
+    else
+    {
+        // Plain text again: no words, no one to ask.
+        ALCodeEditor& editor = *doc.editor;
+        editor.setCompletionProvider(nullptr);
+        editor.setCompletionRequest(nullptr);
+        editor.setHoverProvider(nullptr);
+        editor.setHoverRequest(nullptr);
+        editor.setSignatureRequest(nullptr);
+        editor.setSymbolRequest(nullptr);
+        ALSyntaxWords& tables = editor.highlighter().words();
+        for (const char* table : { "function", "event", "type", "control", "constant", "deprecated" })
+        {
+            tables.set(table, {});
+        }
+        editor.highlighter().wordsChanged();
+        editor.clearMarks();
+    }
+    doc.outline.clear();
+    mProblemStore.forget(doc.id);
 }
 
 void ALFloaterScriptStudio::chooseIncludeFolder()
@@ -2132,6 +2179,33 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         {
             closeDocument(doc->id);
         }
+        return true;
+    }
+    if (name == "history" || name == "his")
+    {
+        // The lines entered, in the Output pane, where a list fits: the :
+        // ones, the search ones with / or search, both with all.
+        const bool        searches = args == "/" || args == "search" || args == "all";
+        const bool        commands = args.empty() || args == ":" || args == "cmd" || args == "all";
+        ALOutputView::Entry entry;
+        entry.source = getString("OutputSourceVim");
+        auto list = [&](const std::vector<std::string>& lines, const char* kind) {
+            entry.text = std::string(kind) + " history:";
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                entry.text += llformat("\n%3d  %s", static_cast<int>(i + 1), lines[i].c_str());
+            }
+            mOutput->append(entry);
+        };
+        if (commands)
+        {
+            list(mVimHistory->command, "cmd");
+        }
+        if (searches)
+        {
+            list(mVimHistory->search, "search");
+        }
+        showBottom("output_tab");
         return true;
     }
     if (name == "wa" || name == "wall")
@@ -6987,12 +7061,17 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::vector<std::string>& f
         return;
     }
     // The tab is the new file from here on: keyed by it, named after
-    // it, watched for changes to it, its problems its own.
+    // it, watched for changes to it, its problems its own, and in the
+    // language its name says.
     mProblemStore.forget(doc->id);
     doc->liveFile.reset();
     doc->file = path;
     doc->id   = "disk:" + path;
     doc->name = gDirUtilp->getBaseFileName(path);
+    if (const FileLanguage said = languageOfFile(path, false); said.said)
+    {
+        speakFileLanguage(*doc, said);
+    }
     watchFile(*doc);
     noteRecentFile(path);
     setStatus(getString("SavedToFile", args));

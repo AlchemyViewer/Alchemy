@@ -33,6 +33,7 @@
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
+#include "alvimkeymap.h"
 #include "lllivefile.h"
 
 #include <boost/signals2.hpp>
@@ -664,9 +665,21 @@ private:
     void fileChosenToLoad(const std::vector<std::string>& files);
     void fileChosenToSave(const std::vector<std::string>& files);
     // A disk tab saved under another name: the tab is that file from
-    // then on.
+    // then on, in the language its name says.
     void saveFileAs();
     void fileChosenToSaveAs(const std::vector<std::string>& files);
+    // What a file's name says it holds: an LSL or a Lua script, or, with
+    // neither extension, what it was asked for as, else plain text.
+    struct FileLanguage
+    {
+        bool script = false;
+        bool lua    = false;
+        // Whether the name said anything: it has an extension.
+        bool said   = false;
+    };
+    static FileLanguage languageOfFile(const std::string& path, bool lua_hint);
+    // The document's language set by it, the editor taught or untaught.
+    void                speakFileLanguage(Doc& doc, const FileLanguage& language);
     // The files opened from disk lately, newest first, under File ▸
     // Open Recent; kept with the state.
     void noteRecentFile(const std::string& path);
@@ -678,6 +691,9 @@ private:
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
     std::vector<std::string>           mRecentFiles;
+    // The : and / lines entered in any of the editors, shared among
+    // their vim keymaps.
+    std::shared_ptr<ALVimKeymap::History> mVimHistory = std::make_shared<ALVimKeymap::History>();
     std::vector<Snippet>               mSnippets[2];
     bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;

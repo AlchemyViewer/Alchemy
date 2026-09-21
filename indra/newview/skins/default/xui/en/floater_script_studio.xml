@@ -166,6 +166,7 @@
     <floater.string name="IncludeGone">[FILE] is not there any more.</floater.string>
     <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
+    <floater.string name="OutputSourceVim">vim</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
