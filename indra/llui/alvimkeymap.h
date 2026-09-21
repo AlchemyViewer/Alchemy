@@ -28,6 +28,8 @@
 
 #include <functional>
 #include <map>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -98,6 +100,19 @@ public:
     // Whether keys are being recorded into a register, and which.
     bool recording() const { return mRecording != 0; }
     char recordingInto() const { return mRecording; }
+
+    // The lines entered on the : line and on the search line, oldest
+    // first, for Up and Down on the line, q: q/ @: and :history -- the
+    // keymap's own unless told to share another's, as the editors of one
+    // studio do, since a line entered in one is wanted in the next.
+    struct History
+    {
+        std::vector<std::string> command;
+        std::vector<std::string> search;
+    };
+    const History&                 history() const { return *mHistory; }
+    std::shared_ptr<History>       sharedHistory() const { return mHistory; }
+    void                           shareHistory(std::shared_ptr<History> history);
 
     // One thing typed: a character, or a key with its modifiers.
     struct Input
@@ -184,8 +199,19 @@ private:
     // ~ for the last replacement, \r for a line break -- as the search
     // engine's.
     std::string replacementOf(const std::string& with) const;
+    // Vim's spelling of a pattern -- magic, with \( \) \| \+ \? \{ \< \>
+    // \zs \ze and the classes, \v for very magic and \V for very nomagic
+    // -- as the search engine's; and how its case is matched: \c and \C
+    // in it, else what the caller forces, else the ignorecase and
+    // smartcase settings.
+    struct Pattern
+    {
+        std::string regex;
+        bool        caseSensitive = true;
+    };
+    Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
     // The history of a line kind, and the line entered into it.
-    std::vector<std::string>& historyOf(llwchar kind) { return mHistory[kind == ':' ? 0 : 1]; }
+    std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mHistory->command : mHistory->search; }
     void                      remember(llwchar kind, const std::string& line);
     // g and v: the command over every line the pattern picks out, or
     // every line it does not.
@@ -233,10 +259,14 @@ private:
     llwchar mFindChar    = 0;
     bool    mFindForward = true;
     bool    mFindTill    = false;
-    // The search, for n and N; :s sets it too.
+    // The search, for n and N; :s sets it too. And how case is matched,
+    // as :set ignorecase and smartcase have it: sensitive unless told
+    // otherwise, as vim's own defaults are.
     std::string mSearchPattern;
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
+    bool        mIgnoreCase      = false;
+    bool        mSmartCase       = false;
 
     std::map<char, Register>  mRegisters;
     Register                  mUnnamed;
@@ -270,7 +300,7 @@ private:
     // not walking.
     std::string              mLine;
     llwchar                  mLineKind = ':';
-    std::vector<std::string> mHistory[2];
+    std::shared_ptr<History> mHistory = std::make_shared<History>();
     S32                      mHistoryAt = -1;
     std::string              mHistoryPrefix;
     // The last :s, for :s with nothing after it, :&, :&&, & and g&: its

@@ -492,6 +492,7 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     if (!mReplaying)
     {
         mMessage.clear();
+        mMessageError = false;
         // A command starts where nothing is pending in normal mode; what
         // it is typed as is kept until it is done, for `.`.
         if (mMode == Mode::Normal && mCount == 0 && !mRegister && !mOperator && !mPending)
@@ -2994,10 +2995,12 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     ALTextSearchOptions   options;
     options.regex     = !whole_word;
     options.wholeWord = whole_word;
-    // Sensitive to case where the pattern has any, as smartcase has it.
-    options.caseSensitive = std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    // A whole word -- * and # -- is looked for as it is, its case as
+    // ignorecase alone says; a pattern in vim's spelling.
+    const Pattern pattern_in = whole_word ? Pattern{ pattern, !mIgnoreCase } : patternOf(pattern);
+    options.caseSensitive    = pattern_in.caseSensitive;
     std::string                    error;
-    const std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, nullptr, &error);
+    const std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, nullptr, &error);
     if (!error.empty())
     {
         say("E486: " + error, true);
@@ -3140,6 +3143,15 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
     mLine += utf8Of(input.ch);
     mHistoryAt = -1;
     return true;
+}
+
+void ALVimKeymap::shareHistory(std::shared_ptr<History> history)
+{
+    if (history)
+    {
+        mHistory   = std::move(history);
+        mHistoryAt = -1;
+    }
 }
 
 void ALVimKeymap::remember(llwchar kind, const std::string& line)
@@ -3391,6 +3403,16 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             view.setTabWidth(llclamp(std::atoi(value.c_str()), 1, 16));
             return;
         }
+        if (option == "ic" || option == "ignorecase")
+        {
+            mIgnoreCase = !off;
+            return;
+        }
+        if (option == "scs" || option == "smartcase")
+        {
+            mSmartCase = !off;
+            return;
+        }
         if (mHooks.command && mHooks.command(view, "set", args))
         {
             return;
@@ -3592,10 +3614,11 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     ALTextSearchOptions options;
     options.regex         = true;
-    options.caseSensitive = std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    const Pattern pattern_in = patternOf(pattern);
+    options.caseSensitive    = pattern_in.caseSensitive;
     const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
     std::string              error;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, &scope, &error);
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error);
     if (!error.empty())
     {
         say("E486: " + error, true);
@@ -3640,6 +3663,281 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     view.undoJournal().endGroup();
     return !mMessageError;
+}
+
+ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optional<bool> force_case) const
+{
+    // Vim's magic spelling to Perl's: with a backslash, ( ) | + ? = { }
+    // < > are the engine's own ( ) | + ? ? { } \b \b, and without one
+    // they are themselves; \v makes what follows very magic, where they
+    // are the engine's own bare and themselves with a backslash; \V very
+    // nomagic, where only ^ $ and the backslash items are special. \zs
+    // is \K; \ze looks ahead at the rest; \{-} is *?; the classes \a \l
+    // \u \x \o \h \i \k are brackets; \c and \C say how case is matched;
+    // a bracket expression is copied through as it stands.
+    Pattern             out;
+    std::optional<bool> case_in_pattern;
+    enum class Magic : U8
+    {
+        Magic,
+        Very,
+        None
+    };
+    Magic magic    = Magic::Magic;
+    bool  looking  = false;
+    auto  literal  = [&](char c) {
+        static const std::string specials("\\^$.|?*+()[]{}");
+        if (specials.find(c) != std::string::npos)
+        {
+            out.regex += '\\';
+        }
+        out.regex += c;
+    };
+    for (size_t i = 0; i < vim.size(); ++i)
+    {
+        const char c = vim[i];
+        if (c == '\\' && i + 1 < vim.size())
+        {
+            const char n = vim[++i];
+            switch (n)
+            {
+                case 'v': magic = Magic::Very; continue;
+                case 'm': magic = Magic::Magic; continue;
+                case 'M':
+                case 'V': magic = Magic::None; continue;
+                case 'c': case_in_pattern = false; continue;
+                case 'C': case_in_pattern = true; continue;
+                case '(': out.regex += magic == Magic::Very ? "\\(" : "("; continue;
+                case ')': out.regex += magic == Magic::Very ? "\\)" : ")"; continue;
+                case '|': out.regex += magic == Magic::Very ? "\\|" : "|"; continue;
+                case '+': out.regex += magic == Magic::Very ? "\\+" : "+"; continue;
+                case '?':
+                case '=': out.regex += magic == Magic::Very ? std::string(1, n) : "?"; continue;
+                case '<':
+                case '>': out.regex += magic == Magic::Very ? std::string(1, n) : "\\b"; continue;
+                case '{':
+                {
+                    if (magic == Magic::Very)
+                    {
+                        out.regex += "\\{";
+                        continue;
+                    }
+                    // \{n,m}, \{-n,m} lazy, \{} for *, \{-} for *?; the
+                    // closing brace may carry a backslash of its own.
+                    size_t close = vim.find('}', i + 1);
+                    if (close == std::string::npos)
+                    {
+                        out.regex += "\\{";
+                        continue;
+                    }
+                    std::string body = vim.substr(i + 1, close - i - 1);
+                    if (!body.empty() && body.back() == '\\')
+                    {
+                        body.pop_back();
+                    }
+                    const bool lazy = !body.empty() && body[0] == '-';
+                    if (lazy)
+                    {
+                        body.erase(0, 1);
+                    }
+                    if (body.empty())
+                    {
+                        out.regex += "*";
+                    }
+                    else if (body == ",")
+                    {
+                        out.regex += "*";
+                    }
+                    else
+                    {
+                        out.regex += "{" + body + "}";
+                    }
+                    if (lazy)
+                    {
+                        out.regex += "?";
+                    }
+                    i = close;
+                    continue;
+                }
+                case 'z':
+                    if (i + 1 < vim.size() && vim[i + 1] == 's')
+                    {
+                        out.regex += "\\K";
+                        ++i;
+                        continue;
+                    }
+                    if (i + 1 < vim.size() && vim[i + 1] == 'e')
+                    {
+                        out.regex += "(?=";
+                        looking = true;
+                        ++i;
+                        continue;
+                    }
+                    literal('z');
+                    continue;
+                case '%':
+                    if (i + 1 < vim.size() && vim[i + 1] == '(')
+                    {
+                        out.regex += "(?:";
+                        ++i;
+                        continue;
+                    }
+                    literal('%');
+                    continue;
+                case '_':
+                    // \_s and the like: the class with a line break in it.
+                    if (i + 1 < vim.size())
+                    {
+                        const char cls = vim[++i];
+                        out.regex += cls == '.' ? std::string("[\\s\\S]") : "(?:\\" + std::string(1, cls) + "|\\n)";
+                        continue;
+                    }
+                    literal('_');
+                    continue;
+                case 'a': out.regex += "[A-Za-z]"; continue;
+                case 'A': out.regex += "[^A-Za-z]"; continue;
+                case 'l': out.regex += "[a-z]"; continue;
+                case 'L': out.regex += "[^a-z]"; continue;
+                case 'u': out.regex += "[A-Z]"; continue;
+                case 'U': out.regex += "[^A-Z]"; continue;
+                case 'x': out.regex += "[0-9A-Fa-f]"; continue;
+                case 'X': out.regex += "[^0-9A-Fa-f]"; continue;
+                case 'o': out.regex += "[0-7]"; continue;
+                case 'O': out.regex += "[^0-7]"; continue;
+                case 'h': out.regex += "[A-Za-z_]"; continue;
+                case 'H': out.regex += "[^A-Za-z_]"; continue;
+                case 'i':
+                case 'k': out.regex += "[A-Za-z0-9_]"; continue;
+                case 'I':
+                case 'K': out.regex += "[A-Za-z_]"; continue;
+                case 'e': out.regex += "\\x1b"; continue;
+                default:
+                    // \s \S \d \D \w \W \n \t \r \b \. \* \[ \] \/ and the
+                    // rest: as they are, a backslash before a letter or a
+                    // symbol the engine reads the same way.
+                    out.regex += '\\';
+                    out.regex += n;
+                    continue;
+            }
+        }
+        if (c == '[' && magic != Magic::None)
+        {
+            // A bracket expression through to its close, as it stands; an
+            // unclosed [ is itself.
+            size_t j = i + 1;
+            if (j < vim.size() && vim[j] == '^')
+            {
+                ++j;
+            }
+            if (j < vim.size() && vim[j] == ']')
+            {
+                ++j;
+            }
+            while (j < vim.size() && vim[j] != ']')
+            {
+                if (vim[j] == '\\' && j + 1 < vim.size())
+                {
+                    ++j;
+                }
+                ++j;
+            }
+            if (j < vim.size())
+            {
+                out.regex.append(vim, i, j - i + 1);
+                i = j;
+            }
+            else
+            {
+                out.regex += "\\[";
+            }
+            continue;
+        }
+        switch (magic)
+        {
+            case Magic::Very:
+                switch (c)
+                {
+                    case '<':
+                    case '>': out.regex += "\\b"; break;
+                    case '=': out.regex += "?"; break;
+                    case '%':
+                        if (i + 1 < vim.size() && vim[i + 1] == '(')
+                        {
+                            out.regex += "(?:";
+                            ++i;
+                        }
+                        else
+                        {
+                            literal('%');
+                        }
+                        break;
+                    case '{':
+                    {
+                        const size_t close = vim.find('}', i + 1);
+                        std::string  body  = close == std::string::npos ? std::string() : vim.substr(i + 1, close - i - 1);
+                        const bool   lazy  = !body.empty() && body[0] == '-';
+                        if (close == std::string::npos)
+                        {
+                            out.regex += "\\{";
+                            break;
+                        }
+                        if (lazy)
+                        {
+                            body.erase(0, 1);
+                        }
+                        out.regex += body.empty() || body == "," ? std::string("*") : "{" + body + "}";
+                        if (lazy)
+                        {
+                            out.regex += "?";
+                        }
+                        i = close;
+                        break;
+                    }
+                    case '~': literal('~'); break;
+                    default: out.regex += c; break;
+                }
+                break;
+            case Magic::Magic:
+                switch (c)
+                {
+                    case '^':
+                    case '$':
+                    case '.':
+                    case '*': out.regex += c; break;
+                    default: literal(c); break;
+                }
+                break;
+            case Magic::None:
+                switch (c)
+                {
+                    case '^': out.regex += i == 0 ? "^" : "\\^"; break;
+                    case '$': out.regex += i + 1 == vim.size() ? "$" : "\\$"; break;
+                    default: literal(c); break;
+                }
+                break;
+        }
+    }
+    if (looking)
+    {
+        out.regex += ")";
+    }
+    if (case_in_pattern)
+    {
+        out.caseSensitive = *case_in_pattern;
+    }
+    else if (force_case)
+    {
+        out.caseSensitive = *force_case;
+    }
+    else if (mIgnoreCase)
+    {
+        out.caseSensitive = mSmartCase && std::any_of(vim.begin(), vim.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    }
+    else
+    {
+        out.caseSensitive = true;
+    }
+    return out;
 }
 
 std::string ALVimKeymap::replacementOf(const std::string& with) const
@@ -3796,10 +4094,11 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
     options.regex         = true;
-    options.caseSensitive = exactcase || (!anycase && std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; }));
+    const Pattern pattern_in = patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
+    options.caseSensitive    = pattern_in.caseSensitive;
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, &scope, &error);
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error);
     if (!error.empty())
     {
         say("E486: " + error, true);
@@ -3828,7 +4127,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
             ++lines;
         }
         seen_line = match.begin.line;
-        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, match, pattern, options, format));
+        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, match, pattern_in.regex, options, format));
     }
     const S32 count = static_cast<S32>(edits.size());
     if (count_only)

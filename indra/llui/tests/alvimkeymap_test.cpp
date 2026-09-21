@@ -554,9 +554,9 @@ namespace tut
     {
         set_test_name(":s takes vim's replacement spelling and flags, and & g& :& :&& do the last one again");
         ALCodeEditor& e = make("cat hat\ncat bat\nrat\n");
-        // The pattern is the search engine's own dialect -- groups in
-        // plain brackets -- and the replacement vim's.
-        keys(":s/(c)at/[&-\\1]/<CR>");
+        // The pattern in vim's spelling -- groups in \( \) -- and the
+        // replacement too.
+        keys(":s/\\(c\\)at/[&-\\1]/<CR>");
         ensure_equals("& is the match and \\1 a group", flat(e.text()), std::string("[cat-c] hat|cat bat|rat|"));
         keys("j:s/at/~x/g<CR>");
         ensure_equals("~ is the last replacement, read again as one", flat(e.text()), std::string("[cat-c] hat|c[at-]x b[at-]x|rat|"));
@@ -644,5 +644,47 @@ namespace tut
         ensure_equals("the second a is its own pair", flat(e.text()), std::string("<a><b>x</b></a>|"));
         keys("0fxvatd");
         ensure_equals("at in visual", flat(e.text()), std::string("<a></a>|"));
+    }
+    template<> template<>
+    void alvimkeymap_object::test<16>()
+    {
+        set_test_name("patterns are vim's: magic by default, \\v very magic, \\V very nomagic, \\< \\> \\zs \\ze \\{-}; case as vim has it, with \\c and :set ic scs");
+        ALCodeEditor& e = make("foo(bar) foo+bar Foo|bar foobar\n");
+        keys(":s/foo(bar)/X/<CR>");
+        ensure_equals("brackets are themselves in magic mode", flat(e.text()), std::string("X foo+bar Foo|bar foobar|"));
+        keys(":s/foo+bar/Y/<CR>");
+        ensure_equals("as is a plus", flat(e.text()), std::string("X Y Foo|bar foobar|"));
+        keys(":s/Foo|bar/Z/<CR>");
+        ensure_equals("and a bar", flat(e.text()), std::string("X Y Z foobar|"));
+        keys(":s/\\v(foo)(bar)/\\2\\1/<CR>");
+        ensure_equals("very magic: bare brackets group", flat(e.text()), std::string("X Y Z barfoo|"));
+        keys(":s/\\<Y\\>/why/<CR>");
+        ensure_equals("word bounds", flat(e.text()), std::string("X why Z barfoo|"));
+        keys(":s/bar\\zsfoo/FOO/<CR>");
+        ensure_equals("\\zs starts the match after what came before", flat(e.text()), std::string("X why Z barFOO|"));
+        keys(":s/bar\\zeFOO/BAR/<CR>");
+        ensure_equals("\\ze ends it before what follows", flat(e.text()), std::string("X why Z BARFOO|"));
+        keys(":s/B.\\{-}O/-/<CR>");
+        ensure_equals("\\{-} is lazy", flat(e.text()), std::string("X why Z -O|"));
+        keys(":s/\\V-O$/[-O]/<CR>");
+        ensure_equals("very nomagic: only ^ and $ special", flat(e.text()), std::string("X why Z [-O]|"));
+        keys(":s/\\V[-O]/end/<CR>");
+        ensure_equals("brackets themselves under \\V", flat(e.text()), std::string("X why Z end|"));
+        keys(":s/x/lower/<CR>");
+        ensure("case matters by default, as vim has it", vim->messageIsError());
+        keys(":s/\\cx/lower/<CR>");
+        ensure_equals("\\c ignores it", flat(e.text()), std::string("lower why Z end|"));
+        keys(":set ic<CR>:s/z/zed/<CR>");
+        ensure_equals(":set ignorecase ignores it", flat(e.text()), std::string("lower why zed end|"));
+        keys(":set scs<CR>:s/W/w/<CR>");
+        ensure("smartcase: a capital makes it matter again", vim->messageIsError());
+        keys(":s/\\CWHY/w/<CR>");
+        ensure("\\C too", vim->messageIsError());
+        keys(":s/WHY/W/i<CR>");
+        ensure_equals("the i flag overrides", flat(e.text()), std::string("lower W zed end|"));
+        keys(":set noic<CR>/W<CR>");
+        ensure("/ is case-sensitive again, and finds the capital", !vim->messageIsError() && caretText() == "0:6");
+        keys(":g/\\v^(lower)/s/end/END/<CR>");
+        ensure_equals(":g takes vim's spelling too", flat(e.text()), std::string("lower W zed END|"));
     }
 }
