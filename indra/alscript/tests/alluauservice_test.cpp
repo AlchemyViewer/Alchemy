@@ -233,6 +233,38 @@ namespace tut
         ensure("the table is found", hover.found);
         ensure(llformat("and said in a glance, not %d characters", (int)hover.label.size()), hover.label.size() < 1200);
         ensure("with how many more there are: " + hover.label, hover.label.find("more") != std::string::npos);
+        ensure("and the whole of it apart, a field to a line", hover.typeDetail.size() > hover.label.size() && hover.typeDetail.find('\n') != std::string::npos);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<17>()
+    {
+        set_test_name("hover says what kind of name it is, a function by its signature, and what is wanted where a type is wrong");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "local function half(n: number): number\n"
+            "    return n / 2\n"
+            "end\n"
+            "const limit = 3\n"
+            "local p = { a = 1 }\n"
+            "ll.Say(0, half(\"x\"))\n"
+            "print(limit, p.a)\n";
+        ALScriptHover hover = service.hover(script, 0, 16);  // half, declared
+        ensure("a function by its signature: " + hover.label, hover.label.rfind("function half(n: number): number", 0) == 0);
+        hover = service.hover(script, 0, 20);  // n, the parameter
+        ensure("a parameter: " + hover.label, hover.label == "(parameter) n: number");
+        hover = service.hover(script, 1, 11);  // n, used
+        ensure("still a parameter where used: " + hover.label, hover.label == "(parameter) n: number");
+        hover = service.hover(script, 3, 7);  // limit
+        ensure("a const: " + hover.label, hover.label == "const limit: number");
+        hover = service.hover(script, 4, 6);  // p
+        ensure("a local: " + hover.label, hover.label.rfind("local p: ", 0) == 0);
+        hover = service.hover(script, 6, 15);  // p.a
+        ensure("a field: " + hover.label, hover.label == "(field) p.a: number");
+        hover = service.hover(script, 5, 16);  // "x" where a number is wanted
+        ensure("what is wanted there: " + hover.expected, hover.expected == "number");
+        hover = service.hover(script, 6, 0);  // print
+        ensure("a builtin by its signature: " + hover.label, hover.label.rfind("function print(", 0) == 0);
     }
 
     template<> template<>

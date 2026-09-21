@@ -1241,27 +1241,127 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
     {
         return answer;
     }
-    const Luau::Position         at   = positionOf(line, column);
-    const std::optional<Luau::TypeId> type = Luau::findTypeAtPosition(*module, *module_source, at);
+    const Luau::Position        at   = positionOf(line, column);
+    std::optional<Luau::TypeId> type = Luau::findTypeAtPosition(*module, *module_source, at);
+
+    // What the name is, said before it as an editor would: a local, a
+    // constant, a parameter, a field, a global; a function by its
+    // signature under its name.
+    Luau::ExprOrLocal            found = Luau::findExprOrLocalAtPosition(*module_source, at);
+    Luau::AstExpr*               expr  = found.getExpr();
+    Luau::AstLocal*              local = found.getLocal();
+    if (!local && expr)
+    {
+        if (Luau::AstExprLocal* use = expr->as<Luau::AstExprLocal>())
+        {
+            local = use->local;
+        }
+    }
+    if (local)
+    {
+        // The local's own type, which at its declaration the position
+        // does not give: there the innermost expression is the function
+        // whose parameter it is.
+        if (const Luau::ScopePtr scope = Luau::findScopeAtPosition(*module, at))
+        {
+            if (const std::optional<Luau::TypeId> bound = scope->lookup(Luau::Symbol(local)))
+            {
+                type = bound;
+            }
+        }
+    }
     if (!type)
     {
         return answer;
     }
     answer.found = true;
-    std::string name = nameOf(Luau::findExprAtPosition(*module_source, at));
-    if (Luau::AstExpr* expr = Luau::findExprAtPosition(*module_source, at); expr && name.empty())
+    std::string name = nameOf(expr);
+    if (name.empty() && local)
     {
-        // Under a binding's own name in a `local` or a function statement.
-        if (std::optional<Luau::Binding> binding = Luau::findBindingAtPosition(*module, *module_source, at))
+        name = local->name.value;
+    }
+    std::string kind;
+    if (local)
+    {
+        kind = local->isConst ? "const" : "local";
+        for (Luau::AstNode* node : Luau::findAstAncestryOfPosition(*module_source, at))
         {
-            (void)binding;
+            if (Luau::AstExprFunction* function = node->as<Luau::AstExprFunction>())
+            {
+                if (function->self == local)
+                {
+                    kind = "self";
+                }
+                for (Luau::AstLocal* arg : function->args)
+                {
+                    if (arg == local)
+                    {
+                        kind = "parameter";
+                    }
+                }
+            }
         }
     }
-    answer.label = name.empty() ? typeText(*type) : name + ": " + typeText(*type);
+    else if (expr && expr->is<Luau::AstExprGlobal>())
+    {
+        kind = "global";
+    }
+    else if (expr && expr->is<Luau::AstExprIndexName>())
+    {
+        kind = expr->as<Luau::AstExprIndexName>()->op == ':' ? "method" : "field";
+    }
+    const Luau::TypeId        followed = Luau::follow(*type);
+    const Luau::FunctionType* function = functionOf(followed);
+    if (function && !name.empty() && Luau::get<Luau::FunctionType>(followed))
+    {
+        Luau::ToStringOptions options;
+        options.functionTypeArguments = true;
+        options.maxTableLength        = 8;
+        options.maxTypeLength         = 1000;
+        answer.label                  = "function " + Luau::toStringNamedFunction(name, *function, options);
+    }
+    else if (name.empty())
+    {
+        answer.label = typeText(*type);
+    }
+    else
+    {
+        const std::string prefix = kind.empty() ? std::string() : (kind == "local" || kind == "const") ? kind + " " : "(" + kind + ") ";
+        answer.label             = prefix + name + ": " + typeText(*type);
+    }
+
+    // The whole of a type the label only glances at.
+    {
+        Luau::ToStringOptions whole;
+        whole.functionTypeArguments = true;
+        whole.useLineBreaks         = true;
+        whole.maxTableLength        = 200;
+        whole.maxTypeLength         = 20000;
+        const std::string full = Luau::toString(*type, whole);
+        Luau::ToStringOptions glance;
+        glance.functionTypeArguments = true;
+        glance.maxTableLength        = 8;
+        glance.maxTypeLength         = 1000;
+        if (full != Luau::toString(*type, glance) || full.find('\n') != std::string::npos)
+        {
+            answer.typeDetail = full;
+        }
+    }
+
+    // What is wanted here, where it is known and is not what is here.
+    if (const std::optional<Luau::TypeId> expected = Luau::findExpectedTypeAtPosition(*module, *module_source, at))
+    {
+        const std::string text = typeText(*expected);
+        if (Luau::follow(*expected) != followed && text != "*error-type*" && text != "unknown" && text != "any" && text != typeText(*type))
+        {
+            answer.expected = text;
+        }
+    }
+
     std::optional<std::string> symbol = Luau::getDocumentationSymbolAtPosition(*module_source, *module, at);
     if (!symbol)
     {
-        symbol = Luau::follow(*type)->documentationSymbol;
+        symbol = followed->documentationSymbol;
     }
     if (const Impl::Doc* doc = impl.docFor(symbol))
     {

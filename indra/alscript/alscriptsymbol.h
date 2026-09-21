@@ -62,8 +62,18 @@ struct ALScriptCompletion
 struct ALScriptHover
 {
     bool        found = false;
-    // The name and its type or signature, as a declaration reads.
+    // The name and its type or signature, as a declaration reads: `local
+    // count: number`, `(parameter) n: number`, `function half(n: number):
+    // number`, `integer count`.
     std::string label;
+    // The type in full where the label gives a glance of it: a table's
+    // fields each on a line, a function's overloads each on a line.
+    // Empty where the label says it all.
+    std::string typeDetail;
+    // What is wanted where the position is -- the parameter an argument
+    // is checked against, the annotation a value must meet -- where the
+    // analyzer knows and it is not what is there.
+    std::string expected;
     std::string documentation;
     std::string link;
     // Where it was declared, when it was declared in the script.
