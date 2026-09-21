@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "alluauconfig.h"
 #include "alpreprocessor.h"
 #include "alscriptworkspace.h"
 #include "llsingleton.h"
@@ -91,11 +92,12 @@ public:
     // Runs with what is in hand, the rest noted as pending: for the
     // analyzers, which cannot wait.
     ALPreprocessor::Result runNow(const Request& request);
-    // The language mode the `.luaurc` governing a SLua script gives it,
-    // from what is in hand: "strict", "nonstrict" or "nocheck", or
-    // nothing where there is no configuration, or it is not in yet. A
-    // run fetches the configuration along with the includes.
-    std::string modeFor(const Request& request);
+    // What the `.luaurc` governing a SLua script says -- its mode, its
+    // lints, its globals -- from what is in hand: false, and the
+    // defaults, where there is no configuration, it is not in yet, or
+    // it does not parse. A run fetches the configuration along with the
+    // includes.
+    bool configOf(const Request& request, ALLuauConfig& out);
     // The configuration fetched where it is in the world and not in hand,
     // and `fetched` called once it is; nothing where it is in hand, or
     // there is none.

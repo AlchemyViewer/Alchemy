@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alluauconfig.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 #include "llsingleton.h"
@@ -77,8 +78,9 @@ public:
         bool        lua     = false;
         // LSL only: Mono's rules for a global initialiser, else LSO's.
         bool        mono    = true;
-        // SLua only: the mode the script's `.luaurc` gave it, or nothing.
-        std::string mode;
+        // SLua only: what the script's `.luaurc` says -- the mode, the
+        // lints, the globals -- or the defaults where it has none.
+        ALLuauConfig config;
         std::string text;
         // Where, for anything but a check.
         S32         line   = 0;

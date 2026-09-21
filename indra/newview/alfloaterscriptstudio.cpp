@@ -1015,14 +1015,17 @@ bool ALFloaterScriptStudio::preprocessed(const Doc& doc) const
     return doc.loaded && !doc.notecard && (doc.envelope.has_value() || ALScriptPreprocessor::enabled());
 }
 
-ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc& doc) const
+ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc& doc, bool with_source) const
 {
     ALScriptPreprocessor::Request request;
     request.ref     = doc.ref;
     request.path    = doc.file.empty() ? std::string() : "disk:" + doc.file;
     request.name    = doc.name;
     request.assetId = doc.assetId;
-    request.source  = doc.editor->text();
+    if (with_source)
+    {
+        request.source = doc.editor->text();
+    }
     request.lua     = doc.language.lua;
     request.compileTarget = mCompileTarget->getValue().asString();
     if (request.compileTarget.empty())
@@ -1725,13 +1728,13 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     request.semantics      = mSemanticColors;
     request.hintParameters = mInlayParameters;
     request.hintTypes      = mInlayTypes;
-    if (doc.language.lua && kind == ALScriptAnalysis::Kind::Check)
+    if (doc.language.lua)
     {
-        // The mode the script's `.luaurc` gives it, where it has one; one
-        // not in hand yet is fetched, and the check made again when it is.
-        const ALScriptPreprocessor::Request root = preprocessRequest(doc);
-        request.mode                             = ALScriptPreprocessor::instance().modeFor(root);
-        if (request.mode.empty() && !doc.configAsked)
+        // What the script's `.luaurc` says, where it has one; one not in
+        // hand yet is fetched, and the check made again when it is.
+        const ALScriptPreprocessor::Request root  = preprocessRequest(doc, /*with_source*/ false);
+        const bool                          found = ALScriptPreprocessor::instance().configOf(root, request.config);
+        if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.configAsked)
         {
             doc.configAsked                  = true;
             const LLHandle<LLFloater> handle = getHandle();

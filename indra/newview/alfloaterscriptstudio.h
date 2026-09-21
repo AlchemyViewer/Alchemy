@@ -417,7 +417,8 @@ private:
     // the source, and what falls in an include is listed by its file.
     bool                          preprocessed(const Doc& doc) const;
     const Doc::Expanded&          expandedFor(Doc& doc);
-    ALScriptPreprocessor::Request preprocessRequest(const Doc& doc) const;
+    // Without the source where only where the script is matters.
+    ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
     void                          preprocess(Doc& doc, bool then_save);
     void                          preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result);
     void                          upload(Doc& doc, const std::string& text);

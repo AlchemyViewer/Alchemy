@@ -603,20 +603,25 @@ ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std
     return ALPreprocessor::run(request.source, options);
 }
 
-std::string ALScriptPreprocessor::modeFor(const Request& request)
+bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
 {
+    out = ALLuauConfig();
     if (!request.lua)
     {
-        return std::string();
+        return false;
     }
     std::string path, text;
     if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, nullptr, path, text) != ALPreprocessor::Found::Yes)
     {
-        return std::string();
+        return false;
     }
-    ALLuauConfig config;
-    std::string  error;
-    return ALLuauConfig::parse(text, config, error) ? config.mode : std::string();
+    std::string error;
+    if (!ALLuauConfig::parse(text, out, error))
+    {
+        out = ALLuauConfig();
+        return false;
+    }
+    return true;
 }
 
 ALPreprocessor::Result ALScriptPreprocessor::runNow(const Request& request)

@@ -167,10 +167,11 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
         {
             mWorker->loadLuau(luau_path, docs_path, generation);
             result.definitionsError = mWorker->luauError;
+            mWorker->luau.setConfig(request.config);
             switch (request.kind)
             {
                 case Kind::Check:
-                    result.problems = mWorker->luau.check(request.text, request.mode);
+                    result.problems = mWorker->luau.check(request.text);
                     result.outline  = mWorker->luau.outline(request.text);
                     if (request.semantics)
                     {
