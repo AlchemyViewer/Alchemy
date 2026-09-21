@@ -47,7 +47,6 @@
 
 #include "llagent.h"
 #include "llappviewer.h"
-#include "llavataractions.h"
 #include "llavatarname.h"
 #include "llfloateravatarpicker.h"
 #include "llbutton.h"
@@ -2494,8 +2493,6 @@ bool LLPanelEstateInfo::postBuild()
 
     getChild<LLUICtrl>("externally_visible_radio")->setFocus(true);
 
-    getChild<LLTextBox>("estate_owner")->setIsFriendCallback(LLAvatarActions::isFriend);
-
     return LLPanelRegionInfo::postBuild();
 }
 
@@ -2745,7 +2742,6 @@ bool LLPanelEstateCovenant::postBuild()
 {
     mEstateNameText = getChild<LLTextBox>("estate_name_text");
     mEstateOwnerText = getChild<LLTextBox>("estate_owner_text");
-    mEstateOwnerText->setIsFriendCallback(LLAvatarActions::isFriend);
     mLastModifiedText = getChild<LLTextBox>("covenant_timestamp_text");
     mEditor = getChild<LLViewerTextEditor>("covenant_editor");
     LLButton* reset_button = getChild<LLButton>("reset_covenant");

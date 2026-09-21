@@ -1228,13 +1228,6 @@ LLChatHistory::LLChatHistory(const LLChatHistory::Params& p)
     editor_params.text_valign = LLFontGL::VAlign::VCENTER;
     editor_params.use_color = true;
     mEditor = LLUICtrlFactory::create<LLTextEditor>(editor_params, this);
-    mEditor->setIsFriendCallback(LLAvatarActions::isFriend);
-    mEditor->setIsObjectBlockedCallback(boost::bind(&LLMuteList::isMuted, LLMuteList::getInstance(), _1, _2, 0));
-    mEditor->setIsObjectReachableCallback([](const LLUUID& obj_id)
-        {
-            LLViewerObject* object = gObjectList.findObject(obj_id);
-            return object && object->isReachable();
-        });
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
     mEditor->setHighlightsCallback(boost::bind(&LLChatHistory::onTextHighlight, this, _1, _2));
 // [/SL:KB]

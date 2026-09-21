@@ -836,7 +836,6 @@ bool LLPanelGroupMembersSubTab::postBuildSubTab(LLView* root)
     // Show the member's profile on double click.
     mMembersList->setDoubleClickCallback(onMemberDoubleClick, this);
     mMembersList->setContextMenu(LLScrollListCtrl::MENU_AVATAR);
-    mMembersList->setIsFriendCallback(LLAvatarActions::isFriend);
 
     LLSD row;
     row["columns"][0]["column"] = "name";

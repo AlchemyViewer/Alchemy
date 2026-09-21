@@ -451,7 +451,6 @@ bool LLPanelLandGeneral::postBuild()
     mTextSalePending = getChild<LLTextBox>("SalePending");
     mTextOwnerLabel = getChild<LLTextBox>("Owner:");
     mTextOwner = getChild<LLTextBox>("OwnerText");
-    mTextOwner->setIsFriendCallback(LLAvatarActions::isFriend);
 
     mContentRating = getChild<LLTextBox>("ContentRatingText");
     mLandType = getChild<LLTextBox>("LandTypeText");
@@ -1200,7 +1199,6 @@ bool LLPanelLandObjects::postBuild()
     mIconGroup = LLUIImageList::getInstance()->getUIImage("icon_group.tga", 0);
 
     mOwnerList = getChild<LLNameListCtrl>("owner list");
-    mOwnerList->setIsFriendCallback(LLAvatarActions::isFriend);
     mOwnerList->sortByColumnIndex(3, false);
     childSetCommitCallback("owner list", onCommitList, this);
     mOwnerList->setDoubleClickCallback(onDoubleClickOwner, this);
@@ -3014,7 +3012,6 @@ bool LLPanelLandCovenant::postBuild()
     mLastRegionID = LLUUID::null;
     mNextUpdateTime = 0;
     mTextEstateOwner = getChild<LLTextBox>("estate_owner_text");
-    mTextEstateOwner->setIsFriendCallback(LLAvatarActions::isFriend);
     return true;
 }
 
