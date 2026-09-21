@@ -40,13 +40,16 @@
 // C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
 // again; registers, the unnamed one being the system clipboard, with 0
 // for the last yank and a-z by name (A-Z to add); marks a-z, ` and '; a
-// search line for / and ?; and a : line for a line number, s///, set,
-// g and v over the lines a pattern picks out, normal, and whatever the
-// hooks take -- w, q, wq, x, q! and the studio's own. Macros: q to
-// record keys into a register, @ to play them. Ctrl-A and Ctrl-X on a
-// number. The mouse: a click puts the caret on a character, a drag is
-// a visual selection. It works the view through what the view exposes
-// and nothing more, so the same keys drive any text view.
+// search line for / and ?; and a : line for a line number, s/// with
+// vim's flags and & g& :& :&& to do the last one again, set, g and v
+// over the lines a pattern picks out, normal, and whatever the hooks
+// take -- w, q, wq, x, q! and the studio's own. Either line keeps a
+// history: Up and Down walk the lines entered before, q: and q/ open
+// the line at the last one, @: runs it again. Macros: q to record keys
+// into a register, @ to play them. Ctrl-A and Ctrl-X on a number. The
+// mouse: a click puts the caret on a character, a drag is a visual
+// selection. It works the view through what the view exposes and
+// nothing more, so the same keys drive any text view.
 class ALVimKeymap final : public ALModalKeymap
 {
 public:
@@ -177,6 +180,13 @@ private:
     // The : line.
     void runCommand(ALTextView& view, const std::string& line);
     bool substitute(ALTextView& view, S32 first, S32 last, const std::string& spec);
+    // Vim's spelling of a replacement -- & for the match, \1 for a group,
+    // ~ for the last replacement, \r for a line break -- as the search
+    // engine's.
+    std::string replacementOf(const std::string& with) const;
+    // The history of a line kind, and the line entered into it.
+    std::vector<std::string>& historyOf(llwchar kind) { return mHistory[kind == ':' ? 0 : 1]; }
+    void                      remember(llwchar kind, const std::string& line);
     // g and v: the command over every line the pattern picks out, or
     // every line it does not.
     bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
@@ -223,7 +233,7 @@ private:
     llwchar mFindChar    = 0;
     bool    mFindForward = true;
     bool    mFindTill    = false;
-    // The search, for n and N.
+    // The search, for n and N; :s sets it too.
     std::string mSearchPattern;
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
@@ -253,9 +263,20 @@ private:
     // The char an insert began after, for a replace's backspace.
     ALTextPos   mInsertStart;
 
-    // The : or / line being typed, and which.
-    std::string mLine;
-    llwchar     mLineKind = ':';
+    // The : or / line being typed, and which; the lines entered before,
+    // : and search apart, oldest first, for Up and Down on the line,
+    // q: and @:; and where Up has walked to in them, with what was
+    // typed before it was pressed, which Down comes back to. -1 while
+    // not walking.
+    std::string              mLine;
+    llwchar                  mLineKind = ':';
+    std::vector<std::string> mHistory[2];
+    S32                      mHistoryAt = -1;
+    std::string              mHistoryPrefix;
+    // The last :s, for :s with nothing after it, :&, :&&, & and g&: its
+    // replacement as it read once ~ was put in, and its flags.
+    std::string mLastReplacement;
+    std::string mLastSubstituteFlags;
 
     // What the last change was, as it was typed, for . -- gathered from
     // the first key of a command until the command is done, and kept

@@ -753,11 +753,24 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 return true;
             case 'q':
                 // Recording into a register: a-z afresh, A-Z onto what
-                // is there.
+                // is there. q: q/ and q? are the line with its history
+                // in it, the last line entered up, rather than vim's
+                // window of them.
                 if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
                 {
                     mRecording = static_cast<char>(ch);
                     mRecorded.clear();
+                }
+                else if (ch == ':' || ch == '/' || ch == '?')
+                {
+                    clearPending();
+                    const std::vector<std::string>& history = historyOf(ch);
+                    mMode                                   = ch == ':' ? Mode::Command : Mode::Search;
+                    mLineKind                               = ch;
+                    mHistoryPrefix.clear();
+                    mHistoryAt = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
+                    mLine      = history.empty() ? std::string() : history.back();
+                    return true;
                 }
                 clearPending();
                 return true;
@@ -769,6 +782,27 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 if (name == '@')
                 {
                     name = mLastPlayed;
+                }
+                if (name == ':')
+                {
+                    // The last : line again.
+                    clearPending();
+                    mLastPlayed = ':';
+                    const std::vector<std::string>& history = historyOf(':');
+                    if (history.empty())
+                    {
+                        say("E30: No previous command line", true);
+                        return true;
+                    }
+                    for (S32 n = 0; n < count; ++n)
+                    {
+                        runCommand(view, history.back());
+                        if (mMessageError)
+                        {
+                            break;
+                        }
+                    }
+                    return true;
                 }
                 if (!((name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || name == '"' || name == '0'))
                 {
@@ -853,6 +887,14 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     case 'g':
                         return command(view, 0x01);  // gg, as a motion the table knows
+                    case '&':
+                        // The last :s again on every line, with its flags.
+                        clearPending();
+                        if (editing)
+                        {
+                            runCommand(view, "%s//~/&");
+                        }
+                        return true;
                     case 'v':
                         if (mVisualLast != Mode::Normal)
                         {
@@ -1550,6 +1592,22 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mReplaying = false;
             return true;
         }
+        case '&':
+        {
+            // The last :s again on this line, without its flags.
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            const S32 line = view.caret().line;
+            clearPending();
+            if (substitute(view, line, line, std::string()))
+            {
+                finishCommand(true);
+            }
+            return true;
+        }
         case '~':
         {
             if (!editing)
@@ -1582,9 +1640,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             clearPending();
             return true;
         case ':':
-            mMode     = Mode::Command;
-            mLineKind = ':';
-            mLine     = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
+            mMode      = Mode::Command;
+            mLineKind  = ':';
+            mHistoryAt = -1;
+            mLine      = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
             if (visual)
             {
                 leaveVisual(view);
@@ -1593,8 +1652,9 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             return true;
         case '/':
         case '?':
-            mMode     = Mode::Search;
-            mLineKind = ch;
+            mMode      = Mode::Search;
+            mLineKind  = ch;
+            mHistoryAt = -1;
             mLine.clear();
             return true;
         case 'n':
@@ -2170,43 +2230,88 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         }
         case 't':
         {
-            // The tag around the caret: back to a <name, on to its </name>.
+            // The tag around the caret, the count of them out: every tag
+            // in the text paired with its closing one by nesting, so that
+            // an inner tag of the same name is not taken for the closing
+            // of the outer; the innermost pair around the caret is the
+            // first, its parent the second. Self-closing tags, comments
+            // and declarations are no tags.
             const std::string text = d.text();
-            const size_t      here = static_cast<size_t>(d.lineStart(from.line).column) + [&] {
-                size_t offset = 0;
-                for (S32 l = 0; l < from.line; ++l)
-                {
-                    offset += d.lineLength(l) + 1;
-                }
-                return offset + from.column;
-            }();
-            size_t open = text.rfind('<', here);
-            while (open != std::string::npos)
+            const size_t      here = d.offsetOf(from);
+            struct Tag
             {
-                if (open + 1 < text.size() && text[open + 1] != '/')
+                size_t openBegin, openEnd, closeBegin, closeEnd;
+            };
+            std::vector<Tag>                             pairs;
+            std::vector<std::pair<std::string, size_t>> open;
+            auto nameAt = [&](size_t at, size_t& end) {
+                end = at;
+                while (end < text.size() && (isWordByte(text[end]) || text[end] == '-' || text[end] == ':' || text[end] == '.'))
                 {
-                    size_t name_end = open + 1;
-                    while (name_end < text.size() && (isWordByte(text[name_end]) || text[name_end] == '-' || text[name_end] == ':'))
-                    {
-                        ++name_end;
-                    }
-                    const std::string name = text.substr(open + 1, name_end - open - 1);
-                    const size_t      gt   = text.find('>', open);
-                    const size_t      end  = name.empty() ? std::string::npos : text.find("</" + name + ">", open);
-                    if (gt != std::string::npos && end != std::string::npos && end >= here - (here > gt ? 0 : 0) && gt < end)
-                    {
-                        const size_t close_end = end + name.size() + 3;
-                        out.range              = around ? ALTextRange(d.posAt(open), d.posAt(close_end)) : ALTextRange(d.posAt(gt + 1), d.posAt(end));
-                        return true;
-                    }
+                    ++end;
                 }
-                if (open == 0)
+                return text.substr(at, end - at);
+            };
+            for (size_t lt = text.find('<'); lt != std::string::npos; lt = text.find('<', lt + 1))
+            {
+                if (text.compare(lt, 4, "<!--") == 0)
+                {
+                    const size_t close = text.find("-->", lt + 4);
+                    lt                 = close == std::string::npos ? text.size() : close + 2;
+                    continue;
+                }
+                const size_t gt = text.find('>', lt + 1);
+                if (gt == std::string::npos)
                 {
                     break;
                 }
-                open = text.rfind('<', open - 1);
+                if (lt + 1 < text.size() && text[lt + 1] == '/')
+                {
+                    size_t            name_end;
+                    const std::string name = nameAt(lt + 2, name_end);
+                    // The nearest open tag of the name closes; the ones
+                    // opened after it were left unclosed.
+                    for (size_t i = open.size(); i-- > 0;)
+                    {
+                        if (open[i].first == name)
+                        {
+                            const size_t open_begin = open[i].second;
+                            pairs.push_back(Tag{ open_begin, text.find('>', open_begin) + 1, lt, gt + 1 });
+                            open.resize(i);
+                            break;
+                        }
+                    }
+                }
+                else if (lt + 1 < text.size() && (std::isalpha(static_cast<unsigned char>(text[lt + 1])) || text[lt + 1] == '_'))
+                {
+                    size_t            name_end;
+                    const std::string name = nameAt(lt + 1, name_end);
+                    if (!name.empty() && text[gt - 1] != '/')
+                    {
+                        open.emplace_back(name, lt);
+                    }
+                }
+                lt = gt;
             }
-            return false;
+            // The pairs around the caret, innermost first: the inner of
+            // two nested pairs starts later.
+            std::vector<const Tag*> around_caret;
+            for (const Tag& tag : pairs)
+            {
+                if (tag.openBegin <= here && here < tag.closeEnd)
+                {
+                    around_caret.push_back(&tag);
+                }
+            }
+            std::sort(around_caret.begin(), around_caret.end(), [](const Tag* a, const Tag* b) { return a->openBegin > b->openBegin; });
+            const size_t level = static_cast<size_t>(llmax(1, count)) - 1;
+            if (level >= around_caret.size())
+            {
+                return false;
+            }
+            const Tag& tag = *around_caret[level];
+            out.range      = around ? ALTextRange(d.posAt(tag.openBegin), d.posAt(tag.closeEnd)) : ALTextRange(d.posAt(tag.openEnd), d.posAt(tag.closeBegin));
+            return true;
         }
         case 'p':
         {
@@ -2937,6 +3042,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 moveTo(view, view.caret());
                 return true;
             case KEY_BACKSPACE:
+                mHistoryAt = -1;
                 if (mLine.empty())
                 {
                     mMode = Mode::Normal;
@@ -2952,12 +3058,49 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                     mLine.erase(cut);
                 }
                 return true;
+            case KEY_UP:
+            case KEY_DOWN:
+            {
+                // The lines entered before that start as this one does,
+                // older with Up and newer with Down, back to this one
+                // past the newest.
+                const std::vector<std::string>& history = historyOf(mLineKind);
+                const S32                       n       = static_cast<S32>(history.size());
+                if (mHistoryAt < 0)
+                {
+                    mHistoryPrefix = mLine;
+                    mHistoryAt     = n;
+                }
+                S32 at = mHistoryAt;
+                while (true)
+                {
+                    at += input.key == KEY_UP ? -1 : 1;
+                    if (at < 0)
+                    {
+                        return true;
+                    }
+                    if (at >= n)
+                    {
+                        mHistoryAt = -1;
+                        mLine      = mHistoryPrefix;
+                        return true;
+                    }
+                    if (history[static_cast<size_t>(at)].compare(0, mHistoryPrefix.size(), mHistoryPrefix) == 0)
+                    {
+                        mHistoryAt = at;
+                        mLine      = history[static_cast<size_t>(at)];
+                        return true;
+                    }
+                }
+            }
             case KEY_RETURN:
             {
                 const std::string line = mLine;
                 const llwchar     kind = mLineKind;
                 mLine.clear();
-                mMode = Mode::Normal;
+                mMode      = Mode::Normal;
+                mHistoryAt = -1;
+                remember(kind, line);
                 if (kind == ':')
                 {
                     runCommand(view, line);
@@ -2995,7 +3138,24 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
         return commandLine(view, as_key);
     }
     mLine += utf8Of(input.ch);
+    mHistoryAt = -1;
     return true;
+}
+
+void ALVimKeymap::remember(llwchar kind, const std::string& line)
+{
+    const size_t MOST = 50;
+    if (line.empty())
+    {
+        return;
+    }
+    std::vector<std::string>& history = historyOf(kind);
+    history.erase(std::remove(history.begin(), history.end(), line), history.end());
+    history.push_back(line);
+    if (history.size() > MOST)
+    {
+        history.erase(history.begin(), history.begin() + static_cast<std::ptrdiff_t>(history.size() - MOST));
+    }
 }
 
 void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
@@ -3119,9 +3279,11 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
     }
     LLStringUtil::trim(args);
 
-    if (name == "s" || name == "substitute")
+    if (name == "s" || name == "substitute" || name == "&" || name == "~")
     {
-        if (!substitute(view, first, last, args))
+        // :& and :&& do the last one again; :~ likewise, on the last
+        // pattern searched for, which here is the same one.
+        if (!substitute(view, first, last, name == "s" || name == "substitute" ? args : "&" + args))
         {
             return;
         }
@@ -3480,59 +3642,161 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     return !mMessageError;
 }
 
+std::string ALVimKeymap::replacementOf(const std::string& with) const
+{
+    // Vim's spelling to the search engine's: & and \0 are the whole
+    // match, \1 to \9 the groups, \r and \n a line break, \t a tab;
+    // \& \~ and \\ are themselves; \u \U \l \L \e \E change case as the
+    // engine has them; a $ is only a $. The ~ was put in before this.
+    std::string out;
+    out.reserve(with.size() + 8);
+    for (size_t i = 0; i < with.size(); ++i)
+    {
+        const char c = with[i];
+        if (c == '\\' && i + 1 < with.size())
+        {
+            const char n = with[++i];
+            switch (n)
+            {
+                case '&': out += '&'; break;
+                case '~': out += '~'; break;
+                case '\\': out += "\\\\"; break;
+                case 'r':
+                case 'n': out += '\n'; break;
+                case 't': out += '\t'; break;
+                case 'e': out += "\\E"; break;
+                case 'u':
+                case 'U':
+                case 'l':
+                case 'L':
+                case 'E': out += '\\'; out += n; break;
+                default:
+                    if (n >= '0' && n <= '9')
+                    {
+                        out += '$';
+                        out += n;
+                    }
+                    else
+                    {
+                        out += n;
+                    }
+                    break;
+            }
+        }
+        else if (c == '&')
+        {
+            out += "$&";
+        }
+        else if (c == '$')
+        {
+            out += "$$";
+        }
+        else
+        {
+            out += c;
+        }
+    }
+    return out;
+}
+
 bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::string& spec)
 {
     // s/pattern/replacement/flags, with whatever follows s as the
-    // separator; g for every match on a line, i for any case.
-    if (spec.empty())
+    // separator; g for every match on a line, i for any case, I for
+    // case as written, n to count without changing, e to say nothing
+    // where nothing matches, & first to keep the last flags. Nothing
+    // after s, or & or &&, does the last one again -- on the last
+    // pattern searched for, with the last replacement -- without its
+    // flags, or with them after &&.
+    std::string        pattern, with, flags;
+    const std::string& rest = spec;
+    if (rest.empty() || rest[0] == '&')
     {
-        say("E35: No previous regular expression", true);
-        return false;
-    }
-    const char sep = spec[0];
-    size_t     p1  = 1;
-    auto       part = [&](std::string& out) {
-        out.clear();
-        while (p1 < spec.size() && spec[p1] != sep)
+        if (mSearchPattern.empty())
         {
-            if (spec[p1] == '\\' && p1 + 1 < spec.size() && spec[p1 + 1] == sep)
-            {
-                out += sep;
-                p1 += 2;
-                continue;
-            }
-            out += spec[p1++];
+            say("E35: No previous regular expression", true);
+            return false;
         }
-        const bool closed = p1 < spec.size();
-        if (closed)
-        {
-            ++p1;
-        }
-        return closed;
-    };
-    std::string pattern, with, flags;
-    part(pattern);
-    if (part(with))
-    {
-        flags = spec.substr(p1);
-    }
-    if (pattern.empty())
-    {
         pattern = mSearchPattern;
+        with    = mLastReplacement;
+        flags   = rest.empty() ? std::string() : rest.substr(1);
     }
-    if (pattern.empty())
+    else
     {
-        say("E35: No previous regular expression", true);
-        return false;
+        const char sep  = rest[0];
+        size_t     p1   = 1;
+        auto       part = [&](std::string& out) {
+            out.clear();
+            while (p1 < rest.size() && rest[p1] != sep)
+            {
+                if (rest[p1] == '\\' && p1 + 1 < rest.size() && rest[p1 + 1] == sep)
+                {
+                    out += sep;
+                    p1 += 2;
+                    continue;
+                }
+                out += rest[p1++];
+            }
+            const bool closed = p1 < rest.size();
+            if (closed)
+            {
+                ++p1;
+            }
+            return closed;
+        };
+        part(pattern);
+        if (part(with))
+        {
+            flags = rest.substr(p1);
+        }
+        if (pattern.empty())
+        {
+            pattern = mSearchPattern;
+        }
+        if (pattern.empty())
+        {
+            say("E35: No previous regular expression", true);
+            return false;
+        }
+        // The replacement as it reads with ~ put in, which is what the
+        // next ~ means.
+        std::string expanded;
+        for (size_t i = 0; i < with.size(); ++i)
+        {
+            if (with[i] == '\\' && i + 1 < with.size())
+            {
+                expanded += with[i];
+                expanded += with[++i];
+            }
+            else if (with[i] == '~')
+            {
+                expanded += mLastReplacement;
+            }
+            else
+            {
+                expanded += with[i];
+            }
+        }
+        with = expanded;
     }
-    mSearchPattern      = pattern;
-    mSearchWholeWord    = false;
-    const bool every    = flags.find('g') != std::string::npos;
-    const bool anycase  = flags.find('i') != std::string::npos;
+    LLStringUtil::trim(flags);
+    if (!flags.empty() && flags[0] == '&')
+    {
+        flags = mLastSubstituteFlags + flags.substr(1);
+    }
+    mSearchPattern        = pattern;
+    mSearchWholeWord      = false;
+    mLastReplacement      = with;
+    mLastSubstituteFlags  = flags;
+    const bool every      = flags.find('g') != std::string::npos;
+    const bool anycase    = flags.find('i') != std::string::npos;
+    const bool exactcase  = flags.find('I') != std::string::npos;
+    const bool count_only = flags.find('n') != std::string::npos;
+    const bool quiet      = flags.find('e') != std::string::npos;
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
     options.regex         = true;
-    options.caseSensitive = !anycase && std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+    options.caseSensitive = exactcase || (!anycase && std::any_of(pattern.begin(), pattern.end(), [](char c) { return c >= 'A' && c <= 'Z'; }));
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
     std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern, options, &scope, &error);
@@ -3543,9 +3807,13 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     }
     if (matches.empty())
     {
-        say("E486: Pattern not found: " + pattern, true);
+        if (!quiet)
+        {
+            say("E486: Pattern not found: " + pattern, true);
+        }
         return false;
     }
+    const std::string                                format = replacementOf(with);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     S32                                              seen_line = -1;
     S32                                              lines     = 0;
@@ -3560,14 +3828,29 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
             ++lines;
         }
         seen_line = match.begin.line;
-        edits.emplace_back(match, ALTextSearch::replacement(d, match, pattern, options, with));
+        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, match, pattern, options, format));
     }
     const S32 count = static_cast<S32>(edits.size());
+    if (count_only)
+    {
+        say(std::to_string(count) + " match" + (count == 1 ? "" : "es") + " on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));
+        return false;
+    }
+    // The caret goes to the last line substituted on, as it will lie
+    // once the edits are in: the lines the ones before it add or take.
+    S32 landing = seen_line;
+    for (size_t i = 0; i + 1 < edits.size(); ++i)
+    {
+        const ALTextRange match = edits[i].first.normalised();
+        landing += static_cast<S32>(std::count(edits[i].second.begin(), edits[i].second.end(), '\n')) - (match.end.line - match.begin.line);
+    }
+    landing += static_cast<S32>(std::count(edits.back().second.begin(), edits.back().second.end(), '\n'));
     if (view.isReadOnly() || !view.replaceAll(std::move(edits)))
     {
         return false;
     }
-    moveTo(view, ALTextPos(seen_line, firstNonBlankColumn(d, seen_line)));
+    landing = llclamp(landing, 0, d.lineCount() - 1);
+    moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     if (count > 1)
     {
         say(std::to_string(count) + " substitutions on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));

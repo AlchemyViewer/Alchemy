@@ -119,6 +119,10 @@ namespace tut
                     {
                         editor->handleKeyHere(KEY_TAB, MASK_NONE);
                     }
+                    else if (name == "Up" || name == "Down")
+                    {
+                        editor->handleKeyHere(name == "Up" ? KEY_UP : KEY_DOWN, MASK_NONE);
+                    }
                     else if (name.size() == 3 && name[0] == 'C' && name[1] == '-')
                     {
                         editor->handleKeyHere(static_cast<KEY>(toupper(name[2])), MASK_CONTROL);
@@ -544,5 +548,101 @@ namespace tut
         ensure("nothing matching is said", vim->messageIsError());
         keys(":g/keep/<CR>");
         ensure("with no command, how many is said", !vim->messageIsError() && vim->message() == "3 lines");
+    }
+    template<> template<>
+    void alvimkeymap_object::test<13>()
+    {
+        set_test_name(":s takes vim's replacement spelling and flags, and & g& :& :&& do the last one again");
+        ALCodeEditor& e = make("cat hat\ncat bat\nrat\n");
+        // The pattern is the search engine's own dialect -- groups in
+        // plain brackets -- and the replacement vim's.
+        keys(":s/(c)at/[&-\\1]/<CR>");
+        ensure_equals("& is the match and \\1 a group", flat(e.text()), std::string("[cat-c] hat|cat bat|rat|"));
+        keys("j:s/at/~x/g<CR>");
+        ensure_equals("~ is the last replacement, read again as one", flat(e.text()), std::string("[cat-c] hat|c[at-]x b[at-]x|rat|"));
+        keys("u:s/at/A\\&B/gn<CR>");
+        ensure("n counts without changing", !vim->messageIsError() && vim->message() == "2 matches on 1 line");
+        ensure_equals("nothing changed", flat(e.text()), std::string("[cat-c] hat|cat bat|rat|"));
+        keys(":s/at/og/<CR>");
+        ensure_equals("the first on the line", flat(e.text()), std::string("[cat-c] hat|cog bat|rat|"));
+        keys("&");
+        ensure_equals("& again on the line, without the flags", flat(e.text()), std::string("[cat-c] hat|cog bog|rat|"));
+        keys("uu:s/at/og/g<CR>u");
+        keys("gg:&&<CR>");
+        ensure_equals(":&& does the last :s again with its flags", flat(e.text()), std::string("[cog-c] hog|cat bat|rat|"));
+        keys("ug&");
+        ensure_equals("g& on every line, with the flags", flat(e.text()), std::string("[cog-c] hog|cog bog|rog|"));
+        keys("u&");
+        ensure_equals("& on this line without them, as vim has it, which forgets them", flat(e.text()), std::string("[cog-c] hat|cat bat|rat|"));
+        keys("u:&&<CR>");
+        ensure_equals("so :&& now has none", flat(e.text()), std::string("[cog-c] hat|cat bat|rat|"));
+        keys("u");
+        keys(":s/zzz/y/e<CR>");
+        ensure("e says nothing where nothing matches", !vim->messageIsError());
+        keys(":s/zzz/y/<CR>");
+        ensure("without e it does", vim->messageIsError());
+        keys("gg:s/hat/one\\rtwo/<CR>");
+        ensure_equals("\\r breaks the line", flat(e.text()), std::string("[cat-c] one|two|cat bat|rat|"));
+        keys(":s/two/\\U&/<CR>");
+        ensure_equals("\\U upper-cases what follows", flat(e.text()), std::string("[cat-c] one|TWO|cat bat|rat|"));
+        keys(":s/t/$/I<CR>");
+        ensure("I matches the case as written: no lower t here", vim->messageIsError());
+        keys(":s/T/$/I<CR>");
+        ensure_equals("a $ is a $", flat(e.text()), std::string("[cat-c] one|$WO|cat bat|rat|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<14>()
+    {
+        set_test_name("the : and / lines keep a history for Up and Down, q: and q/ open the line at the last, @: runs it again");
+        ALCodeEditor& e = make("a1\na2\na3\na4\n");
+        keys(":s/a/b/<CR>");
+        keys("j:s/a/c/<CR>");
+        keys("j:<Up>");
+        ensure_equals("Up brings the last line back", vim->commandLine(), std::string("s/a/c/"));
+        keys("<Up>");
+        ensure_equals("and the one before", vim->commandLine(), std::string("s/a/b/"));
+        keys("<Up>");
+        ensure_equals("no further", vim->commandLine(), std::string("s/a/b/"));
+        keys("<Down><Down>");
+        ensure_equals("Down past the newest is what was typed", vim->commandLine(), std::string(""));
+        keys("s/a/b<Up>");
+        ensure_equals("Up walks only the lines that start as this one", vim->commandLine(), std::string("s/a/b/"));
+        keys("<CR>");
+        ensure_equals("run", flat(e.text()), std::string("b1|c2|b3|a4|"));
+        keys("j@:");
+        ensure_equals("@: runs the last line again", flat(e.text()), std::string("b1|c2|b3|b4|"));
+        keys("gg/a4<CR>");
+        keys("q/");
+        ensure("q/ opens the search line", vim->mode() == ALVimKeymap::Mode::Search);
+        ensure_equals("at the last search", vim->commandLine(), std::string("a4"));
+        keys("<Esc>q:");
+        ensure("q: opens the : line", vim->mode() == ALVimKeymap::Mode::Command);
+        ensure_equals("at the last command", vim->commandLine(), std::string("s/a/b/"));
+        keys("<Up>");
+        ensure_equals("with the history above it", vim->commandLine(), std::string("s/a/c/"));
+        keys("<Esc>");
+        ensure("escape leaves it", vim->mode() == ALVimKeymap::Mode::Normal);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<15>()
+    {
+        set_test_name("it and at pair a tag with its own closing one through nesting, count levels out, and skip what is no tag");
+        ALCodeEditor& e = make("<div><!-- <p> --><p>one <br/> <b>two</b> three</p></div>\n");
+        keys("0fwdit");
+        ensure_equals("it inside the innermost", flat(e.text()), std::string("<div><!-- <p> --><p>one <br/> <b></b> three</p></div>|"));
+        keys("u0fwd2it");
+        ensure_equals("2it a level out, the inner b of the same nesting not taken for the close", flat(e.text()), std::string("<div><!-- <p> --><p></p></div>|"));
+        keys("u0fwd3at");
+        ensure_equals("3at the outer tag whole, the comment's <p> no tag", flat(e.text()), std::string("|"));
+        keys("u0fwd4at");
+        ensure_equals("no fourth: nothing", flat(e.text()), std::string("<div><!-- <p> --><p>one <br/> <b>two</b> three</p></div>|"));
+        e.setText("<a><b>x</b></a><a>y</a>\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("0fydat");
+        ensure_equals("the second a is its own pair", flat(e.text()), std::string("<a><b>x</b></a>|"));
+        keys("0fxvatd");
+        ensure_equals("at in visual", flat(e.text()), std::string("<a></a>|"));
     }
 }
