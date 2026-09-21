@@ -26,18 +26,28 @@
 
 #include "alscriptworkspace.h"
 
+#include "alscriptenvelope.h"
+#include "alscriptpreprocessor.h"
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
 #include "llchat.h"
+#include "llcompilequeue.h"
 #include "lldate.h"
 #include "lleventtimer.h"
+#include "llexperiencecache.h"
 #include "llfilesystem.h"
+#include "llfloaterperms.h"
+#include "llfloaterreg.h"
 #include "llinventory.h"
 #include "llinventorymodel.h"
+#include "llnotecard.h"
 #include "llnotificationsutil.h"
 #include "llpreviewscript.h"
 #include "llscripteditorws.h"
+#include "lltrans.h"
+#include "llversioninfo.h"
+#include "llviewerassettype.h"
 #include "llviewerassetupload.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
@@ -54,6 +64,8 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
+#include <sstream>
 
 namespace
 {
@@ -349,6 +361,27 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
     {
         answer.error = "the asset could not be read";
     }
+    else if (type == LLAssetType::AT_NOTECARD)
+    {
+        // A notecard in its format, or the bare text of one written
+        // before there was a format.
+        answer.assetId  = asset_id;
+        answer.notecard = true;
+        if (answer.text.compare(0, 19, "Linden text version") == 0)
+        {
+            LLNotecard         notecard(LLNotecard::MAX_SIZE);
+            std::istringstream in(answer.text);
+            if (notecard.importStream(in))
+            {
+                answer.text     = notecard.getText();
+                answer.embedded = notecard.getItems();
+            }
+            else
+            {
+                answer.error = "the notecard could not be read";
+            }
+        }
+    }
     else
     {
         answer.assetId = asset_id;
@@ -491,6 +524,223 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     return true;
 }
 
+bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
+                                     compile_callback_t callback, std::string& error)
+{
+    LLNotecard notecard(LLNotecard::MAX_SIZE);
+    notecard.setItems(embedded);
+    notecard.setText(text);
+    std::stringstream out;
+    if (!notecard.exportStream(out))
+    {
+        error = "the notecard could not be written";
+        return false;
+    }
+    const std::string buffer   = out.str();
+    const bool        carries  = !embedded.empty();
+    auto              answered = [this, ref, callback, carries](const LLUUID& new_asset_id) {
+        CompileResult result;
+        result.ref        = ref;
+        result.notecard   = true;
+        result.success    = true;
+        result.newAssetId = new_asset_id;
+        if (carries)
+        {
+            // The uploader may have rewritten what it was given; the copy
+            // in the cache is not to be trusted.
+            LLFileSystem::removeFile(new_asset_id, LLAssetType::AT_NOTECARD);
+        }
+        LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
+    };
+    auto failed = [this, ref, callback](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
+        CompileResult result;
+        result.ref      = ref;
+        result.notecard = true;
+        result.error    = reason.empty() ? std::string("the upload failed") : reason;
+        LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
+        return true;
+    };
+
+    if (ref.inInventory())
+    {
+        LLViewerRegion* region = gAgent.getRegion();
+        if (!region)
+        {
+            error = "no region";
+            return false;
+        }
+        const std::string url = region->getCapability("UpdateNotecardAgentInventory");
+        if (url.empty())
+        {
+            error = "the region cannot update notecards";
+            return false;
+        }
+        LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
+            ref.item, LLAssetType::AT_NOTECARD, buffer,
+            [answered](LLUUID, LLUUID new_asset_id, LLUUID, LLSD) { answered(new_asset_id); }, failed));
+        LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+        return true;
+    }
+
+    LLViewerObject* object = gObjectList.findObject(ref.object);
+    if (!object || !object->getRegion())
+    {
+        error = "no such object";
+        return false;
+    }
+    const std::string url = object->getRegion()->getCapability("UpdateNotecardTaskInventory");
+    if (url.empty())
+    {
+        error = "the region cannot update notecards";
+        return false;
+    }
+    LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
+        ref.object, ref.item, LLAssetType::AT_NOTECARD, buffer,
+        [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id); }, failed));
+    LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+    return true;
+}
+
+void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
+                                const std::string& target, prepared_callback_t callback)
+{
+    if (!ALScriptEnvelope::looksWrapped(text) && !ALScriptPreprocessor::enabled())
+    {
+        Prepared as_is;
+        as_is.text = text;
+        callback(as_is);
+        return;
+    }
+    std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text);
+    ALScriptPreprocessor::Request   request;
+    request.ref           = ref;
+    request.name          = name;
+    request.assetId       = asset_id;
+    request.source        = envelope ? envelope->source : text;
+    request.lua           = lua;
+    request.compileTarget = target;
+    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback](const ALPreprocessor::Result& expanded) {
+        Prepared prepared;
+        if (expanded.hasErrors())
+        {
+            for (const ALScriptProblem& problem : expanded.problems)
+            {
+                if (problem.severity != ALScriptProblem::Severity::Error)
+                {
+                    continue;
+                }
+                Diagnostic diagnostic;
+                diagnostic.line      = problem.line;
+                diagnostic.column    = problem.column;
+                diagnostic.hasColumn = true;
+                diagnostic.level     = "ERROR";
+                diagnostic.message   = problem.file.empty() ? problem.message : problem.file + ": " + problem.message;
+                prepared.errors.push_back(std::move(diagnostic));
+            }
+            callback(prepared);
+            return;
+        }
+        prepared.text = request.source;
+        if (!expanded.disabled)
+        {
+            ALScriptEnvelope wrapped = envelope ? *envelope : ALScriptEnvelope();
+            wrapped.lua              = lua;
+            wrapped.source           = request.source;
+            wrapped.expanded         = expanded.text;
+            wrapped.compileTarget    = target;
+            wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
+            wrapped.lastCompiled     = LLDate::now().asString();
+            prepared.text            = wrapped.wrap();
+        }
+        callback(prepared);
+    });
+}
+
+void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback)
+{
+    auto fail = [this, ref, callback](const std::string& why) {
+        CompileResult result;
+        result.ref   = ref;
+        result.error = why;
+        deliver(result, callback);
+    };
+    LLViewerObject*        object = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
+    const LLInventoryItem* item   = ref.inInventory() ? gInventory.getItem(ref.item) : object ? object->getInventoryItem(ref.item) : nullptr;
+    if (!item)
+    {
+        fail(ref.inInventory() ? "no such item" : object ? "no such item in the object" : "no such object");
+        return;
+    }
+    // The target: what was asked, or what the script compiles for now.
+    // A script is in one language, and only compiles for that language's
+    // targets.
+    const bool  lua    = item->getInventorySubType() == SST_LUA || item->getRuntime() == "luau";
+    std::string target = requested;
+    if (target.empty() || target == "auto")
+    {
+        target = item->getRuntime();
+        if (target.empty())
+        {
+            target = lua ? "luau" : "mono";
+        }
+    }
+    if ((target == "luau") != lua)
+    {
+        fail(std::string(lua ? "a Luau" : "an LSL") + " script does not compile for " + target);
+        return;
+    }
+    const std::string name = item->getName();
+    // Its experience, then its text, then the upload.
+    auto go = [this, ref, target, lua, name, callback, fail](const LLUUID& experience) {
+        load(ref, [this, target, lua, name, callback, fail, experience](const Loaded& loaded) {
+            if (!loaded.error.empty())
+            {
+                fail(loaded.error);
+                return;
+            }
+            const ALScriptRef ref = loaded.ref;
+            prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, experience, fail](const Prepared& prepared) {
+                if (!prepared.errors.empty())
+                {
+                    CompileResult result;
+                    result.ref         = ref;
+                    result.diagnostics = prepared.errors;
+                    for (const Diagnostic& diagnostic : prepared.errors)
+                    {
+                        result.messages.push_back(diagnostic.message);
+                    }
+                    deliver(result, callback);
+                    return;
+                }
+                SaveOptions options;
+                options.compileTarget = target;
+                options.running       = true;
+                options.experience    = experience;
+                std::string error;
+                if (!save(ref, prepared.text, options, callback, error))
+                {
+                    fail(error);
+                }
+            });
+        });
+    };
+    if (object && object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
+    {
+        LLExperienceCache::instance().fetchAssociatedExperience(ref.object, ref.item, [go](const LLSD& result) {
+            LLUUID experience;
+            if (result.has(LLExperienceCache::EXPERIENCE_ID))
+            {
+                experience = result[LLExperienceCache::EXPERIENCE_ID].asUUID();
+            }
+            LLAppViewer::instance()->postToMainCoro([go, experience]() { go(experience); });
+        });
+    }
+    else
+    {
+        go(LLUUID::null);
+    }
+}
+
 // --- a script in an object -------------------------------------------------------
 
 bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running)
@@ -595,6 +845,199 @@ void ALScriptWorkspace::sweepListeners()
 {
     mListeners.erase(std::remove_if(mListeners.begin(), mListeners.end(), [](const std::unique_ptr<ContentsListener>& l) { return l->done; }),
                      mListeners.end());
+}
+
+// --- changing what an object holds ---------------------------------------------------
+
+bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, const std::string& name, created_callback_t callback, std::string& error)
+{
+    if (name.empty())
+    {
+        error = "a name is needed";
+        return false;
+    }
+    LLViewerObject* prim = gObjectList.findObject(prim_id);
+    if (!prim || !prim->getRegion())
+    {
+        error = "no such object";
+        return false;
+    }
+    if (!prim->permModify())
+    {
+        error = "the object may not be changed";
+        return false;
+    }
+    // The region makes the item where it can; a script may still be asked
+    // for the old way, a notecard may not.
+    const bool cap = prim->getRegion()->isCapabilityAvailable("CreateTaskInventoryItem");
+    if (notecard && !cap)
+    {
+        error = "the region cannot make a notecard in an object";
+        return false;
+    }
+    const LLAssetType::EType     asset_type = notecard ? LLAssetType::AT_NOTECARD : LLAssetType::AT_LSL_TEXT;
+    const LLInventoryType::EType inv_type   = notecard ? LLInventoryType::IT_NOTECARD : LLInventoryType::IT_LSL;
+    const U8                     sub_type   = notecard ? 0 : lua ? SST_LUA : SST_LSL;
+    const char*                  perm_key   = notecard ? "Notecards" : "Scripts";
+    LLPermissions                perms;
+    perms.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+    perms.initMasks(PERM_ALL, PERM_ALL, LLFloaterPerms::getEveryonePerms(perm_key), LLFloaterPerms::getGroupPerms(perm_key),
+                    PERM_MOVE | LLFloaterPerms::getNextOwnerPerms(perm_key));
+    std::string description;
+    LLViewerAssetType::generateDescriptionFor(asset_type, description);
+
+    if (cap)
+    {
+        LLSD params;
+        if (!notecard)
+        {
+            params["enabled"] = true;
+            params["vm"]      = lua ? "luau" : "mono";
+        }
+        prim->createInventoryItem(asset_type, inv_type, sub_type, name, description, perms, params,
+                                  [prim_id, name, callback](bool success, const LLSD& response) {
+                                      Created made;
+                                      made.prim = prim_id;
+                                      made.name = name;
+                                      if (success)
+                                      {
+                                          made.item = response["item_id"].asUUID();
+                                          if (response.has("name"))
+                                          {
+                                              made.name = response["name"].asString();
+                                          }
+                                      }
+                                      else
+                                      {
+                                          made.error = response.has("message") ? response["message"].asString() : std::string("the region refused");
+                                      }
+                                      LLAppViewer::instance()->postToMainCoro([made, callback]() { callback(made); });
+                                  });
+        return true;
+    }
+    LLPointer<LLViewerInventoryItem> item = new LLViewerInventoryItem(LLUUID::null, LLUUID::null, perms, LLUUID::null, asset_type, inv_type, name,
+                                                                      description, LLSaleInfo::DEFAULT,
+                                                                      LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK & sub_type, time_corrected());
+    prim->saveScript(item, true, true, LLUUID::null);
+    // The object's contents will show it, under whatever id the region
+    // gives it.
+    Created made;
+    made.prim = prim_id;
+    made.name = name;
+    callback(made);
+    return true;
+}
+
+bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, std::string& error)
+{
+    if (name.empty())
+    {
+        error = "a name is needed";
+        return false;
+    }
+    if (ref.inInventory())
+    {
+        LLViewerInventoryItem* item = gInventory.getItem(ref.item);
+        if (!item)
+        {
+            error = "no such item";
+            return false;
+        }
+        if (item->getName() != name)
+        {
+            LLSD updates;
+            updates["name"] = name;
+            update_inventory_item(ref.item, updates, nullptr);
+        }
+        return true;
+    }
+    LLViewerObject*  object = gObjectList.findObject(ref.object);
+    LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
+    if (!item)
+    {
+        error = object ? "no such item in the object" : "no such object";
+        return false;
+    }
+    if (!object->permModify())
+    {
+        error = "the object may not be changed";
+        return false;
+    }
+    if (item->getName() == name)
+    {
+        return true;
+    }
+    LLPointer<LLViewerInventoryItem> renamed = new LLViewerInventoryItem(item);
+    renamed->rename(name);
+    object->updateInventory(renamed, TASK_INVENTORY_ITEM_KEY, false);
+    return true;
+}
+
+bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
+{
+    if (ref.inInventory())
+    {
+        LLViewerInventoryItem* item = gInventory.getItem(ref.item);
+        if (!item)
+        {
+            error = "no such item";
+            return false;
+        }
+        const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
+        if (trash.isNull())
+        {
+            error = "no trash folder";
+            return false;
+        }
+        gInventory.changeItemParent(item, trash, false);
+        return true;
+    }
+    LLViewerObject*  object = gObjectList.findObject(ref.object);
+    LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
+    if (!item)
+    {
+        error = object ? "no such item in the object" : "no such object";
+        return false;
+    }
+    if (!object->permModify())
+    {
+        error = "the object may not be changed";
+        return false;
+    }
+    object->removeInventory(ref.item);
+    return true;
+}
+
+bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error)
+{
+    if (prims.empty())
+    {
+        error = "nothing to do";
+        return false;
+    }
+    const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
+    const char* title = kind == Queue::Recompile ? "CompileQueueTitle" : kind == Queue::Reset ? "ResetQueueTitle" : kind == Queue::Start ? "RunQueueTitle" : "NotRunQueueTitle";
+    LLUUID      id;
+    id.generate();
+    LLFloaterScriptQueue* queue = LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));
+    if (!queue)
+    {
+        error = "the queue could not be opened";
+        return false;
+    }
+    queue->setCompileTarget(target.empty() ? std::string("auto") : target);
+    for (const auto& [prim, prim_name] : prims)
+    {
+        queue->addObject(prim, prim_name);
+    }
+    if (!queue->start())
+    {
+        queue->closeFloater();
+        error = "the queue would not start";
+        return false;
+    }
+    queue->setTitle(LLTrans::getString(title));
+    return true;
 }
 
 // --- what scripts say ------------------------------------------------------------

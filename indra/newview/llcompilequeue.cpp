@@ -40,8 +40,6 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
 #include "llagent.h"
-#include "lldate.h"
-#include "llversioninfo.h"
 #include "llchat.h"
 #include "llfloaterreg.h"
 #include "llviewerwindow.h"
@@ -519,21 +517,14 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             (ALScriptEnvelope::looksWrapped(text) || ALScriptPreprocessor::enabled()))
         {
             preprocessed = true;
-            const ALScriptRef               ref(object->getID(), inventory->getUUID());
-            std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text);
-            ALScriptPreprocessor::Request   request;
-            request.ref     = ref;
-            request.name    = inventory->getName();
-            request.assetId = assetId;
-            request.source        = envelope ? envelope->source : text;
-            request.lua           = script_is_lua;
-            request.compileTarget = compile_target;
+            const ALScriptRef ref(object->getID(), inventory->getUUID());
             const std::string pumpName = pump.getName();
-            auto              answer   = std::make_shared<ALPreprocessor::Result>();
-            ALScriptPreprocessor::instance().run(request, [pumpName, answer](const ALPreprocessor::Result& r) {
-                *answer = r;
-                LLEventPumps::instance().post(pumpName, LLSDMap("preprocessed", LLSD::Boolean(true)));
-            });
+            auto              prepared = std::make_shared<ALScriptWorkspace::Prepared>();
+            ALScriptWorkspace::instance().prepare(ref, inventory->getName(), assetId, text, script_is_lua, compile_target,
+                                                  [pumpName, prepared](const ALScriptWorkspace::Prepared& p) {
+                                                      *prepared = p;
+                                                      LLEventPumps::instance().post(pumpName, LLSDMap("prepared", LLSD::Boolean(true)));
+                                                  });
             result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
             floater.check();
             if (result.has("timeout"))
@@ -543,29 +534,14 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
                 floater->addStringMessage(floater->getString("Timeout", args));
                 return true;
             }
-            if (answer->hasErrors())
+            if (!prepared->errors.empty())
             {
                 floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
-                for (const ALScriptProblem& problem : answer->problems)
+                for (const ALScriptWorkspace::Diagnostic& problem : prepared->errors)
                 {
-                    if (problem.severity == ALScriptProblem::Severity::Error)
-                    {
-                        floater->addStringMessage((problem.file.empty() ? std::string() : problem.file + ": ") + std::to_string(problem.line + 1) + ": " + problem.message);
-                    }
+                    floater->addStringMessage(std::to_string(problem.line + 1) + ": " + problem.message);
                 }
                 return true;
-            }
-            std::string upload = request.source;
-            if (!answer->disabled)
-            {
-                ALScriptEnvelope wrapped = envelope ? *envelope : ALScriptEnvelope();
-                wrapped.lua              = script_is_lua;
-                wrapped.source           = request.source;
-                wrapped.expanded         = answer->text;
-                wrapped.compileTarget    = compile_target;
-                wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
-                wrapped.lastCompiled     = LLDate::now().asString();
-                upload                   = wrapped.wrap();
             }
             ALScriptWorkspace::SaveOptions options;
             options.compileTarget = compile_target;
@@ -573,7 +549,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             options.experience    = experienceId;
             std::string error;
             const bool  sent = ALScriptWorkspace::instance().save(
-                ref, upload, options,
+                ref, prepared->text, options,
                 [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
                     LLSD out;
                     out["compiled"] = compiled.success;

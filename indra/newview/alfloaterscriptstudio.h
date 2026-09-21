@@ -111,6 +111,10 @@ private:
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
         bool                                       sourceView = false;
+        // A notecard rather than a script: plain text, saved as a
+        // notecard with the items it came with, never analysed.
+        bool                                       notecard = false;
+        std::vector<LLPointer<LLInventoryItem>>    embedded;
         // The envelope the asset came in, whose source the editor holds
         // and whose expanded code the companion tab shows; a save runs
         // the preprocessor over the source and wraps both again.
@@ -290,9 +294,11 @@ private:
     void onOutputFilter();
     void onOutputChosen();
 
-    // The explorer: the objects in hand -- selected in world, or holding
-    // a script that is open -- each prim's scripts and notecards listed
-    // as they are fetched, with whether each script runs.
+    // The explorer: the objects in hand -- pinned, selected in world, or
+    // holding a script that is open -- each prim's scripts and notecards
+    // listed as they are fetched, with whether each script runs. A pinned
+    // object stays listed when it is neither, and across sessions; one
+    // that is not around is listed by the name it had.
     struct ExplorerPrim
     {
         LLUUID                            id;
@@ -304,15 +310,53 @@ private:
     {
         LLUUID                    root;
         std::string               name;
+        bool                      pinned  = false;
+        bool                      present = true;
         std::vector<ExplorerPrim> prims;
+    };
+    struct Pinned
+    {
+        LLUUID      root;
+        std::string name;
+    };
+    // What a row of the explorer stands for: an object, a prim of one, or
+    // a script or notecard in a prim.
+    struct ExplorerRow
+    {
+        LLUUID      root;
+        LLUUID      prim;
+        LLUUID      item;
+        std::string name;
+        bool        script = false;
+        bool        lua    = false;
+        bool        isItem() const { return item.notNull(); }
+        ALScriptRef ref() const { return ALScriptRef(prim, item); }
     };
     void pumpExplorer();
     void refreshExplorer();
     void explorerContents(const ALScriptWorkspace::Contents& contents);
     void fillExplorer();
-    bool explorerChoice(ALScriptRef& ref, std::string& name) const;
-    void onExplorerChosen();
-    void onExplorerAction(const std::string& action);
+    // The rows chosen, in the list's order.
+    std::vector<ExplorerRow> explorerChoice() const;
+    // The prims the rows chosen as prims or objects stand for, each once,
+    // with the name the queues report under; an object row means every
+    // prim of it. A script's own prim is not among them.
+    std::vector<std::pair<LLUUID, std::string>> containerPrims(const std::vector<ExplorerRow>& rows) const;
+    void                     onExplorerChosen();
+    void                     onExplorerAction(const std::string& action);
+    void                     showExplorerMenu(S32 x, S32 y);
+    bool                     explorerActionEnabled(const std::string& action) const;
+    // A script or notecard made in a prim, named through a dialog and
+    // opened once the region lists it.
+    void explorerCreate(const LLUUID& prim, bool notecard, bool lua);
+    void explorerCreated(const ALScriptWorkspace::Created& made);
+    void explorerRename(const ExplorerRow& row);
+    void explorerDelete(const std::vector<ExplorerRow>& rows);
+    void explorerRecompile(const std::vector<ExplorerRow>& rows);
+    bool isPinned(const LLUUID& root) const;
+    // Pinned or let go; the state and the list are the caller's to bring
+    // up to date.
+    void togglePinned(const LLUUID& root, const std::string& name);
     void runningState(const ALScriptWorkspace::RunningState& state);
 
     // Whether a save may go ahead: the analyzers' check of the text as it
@@ -369,6 +413,13 @@ private:
     LLComboBox*                        mOutputFilter  = nullptr;
     LLScrollListCtrl*                  mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
+    std::vector<Pinned>                mPinned;
+    // A prim whose new item is to be opened once its contents list it,
+    // by name where the region gave no id.
+    LLUUID                             mOpenWhenListedPrim;
+    LLUUID                             mOpenWhenListedItem;
+    std::string                        mOpenWhenListedName;
+    LLHandle<LLContextMenu>            mExplorerMenuHandle;
     // The roots selected in world when last looked, and when.
     std::vector<LLUUID>                mExplorerRoots;
     F64                                mExplorerPolled = 0.0;

@@ -1744,6 +1744,72 @@ Save changes to &quot;[NAME]&quot;?
 
   <notification
    icon="alertmodal.tga"
+   label="New Item"
+   name="ScriptStudioNewItem"
+   type="alertmodal">
+A name for the new [KIND]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Make It"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   label="Rename"
+   name="ScriptStudioRenameItem"
+   type="alertmodal">
+A new name for &quot;[NAME]&quot;:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="name" type="text" value="[NAME]" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Rename"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItem"
+   type="alertmodal">
+Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioDeleteItems"
+   type="alertmodal">
+Delete [COUNT] items from their objects? An item taken out of an object is gone for good.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Delete"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>

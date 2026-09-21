@@ -25,6 +25,8 @@
 #pragma once
 
 #include "llassettype.h"
+#include "llinventory.h"
+#include "llpointer.h"
 #include "llsd.h"
 #include "llsingleton.h"
 #include "lluuid.h"
@@ -114,13 +116,18 @@ public:
         // Whether the agent may see the text at all, and change it.
         bool        viewable   = false;
         bool        modifiable = false;
+        // A notecard rather than a script: its text with the format
+        // stripped, and the items it carries, which go back with it.
+        bool                                     notecard = false;
+        std::vector<LLPointer<LLInventoryItem>> embedded;
         // Why there is no text, where there is none.
         std::string error;
     };
     typedef std::function<void(const Loaded&)> load_callback_t;
 
     // The script's text, fetched if need be. A script the agent may not
-    // view comes back without text and says so.
+    // view comes back without text and says so. A notecard loads the same
+    // way, its text alone.
     void load(const ALScriptRef& ref, load_callback_t callback);
 
     // --- saving and compiling ----------------------------------------------
@@ -141,6 +148,8 @@ public:
         ALScriptRef             ref;
         bool                    success = false;
         bool                    running = false;
+        // A notecard saved rather than a script compiled.
+        bool                    notecard = false;
         LLUUID                  newAssetId;
         std::vector<Diagnostic> diagnostics;
         // The server's lines as they came.
@@ -163,6 +172,31 @@ public:
     // is no region, no capability or no such object; the result otherwise
     // reaches the callback and every listener.
     bool save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error);
+
+    // A notecard's text uploaded in its format with the items it carried;
+    // the result says it was saved, or why not, the same way.
+    bool saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
+                      compile_callback_t callback, std::string& error);
+
+    // A script's text as it goes up again: expanded afresh from its
+    // source where the preprocessor wrapped it or is on, so that its
+    // includes are current, and wrapped again; or as it is. The
+    // preprocessor's errors, where it found any, are the diagnostics and
+    // nothing goes up.
+    struct Prepared
+    {
+        std::string             text;
+        std::vector<Diagnostic> errors;
+    };
+    typedef std::function<void(const Prepared&)> prepared_callback_t;
+    void prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
+                 const std::string& target, prepared_callback_t callback);
+
+    // A script fetched, prepared, and uploaded to compile for a target:
+    // what was asked, or "auto" for what it compiles for now. What the
+    // compiler said reaches the callback and every listener; a script
+    // that cannot go up says why in the result's error.
+    void recompile(const ALScriptRef& ref, const std::string& target, compile_callback_t callback);
 
     // The server's error strings as diagnostics.
     static std::vector<Diagnostic> parseDiagnostics(const LLSD& errors, bool lua);
@@ -213,6 +247,43 @@ public:
     // The scripts and notecards a prim holds, fetched from the region if
     // need be, answered once on the main thread.
     void listContents(const LLUUID& prim, contents_callback_t callback);
+
+    // --- changing what an object holds ---------------------------------------------
+
+    struct Created
+    {
+        LLUUID      prim;
+        // The new item, or null where the region names it only through
+        // the object's contents.
+        LLUUID      item;
+        std::string name;
+        std::string error;
+    };
+    typedef std::function<void(const Created&)> created_callback_t;
+
+    // A new script, in one language and from the region's template, or a
+    // new notecard, in a prim's contents. False with why where nothing was
+    // asked for; the answer otherwise reaches the callback on the main
+    // thread.
+    bool create(const LLUUID& prim, bool notecard, bool lua, const std::string& name, created_callback_t callback, std::string& error);
+    // A new name for a script or notecard, in an object or in inventory.
+    bool rename(const ALScriptRef& ref, const std::string& name, std::string& error);
+    // An item taken out of an object, which is for good, or an inventory
+    // item put in the trash.
+    bool remove(const ALScriptRef& ref, std::string& error);
+
+    // The legacy queues over whole prims, which walk their contents and
+    // report in a window of their own: every script recompiled for a
+    // target ("auto" for what each compiles for now), reset, started or
+    // stopped. Each prim comes with a name for the report.
+    enum class Queue : U8
+    {
+        Recompile,
+        Reset,
+        Start,
+        Stop
+    };
+    bool queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error);
 
     // --- what scripts say ------------------------------------------------------
 

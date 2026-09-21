@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- The right-click menu of Script Studio's explorer: what can be done
+     with the rows chosen, which are scripts and notecards, or the prims
+     and objects that hold them. -->
+<context_menu
+ name="Script studio explorer menu">
+  <menu_item_call label="Open" layout="topleft" name="open">
+    <menu_item_call.on_click function="Explorer.Action" parameter="open" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="open" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="New Script" layout="topleft" name="new_lsl">
+    <menu_item_call.on_click function="Explorer.Action" parameter="new_lsl" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="new_lsl" />
+  </menu_item_call>
+  <menu_item_call label="New Lua Script" layout="topleft" name="new_lua">
+    <menu_item_call.on_click function="Explorer.Action" parameter="new_lua" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="new_lua" />
+  </menu_item_call>
+  <menu_item_call label="New Notecard" layout="topleft" name="new_notecard">
+    <menu_item_call.on_click function="Explorer.Action" parameter="new_notecard" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="new_notecard" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Rename..." layout="topleft" name="rename">
+    <menu_item_call.on_click function="Explorer.Action" parameter="rename" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="rename" />
+  </menu_item_call>
+  <menu_item_call label="Delete..." layout="topleft" name="delete">
+    <menu_item_call.on_click function="Explorer.Action" parameter="delete" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="delete" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Recompile" layout="topleft" name="recompile">
+    <menu_item_call.on_click function="Explorer.Action" parameter="recompile" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="recompile" />
+  </menu_item_call>
+  <menu_item_call label="Reset" layout="topleft" name="reset">
+    <menu_item_call.on_click function="Explorer.Action" parameter="reset" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="reset" />
+  </menu_item_call>
+  <menu_item_call label="Restart" layout="topleft" name="restart">
+    <menu_item_call.on_click function="Explorer.Action" parameter="restart" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="restart" />
+  </menu_item_call>
+  <menu_item_call label="Start" layout="topleft" name="start">
+    <menu_item_call.on_click function="Explorer.Action" parameter="start" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="start" />
+  </menu_item_call>
+  <menu_item_call label="Stop" layout="topleft" name="stop">
+    <menu_item_call.on_click function="Explorer.Action" parameter="stop" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="stop" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Teleport To" layout="topleft" name="teleport">
+    <menu_item_call.on_click function="Explorer.Action" parameter="teleport" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="teleport" />
+  </menu_item_call>
+  <menu_item_call label="Zoom To" layout="topleft" name="zoom">
+    <menu_item_call.on_click function="Explorer.Action" parameter="zoom" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="zoom" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_check label="Pinned" layout="topleft" name="pin">
+    <menu_item_check.on_check function="Explorer.Check" parameter="pin" />
+    <menu_item_check.on_click function="Explorer.Action" parameter="pin" />
+    <menu_item_check.on_enable function="Explorer.Enable" parameter="pin" />
+  </menu_item_check>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Fetch Again" layout="topleft" name="refresh">
+    <menu_item_call.on_click function="Explorer.Action" parameter="refresh" />
+  </menu_item_call>
+  <menu_item_call label="Copy" layout="topleft" name="copy">
+    <menu_item_call.on_click function="Explorer.Action" parameter="copy" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="copy" />
+  </menu_item_call>
+</context_menu>
