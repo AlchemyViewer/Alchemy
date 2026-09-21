@@ -55,7 +55,7 @@ class LLTabContainer;
 class LLTextEditor;
 class LLViewerObject;
 
-// The scripting studio of doc/SCRIPT_STUDIO.md, as far as phase 1 takes it:
+// The scripting studio:
 // scripts from inventory and from objects open in tabs over code editors,
 // saved and compiled through the workspace, with the compiler's problems in
 // a pane that jumps to the line, the region's vocabulary colouring,

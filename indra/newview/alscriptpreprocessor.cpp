@@ -27,6 +27,7 @@
 
 #include "alscriptpreprocessor.h"
 
+#include "allslservice.h"
 #include "alscriptenvelope.h"
 #include "llagent.h"
 #include "lldir.h"
@@ -294,16 +295,27 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
     return unknown ? ALPreprocessor::Found::Pending : ALPreprocessor::Found::No;
 }
 
-ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request)
+ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request, bool optimize)
 {
     static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
     static LLCachedControl<bool> lazy(gSavedSettings, "ALScriptPreprocLazyLists", false);
     static LLCachedControl<bool> compress(gSavedSettings, "ALScriptPreprocCompress", false);
+    static LLCachedControl<bool> optimizer(gSavedSettings, "ALScriptPreprocOptimizer", false);
+    static LLCachedControl<bool> shrink(gSavedSettings, "ALScriptPreprocOptimizerShrinkNames", false);
+    static LLCachedControl<bool> addstrings(gSavedSettings, "ALScriptPreprocOptimizerAddStrings", false);
     ALPreprocessor::Options      options;
     options.lua       = request.lua;
     options.switches  = switches;
     options.lazyLists = lazy;
     options.compress  = compress;
+    // The analyzers see the expanded text before the optimizer has been
+    // at it, so that their positions stay the author's.
+    options.optimize              = optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
+    options.optimizer.shrinknames = shrink;
+    options.optimizer.addstrings  = addstrings;
+    options.optimizer.target      = request.compileTarget == "lsl2"       ? ALLSLOptimizer::Target::LSO
+                                    : request.compileTarget == "lsl-luau" ? ALLSLOptimizer::Target::Luau
+                                                                          : ALLSLOptimizer::Target::Mono;
     options.agentId   = gAgentID.asString();
     options.agentName = isAgentAvatarValid() ? gAgentAvatarp->getFullname() : std::string();
     options.assetId   = request.assetId.isNull() ? std::string() : request.assetId.asString();
@@ -311,9 +323,9 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request)
     return options;
 }
 
-ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std::set<std::string>* wanted)
+ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std::set<std::string>* wanted, bool optimize)
 {
-    ALPreprocessor::Options options = optionsFor(request);
+    ALPreprocessor::Options options = optionsFor(request, optimize);
     options.resolve                 = [this, &request, wanted](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
         return resolve(ask, out, request, wanted);
     };
@@ -322,7 +334,7 @@ ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std
 
 ALPreprocessor::Result ALScriptPreprocessor::runNow(const Request& request)
 {
-    return attempt(request, nullptr);
+    return attempt(request, nullptr, false);
 }
 
 void ALScriptPreprocessor::run(const Request& request, callback_t callback)
@@ -352,7 +364,7 @@ void ALScriptPreprocessor::run(const Request& request, callback_t callback)
 void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
 {
     std::set<std::string>  wanted;
-    ALPreprocessor::Result result = attempt(job->request, &wanted);
+    ALPreprocessor::Result result = attempt(job->request, &wanted, true);
     if (wanted.empty() || ++job->rounds > MAX_ROUNDS)
     {
         if (job->callback)

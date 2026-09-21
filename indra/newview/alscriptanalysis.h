@@ -39,7 +39,7 @@ namespace LL
 }
 
 // The LSL and SLua analyzers, each owned by one worker thread and asked
-// about one script at a time, as doc/SCRIPT_STUDIO.md section 4.3 has it:
+// about one script at a time:
 // what is wrong with it and what it declares, what could go at a
 // position, what is at one, what a call there takes, and where a name is
 // bound and used. A request carries the document's version, the

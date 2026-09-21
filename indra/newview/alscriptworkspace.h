@@ -76,9 +76,8 @@ struct ALScriptRef
 // result parsed into the one diagnostic convention, the running state and
 // reset of a script in an object, and what scripts say as they run. The
 // legacy floaters decided each of these for themselves, four times over
-// for the compile target; the studio and the bridge share this instead
-// (doc/SCRIPT_STUDIO.md, section 3.5). Every answer arrives on the main
-// thread.
+// for the compile target; the studio and the bridge share this instead.
+// Every answer arrives on the main thread.
 class ALScriptWorkspace : public LLSingleton<ALScriptWorkspace>
 {
     LLSINGLETON(ALScriptWorkspace);

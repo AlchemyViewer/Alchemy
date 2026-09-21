@@ -525,8 +525,9 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             request.ref     = ref;
             request.name    = inventory->getName();
             request.assetId = assetId;
-            request.source  = envelope ? envelope->source : text;
-            request.lua     = script_is_lua;
+            request.source        = envelope ? envelope->source : text;
+            request.lua           = script_is_lua;
+            request.compileTarget = compile_target;
             const std::string pumpName = pump.getName();
             auto              answer   = std::make_shared<ALPreprocessor::Result>();
             ALScriptPreprocessor::instance().run(request, [pumpName, answer](const ALPreprocessor::Result& r) {

@@ -68,6 +68,9 @@ public:
         LLUUID      assetId;
         std::string source;
         bool        lua = false;
+        // What the script compiles for, which the optimizer's arithmetic
+        // follows: mono, lsl2 or lsl-luau.
+        std::string compileTarget;
     };
     typedef std::function<void(const ALPreprocessor::Result&)> callback_t;
 
@@ -103,8 +106,8 @@ private:
     // a name not found may still be there.
     std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown) const;
     ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, std::set<std::string>* wanted);
-    ALPreprocessor::Result attempt(const Request& request, std::set<std::string>* wanted);
-    ALPreprocessor::Options optionsFor(const Request& request);
+    ALPreprocessor::Result attempt(const Request& request, std::set<std::string>* wanted, bool optimize);
+    ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
     void                    attemptJob(const std::shared_ptr<Job>& job);
 
     std::map<std::string, Cached>                          mTexts;

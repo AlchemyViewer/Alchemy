@@ -35,7 +35,7 @@
 
 // A place in a document: a line, and a byte offset into it. Zero-based, and
 // the column counts bytes of UTF-8 rather than characters -- the one
-// convention every boundary converts to (doc/SCRIPT_STUDIO.md, section 3.8).
+// convention every boundary converts to.
 // A position the document hands out is on a grapheme boundary; one a caller
 // makes up may not be, and clamp() puts it right.
 struct ALTextPos

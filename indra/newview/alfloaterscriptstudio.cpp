@@ -642,6 +642,11 @@ ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc
     request.assetId = doc.assetId;
     request.source  = doc.editor->text();
     request.lua     = doc.language.lua;
+    request.compileTarget = mCompileTarget->getValue().asString();
+    if (request.compileTarget.empty())
+    {
+        request.compileTarget = doc.language.compileTarget;
+    }
     return request;
 }
 
@@ -691,14 +696,15 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     }
     Doc& doc          = *mDocs[index];
     doc.preprocessing = false;
-    // What the analyzers see from here, with every include in; and what
-    // a save would upload.
-    doc.expanded.valid    = true;
-    doc.expanded.disabled = result.disabled;
-    doc.expanded.version  = version;
-    doc.expanded.text     = result.text;
-    doc.expanded.map      = result.map;
-    doc.expanded.problems = result.problems;
+    // What a save would upload, shown; the analyzers' own expansion is
+    // made again now that every include is in, without the optimizer.
+    doc.uploaded.valid    = true;
+    doc.uploaded.disabled = result.disabled;
+    doc.uploaded.version  = version;
+    doc.uploaded.text     = result.text;
+    doc.uploaded.map      = result.map;
+    doc.uploaded.problems = result.problems;
+    doc.expanded.valid    = false;
     showExpanded(doc, result.text);
     refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -743,7 +749,6 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         showBottom("problems_tab");
         return;
     }
-    doc.uploaded = doc.expanded;
     if (result.disabled)
     {
         // `//fspreprocessor off`: the text goes up as it is, as
@@ -1561,13 +1566,34 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         add(line, column, problem.hasColumn, line, column, error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning, problem.level,
             getString("OriginCompiler"), problem.message, file);
     }
+    // The preprocessor's own word on the text as it stands, and the
+    // optimizer's notes from the last run ahead of a save.
+    const auto preprocessorRow = [&](const ALScriptProblem& problem) {
+        const ALCodeEditor::Mark mark  = problem.severity == ALScriptProblem::Severity::Error     ? ALCodeEditor::Mark::Error
+                                         : problem.severity == ALScriptProblem::Severity::Warning ? ALCodeEditor::Mark::Warning
+                                                                                                  : ALCodeEditor::Mark::Note;
+        const std::string        level = problem.severity == ALScriptProblem::Severity::Error     ? "ERROR"
+                                         : problem.severity == ALScriptProblem::Severity::Warning ? "WARNING"
+                                                                                                  : "NOTE";
+        const bool optimizer = problem.source == ALScriptProblem::Source::Optimizer;
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level,
+            getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), problem.message, problem.file);
+    };
     if (doc.expanded.valid)
     {
         for (const ALScriptProblem& problem : doc.expanded.problems)
         {
-            const bool error = problem.severity == ALScriptProblem::Severity::Error;
-            add(problem.line, problem.column, true, problem.endLine, problem.endColumn, error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning,
-                error ? "ERROR" : "WARNING", getString("OriginPreprocessor"), problem.message, problem.file);
+            preprocessorRow(problem);
+        }
+    }
+    if (doc.uploaded.valid)
+    {
+        for (const ALScriptProblem& problem : doc.uploaded.problems)
+        {
+            if (problem.source == ALScriptProblem::Source::Optimizer)
+            {
+                preprocessorRow(problem);
+            }
         }
     }
     for (const ALScriptProblem& problem : doc.analysis)
@@ -3040,13 +3066,16 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         }
     }
     else if (action == "preproc_enabled" || action == "preproc_switch" || action == "preproc_lazy" || action == "preproc_compress" ||
-             action == "preproc_disk")
+             action == "preproc_disk" || action == "preproc_optimize" || action == "preproc_shrink" || action == "preproc_addstrings")
     {
-        const char* setting = action == "preproc_enabled"  ? "ALScriptPreprocEnabled"
-                              : action == "preproc_switch" ? "ALScriptPreprocSwitch"
-                              : action == "preproc_lazy"   ? "ALScriptPreprocLazyLists"
+        const char* setting = action == "preproc_enabled"    ? "ALScriptPreprocEnabled"
+                              : action == "preproc_switch"   ? "ALScriptPreprocSwitch"
+                              : action == "preproc_lazy"     ? "ALScriptPreprocLazyLists"
                               : action == "preproc_compress" ? "ALScriptPreprocCompress"
-                                                             : "ALScriptPreprocDiskIncludes";
+                              : action == "preproc_optimize" ? "ALScriptPreprocOptimizer"
+                              : action == "preproc_shrink"   ? "ALScriptPreprocOptimizerShrinkNames"
+                              : action == "preproc_addstrings" ? "ALScriptPreprocOptimizerAddStrings"
+                                                               : "ALScriptPreprocDiskIncludes";
         gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
         // What the analyzers see changes with the setting.
         for (std::unique_ptr<Doc>& doc : mDocs)
@@ -3232,6 +3261,18 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "preproc_disk")
     {
         return gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
+    }
+    if (action == "preproc_optimize")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
+    }
+    if (action == "preproc_shrink")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerShrinkNames");
+    }
+    if (action == "preproc_addstrings")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerAddStrings");
     }
     return false;
 }

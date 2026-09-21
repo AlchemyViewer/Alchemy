@@ -80,6 +80,7 @@
     <floater.string name="TabExpandedTip">What the preprocessor made of this script, as the server compiles it; read-only here</floater.string>
     <floater.string name="ExpandedTabName">[NAME] (preprocessed)</floater.string>
     <floater.string name="OriginPreprocessor">Preprocessor</floater.string>
+    <floater.string name="OriginOptimizer">Optimizer</floater.string>
     <floater.string name="Preprocessing">Preprocessing [NAME]...</floater.string>
     <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
     <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched.</floater.string>
@@ -156,6 +157,19 @@
                 <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Optimize" layout="topleft" name="preproc_optimize">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_optimize" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_optimize" />
+                </menu_item_check>
+                <menu_item_check label="Shrink Names" layout="topleft" name="preproc_shrink">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_shrink" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_shrink" />
+                </menu_item_check>
+                <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
                 </menu_item_check>
                 <menu_item_separator layout="topleft" />
                 <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">

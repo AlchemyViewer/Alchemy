@@ -332,6 +332,39 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptPreprocOptimizer</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor runs the LSL optimizer over what it uploads: constants folded, dead code and unused names removed, and every change listed among the problems as a note.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizerAddStrings</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer joins adjacent string literals, which makes a new entry in the constant pool.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocOptimizerShrinkNames</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer shortens every name the script owns; the Preprocessed tab and the notes say which became what.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptPreprocSwitch</key>
         <map>
             <key>Comment</key>
