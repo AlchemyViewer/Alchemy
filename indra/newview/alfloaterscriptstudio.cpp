@@ -266,14 +266,16 @@ namespace
 // static
 bool ALFloaterScriptStudio::wantsScripts()
 {
-    static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptStudioEnabled", false);
+    static LLCachedControl<bool> enabled(gSavedSettings, "ALScriptStudioEnabled", true);
     return enabled;
 }
 
 // static
-ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const std::string& name)
+ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus)
 {
-    // Open somewhere already: that window, brought forward.
+    // Open somewhere already: that window, brought forward -- if a
+    // window may be shown at all, which a restriction on viewing
+    // scripts decides the same way for every window.
     if (!ref.isNull())
     {
         for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
@@ -281,19 +283,99 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
             ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
             if (window && window->indexOf(ref) != NONE)
             {
+                if (!LLFloaterReg::canShowInstance("script_studio", window->getKey()))
+                {
+                    return nullptr;
+                }
                 window->openFloater(window->getKey());
-                window->setFocus(true);
+                if (take_focus)
+                {
+                    window->setFocus(true);
+                }
                 window->openScript(ref, name);
                 return window;
             }
         }
     }
-    ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
+    ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), take_focus ? TAKE_FOCUS_YES : TAKE_FOCUS_NO);
     if (studio && !ref.isNull())
     {
         studio->openScript(ref, name);
     }
     return studio;
+}
+
+// static
+ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
+{
+    ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
+    if (studio && root.notNull())
+    {
+        studio->exploreObject(root);
+    }
+    return studio;
+}
+
+// static
+void ALFloaterScriptStudio::savedElsewhere(const ALScriptRef& ref, const std::string& text)
+{
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
+        const size_t           index  = window ? window->indexOf(ref) : NONE;
+        if (index == NONE)
+        {
+            continue;
+        }
+        Doc& doc = *window->mDocs[index];
+        if (doc.notecard || !doc.loaded || doc.saving)
+        {
+            return;
+        }
+        if (doc.editor->isDirty() && doc.modifiable)
+        {
+            // What was typed here stays a step behind what was saved
+            // there, and the tab stays unsaved.
+            doc.carriedText = text;
+            window->takeCarriedText(doc);
+        }
+        else
+        {
+            // As if loaded afresh: the envelope read, the expanded code
+            // shown, the analyzers asked, and nothing to save.
+            ALScriptWorkspace::Loaded answer;
+            answer.ref        = ref;
+            answer.assetId    = doc.assetId;
+            answer.name       = doc.name;
+            answer.text       = text;
+            answer.language   = doc.language;
+            answer.viewable   = true;
+            answer.modifiable = doc.modifiable;
+            window->loaded(answer);
+        }
+        return;
+    }
+}
+
+// static
+void ALFloaterScriptStudio::itemRemoved(const ALScriptRef& ref)
+{
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
+        const size_t           index  = window ? window->indexOf(ref) : NONE;
+        if (index == NONE)
+        {
+            continue;
+        }
+        window->letGoOf(index);
+        if (!window->mMain && window->mDocs.empty())
+        {
+            // A window popped out for it alone has nothing left to show.
+            window->closeFloater();
+        }
+        return;
+    }
 }
 
 ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
@@ -4534,6 +4616,31 @@ void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& ro
             setStatus(error, true);
         }
     }
+}
+
+void ALFloaterScriptStudio::exploreObject(const LLUUID& root)
+{
+    // Pinned, so that it stays listed once it is no longer selected in
+    // world; in sight; and chosen, so that the buttons act on it.
+    if (!isPinned(root))
+    {
+        togglePinned(root, objectNameOf(gObjectList.findObject(root), getString("ObjectUnnamed")));
+        saveState();
+    }
+    mFolds.setCollapsed("explorer", false);
+    refreshExplorer();
+    mExplorer->deselectAllItems();
+    for (LLScrollListItem* item : mExplorer->getAllData())
+    {
+        const LLSD& value = item->getValue();
+        if (value.isMap() && !value.has("prim") && !value.has("item") && value["root"].asUUID() == root)
+        {
+            item->setSelected(true);
+            break;
+        }
+    }
+    mExplorer->scrollToShowSelected();
+    onExplorerChosen();
 }
 
 bool ALFloaterScriptStudio::isPinned(const LLUUID& root) const

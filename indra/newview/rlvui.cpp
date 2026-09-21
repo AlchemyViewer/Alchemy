@@ -375,7 +375,7 @@ bool RlvUIEnabler::filterFloaterViewXXX(const std::string& strName, const LLSD&)
         RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_NOTECARD);
         return false;
     }
-    else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT)) && (("preview_script" == strName) || ("preview_scriptedit" == strName)) )
+    else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT)) && (("preview_script" == strName) || ("preview_scriptedit" == strName) || ("script_studio" == strName)) )
     {
         RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_SCRIPT);
         return false;

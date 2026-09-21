@@ -3034,6 +3034,7 @@ even though the user gets a free copy.
              layout="topleft"
              left_pad="8"
              name="button publish"
+             tool_tip="Open this object in Script Studio's explorer, or publish it to an external editor when WebSocket sync is on"
              width="140" />
             <filter_editor
              follows="left|top|right"

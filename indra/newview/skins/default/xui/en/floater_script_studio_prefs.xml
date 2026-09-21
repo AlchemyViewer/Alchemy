@@ -255,7 +255,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="studio_enabled"
-             tool_tip="Double-clicking a script in inventory or an object opens it here rather than in the old editor"
+             tool_tip="A script opened from inventory, an object's contents or the build tool opens here; off, the old script editor opens it, for one more release"
              top="12"
              width="400" />
             <check_box

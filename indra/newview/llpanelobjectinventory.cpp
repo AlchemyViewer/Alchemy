@@ -1065,6 +1065,7 @@ void LLTaskLSLBridge::openItem()
 bool LLTaskLSLBridge::removeItem()
 {
     LLFloaterReg::hideInstance("preview_scriptedit", LLSD(mUUID));
+    ALFloaterScriptStudio::itemRemoved(ALScriptRef(mPanel->getTaskUUID(), mUUID));
     return LLTaskInvFVBridge::removeItem();
 }
 

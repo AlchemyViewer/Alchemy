@@ -77,12 +77,25 @@ public:
     AL_VIEW_TYPE(ALFloaterScriptStudio, ALStudioFloater);
 
     // Whether scripts open here rather than in the legacy floaters: the
-    // ALScriptStudioEnabled setting, which is how the two share a viewer
-    // for a release.
+    // ALScriptStudioEnabled setting, on unless someone turned it off,
+    // which is how the two share a viewer for a release.
     static bool wantsScripts();
     // The studio, with this script open in it: the window that has it
-    // open already, else the main one.
-    static ALFloaterScriptStudio* open(const ALScriptRef& ref, const std::string& name = std::string());
+    // open already, else the main one; null where a restriction keeps
+    // the studio from opening.
+    static ALFloaterScriptStudio* open(const ALScriptRef& ref, const std::string& name = std::string(), bool take_focus = true);
+    // The studio, with this object pinned in its explorer and chosen
+    // there: what the build tool's Explore in IDE button means when no
+    // external editor is listening.
+    static ALFloaterScriptStudio* explore(const LLUUID& root);
+    // A script saved from outside the studio -- by an external editor
+    // over the bridge -- with this text: the tab that holds it, if one
+    // does, shows the text as saved. A tab with unsaved changes takes
+    // the text as one more step to undo, so that nothing typed is lost.
+    static void savedElsewhere(const ALScriptRef& ref, const std::string& text);
+    // A script or notecard gone from its object, so that a tab holding
+    // it goes too.
+    static void itemRemoved(const ALScriptRef& ref);
     // Whether this is the main window, which keeps the state and is
     // hidden rather than destroyed when closed; the others are the
     // scripts popped out into windows of their own, gone when closed.
@@ -437,6 +450,8 @@ private:
     void explorerRename(const ExplorerRow& row);
     void explorerDelete(const std::vector<ExplorerRow>& rows);
     void explorerRecompile(const std::vector<ExplorerRow>& rows);
+    // An object pinned, the explorer shown, and the object's row chosen.
+    void exploreObject(const LLUUID& root);
     bool isPinned(const LLUUID& root) const;
     // Pinned or let go; the state and the list are the caller's to bring
     // up to date.

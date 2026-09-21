@@ -30,6 +30,8 @@
 #include "llviewerprecompiledheaders.h"
 #include "llscripteditorws.h"
 
+#include "alfloaterscriptstudio.h"
+
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
@@ -1836,6 +1838,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
             sed->makeEditorPristine();
         }
     }
+    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), content);
 
     return response;
 }

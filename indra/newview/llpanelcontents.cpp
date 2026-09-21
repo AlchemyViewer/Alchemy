@@ -45,6 +45,7 @@
 #include "material_codes.h"
 
 // project includes
+#include "alfloaterscriptstudio.h"
 #include "llagent.h"
 #include "llpanelobjectinventory.h"
 #include "llpreviewscript.h"
@@ -225,8 +226,10 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     bool has_create_cap = region && !region->getCapability("CreateTaskInventoryItem").empty();
     getChildView("button new notecard")->setEnabled(has_create_cap && new_button_enabled);
 
-    // Publish button - enabled only when WS server is configured, and a single editable root object is selected.
-    mPublishButton->setEnabled(LLScriptEditorWSServer::isEnabled() && new_button_enabled);
+    // Explore in IDE: to an external editor over the bridge when that is
+    // on, else to Script Studio when it takes scripts; either way a
+    // single editable root object.
+    mPublishButton->setEnabled((LLScriptEditorWSServer::isEnabled() || ALFloaterScriptStudio::wantsScripts()) && new_button_enabled);
 
     // Sync toggle state to reflect whether the object is currently published.
     if (LLScriptEditorWSServer::isEnabled())
@@ -466,6 +469,20 @@ void LLPanelContents::onClickPublish()
         return;
     }
 
+    const LLUUID object_id = object->getID();
+    if (!LLScriptEditorWSServer::isEnabled())
+    {
+        // No external editor listening: the studio's explorer, with the
+        // object kept in it.
+        if (ALFloaterScriptStudio::wantsScripts())
+        {
+            ALFloaterScriptStudio::explore(object_id);
+        }
+        // Not a toggle this way: nothing to stop.
+        mPublishButton->setToggleState(false);
+        return;
+    }
+
     auto server = LLScriptEditorWSServer::ensureServerRunning();
     if (!server)
     {
@@ -473,7 +490,6 @@ void LLPanelContents::onClickPublish()
         return;
     }
 
-    const LLUUID object_id = object->getID();
     if (server->getConnectionCount())
     { // if we already have at least one connection, then we can toggle the publish state of the object
         if (server->isObjectPublished(object_id))
