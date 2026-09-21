@@ -841,6 +841,7 @@ void ALTextView::setAtoms(std::vector<Atom> atoms)
             const bool kept = std::any_of(atoms.begin(), atoms.end(), [&](const Atom& a) { return a.view == atom.view; });
             if (!kept)
             {
+                letGoOfAtomView(atom.view);
                 removeChild(atom.view);
                 atom.view->die();
             }
@@ -971,8 +972,117 @@ void ALTextView::placeAtomViews()
                 placed = true;
             }
         }
+        if (!placed && atom.view->getVisible())
+        {
+            letGoOfAtomView(atom.view);
+        }
         atom.view->setVisible(placed);
     }
+}
+
+S32 ALTextView::focusedAtom() const
+{
+    for (size_t i = 0; i < mAtoms.size(); ++i)
+    {
+        if (mAtoms[i].view && gFocusMgr.childHasKeyboardFocus(mAtoms[i].view))
+        {
+            return static_cast<S32>(i);
+        }
+    }
+    return -1;
+}
+
+bool ALTextView::atomViewFocused() const
+{
+    return focusedAtom() >= 0;
+}
+
+void ALTextView::letGoOfAtomView(LLView* view)
+{
+    if (!view || !gFocusMgr.childHasKeyboardFocus(view))
+    {
+        return;
+    }
+    if (mTakesFocus)
+    {
+        setFocus(true);
+    }
+    else
+    {
+        gFocusMgr.releaseFocusIfNeeded(view);
+    }
+}
+
+bool ALTextView::focusAtomView(bool forward)
+{
+    const S32 from = focusedAtom();
+    // From the text: the first view at or past the caret, or the last at
+    // or before it. From a view: the one after or before it; past the
+    // ends, the text.
+    S32 index = -1;
+    if (from >= 0)
+    {
+        index = from + (forward ? 1 : -1);
+    }
+    else
+    {
+        for (size_t i = 0; i < mAtoms.size(); ++i)
+        {
+            const bool past = forward ? mAtoms[i].at >= mCaret : mAtoms[i].at <= mCaret;
+            if (past && mAtoms[i].view)
+            {
+                index = static_cast<S32>(i);
+                if (forward)
+                {
+                    break;
+                }
+            }
+        }
+    }
+    for (; index >= 0 && index < static_cast<S32>(mAtoms.size()); index += forward ? 1 : -1)
+    {
+        LLView* view = mAtoms[static_cast<size_t>(index)].view;
+        if (!view)
+        {
+            continue;
+        }
+        // Brought into view first, so that its box is on the screen
+        // before it is looked at.
+        placeCaret(mAtoms[static_cast<size_t>(index)].at, false);
+        mDesiredX = -1.f;
+        scrollToCaret();
+        placeAtomViews();
+        // A control takes it, or the first control in it; a plain view is
+        // passed over.
+        LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
+        if (!ctrl || !ctrl->getEnabled())
+        {
+            continue;
+        }
+        if (!ctrl->focusFirstItem(false, false))
+        {
+            ctrl->setFocus(true);
+        }
+        if (!gFocusMgr.childHasKeyboardFocus(view))
+        {
+            continue;
+        }
+        return true;
+    }
+    if (from >= 0)
+    {
+        // Past the ends: back to the text.
+        if (mTakesFocus)
+        {
+            setFocus(true);
+        }
+        else
+        {
+            gFocusMgr.releaseFocusIfNeeded(mAtoms[static_cast<size_t>(from)].view);
+        }
+        return true;
+    }
+    return false;
 }
 
 ALTextPos ALTextView::snapped(const ALTextPos& pos, const ALTextPos& from) const
@@ -1269,6 +1379,7 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
             {
                 if (mAtoms[i].view)
                 {
+                    letGoOfAtomView(mAtoms[i].view);
                     removeChild(mAtoms[i].view);
                     mAtoms[i].view->die();
                 }
@@ -3408,6 +3519,25 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
     {
         hideFind();
         return true;
+    }
+    // The keyboard among the atoms' views: from one of them, Tab moves
+    // on and Escape comes back to the text; from a read-only text, which
+    // has no tab of its own, Tab goes into them.
+    if ((key == KEY_TAB && (mask & ~MASK_SHIFT) == MASK_NONE) || (key == KEY_ESCAPE && mask == MASK_NONE))
+    {
+        const bool from_view = atomViewFocused();
+        if (from_view && key == KEY_ESCAPE)
+        {
+            if (mTakesFocus)
+            {
+                setFocus(true);
+            }
+            return true;
+        }
+        if (key == KEY_TAB && (from_view || mReadOnly) && focusAtomView((mask & MASK_SHIFT) == 0))
+        {
+            return true;
+        }
     }
     if (mModal && mModal->handleKey(*this, key, mask))
     {

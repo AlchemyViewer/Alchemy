@@ -30,6 +30,8 @@
 #include "llurlaction.h"
 #include "lluicolortable.h"
 
+#include <algorithm>
+
 static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
 
 namespace
@@ -121,22 +123,35 @@ void ALOutputView::followTail()
 
 void ALOutputView::show(const Entry& entry, U32 serial)
 {
+    showAt(entry, serial, mShown.size(), document().lineCount());
+}
+
+void ALOutputView::showAt(const Entry& entry, U32 serial, size_t index, S32 line)
+{
     const Laid laid  = layEntry(entry);
-    S32        first = document().lineCount();
-    if (document().empty() && mShown.empty())
+    S32        first = line;
+    const S32  lines = 1 + static_cast<S32>(std::count(laid.text.begin(), laid.text.end(), '\n'));
+    if (mShown.empty())
     {
+        // The first: the text whole, in place of the one empty line.
         document().replace(ALTextRange(document().start(), document().end()), laid.text);
         first = 0;
+    }
+    else if (index < mShown.size())
+    {
+        // Before another: its lines and the break after them.
+        document().insert(document().lineStart(first), laid.text + "\n");
     }
     else
     {
         document().append("\n" + laid.text);
+        first = document().lineCount() - lines;
     }
     Shown shown;
     shown.serial = serial;
-    shown.lines  = document().lineCount() - first;
+    shown.lines  = lines;
     shown.stamp  = laid.stamp;
-    mShown.push_back(shown);
+    mShown.insert(mShown.begin() + static_cast<std::ptrdiff_t>(index), shown);
 
     if (entry.link && laid.sourceEnd > laid.sourceBegin)
     {
@@ -225,14 +240,16 @@ void ALOutputView::clearEntries()
 void ALOutputView::setCapacity(S32 capacity)
 {
     mCapacity = llmax(1, capacity);
-    if (static_cast<S32>(mEntries.size()) > mCapacity)
+    while (static_cast<S32>(mEntries.size()) > mCapacity)
     {
-        while (static_cast<S32>(mEntries.size()) > mCapacity)
+        const U32 oldest = mSerials.front();
+        mEntries.pop_front();
+        mSerials.pop_front();
+        if (!mShown.empty() && mShown.front().serial == oldest)
         {
-            mEntries.pop_front();
-            mSerials.pop_front();
+            document().removeFirstLines(mShown.front().lines);
+            mShown.pop_front();
         }
-        refill();
     }
 }
 
@@ -242,17 +259,58 @@ void ALOutputView::setFilter(filter_t filter)
     refill();
 }
 
+void ALOutputView::hideAt(size_t index, S32 line)
+{
+    const S32 lines = mShown[index].lines;
+    if (mShown.size() == 1)
+    {
+        document().replace(ALTextRange(document().start(), document().end()), std::string());
+    }
+    else if (index + 1 < mShown.size())
+    {
+        // Its lines and the break after them.
+        document().remove(ALTextRange(document().lineStart(line), document().lineStart(line + lines)));
+    }
+    else
+    {
+        // The last: the break before it and its lines.
+        document().remove(ALTextRange(document().lineEnd(line - 1), document().end()));
+    }
+    mShown.erase(mShown.begin() + static_cast<std::ptrdiff_t>(index));
+}
+
 void ALOutputView::refill()
 {
+    // What is shown brought to what the filter takes now, entry by
+    // entry against what was shown: the ones that stay keep their lines
+    // and their links, the ones the filter drops lose them, the ones it
+    // takes in get theirs -- rather than the whole text again, which a
+    // long log would feel.
     const bool follow = atTail();
-    mShown.clear();
-    setText("");
+    size_t     shown  = 0;
+    S32        line   = 0;
     for (size_t i = 0; i < mEntries.size(); ++i)
     {
-        if (passes(mEntries[i]))
+        const bool was = shown < mShown.size() && mShown[shown].serial == mSerials[i];
+        const bool now = passes(mEntries[i]);
+        if (was && now)
         {
-            show(mEntries[i], mSerials[i]);
+            line += mShown[shown++].lines;
         }
+        else if (was)
+        {
+            hideAt(shown, line);
+        }
+        else if (now)
+        {
+            showAt(mEntries[i], mSerials[i], shown, line);
+            line += mShown[shown++].lines;
+        }
+    }
+    while (shown < mShown.size())
+    {
+        // Shown, but no entry's any more.
+        hideAt(shown, line);
     }
     if (follow)
     {

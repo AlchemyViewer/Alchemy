@@ -182,9 +182,9 @@ public:
     // a font of their own; likewise.
     void setRunProvider(run_provider_t provider);
     void invalidateLine(S32 index);
-    // A space's advance, in the screen's pixels: what a column is, for
-    // whoever draws by columns.
-    F32  columnWidth() { return spaceAdvance(); }
+    // A space's advance in the UI's pixels, as every other x the layout
+    // hands out is: what a column is, for whoever draws by columns.
+    F32  columnWidth();
 
     // The font's line height: what a row is tall unless a box on it is
     // taller, and what a line not yet laid out counts as.

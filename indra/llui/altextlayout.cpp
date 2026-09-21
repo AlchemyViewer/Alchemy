@@ -89,6 +89,12 @@ S32 ALTextLayout::rowHeight() const
     return mFont ? mFont->getLineSpacing() : 0;
 }
 
+F32 ALTextLayout::columnWidth()
+{
+    refreshIfFontsChanged();
+    return spaceAdvance() / mScaleX;
+}
+
 void ALTextLayout::refreshIfFontsChanged()
 {
     if (mFontGeneration == LLFontGL::sResolutionGeneration && mScaleX == LLFontGL::sScaleX && mScaleY == LLFontGL::sScaleY)

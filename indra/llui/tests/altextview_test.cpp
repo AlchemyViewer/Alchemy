@@ -748,4 +748,72 @@ namespace tut
         ensure("italic of the font given is that font's italic face", v.styles()[1].font == LLFontGL::getFontMonospace()->faceFor(LLFontGL::ITALIC));
         ensure("the underline keeps no font of its own", v.styles()[2].font == nullptr && (v.styles()[2].flags & LLFontGL::UNDERLINE));
     }
+    template<> template<>
+    void altextview_object::test<22>()
+    {
+        set_test_name("the keyboard goes among the atoms' views with Tab and back to the text past the ends, with Escape, or when a view is scrolled away");
+        std::string text;
+        for (int line = 0; line < 30; ++line)
+        {
+            text += "line " + ALTextView::atomPlaceholder() + " " + std::to_string(line) + "\n";
+        }
+        ALTextView& v = make(text.c_str(), 400, 100);
+        v.setReadOnly(true);
+        auto button = [](const char* name) {
+            LLButton::Params bp(LLUICtrlFactory::getDefaultParams<LLButton>());
+            bp.name  = name;
+            bp.label = name;
+            bp.rect  = LLRect(0, 16, 40, 0);
+            return LLUICtrlFactory::create<LLButton>(bp);
+        };
+        LLButton* first = button("first");
+        LLButton* second = button("second");
+        LLButton* far = button("far");
+        ALTextView::Atom a;
+        a.at    = ALTextPos(0, 5);
+        a.width = 40;
+        a.view  = first;
+        ALTextView::Atom b = a;
+        b.at    = ALTextPos(1, 5);
+        b.view  = second;
+        ALTextView::Atom c = a;
+        c.at    = ALTextPos(25, 5);
+        c.view  = far;
+        v.setAtoms({ a, b, c });
+        v.placeAtomViews();
+        v.setCaret(ALTextPos(0, 0));
+        ensure("the text has the keyboard", v.hasFocus() && !v.atomViewFocused());
+        key(KEY_TAB);
+        ensure("Tab goes into the first view after the caret", first->hasFocus() && v.atomViewFocused());
+        key(KEY_TAB);
+        ensure("and on to the next", second->hasFocus());
+        key(KEY_TAB);
+        ensure("and to the far one, brought into sight", far->hasFocus() && far->getVisible() && v.scrollY() > 0);
+        key(KEY_TAB);
+        ensure("past the last: the text again", gFocusMgr.getKeyboardFocus() == &v && !v.atomViewFocused());
+        key(KEY_TAB, MASK_SHIFT);
+        ensure("Shift-Tab goes to the last view before the caret", far->hasFocus());
+        key(KEY_TAB, MASK_SHIFT);
+        ensure("and back to the one before", second->hasFocus());
+        key(KEY_ESCAPE);
+        ensure("Escape comes back to the text", gFocusMgr.getKeyboardFocus() == &v);
+        key(KEY_TAB);
+        ensure("Tab from the text goes to the view at the caret, which followed the last one looked at", second->hasFocus());
+        // A view scrolled away hands the keyboard back.
+        key(KEY_ESCAPE);
+        v.setCaret(ALTextPos(1, 0));
+        key(KEY_TAB);
+        ensure("second again", second->hasFocus());
+        v.setScrollY(v.layout().rowHeight() * 20);
+        v.placeAtomViews();
+        ensure("hidden, and the text has the keyboard", !second->getVisible() && gFocusMgr.getKeyboardFocus() == &v);
+        // A view whose atom goes with an edit hands it back too.
+        v.setScrollY(0);
+        v.placeAtomViews();
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_TAB);
+        ensure("first again", first->hasFocus());
+        v.document().remove(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        ensure("its atom gone with the line, the keyboard on the text", v.atoms().size() == 2 && gFocusMgr.getKeyboardFocus() == &v);
+    }
 }

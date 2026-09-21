@@ -170,4 +170,40 @@ namespace tut
         v.append(unsourced);
         ensure_equals("no stamp or source, no brackets", v.text(), std::string("just words"));
     }
+    template<> template<>
+    void aloutputview_object::test<3>()
+    {
+        set_test_name("a filter changing edits only the entries it takes in or drops: the rest keep their lines and their links");
+        ALOutputView& v = make(10);
+        ALOutputView::Entry linked = entry("", "at http://example.com/a");
+        linked.link                = true;
+        v.append(linked);
+        v.append(entry("error", "two\nmore"));
+        v.append(entry("", "three"));
+        v.append(entry("error", "four"));
+        ensure_equals("four shown over five lines", v.document().lineCount(), 5);
+        ensure_equals("two links on the first", v.substitutions().size(), size_t(2));
+        U32 edits = 0;
+        boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
+        v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error"; });
+        ensure_equals("the errors alone", v.text(), std::string("[12:00:00] Thing (error): two\n    more\n[12:00:00] Thing (error): four"));
+        ensure_equals("two edits: the two dropped", edits, U32(2));
+        ensure("the first's links went with it", v.substitutions().empty());
+        edits = 0;
+        v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error" || e.text.find("http") != std::string::npos; });
+        ensure_equals("the linked one back at the top", v.document().line(0), std::string("[12:00:00] Thing: at http://example.com/a"));
+        ensure_equals("one edit: the one taken in", edits, U32(1));
+        ensure_equals("with its links again", v.substitutions().size(), size_t(2));
+        ensure("the URL where it is", v.substitutions()[1].url == "http://example.com/a" && v.substitutions()[1].range.begin == ALTextPos(0, 21));
+        v.setFilter(nullptr);
+        ensure_equals("everything, in order", v.text(), std::string("[12:00:00] Thing: at http://example.com/a\n[12:00:00] Thing (error): two\n    more\n[12:00:00] Thing: three\n[12:00:00] Thing (error): four"));
+        v.setFilter([](const ALOutputView::Entry& e) { return e.text == "three"; });
+        ensure_equals("down to one in the middle", v.text(), std::string("[12:00:00] Thing: three"));
+        v.setFilter([](const ALOutputView::Entry&) { return false; });
+        ensure("down to none", v.text().empty() && v.document().lineCount() == 1);
+        v.setFilter(nullptr);
+        ensure_equals("and back", v.document().lineCount(), 5);
+        v.setCapacity(2);
+        ensure_equals("a smaller capacity drops the oldest with their lines", v.text(), std::string("[12:00:00] Thing: three\n[12:00:00] Thing (error): four"));
+    }
 }

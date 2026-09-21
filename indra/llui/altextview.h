@@ -353,6 +353,17 @@ public:
     // where the box is not: what a frame does before it draws, and what
     // a click on one needs done before the first frame.
     void placeAtomViews();
+    // The keyboard, among the atoms' views: from the text, Tab goes to
+    // the first view after the caret and Shift-Tab to the last before
+    // it, where the text is read-only and takes no tab of its own; from
+    // a view, Tab and Shift-Tab go on to the next and back to the one
+    // before, and past the ends back to the text, as does Escape. A view
+    // that loses its box -- scrolled away, its atom gone -- hands the
+    // keyboard back to the text. Whether one of them has the keyboard.
+    bool atomViewFocused() const;
+    // The keyboard moved to the next or the previous atom's view from
+    // wherever it is, or back to the text past the ends; false with none.
+    bool focusAtomView(bool forward);
 
     // --- the spell check -------------------------------------------------------
 
@@ -632,6 +643,10 @@ private:
     const Substitution* linkAtLocal(S32 x, S32 y);
     const Atom*         atomAtLocal(S32 x, S32 y);
     void                checkLine(S32 line);
+    // The atom whose view has the keyboard, or -1; and the keyboard taken
+    // back from a view about to lose its box.
+    S32                 focusedAtom() const;
+    void                letGoOfAtomView(LLView* view);
 
     ALTextDocument      mDocument;
     ALTextUndo          mUndo;
