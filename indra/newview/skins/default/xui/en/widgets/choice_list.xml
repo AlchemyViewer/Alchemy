@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- A list to choose from on the text engine: the code editor's
+     completions. Read-only, never focused, solid over the text, with
+     the notes in the reading face and the chosen line on a band. -->
+<choice_list
+  name="choice_list"
+  font="Monospace"
+  note_font="SansSerif"
+  mouse_opaque="true"
+  tab_stop="false"
+  takes_focus="false"
+  read_only="true"
+  word_wrap="false"
+  text_color="TextFgColor"
+  text_readonly_color="TextFgColor"
+  bg_color="CodeCompletionBgColor"
+  bg_readonly_color="CodeCompletionBgColor"
+  bg_focus_color="CodeCompletionBgColor"
+  border_color="CodeCompletionBorderColor"
+  cursor_color="TextCursorColor"
+  selection_color="ScrollSelectedBGColor"
+  context_menu=""
+  h_pad="4"
+  v_pad="2"
+  tab_width="4"/>
