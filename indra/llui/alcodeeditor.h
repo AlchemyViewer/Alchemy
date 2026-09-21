@@ -116,6 +116,34 @@ public:
     void                           setDecorations(std::vector<Decoration> decorations);
     const std::vector<Decoration>& decorations() const { return mDecorations; }
 
+    // A stretch coloured by what an analyzer knows it to be, over what
+    // the grammar coloured it: a parameter, a local, a field, a type, a
+    // call to something deprecated, which is struck through. Replaced
+    // whole; an edit slides them as it does the decorations.
+    struct SemanticToken
+    {
+        ALTextRange  range;
+        ALSyntaxKind kind   = ALSyntaxKind::Variable;
+        bool         strike = false;
+    };
+    void                              setSemanticTokens(std::vector<SemanticToken> tokens);
+    const std::vector<SemanticToken>& semanticTokens() const { return mSemantics; }
+
+    // A word shown beside the text without being in it -- a parameter's
+    // name before the argument it is given, a type after a name declared
+    // without one -- in a dim pill the text makes room for. Before the
+    // text at its position, so the caret there sits after it, or after
+    // the text before its position, with the caret before it. Replaced
+    // whole; an edit drops the ones on its lines and slides the rest.
+    struct InlayHint
+    {
+        ALTextPos   at;
+        std::string text;
+        bool        before = true;
+    };
+    void                          setInlayHints(std::vector<InlayHint> hints);
+    const std::vector<InlayHint>& inlayHints() const { return mInlays; }
+
     // The places a name stands, washed over until they are cleared or
     // the caret leaves them all; an edit slides them as it does the
     // decorations.
@@ -415,6 +443,11 @@ private:
     std::vector<Decoration>            mDecorations;
     std::vector<ALTextRange>           mHighlights;
     std::vector<LLVector2>             mSquiggleScratch;
+    std::vector<SemanticToken>         mSemantics;
+    std::vector<InlayHint>             mInlays;
+    // What the layout is told about a line's inlays.
+    void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
+    F32  inlayWidth(const InlayHint& hint) const;
 
     std::vector<FoldRegion> mRegions;
     U32                     mRegionsVersion = 0;

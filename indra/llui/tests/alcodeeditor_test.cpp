@@ -488,4 +488,76 @@ namespace tut
         ensure_equals("the snippet in place of the prefix", f.text(), std::string("for (i = 0; i < n; ++i)\n{\n    \n}"));
         ensure_equals("its first placeholder selected", f.selectedText(), std::string("i = 0"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<13>()
+    {
+        set_test_name("an inlay makes room in the line, the caret sits past a word before the text and before a word after it, and an edit keeps or drops it");
+        ALCodeEditor& e = make("f(a, b)\nlocal x = 1\n", "slua");
+        ALTextLayout& lay = e.layout();
+        const F32 was_a = lay.xOf(0, 2);
+        const F32 was_b = lay.xOf(0, 5);
+        const F32 was_x = lay.xOf(1, 7);
+        const F32 was_after_x = lay.xOf(1, 8);
+        std::vector<ALCodeEditor::InlayHint> hints;
+        hints.push_back({ ALTextPos(0, 2), "name:", true });
+        hints.push_back({ ALTextPos(0, 5), "count:", true });
+        hints.push_back({ ALTextPos(1, 7), ": number", false });
+        e.setInlayHints(hints);
+        ensure_equals("three kept", e.inlayHints().size(), size_t(3));
+        const F32 now_a = lay.xOf(0, 2);
+        ensure("a sits past the word before it", now_a > was_a);
+        ensure("b further still, past two words", lay.xOf(0, 5) - was_b > now_a - was_a);
+        ensure("the line is wider", lay.line(0).width > lay.xOf(0, 7) - 1.f && lay.line(0).width > 7.f * lay.columnWidth());
+        ensure("x's end sits before the word after it", lay.xOf(1, 7) == was_x);
+        ensure("and what follows x moved past the word", lay.xOf(1, 8) > was_after_x);
+        // A click in the word lands at the column it belongs to.
+        ensure_equals("a click in name: is a's column", lay.columnAt(0, 0, (was_a + now_a) * 0.5f, false), 2);
+        // A gap glyph is not a text glyph.
+        S32 gaps = 0;
+        for (const ALTextLayout::Glyph& g : lay.line(0).glyphs) gaps += g.inlay >= 0;
+        ensure_equals("two gaps on the first line", gaps, 2);
+        // Typing at the end of x extends x, and the type after it moves along.
+        e.setCaret(ALTextPos(1, 7));
+        type("y");
+        ensure("the type hint moved past what was typed", e.inlayHints()[2].at == ALTextPos(1, 8));
+        // Typing at the start of a stays before a, and the name before it stays too.
+        e.setCaret(ALTextPos(0, 2));
+        type("z");
+        ensure("the name stays where the argument starts", e.inlayHints()[0].at == ALTextPos(0, 2));
+        ensure("the next name moved along", e.inlayHints()[1].at == ALTextPos(0, 6));
+        // Deleting through the second line's name takes its hint.
+        e.setSelection(ALTextRange(ALTextPos(1, 6), ALTextPos(1, 9)));
+        key(KEY_DELETE);
+        ensure_equals("the cut one is gone", e.inlayHints().size(), size_t(2));
+        // A line put in above moves them down.
+        e.setCaret(ALTextPos(0, 0));
+        key(KEY_RETURN);
+        ensure("moved to the second line", e.inlayHints()[0].at == ALTextPos(1, 2) && e.inlayHints()[1].at == ALTextPos(1, 6));
+        ensure("and laid out there", lay.xOf(1, 2) > was_a);
+        // Replaced whole, with none.
+        e.setInlayHints({});
+        ensure("none left", e.inlayHints().empty());
+        ensure("the line back to its width", lay.xOf(1, 2) == was_a);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<14>()
+    {
+        set_test_name("semantic tokens ride the edits: slid past an insertion, dropped when cut through");
+        ALCodeEditor& e = make("integer n = 1;\nx = n;", "lsl");
+        std::vector<ALCodeEditor::SemanticToken> tokens;
+        tokens.push_back({ ALTextRange(ALTextPos(0, 8), ALTextPos(0, 9)), ALSyntaxKind::Variable, false });
+        tokens.push_back({ ALTextRange(ALTextPos(1, 4), ALTextPos(1, 5)), ALSyntaxKind::Variable, true });
+        e.setSemanticTokens(tokens);
+        ensure_equals("two", e.semanticTokens().size(), size_t(2));
+        e.setCaret(ALTextPos(1, 0));
+        type("y");
+        ensure("the second slid along", e.semanticTokens()[1].range.begin == ALTextPos(1, 5) && e.semanticTokens()[1].range.end == ALTextPos(1, 6));
+        ensure("the first stayed", e.semanticTokens()[0].range.begin == ALTextPos(0, 8));
+        e.setCaret(ALTextPos(0, 9));
+        key(KEY_BACKSPACE);
+        ensure_equals("the first, cut through, is gone", e.semanticTokens().size(), size_t(1));
+        ensure("the survivor is the struck one", e.semanticTokens()[0].strike);
+    }
 }

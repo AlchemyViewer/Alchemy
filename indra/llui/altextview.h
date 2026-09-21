@@ -151,6 +151,8 @@ public:
     // line and the matched bracket follow. hasFocus counts a child.
     bool keyboardOnText() const;
     const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
+    // The colour a kind is drawn in here.
+    const LLColor4& colorForKind(ALSyntaxKind kind) const;
     // The colour table's name for a kind's colour under a prefix:
     // "SyntaxComment", "ScriptComment". Text has none, being the view's
     // own text colour.
@@ -407,7 +409,6 @@ private:
     void drawMapPreview(F32 alpha);
     void drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_top, F32 left, F32 alpha);
     void colorRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha);
-    const LLColor4& colorForKind(ALSyntaxKind kind) const;
     // Laying out is a cache fill, which a const query may cause.
     ALTextLayout& lay() const { return const_cast<ALTextLayout&>(mLayout); }
 

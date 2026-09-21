@@ -212,6 +212,23 @@ F32 ALTextLayout::spaceAdvance()
     return mSpaceAdvance;
 }
 
+void ALTextLayout::setInlayProvider(inlay_provider_t provider)
+{
+    mInlays = std::move(provider);
+    invalidateAll();
+}
+
+void ALTextLayout::invalidateLine(S32 index)
+{
+    if (index < 0 || index >= lineCount())
+    {
+        return;
+    }
+    mLines[index] = Line();
+    mTopsDirty    = true;
+    mContentWidth = -1.f;
+}
+
 void ALTextLayout::layoutLine(S32 index, Line& out)
 {
     out.placed.clear();
@@ -229,11 +246,41 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     // The pen, in the screen's pixels; what is kept is in the UI's.
     F32                   x        = 0.f;
 
+    // What goes beside the text, by column.
+    mInlayScratch.clear();
+    if (mInlays)
+    {
+        mInlays(index, mInlayScratch);
+        std::stable_sort(mInlayScratch.begin(), mInlayScratch.end(), [](const Inlay& a, const Inlay& b) { return a.column < b.column; });
+    }
+    size_t next_inlay = 0;
+    auto   gap        = [&](S32 cluster, F32 width, S32 inlay, bool before) {
+        out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
+        out.glyphs.push_back(Glyph{ cluster, x * inv_x, width * inv_x, inlay, before });
+        x += width;
+        if (!subpixel)
+        {
+            x = static_cast<F32>(ll_round(x));
+        }
+    };
+    // The inlays at a column, as gaps as wide as they said.
+    auto inlays_at = [&](size_t column) {
+        while (next_inlay < mInlayScratch.size() && mInlayScratch[next_inlay].column <= static_cast<S32>(column))
+        {
+            const Inlay& inlay = mInlayScratch[next_inlay++];
+            if (inlay.width > 0.f)
+            {
+                gap(static_cast<S32>(column), inlay.width * mScaleX, inlay.id, inlay.before);
+            }
+        }
+    };
+
     // The text between tabs is shaped a piece at a time, and every tab is a
     // gap to the next stop. The pen moves the way the font's own draw moves
     // it, rounded after every glyph unless the face keeps a subpixel pen, so
     // that what is laid out here is what renderGlyphs puts on the screen.
-    auto shape = [&](size_t begin, size_t end) {
+    // An inlay splits a piece too, so that its gap goes where its column is.
+    auto shape_run = [&](size_t begin, size_t end) {
         if (!face || end <= begin)
         {
             return;
@@ -250,10 +297,22 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
             }
         }
     };
+    auto shape = [&](size_t begin, size_t end) {
+        size_t from = begin;
+        while (next_inlay < mInlayScratch.size() && mInlayScratch[next_inlay].column < static_cast<S32>(end))
+        {
+            const size_t at = static_cast<size_t>(llmax(mInlayScratch[next_inlay].column, static_cast<S32>(from)));
+            shape_run(from, at);
+            inlays_at(at);
+            from = at;
+        }
+        shape_run(from, end);
+    };
     size_t piece = 0;
     for (size_t at = text.find('\t'); at != std::string::npos; at = text.find('\t', piece))
     {
         shape(piece, at);
+        inlays_at(at);
         const F32 stop = (floorf(x / tab_stop) + 1.f) * tab_stop;
         out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
         out.glyphs.push_back(Glyph{ static_cast<S32>(at), x * inv_x, (stop - x) * inv_x });
@@ -261,6 +320,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         piece = at + 1;
     }
     shape(piece, text.size());
+    inlays_at(text.size());
     out.width = x * inv_x;
     if (mContentWidth >= 0.f && x > mContentWidth)
     {
@@ -473,10 +533,18 @@ F32 ALTextLayout::xOf(S32 index, S32 column, S32* row_out)
     const Row& row = entry.rows[r];
     for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
     {
-        if (entry.glyphs[k].cluster >= column)
+        const Glyph& glyph = entry.glyphs[k];
+        if (glyph.cluster < column)
         {
-            return entry.glyphs[k].pen - row.xStart;
+            continue;
         }
+        // An inlay standing before the text at the column: the caret at
+        // the column sits past it, unless the row ends with it.
+        if (glyph.inlay >= 0 && glyph.inlayBefore && glyph.cluster == column && k + 1 < row.glyphEnd)
+        {
+            continue;
+        }
+        return glyph.pen - row.xStart;
     }
     return row.width;
 }

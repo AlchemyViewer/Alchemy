@@ -212,6 +212,7 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     }
     mMarks.assign(document().lineCount(), Mark::None);
     mEditConnection    = document().onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
+    layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) { provideInlays(line, out); });
     mChangedConnection = onTextChanged([this]() {
         if (completionOpen())
         {
@@ -286,6 +287,31 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                        mDecorations.end());
     mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !slide(r, removed, end_after); }),
                       mHighlights.end());
+    mSemantics.erase(std::remove_if(mSemantics.begin(), mSemantics.end(), [&](SemanticToken& t) { return !slide(t.range, removed, end_after); }),
+                     mSemantics.end());
+    // An inlay moves with the text it stands by: one before the text at
+    // its position stays put when something is typed there, since what
+    // is typed is the start of that text; one after the text before it
+    // moves along, since what is typed extends that text. An edit that
+    // takes the position with it takes the inlay.
+    mInlays.erase(std::remove_if(mInlays.begin(), mInlays.end(),
+                                 [&](InlayHint& h) {
+                                     if (removed.empty())
+                                     {
+                                         if (removed.begin < h.at || (removed.begin == h.at && !h.before))
+                                         {
+                                             h.at = slidPast(h.at, removed, end_after);
+                                         }
+                                         return false;
+                                     }
+                                     if (removed.end <= h.at)
+                                     {
+                                         h.at = slidPast(h.at, removed, end_after);
+                                         return false;
+                                     }
+                                     return !(h.at <= removed.begin);
+                                 }),
+                  mInlays.end());
     // The placeholder being typed over becomes what was typed; the others
     // move with the text, and one the edit cut into goes.
     if (!mPlaceholders.empty())
@@ -737,6 +763,51 @@ S32 ALCodeEditor::bracketDepthBefore(S32 line)
 
 void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors)
 {
+    // What the analyzer knows a stretch to be, over the grammar's colour
+    // for it; a comment or a string keeps its own, since a name inside
+    // one is not that name.
+    if (!mSemantics.empty())
+    {
+        auto first = std::lower_bound(mSemantics.begin(), mSemantics.end(), line, [](const SemanticToken& t, S32 l) { return t.range.end.line < l; });
+        if (first != mSemantics.end() && first->range.begin.line <= line)
+        {
+            const std::vector<ALSyntaxToken>& grammar = highlighter().tokens(line);
+            auto                              literal = [&](S32 cluster) {
+                for (const ALSyntaxToken& g : grammar)
+                {
+                    if (g.begin <= cluster && cluster < g.end)
+                    {
+                        return g.kind == ALSyntaxKind::Comment || g.kind == ALSyntaxKind::DocComment || g.kind == ALSyntaxKind::String
+                               || g.kind == ALSyntaxKind::Escape || g.kind == ALSyntaxKind::Preprocessor;
+                    }
+                }
+                return false;
+            };
+            auto token = first;
+            for (size_t k = 0; k < colors.size(); ++k)
+            {
+                const ALTextLayout::Glyph& glyph = laid.glyphs[row.glyphBegin + k];
+                if (glyph.inlay >= 0)
+                {
+                    continue;
+                }
+                const ALTextPos at(line, glyph.cluster);
+                while (token != mSemantics.end() && token->range.begin.line <= line && token->range.end <= at)
+                {
+                    ++token;
+                }
+                if (token == mSemantics.end() || token->range.begin.line > line || !(token->range.begin <= at && at < token->range.end))
+                {
+                    continue;
+                }
+                if (literal(glyph.cluster))
+                {
+                    continue;
+                }
+                colors[k] = LLColor4U(colorForKind(token->kind) % alpha);
+            }
+        }
+    }
     if (!mColorBrackets || !mBracketColorsSet)
     {
         return;
@@ -784,6 +855,78 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
         {
             colors[k] = LLColor4U(mBracketColors[static_cast<size_t>(at[next].second % 3)].get() % alpha);
         }
+    }
+}
+
+// --- what the analyzer knows ----------------------------------------------------------
+
+void ALCodeEditor::setSemanticTokens(std::vector<SemanticToken> tokens)
+{
+    std::stable_sort(tokens.begin(), tokens.end(), [](const SemanticToken& a, const SemanticToken& b) { return a.range.begin < b.range.begin; });
+    mSemantics = std::move(tokens);
+}
+
+void ALCodeEditor::setInlayHints(std::vector<InlayHint> hints)
+{
+    std::stable_sort(hints.begin(), hints.end(), [](const InlayHint& a, const InlayHint& b) { return a.at < b.at; });
+    // The lines whose inlays are not what they were are laid out again;
+    // the rest keep their layout.
+    auto same_line = [](const std::vector<InlayHint>& list, size_t& i, S32 line, std::vector<const InlayHint*>& out) {
+        out.clear();
+        while (i < list.size() && list[i].at.line == line)
+        {
+            out.push_back(&list[i++]);
+        }
+    };
+    size_t                       was = 0, now = 0;
+    std::vector<const InlayHint*> old_line, new_line;
+    while (was < mInlays.size() || now < hints.size())
+    {
+        const S32 line = llmin(was < mInlays.size() ? mInlays[was].at.line : S32_MAX, now < hints.size() ? hints[now].at.line : S32_MAX);
+        same_line(mInlays, was, line, old_line);
+        same_line(hints, now, line, new_line);
+        bool changed = old_line.size() != new_line.size();
+        for (size_t k = 0; !changed && k < old_line.size(); ++k)
+        {
+            changed = old_line[k]->at != new_line[k]->at || old_line[k]->text != new_line[k]->text || old_line[k]->before != new_line[k]->before;
+        }
+        if (changed)
+        {
+            layout().invalidateLine(line);
+        }
+    }
+    mInlays = std::move(hints);
+}
+
+namespace
+{
+    // Around the word of an inlay, in pixels: the pill's inset from the
+    // text either side, and the room inside it.
+    constexpr F32 INLAY_GAP = 2.f;
+    constexpr F32 INLAY_PAD = 3.f;
+}
+
+F32 ALCodeEditor::inlayWidth(const InlayHint& hint) const
+{
+    const LLFontGL* font = getFont();
+    if (!font || hint.text.empty())
+    {
+        return 0.f;
+    }
+    return font->getWidthF32(hint.text) + 2.f * (INLAY_GAP + INLAY_PAD);
+}
+
+void ALCodeEditor::provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const
+{
+    auto first = std::lower_bound(mInlays.begin(), mInlays.end(), line, [](const InlayHint& h, S32 l) { return h.at.line < l; });
+    for (auto it = first; it != mInlays.end() && it->at.line == line; ++it)
+    {
+        ALTextLayout::Inlay inlay;
+        inlay.column = it->at.column;
+        inlay.width  = inlayWidth(*it);
+        inlay.before = it->before;
+        inlay.id     = static_cast<S32>(it - mInlays.begin());
+        out.push_back(inlay);
     }
 }
 
@@ -976,6 +1119,51 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             if (i == mPlaceholderAt)
             {
                 gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
+            }
+        }
+    }
+    // The words beside the text, each in a pill the layout made room for.
+    {
+        const ALTextLayout::Line& laid = layout().line(line);
+        if (row >= 0 && row < static_cast<S32>(laid.rows.size()))
+        {
+            const ALTextLayout::Row& r    = laid.rows[static_cast<size_t>(row)];
+            const LLFontGL*          font = getFont();
+            for (size_t k = r.glyphBegin; k < r.glyphEnd && font; ++k)
+            {
+                const ALTextLayout::Glyph& glyph = laid.glyphs[k];
+                if (glyph.inlay < 0 || glyph.inlay >= static_cast<S32>(mInlays.size()))
+                {
+                    continue;
+                }
+                const InlayHint& hint = mInlays[static_cast<size_t>(glyph.inlay)];
+                const F32        x0   = left + glyph.pen - r.xStart + INLAY_GAP;
+                const F32        x1   = left + glyph.pen - r.xStart + glyph.advance - INLAY_GAP;
+                if (x1 <= static_cast<F32>(text.mLeft) || x0 >= static_cast<F32>(text.mRight))
+                {
+                    continue;
+                }
+                const LLColor4 ink    = textColor();
+                const LLColor4 ground = backgroundColor();
+                const LLColor4 pill   = lerp(ground, ink, 0.12f) % alpha;
+                const LLColor4 word   = lerp(ground, ink, 0.65f) % alpha;
+                gl_rect_2d(static_cast<S32>(x0), screen_top - 1, static_cast<S32>(x1), screen_top - row_h + 1, pill);
+                font->renderUTF8(hint.text, 0, x0 + INLAY_PAD, static_cast<F32>(screen_top - llround(font->getAscenderHeight())), word, LLFontGL::LEFT,
+                                 LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+            }
+        }
+    }
+    // A line through what is deprecated.
+    if (!mSemantics.empty())
+    {
+        auto first = std::lower_bound(mSemantics.begin(), mSemantics.end(), line, [](const SemanticToken& t, S32 l) { return t.range.end.line < l; });
+        for (auto it = first; it != mSemantics.end() && it->range.begin.line <= line; ++it)
+        {
+            F32 x0, x1;
+            if (it->strike && spanOnRow(line, row, it->range, x0, x1))
+            {
+                const S32 y = screen_top - row_h / 2;
+                gl_rect_2d(static_cast<S32>(left + x0), y + 1, static_cast<S32>(left + x1), y, colorForKind(it->kind) % alpha);
             }
         }
     }

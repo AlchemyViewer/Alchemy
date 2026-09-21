@@ -30,6 +30,7 @@
 
 #include <boost/signals2.hpp>
 
+#include <functional>
 #include <vector>
 
 // The layout of a document's lines: each line shaped once, into glyphs with
@@ -51,20 +52,39 @@
 // divides, and LLFontGL::renderGlyphs multiplies back.
 //
 // A tab is a gap: a glyph with no face whose advance reaches the next stop.
-// An atom -- an image or a view in the text -- will be the same gap with a
-// height of its own, when there is one.
+// An inlay -- a word the view shows beside the text without its being in
+// the text, such as a parameter's name before an argument -- is the same
+// gap at a column, as wide as whoever provides it says, which the view
+// then draws its word into. An atom -- an image or a view in the text --
+// will be the same gap with a height of its own, when there is one.
 class ALTextLayout
 {
 public:
     // A glyph as the caret and the hit test see it: the byte of the line it
     // begins at, where its pen sat, and how far the pen moved. Several
     // glyphs may share a cluster; a caret sits only where a cluster begins.
+    // An inlay's gap carries the inlay's id, and whether it stands before
+    // the text at its column -- so the caret at the column sits after it
+    // -- or after the text before the column, with the caret before it.
     struct Glyph
     {
-        S32 cluster = 0;
-        F32 pen     = 0.f;
-        F32 advance = 0.f;
+        S32  cluster     = 0;
+        F32  pen         = 0.f;
+        F32  advance     = 0.f;
+        S32  inlay       = -1;
+        bool inlayBefore = true;
     };
+
+    // What goes beside a line's text: at a byte column, so wide, before
+    // or after the text there, known to the provider by an id.
+    struct Inlay
+    {
+        S32  column = 0;
+        F32  width  = 0.f;
+        bool before = true;
+        S32  id     = -1;
+    };
+    typedef std::function<void(S32 line, std::vector<Inlay>& out)> inlay_provider_t;
 
     // A row of a line: the bytes it holds, the glyphs it holds, and where in
     // the unwrapped line it starts, since the glyphs keep their unwrapped pen.
@@ -102,6 +122,11 @@ public:
     // In spaces.
     void setTabWidth(S32 spaces);
     S32  tabWidth() const { return mTabWidth; }
+    // Asked, as each line is laid out, what goes beside it; the widths
+    // in the UI's pixels. Whoever provides them lays a line out again,
+    // through invalidateLine, when they change.
+    void setInlayProvider(inlay_provider_t provider);
+    void invalidateLine(S32 index);
     // A space's advance, in the screen's pixels: what a column is, for
     // whoever draws by columns.
     F32  columnWidth() { return spaceAdvance(); }
@@ -183,4 +208,6 @@ private:
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
     std::vector<ALShapedGlyph>         mShaped;
+    inlay_provider_t                   mInlays;
+    std::vector<Inlay>                 mInlayScratch;
 };
