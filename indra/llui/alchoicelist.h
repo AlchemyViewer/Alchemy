@@ -93,6 +93,8 @@ public:
     typedef boost::signals2::signal<void(S32 index)> choice_signal_t;
     // A choice picked: double-clicked.
     boost::signals2::connection onPicked(const choice_signal_t::slot_type& slot) { return mPicked.connect(slot); }
+    // Told when the chosen line changes, by a key, a click or a new list.
+    boost::signals2::connection onChosen(const choice_signal_t::slot_type& slot) { return mChosenSignal.connect(slot); }
 
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -121,4 +123,5 @@ private:
     bool                mNoteColorSet = false;
     LLUIColor           mBorderColor;
     choice_signal_t     mPicked;
+    choice_signal_t     mChosenSignal;
 };

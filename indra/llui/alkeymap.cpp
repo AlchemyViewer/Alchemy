@@ -40,7 +40,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "new_line",      "indent",          "unindent",        "undo",             "redo",             "cut",
         "copy",          "paste",           "delete",          "toggle_comment",   "duplicate_line",   "move_line_up",
         "move_line_down", "delete_line",    "fold",            "unfold",           "fold_all",         "unfold_all",
-        "complete",      "go_to_definition", "find_references", "rename",           "find",             "replace",
+        "complete",      "signature_help", "go_to_definition", "find_references", "rename",         "find",             "replace",
         "find_next",     "find_previous",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
@@ -83,16 +83,32 @@ void ALKeymap::unbind(KEY key, MASK mask)
 
 bool ALKeymap::keysFor(ALEditorCommand command, KEY& key, MASK& mask) const
 {
+    bool found = false;
     for (const Binding& binding : mBindings)
     {
-        if (binding.command == command)
+        if (binding.command != command)
         {
-            key  = binding.key;
-            mask = binding.mask;
-            return true;
+            continue;
         }
+#if LL_DARWIN
+        // Command-Space is the system's, and never reaches the viewer:
+        // a Control binding of the same command is the one to show.
+        if (binding.key == ' ' && (binding.mask & MASK_CONTROL))
+        {
+            if (!found)
+            {
+                key   = binding.key;
+                mask  = binding.mask;
+                found = true;
+            }
+            continue;
+        }
+#endif
+        key  = binding.key;
+        mask = binding.mask;
+        return true;
     }
-    return false;
+    return found;
 }
 
 ALEditorCommand ALKeymap::lookup(KEY key, MASK mask) const
@@ -170,6 +186,7 @@ ALKeymap ALKeymap::standard()
     map.bind('[', MASK_CONTROL | MASK_SHIFT, C::Fold);
     map.bind(']', MASK_CONTROL | MASK_SHIFT, C::Unfold);
     map.bind(' ', MASK_CONTROL, C::Complete);
+    map.bind(' ', MASK_CONTROL | MASK_SHIFT, C::SignatureHelp);
     map.bind(KEY_F12, MASK_NONE, C::GoToDefinition);
     map.bind(KEY_F12, MASK_SHIFT, C::FindReferences);
     map.bind(KEY_F2, MASK_NONE, C::Rename);
@@ -205,6 +222,7 @@ ALKeymap ALKeymap::standard()
     map.bind('H', MASK_MAC_CONTROL, C::DeleteLeft);
     map.bind('K', MASK_MAC_CONTROL, C::DeleteToLineEnd);
     map.bind(' ', MASK_MAC_CONTROL, C::Complete);
+    map.bind(' ', MASK_MAC_CONTROL | MASK_SHIFT, C::SignatureHelp);
 #endif
     return map;
 }

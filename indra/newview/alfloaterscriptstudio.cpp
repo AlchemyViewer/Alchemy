@@ -431,6 +431,7 @@ bool ALFloaterScriptStudio::postBuild()
         mSaveRect = false;
     }
     setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
+    showEditorKeys();
     // The toolbar's tips say their keys as the menus have them, in the
     // platform's own spelling: Ctrl+S here, the Command symbol on a Mac.
     const auto keys_in_tip = [this](const char* control, std::initializer_list<const char*> items) {
@@ -936,6 +937,7 @@ void ALFloaterScriptStudio::applyEditorOptions()
             applyEditorOptions(*each->expandedEditor);
         }
     }
+    showEditorKeys();
     saveState();
 }
 
@@ -2259,31 +2261,34 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         }
         if (known->deprecated)
         {
-            text += "\n(deprecated)";
+            text += "\n" + ALCodeEditor::deprecatedNote();
         }
         return true;
     });
-    editor.setCompletionProvider([this, lua](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
-        auto begins = [&prefix](const std::string& word) {
-            if (word.size() < prefix.size())
-            {
-                return false;
-            }
-            for (size_t i = 0; i < prefix.size(); ++i)
-            {
-                if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
-        };
+    editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+        auto begins = [&prefix](const std::string& word) { return ALCodeEditor::matchTier(word, prefix) >= 0; };
+        // An LSL event's handler goes straight inside a state and nowhere
+        // else, so a handler is offered only there; asked once, and only
+        // if one matches.
+        std::optional<bool> in_state;
         for (const Vocab& word : vocabulary(lua))
         {
-            if (begins(word.text))
+            if (!begins(word.text))
             {
-                out.push_back(completionFor(word, lua));
+                continue;
             }
+            if (!lua && word.kind == ALSyntaxKind::Event)
+            {
+                if (!in_state)
+                {
+                    in_state = inStateBody(*raw->editor, at);
+                }
+                if (!*in_state)
+                {
+                    continue;
+                }
+            }
+            out.push_back(completionFor(word, lua));
         }
         // A snippet by its prefix, where a bare word is being typed
         // rather than a member.
@@ -2294,10 +2299,11 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
                 if (begins(snippet.prefix))
                 {
                     ALCodeEditor::Completion c;
-                    c.text    = snippet.prefix;
-                    c.detail  = getString("SnippetDetail") + "  " + snippet.name;
-                    c.kind    = ALSyntaxKind::Control;
-                    c.snippet = snippet.body;
+                    c.text          = snippet.prefix;
+                    c.detail        = getString("SnippetDetail") + "  " + snippet.name;
+                    c.kind          = ALSyntaxKind::Control;
+                    c.snippet       = snippet.body;
+                    c.documentation = snippet.detail;
                     out.push_back(std::move(c));
                 }
             }
@@ -2305,12 +2311,61 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     });
 }
 
+// static
+bool ALFloaterScriptStudio::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
+{
+    // The blocks open at the position, each by what opened it: a state's
+    // is the one after `default` or `state name`. Read off the grammar's
+    // tokens, so that a brace in a string or a comment is none.
+    std::vector<bool> open;
+    std::string       before[2];
+    for (S32 line = 0; line <= at.line && line < editor.document().lineCount(); ++line)
+    {
+        const std::string& text = editor.document().line(line);
+        for (const ALSyntaxToken& token : editor.highlighter().tokens(line))
+        {
+            if (line == at.line && token.begin >= at.column)
+            {
+                break;
+            }
+            if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment)
+            {
+                continue;
+            }
+            const std::string_view word = std::string_view(text).substr(token.begin, token.end - token.begin);
+            if (word.find_first_not_of(" \t") == std::string_view::npos)
+            {
+                continue;
+            }
+            if (token.kind == ALSyntaxKind::Punctuation)
+            {
+                for (const char c : word)
+                {
+                    if (c == '{')
+                    {
+                        open.push_back(before[0] == "default" || before[1] == "state");
+                    }
+                    else if (c == '}' && !open.empty())
+                    {
+                        open.pop_back();
+                    }
+                }
+            }
+            before[1] = std::move(before[0]);
+            before[0] = std::string(word);
+        }
+    }
+    return !open.empty() && open.back();
+}
+
 ALCodeEditor::Completion ALFloaterScriptStudio::completionFor(const Vocab& word, bool lua) const
 {
     ALCodeEditor::Completion c;
-    c.text   = word.text;
-    c.detail = word.detail;
-    c.kind   = word.deprecated ? ALSyntaxKind::Deprecated : word.kind;
+    c.text          = word.text;
+    c.detail        = word.detail;
+    c.kind          = word.kind;
+    c.deprecated    = word.deprecated;
+    c.documentation = word.tooltip;
     if (word.kind == ALSyntaxKind::Event)
     {
         // A handler to fill in: LSL's with its typed parameters as the
@@ -2600,9 +2655,11 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
             for (const ALScriptCompletion& c : result.completions)
             {
                 ALCodeEditor::Completion completion;
-                completion.text   = c.text;
-                completion.detail = c.detail;
-                completion.kind   = c.deprecated ? ALSyntaxKind::Deprecated : syntaxKindOf(c.kind);
+                completion.text          = c.text;
+                completion.detail        = c.detail;
+                completion.kind          = syntaxKindOf(c.kind);
+                completion.deprecated    = c.deprecated;
+                completion.documentation = c.documentation;
                 more.push_back(std::move(completion));
             }
             doc.editor->supplyCompletions(at, std::move(more));
@@ -3996,6 +4053,24 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         args["[SHOWN]"] = "0";
         args["[TOTAL]"] = std::to_string(held);
         mProblems->setCommentText(getString("ProblemsShown", args));
+    }
+}
+
+void ALFloaterScriptStudio::showEditorKeys()
+{
+    // A menu item for an editor command the menu has no key of its own
+    // for shows the keymap's, which is what the editor answers to.
+    const ALKeymap keymap = ALScriptKeymap::current();
+    for (const char* name : { "complete", "signature_help" })
+    {
+        LLMenuItemGL*                        item    = menuBar()->findChild<LLMenuItemGL>(name, true);
+        const std::optional<ALEditorCommand> command = alEditorCommandFromName(name);
+        KEY                                  key     = KEY_NONE;
+        MASK                                 mask    = MASK_NONE;
+        if (item && command && keymap.keysFor(*command, key, mask))
+        {
+            item->setShownAccelerator(key, mask);
+        }
     }
 }
 
@@ -5426,10 +5501,13 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     {
         return;
     }
-    std::string text;
+    std::string      text;
+    std::vector<S32> code_lines;
+    auto             lines_so_far = [&text]() { return static_cast<S32>(std::count(text.begin(), text.end(), '\n')); };
     if (result.hover.found)
     {
         text = result.hover.label;
+        code_lines.push_back(0);
         LLStringUtil::format_map_t args;
         if (result.hover.hasDefinition)
         {
@@ -5443,7 +5521,13 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         }
         if (!result.hover.typeDetail.empty())
         {
-            text += "\n\n" + result.hover.typeDetail;
+            text += "\n\n";
+            const S32 first = lines_so_far();
+            text += result.hover.typeDetail;
+            for (S32 line = first; line <= lines_so_far(); ++line)
+            {
+                code_lines.push_back(line);
+            }
         }
         std::string documentation = result.hover.documentation;
         std::string link          = result.hover.link;
@@ -5473,12 +5557,29 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     {
         text += (text.empty() ? "" : "\n\n") + problems;
     }
-    showSymbol(text, result.hover.found && result.hover.hasDefinition ? result.hover.definitionLine : -1);
+    showSymbol(text, result.hover.found && result.hover.hasDefinition ? result.hover.definitionLine : -1, code_lines);
 }
 
-void ALFloaterScriptStudio::showSymbol(const std::string& text, S32 declared_line)
+void ALFloaterScriptStudio::showSymbol(const std::string& text, S32 declared_line, const std::vector<S32>& code_lines)
 {
     mSymbol->setText(text);
+    std::vector<ALTextView::Style> styles;
+    if (Doc* doc = active(); doc && !code_lines.empty())
+    {
+        // The declaration read as code: its words in the colours the
+        // script's own text gives them.
+        const ALTextRange word = doc->editor->identifierAtCaret();
+        const std::string name = doc->editor->document().text(word);
+        const ALSyntaxKind kind = word.empty() ? ALSyntaxKind::Text : doc->editor->semanticKindAt(word.begin);
+        for (const S32 line : code_lines)
+        {
+            if (line < mSymbol->document().lineCount())
+            {
+                doc->editor->styleAsCode(*mSymbol, line, styles, name, kind);
+            }
+        }
+    }
+    mSymbol->setStyles(std::move(styles));
     const S32 lines = mSymbol->document().lineCount();
     for (S32 line = 0; line < lines; ++line)
     {
@@ -5576,14 +5677,14 @@ void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
     std::string text = word.detail.empty() ? word.text : word.detail;
     if (word.deprecated)
     {
-        text += "  (" + getString("Deprecated") + ")";
+        text += "\n" + ALCodeEditor::deprecatedNote();
     }
     if (!word.tooltip.empty())
     {
         text += "\n\n" + word.tooltip;
     }
     text += "\n" + helpUrl(lua, word.text);
-    showSymbol(text);
+    showSymbol(text, -1, { 0 });
 }
 
 void ALFloaterScriptStudio::reference(Doc& doc)
@@ -7845,6 +7946,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->editor->perform(ALEditorCommand::Complete);
     }
+    else if (doc && action == "signature_help")
+    {
+        doc->editor->perform(ALEditorCommand::SignatureHelp);
+    }
     else if (doc && action == "fold")
     {
         doc->editor->perform(ALEditorCommand::Fold);
@@ -8156,7 +8261,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         return doc && doc->loaded && !doc->notecard && !doc->preprocessing;
     }
-    if (action == "load_file" || action == "toggle_comment" || action == "complete")
+    if (action == "load_file" || action == "toggle_comment" || action == "complete" || action == "signature_help")
     {
         return doc && doc->modifiable;
     }

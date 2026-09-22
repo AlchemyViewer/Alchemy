@@ -210,6 +210,12 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     list.v_pad(2);
     mCompletionList = LLUICtrlFactory::create<ALChoiceList>(list);
     mCompletionList->onPicked([this](S32) { acceptCompletion(); });
+    mCompletionList->onChosen([this](S32) {
+        if (completionOpen())
+        {
+            showCompletionDoc();
+        }
+    });
     addChild(mCompletionList);
 }
 
@@ -1679,6 +1685,8 @@ void ALCodeEditor::hideCompletionList()
         mCompletionList->setChoices({});
     }
     mCompletions.clear();
+    mListedFor.clear();
+    hideCompletionDoc();
 }
 
 void ALCodeEditor::closeCompletion()
@@ -1718,20 +1726,7 @@ void ALCodeEditor::documentCompletions(const ALTextPos& at, std::string_view pre
     {
         seen.insert(c.text);
     }
-    auto begins = [&](std::string_view word) {
-        if (word.size() < prefix.size())
-        {
-            return false;
-        }
-        for (size_t i = 0; i < prefix.size(); ++i)
-        {
-            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    };
+    auto begins = [&](std::string_view word) { return matchTier(word, prefix) >= 0; };
     // The document's own words, other than the one being typed.
     const S32 count = document().lineCount();
     for (S32 l = 0; l < count && out.size() < COMPLETION_CAP; ++l)
@@ -1819,23 +1814,9 @@ void ALCodeEditor::refreshCompletion()
     // What was answered about this word, narrowed to the prefix as typed
     // now; what was known already keeps its place, and what is new about
     // it fills what was empty.
-    auto begins = [&](const std::string& word) {
-        if (word.size() < prefix.size())
-        {
-            return false;
-        }
-        for (size_t i = 0; i < prefix.size(); ++i)
-        {
-            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    };
     for (const Completion& c : mSupplied)
     {
-        if (!begins(c.text))
+        if (matchTier(c.text, prefix) < 0)
         {
             continue;
         }
@@ -1849,6 +1830,10 @@ void ALCodeEditor::refreshCompletion()
                 {
                     have.detail = c.detail;
                     have.kind   = c.kind;
+                }
+                if (have.documentation.empty())
+                {
+                    have.documentation = c.documentation;
                 }
                 break;
             }
@@ -1866,16 +1851,58 @@ void ALCodeEditor::refreshCompletion()
     {
         mCompletionRequest(start, prefix);
     }
-    // What matches the case typed comes first; then the alphabet.
-    std::stable_sort(mCompletions.begin(), mCompletions.end(), [&](const Completion& a, const Completion& b) {
-        const bool a_exact = a.text.compare(0, prefix.size(), prefix) == 0;
-        const bool b_exact = b.text.compare(0, prefix.size(), prefix) == 0;
-        if (a_exact != b_exact)
+    // The best match first: the start of the word as typed, then in
+    // either case, then a part of it, then letters of its parts. Among
+    // equals the script's own names -- a parameter, a local, a field --
+    // then the language's words, then its constants, then what is
+    // deprecated, then the document's bare words; then the alphabet.
+    auto rank = [](const Completion& c) {
+        if (c.deprecated || c.kind == ALSyntaxKind::Deprecated)
         {
-            return a_exact;
+            return 3;
         }
-        return a.text < b.text;
+        switch (c.kind)
+        {
+            case ALSyntaxKind::Parameter:
+            case ALSyntaxKind::Variable:
+            case ALSyntaxKind::Property:
+                return 0;
+            case ALSyntaxKind::Constant:
+                return 2;
+            case ALSyntaxKind::Text:
+                return 4;
+            default:
+                return 1;
+        }
+    };
+    struct Sorted
+    {
+        S32 tier;
+        S32 rank;
+    };
+    std::vector<std::pair<Sorted, Completion>> sorted;
+    sorted.reserve(mCompletions.size());
+    for (Completion& c : mCompletions)
+    {
+        const S32 tier = prefix.empty() ? 0 : matchTier(c.text, prefix);
+        sorted.push_back({ { tier < 0 ? 9 : tier, rank(c) }, std::move(c) });
+    }
+    std::stable_sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        if (a.first.tier != b.first.tier)
+        {
+            return a.first.tier < b.first.tier;
+        }
+        if (a.first.rank != b.first.rank)
+        {
+            return a.first.rank < b.first.rank;
+        }
+        return a.second.text < b.second.text;
     });
+    mCompletions.clear();
+    for (auto& [order, c] : sorted)
+    {
+        mCompletions.push_back(std::move(c));
+    }
     if (mCompletions.size() > COMPLETION_CAP)
     {
         mCompletions.resize(COMPLETION_CAP);
@@ -1886,7 +1913,111 @@ void ALCodeEditor::refreshCompletion()
         return;
     }
     mCompletionRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
-    listCompletions();
+    // The same list again, an answer joined to it, keeps what was chosen
+    // in it; a list for more typed starts from the best.
+    const bool same = completionOpen() && asked == mListedFor;
+    mListedFor      = asked;
+    listCompletions(same);
+}
+
+namespace
+{
+    // Whether a part of a word begins at a byte: after an underscore, a
+    // dot or a colon, at a capital after a small letter, at the last
+    // capital of a run before a small letter, and at a digit.
+    bool partAt(std::string_view word, size_t k)
+    {
+        if (k == 0)
+        {
+            return true;
+        }
+        const unsigned char prev = static_cast<unsigned char>(word[k - 1]);
+        const unsigned char c    = static_cast<unsigned char>(word[k]);
+        if (prev == '_' || prev == '.' || prev == ':')
+        {
+            return c != '_';
+        }
+        if (isupper(c) && islower(prev))
+        {
+            return true;
+        }
+        if (isdigit(c) && !isdigit(prev))
+        {
+            return true;
+        }
+        return isupper(c) && isupper(prev) && k + 1 < word.size() && islower(static_cast<unsigned char>(word[k + 1]));
+    }
+
+    bool sameLetter(char a, char b)
+    {
+        return LLStringOps::toLower(a) == LLStringOps::toLower(b);
+    }
+
+    // The rest of what was typed, from `i`, in the word from `j`: each
+    // letter the next of the word, or the first of a part further on.
+    bool byParts(std::string_view word, size_t j, std::string_view typed, size_t i, bool running)
+    {
+        if (i == typed.size())
+        {
+            return true;
+        }
+        if (running && j < word.size() && sameLetter(word[j], typed[i]) && byParts(word, j + 1, typed, i + 1, true))
+        {
+            return true;
+        }
+        for (size_t k = j; k < word.size(); ++k)
+        {
+            if (partAt(word, k) && sameLetter(word[k], typed[i]) && byParts(word, k + 1, typed, i + 1, true))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+// static
+S32 ALCodeEditor::matchTier(std::string_view word, std::string_view typed)
+{
+    if (typed.empty())
+    {
+        return 0;
+    }
+    if (word.size() < typed.size())
+    {
+        return -1;
+    }
+    if (word.compare(0, typed.size(), typed) == 0)
+    {
+        return 0;
+    }
+    auto same_at = [&](size_t at) {
+        for (size_t i = 0; i < typed.size(); ++i)
+        {
+            if (!sameLetter(word[at + i], typed[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (same_at(0))
+    {
+        return 1;
+    }
+    for (size_t k = 1; k + typed.size() <= word.size(); ++k)
+    {
+        if (partAt(word, k) && same_at(k))
+        {
+            return 2;
+        }
+    }
+    // Past a length where no name is typed by the letters of its parts.
+    if (typed.size() <= 32 && byParts(word, 0, typed, 0, false))
+    {
+        return 3;
+    }
+    return -1;
 }
 
 // static
@@ -1895,6 +2026,10 @@ const char* ALCodeEditor::iconNameOf(const Completion& completion)
     if (!completion.snippet.empty())
     {
         return "Symbol_Snippet";
+    }
+    if (completion.deprecated)
+    {
+        return "Symbol_Deprecated";
     }
     switch (completion.kind)
     {
@@ -1940,6 +2075,10 @@ const char* ALCodeEditor::badgeOf(const Completion& completion)
     {
         return "s";
     }
+    if (completion.deprecated)
+    {
+        return "!";
+    }
     switch (completion.kind)
     {
         case ALSyntaxKind::Function:     return "f";
@@ -1960,9 +2099,25 @@ const char* ALCodeEditor::badgeOf(const Completion& completion)
     }
 }
 
-void ALCodeEditor::listCompletions()
+void ALCodeEditor::listCompletions(bool keep_choice)
 {
-    const S32 was = llmax(0, mCompletionList->chosen());
+    // What was chosen, by its word: an answer joined to the list may put
+    // rows above it, and the row under the finger must stay the word the
+    // finger is on.
+    std::string was;
+    if (keep_choice && mCompletionList->chosen() >= 0 && mCompletionList->chosen() < mCompletionList->count())
+    {
+        was = mCompletionList->choices()[mCompletionList->chosen()].text;
+    }
+    S32 chosen = 0;
+    for (size_t i = 0; i < mCompletions.size() && !was.empty(); ++i)
+    {
+        if (mCompletions[i].text == was)
+        {
+            chosen = static_cast<S32>(i);
+            break;
+        }
+    }
     if (mCompletionList->getFont() != getFont())
     {
         mCompletionList->setFont(getFont());
@@ -1986,7 +2141,11 @@ void ALCodeEditor::listCompletions()
         choice.note  = c.detail;
         choice.icon  = iconOf(c);
         choice.badge = badgeOf(c);
-        if (c.kind != ALSyntaxKind::Text)
+        if (c.deprecated)
+        {
+            choice.color = colorForKind(ALSyntaxKind::Deprecated);
+        }
+        else if (c.kind != ALSyntaxKind::Text)
         {
             choice.color = colorForKind(c.kind);
         }
@@ -1997,9 +2156,126 @@ void ALCodeEditor::listCompletions()
     const LLRect local = getLocalRect();
     const S32    width = llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8));
     mCompletionList->setShape(LLRect(0, 40, width, 0));
-    mCompletionList->setChoices(std::move(choices), was);
+    mCompletionList->setChoices(std::move(choices), chosen);
     placeCompletion();
     mCompletionList->setVisible(true);
+    showCompletionDoc();
+}
+
+void ALCodeEditor::hideCompletionDoc()
+{
+    if (mCompletionDoc)
+    {
+        mCompletionDoc->setVisible(false);
+    }
+}
+
+void ALCodeEditor::showCompletionDoc()
+{
+    const S32 index = chosenCompletion();
+    if (index < 0 || index >= static_cast<S32>(mCompletions.size()) || mCompletions[index].documentation.empty())
+    {
+        hideCompletionDoc();
+        return;
+    }
+    const Completion& c      = mCompletions[index];
+    const LLColor4    ground = ALSurface::ground(backgroundColor(), textColor());
+    const S32         WIDTH  = 320;
+    const S32         PAD    = 6;
+    if (!mCompletionDoc)
+    {
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name                = "completion_doc";
+        p.rect                = LLRect(0, 20, WIDTH, 0);
+        p.read_only           = true;
+        p.word_wrap           = true;
+        p.tab_stop            = false;
+        p.takes_focus         = false;
+        p.mouse_opaque        = true;
+        p.font                = LLFontGL::getFontSansSerif();
+        p.bg_visible          = true;
+        p.bg_color            = ground;
+        p.bg_readonly_color   = ground;
+        p.text_readonly_color = textColor();
+        p.h_pad               = PAD;
+        p.v_pad               = PAD - 2;
+        p.context_menu        = std::string();
+        mCompletionDoc        = LLUICtrlFactory::create<ALTextView>(p);
+        mCompletionDoc->setVisible(false);
+        mCompletionDoc->onLinkClicked([](const ALTextView::Substitution& link) {
+            if (!link.url.empty())
+            {
+                LLUrlAction::clickAction(link.url, false);
+            }
+        });
+        addChild(mCompletionDoc);
+    }
+    mCompletionDoc->setBackgroundColor(ground);
+    mCompletionDoc->setTextColor(textColor());
+    // Its declaration as code, then what it does in the reading face.
+    std::string says = c.detail.empty() ? c.text : c.detail;
+    if (c.deprecated)
+    {
+        says += "\n" + deprecatedNote();
+    }
+    says += "\n" + c.documentation;
+    mCompletionDoc->setText(says);
+    std::vector<ALTextView::Style> styles;
+    styleAsCode(*mCompletionDoc, 0, styles, c.text, c.kind);
+    if (c.deprecated)
+    {
+        static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
+        ALTextView::Style      note;
+        note.range = ALTextRange(ALTextPos(1, 0), mCompletionDoc->document().lineEnd(1));
+        note.color = warning.get();
+        styles.push_back(note);
+    }
+    mCompletionDoc->setStyles(std::move(styles));
+    const S32 lines = mCompletionDoc->document().lineCount();
+    for (S32 line = 0; line < lines; ++line)
+    {
+        mCompletionDoc->linkUrlsOn(line);
+    }
+    // Beside the list where there is room, on the right or else the
+    // left; else under it, or over it; as tall as it says, up to a
+    // limit, the rest cut.
+    const LLRect local = getLocalRect();
+    const LLRect list  = mCompletionList->getRect();
+    const S32    width = llmin(WIDTH, llmax(120, local.getWidth() - 8));
+    mCompletionDoc->setShape(LLRect(0, 40, width, 0));
+    for (S32 line = 0; line < lines; ++line)
+    {
+        mCompletionDoc->layout().line(line);
+    }
+    const S32 height = llmin(mCompletionDoc->layout().totalHeight() + 2 * (PAD - 2) + 2, llmax(list.getHeight(), 200));
+    LLRect    rect;
+    if (list.mRight + 2 + width <= local.mRight)
+    {
+        rect = LLRect(list.mRight + 2, list.mTop, list.mRight + 2 + width, list.mTop - height);
+    }
+    else if (list.mLeft - 2 - width >= local.mLeft)
+    {
+        rect = LLRect(list.mLeft - 2 - width, list.mTop, list.mLeft - 2, list.mTop - height);
+    }
+    else if (list.mBottom - 2 - height >= local.mBottom)
+    {
+        rect = LLRect(list.mLeft, list.mBottom - 2, list.mLeft + width, list.mBottom - 2 - height);
+    }
+    else
+    {
+        rect = LLRect(list.mLeft, list.mTop + 2 + height, list.mLeft + width, list.mTop + 2);
+    }
+    // Kept within the view, top and bottom.
+    if (rect.mBottom < local.mBottom)
+    {
+        rect.translate(0, local.mBottom - rect.mBottom);
+    }
+    if (rect.mTop > local.mTop)
+    {
+        rect.translate(0, local.mTop - rect.mTop);
+    }
+    mCompletionDoc->setShape(rect);
+    mCompletionDoc->setVisible(true);
 }
 
 void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
@@ -2110,6 +2386,26 @@ namespace
         // `\n`, `\t`, `\\`, `\"`, `\xHH`, `\ddd`: one byte each.
         return 1;
     }
+}
+
+bool ALCodeEditor::inProse(const ALTextPos& at)
+{
+    // The byte before the position: what was just typed, where a string
+    // or a comment runs to the end of its line and a position past the
+    // end is at no token.
+    const S32 column = at.column - 1;
+    if (column < 0 || at.line < 0 || at.line >= document().lineCount())
+    {
+        return false;
+    }
+    for (const ALSyntaxToken& token : highlighter().tokens(at.line))
+    {
+        if (token.begin <= column && column < token.end)
+        {
+            return quiet(token.kind);
+        }
+    }
+    return false;
 }
 
 ALTextRange ALCodeEditor::identifierAtCaret() const
@@ -2311,6 +2607,16 @@ bool ALCodeEditor::complete()
         return false;
     }
     openCompletion();
+    return true;
+}
+
+bool ALCodeEditor::signatureHelp()
+{
+    if (!mSignatureRequest)
+    {
+        return false;
+    }
+    mSignatureRequest(caret());
     return true;
 }
 
@@ -2776,7 +3082,11 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         return true;
     }
     const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));
-    if (uni_char == '.' && mAutoComplete && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
+    // In a comment or a string what is typed is prose: the list does not
+    // open on its own there, where a Return meant as a new line would
+    // otherwise put a call into the comment. Asked for, it still opens.
+    const bool prose = mAutoComplete && !was_open && inProse(caret());
+    if (uni_char == '.' && mAutoComplete && !prose && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
     {
         // A member is coming: what there is to choose from, at once.
         openCompletion();
@@ -2785,7 +3095,7 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     {
         closeCompletion();
     }
-    else if (!was_open && mAutoComplete && static_cast<S32>(wordBeforeCaret().size()) >= COMPLETION_AUTO_AT)
+    else if (!was_open && mAutoComplete && !prose && static_cast<S32>(wordBeforeCaret().size()) >= COMPLETION_AUTO_AT)
     {
         openCompletion();
     }
@@ -2804,6 +3114,10 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
     if (cardShown() && mCard->getRect().pointInRect(x, y))
+    {
+        return LLUICtrl::handleMouseDown(x, y, mask);
+    }
+    if (mCompletionDoc && mCompletionDoc->getVisible() && mCompletionDoc->getRect().pointInRect(x, y))
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
@@ -2877,21 +3191,21 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     // A mark in the gutter says what is on its line: every problem there.
     if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
     {
-        const S32   line = posAtLocal(text.mLeft, y, false).line;
-        std::string says;
+        const S32                line = posAtLocal(text.mLeft, y, false).line;
+        std::vector<CardProblem> problems;
         for (const Decoration& d : mDecorations)
         {
             const ALTextRange range = d.range.normalised();
             if (!d.message.empty() && range.begin.line <= line && line <= range.end.line)
             {
-                says += (says.empty() ? "" : "\n") + d.message;
+                problems.push_back({ d.message, d.color });
             }
         }
-        if (says.empty())
+        if (problems.empty())
         {
             return ALTextView::handleToolTip(x, y, mask);
         }
-        showCard(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), says);
+        showCard(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), std::string(), problems);
         return true;
     }
     if (cardShown() && mCard->getRect().pointInRect(x, y))
@@ -2904,20 +3218,12 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         return ALTextView::handleToolTip(x, y, mask);
     }
     const ALTextPos at = posAtLocal(x, y, false);
-    std::string     says;
-    ALTextRange     about;
-    // A problem under the mouse says what it is; else the word does.
-    for (const Decoration& d : mDecorations)
-    {
-        const ALTextRange range = d.range.normalised();
-        if (!d.message.empty() && range.begin <= at && at < range.end)
-        {
-            says  = d.message;
-            about = range;
-            break;
-        }
-    }
-    const ALTextRange word = identifierAt(at);
+    // A problem under the mouse says what it is, and the word what it is
+    // as well: what is wrong with a call is read against what it takes.
+    ALTextRange                    about;
+    const std::vector<CardProblem> problems = problemsUnder(at, about);
+    std::string                    says;
+    const ALTextRange              word = identifierAt(at);
     // A string literal says its own size, anywhere in it -- the space
     // after its comma as much as the word before -- since what the
     // analyzer has to say about one is that it is a string, which the
@@ -2929,14 +3235,14 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         if (!size.empty())
         {
             says  = alSaid("CodeStringHead", "string") + "\n" + size;
-            about = literal;
+            about = about.empty() ? literal : ALTextRange(std::min(about.begin, literal.begin), std::max(about.end, literal.end));
         }
     }
     if (says.empty() && mHover && !word.empty())
     {
         if (mHover(at, document().text(word), says))
         {
-            about = word;
+            about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
         }
     }
     if (says.empty() && !word.empty())
@@ -2951,7 +3257,7 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             if (!mHoverAnswer.empty())
             {
                 says  = mHoverAnswer;
-                about = word;
+                about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
             }
         }
         else if (mHoverRequest)
@@ -2962,15 +3268,84 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             mHoverRequest(word.begin, document().text(word));
         }
     }
-    if (says.empty())
+    if (says.empty() && problems.empty())
     {
         return ALTextView::handleToolTip(x, y, mask);
     }
-    showCard(about, says);
+    showCard(about, says, problems);
     return true;
 }
 
-void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says)
+std::vector<ALCodeEditor::CardProblem> ALCodeEditor::problemsUnder(const ALTextPos& at, ALTextRange& about) const
+{
+    std::vector<CardProblem> problems;
+    for (const Decoration& d : mDecorations)
+    {
+        const ALTextRange range = d.range.normalised();
+        if (!d.message.empty() && range.begin <= at && at < range.end)
+        {
+            problems.push_back({ d.message, d.color });
+            about = about.empty() ? range : ALTextRange(std::min(about.begin, range.begin), std::max(about.end, range.end));
+        }
+    }
+    return problems;
+}
+
+// static
+const std::string& ALCodeEditor::deprecatedNote()
+{
+    static const std::string note = alSaid("CodeDeprecated", "(deprecated)");
+    return note;
+}
+
+ALSyntaxKind ALCodeEditor::semanticKindAt(const ALTextPos& at) const
+{
+    auto found = std::upper_bound(mSemantics.begin(), mSemantics.end(), at, [](const ALTextPos& pos, const SemanticToken& t) { return pos < t.range.begin; });
+    if (found == mSemantics.begin())
+    {
+        return ALSyntaxKind::Text;
+    }
+    --found;
+    return found->range.begin <= at && at < found->range.end ? found->kind : ALSyntaxKind::Text;
+}
+
+void ALCodeEditor::styleAsCode(const ALTextView& view, S32 line, std::vector<ALTextView::Style>& styles, std::string_view name, ALSyntaxKind kind)
+{
+    const std::string& text = view.document().line(line);
+    std::vector<ALSyntaxToken> tokens;
+    if (std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar())
+    {
+        ALSyntaxState state = grammar->initialState();
+        grammar->lexLine(text, state, tokens, highlighter().words());
+    }
+    if (tokens.empty())
+    {
+        ALTextView::Style whole;
+        whole.range = ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(text.size())));
+        whole.font  = getFont();
+        styles.push_back(whole);
+        return;
+    }
+    // The tokens cover the line without a gap, so each carries the face.
+    for (const ALSyntaxToken& token : tokens)
+    {
+        ALTextView::Style one;
+        one.range = ALTextRange(ALTextPos(line, token.begin), ALTextPos(line, token.end));
+        one.font  = getFont();
+        ALSyntaxKind shown = token.kind;
+        if (shown == ALSyntaxKind::Text && kind != ALSyntaxKind::Text && !name.empty() && std::string_view(text).substr(token.begin, token.end - token.begin) == name)
+        {
+            shown = kind;
+        }
+        if (shown != ALSyntaxKind::Text)
+        {
+            one.color = colorForKind(shown);
+        }
+        styles.push_back(std::move(one));
+    }
+}
+
+void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems)
 {
     static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
     // The card is one of the studio's small floating things, and they
@@ -3010,24 +3385,64 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says)
     }
     mCard->setBackgroundColor(ground);
     mCard->setTextColor(textColor());
-    if (cardShown() && about == mCardAbout && says == mCard->text())
+    // The problems, a line or more each, then a blank line, then what the
+    // word is, its first line the head.
+    std::string                                 all;
+    std::vector<std::pair<S32, const LLColor4*>> problem_lines;
+    S32                                         line_count = 0;
+    for (const CardProblem& problem : problems)
+    {
+        if (!all.empty())
+        {
+            all += "\n";
+        }
+        all += problem.message;
+        const S32 made = 1 + static_cast<S32>(std::count(problem.message.begin(), problem.message.end(), '\n'));
+        for (S32 i = 0; i < made; ++i)
+        {
+            problem_lines.emplace_back(line_count++, &problem.color);
+        }
+    }
+    S32 head_line = -1;
+    if (!says.empty())
+    {
+        if (!all.empty())
+        {
+            all += "\n\n";
+            line_count += 1;
+        }
+        head_line = line_count;
+        all += says;
+    }
+    if (cardShown() && about == mCardAbout && all == mCard->text())
     {
         // The mouse resting on again: the card is up already.
         return;
     }
     mCardAbout = about;
-    // The words: the first line in the editor's face, a note about
-    // deprecation in the warning colour, every URL a link.
-    mCard->setText(says);
+    // The words: each problem in its colour, the head as code, a note
+    // about deprecation in the warning colour, every URL a link.
+    mCard->setText(all);
     std::vector<ALTextView::Style> styles;
-    ALTextView::Style              head;
-    head.range = ALTextRange(ALTextPos(0, 0), mCard->document().lineEnd(0));
-    head.font  = getFont();
-    styles.push_back(head);
-    const S32 lines = mCard->document().lineCount();
-    for (S32 line = 0; line < lines; ++line)
+    for (const auto& [line, color] : problem_lines)
     {
-        if (mCard->document().line(line).find("(deprecated)") != std::string::npos)
+        ALTextView::Style one;
+        one.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+        one.color = *color;
+        styles.push_back(one);
+    }
+    if (head_line >= 0)
+    {
+        // The name in the head coloured as the text colours it where the
+        // analyzer said what it is: a global, a parameter, a function of
+        // the script's own, which the grammar alone does not know.
+        const ALTextRange word = mMouseX >= 0 ? identifierAt(posAtLocal(mMouseX, mMouseY, false)) : identifierAt(about.begin);
+        styleAsCode(*mCard, head_line, styles, document().text(word), word.empty() ? ALSyntaxKind::Text : semanticKindAt(word.begin));
+    }
+    const S32 lines = mCard->document().lineCount();
+    for (S32 line = head_line + 1; line < lines && head_line >= 0; ++line)
+    {
+        if (mCard->document().line(line).find(deprecatedNote()) != std::string::npos)
         {
             ALTextView::Style note;
             note.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
@@ -3135,7 +3550,9 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
     {
         return;
     }
-    showCard(word, text);
+    ALTextRange                    about;
+    const std::vector<CardProblem> problems = problemsUnder(under, about);
+    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems);
 }
 
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
@@ -3321,6 +3738,10 @@ void ALCodeEditor::draw()
         // Over the card rather than under it, so that its own ground
         // cannot paint the frame out along the edge it shares.
         gl_rect_2d(mCard->getRect(), ALSurface::frame(textColor(), getDrawContext().mAlpha), false);
+    }
+    if (mCompletionDoc && mCompletionDoc->getVisible())
+    {
+        gl_rect_2d(mCompletionDoc->getRect(), ALSurface::frame(textColor(), getDrawContext().mAlpha), false);
     }
 }
 

@@ -365,6 +365,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	     where they are not the same number, and what it is written as
 	     only where the escapes make that longer. -->
 	<string name="CodeStringHead">string</string>
+	<string name="CodeDeprecated">(deprecated)</string>
 	<string name="CodeStringBytesA">[COUNT] byte</string>
 	<string name="CodeStringBytesB">[COUNT] bytes</string>
 	<string name="CodeStringCharactersA">[COUNT] character</string>

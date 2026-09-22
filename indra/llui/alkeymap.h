@@ -88,6 +88,7 @@ enum class ALEditorCommand : U8
     FoldAll,
     UnfoldAll,
     Complete,
+    SignatureHelp,
     GoToDefinition,
     FindReferences,
     Rename,

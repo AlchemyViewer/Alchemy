@@ -2173,6 +2173,8 @@ bool ALTextView::perform(ALEditorCommand command)
             return performFold(command);
         case C::Complete:
             return complete();
+        case C::SignatureHelp:
+            return signatureHelp();
         case C::GoToDefinition:
         case C::FindReferences:
         case C::Rename:

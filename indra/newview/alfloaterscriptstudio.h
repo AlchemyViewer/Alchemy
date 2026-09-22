@@ -390,6 +390,8 @@ private:
     // What the pane's rows say a level is, and what the compiler's own
     // word for one means.
     static const char*  levelName(Doc::Level level);
+    // The keymap's keys beside the menu's editor commands that have none.
+    void                showEditorKeys();
     static Doc::Level   levelOf(const std::string& said);
     static Doc::Level   levelOf(ALScriptProblem::Severity severity);
     static ALCodeEditor::Mark markOf(Doc::Level level);
@@ -421,6 +423,9 @@ private:
         std::string body;
     };
     const std::vector<Snippet>& snippets(bool lua);
+    // Whether a position of an LSL script is straight inside a state,
+    // where an event's handler goes.
+    static bool                 inStateBody(ALCodeEditor& editor, const ALTextPos& at);
     // A word of the vocabulary as a completion: a function with its
     // call, an event as a handler to fill in, a constant as itself.
     ALCodeEditor::Completion completionFor(const Vocab& word, bool lua) const;
@@ -532,7 +537,9 @@ private:
     // The inspector's words about the symbol at the caret: the text, with
     // every URL in it a link, and the line it says the symbol is
     // declared on a link to the line, where it says one.
-    void                          showSymbol(const std::string& text, S32 declared_line = -1);
+    // The inspector's text; the lines given are code, styled as the
+    // active script's editor would colour them.
+    void                          showSymbol(const std::string& text, S32 declared_line = -1, const std::vector<S32>& code_lines = {});
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void takeCarriedText(Doc& doc);

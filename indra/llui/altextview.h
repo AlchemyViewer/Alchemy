@@ -614,6 +614,8 @@ protected:
     void armTripleClick();
     // Completion was asked for.
     virtual bool complete() { return false; }
+    // What the call at the caret takes, asked for again.
+    virtual bool signatureHelp() { return false; }
     // What the map shows beside a line: a mark's colour, where the
     // subclass has one for it.
     virtual bool mapMark(S32 line, LLColor4& color) const { return false; }

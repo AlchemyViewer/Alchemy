@@ -61,6 +61,7 @@
     <panel.string name="cmd_fold_all">Fold all</panel.string>
     <panel.string name="cmd_unfold_all">Unfold all</panel.string>
     <panel.string name="cmd_complete">Complete</panel.string>
+    <panel.string name="cmd_signature_help">Parameter Info</panel.string>
     <panel.string name="cmd_go_to_definition">Go to definition</panel.string>
     <panel.string name="cmd_find_references">Find references</panel.string>
     <panel.string name="cmd_rename">Rename symbol</panel.string>

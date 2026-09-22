@@ -160,6 +160,7 @@ void ALChoiceList::choose(S32 index)
     // The caret is the chosen line: what the ruler marks, and what is
     // kept in sight.
     setCaret(ALTextPos(mChosen, 0));
+    mChosenSignal(mChosen);
 }
 
 void ALChoiceList::moveChoice(S32 by, bool wrap)

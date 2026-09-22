@@ -812,4 +812,137 @@ namespace tut
         type("\ny()\nend");
         ensure_equals("tabs in and out", e.text(), std::string("\tif x then\n\t\ty()\n\tend"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<22>()
+    {
+        set_test_name("completion: not in comments or strings, by the parts of a word, the script's own first, the choice kept by its word, its documentation beside it");
+        // Prose is not completed on its own; asked for, it is.
+        ALCodeEditor& e = make("integer counter;\n");
+        e.setCaret(e.document().end());
+        type("// the cou");
+        ensure("not in a comment", !e.completionOpen());
+        type("\n\"cou");
+        ensure("not in a string", !e.completionOpen());
+        key(' ', MASK_CONTROL);
+        ensure("asked for, it opens", e.completionOpen());
+        key(KEY_ESCAPE);
+        type("\"\ncou");
+        ensure("in code, it opens", e.completionOpen());
+        key(KEY_ESCAPE);
+
+        // The tiers.
+        ensure_equals("start as typed", ALCodeEditor::matchTier("llSay", "llS"), 0);
+        ensure_equals("start in either case", ALCodeEditor::matchTier("llSay", "LLs"), 1);
+        ensure_equals("a part", ALCodeEditor::matchTier("llSay", "say"), 2);
+        ensure_equals("a part after an underscore", ALCodeEditor::matchTier("PRIM_POSITION", "pos"), 2);
+        ensure_equals("the letters of parts", ALCodeEditor::matchTier("llSetPos", "setpos"), 2);
+        ensure_equals("initials", ALCodeEditor::matchTier("llSetPos", "sp"), 3);
+        ensure_equals("initials, one needing a second look", ALCodeEditor::matchTier("llSetSpeed", "sp"), 2);
+        ensure_equals("a member", ALCodeEditor::matchTier("ll.SetPos", "ll.pos"), 3);
+        ensure_equals("not the middle of a part", ALCodeEditor::matchTier("llSay", "ay"), -1);
+        ensure_equals("nor a stray letter", ALCodeEditor::matchTier("llSay", "sx"), -1);
+
+        // A provider's words matched by their parts, ranked.
+        e.setText("");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            const char* words[] = { "llSay", "llSetPos", "llSensor", "SAY_CHANNEL", "saying" };
+            const ALSyntaxKind kinds[] = { ALSyntaxKind::Function, ALSyntaxKind::Function, ALSyntaxKind::Function, ALSyntaxKind::Constant, ALSyntaxKind::Variable };
+            for (size_t i = 0; i < 5; ++i)
+            {
+                if (ALCodeEditor::matchTier(words[i], prefix) >= 0)
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = words[i];
+                    c.kind = kinds[i];
+                    c.documentation = std::string("What ") + words[i] + " does.";
+                    out.push_back(c);
+                }
+            }
+        });
+        type("say");
+        ensure("open on three letters of a part", e.completionOpen());
+        std::string listed;
+        for (const ALCodeEditor::Completion& c : e.completions()) listed += " " + c.text;
+        ensure_equals("the start first, then either case, then a part", listed, std::string(" saying SAY_CHANNEL llSay"));
+        ensure("the chosen one's documentation beside the list", e.findChild<ALTextView>("completion_doc") &&
+                                                                     e.findChild<ALTextView>("completion_doc")->getVisible() &&
+                                                                     e.findChild<ALTextView>("completion_doc")->text().find("What saying does.") != std::string::npos);
+        key(KEY_DOWN);
+        ensure("it follows the choice", e.findChild<ALTextView>("completion_doc")->text().find("What SAY_CHANNEL does.") != std::string::npos);
+
+        // An answer joining the list keeps the choice on its word.
+        ALCodeEditor::Completion late;
+        late.text = "sayAgain";
+        late.kind = ALSyntaxKind::Variable;
+        e.supplyCompletions(ALTextPos(0, 0), { late });
+        ensure("the answer is in", e.completions().size() == 4 && e.completions()[0].text == "sayAgain");
+        ensure_equals("the choice is still SAY_CHANNEL", e.completions()[e.chosenCompletion()].text, std::string("SAY_CHANNEL"));
+        // More typed starts from the best.
+        type("i");
+        ensure_equals("narrowed to the best", e.completions()[e.chosenCompletion()].text, std::string("saying"));
+        key(KEY_ESCAPE);
+        ensure("the documentation goes with the list", !e.findChild<ALTextView>("completion_doc")->getVisible());
+
+        // A deprecated function completes as a function.
+        e.setText("");
+        e.setCompletionProvider([](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ALCodeEditor::Completion c;
+            c.text       = "llOldThing";
+            c.detail     = "llOldThing(integer n)";
+            c.kind       = ALSyntaxKind::Function;
+            c.deprecated = true;
+            if (ALCodeEditor::matchTier(c.text, prefix) >= 0)
+            {
+                out.push_back(c);
+            }
+        });
+        type("llOld");
+        ensure("offered", e.completionOpen() && e.completions()[0].deprecated);
+        key(KEY_RETURN);
+        ensure_equals("with its brackets and its parameter", e.text(), std::string("llOldThing(n)"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<23>()
+    {
+        set_test_name("a card over a problem says the problem and the word both, the word's head coloured as code");
+        ALCodeEditor& e = make("llSay(0, x);\n");
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& text) {
+            if (word != "llSay")
+            {
+                return false;
+            }
+            text = "integer llSay(integer channel, string msg)\nSays something.";
+            return true;
+        });
+        ALCodeEditor::Decoration d;
+        d.range   = ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5));
+        d.message = "Too few arguments";
+        d.color   = LLColor4::red;
+        e.setDecorations({ d });
+        const LLRect text = e.textRect();
+        S32          row;
+        const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text.mTop - e.layout().rowHeight() / 2;
+        e.handleHover(x, y, MASK_NONE);
+        ensure("taken", e.handleToolTip(x, y, MASK_NONE));
+        const ALTextView& card = *e.card();
+        ensure_equals("the problem, a blank, then the word", card.text(), std::string("Too few arguments\n\ninteger llSay(integer channel, string msg)\nSays something."));
+        ensure("the problem in its colour", !card.styles().empty() && card.styles()[0].range.begin.line == 0 && card.styles()[0].color == LLColor4::red);
+        // The head's words: `integer` a type, `llSay` in the text's own
+        // colour or a function's, in the editor's face either way.
+        bool typed = false, faced = true;
+        for (const ALTextView::Style& style : card.styles())
+        {
+            if (style.range.begin.line != 2)
+            {
+                continue;
+            }
+            faced = faced && style.font == e.getFont();
+            typed = typed || (style.range.begin.column == 0 && style.color && *style.color == e.colorForKind(ALSyntaxKind::Type));
+        }
+        ensure("the head in the editor's face", faced);
+        ensure("its type coloured as a type", typed);
+    }
 }

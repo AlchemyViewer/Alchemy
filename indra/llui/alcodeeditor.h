@@ -256,6 +256,11 @@ public:
         // A snippet rather than a word: accepting it puts this body in
         // place of the prefix, with its placeholders to tab through.
         std::string  snippet;
+        // What it does, shown beside the list while it is the one chosen.
+        std::string  documentation;
+        // Struck from the language: marked so on the list and last in it,
+        // but completed as what it is -- a function with its brackets.
+        bool         deprecated = false;
         // The mark before it on the list, where the provider has one;
         // else the icon of its kind, or a badge where the icons are not
         // to be had.
@@ -264,6 +269,14 @@ public:
     // The icon a kind wears on the list -- Symbol_Function and the rest,
     // looked up once each -- and the badge, a letter, where there is no
     // image provider to look them up in.
+    // How well what was typed matches a word, best first, or -1 for not
+    // at all: 0 its start as typed, 1 its start in either case, 2 a run
+    // of it from where one of its parts begins -- `Say` in `llSay`,
+    // `listen` in `llListen` -- and 3 a letter at the start of each of
+    // several parts, runs of each after -- `setpos` or `sp` in
+    // `llSetPos`. The parts begin after an underscore or a dot, at a
+    // capital after a small letter, and at a digit.
+    static S32          matchTier(std::string_view word, std::string_view typed);
     static const char*  iconNameOf(const Completion& completion);
     static LLUIImagePtr iconOf(const Completion& completion);
     static const char*  badgeOf(const Completion& completion);
@@ -319,6 +332,9 @@ public:
     // caret's is the one it is on or at the end of.
     ALTextRange identifierAt(const ALTextPos& pos) const;
     ALTextRange identifierAtCaret() const;
+    // Whether what was typed just before a position is in a comment or a
+    // string, by the grammar's tokens: prose, which nothing completes.
+    bool        inProse(const ALTextPos& at);
     // The whole string literal a position is in, quotes and all: the run
     // of string and escape tokens around it, carried across lines while
     // one begins or ends inside a string, so that a long string is one
@@ -367,16 +383,34 @@ public:
     typedef std::function<void(const ALTextPos& at, std::string_view word)> hover_request_t;
     void setHoverRequest(hover_request_t request) { mHoverRequest = std::move(request); }
     void supplyHover(const ALTextPos& at, const std::string& text);
-    // What is said of the word or the problem the mouse rests on, in a
-    // card over the text: the first line in the editor's own face,
-    // whatever follows in the reading face under it, a note about
-    // deprecation in the warning colour, and every URL in it a link. It
-    // stays while the mouse is on what it is about or on the card, and
-    // goes with a key, an edit, a scroll or a click elsewhere.
-    void        showCard(const ALTextRange& about, const std::string& says);
+    // What is said of the problems and the word the mouse rests on, in a
+    // card over the text: each problem first, in its squiggle's colour;
+    // then what the word is -- its first line in the editor's own face,
+    // coloured as the text would colour it, and whatever follows in the
+    // reading face -- a note about deprecation in the warning colour,
+    // and every URL a link. It stays while the mouse is on what it is
+    // about or on the card, and goes with a key, an edit, a scroll or a
+    // click elsewhere.
+    struct CardProblem
+    {
+        std::string message;
+        LLColor4    color;
+    };
+    void        showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems = {});
     void        hideCard();
     bool        cardShown() const;
     ALTextView* card() const { return mCard; }
+    // A line of another view styled as code: in this editor's face, each
+    // token in the colour this editor's grammar and theme give it, and
+    // `name`, where given, in the colour of `kind` -- a declaration's
+    // name, which the grammar alone does not know.
+    void        styleAsCode(const ALTextView& view, S32 line, std::vector<ALTextView::Style>& styles, std::string_view name = std::string_view(),
+                            ALSyntaxKind kind = ALSyntaxKind::Text);
+    // What a card says of something deprecated, on a line of its own:
+    // whoever writes the words puts this, and the card colours it.
+    static const std::string& deprecatedNote();
+    // What the analyzer made of the name at a position, else Text.
+    ALSyntaxKind semanticKindAt(const ALTextPos& at) const;
 
     // --- signature help ------------------------------------------------------------
 
@@ -427,6 +461,7 @@ protected:
     bool performFold(ALEditorCommand command) override;
     bool canFold(ALEditorCommand command) const override;
     bool complete() override;
+    bool signatureHelp() override;
     bool performSymbol(ALEditorCommand command) override;
     bool canSymbol(ALEditorCommand command) const override;
     bool mapMark(S32 line, LLColor4& color) const override;
@@ -460,11 +495,18 @@ private:
     void openCompletion();
     void refreshCompletion();
     void placeCompletion();
-    void listCompletions();
+    // The list shown; the one chosen kept by its word where the list is
+    // still about what was typed, else the best.
+    void listCompletions(bool keep_choice);
+    // What the chosen completion does, beside the list, or nothing.
+    void showCompletionDoc();
+    void hideCompletionDoc();
     // Out of sight, but still about the word it was asked about, for an
     // answer that may yet come.
     void hideCompletionList();
     void drawSignature(const LLRect& text);
+    // The problems squiggled under a position, and the stretch they span.
+    std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
     void documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out);
 
@@ -542,6 +584,10 @@ private:
     signature_request_t     mSignatureRequest;
     symbol_request_t        mSymbolRequest;
     ALChoiceList*           mCompletionList = nullptr;
+    ALTextView*             mCompletionDoc  = nullptr;
+    // What the list was last made for, the head and the prefix: a new
+    // list for the same is the old one with an answer joined to it.
+    std::string             mListedFor;
     std::vector<Completion> mCompletions;
     // The identifier the list is narrowing, which the choice replaces;
     // and the name before the dot before it, where there is one, whose
