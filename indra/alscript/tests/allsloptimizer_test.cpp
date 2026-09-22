@@ -603,7 +603,7 @@ namespace tut
             "            g = 1;\n"
             "        }\n"
             "        integer i;\n"
-            "        for (i = both(llAbs(g)); i < 9; ++i) g++;\n"
+            "        for (i = both(llAbs(g)), g = 0; i < 9; ++i) g++;\n"
             "        while (both(llAbs(g)) < 9) g++;\n"
             "        if (g) g = 0; else if (both(llAbs(g))) g = 2;\n"
             "    }\n"
@@ -611,7 +611,8 @@ namespace tut
         const ALLSLInliner::Result above = ALLSLInliner::run(heads);
         auto got = [&above](const char* text) { return above.text.find(text) != std::string::npos; };
         ensure("above the if: " + above.text, got("        integer _t_1 = llAbs(g);\n        if ((_t_1 + _t_1) > 3)"));
-        ensure("above the for: " + above.text, got("        integer _t_2 = llAbs(g);\n        for (i = (_t_2 + _t_2); i < 9; ++i) g++;"));
+        ensure("above the for, an assignment after the call's part not minded: " + above.text,
+               got("        integer _t_2 = llAbs(g);\n        for (i = (_t_2 + _t_2), g = 0; i < 9; ++i) g++;"));
         ensure("the while keeps its call: " + above.text, got("while (both(llAbs(g)) < 9) g++;"));
         ensure("so does the else-if: " + above.text, got("else if (both(llAbs(g))) g = 2;"));
         ensure_equals("two went", above.inlined, 2);

@@ -684,13 +684,16 @@ namespace
                     case NODE_IF_STATEMENT: scanned = static_cast<LSLIfStatement*>(holder)->getCheckExpr(); break;
                     case NODE_FOR_STATEMENT:
                         // The first part's expression the call is in may
-                        // assign at its root, as a statement's may.
+                        // assign at its root, as a statement's may; the
+                        // ones after it run after the call and are not
+                        // looked at.
                         scanned = static_cast<LSLForStatement*>(holder)->getInitExprs();
                         for (LSLASTNode* init = scanned ? scanned->getChild(0) : nullptr; init; init = init->getNext())
                         {
                             if (isInside(call, init))
                             {
                                 root = init;
+                                break;
                             }
                         }
                         break;
@@ -700,7 +703,26 @@ namespace
                 {
                     return false;
                 }
-                for (LSLASTNode* n : nodesOf(scanned))
+                std::vector<LSLASTNode*> evaluated;
+                if (shape == NODE_FOR_STATEMENT)
+                {
+                    for (LSLASTNode* init = scanned->getChild(0); init; init = init->getNext())
+                    {
+                        for (LSLASTNode* n : nodesOf(init))
+                        {
+                            evaluated.push_back(n);
+                        }
+                        if (init == root)
+                        {
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    evaluated = nodesOf(scanned);
+                }
+                for (LSLASTNode* n : evaluated)
                 {
                     if (n->getNodeType() != NODE_EXPRESSION || isInside(n, call))
                     {
