@@ -27,6 +27,7 @@
 #include "alvimkeymap.h"
 
 #include "alcodeeditor.h"
+#include "alsaid.h"
 #include "altextsearch.h"
 #include "llclipboard.h"
 #include "llstring.h"
@@ -341,6 +342,30 @@ std::vector<ALVimKeymap::Input> ALVimKeymap::decodeInputs(std::string_view text)
 
 // --- what the outside sees -------------------------------------------------------------
 
+// static
+std::string ALVimKeymap::said(const char* key, const std::string& english, const LLStringUtil::format_map_t& args)
+{
+    return args.empty() ? alSaid(key, english) : alSaid(key, english, args);
+}
+
+// static
+std::string ALVimKeymap::substitutionsSaid(S32 count, S32 lines)
+{
+    const LLStringUtil::format_map_t args{ { "[COUNT]", std::to_string(count) }, { "[LINES]", std::to_string(lines) } };
+    return lines == 1 ? said("VimSubstitutionsOneLine", "[COUNT] substitutions on 1 line", args) : said("VimSubstitutions", "[COUNT] substitutions on [LINES] lines", args);
+}
+
+// static
+std::string ALVimKeymap::matchesSaid(S32 count, S32 lines)
+{
+    const LLStringUtil::format_map_t args{ { "[COUNT]", std::to_string(count) }, { "[LINES]", std::to_string(lines) } };
+    if (count == 1)
+    {
+        return said("VimOneMatch", "1 match on 1 line", args);
+    }
+    return lines == 1 ? said("VimMatchesOneLine", "[COUNT] matches on 1 line", args) : said("VimMatches", "[COUNT] matches on [LINES] lines", args);
+}
+
 bool ALVimKeymap::inserting() const
 {
     return mMode == Mode::Insert || mMode == Mode::Replace;
@@ -348,29 +373,31 @@ bool ALVimKeymap::inserting() const
 
 std::string ALVimKeymap::status() const
 {
-    const std::string recording = mRecording ? std::string("recording @") + mRecording + " " : std::string();
+    // Asked for every frame the band is drawn: the words come from a
+    // cache, and the map is only made where a word goes into them.
+    const std::string recording = mRecording ? said("VimRecording", "recording @[REGISTER]", { { "[REGISTER]", std::string(1, mRecording) } }) + " " : std::string();
     switch (mMode)
     {
-        case Mode::Insert:      return recording + "-- INSERT --";
-        case Mode::Replace:     return recording + "-- REPLACE --";
-        case Mode::Visual:      return recording + "-- VISUAL --";
-        case Mode::VisualLine:  return recording + "-- VISUAL LINE --";
-        case Mode::VisualBlock: return recording + "-- VISUAL BLOCK --";
+        case Mode::Insert:      return recording + said("VimModeInsert", "-- INSERT --");
+        case Mode::Replace:     return recording + said("VimModeReplace", "-- REPLACE --");
+        case Mode::Visual:      return recording + said("VimModeVisual", "-- VISUAL --");
+        case Mode::VisualLine:  return recording + said("VimModeVisualLine", "-- VISUAL LINE --");
+        case Mode::VisualBlock: return recording + said("VimModeVisualBlock", "-- VISUAL BLOCK --");
         case Mode::Command:
         case Mode::Search:      return utf8Of(mLineKind) + mLine;
         case Mode::Confirm:
         {
-            if (mConfirming.at >= mConfirming.edits.size())
-            {
-                return recording + "replace with  (y/n/a/q/l)?";
-            }
             // The question, saying how many lines the match runs over
             // where it runs over more than one, since the selection is
             // the only other sign of that.
-            const auto&       edit  = mConfirming.edits[mConfirming.at];
-            const ALTextRange match = edit.first.normalised();
-            const S32         lines = match.end.line - match.begin.line + 1;
-            return recording + "replace with " + edit.second + (lines > 1 ? " (over " + std::to_string(lines) + " lines)" : std::string()) + " (y/n/a/q/l)?";
+            const bool                 have  = mConfirming.at < mConfirming.edits.size();
+            const ALTextRange          match = have ? mConfirming.edits[mConfirming.at].first.normalised() : ALTextRange();
+            const S32                  lines = match.end.line - match.begin.line + 1;
+            LLStringUtil::format_map_t args;
+            args["[WITH]"]  = have ? mConfirming.edits[mConfirming.at].second : std::string();
+            args["[COUNT]"] = std::to_string(lines);
+            return recording + (lines > 1 ? said("VimConfirmReplaceLines", "replace with [WITH] (over [COUNT] lines) (y/n/a/q/l)?", args)
+                                          : said("VimConfirmReplace", "replace with [WITH] (y/n/a/q/l)?", args));
         }
         case Mode::Normal:
         default:
@@ -577,7 +604,7 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs)
 {
     if (mPlaying >= 100)
     {
-        say("E169: Command too recursive", true);
+        say(said("VimTooRecursive", "E169: Command too recursive"), true);
         return false;
     }
     ++mPlaying;
@@ -838,7 +865,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     const std::vector<std::string>& history = historyOf(':');
                     if (history.empty())
                     {
-                        say("E30: No previous command line", true);
+                        say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
                         return true;
                     }
                     for (S32 n = 0; n < count; ++n)
@@ -1710,7 +1737,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         case 'N':
             if (mSearchPattern.empty())
             {
-                say("E35: No previous regular expression", true);
+                say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
             }
             else
             {
@@ -2057,7 +2084,7 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             const auto mark = mMarks.find(static_cast<char>(arg));
             if (mark == mMarks.end())
             {
-                say("E20: Mark not set", true);
+                say(said("VimMarkNotSet", "E20: Mark not set"), true);
                 m.moved = false;
                 return m;
             }
@@ -2451,7 +2478,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 if (pieces.size() == 1 && last > first)
                 {
-                    say(std::to_string(last - first + 1) + " lines yanked");
+                    say(said("VimLinesYanked", "[COUNT] lines yanked", { { "[COUNT]", std::to_string(last - first + 1) } }));
                 }
                 moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
             }
@@ -2511,7 +2538,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
                     if (last > first)
                     {
-                        say(std::to_string(last - first + 1) + " fewer lines");
+                        say(said("VimFewerLines", "[COUNT] fewer lines", { { "[COUNT]", std::to_string(last - first + 1) } }));
                     }
                 }
             }
@@ -2602,7 +2629,8 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
             if (last > first)
             {
-                say(std::to_string(last - first + 1) + " lines " + (op == '>' ? ">" : "<") + "ed 1 time");
+                say(said(op == '>' ? "VimLinesShiftedRight" : "VimLinesShiftedLeft", op == '>' ? "[COUNT] lines >ed 1 time" : "[COUNT] lines <ed 1 time",
+                         { { "[COUNT]", std::to_string(last - first + 1) } }));
             }
             return;
         }
@@ -2710,7 +2738,7 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
     const Register        reg = fetch(name);
     if (reg.text.empty())
     {
-        say("E353: Nothing in register " + std::string(1, name ? name : '"'), true);
+        say(said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } }), true);
         return;
     }
     const ALTextPos from = view.caret();
@@ -3052,12 +3080,12 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, nullptr, error, wholes);
     if (!error.empty())
     {
-        say("E486: " + error, true);
+        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
         return false;
     }
     if (matches.empty())
     {
-        say("E486: Pattern not found: " + pattern, true);
+        say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         return false;
     }
     ALTextPos from = cursor(view);
@@ -3419,7 +3447,7 @@ void ALVimKeymap::endConfirming(ALTextView& view)
     }
     if (mConfirming.made > 1)
     {
-        say(std::to_string(mConfirming.made) + " substitutions on " + std::to_string(mConfirming.lines) + " line" + (mConfirming.lines == 1 ? "" : "s"));
+        say(substitutionsSaid(mConfirming.made, mConfirming.lines));
     }
     const bool changed = mConfirming.made > 0;
     mConfirming        = Confirming();
@@ -3694,14 +3722,14 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         {
             return;
         }
-        say("E518: Unknown option: " + args, true);
+        say(said("VimUnknownOption", "E518: Unknown option: [OPTION]", { { "[OPTION]", args } }), true);
         return;
     }
     if (mHooks.command && mHooks.command(view, name, args))
     {
         return;
     }
-    say("E492: Not an editor command: " + line, true);
+    say(said("VimNotACommand", "E492: Not an editor command: [LINE]", { { "[LINE]", line } }), true);
 }
 
 bool ALVimKeymap::addToNumber(ALTextView& view, S64 by)
@@ -3848,7 +3876,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     // come.
     if (spec.empty())
     {
-        say("E35: No previous regular expression", true);
+        say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
         return false;
     }
     const ALTextDocument& d   = view.document();
@@ -3873,7 +3901,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     if (pattern.empty())
     {
-        say("E35: No previous regular expression", true);
+        say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
         return false;
     }
     mSearchPattern   = pattern;
@@ -3899,7 +3927,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
-        say("E486: " + error, true);
+        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
         return false;
     }
     std::vector<S32> lines;
@@ -3913,7 +3941,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     }
     if (lines.empty())
     {
-        say("E486: Pattern not found: " + pattern, true);
+        say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         return false;
     }
     if (command.empty())
@@ -3921,7 +3949,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         // Nothing to do to them: the last one is where the caret goes,
         // and how many there were is said.
         moveTo(view, ALTextPos(lines.back(), firstNonBlankColumn(d, lines.back())));
-        say(std::to_string(lines.size()) + " line" + (lines.size() == 1 ? "" : "s"));
+        say(lines.size() == 1 ? said("VimOneLine", "1 line") : said("VimLines", "[COUNT] lines", { { "[COUNT]", std::to_string(lines.size()) } }));
         return true;
     }
     // One step to undo for the lot; an asking :s among the commands
@@ -3948,7 +3976,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         // An error part way: what was gathered from the lines before it
         // is not asked about, as vim stops there too; said, since the
         // error alone would not say so.
-        say(mMessage + " -- nothing substituted", true);
+        say(said("VimNothingSubstituted", "[MESSAGE] -- nothing substituted", { { "[MESSAGE]", mMessage } }), true);
     }
     if (!mConfirming.edits.empty() && !mMessageError)
     {
@@ -4666,7 +4694,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     {
         if (mSearchPattern.empty())
         {
-            say("E35: No previous regular expression", true);
+            say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
             return false;
         }
         pattern = mSearchPattern;
@@ -4707,7 +4735,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         }
         if (pattern.empty())
         {
-            say("E35: No previous regular expression", true);
+            say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
             return false;
         }
         // The replacement as it reads with ~ put in, which is what the
@@ -4758,14 +4786,14 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
-        say("E486: " + error, true);
+        say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
         return false;
     }
     if (matches.empty())
     {
         if (!quiet)
         {
-            say("E486: Pattern not found: " + pattern, true);
+            say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         }
         return false;
     }
@@ -4794,7 +4822,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const S32 count = static_cast<S32>(edits.size());
     if (count_only)
     {
-        say(std::to_string(count) + " match" + (count == 1 ? "" : "es") + " on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));
+        say(matchesSaid(count, lines));
         return false;
     }
     if (asking && !view.isReadOnly())
@@ -4835,7 +4863,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
     if (count > 1)
     {
-        say(std::to_string(count) + " substitutions on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));
+        say(substitutionsSaid(count, lines));
     }
     return true;
 }

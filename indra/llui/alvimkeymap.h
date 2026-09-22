@@ -312,6 +312,12 @@ private:
     void noteVisualOperation(const Span& span, S32 lines_hint = -1);
 
     void say(const std::string& message, bool error = false);
+    // What the mode says, in the skin's words where the skin has them
+    // (strings.xml, keys Vim*), else in vim's own English; [NAME]s
+    // filled in from the map either way.
+    static std::string said(const char* key, const std::string& english, const LLStringUtil::format_map_t& args = {});
+    static std::string substitutionsSaid(S32 count, S32 lines);
+    static std::string matchesSaid(S32 count, S32 lines);
     void bump() { ++mGeneration; }
 
     Mode  mMode = Mode::Normal;

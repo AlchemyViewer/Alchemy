@@ -26,6 +26,7 @@
 
 #include "alxuiedit.h"
 
+#include "alsaid.h"
 #include "alxuicatalog.h"
 #include "alxuiselection.h"
 
@@ -251,7 +252,7 @@ bool ALXUIEdit::writeFile(const std::string& path, std::string_view text, std::s
 {
     if (path.empty())
     {
-        error = "no file to write";
+        error = alSaid("XUIEditNoFile", "no file to write");
         return false;
     }
 
@@ -259,14 +260,14 @@ bool ALXUIEdit::writeFile(const std::string& path, std::string_view text, std::s
     llofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out.good())
     {
-        error = "could not open " + path;
+        error = alSaid("XUIEditCannotOpen", "could not open [PATH]", { { "[PATH]", path } });
         return false;
     }
     out.write(text.data(), (std::streamsize)text.size());
     out.close();
     if (!out.good())
     {
-        error = "could not write " + path;
+        error = alSaid("XUIEditCannotWrite", "could not write [PATH]", { { "[PATH]", path } });
         return false;
     }
     return true;
@@ -867,14 +868,14 @@ bool ALXUIEdit::setText(const path_t& path, const std::string& text)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
     for (pugi::xml_node child : node.children())
     {
         if (child.type() == pugi::node_element)
         {
-            mError = std::string("the text of ") + node.name() + " is written around its children";
+            mError = alSaid("XUIEditTextAroundChildren", "the text of [NAME] is written around its children", { { "[NAME]", node.name() } });
             return false;
         }
     }
@@ -883,7 +884,7 @@ bool ALXUIEdit::setText(const path_t& path, const std::string& text)
     Span whole;
     if (!extentOf(node, body, whole))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
 
@@ -907,7 +908,7 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
     pugi::xml_node node = resolve(parent);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -917,7 +918,7 @@ bool ALXUIEdit::insertElement(const path_t& parent, const std::string& xml)
     bool opens = false;
     if (!contentPoint(node, at, length, indent, opens))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
 
@@ -952,14 +953,14 @@ bool ALXUIEdit::removeElement(const path_t& path)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
     Span body;
     Span whole;
     if (!extentOf(node, body, whole))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
     splice(whole, std::string_view());
@@ -1114,13 +1115,13 @@ bool ALXUIEdit::moveElement(const path_t& path, const path_t& parent)
     note(Did::MovedElement, path);
     if (path.empty() || within(path, parent))
     {
-        mError = "an element cannot be moved into itself";
+        mError = alSaid("XUIEditMoveIntoItself", "an element cannot be moved into itself");
         return false;
     }
     std::string xml;
     if (!liftElement(path, xml))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
 
@@ -1141,13 +1142,13 @@ bool ALXUIEdit::duplicateElement(const path_t& path)
     note(Did::AddedElement, path);
     if (path.empty())
     {
-        mError = "the root is not a thing to copy";
+        mError = alSaid("XUIEditRootNotCopied", "the root is not a thing to copy");
         return false;
     }
     std::string xml;
     if (!liftElement(path, xml))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
     return insertBeside(path, xml, false);
@@ -1171,14 +1172,14 @@ bool ALXUIEdit::insertBeside(const path_t& sibling, const std::string& xml, bool
     pugi::xml_node node = resolve(sibling);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
     Span body;
     Span whole;
     if (!extentOf(node, body, whole))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
 
@@ -1221,13 +1222,13 @@ bool ALXUIEdit::moveBeside(const path_t& path, const path_t& sibling, bool befor
     note(Did::MovedElement, path);
     if (path.empty() || within(path, sibling))
     {
-        mError = "an element cannot be moved beside itself";
+        mError = alSaid("XUIEditMoveBesideItself", "an element cannot be moved beside itself");
         return false;
     }
     std::string xml;
     if (!liftElement(path, xml))
     {
-        mError = "could not read the element";
+        mError = alSaid("XUIEditCannotRead", "could not read the element");
         return false;
     }
 
@@ -1262,7 +1263,7 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -1285,7 +1286,7 @@ bool ALXUIEdit::setAttribute(const path_t& path, const std::string& name, const 
     std::string separator;
     if (!insertionPoint(node, at, separator))
     {
-        mError = "could not find where " + name + " would go";
+        mError = alSaid("XUIEditNoPlaceFor", "could not find where [NAME] would go", { { "[NAME]", name } });
         return false;
     }
     splice({ at, 0 }, separator + name + "=\"" + escapeValue(value, '"') + "\"");
@@ -1299,7 +1300,7 @@ bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -1307,7 +1308,7 @@ bool ALXUIEdit::removeAttribute(const path_t& path, const std::string& name)
     Span whole;
     if (!spanOf(node, name, span, whole))
     {
-        mError = "the element does not carry " + name;
+        mError = alSaid("XUIEditNotCarried", "the element does not carry [NAME]", { { "[NAME]", name } });
         return false;
     }
     note(Did::TookFieldOut, path, name);
@@ -1321,13 +1322,13 @@ bool ALXUIEdit::renameAttribute(const path_t& path, const std::string& from, con
     mError.clear();
     if (from == to)
     {
-        mError = "that is the name it has";
+        mError = alSaid("XUIEditSameName", "that is the name it has");
         return false;
     }
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -1335,7 +1336,7 @@ bool ALXUIEdit::renameAttribute(const path_t& path, const std::string& from, con
     Span whole;
     if (!spanOf(node, from, span, whole))
     {
-        mError = "the element does not carry " + from;
+        mError = alSaid("XUIEditNotCarried", "the element does not carry [NAME]", { { "[NAME]", from } });
         return false;
     }
     // Two of a name on one element is one value chosen by which the parser
@@ -1344,7 +1345,7 @@ bool ALXUIEdit::renameAttribute(const path_t& path, const std::string& from, con
     Span taken_whole;
     if (spanOf(node, to, taken, taken_whole))
     {
-        mError = "the element already carries " + to;
+        mError = alSaid("XUIEditAlreadyCarries", "the element already carries [NAME]", { { "[NAME]", to } });
         return false;
     }
 
@@ -1392,8 +1393,8 @@ bool ALXUIEdit::addDelta(pugi::xml_node node, std::string_view name, S32 delta,
     const S32 now = was + delta;
     if (isAnchoredBySign(name) && (was < 0) != (now < 0))
     {
-        mError = attribute + " would cross the edge it is measured from, which moves the element to the other side"
-                 " of its parent rather than by " + std::to_string(delta) + " pixels";
+        mError = alSaid("XUIEditWouldCrossEdge", "[NAME] would cross the edge it is measured from, which moves the element to the other side of its parent rather than by [COUNT] pixels",
+                        { { "[NAME]", attribute }, { "[COUNT]", std::to_string(delta) } });
         return false;
     }
     writes.emplace_back(attribute, now);
@@ -1413,7 +1414,7 @@ bool ALXUIEdit::translate(const path_t& path, S32 dx, S32 dy, const Anchor& now)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -1498,7 +1499,7 @@ bool ALXUIEdit::resize(const path_t& path, S32 dw, S32 dh, const Anchor& now)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 
@@ -1545,7 +1546,7 @@ bool ALXUIEdit::reauthor(const path_t& path, const Anchor& want, EAuthor what)
     pugi::xml_node node = resolve(path);
     if (!node)
     {
-        mError = "no element at that path";
+        mError = alSaid("XUIEditNoElement", "no element at that path");
         return false;
     }
 

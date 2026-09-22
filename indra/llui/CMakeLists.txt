@@ -303,6 +303,7 @@ target_sources(
         aljumpbar.h
         alpopover.h
         alquickopen.h
+        alsaid.h
         alscopebar.h
         alsettingrow.h
         alspecimenlist.h
