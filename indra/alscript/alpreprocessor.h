@@ -132,6 +132,10 @@ public:
         // The script's own name, which is `__SHORTFILE__` and `__FILE__`
         // at the top and the source map's first file.
         std::string fileName;
+        // Macros defined for every script, as a scripter's settings give
+        // them: `NAME`, which is 1, or `NAME=value`. One whose name is no
+        // identifier is passed over.
+        std::vector<std::string> defines;
         // Seconds since the epoch for `__UNIXTIME__`, `__DATE__` and
         // `__TIME__`; zero for now.
         S64  unixTime = 0;

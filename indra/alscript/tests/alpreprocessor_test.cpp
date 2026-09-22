@@ -776,4 +776,17 @@ namespace tut
         ensure_equals("the same text", in_two.text, at_once.text);
         ensure_equals("and the same way back", in_two.map.toSource(0, 0).line, at_once.map.toSource(0, 0).line);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<20>()
+    {
+        set_test_name("a scripter's own macros are defined for every script, and a script's #undef has the last word");
+        ALPreprocessor::Options opts = options();
+        opts.defines = { "DEBUG", "LEVEL=3", " SPACED = 7 ", "2BAD", "" };
+        ALPreprocessor::Result r = ALPreprocessor::run("#if DEBUG\nx = LEVEL;\n#endif\ny = SPACED;\n#undef LEVEL\nz = LEVEL;\n", opts);
+        ensure_equals("no problems", messages(r), std::string());
+        ensure("DEBUG is 1, so the block is in: " + r.text, r.text.find("x = 3;") != std::string::npos);
+        ensure("a value around blanks: " + r.text, r.text.find("y = 7;") != std::string::npos);
+        ensure("undefined by the script: " + r.text, r.text.find("z = LEVEL;") != std::string::npos);
+    }
 } // namespace tut

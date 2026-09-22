@@ -39,10 +39,16 @@ ALLuauConfig::ALLuauConfig()
 }
 
 // static
-bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& error)
+bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& error, const ALLuauConfig* base)
 {
-    out = ALLuauConfig();
+    out = base ? *base : ALLuauConfig();
     Luau::Config       config;
+    if (base)
+    {
+        config.enabledLint.warningMask = base->lints;
+        config.fatalLint.warningMask   = base->fatalLints;
+        config.lintErrors              = base->lintErrors;
+    }
     Luau::ConfigOptions options;
     // Aliases are taken however they are cased in the file.
     options.aliasOptions = Luau::ConfigOptions::AliasOptions{ std::nullopt, true };
@@ -67,10 +73,10 @@ bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& 
         default:                    break;
     }
     // Luau's default mode is nonstrict whether or not the file said so;
-    // only what the file says is reported.
+    // only what the file says is reported, else the base's.
     if (text.find("languageMode") == std::string_view::npos)
     {
-        out.mode.clear();
+        out.mode = base ? base->mode : std::string();
     }
     error.clear();
     return true;
@@ -102,4 +108,25 @@ bool ALLuauConfig::absolute(std::string_view path)
         return true;
     }
     return path.size() >= 3 && std::isalpha(static_cast<unsigned char>(path[0])) && path[1] == ':' && (path[2] == '/' || path[2] == '\\');
+}
+
+// static
+const std::vector<std::string>& ALLuauConfig::lintNames()
+{
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> out;
+        for (int code = Luau::LintWarning::Code_Unknown + 1; code < Luau::LintWarning::Code__Count; ++code)
+        {
+            out.emplace_back(Luau::LintWarning::getName(static_cast<Luau::LintWarning::Code>(code)));
+        }
+        return out;
+    }();
+    return names;
+}
+
+// static
+uint64_t ALLuauConfig::lintBit(std::string_view name)
+{
+    const Luau::LintWarning::Code code = Luau::LintWarning::parseName(std::string(name).c_str());
+    return code == Luau::LintWarning::Code_Unknown ? 0 : (1ull << code);
 }

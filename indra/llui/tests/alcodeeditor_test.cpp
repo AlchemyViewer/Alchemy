@@ -971,4 +971,117 @@ namespace tut
         gFocusMgr.setKeyboardFocus(nullptr);
         ensure("unfocused, a quieter one", e.selectionDrawColor() == e.paint(ALCodeEditor::Paint::SelectionInactive) && e.selectionDrawColor() != e.selectionColor());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<25>()
+    {
+        set_test_name("brackets and quotes typed in pairs: closed, typed over, wrapped, taken away together; not in comments or after a letter");
+        ALCodeEditor& e = make("");
+        e.setAutoClose(true);
+        type("llSay(");
+        ensure_equals("closed", e.text(), std::string("llSay()"));
+        ensure("the caret between", e.caret() == ALTextPos(0, 6));
+        type("0, \"");
+        ensure_equals("a quote closed too", e.text(), std::string("llSay(0, \"\")"));
+        type("hi\"");
+        ensure_equals("its closer typed over", e.text(), std::string("llSay(0, \"hi\")"));
+        type(")");
+        ensure_equals("and the bracket's", e.text(), std::string("llSay(0, \"hi\")"));
+        ensure("past it", e.caret() == ALTextPos(0, 14));
+        type(";");
+
+        // One Backspace between a pair just put in takes both.
+        e.setText("");
+        type("x = [");
+        ensure_equals("opened", e.text(), std::string("x = []"));
+        key(KEY_BACKSPACE);
+        ensure_equals("both gone", e.text(), std::string("x = "));
+
+        // Before a word the bracket is about the word.
+        e.setText("count");
+        e.setCaret(ALTextPos(0, 0));
+        type("(");
+        ensure_equals("not closed before a word", e.text(), std::string("(count"));
+
+        // A quote after a letter is an apostrophe; in a comment, prose.
+        e.setText("// it");
+        e.setCaret(e.document().end());
+        type("(");
+        ensure_equals("not in a comment", e.text(), std::string("// it("));
+        e.setText("s = \"don");
+        e.setCaret(e.document().end());
+        type("\"");
+        ensure_equals("not after a letter", e.text(), std::string("s = \"don\""));
+
+        // A selection wrapped in the pair, and still chosen.
+        e.setText("a + b");
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)));
+        type("(");
+        ensure_equals("wrapped", e.text(), std::string("(a + b)"));
+        ensure("the inside still chosen", e.selection().normalised() == ALTextRange(ALTextPos(0, 1), ALTextPos(0, 6)));
+
+        // A closer the text already had is typed, not gone over.
+        e.setText("f()");
+        e.setCaret(ALTextPos(0, 2));
+        type(")");
+        ensure_equals("a closer not put in is typed", e.text(), std::string("f())"));
+
+        // Off, as it was.
+        e.setAutoClose(false);
+        e.setText("");
+        type("(");
+        ensure_equals("off, one bracket", e.text(), std::string("("));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<26>()
+    {
+        set_test_name("completion opens as asked: on its own or not, after so many letters, and Return takes it or starts a line");
+        ALCodeEditor& e = make("integer counter;\n");
+        e.setCaret(e.document().end());
+        e.setAutoComplete(false);
+        type("co");
+        ensure("off: not on its own", !e.completionOpen());
+        key(' ', MASK_CONTROL);
+        ensure("but when asked", e.completionOpen());
+        key(KEY_ESCAPE);
+        e.setAutoComplete(true);
+        e.setCompleteAfter(4);
+        e.setText("integer counter;\n");
+        e.setCaret(e.document().end());
+        type("cou");
+        ensure("not at three letters when four are asked", !e.completionOpen());
+        type("n");
+        ensure("at four", e.completionOpen());
+        e.setAcceptOnEnter(false);
+        key(KEY_RETURN);
+        ensure("Return does not take it", !e.completionOpen());
+        ensure_equals("it starts a line", e.text(), std::string("integer counter;\ncoun\n"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<27>()
+    {
+        set_test_name("the hover card waits for the rest asked for, and can be turned off");
+        ALCodeEditor& e = make("llSay(0, x);\n");
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& text) {
+            text = "about " + std::string(word);
+            return true;
+        });
+        const LLRect text = e.textRect();
+        S32          row;
+        const S32    x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text.mTop - e.layout().rowHeight() / 2;
+        e.setHoverDelay(60.f);
+        e.handleHover(x, y, MASK_NONE);
+        ensure("the tooltip's asking is taken", e.handleToolTip(x, y, MASK_NONE));
+        ensure("but no card before the rest", !e.cardShown());
+        e.setHoverDelay(0.f);
+        ensure("taken", e.handleToolTip(x, y, MASK_NONE));
+        ensure("with no wait, the card", e.cardShown());
+        e.hideCard();
+        e.setHoverCards(false);
+        e.handleToolTip(x, y, MASK_NONE);
+        ensure("off: no card", !e.cardShown());
+    }
 }

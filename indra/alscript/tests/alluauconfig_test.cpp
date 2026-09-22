@@ -89,4 +89,35 @@ namespace tut
         ensure("said nothing: the defaults", ALLuauConfig::parse("{}", config, error) && config.lints == defaults.lints && config.fatalLints == 0 && config.globals.empty());
         ensure("every lint an error where asked", ALLuauConfig::parse("{ \"lintErrors\": true }", config, error) && config.lintErrors);
     }
+
+    template<> template<>
+    void alluauconfig_object::test<4>()
+    {
+        set_test_name("a .luaurc over a scripter's own lints and mode overrides only what it says");
+        const uint64_t unused   = ALLuauConfig::lintBit("LocalUnused");
+        const uint64_t function = ALLuauConfig::lintBit("FunctionUnused");
+        const uint64_t shadow   = ALLuauConfig::lintBit("LocalShadow");
+        ensure("the lints have bits", unused && function && shadow && unused != function);
+        ensure("an unknown lint has none", ALLuauConfig::lintBit("NoSuchLint") == 0);
+        ensure("every lint is named", ALLuauConfig::lintNames().size() > 20 && ALLuauConfig::lintNames().front() == "UnknownGlobal");
+
+        ALLuauConfig base;
+        base.lints &= ~unused;          // the scripter turned it off
+        base.fatalLints |= shadow;      // and made this one an error
+        base.mode = "strict";
+        ALLuauConfig config;
+        std::string  error;
+        ensure("an empty file", ALLuauConfig::parse("{}", config, error, &base));
+        ensure("keeps the lints off", (config.lints & unused) == 0 && (config.lints & function) != 0);
+        ensure("and the errors", (config.fatalLints & shadow) != 0);
+        ensure_equals("and the mode", config.mode, std::string("strict"));
+
+        ensure("a file saying one lint", ALLuauConfig::parse("{ \"lint\": { \"LocalUnused\": true, \"FunctionUnused\": false }, \"languageMode\": \"nonstrict\" }", config, error, &base));
+        ensure("turns that one on", (config.lints & unused) != 0);
+        ensure("and that one off", (config.lints & function) == 0);
+        ensure("the rest as the scripter had them", (config.fatalLints & shadow) != 0);
+        ensure_equals("its mode over theirs", config.mode, std::string("nonstrict"));
+
+        ensure("without a base, Luau's defaults", ALLuauConfig::parse("{}", config, error) && (config.lints & unused) != 0 && config.mode.empty());
+    }
 }

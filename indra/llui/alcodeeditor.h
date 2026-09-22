@@ -326,9 +326,23 @@ public:
     bool completionOpen() const;
     void closeCompletion();
     // Whether the list opens on its own as an identifier is typed, or only
-    // when asked for.
+    // when asked for; after how many letters; and whether Return takes the
+    // chosen one, as Tab does, or starts a new line.
     void setAutoComplete(bool on) { mAutoComplete = on; }
     bool getAutoComplete() const { return mAutoComplete; }
+    void setCompleteAfter(S32 letters) { mCompleteAfter = llclamp(letters, 1, 9); }
+    S32  getCompleteAfter() const { return mCompleteAfter; }
+    void setAcceptOnEnter(bool on) { mAcceptOnEnter = on; }
+    bool getAcceptOnEnter() const { return mAcceptOnEnter; }
+
+    // --- brackets and quotes typed in pairs ------------------------------------
+
+    // Whether an opening bracket or quote the grammar pairs is closed as it
+    // is typed, with the caret between; the closer typed over rather than
+    // doubled while it is the one put in; a selection wrapped in the pair
+    // typed; and both taken away by one Backspace between them.
+    void setAutoClose(bool on) { mAutoClose = on; }
+    bool getAutoClose() const { return mAutoClose; }
     // Puts the chosen completion in place of the prefix; a function comes
     // with its brackets, the caret between them where it takes anything,
     // and the call's signature asked for. False with none open.
@@ -427,6 +441,13 @@ public:
         LLColor4    color;
     };
     void        showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems = {});
+    // Whether the mouse resting on the text brings up a card at all, and
+    // after how long, in seconds; below zero, when the tooltip manager
+    // asks, which is the viewer's own tooltip delay.
+    void        setHoverCards(bool on) { mHoverCards = on; }
+    bool        getHoverCards() const { return mHoverCards; }
+    void        setHoverDelay(F32 seconds) { mHoverDelay = seconds; }
+    F32         getHoverDelay() const { return mHoverDelay; }
     void        hideCard();
     bool        cardShown() const;
     ALTextView* card() const { return mCard; }
@@ -535,6 +556,17 @@ private:
     // answer that may yet come.
     void hideCompletionList();
     void drawSignature(const LLRect& text);
+    // The card for the problems and the word at a point of the text, where
+    // there is anything to say; what the tooltip and the resting mouse
+    // both ask.
+    bool hoverCardAt(S32 x, S32 y);
+    // A pair typed as it was typed: the opener closed, the closer typed
+    // over, a selection wrapped. False where the character is for the
+    // text as ever.
+    bool typePair(char c);
+    // The pair around the caret that one Backspace takes away, if the
+    // closer is one typing put in.
+    bool deletePair();
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
@@ -554,6 +586,19 @@ private:
     bool mHighlightCurrentLine = true;
     bool mMatchBrackets        = true;
     bool mAutoComplete         = true;
+    S32  mCompleteAfter        = 2;
+    bool mAcceptOnEnter        = true;
+    bool mAutoClose            = false;
+    // The closers typing put in, which a closer typed goes over and a
+    // Backspace takes with its opener; they move with the edits, and go
+    // when the caret leaves their line.
+    std::vector<ALTextPos> mAutoClosed;
+    bool     mHoverCards = true;
+    F32      mHoverDelay = -1.f;
+    // How long the mouse has rested, and whether the card was asked for
+    // since it last moved.
+    LLFrameTimer mMouseRest;
+    bool         mHoverTried = false;
 
     LLUIColor mGutterColor;
     LLUIColor mLineNumberColor;

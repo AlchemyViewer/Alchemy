@@ -3430,6 +3430,21 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         engine.predefine("__AGENTIDRAW__ " + options.agentId);
         engine.predefine("__AGENTNAME__ \"" + options.agentName + "\"");
     }
+    for (const std::string& define : options.defines)
+    {
+        const size_t      equals = define.find('=');
+        std::string       name   = define.substr(0, equals);
+        const std::string value  = equals == std::string::npos ? std::string("1") : define.substr(equals + 1);
+        const size_t first = name.find_first_not_of(" \t");
+        const size_t last  = name.find_last_not_of(" \t");
+        name = first == std::string::npos ? std::string() : name.substr(first, last - first + 1);
+        const bool identifier = !name.empty() && !isdigit(static_cast<unsigned char>(name[0])) &&
+                                std::all_of(name.begin(), name.end(), [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; });
+        if (identifier)
+        {
+            engine.predefine(name + " " + value);
+        }
+    }
     if (!options.lua)
     {
         for (const char* type : { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" })

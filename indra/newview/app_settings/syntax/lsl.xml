@@ -16,15 +16,24 @@
   words: the words the grammar itself puts in its tables; the language
   service adds the rest at runtime.
 
-  indent: how the language indents -- opens, a pattern found at the end
+  indent: how the language indents. opens, a pattern found at the end
   of the text before the caret, which sends a new line in a level, and
   closes, one matched at the start of a line's text, which brings the
   line out to the level of what opened it as it is typed.
+  pairs: the brackets and quotes typed in pairs, each its opener and
+  its closer, which the editor closes as the opener is typed.
 -->
 <llsd>
   <map>
     <key>name</key>
     <string>lsl</string>
+    <key>pairs</key>
+    <array>
+      <string>()</string>
+      <string>[]</string>
+      <string>{}</string>
+      <string>""</string>
+    </array>
     <key>line_comment</key>
     <string>//</string>
     <key>extensions</key>

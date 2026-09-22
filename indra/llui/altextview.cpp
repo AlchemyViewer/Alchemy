@@ -3677,7 +3677,7 @@ void ALTextView::drawRows(const LLRect& text)
     const S32  bottom_y    = mScrollY + text.getHeight();
     const bool show_caret  = keyboardOnText() && gFocusMgr.getAppHasFocus() && !mReadOnly;
     const F32  blink       = mBlink.getElapsedTimeF32();
-    const bool caret_on    = show_caret && (blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
+    const bool caret_on    = show_caret && (!mCaretBlink || blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1));
     const ALTextRange sel  = selection().normalised();
     const bool has_sel     = !sel.empty();
     S32        caret_row   = 0;
@@ -3766,8 +3766,9 @@ void ALTextView::drawRows(const LLRect& text)
             // The caret.
             if (caret_on && line == mCaret.line && static_cast<S32>(r) == caret_row)
             {
-                const S32 x = static_cast<S32>(left + caret_x);
-                if (mModal && !mModal->inserting())
+                const S32  x     = static_cast<S32>(left + caret_x);
+                const bool modal = mModal && !mModal->inserting();
+                if (modal || mCaretStyle != CaretStyle::Line)
                 {
                     // A block over the cluster the caret is on, as a modal
                     // editor's is; a space's width past the line's end.
@@ -3778,7 +3779,16 @@ void ALTextView::drawRows(const LLRect& text)
                     {
                         right = caret_x + cell;
                     }
-                    gl_rect_2d(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height, mCursorColor.get() % (0.55f * alpha));
+                    if (!modal && mCaretStyle == CaretStyle::Underline)
+                    {
+                        // A bar under the cluster, as thick as the line caret is wide.
+                        gl_rect_2d(x, row_screen_top - row.height + CARET_WIDTH, static_cast<S32>(left + right), row_screen_top - row.height,
+                                   mCursorColor.get() % alpha);
+                    }
+                    else
+                    {
+                        gl_rect_2d(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height, mCursorColor.get() % (0.55f * alpha));
+                    }
                 }
                 else
                 {

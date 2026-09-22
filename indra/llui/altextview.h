@@ -222,6 +222,19 @@ public:
     // The selection as drawn now: its colour, or a subclass's for a view
     // the keyboard has left.
     virtual LLColor4 selectionDrawColor() const { return mSelectionColor.get(); }
+    // How the caret is drawn where a modal keymap does not say -- a line
+    // before the character, a block over it, a bar under it -- and whether
+    // it blinks.
+    enum class CaretStyle : U8
+    {
+        Line,
+        Block,
+        Underline
+    };
+    void       setCaretStyle(CaretStyle style) { mCaretStyle = style; }
+    CaretStyle getCaretStyle() const { return mCaretStyle; }
+    void       setCaretBlink(bool blink) { mCaretBlink = blink; }
+    bool       getCaretBlink() const { return mCaretBlink; }
     // What the view's syntax colours are named under in the colour table:
     // "Syntax", or "Script" for Script Studio's editors.
     const std::string& colorPrefix() const { return mColorPrefix; }
@@ -804,6 +817,8 @@ private:
     F32          mWheelRemainder = 0.f;
     bool         mSelecting = false;
     LLFrameTimer mBlink;
+    CaretStyle   mCaretStyle = CaretStyle::Line;
+    bool         mCaretBlink = true;
     // The second and the third click of a run count only where they land
     // by the first: the window tells clicks apart by time alone, and two
     // quick clicks in two places are two clicks.

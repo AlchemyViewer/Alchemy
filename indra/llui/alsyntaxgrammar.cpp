@@ -262,6 +262,7 @@ struct ALSyntaxGrammar::Impl
     std::vector<std::string> extensions;
     std::vector<std::string> wordTables;
     std::string              lineComment;
+    std::vector<std::pair<char, char>> pairs;
     bool                     prose = false;
     // What opens a block, searched for at the end of the text before the
     // caret, and what closes one, matched at the start of a line's text.
@@ -691,6 +692,17 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
     }
     impl->lineComment = description["line_comment"].asString();
     impl->prose       = description["prose"].asBoolean();
+    const LLSD& pairs = description["pairs"];
+    for (LLSD::array_const_iterator it = pairs.beginArray(); it != pairs.endArray(); ++it)
+    {
+        const std::string pair = it->asString();
+        if (pair.size() != 2)
+        {
+            error = "a pair is two characters, the opener and the closer";
+            return false;
+        }
+        impl->pairs.emplace_back(pair[0], pair[1]);
+    }
     if (description.has("indent"))
     {
         const LLSD& indent = description["indent"];
@@ -839,6 +851,11 @@ void ALSyntaxGrammar::collectWords(std::string_view prefix, std::vector<std::pai
 const std::string& ALSyntaxGrammar::lineComment() const
 {
     return mImpl->lineComment;
+}
+
+const std::vector<std::pair<char, char>>& ALSyntaxGrammar::pairs() const
+{
+    return mImpl->pairs;
 }
 
 bool ALSyntaxGrammar::prose() const

@@ -167,6 +167,10 @@ public:
     const std::vector<std::string>& wordTables() const;
     // What a comment to the end of the line begins with, or nothing.
     const std::string& lineComment() const;
+    // The brackets and quotes typed in pairs, each an opener and its
+    // closer, where the file says (`pairs`, each two characters: "()",
+    // "\"\""); a quote closes itself.
+    const std::vector<std::pair<char, char>>& pairs() const;
     // Whether the text is prose rather than code: the spell check then
     // looks at all of it, not only at comments and strings.
     bool prose() const;

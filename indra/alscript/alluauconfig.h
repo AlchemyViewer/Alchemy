@@ -57,8 +57,15 @@ struct ALLuauConfig
     std::vector<std::string> globals;
 
     // False, with Luau's own word on what is wrong, for text that is not
-    // a configuration.
-    static bool parse(std::string_view text, ALLuauConfig& out, std::string& error);
+    // a configuration. What the file does not say is the base's, where
+    // one is given -- a scripter's own choice of lints and mode, which a
+    // `.luaurc` overrides key by key -- else Luau's defaults.
+    static bool parse(std::string_view text, ALLuauConfig& out, std::string& error, const ALLuauConfig* base = nullptr);
+
+    // Every lint by the name a `.luaurc` gives it, in Luau's order, and
+    // the bit of the masks above that one is.
+    static const std::vector<std::string>& lintNames();
+    static uint64_t                        lintBit(std::string_view name);
 
     // The alias a require name starts with -- `@lib/util` names `lib`,
     // in lower case -- and what follows it; false where the name has none.

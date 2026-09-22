@@ -60,7 +60,6 @@ namespace
     const S32 FOLD_BOX_GAP = 6;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
-    const S32 COMPLETION_AUTO_AT = 2;
     const size_t COMPLETION_CAP  = 200;
     const S32    SIGNATURE_PAD   = 6;
 
@@ -314,6 +313,19 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
             clearPlaceholders();
         }
     }
+
+    // A closer typing put in moves with the text before it, and goes with
+    // an edit that takes it.
+    mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(),
+                                     [&](ALTextPos& at) {
+                                         if (removed.end <= at)
+                                         {
+                                             at = edit.slidPast(at);
+                                             return false;
+                                         }
+                                         return !(at < removed.begin);
+                                     }),
+                      mAutoClosed.end());
 
     // Folds slide the same way. One that starts on the edit's first line
     // stays: typing on a block's first line is not opening the block.
@@ -3104,6 +3116,14 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
                 mCompletionList->moveChoice(COMPLETION_ROWS, false);
                 return true;
             case KEY_RETURN:
+                if (!mAcceptOnEnter)
+                {
+                    // A new line, as the key says; the list goes.
+                    closeCompletion();
+                    break;
+                }
+                acceptCompletion();
+                return true;
             case KEY_TAB:
                 acceptCompletion();
                 return true;
@@ -3128,6 +3148,14 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         hideSignature();
         return true;
     }
+    if (key == KEY_BACKSPACE && mask == MASK_NONE && mAutoClose && deletePair())
+    {
+        if (mSignature && mSignatureRequest)
+        {
+            mSignatureRequest(caret());
+        }
+        return true;
+    }
     const bool taken = ALTextView::handleKeyHere(key, mask);
     if (!typingText())
     {
@@ -3146,7 +3174,8 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
     const bool typing   = typingText();
     const bool was_open = completionOpen();
-    if (!ALTextView::handleUnicodeCharHere(uni_char))
+    const bool paired   = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() && typePair(static_cast<char>(uni_char));
+    if (!paired && !ALTextView::handleUnicodeCharHere(uni_char))
     {
         return false;
     }
@@ -3171,7 +3200,7 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     {
         closeCompletion();
     }
-    else if (!was_open && mAutoComplete && !prose && static_cast<S32>(wordBeforeCaret().size()) >= COMPLETION_AUTO_AT)
+    else if (!was_open && mAutoComplete && !prose && static_cast<S32>(wordBeforeCaret().size()) >= mCompleteAfter)
     {
         openCompletion();
     }
@@ -3181,6 +3210,108 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         mSignatureRequest(caret());
     }
     return true;
+}
+
+bool ALCodeEditor::typePair(char c)
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    if (!grammar || grammar->pairs().empty())
+    {
+        return false;
+    }
+    const auto&        pairs = grammar->pairs();
+    const ALTextPos    at    = caret();
+    const std::string& line  = document().line(at.line);
+    const char         next  = at.column < static_cast<S32>(line.size()) ? line[at.column] : '\0';
+    // Over the closer typing put in, rather than a second one.
+    if (!hasSelection() && next == c)
+    {
+        const auto put = std::find(mAutoClosed.begin(), mAutoClosed.end(), at);
+        if (put != mAutoClosed.end())
+        {
+            for (const auto& [open, close] : pairs)
+            {
+                if (close == c)
+                {
+                    mAutoClosed.erase(put);
+                    setCaret(ALTextPos(at.line, at.column + 1));
+                    return true;
+                }
+            }
+        }
+    }
+    for (const auto& [open, close] : pairs)
+    {
+        if (c != open)
+        {
+            continue;
+        }
+        if (hasSelection())
+        {
+            // The selection wrapped in the pair, and still chosen inside it.
+            const ALTextRange sel   = selection().normalised();
+            const std::string inner = document().text(sel);
+            insertText(std::string(1, open) + inner + std::string(1, close));
+            const ALTextPos end = caret();
+            setSelection(ALTextRange(ALTextPos(sel.begin.line, sel.begin.column + 1), ALTextPos(end.line, end.column - 1)));
+            return true;
+        }
+        // Not in a comment or a string, where it is prose; and only before
+        // a blank, the line's end, or what closes or ends -- a bracket
+        // opened before a word is about that word.
+        if (inProse(at))
+        {
+            return false;
+        }
+        bool room = next == '\0' || isspace(static_cast<unsigned char>(next)) || strchr(";,", next) != nullptr;
+        for (const auto& [o, closer] : pairs)
+        {
+            room = room || (next == closer && o != closer);
+        }
+        if (!room)
+        {
+            return false;
+        }
+        // A quote after a letter is an apostrophe, and after itself is the
+        // end of an empty string.
+        if (open == close && at.column > 0 && (alIdentifierByte(line[at.column - 1]) || line[at.column - 1] == open))
+        {
+            return false;
+        }
+        insertText(std::string(1, open) + std::string(1, close));
+        const ALTextPos inside(at.line, at.column + 1);
+        setCaret(inside);
+        mAutoClosed.push_back(inside);
+        return true;
+    }
+    return false;
+}
+
+bool ALCodeEditor::deletePair()
+{
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter().grammar();
+    const ALTextPos                              at      = caret();
+    const auto                                   put     = std::find(mAutoClosed.begin(), mAutoClosed.end(), at);
+    if (!grammar || hasSelection() || put == mAutoClosed.end() || at.column == 0)
+    {
+        return false;
+    }
+    const std::string& line = document().line(at.line);
+    if (at.column >= static_cast<S32>(line.size()))
+    {
+        return false;
+    }
+    for (const auto& [open, close] : grammar->pairs())
+    {
+        if (line[at.column - 1] == open && line[at.column] == close)
+        {
+            mAutoClosed.erase(put);
+            setSelection(ALTextRange(ALTextPos(at.line, at.column - 1), ALTextPos(at.line, at.column + 1)));
+            insertText(std::string());
+            return true;
+        }
+    }
+    return false;
 }
 
 bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
@@ -3200,6 +3331,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     hideCard();
     closeCompletion();
     clearPlaceholders();
+    mAutoClosed.clear();
     const LLRect text         = textRect();
     const S32    gutter_right = leftEdge() + gutterWidth();
     if (mShowFoldMarkers && x < gutter_right && x >= gutter_right - FOLD_COLUMN)
@@ -3293,6 +3425,21 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     {
         return ALTextView::handleToolTip(x, y, mask);
     }
+    if (!mHoverCards)
+    {
+        return ALTextView::handleToolTip(x, y, mask);
+    }
+    if (mHoverDelay >= 0.f && mMouseRest.getElapsedTimeF32() < mHoverDelay)
+    {
+        // The card comes when the mouse has rested as long as was asked,
+        // which draw watches for, rather than at the tooltip's own time.
+        return true;
+    }
+    return hoverCardAt(x, y) || ALTextView::handleToolTip(x, y, mask);
+}
+
+bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
+{
     const ALTextPos at = posAtLocal(x, y, false);
     // A problem under the mouse says what it is, and the word what it is
     // as well: what is wrong with a call is read against what it takes.
@@ -3346,7 +3493,7 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     }
     if (says.empty() && problems.empty())
     {
-        return ALTextView::handleToolTip(x, y, mask);
+        return false;
     }
     showCard(about, says, problems);
     return true;
@@ -3650,6 +3797,12 @@ bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 
 bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (x != mMouseX || y != mMouseY)
+    {
+        // Moved: the rest the card waits for starts again.
+        mMouseRest.reset();
+        mHoverTried = false;
+    }
     mMouseX = x;
     mMouseY = y;
     if (cardShown())
@@ -3676,6 +3829,8 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
 {
     mGutterHover     = false;
     mGutterHoverLine = -1;
+    mMouseX          = -1;
+    mMouseY          = -1;
     hideCard();
     ALTextView::onMouseLeave(x, y, mask);
 }
@@ -3803,6 +3958,16 @@ void ALCodeEditor::draw()
     if (!mPlaceholders.empty() && caret().line != mPlaceholders.front().begin.line)
     {
         clearPlaceholders();
+    }
+    // A closer put in is typed over only on its own line.
+    mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(), [this](const ALTextPos& at) { return at.line != caret().line; }),
+                      mAutoClosed.end());
+    // The mouse rested long enough on the text: its card, once.
+    if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
+        textRect().pointInRect(mMouseX, mMouseY) && !(mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(mMouseX, mMouseY)))
+    {
+        mHoverTried = true;
+        hoverCardAt(mMouseX, mMouseY);
     }
     ALTextView::draw();
     if (mSignature)
