@@ -304,6 +304,7 @@ target_sources(
         alpopover.h
         alquickopen.h
         alsaid.h
+        altextchars.h
         alscopebar.h
         alsettingrow.h
         alspecimenlist.h

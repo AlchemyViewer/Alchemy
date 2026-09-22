@@ -26,6 +26,8 @@
 
 #include "altextsearch.h"
 
+#include "altextchars.h"
+
 #include <boost/regex.hpp>
 
 #include <algorithm>
@@ -33,26 +35,9 @@
 
 namespace
 {
-    // What a word is made of, for matching whole ones: a name's bytes,
-    // and anything beyond ASCII, which is never punctuation here.
-    bool wordByte(char c)
-    {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || static_cast<unsigned char>(c) >= 0x80;
-    }
-
-    std::string lowered(std::string_view text)
-    {
-        std::string out(text);
-        for (char& c : out)
-        {
-            c = LLStringOps::toLower(c);
-        }
-        return out;
-    }
-
     bool wholeWord(const std::string& line, S32 begin, S32 end)
     {
-        return !(begin > 0 && wordByte(line[begin - 1])) && !(end < static_cast<S32>(line.size()) && wordByte(line[end]));
+        return !(begin > 0 && alWordByte(line[begin - 1])) && !(end < static_cast<S32>(line.size()) && alWordByte(line[end]));
     }
 
     // The replacement in the case the match had: all upper, capitalised
@@ -125,6 +110,23 @@ namespace
             return false;
         }
     }
+
+    // The pattern last compiled, kept: a replace-all asks for the same
+    // one once per match, a find bar once per keystroke.
+    const boost::regex* compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
+    {
+        static std::string  last_query;
+        static bool         last_case = false;
+        static bool         last_ok   = false;
+        static boost::regex last_re;
+        if (!last_ok || last_query != query || last_case != options.caseSensitive)
+        {
+            last_query.assign(query);
+            last_case = options.caseSensitive;
+            last_ok   = compile(query, options, last_re, error);
+        }
+        return last_ok ? &last_re : nullptr;
+    }
 }
 
 // static
@@ -144,13 +146,15 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     {
         return out;
     }
-    boost::regex re;
-    if (options.regex && !compile(query, options, re, error))
+    const boost::regex* compiled = options.regex ? compiledOnce(query, options, error) : nullptr;
+    if (options.regex && !compiled)
     {
         return out;
     }
-    const ALTextRange within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
-    const std::string needle = options.caseSensitive ? std::string(query) : lowered(query);
+    static const boost::regex NONE;
+    const boost::regex&       re     = compiled ? *compiled : NONE;
+    const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
+    const std::string_view needle = query;
 
     // One stretch of text searched from `from` to `to`, each match's
     // offsets turned into places by `posOf`. The text is a line, or the
@@ -206,26 +210,31 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
         }
         else
         {
-            const std::string hay = options.caseSensitive ? text : lowered(text);
-            size_t            at  = static_cast<size_t>(from);
-            while (at + needle.size() <= static_cast<size_t>(to))
+            // As it is by find; without regard to case codepoint by
+            // codepoint at each character, nothing lowered and nothing
+            // allocated.
+            size_t at = static_cast<size_t>(from);
+            while (at < static_cast<size_t>(to))
             {
-                const size_t found = hay.find(needle, at);
-                if (found == std::string::npos || found + needle.size() > static_cast<size_t>(to))
+                size_t begin = at;
+                if (options.caseSensitive)
                 {
-                    break;
-                }
-                const S32 begin  = static_cast<S32>(found);
-                const S32 finish = static_cast<S32>(found + needle.size());
-                if (!options.wholeWord || wholeWord(text, begin, finish))
-                {
-                    out.emplace_back(posOf(begin), posOf(finish));
-                    if (whole_begins)
+                    begin = text.find(needle, at);
+                    if (begin == std::string::npos || begin >= static_cast<size_t>(to))
                     {
-                        whole_begins->push_back(posOf(begin));
+                        break;
                     }
                 }
-                at = found + 1;
+                const size_t finish = alMatchAt(text, begin, needle, !options.caseSensitive);
+                if (finish != std::string_view::npos && finish <= static_cast<size_t>(to) && (!options.wholeWord || wholeWord(text, static_cast<S32>(begin), static_cast<S32>(finish))))
+                {
+                    out.emplace_back(posOf(static_cast<S32>(begin)), posOf(static_cast<S32>(finish)));
+                    if (whole_begins)
+                    {
+                        whole_begins->push_back(posOf(static_cast<S32>(begin)));
+                    }
+                }
+                at = options.caseSensitive ? begin + 1 : utf8str_decode_at(text, begin).next;
             }
         }
     };
@@ -296,10 +305,11 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
     std::string       out(with);
     if (options.regex)
     {
-        boost::regex re;
-        if (compile(query, options, re, nullptr) && boost::regex_search(text, re, boost::match_default | boost::match_not_dot_newline))
+        // The pattern as compiled for the matches, once for the lot.
+        const boost::regex* re = compiledOnce(query, options, nullptr);
+        if (re && boost::regex_search(text, *re, boost::match_default | boost::match_not_dot_newline))
         {
-            out = boost::regex_replace(text, re, std::string(with),
+            out = boost::regex_replace(text, *re, std::string(with),
                                        boost::match_default | boost::match_not_dot_newline | boost::format_perl | boost::format_first_only | boost::format_no_copy);
         }
     }

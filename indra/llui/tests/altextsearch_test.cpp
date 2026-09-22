@@ -152,4 +152,19 @@ namespace tut
         options.regex       = true;
         ensure_equals("not let across, nothing crosses", said(ALTextSearch::matches(doc, "two\\nthree", options)), std::string());
     }
+
+    template<> template<>
+    void altextsearch_object::test<6>()
+    {
+        set_test_name("a search without regard to case folds past ASCII, codepoint by codepoint, and a word is whole by the same bytes");
+        ALTextDocument      doc;
+        doc.setText("caf\xc3\xa9 CAF\xc3\x89 cafe\n");
+        ALTextSearchOptions options;
+        ensure_equals("\xc3\xa9 finds \xc3\x89 too", said(ALTextSearch::matches(doc, "caf\xc3\xa9", options)), std::string("0:0-5 0:6-11"));
+        options.caseSensitive = true;
+        ensure_equals("as typed, only itself", said(ALTextSearch::matches(doc, "caf\xc3\xa9", options)), std::string("0:0-5"));
+        options.caseSensitive = false;
+        options.wholeWord     = true;
+        ensure_equals("whole words", said(ALTextSearch::matches(doc, "cafe", options)), std::string("0:12-16"));
+    }
 }

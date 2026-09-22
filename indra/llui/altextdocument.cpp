@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 
+#include "altextchars.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -85,50 +86,10 @@ namespace
         return out;
     }
 
-    // Whether the byte at `at` begins something a word is made of: a letter,
-    // a digit, an underscore, or anything beyond ASCII, which is a letter
-    // often enough for a search to treat it as one.
+    // Whether the byte at `at` begins something a word is made of.
     bool wordByteAt(std::string_view text, size_t at)
     {
-        if (at >= text.size())
-        {
-            return false;
-        }
-        const unsigned char c = static_cast<unsigned char>(text[at]);
-        return c >= 0x80 || c == '_' || std::isalnum(c);
-    }
-
-    // The end of a match of the needle at `at`, or npos. Without regard to
-    // case it compares codepoint by codepoint, since lower-casing a string
-    // can change its length and with it every offset.
-    size_t matchAt(std::string_view hay, size_t at, std::string_view needle, bool case_insensitive)
-    {
-        if (!case_insensitive)
-        {
-            if (at + needle.size() > hay.size() || hay.compare(at, needle.size(), needle) != 0)
-            {
-                return std::string_view::npos;
-            }
-            return at + needle.size();
-        }
-        size_t h = at;
-        size_t n = 0;
-        while (n < needle.size())
-        {
-            if (h >= hay.size())
-            {
-                return std::string_view::npos;
-            }
-            const LLCodepointAt hc = utf8str_decode_at(hay, h);
-            const LLCodepointAt nc = utf8str_decode_at(needle, n);
-            if (LLStringOps::toLower(hc.cp) != LLStringOps::toLower(nc.cp))
-            {
-                return std::string_view::npos;
-            }
-            h = hc.next;
-            n = nc.next;
-        }
-        return h;
+        return at < text.size() && alWordByte(text[at]);
     }
 }
 
@@ -286,19 +247,22 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     edit.range   = range;
     edit.removed = this->text(range);
 
+    // What is put in, its line endings as LF: as it came where it has
+    // no CR, else joined again from its lines.
     std::vector<std::string> pieces;
     splitLines(text, pieces);
-    edit.inserted = joinLines(pieces);
+    if (text.find('\r') == std::string_view::npos)
+    {
+        edit.inserted.assign(text);
+    }
+    else
+    {
+        edit.inserted = joinLines(pieces);
+    }
     if (edit.nothing())
     {
         return edit;
     }
-
-    // The whole text kept, if it is, is patched rather than made again:
-    // the stretch replaced in it, and the line starts from the edit on.
-    const bool   patch     = mWholeValid && mWholeVersion == mVersion;
-    const size_t patch_at  = patch ? mLineStarts[static_cast<size_t>(range.begin.line)] + static_cast<size_t>(range.begin.column) : 0;
-    const size_t patch_end = edit.removed.size();
 
     // The line the range starts in keeps what came before it, the line it
     // ends in keeps what comes after, and the pieces go between.
@@ -310,16 +274,10 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
                   std::make_move_iterator(pieces.end()));
 
     ++mVersion;
-    if (patch)
-    {
-        mWhole.replace(patch_at, patch_end, edit.inserted);
-        mLineStarts.resize(static_cast<size_t>(range.begin.line) + 1);
-        for (size_t l = static_cast<size_t>(range.begin.line) + 1; l < mLines.size(); ++l)
-        {
-            mLineStarts.push_back(mLineStarts.back() + mLines[l - 1].size() + 1);
-        }
-        mWholeVersion = mVersion;
-    }
+    // The whole text kept, if it was, is made again when next asked
+    // for: the same work as patching it here, and none where nobody
+    // asks again.
+    mWholeValid = false;
     mChanged(edit);
     return edit;
 }
@@ -511,7 +469,7 @@ std::optional<ALTextRange> ALTextDocument::findInLine(S32 line, size_t from, siz
                 break;
             }
         }
-        const size_t match_end = matchAt(hay, begin, needle, options.caseInsensitive);
+        const size_t match_end = alMatchAt(hay, begin, needle, options.caseInsensitive);
         const bool   whole     = !options.wholeWord ||
                              ((begin == 0 || !wordByteAt(hay, utf8str_step_grapheme_backward(hay, begin))) && !wordByteAt(hay, match_end));
         if (match_end != std::string_view::npos && whole)

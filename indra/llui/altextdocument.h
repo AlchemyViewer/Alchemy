@@ -130,7 +130,8 @@ public:
     std::string text(const ALTextRange& range) const;
     // The whole text kept from one asking to the next while nothing
     // changes, for whoever reads it whole often -- a search that may
-    // cross lines, say -- with where each line starts in it.
+    // cross lines, say -- with where each line starts in it. Made again
+    // on the first asking after an edit.
     const std::string&         wholeText() const;
     const std::vector<size_t>& lineStarts() const;
 
