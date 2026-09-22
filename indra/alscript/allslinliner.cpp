@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cstring>
 #include <map>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -356,6 +357,8 @@ namespace
     struct Plan
     {
         Edit            edit;
+        // Temporaries for the arguments, put before the call's statement.
+        std::optional<Edit> before;
         ALScriptProblem note;
         S32             callLine = 0;
     };
@@ -495,14 +498,29 @@ namespace
                     }
                 }
             }
-            std::string after;
-            if (!returns.empty())
+            // A return that is the body's last statement is the end of the
+            // block anyway; the rest are jumps to a label after it.
+            LSLASTNode* lastStatement = nullptr;
+            for (LSLASTNode* child = body->getChild(0); child; child = child->getNext())
             {
-                after = freshName("_ret", taken, used, context);
-                for (LSLASTNode* r : returns)
+                if (child->getNodeType() == NODE_STATEMENT)
                 {
-                    renames.push_back(Rename{ beginOf(r), endOf(r), "jump " + after + ";" });
+                    lastStatement = child;
                 }
+            }
+            std::string after;
+            for (LSLASTNode* r : returns)
+            {
+                if (r == lastStatement)
+                {
+                    renames.push_back(Rename{ beginOf(r), endOf(r), std::string() });
+                    continue;
+                }
+                if (after.empty())
+                {
+                    after = freshName("_ret", taken, used, context);
+                }
+                renames.push_back(Rename{ beginOf(r), endOf(r), "jump " + after + ";" });
             }
             std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
 
@@ -585,12 +603,13 @@ namespace
                 }
             }
             std::vector<std::string> argText(args.size());
+            std::vector<size_t>      wantTemp;
             for (size_t i = 0; i < args.size() && simple; ++i)
             {
                 const LSLNodeSubType kind     = args[i]->getNodeSubType();
                 const bool           constant = kind == NODE_CONSTANT_EXPRESSION;
                 const bool           name     = kind == NODE_LVALUE_EXPRESSION;
-                if ((!constant && !name) || (!constant && uses[params[i]->getSymbol()] > 1))
+                if (!constant && !name)
                 {
                     simple = false;
                     break;
@@ -600,10 +619,81 @@ namespace
                 {
                     argText[i] = "(" + argText[i] + ")";
                 }
+                if (!constant && uses[params[i]->getSymbol()] > 1)
+                {
+                    wantTemp.push_back(i);
+                }
             }
             if (!simple)
             {
                 return false;
+            }
+            // A name the expression would read more than once is read once
+            // into a temporary before the call's statement, where the
+            // statement is one a declaration can stand before -- in a
+            // block, an expression, a declaration or a return -- and
+            // nothing else in it changes anything before the call would
+            // have read the name: no other call, and no assignment but
+            // the statement's own at its root.
+            std::optional<Edit> before;
+            if (!wantTemp.empty())
+            {
+                LSLASTNode* holder = call->getParent();
+                while (holder && holder->getNodeType() != NODE_STATEMENT)
+                {
+                    holder = holder->getParent();
+                }
+                if (!holder || !holder->getParent() || holder->getParent()->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+                {
+                    return false;
+                }
+                const LSLNodeSubType shape = holder->getNodeSubType();
+                if (shape != NODE_EXPRESSION_STATEMENT && shape != NODE_DECLARATION && shape != NODE_RETURN_STATEMENT)
+                {
+                    return false;
+                }
+                LSLASTNode* root = shape == NODE_EXPRESSION_STATEMENT ? static_cast<LSLExpressionStatement*>(holder)->getExpr() : nullptr;
+                for (LSLASTNode* n : nodesOf(holder))
+                {
+                    if (n->getNodeType() != NODE_EXPRESSION)
+                    {
+                        continue;
+                    }
+                    if (n->getNodeSubType() == NODE_FUNCTION_EXPRESSION && n != call &&
+                        static_cast<LSLFunctionExpression*>(n)->getIdentifier()->getSymbol() != sym)
+                    {
+                        // Another call of this same function changes nothing
+                        // either; any other call is its own business.
+                        return false;
+                    }
+                    if (n != root && operation_mutates(static_cast<LSLExpression*>(n)->getOperation()))
+                    {
+                        return false;
+                    }
+                }
+                const Names visible = visibleFrom(holder);
+                Names       taken   = visible;
+                Block       decls;
+                for (const size_t i : wantTemp)
+                {
+                    LSLSymbol*  psym = params[i]->getSymbol();
+                    const char* type = psym && psym->getType() ? typeWord(psym->getType()->getIType()) : nullptr;
+                    if (!type)
+                    {
+                        return false;
+                    }
+                    const std::string temp = freshName("_t", taken, used, context);
+                    decls.push_back(PieceLine{ Piece{ std::string(type) + " " + temp + " = ", beginOf(args[i]), false },
+                                               Piece{ argText[i], beginOf(args[i]), true }, Piece{ ";", beginOf(args[i]), false } });
+                    argText[i] = temp;
+                }
+                // The statement's own indentation before it, on the line
+                // the temporaries leave it on.
+                const Pos          at     = beginOf(holder);
+                const std::string& line   = lines[static_cast<size_t>(at.line)];
+                const size_t       indent = line.find_first_not_of(" \t");
+                decls.push_back(PieceLine{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } });
+                before = Edit{ at, at, std::move(decls) };
             }
             std::vector<Rename> renames;
             for (LSLASTNode* n : nodesOf(expr))
@@ -625,6 +715,7 @@ namespace
             block.front().insert(block.front().begin(), Piece{ "(", beginOf(call), false });
             block.back().push_back(Piece{ ")", endOf(call), false });
             out.edit     = Edit{ beginOf(call), endOf(call), std::move(block) };
+            out.before   = std::move(before);
             out.note     = noteAt(call, std::string("put what the function ") + sym->getName() + (last ? " returns in place of its one call" : " returns in place of a call"));
             out.callLine = beginOf(call).line;
             return true;
@@ -678,6 +769,7 @@ namespace
         Names                            used;
         Weave                            weave(lines);
         std::vector<ALScriptProblem>     said;
+        S32                              went = 0;
         auto                             clashes = [&](Pos b, Pos e) {
             for (S32 line = b.line; line <= e.line; ++line)
             {
@@ -731,8 +823,14 @@ namespace
             {
                 Plan one;
                 if (plan(lines, parser.context, function, call, count == 1, is_marked, used, one) && !clashes(one.edit.begin, one.edit.end) &&
-                    !(one.edit.begin.line >= fbegin.line && one.edit.end.line <= fend.line))
+                    !(one.edit.begin.line >= fbegin.line && one.edit.end.line <= fend.line) &&
+                    !(one.before && clashes(one.before->begin, one.before->end)))
                 {
+                    if (one.before)
+                    {
+                        edited.emplace_back(one.before->begin, one.before->end);
+                    }
+                    edited.emplace_back(one.edit.begin, one.edit.end);
                     plans.push_back(std::move(one));
                 }
                 else
@@ -746,9 +844,13 @@ namespace
             }
             for (Plan& one : plans)
             {
-                edited.emplace_back(one.edit.begin, one.edit.end);
                 said.push_back(std::move(one.note));
+                if (one.before)
+                {
+                    weave.edits.push_back(std::move(*one.before));
+                }
                 weave.edits.push_back(std::move(one.edit));
+                ++went;
             }
             if (all)
             {
@@ -768,7 +870,7 @@ namespace
             notes.push_back(std::move(note));
         }
         weave.run(text, map);
-        return static_cast<S32>(weave.edits.size());
+        return went;
     }
 } // namespace
 

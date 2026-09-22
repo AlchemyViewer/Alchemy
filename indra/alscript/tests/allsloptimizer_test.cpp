@@ -364,6 +364,12 @@ namespace tut
         ensure("a path to create is left: " + n.text, hasn("string f = llJsonSetValue"));
         ensure("a value that is a fraction is left: " + n.text, hasn("string g = llJsonSetValue"));
         ensure("a document with a fraction is left: " + n.text, hasn("string h = llJsonGetValue"));
+        const std::string dels = wrap("", "        string a = llJsonSetValue(\"{\\\"a\\\": 1, \\\"b\\\": 2}\", [\"a\"], JSON_DELETE);\n        string b = llJsonSetValue(\"[1, 2, 3]\", [1], JSON_DELETE);\n        string c = llJsonSetValue(\"[1, 2, 3]\", [7], JSON_DELETE);\n        llSay(0, a + b + c);\n        a = b = c = \"\";\n");
+        ALLSLOptimizer::Result q = ALLSLOptimizer::run(dels, options());
+        auto hasq = [&q](const char* text) { return q.text.find(text) != std::string::npos; };
+        ensure("a key deleted: " + q.text, hasq("string a = \"{\\\"b\\\":2}\";"));
+        ensure("an index deleted: " + q.text, hasq("string b = \"[1,3]\";"));
+        ensure("deleting what is not there is the simulator's: " + q.text, hasq("string c = llJsonSetValue"));
     }
     template<> template<>
     void allsloptimizer_object::test<13>()
@@ -407,23 +413,25 @@ namespace tut
         ensure("optimized: " + notes(r), r.optimized);
         // The inliner's own text is what the optimizer read.
         const ALLSLInliner::Result put = ALLSLInliner::run(source);
-        ensure_equals("three put in place, in one round", put.inlined, 3);
+        ensure_equals("five put in place", put.inlined, 5);
         ensure("the block where the call was: " + put.text,
                put.text.find("        {\nstring what = \"hi\";\ninteger n = i;\n\n    integer i_1 = n * 2;\n    llSay(0, what + (string)i_1);\n\n}\n") != std::string::npos);
-        ensure("the expression where the other call was: " + put.text, put.text.find("g = (i * 2 + g) + thrice(g) + thrice(i);") != std::string::npos);
+        ensure("the expression where the other call was, the temporaries before the statement: " + put.text,
+               put.text.find("        integer _t_1 = g;\n        integer _t_2 = i;\n        g = (i * 2 + g) + (_t_1 + _t_1 + _t_1) + (_t_2 + _t_2 + _t_2);") != std::string::npos);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
         ensure("say went into a block, its i renamed past the caller's: " + r.text, has("integer i_1 = n * 2;") && has("llSay(0, what + (string)i_1);"));
         ensure("the parameters became locals set to the arguments: " + r.text, has("string what = \"hi\";") && has("integer n = i;"));
         ensure("say is gone: " + r.text, !has("say(string what"));
         ensure("twice became its expression with the argument in: " + r.text, has("(i * 2 + g)"));
-        ensure("thrice uses its parameter thrice, so only a constant would do: left: " + r.text, has("thrice(g)") && has("thrice(i)") && has("integer thrice(integer x)"));
+        ensure("thrice reads its parameter thrice, so each name is read once into a temporary before the statement: " + r.text,
+               has("integer _t_1 = g;") && has("integer _t_2 = i;") && has("(_t_1 + _t_1 + _t_1)") && has("(_t_2 + _t_2 + _t_2)") && !has("integer thrice(integer x)"));
         ensure("loop went in with its label and jump given a fresh name: " + r.text, !has("loop();") && !has("loop()\n") && has("@again_1;") && has("jump again_1;"));
         S32 said = 0;
         for (const ALScriptProblem& p : r.problems)
         {
-            said += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of its one call") != std::string::npos;
+            said += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of") != std::string::npos;
         }
-        ensure_equals("three notes", said, 3);
+        ensure_equals("five notes: say, twice, loop, and thrice twice", said, 5);
         // The map leads from the block back to the function's own lines.
         const size_t at = r.text.find("llSay(0, what + (string)i_1);");
         ensure("found", at != std::string::npos);
@@ -524,6 +532,9 @@ namespace tut
         auto has = [&put](const char* text) { return put.text.find(text) != std::string::npos; };
         ensure("the returns are jumps: " + put.text, has("if (n < 0) jump _ret_1;") && has("        jump _ret_1;"));
         ensure("to a label after the block: " + put.text, has("}@_ret_1;"));
+        const ALLSLInliner::Result trailing = ALLSLInliner::run("f()\n{\n    llSay(0, \"x\");\n    return;\n}\ndefault\n{\n    state_entry()\n    {\n        f();\n    }\n}\n");
+        ensure("a return that ends the body is just dropped: " + trailing.text, trailing.text.find("jump") == std::string::npos && trailing.text.find("@_ret") == std::string::npos &&
+               trailing.text.find("llSay(0, \"x\");") != std::string::npos);
         ensure("check is gone", !has("check(integer n)"));
         // outer's one call goes in the first round; inner's call is inside
         // outer, whose lines go that round, so inner waits for the next.

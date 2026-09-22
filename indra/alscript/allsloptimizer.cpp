@@ -1694,9 +1694,16 @@ namespace
                       LSLConstant* builtin = c.builtin(name);
                       return builtin && value == static_cast<LSLStringConstant*>(builtin)->getValue();
                   };
+                  // JSON_DELETE takes out what is there: a key from an
+                  // object, an index from an array; what is not there the
+                  // simulator answers for.
+                  const bool deleting = same("JSON_DELETE");
                   if (same("JSON_TRUE")) put.kind = JsonValue::Kind::True;
                   else if (same("JSON_FALSE")) put.kind = JsonValue::Kind::False;
                   else if (same("JSON_NULL")) put.kind = JsonValue::Kind::Null;
+                  else if (deleting)
+                  {
+                  }
                   else if (plainJsonString(value))
                   {
                       put.kind = JsonValue::Kind::String;
@@ -1729,21 +1736,29 @@ namespace
                   {
                       std::string key;
                       if (!argString({ last }, 0, key) || !plainJsonString(key)) return nullptr;
-                      bool replaced = false;
-                      for (auto& field : at->fields)
+                      bool found = false;
+                      for (size_t i = 0; i < at->fields.size(); ++i)
                       {
-                          if (field.first == key)
+                          if (at->fields[i].first == key)
                           {
-                              field.second = put;
-                              replaced     = true;
+                              found = true;
+                              if (deleting) at->fields.erase(at->fields.begin() + static_cast<std::ptrdiff_t>(i));
+                              else at->fields[i].second = put;
+                              break;
                           }
                       }
-                      if (!replaced) at->fields.emplace_back(key, put);
+                      if (!found && deleting) return nullptr;
+                      if (!found) at->fields.emplace_back(key, put);
                   }
                   else if (last->getNodeSubType() == NODE_INTEGER_CONSTANT && at->kind == JsonValue::Kind::Array)
                   {
                       const int index = static_cast<LSLIntegerConstant*>(last)->getValue();
-                      if (index == -1 || static_cast<size_t>(index) == at->items.size()) at->items.push_back(put);
+                      if (deleting)
+                      {
+                          if (index < 0 || static_cast<size_t>(index) >= at->items.size()) return nullptr;
+                          at->items.erase(at->items.begin() + index);
+                      }
+                      else if (index == -1 || static_cast<size_t>(index) == at->items.size()) at->items.push_back(put);
                       else if (index >= 0 && static_cast<size_t>(index) < at->items.size()) at->items[static_cast<size_t>(index)] = put;
                       else if (index > 0) return c.builtin("JSON_INVALID");
                       else return nullptr;
