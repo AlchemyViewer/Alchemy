@@ -98,8 +98,13 @@ public:
     virtual void    resetMaskKeys() = 0;
     virtual void    scanKeyboard() = 0;                                                         // scans keyboard, calls functions as necessary
     // Mac must differentiate between Command = Control for keyboard events
-    // and Command != Control for mouse events.
+    // and Command != Control for mouse events. A key's mask on the Mac has
+    // Command as MASK_CONTROL and its own Control key as MASK_MAC_CONTROL.
     virtual MASK    currentMask(bool for_mouse_event) = 0;
+    // A mask with the Mac's Control key read as MASK_CONTROL, for whoever
+    // does not tell it from Command: the in-world bindings, which either key
+    // has always worked. The same mask anywhere else.
+    static MASK     foldMacControl(MASK mask) { return (mask & MASK_MAC_CONTROL) ? ((mask & ~MASK_MAC_CONTROL) | MASK_CONTROL) : mask; }
     virtual KEY     currentKey() { return mCurTranslatedKey; }
 
     EKeyboardInsertMode getInsertMode() { return mInsertMode; }

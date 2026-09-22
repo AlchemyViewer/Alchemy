@@ -132,7 +132,13 @@ namespace tut
     {
         set_test_name("arrows move, shift selects, and an unshifted arrow collapses");
         ALTextView& v = make("one two\nthree");
-        key(KEY_RIGHT, MASK_CONTROL);
+#if LL_DARWIN
+        // Option by words on the Mac, Command being to the line's end.
+        const MASK word = MASK_ALT;
+#else
+        const MASK word = MASK_CONTROL;
+#endif
+        key(KEY_RIGHT, word);
         ensure("a word along", v.caret() > ALTextPos(0, 0) && v.caret() <= ALTextPos(0, 4));
         key(KEY_END);
         ensure("line end", v.caret() == ALTextPos(0, 7));
@@ -854,5 +860,46 @@ namespace tut
         v.setCaret(ALTextPos(1, 0));
         v.perform(ALEditorCommand::Indent);
         ensure_equals("a caret alone puts a tab in", v.document().line(1), std::string("        second line"));
+    }
+
+    template<> template<>
+    void altextview_object::test<24>()
+    {
+        set_test_name("deleting to either end of the line, and past it from there");
+        ALTextView& v = make("one two\nthree four");
+        v.setCaret(ALTextPos(1, 5));
+        v.perform(ALEditorCommand::DeleteToLineStart);
+        ensure_equals("back to the start", v.text(), std::string("one two\n four"));
+        v.perform(ALEditorCommand::DeleteToLineStart);
+        ensure_equals("from the start, the break", v.text(), std::string("one two four"));
+        v.setCaret(ALTextPos(0, 3));
+        v.perform(ALEditorCommand::DeleteToLineEnd);
+        ensure_equals("on to the end", v.text(), std::string("one"));
+        v.setText("a\nb");
+        v.setCaret(ALTextPos(0, 1));
+        v.perform(ALEditorCommand::DeleteToLineEnd);
+        ensure_equals("from the end, the break", v.text(), std::string("ab"));
+#if LL_DARWIN
+        // The Mac's keys: Command is MASK_CONTROL, its Control key
+        // MASK_MAC_CONTROL.
+        v.setText("  alpha beta\ngamma");
+        v.setCaret(ALTextPos(0, 5));
+        key(KEY_RIGHT, MASK_CONTROL);
+        ensure("command-right to the line's end", v.caret() == ALTextPos(0, 12));
+        key(KEY_LEFT, MASK_CONTROL);
+        ensure("command-left to the first thing on it", v.caret() == ALTextPos(0, 2));
+        key(KEY_DOWN, MASK_CONTROL);
+        ensure("command-down to the end", v.caret() == ALTextPos(1, 5));
+        key(KEY_UP, MASK_CONTROL);
+        ensure("command-up to the start", v.caret() == ALTextPos(0, 0));
+        key('E', MASK_MAC_CONTROL);
+        ensure("control-e to the line's end", v.caret() == ALTextPos(0, 12));
+        key(KEY_BACKSPACE, MASK_CONTROL);
+        ensure_equals("command-backspace to the line's start", v.document().line(0), std::string(""));
+        type("x y");
+        key('A', MASK_MAC_CONTROL);
+        key('K', MASK_MAC_CONTROL);
+        ensure_equals("control-k to the line's end", v.document().line(0), std::string(""));
+#endif
     }
 }

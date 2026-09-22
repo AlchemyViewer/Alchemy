@@ -369,8 +369,10 @@ void ALCanvasView::zoomAbout(F32 zoom, S32 x, S32 y)
 // what is held.
 bool ALCanvasView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
+    // Either Control on the Mac: Command, as zooming has it there, or the
+    // key itself.
     const MASK held = gKeyboard ? gKeyboard->currentMask(false) : MASK_NONE;
-    if (!(held & MASK_CONTROL) || delta.mClicks == 0)
+    if (!(held & (MASK_CONTROL | MASK_MAC_CONTROL)) || delta.mClicks == 0)
     {
         toContent(x, y);
         return LLPanel::handleScrollWheel(x, y, delta);
@@ -964,7 +966,7 @@ bool ALCanvasRow::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     // Only that: a wheel over the slack around a surface is not a wheel over
     // anything on it, so nothing on it is scrolled by it.
     const MASK held = gKeyboard ? gKeyboard->currentMask(false) : MASK_NONE;
-    if (held & MASK_CONTROL)
+    if (held & (MASK_CONTROL | MASK_MAC_CONTROL))
     {
         for (ALCanvasView* canvas : mCanvases)
         {

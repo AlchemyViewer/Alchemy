@@ -3283,7 +3283,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             }
 #endif
 
-            if (!(mask & (MASK_CONTROL | MASK_ALT)))
+            if (!(mask & (MASK_CONTROL | MASK_ALT | MASK_MAC_CONTROL)))
             {
                 // We have keyboard focus, and it's not an accelerator
                 if (keyboard_focus && keyboard_focus->wantsKeyUpKeyDown())
@@ -3311,7 +3311,8 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
     // give menus a chance to handle modified (Ctrl, Alt) shortcut keys before current focus
     // as long as focus isn't locked
-    if (mask & (MASK_CONTROL | MASK_ALT) && !gFocusMgr.focusLocked())
+    // The Mac's own Control key too, which a menu item may ask for by name.
+    if (mask & (MASK_CONTROL | MASK_ALT | MASK_MAC_CONTROL) && !gFocusMgr.focusLocked())
     {
         // Check the current floater's menu first, if it has one.
         if (gFocusMgr.keyboardFocusHasAccelerators()
@@ -3338,13 +3339,16 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     // give floaters first chance to handle TAB key
     // so frontmost floater gets focus
     // if nothing has focus, go to first or last UI element as appropriate
-    if (key == KEY_TAB && (mask & MASK_CONTROL || keyboard_focus == NULL))
+    // Control-Tab is Control-Tab on the Mac too, where Command-Tab is the
+    // system's.
+    const bool control_tab = key == KEY_TAB && (mask & (MASK_CONTROL | MASK_MAC_CONTROL)) != 0;
+    if (key == KEY_TAB && (control_tab || keyboard_focus == NULL))
     {
         LL_WARNS() << "LLviewerWindow::handleKey give floaters first chance at tab key " << LL_ENDL;
         if (gMenuHolder) gMenuHolder->hideMenus();
 
         // if CTRL-tabbing (and not just TAB with no focus), go into window cycle mode
-        gFloaterView->setCycleMode((mask & MASK_CONTROL) != 0);
+        gFloaterView->setCycleMode(control_tab);
 
         // do CTRL-TAB and CTRL-SHIFT-TAB logic
         if (mask & MASK_SHIFT)

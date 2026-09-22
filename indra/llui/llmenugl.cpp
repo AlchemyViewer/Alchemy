@@ -190,12 +190,12 @@ LLMenuItemGL::LLMenuItemGL(const LLMenuItemGL::Params& p)
     if (shortcut.find("control") != shortcut.npos)
     {
 #ifdef LL_DARWIN
-        if ( useMacCtrl )
-        {
-            mAcceleratorMask |= MASK_MAC_CONTROL;
-        }
-#endif // LL_DARWIN
+        // The Mac's Control key itself rather than Command, which is what
+        // "control" means there otherwise.
+        mAcceleratorMask |= useMacCtrl ? MASK_MAC_CONTROL : MASK_CONTROL;
+#else
         mAcceleratorMask |= MASK_CONTROL;
+#endif // LL_DARWIN
     }
     if (shortcut.find("alt") != shortcut.npos)
     {
@@ -238,7 +238,7 @@ bool LLMenuItemGL::hasAccelerator(const KEY &key, const MASK &mask) const
 //virtual
 bool LLMenuItemGL::handleAcceleratorKey(KEY key, MASK mask)
 {
-    if( getEnabled() && (!gKeyboard->getKeyRepeated(key) || mAllowKeyRepeat) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_NORMALKEYS)) )
+    if( getEnabled() && (!gKeyboard->getKeyRepeated(key) || mAllowKeyRepeat) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_MODIFIERS)) )
     {
         onCommit();
         return true;
@@ -296,7 +296,7 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
         for (list_it = listp->begin(); list_it != listp->end(); ++list_it)
         {
             accelerator = *list_it;
-            if ((accelerator->mKey == mAcceleratorKey) && (accelerator->mMask == (mAcceleratorMask & MASK_NORMALKEYS)))
+            if ((accelerator->mKey == mAcceleratorKey) && (accelerator->mMask == (mAcceleratorMask & MASK_MODIFIERS)))
             {
 
             // *NOTE: get calling code to throw up warning or route
@@ -320,7 +320,7 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
             if (accelerator)
             {
                 accelerator->mKey = mAcceleratorKey;
-                accelerator->mMask = (mAcceleratorMask & MASK_NORMALKEYS);
+                accelerator->mMask = (mAcceleratorMask & MASK_MODIFIERS);
 //              accelerator->mName = mLabel;
             }
             listp->push_back(accelerator);//addData(accelerator);
@@ -919,7 +919,7 @@ bool LLMenuItemCallGL::handleKeyHere( KEY key, MASK mask )
 
 bool LLMenuItemCallGL::handleAcceleratorKey( KEY key, MASK mask )
 {
-    if( (!gKeyboard->getKeyRepeated(key) || getAllowKeyRepeat()) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_NORMALKEYS)) )
+    if( (!gKeyboard->getKeyRepeated(key) || getAllowKeyRepeat()) && (key == mAcceleratorKey) && (mask == (mAcceleratorMask & MASK_MODIFIERS)) )
     {
         updateEnabled();
         if (getEnabled())

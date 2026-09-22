@@ -100,6 +100,8 @@ namespace
             case ALEditorCommand::DeleteRight:
             case ALEditorCommand::DeleteWordLeft:
             case ALEditorCommand::DeleteWordRight:
+            case ALEditorCommand::DeleteToLineStart:
+            case ALEditorCommand::DeleteToLineEnd:
             case ALEditorCommand::NewLine:
             case ALEditorCommand::Indent:
             case ALEditorCommand::Unindent:
@@ -1867,6 +1869,38 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         case C::DeleteWordRight:
             deleteRange(hasSelection() ? selection() : ALTextRange(mCaret, mDocument.nextWord(mCaret)));
+            return true;
+        case C::DeleteToLineStart:
+            // Back to the line's start, or the break before it from there,
+            // as Command-Backspace on the Mac.
+            if (hasSelection())
+            {
+                deleteRange(selection());
+            }
+            else if (mCaret.column > 0)
+            {
+                deleteRange(ALTextRange(ALTextPos(mCaret.line, 0), mCaret));
+            }
+            else if (mCaret != mDocument.start())
+            {
+                deleteRange(ALTextRange(mDocument.prevCluster(mCaret), mCaret));
+            }
+            return true;
+        case C::DeleteToLineEnd:
+            // On to the line's end, or the break after it from there, as
+            // Control-K on the Mac.
+            if (hasSelection())
+            {
+                deleteRange(selection());
+            }
+            else if (mCaret != mDocument.lineEnd(mCaret.line))
+            {
+                deleteRange(ALTextRange(mCaret, mDocument.lineEnd(mCaret.line)));
+            }
+            else if (mCaret != mDocument.end())
+            {
+                deleteRange(ALTextRange(mCaret, mDocument.nextCluster(mCaret)));
+            }
             return true;
         case C::NewLine:
         {
@@ -3672,6 +3706,13 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
     if (!perform(command))
     {
         return false;
+    }
+    if (mModal && !mModal->inserting())
+    {
+        // A key the modal keymap left to the plain one -- Command-A on
+        // the Mac, a paste -- moved the caret or the selection under it,
+        // as the mouse does.
+        mModal->mouseChanged(*this);
     }
     mBlink.reset();
     return true;

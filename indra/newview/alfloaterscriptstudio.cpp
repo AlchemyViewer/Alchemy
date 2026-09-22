@@ -647,8 +647,9 @@ void ALFloaterScriptStudio::draw()
 
 bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
 {
-    // Control-tab and control-shift-tab go round the tabs, as everywhere.
-    if (key == KEY_TAB && (mask == MASK_CONTROL || mask == (MASK_CONTROL | MASK_SHIFT)))
+    // Control-tab and control-shift-tab go round the tabs, as everywhere --
+    // the Mac's own Control key there, Command-Tab being the system's.
+    if (key == KEY_TAB && ((mask & ~MASK_SHIFT) == MASK_CONTROL || (mask & ~MASK_SHIFT) == MASK_MAC_CONTROL))
     {
         cycleTab(mask & MASK_SHIFT ? -1 : 1);
         return true;

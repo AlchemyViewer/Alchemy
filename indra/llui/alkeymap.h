@@ -67,6 +67,8 @@ enum class ALEditorCommand : U8
     DeleteRight,
     DeleteWordLeft,
     DeleteWordRight,
+    DeleteToLineStart,
+    DeleteToLineEnd,
     NewLine,
     Indent,
     Unindent,

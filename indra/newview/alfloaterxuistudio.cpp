@@ -2098,8 +2098,9 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
     // Between the two places an element is worked on: the outline, where it
     // is found and moved in the tree, and the canvas, where it is dragged
     // and its handles are. Control and tab rather than tab, because tab
-    // belongs to the field the developer is typing in.
-    if (key == KEY_TAB && mask == MASK_CONTROL)
+    // belongs to the field the developer is typing in; the Mac's own
+    // Control key there, Command-Tab being the system's.
+    if (key == KEY_TAB && (mask == MASK_CONTROL || mask == MASK_MAC_CONTROL))
     {
         ALXUICanvas* canvas = mCanvases[PRIMARY];
         const bool on_canvas = canvas && canvas->getVisible() && gFocusMgr.childHasKeyboardFocus(canvas);

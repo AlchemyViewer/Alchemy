@@ -36,6 +36,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "move_page_down", "select_left",    "select_right",    "select_up",        "select_down",      "select_word_left",
         "select_word_right", "select_line_start", "select_line_end", "select_doc_start", "select_doc_end", "select_page_up",
         "select_page_down", "select_all",   "delete_left",     "delete_right",     "delete_word_left", "delete_word_right",
+        "delete_to_line_start", "delete_to_line_end",
         "new_line",      "indent",          "unindent",        "undo",             "redo",             "cut",
         "copy",          "paste",           "delete",          "toggle_comment",   "duplicate_line",   "move_line_up",
         "move_line_down", "delete_line",    "fold",            "unfold",           "fold_all",         "unfold_all",
@@ -161,8 +162,33 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_F3, MASK_NONE, C::FindNext);
     map.bind(KEY_F3, MASK_SHIFT, C::FindPrevious);
 #if LL_DARWIN
-    // Command-space belongs to the system; the control key itself does
-    // what it does everywhere else.
+    // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
+    // goes to the ends of the line and of the text, Option with one by
+    // words (above), Command-Backspace back to the line's start, and
+    // Command-G and Command-Shift-G through the matches.
+    map.bind(KEY_LEFT, MASK_CONTROL, C::MoveLineStart);
+    map.bind(KEY_RIGHT, MASK_CONTROL, C::MoveLineEnd);
+    map.bind(KEY_UP, MASK_CONTROL, C::MoveDocStart);
+    map.bind(KEY_DOWN, MASK_CONTROL, C::MoveDocEnd);
+    map.bind(KEY_LEFT, MASK_CONTROL | MASK_SHIFT, C::SelectLineStart);
+    map.bind(KEY_RIGHT, MASK_CONTROL | MASK_SHIFT, C::SelectLineEnd);
+    map.bind(KEY_UP, MASK_CONTROL | MASK_SHIFT, C::SelectDocStart);
+    map.bind(KEY_DOWN, MASK_CONTROL | MASK_SHIFT, C::SelectDocEnd);
+    map.bind(KEY_BACKSPACE, MASK_CONTROL, C::DeleteToLineStart);
+    map.bind(KEY_DELETE, MASK_CONTROL, C::DeleteToLineEnd);
+    map.bind('G', MASK_CONTROL, C::FindNext);
+    map.bind('G', MASK_CONTROL | MASK_SHIFT, C::FindPrevious);
+    // And the Control keys every text field there takes from the text
+    // system. Control-space completes, Command-space being the system's.
+    map.bind('A', MASK_MAC_CONTROL, C::MoveLineStart);
+    map.bind('E', MASK_MAC_CONTROL, C::MoveLineEnd);
+    map.bind('B', MASK_MAC_CONTROL, C::MoveLeft);
+    map.bind('F', MASK_MAC_CONTROL, C::MoveRight);
+    map.bind('P', MASK_MAC_CONTROL, C::MoveUp);
+    map.bind('N', MASK_MAC_CONTROL, C::MoveDown);
+    map.bind('D', MASK_MAC_CONTROL, C::DeleteRight);
+    map.bind('H', MASK_MAC_CONTROL, C::DeleteLeft);
+    map.bind('K', MASK_MAC_CONTROL, C::DeleteToLineEnd);
     map.bind(' ', MASK_MAC_CONTROL, C::Complete);
 #endif
     return map;

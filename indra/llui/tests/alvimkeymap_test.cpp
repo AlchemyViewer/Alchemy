@@ -129,7 +129,7 @@ namespace tut
                     }
                     else if (name.size() == 3 && name[0] == 'C' && name[1] == '-')
                     {
-                        editor->handleKeyHere(static_cast<KEY>(toupper(name[2])), MASK_CONTROL);
+                        editor->handleKeyHere(static_cast<KEY>(toupper(name[2])), ALVimKeymap::CONTROL);
                     }
                     else
                     {
@@ -488,7 +488,7 @@ namespace tut
         const std::vector<ALVimKeymap::Input> back = ALVimKeymap::decodeInputs("a<lt>b<C-r><Esc>");
         ensure_equals("five inputs", back.size(), size_t(5));
         ensure("a literal <", back[1].isChar && back[1].ch == '<');
-        ensure("a control chord", !back[3].isChar && back[3].key == 'R' && (back[3].mask & MASK_CONTROL));
+        ensure("a control chord", !back[3].isChar && back[3].key == 'R' && (back[3].mask & ALVimKeymap::CONTROL));
         ensure_equals("and encode back", ALVimKeymap::encodeInputs(back), std::string("a<lt>b<C-r><Esc>"));
     }
 

@@ -201,7 +201,15 @@ MASK LLKeyboardSDL::updateModifiers(const MASK mask)
 
     if(mask & SDL_KMOD_CTRL)
     {
+#if LL_DARWIN
+        // The Mac's own Control key, apart from Command: what a shortcut
+        // is made with there is Command, which is MASK_CONTROL, and
+        // Control is left to whoever asks for it by name -- Control-Tab,
+        // the text system's line keys, vim's chords.
+        out_mask |= MASK_MAC_CONTROL;
+#else
         out_mask |= MASK_CONTROL;
+#endif
     }
 
     if(mask & SDL_KMOD_ALT)
@@ -325,7 +333,16 @@ MASK LLKeyboardSDL::currentMask(bool for_mouse_event)
     if (mask & SDL_KMOD_SHIFT)
         result |= MASK_SHIFT;
     if (mask & SDL_KMOD_CTRL)
+    {
+#if LL_DARWIN
+        // A click with Control held is a Control-click, as the tools and
+        // the camera have always had it; a key with it is the Mac's own
+        // Control, as updateModifiers says.
+        result |= for_mouse_event ? MASK_CONTROL : MASK_MAC_CONTROL;
+#else
         result |= MASK_CONTROL;
+#endif
+    }
     if (mask & SDL_KMOD_ALT)
         result |= MASK_ALT;
 

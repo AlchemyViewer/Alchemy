@@ -138,6 +138,14 @@ public:
     void                    share(std::shared_ptr<Shared> shared);
 
     // One thing typed: a character, or a key with its modifiers.
+    // The Control of vim's chords: the Mac's own Control key there, where
+    // MASK_CONTROL is Command and belongs to the menus -- Command-C copies
+    // and Command-V pastes in every mode -- and Control everywhere else.
+#if LL_DARWIN
+    static constexpr MASK CONTROL = MASK_MAC_CONTROL;
+#else
+    static constexpr MASK CONTROL = MASK_CONTROL;
+#endif
     struct Input
     {
         bool    isChar = false;

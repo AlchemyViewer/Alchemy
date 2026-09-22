@@ -260,7 +260,7 @@ std::string ALVimKeymap::encodeInputs(const std::vector<Input>& inputs)
             continue;
         }
         std::string spelt;
-        if (in.mask & MASK_CONTROL)
+        if (in.mask & CONTROL)
         {
             spelt += "C-";
         }
@@ -302,7 +302,7 @@ std::vector<ALVimKeymap::Input> ALVimKeymap::decodeInputs(std::string_view text)
                 MASK mask = MASK_NONE;
                 while (name.size() > 2 && name[1] == '-' && (name[0] == 'C' || name[0] == 'A' || name[0] == 'M' || name[0] == 'S'))
                 {
-                    mask |= name[0] == 'C' ? MASK_CONTROL : name[0] == 'S' ? MASK_SHIFT : MASK_ALT;
+                    mask |= name[0] == 'C' ? CONTROL : name[0] == 'S' ? MASK_SHIFT : MASK_ALT;
                     name.erase(0, 2);
                 }
                 KEY key;
@@ -735,7 +735,7 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
     {
         // Keys: the ones vim gives a meaning, and the rest left to the
         // view's own keymap.
-        const bool ctrl = (input.mask & MASK_CONTROL) != 0;
+        const bool ctrl = (input.mask & CONTROL) != 0;
         switch (input.key)
         {
             case KEY_ESCAPE:
@@ -3014,7 +3014,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
     const ALTextDocument& d = view.document();
     if (!input.isChar)
     {
-        const bool ctrl = (input.mask & MASK_CONTROL) != 0;
+        const bool ctrl = (input.mask & CONTROL) != 0;
         if (input.key == KEY_ESCAPE || (ctrl && input.key == '[') || (ctrl && input.key == 'C'))
         {
             leaveInsert(view);
@@ -3035,7 +3035,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             // Typed text with a break in it is no longer one block's.
             mTyped += "\n";
         }
-        else if (input.key == KEY_TAB && !(input.mask & (MASK_CONTROL | MASK_ALT)))
+        else if (input.key == KEY_TAB && !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)))
         {
             mTyped += view.tabText(view.caret());
         }
@@ -3271,7 +3271,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
     // Tab walks the completions; anything else keeps what it put on the
     // line and lets the rest go -- but Escape with them up only lets
     // them go, the word as typed back on the line.
-    if (!input.isChar && input.key == KEY_TAB && !(input.mask & (MASK_CONTROL | MASK_ALT)))
+    if (!input.isChar && input.key == KEY_TAB && !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)))
     {
         complete(view, !(input.mask & MASK_SHIFT));
         return true;
@@ -3289,7 +3289,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
         // Vim's own editing of the line: Control-B and Control-E to the
         // ends, Control-W a word back, Control-U to the start, Control-H
         // a character back.
-        if ((input.mask & MASK_CONTROL) && !(input.mask & MASK_ALT))
+        if ((input.mask & CONTROL) && !(input.mask & MASK_ALT))
         {
             switch (input.key)
             {
@@ -3468,7 +3468,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
             default:
                 // A plain key's character follows; a control chord is
                 // nobody's while the line is being typed.
-                return (input.mask & (MASK_CONTROL | MASK_ALT)) != 0;
+                return (input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)) != 0;
         }
     }
     if (input.ch == '\r' || input.ch == '\n')
@@ -3712,13 +3712,13 @@ bool ALVimKeymap::confirmKey(ALTextView& view, const Input& input)
         }
         // Control-E and Control-Y scroll while the question stands, as
         // they do in vim, the match staying where it is.
-        if ((input.mask & MASK_CONTROL) && (input.key == 'E' || input.key == 'Y'))
+        if ((input.mask & CONTROL) && (input.key == 'E' || input.key == 'Y'))
         {
             view.setScrollY(view.scrollY() + (input.key == 'E' ? 1 : -1) * view.layout().rowHeight());
             return true;
         }
         // A plain key's character follows; a chord or a Return is nobody's.
-        return input.key == KEY_RETURN || (input.mask & (MASK_CONTROL | MASK_ALT)) != 0;
+        return input.key == KEY_RETURN || (input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)) != 0;
     }
     switch (input.ch)
     {

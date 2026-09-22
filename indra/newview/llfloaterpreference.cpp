@@ -3984,6 +3984,8 @@ void LLPanelPreferenceControls::updateAndApply()
 // from LLSetKeybindDialog's interface
 bool LLPanelPreferenceControls::onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes)
 {
+    // The in-world bindings take either Control on the Mac as Control.
+    mask = LLKeyboard::foldMacControl(mask);
     if (!mConflictHandler[mEditingMode].canAssignControl(mEditingControl))
     {
         return true;

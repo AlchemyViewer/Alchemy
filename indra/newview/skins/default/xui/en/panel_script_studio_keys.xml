@@ -40,6 +40,8 @@
     <panel.string name="cmd_delete_right">Delete right</panel.string>
     <panel.string name="cmd_delete_word_left">Delete the word left</panel.string>
     <panel.string name="cmd_delete_word_right">Delete the word right</panel.string>
+    <panel.string name="cmd_delete_to_line_start">Delete to the line's start</panel.string>
+    <panel.string name="cmd_delete_to_line_end">Delete to the line's end</panel.string>
     <panel.string name="cmd_new_line">New line</panel.string>
     <panel.string name="cmd_indent">Indent</panel.string>
     <panel.string name="cmd_unindent">Unindent</panel.string>
