@@ -449,6 +449,12 @@ private:
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void takeCarriedText(Doc& doc);
+    // What a notecard carries, each item a button in the text where its
+    // placeholder is -- the character that stands for it in the format
+    // -- that opens the item or offers a copy of it; and the opening.
+    void             placeEmbeddedItems(Doc& doc);
+    ALTextView::Atom embeddedAtom(Doc& doc, const ALTextPos& at, size_t index);
+    void             openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item);
     void save(Doc& doc);
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);

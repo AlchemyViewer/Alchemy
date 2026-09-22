@@ -167,6 +167,7 @@
     <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
+    <floater.string name="EmbeddedItemTip">[NAME], carried in the notecard: open it, or take a copy</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Preprocess on Save and Preprocessor > Firestorm > Switch Statements)</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Preprocess on Save and Preprocessor > Extensions)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
@@ -865,6 +866,29 @@
              drag_handle_second_indent="10"
              drag_handle_color="DkGray0"
              drag_handle_on_hover="true">
+                <!-- The tabs, the editor and its crumb bar sit flush, in a
+                     stack of their own: the outer stack's gap is for the
+                     handle between them and the band below. -->
+                <layout_panel
+                 auto_resize="true"
+                 height="324"
+                 layout="topleft"
+                 min_dim="168"
+                 name="editor_column"
+                 user_resize="true"
+                 width="574">
+                <layout_stack
+                 animate="false"
+                 follows="all"
+                 height="324"
+                 layout="topleft"
+                 left="0"
+                 name="editor_stack"
+                 orientation="vertical"
+                 top="0"
+                 width="574"
+                 border_size="0"
+                 show_drag_handle="false">
                 <layout_panel
                  auto_resize="false"
                  height="24"
@@ -892,7 +916,6 @@
                  layout="topleft"
                  min_dim="120"
                  name="editor_host"
-                 user_resize="true"
                  width="574">
                     <panel
                      follows="all"
@@ -958,6 +981,8 @@
                         <combo_box.item label="LSL on Luau" name="compile_target_lsl_luau" value="lsl-luau" />
                         <combo_box.item label="Lua" name="compile_target_luau" value="luau" />
                     </combo_box>
+                </layout_panel>
+                </layout_stack>
                 </layout_panel>
                 <layout_panel
                  auto_resize="false"

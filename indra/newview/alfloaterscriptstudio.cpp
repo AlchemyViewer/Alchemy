@@ -37,6 +37,8 @@
 #include "altextsearch.h"
 #include "alvimkeymap.h"
 #include "llagent.h"
+#include "llaudioengine.h"
+#include "llavataractions.h"
 #include "lldate.h"
 #include "lltimer.h"
 #include "llsyntaxid.h"
@@ -52,8 +54,12 @@
 #include "llfilepicker.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
+#include "llenvironment.h"
+#include "llinventoryicon.h"
 #include "llinventorymodel.h"
 #include "lllayoutstack.h"
+#include "llmaterialeditor.h"
+#include "llpreviewtexture.h"
 #include "lllineeditor.h"
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
@@ -71,6 +77,7 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+#include "llviewerinventory.h"
 #include "llviewermenu.h"
 #include "llweb.h"
 #include "llviewermenufile.h"
@@ -841,6 +848,146 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
     doc.carriedText.reset();
 }
 
+void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc)
+{
+    // The format stands each item in the text as a character past the
+    // last the standard assigns -- the first item's the first of them --
+    // which is four bytes starting F4 in UTF-8; each becomes an atom
+    // over its four bytes, so the text keeps it and a save carries it.
+    std::vector<ALTextView::Atom> atoms;
+    const ALTextDocument&         text = doc.editor->document();
+    for (S32 line = 0; line < text.lineCount() && !doc.embedded.empty(); ++line)
+    {
+        const std::string& bytes = text.line(line);
+        for (size_t i = 0; i + 3 < bytes.size(); ++i)
+        {
+            const unsigned char b0 = static_cast<unsigned char>(bytes[i]);
+            const unsigned char b1 = static_cast<unsigned char>(bytes[i + 1]);
+            const unsigned char b2 = static_cast<unsigned char>(bytes[i + 2]);
+            const unsigned char b3 = static_cast<unsigned char>(bytes[i + 3]);
+            if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+            {
+                continue;
+            }
+            const U32 code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
+            const U32 index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
+            if (index < doc.embedded.size() && doc.embedded[index].notNull())
+            {
+                atoms.push_back(embeddedAtom(doc, ALTextPos(line, static_cast<S32>(i)), index));
+            }
+            i += 3;
+        }
+    }
+    doc.editor->setAtoms(std::move(atoms));
+}
+
+ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& at, size_t index)
+{
+    const LLPointer<LLInventoryItem> item = doc.embedded[index];
+    const LLFontGL*                  font = LLFontGL::getFontSansSerifSmall();
+    LLStringUtil::format_map_t       args;
+    args["[NAME]"] = item->getName();
+    // A button with the item's icon and name, as wide as they are.
+    LLButton::Params p;
+    p.name                    = "embedded_item";
+    p.label                   = item->getName();
+    p.font                    = font;
+    p.image_overlay           = LLUI::getUIImage(LLInventoryIcon::getIconName(item->getType(), item->getInventoryType(), item->getFlags()));
+    p.image_overlay_alignment = "left";
+    p.tool_tip                = getString("EmbeddedItemTip", args);
+    const S32 width           = font->getWidth(item->getName()) + 16 + 12;
+    p.rect                    = LLRect(0, 0, width, 0);
+    LLButton*         button  = LLUICtrlFactory::create<LLButton>(p);
+    const ALScriptRef ref     = doc.ref;
+    button->setClickedCallback([this, ref, item](LLUICtrl*, const LLSD&) { openEmbeddedItem(ref, item); });
+    ALTextView::Atom atom;
+    atom.at      = at;
+    atom.length  = 4;
+    atom.width   = width;
+    atom.view    = button;
+    atom.tooltip = p.tool_tip();
+    atom.value   = static_cast<S32>(index);
+    return atom;
+}
+
+void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item)
+{
+    if (item.isNull())
+    {
+        return;
+    }
+    // As the legacy notecard does: a texture or a material opens in its
+    // preview, with the notecard named so that a save from there can
+    // reach it; a calling card opens the profile; a sound plays; the
+    // rest, and the sound once played, are offered as a copy.
+    switch (item->getType())
+    {
+        case LLAssetType::AT_TEXTURE:
+        {
+            LLPreviewTexture* preview = LLFloaterReg::showTypedInstance<LLPreviewTexture>("preview_texture", LLSD(item->getAssetUUID()), TAKE_FOCUS_YES);
+            if (preview)
+            {
+                preview->setAuxItem(item);
+                preview->setNotecardInfo(ref.item, ref.object);
+                if (preview->hasString("Title"))
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[NAME]"] = item->getName();
+                    preview->setTitle(preview->getString("Title", args));
+                }
+                preview->getChild<LLUICtrl>("desc")->setValue(item->getDescription());
+            }
+            return;
+        }
+        case LLAssetType::AT_MATERIAL:
+        {
+            LLSD key;
+            key["objectid"]   = ref.object;
+            key["notecardid"] = ref.item;
+            if (LLMaterialEditor* preview = LLFloaterReg::getTypedInstance<LLMaterialEditor>("material_editor", key))
+            {
+                preview->setAuxItem(item);
+                preview->setNotecardInfo(ref.item, ref.object);
+                preview->openFloater(key);
+                preview->setFocus(true);
+            }
+            return;
+        }
+        case LLAssetType::AT_CALLINGCARD:
+            if (!item->getDescription().empty())
+            {
+                LLAvatarActions::showProfile(LLUUID(item->getDescription()));
+            }
+            else if (item->getCreatorUUID().notNull())
+            {
+                LLAvatarActions::showProfile(item->getCreatorUUID());
+            }
+            return;
+        case LLAssetType::AT_SOUND:
+            if (gAudiop)
+            {
+                gAudiop->triggerSound(item->getAssetUUID(), gAgentID, 1.f, LLAudioEngine::AUDIO_TYPE_UI, gAgent.getPositionGlobal());
+            }
+            break;
+        case LLAssetType::AT_SETTINGS:
+            if (!LLEnvironment::instance().isInventoryEnabled())
+            {
+                LLNotificationsUtil::add("NoEnvironmentSettings");
+                return;
+            }
+            break;
+        default:
+            break;
+    }
+    LLNotificationsUtil::add("ConfirmItemCopy", LLSD(), LLSD(), [ref, item](const LLSD& notification, const LLSD& response) {
+        if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && item.notNull())
+        {
+            // The server finds the folder for it.
+            copy_inventory_from_notecard(LLUUID::null, ref.object, ref.item, item);
+        }
+    });
+}
+
 void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
 {
     const size_t index = indexOf(answer.ref);
@@ -872,6 +1019,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         doc.editor->setSyntax("text");
         doc.editor->setText(answer.text);
         takeCarriedText(doc);
+        placeEmbeddedItems(doc);
         doc.editor->setReadOnly(!answer.modifiable);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
@@ -2748,50 +2896,108 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
         static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
         const bool                   preprocessing = ALScriptPreprocessor::enabled();
+        const ALTextDocument& text = doc.editor->document();
+        // The transform a line's first statement is written for, by its
+        // shape -- `switch (`, `case ...:`, `default:`, `break;`, `break
+        // 2;`, `continue;`, `inline f(` or `inline integer f(` -- and
+        // nothing for a line where one of the words is a name of the
+        // script's own; the word itself comes back in `word`.
+        auto shapeOf = [&text](S32 index, std::string& word) -> const char* {
+            const std::string& line = text.line(index);
+            auto               isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+            size_t             at     = line.find_first_not_of(" \t");
+            // Past a closing or opening brace and a statement's end, which
+            // the words may follow on the same line.
+            while (at != std::string::npos && (line[at] == '{' || line[at] == '}' || line[at] == ';'))
+            {
+                at = line.find_first_not_of(" \t", at + 1);
+            }
+            if (at == std::string::npos || !isWord(line[at]))
+            {
+                return nullptr;
+            }
+            size_t end = at;
+            while (end < line.size() && isWord(line[end]))
+            {
+                ++end;
+            }
+            word                   = line.substr(at, end - at);
+            const size_t rest      = line.find_first_not_of(" \t", end);
+            const char   following = rest == std::string::npos ? '\0' : line[rest];
+            if (word == "switch")
+            {
+                return following == '(' ? "PreprocHintSwitch" : nullptr;
+            }
+            if (word == "case")
+            {
+                // `case <what>:` -- the colon somewhere after, and the
+                // word not used as a name would be: `case = 1;`, `case(`.
+                return following != '=' && following != '(' && following != '.' && following != ';' && line.find(':', end) != std::string::npos ? "PreprocHintSwitch" : nullptr;
+            }
+            if (word == "default")
+            {
+                return following == ':' ? "PreprocHintSwitch" : nullptr;
+            }
+            if (word == "break" || word == "continue")
+            {
+                return following == ';' || isdigit(static_cast<unsigned char>(following)) ? "PreprocHintExtensions" : nullptr;
+            }
+            if (word == "inline")
+            {
+                // `inline name(` or `inline type name(`.
+                size_t k = rest;
+                for (int words = 0; words < 2 && k != std::string::npos && k < line.size() && isWord(line[k]); ++words)
+                {
+                    while (k < line.size() && isWord(line[k]))
+                    {
+                        ++k;
+                    }
+                    k = line.find_first_not_of(" \t", k);
+                    if (k != std::string::npos && line[k] == '(')
+                    {
+                        return "PreprocHintExtensions";
+                    }
+                }
+                return nullptr;
+            }
+            return nullptr;
+        };
         for (ALScriptProblem& problem : doc.analysis)
         {
-            if (problem.severity != ALScriptProblem::Severity::Error || problem.line < 0 || problem.line >= doc.editor->document().lineCount())
+            if (problem.severity != ALScriptProblem::Severity::Error || problem.line < 0 || problem.line >= text.lineCount())
             {
                 continue;
             }
-            // The word at the error, or the one just before it: the parser
-            // says where it stopped, which may be the token after the one
-            // that is the trouble, and a `break;` on its own is a name
-            // nobody declared rather than a parse error at all.
-            const std::string& line = doc.editor->document().line(problem.line);
-            auto               wordAt = [&line](size_t at) {
-                size_t end = at;
-                while (end < line.size() && (isalnum(static_cast<unsigned char>(line[end])) || line[end] == '_'))
-                {
-                    ++end;
-                }
-                return line.substr(at, end - at);
-            };
-            const size_t column = static_cast<size_t>(llmax(0, problem.column));
-            std::string  word   = wordAt(llmin(column, line.size()));
-            static const std::set<std::string> ours{ "switch", "case", "break", "continue", "inline" };
-            if (!ours.count(word))
+            // The line the parser stopped on, written for a transform; or
+            // the one before it where the line is a brace on its own,
+            // since a switch's brace may open on the next line.
+            std::string word;
+            const char* item = shapeOf(problem.line, word);
+            if (!item)
             {
-                size_t back = llmin(column, line.size());
-                while (back > 0 && line[back - 1] == ' ')
+                const std::string& line = text.line(problem.line);
+                const size_t       at   = line.find_first_not_of(" \t");
+                S32                back = problem.line - 1;
+                while (at != std::string::npos && line[at] == '{' && back >= 0 && text.line(back).find_first_not_of(" \t") == std::string::npos)
                 {
                     --back;
                 }
-                size_t start = back;
-                while (start > 0 && (isalnum(static_cast<unsigned char>(line[start - 1])) || line[start - 1] == '_'))
+                if (at != std::string::npos && line[at] == '{' && back >= 0)
                 {
-                    --start;
+                    item = shapeOf(back, word);
+                    if (item && std::string(item) != "PreprocHintSwitch")
+                    {
+                        item = nullptr;
+                    }
                 }
-                word = line.substr(start, back - start);
             }
-            const char* item = nullptr;
-            if ((word == "switch" || word == "case") && !(preprocessing && switches))
+            if (item && std::string(item) == "PreprocHintSwitch" && preprocessing && switches)
             {
-                item = "PreprocHintSwitch";
+                item = nullptr;
             }
-            else if ((word == "break" || word == "continue" || word == "inline") && !(preprocessing && extensions))
+            if (item && std::string(item) == "PreprocHintExtensions" && preprocessing && extensions)
             {
-                item = "PreprocHintExtensions";
+                item = nullptr;
             }
             if (item)
             {
