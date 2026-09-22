@@ -28,6 +28,9 @@
 #include "allsloptimizer.h"
 
 #include "allslservice.h"
+#include "llmath.h"
+#include "llquaternion.h"
+#include "v3math.h"
 
 #include <tailslide/tailslide.hh>
 #include <tailslide/operations.hh>
@@ -514,6 +517,14 @@ namespace
             }
             return allocator->newTracked<LSLVectorConstant>(fx, fy, fz);
         }
+        LSLConstant* rotation(float x, float y, float z, float s)
+        {
+            if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || !std::isfinite(s))
+            {
+                return nullptr;
+            }
+            return allocator->newTracked<LSLQuaternionConstant>(x, y, z, s);
+        }
     };
 
     typedef std::vector<LSLConstant*> Args;
@@ -582,6 +593,30 @@ namespace
             return false;
         }
         out = *static_cast<LSLVectorConstant*>(a[i])->getValue();
+        return true;
+    }
+
+    // A rotation argument that is a unit quaternion, near enough that the
+    // VM's normalising of it changes nothing: what the rotation functions
+    // are folded over, since what a VM does with the rest is its own.
+    bool argUnitRotation(const Args& a, size_t i, LLQuaternion& out)
+    {
+        if (i >= a.size() || a[i]->getNodeSubType() != NODE_QUATERNION_CONSTANT)
+        {
+            return false;
+        }
+        const Quaternion* q   = static_cast<LSLQuaternionConstant*>(a[i])->getValue();
+        const float       mag = std::sqrt(q->x * q->x + q->y * q->y + q->z * q->z + q->s * q->s);
+        if (!std::isfinite(mag) || std::fabs(mag - 1.0f) >= 1e-6f)
+        {
+            return false;
+        }
+        // set() normalises, which changes nothing of a unit rotation but
+        // the last bit; the components are taken as they are.
+        out.mQ[VX] = q->x;
+        out.mQ[VY] = q->y;
+        out.mQ[VZ] = q->z;
+        out.mQ[VW] = q->s;
         return true;
     }
 
@@ -785,6 +820,265 @@ namespace
         return true;
     }
 
+    // A strict reader of JSON, for llJsonGetValue: only what RFC 8259
+    // allows, in ASCII, so that what is folded is what every reader
+    // agrees on; anything the simulator's own reader might take another
+    // way -- duplicate keys, numbers with a fraction or an exponent,
+    // escapes outside ASCII, and the JSON_* answers, which are
+    // characters no string literal here may hold -- is left to it.
+    struct JsonValue
+    {
+        enum class Kind : U8
+        {
+            Null,
+            True,
+            False,
+            Number,
+            String,
+            Array,
+            Object
+        };
+        Kind                                           kind = Kind::Null;
+        std::string                                    text;  // a number as written, a string unescaped
+        std::vector<JsonValue>                         items;
+        std::vector<std::pair<std::string, JsonValue>> fields;
+    };
+
+    struct JsonReader
+    {
+        const std::string& in;
+        size_t             at = 0;
+        bool               ok = true;
+
+        explicit JsonReader(const std::string& text) : in(text) {}
+
+        void space()
+        {
+            while (at < in.size() && (in[at] == ' ' || in[at] == '\t' || in[at] == '\n' || in[at] == '\r'))
+            {
+                ++at;
+            }
+        }
+        bool take(char c)
+        {
+            if (at < in.size() && in[at] == c)
+            {
+                ++at;
+                return true;
+            }
+            return false;
+        }
+        bool word(const char* w)
+        {
+            const size_t n = strlen(w);
+            if (in.compare(at, n, w) == 0)
+            {
+                at += n;
+                return true;
+            }
+            return false;
+        }
+        bool string(std::string& out)
+        {
+            if (!take('"'))
+            {
+                return false;
+            }
+            out.clear();
+            while (at < in.size())
+            {
+                const char c = in[at++];
+                if (c == '"')
+                {
+                    return true;
+                }
+                if (static_cast<unsigned char>(c) < 0x20)
+                {
+                    return false;
+                }
+                if (c != '\\')
+                {
+                    out += c;
+                    continue;
+                }
+                if (at >= in.size())
+                {
+                    return false;
+                }
+                const char e = in[at++];
+                switch (e)
+                {
+                    case '"': out += '"'; break;
+                    case '\\': out += '\\'; break;
+                    case '/': out += '/'; break;
+                    case 'b': out += '\b'; break;
+                    case 'f': out += '\f'; break;
+                    case 'n': out += '\n'; break;
+                    case 'r': out += '\r'; break;
+                    case 't': out += '\t'; break;
+                    case 'u':
+                    {
+                        if (at + 4 > in.size())
+                        {
+                            return false;
+                        }
+                        unsigned code = 0;
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            const char h = in[at++];
+                            if (!isxdigit(static_cast<unsigned char>(h)))
+                            {
+                                return false;
+                            }
+                            code = code * 16 + static_cast<unsigned>(isdigit(static_cast<unsigned char>(h)) ? h - '0' : tolower(h) - 'a' + 10);
+                        }
+                        if (code == 0 || code > 0x7F)
+                        {
+                            return false;
+                        }
+                        out += static_cast<char>(code);
+                        break;
+                    }
+                    default: return false;
+                }
+            }
+            return false;
+        }
+        bool value(JsonValue& out)
+        {
+            space();
+            if (at >= in.size())
+            {
+                return false;
+            }
+            const char c = in[at];
+            if (c == '{')
+            {
+                ++at;
+                out.kind = JsonValue::Kind::Object;
+                space();
+                if (take('}'))
+                {
+                    return true;
+                }
+                while (true)
+                {
+                    space();
+                    std::string key;
+                    if (!string(key))
+                    {
+                        return false;
+                    }
+                    for (const auto& field : out.fields)
+                    {
+                        if (field.first == key)
+                        {
+                            return false;
+                        }
+                    }
+                    space();
+                    if (!take(':'))
+                    {
+                        return false;
+                    }
+                    JsonValue v;
+                    if (!value(v))
+                    {
+                        return false;
+                    }
+                    out.fields.emplace_back(std::move(key), std::move(v));
+                    space();
+                    if (take(','))
+                    {
+                        continue;
+                    }
+                    return take('}');
+                }
+            }
+            if (c == '[')
+            {
+                ++at;
+                out.kind = JsonValue::Kind::Array;
+                space();
+                if (take(']'))
+                {
+                    return true;
+                }
+                while (true)
+                {
+                    JsonValue v;
+                    if (!value(v))
+                    {
+                        return false;
+                    }
+                    out.items.push_back(std::move(v));
+                    space();
+                    if (take(','))
+                    {
+                        continue;
+                    }
+                    return take(']');
+                }
+            }
+            if (c == '"')
+            {
+                out.kind = JsonValue::Kind::String;
+                return string(out.text);
+            }
+            if (word("true"))
+            {
+                out.kind = JsonValue::Kind::True;
+                return true;
+            }
+            if (word("false"))
+            {
+                out.kind = JsonValue::Kind::False;
+                return true;
+            }
+            if (word("null"))
+            {
+                out.kind = JsonValue::Kind::Null;
+                return true;
+            }
+            // A number: only a plain integer is taken; a fraction or an
+            // exponent is left to the simulator's own formatting.
+            const size_t start = at;
+            take('-');
+            if (at < in.size() && in[at] == '0')
+            {
+                ++at;
+            }
+            else if (at < in.size() && in[at] >= '1' && in[at] <= '9')
+            {
+                while (at < in.size() && isdigit(static_cast<unsigned char>(in[at])))
+                {
+                    ++at;
+                }
+            }
+            else
+            {
+                return false;
+            }
+            if (at < in.size() && (in[at] == '.' || in[at] == 'e' || in[at] == 'E'))
+            {
+                ok = false;
+                return false;
+            }
+            out.kind = JsonValue::Kind::Number;
+            out.text = in.substr(start, at - start);
+            return at > start + (in[start] == '-' ? 1 : 0);
+        }
+        bool whole(JsonValue& out)
+        {
+            if (!value(out))
+            {
+                return false;
+            }
+            space();
+            return at == in.size();
+        }
+    };
+
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
 
     const std::unordered_map<std::string, Evaluator>& evaluators()
@@ -893,6 +1187,75 @@ namespace
                   const float mag = static_cast<float>(std::sqrt(double(v.x) * v.x + double(v.y) * v.y + double(v.z) * v.z));
                   if (mag == 0.0f) return c.vector(0, 0, 0);
                   return c.vector(v.x / mag, v.y / mag, v.z / mag);
+              } },
+            // The rotations, by the viewer's own quaternion, which is the
+            // lineage of the simulator's: Euler angles through the
+            // matrix, axis and angle, and the axes of a rotation as the
+            // unit vectors turned by it. Only unit rotations are folded.
+            { "llEuler2Rot",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  Vector3 v;
+                  if (!argVector(a, 0, v)) return nullptr;
+                  LLQuaternion q;
+                  q.setEulerAngles(v.x, v.y, v.z);
+                  return c.rotation(q.mQ[VX], q.mQ[VY], q.mQ[VZ], q.mQ[VW]);
+              } },
+            { "llRot2Euler",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  F32 roll, pitch, yaw;
+                  q.getEulerAngles(&roll, &pitch, &yaw);
+                  return c.vector(roll, pitch, yaw);
+              } },
+            { "llAxisAngle2Rot",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  Vector3 axis;
+                  double  angle;
+                  if (!argVector(a, 0, axis) || !argFloat(a, 1, angle)) return nullptr;
+                  const LLQuaternion q(static_cast<F32>(angle), LLVector3(axis.x, axis.y, axis.z));
+                  return c.rotation(q.mQ[VX], q.mQ[VY], q.mQ[VZ], q.mQ[VW]);
+              } },
+            { "llRot2Axis",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  F32       angle;
+                  LLVector3 axis;
+                  q.getAngleAxis(&angle, axis);
+                  // No rotation has no axis to speak of: the VM's to say.
+                  if (angle == 0.0f) return nullptr;
+                  return c.vector(axis.mV[VX], axis.mV[VY], axis.mV[VZ]);
+              } },
+            { "llRot2Angle",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  F32       angle;
+                  LLVector3 axis;
+                  q.getAngleAxis(&angle, axis);
+                  return c.number(angle);
+              } },
+            { "llRot2Fwd",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  const LLVector3 v = LLVector3(1.f, 0.f, 0.f) * q;
+                  return c.vector(v.mV[VX], v.mV[VY], v.mV[VZ]);
+              } },
+            { "llRot2Left",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  const LLVector3 v = LLVector3(0.f, 1.f, 0.f) * q;
+                  return c.vector(v.mV[VX], v.mV[VY], v.mV[VZ]);
+              } },
+            { "llRot2Up",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LLQuaternion q;
+                  if (!argUnitRotation(a, 0, q)) return nullptr;
+                  const LLVector3 v = LLVector3(0.f, 0.f, 1.f) * q;
+                  return c.vector(v.mV[VX], v.mV[VY], v.mV[VZ]);
               } },
             { "llStringLength",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1139,6 +1502,51 @@ namespace
                       case NODE_QUATERNION_CONSTANT: return c.integer(6);
                       default: return nullptr;
                   }
+              } },
+            { "llJsonGetValue",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string      json;
+                  LSLListConstant* path;
+                  if (!argString(a, 0, json) || !argList(a, 1, path)) return nullptr;
+                  JsonValue  root;
+                  JsonReader reader(json);
+                  if (!reader.whole(root)) return nullptr;
+                  const JsonValue* at = &root;
+                  for (LSLConstant* step : elements(path))
+                  {
+                      if (step->getNodeSubType() == NODE_STRING_CONSTANT && at->kind == JsonValue::Kind::Object)
+                      {
+                          const char*      key   = static_cast<LSLStringConstant*>(step)->getValue();
+                          const JsonValue* found = nullptr;
+                          for (const auto& field : at->fields)
+                          {
+                              if (field.first == key)
+                              {
+                                  found = &field.second;
+                              }
+                          }
+                          if (!found) return nullptr;
+                          at = found;
+                      }
+                      else if (step->getNodeSubType() == NODE_INTEGER_CONSTANT && at->kind == JsonValue::Kind::Array)
+                      {
+                          const int index = static_cast<LSLIntegerConstant*>(step)->getValue();
+                          if (index < 0 || static_cast<size_t>(index) >= at->items.size()) return nullptr;
+                          at = &at->items[static_cast<size_t>(index)];
+                      }
+                      else
+                      {
+                          return nullptr;
+                      }
+                  }
+                  // A string or a plain number: what is written is what
+                  // is answered. The rest -- true, false, null, a nested
+                  // object or array -- the simulator spells its own way.
+                  if (at->kind == JsonValue::Kind::String || at->kind == JsonValue::Kind::Number)
+                  {
+                      return c.string(at->text);
+                  }
+                  return nullptr;
               } },
             { "llList2CSV",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -2272,6 +2680,17 @@ namespace
                 mStream << '<' << number(q->x, true) << ", " << number(q->y, true) << ", " << number(q->z, true) << ", " << number(q->s, true) << '>';
                 return false;
             });
+        }
+        // Tailslide calls the type quaternion, which LSL takes, but the
+        // word everyone writes is rotation.
+        bool visit(LSLType* type) override
+        {
+            if (type->getIType() == LST_QUATERNION)
+            {
+                mStream << "rotation";
+                return false;
+            }
+            return PrettyPrintVisitor::visit(type);
         }
         bool visit(LSLGlobalVariable* n) override { return at(n, [&] { return PrettyPrintVisitor::visit(n); }); }
         bool visit(LSLGlobalFunction* n) override { return at(n, [&] { return PrettyPrintVisitor::visit(n); }); }

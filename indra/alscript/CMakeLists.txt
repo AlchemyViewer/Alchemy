@@ -37,7 +37,7 @@ target_sources(
         alsourcemap.h
 )
 
-target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide PUBLIC llcommon)
+target_link_libraries(alscript PRIVATE al::flags ll::slua ll::tailslide llmath PUBLIC llcommon)
 target_precompile_headers(alscript REUSE_FROM llprecompiled)
 
 # tests

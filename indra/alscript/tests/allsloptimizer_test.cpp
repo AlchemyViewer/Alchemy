@@ -297,4 +297,41 @@ namespace tut
         }
         ensure("some golden files", checked > 0 || std::getenv("AL_OPTIMIZER_WRITE_EXPECTED"));
     }
+    template<> template<>
+    void allsloptimizer_object::test<11>()
+    {
+        set_test_name("the rotation functions fold over unit rotations by the viewer's own quaternion, and leave the rest");
+        const std::string source = wrap("", "        rotation a = llEuler2Rot(<0, 0, PI_BY_TWO>);\n        vector b = llRot2Euler(<0, 0, 0.7071068, 0.7071068>);\n        rotation c = llAxisAngle2Rot(<0, 0, 2>, PI);\n        vector d = llRot2Axis(<0, 0, 0.7071068, 0.7071068>);\n        float e = llRot2Angle(<0, 0, 0.7071068, 0.7071068>);\n        vector f = llRot2Fwd(<0, 0, 0.7071068, 0.7071068>);\n        vector h = llRot2Up(<0.7071068, 0, 0, 0.7071068>);\n        vector i = llRot2Axis(<0, 0, 0, 1>);\n        vector j = llRot2Fwd(<0, 0, 2, 2>);\n        llSay(0, (string)a + (string)b + (string)c + (string)d + (string)e + (string)f + (string)h + (string)i + (string)j);\n        a = c = ZERO_ROTATION; b = d = f = h = i = j = ZERO_VECTOR; e = 0;\n");
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized", r.optimized);
+        auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+        // A quarter turn about z: x and y zero, z and s a half root two.
+        ensure("euler to rot: " + r.text, has("rotation a = <0, 0, 0.70710677, 0.70710677>;") || has("rotation a = <0, 0, 0.7071068, 0.7071068>;"));
+        ensure("rot to euler: " + r.text, has("vector b = <0, 0, 1.5707964>;") || has("vector b = <0, 0, 1.5707963>;"));
+        ensure("axis and angle, the axis normalised: " + r.text, has("rotation c = <0, 0, 1, ") && !has("llAxisAngle2Rot"));
+        ensure("the axis back, a bit under one as the division leaves it: " + r.text, has("vector d = <0, 0, 0.99999994>;") || has("vector d = <0, 0, 1>;"));
+        ensure("the angle back: " + r.text, has("float e = 1.5707964;") || has("float e = 1.5707963;"));
+        ensure("fwd of a quarter turn is left: " + r.text, !has("llRot2Fwd(<0, 0, 0.7071068, 0.7071068>)") && has("vector f = <"));
+        ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, -"));
+        ensure("no rotation has no axis: left", has("llRot2Axis(<0, 0, 0, 1>)"));
+        ensure("not a unit rotation: left", has("llRot2Fwd(<0, 0, 2, 2>)"));
+    }
+    template<> template<>
+    void allsloptimizer_object::test<12>()
+    {
+        set_test_name("llJsonGetValue folds a string or a plain number out of strict JSON, and leaves the rest to the simulator");
+        const std::string source = wrap("", "        string a = llJsonGetValue(\"{\\\"name\\\": \\\"Ann\\\", \\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"name\"]);\n        string b = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", -7]}\", [\"tags\", 1]);\n        string c = llJsonGetValue(\"{\\\"tags\\\": [\\\"x\\\", 7, {\\\"k\\\": \\\"v\\\"}]}\", [\"tags\", 2, \"k\"]);\n        string d = llJsonGetValue(\"[1.5]\", [0]);\n        string e = llJsonGetValue(\"[true]\", [0]);\n        string f = llJsonGetValue(\"[1]\", [3]);\n        string g = llJsonGetValue(\"{\\\"a\\\": 1, \\\"a\\\": 2}\", [\"a\"]);\n        string h = llJsonGetValue(\"[1,]\", [0]);\n        string i = llJsonGetValue(\"[\\\"a\\\\\\\"b\\\"]\", [0]);\n        llSay(0, a + b + c + d + e + f + g + h + i);\n        a = b = c = d = e = f = g = h = i = \"\";\n");
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized", r.optimized);
+        auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+        ensure("a key: " + r.text, has("string a = \"Ann\";"));
+        ensure("an index, a negative integer: " + r.text, has("string b = \"-7\";"));
+        ensure("down a path: " + r.text, has("string c = \"v\";"));
+        ensure("a fraction is left: " + r.text, has("string d = llJsonGetValue"));
+        ensure("true is left", has("string e = llJsonGetValue"));
+        ensure("out of range is left", has("string f = llJsonGetValue"));
+        ensure("duplicate keys are left", has("string g = llJsonGetValue"));
+        ensure("a trailing comma is left", has("string h = llJsonGetValue"));
+        ensure("an escape unescaped: " + r.text, has("string i = \"a\\\"b\";"));
+    }
 } // namespace tut
