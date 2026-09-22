@@ -235,6 +235,10 @@
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
                 </menu_item_check>
+                <menu_item_check label="Break, Continue and &amp;= |= ^=" layout="topleft" name="preproc_extensions">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
+                </menu_item_check>
                 <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
@@ -251,6 +255,10 @@
                 <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
+                </menu_item_check>
+                <menu_item_check label="Inline Functions Called Once" layout="topleft" name="preproc_inline">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_inline" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
                 </menu_item_check>
                 <menu_item_separator layout="topleft" />
                 <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">

@@ -38,6 +38,10 @@
         <string>return</string>
         <string>state</string>
         <string>default</string>
+        <string>switch</string>
+        <string>case</string>
+        <string>break</string>
+        <string>continue</string>
       </array>
       <key>type</key>
       <array>

@@ -1499,6 +1499,18 @@ void ALFloaterScriptStudio::teachWords(ALCodeEditor& editor, bool lua)
             default: break;
         }
     }
+    if (!lua)
+    {
+        // The preprocessor's words, which the grid's keywords do not list:
+        // Firestorm's switch and LSL-PyOptimizer's break and continue.
+        for (const char* word : { "switch", "case", "break", "continue" })
+        {
+            if (std::find(controls.begin(), controls.end(), word) == controls.end())
+            {
+                controls.push_back(word);
+            }
+        }
+    }
     ALSyntaxWords& tables = editor.highlighter().words();
     tables.set("function", std::move(functions));
     tables.set("event", std::move(events));
@@ -4207,7 +4219,7 @@ void ALFloaterScriptStudio::goToLine()
             }
             doc->editor->setFocus(true);
         },
-        mEditorHost, 420, 56,
+        mEditorHost, 420, ALQuickOpen::heightForRows(1),
         [docOf, was]() {
             if (Doc* doc = docOf())
             {
@@ -6654,7 +6666,8 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         }
     }
     else if (action == "preproc_enabled" || action == "preproc_switch" || action == "preproc_lazy" || action == "preproc_compress" ||
-             action == "preproc_disk" || action == "preproc_optimize" || action == "preproc_shrink" || action == "preproc_addstrings")
+             action == "preproc_disk" || action == "preproc_optimize" || action == "preproc_shrink" || action == "preproc_addstrings" ||
+             action == "preproc_inline" || action == "preproc_extensions")
     {
         const char* setting = action == "preproc_enabled"    ? "ALScriptPreprocEnabled"
                               : action == "preproc_switch"   ? "ALScriptPreprocSwitch"
@@ -6663,6 +6676,8 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
                               : action == "preproc_optimize" ? "ALScriptPreprocOptimizer"
                               : action == "preproc_shrink"   ? "ALScriptPreprocOptimizerShrinkNames"
                               : action == "preproc_addstrings" ? "ALScriptPreprocOptimizerAddStrings"
+                              : action == "preproc_inline"     ? "ALScriptPreprocOptimizerInlining"
+                              : action == "preproc_extensions" ? "ALScriptPreprocExtensions"
                                                                : "ALScriptPreprocDiskIncludes";
         gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
         // What the analyzers see changes with the setting.
@@ -6930,6 +6945,14 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "preproc_addstrings")
     {
         return gSavedSettings.getBOOL("ALScriptPreprocOptimizerAddStrings");
+    }
+    if (action == "preproc_inline")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerInlining");
+    }
+    if (action == "preproc_extensions")
+    {
+        return gSavedSettings.getBOOL("ALScriptPreprocExtensions");
     }
     return false;
 }

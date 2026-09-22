@@ -365,6 +365,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptPreprocOptimizerInlining</key>
+        <map>
+            <key>Comment</key>
+            <string>The optimizer puts a user function called from one place in that place, and drops the function.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptPreprocExtensions</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor takes break and continue in loops and the &amp;= |= ^= &lt;&lt;= &gt;&gt;= assignments in LSL, as LSL-PyOptimizer does, and writes the LSL they stand for.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptPreprocSwitch</key>
         <map>
             <key>Comment</key>

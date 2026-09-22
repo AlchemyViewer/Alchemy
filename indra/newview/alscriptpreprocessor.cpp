@@ -567,16 +567,20 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     static LLCachedControl<bool> optimizer(gSavedSettings, "ALScriptPreprocOptimizer", false);
     static LLCachedControl<bool> shrink(gSavedSettings, "ALScriptPreprocOptimizerShrinkNames", false);
     static LLCachedControl<bool> addstrings(gSavedSettings, "ALScriptPreprocOptimizerAddStrings", false);
+    static LLCachedControl<bool> inlining(gSavedSettings, "ALScriptPreprocOptimizerInlining", false);
+    static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
     ALPreprocessor::Options      options;
-    options.lua       = request.lua;
-    options.switches  = switches;
-    options.lazyLists = lazy;
-    options.compress  = compress;
+    options.lua        = request.lua;
+    options.switches   = switches;
+    options.lazyLists  = lazy;
+    options.compress   = compress;
+    options.extensions = extensions;
     // The analyzers see the expanded text before the optimizer has been
     // at it, so that their positions stay the author's.
     options.optimize              = optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
     options.optimizer.shrinknames = shrink;
     options.optimizer.addstrings  = addstrings;
+    options.optimizer.inlining    = inlining;
     options.optimizer.target      = request.compileTarget == "lsl2"       ? ALLSLOptimizer::Target::LSO
                                     : request.compileTarget == "lsl-luau" ? ALLSLOptimizer::Target::Luau
                                                                           : ALLSLOptimizer::Target::Mono;
