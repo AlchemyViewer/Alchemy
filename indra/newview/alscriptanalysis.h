@@ -28,9 +28,13 @@
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 #include "llsingleton.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace LL
@@ -120,7 +124,12 @@ public:
     };
     typedef std::function<void(const Result&)> callback_t;
 
-    // Asks the worker and answers on the main thread.
+    // Asks the worker and answers on the main thread. A check of a
+    // script whose newer check is already waiting is passed over rather
+    // than run: typing through a slow check would otherwise queue one
+    // whole-script check per keystroke, every answer but the last
+    // thrown away on arrival, with a hover or a completion waiting
+    // behind them all.
     void ask(Request request, callback_t callback);
 
     // The region's definitions changed: the Luau ones are read again
@@ -137,4 +146,12 @@ private:
     // after another.
     std::unique_ptr<Worker>                             mWorker;
     U32                                                 mDefinitionsGeneration = 1;
+    // The newest check asked for of each script, by the serial they were
+    // asked in: a check the worker reaches with a newer one already
+    // asked for is passed over. Written on the main thread, read on the
+    // worker; both under the lock, since a check may take a moment and
+    // the main thread goes on asking meanwhile.
+    std::mutex                                          mLatestMutex;
+    boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> mLatestCheck;
+    U32                                                 mAskSerial = 0;
 };

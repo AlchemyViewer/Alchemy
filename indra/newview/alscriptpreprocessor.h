@@ -29,11 +29,13 @@
 #include "alpreprocessor.h"
 #include "alscriptworkspace.h"
 #include "llsingleton.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <functional>
-#include <map>
 #include <memory>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -110,12 +112,8 @@ public:
     static std::string pathOf(const ALScriptRef& ref);
 
 private:
+    typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;
     struct Job;
-    struct Cached
-    {
-        LLUUID      assetId;
-        std::string text;
-    };
     // Something an include name could mean, in the order tried.
     struct Candidate
     {
@@ -129,23 +127,38 @@ private:
     // `unknown` says the object's contents have not been listed yet, so
     // a name not found may still be there.
     std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown) const;
-    ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, std::set<std::string>* wanted);
+    ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted);
     // The `.luaurc` that governs a file, by the file's identity: its own
     // identity and its text, fetched like an include where it is in the
     // world. No where there is none.
-    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, std::set<std::string>* wanted, std::string& path, std::string& text);
+    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, wanted_t* wanted, std::string& path, std::string& text);
     // An include's text, from the cache or a file; Pending, and wanted,
     // where it is in the world and not in hand yet.
-    ALPreprocessor::Found  textOf(const Candidate& candidate, std::set<std::string>* wanted, std::string& text, std::string& assetId);
-    ALPreprocessor::Result attempt(const Request& request, std::set<std::string>* wanted, bool optimize);
+    ALPreprocessor::Found  textOf(const Candidate& candidate, wanted_t* wanted, std::string& text, std::string& assetId);
+    ALPreprocessor::Result attempt(const Request& request, wanted_t* wanted, bool optimize);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
     void                    attemptJob(const std::shared_ptr<Job>& job);
     // An include by its identity, loaded into the cache -- or noted as
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);
 
-    std::map<std::string, Cached>                          mTexts;
-    std::set<std::string>                                  mFailed;
+    // The texts fetched, by the identity they came under, with how many
+    // bytes they come to: kept for the session so that a check need
+    // wait for nothing, and the oldest let go of past a budget, since a
+    // session that opens a hundred scripts would otherwise hold every
+    // include any of them ever named.
+    struct Cached
+    {
+        LLUUID      assetId;
+        std::string text;
+        U32         used = 0;
+    };
+    boost::unordered_flat_map<std::string, Cached, ll::string_hash, std::equal_to<>> mTexts;
+    U32                                                                             mUse = 0;
+    size_t                                                                          mHeld = 0;
+    // The oldest let go of until what is held is within the budget.
+    void                                                                            trimTexts();
+    wanted_t                                                                        mFailed;
     // What each prim was last said to hold.
-    std::map<LLUUID, std::vector<ALScriptWorkspace::Item>> mContents;
+    boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
 };

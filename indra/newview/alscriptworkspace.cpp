@@ -57,6 +57,7 @@
 #include "message.h"
 // [RLVa:KB]
 #include "rlvhandler.h"
+#include "alscriptmessages.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
@@ -69,28 +70,11 @@
 
 namespace
 {
-    // What the compilers say about where a problem is. Luau's names the
-    // chunk and a one-based line; LSL's gives a zero-based line and column
-    // as the viewer scrolls to them.
-    const boost::regex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
-    const boost::regex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
-    const boost::regex DEFAULT_STATE(R"(\s*default\s*\{)");
-
-    // How a script's run-time error starts: the object, the script, and
-    // the words.
-    const boost::regex RUNTIME_ERROR_HEADER(R"(^(.+?)\s+\[script:([^\]]+)\]\s+Script run-time error)");
-    const char* const  RUNTIME_ERROR_MARKER = "Script run-time error";
     // How long after a line the lines that belong with it may still come,
     // and how often that is looked at.
     const F32    BURST_TIMEOUT      = 1.0f;
     const F32    BURST_FLUSH_PERIOD = 0.25f;
     const size_t RECENT_RUNTIME     = 500;
-
-    bool endsWith(const std::string& text, const char* suffix)
-    {
-        const size_t n = strlen(suffix);
-        return text.size() >= n && text.compare(text.size() - n, n, suffix) == 0;
-    }
 
     // The script a message names, in a prim's contents.
     LLInventoryItem* scriptNamed(LLViewerObject* prim, const std::string& name)
@@ -224,7 +208,7 @@ ALScriptWorkspace::~ALScriptWorkspace() = default;
 
 bool ALScriptWorkspace::looksLikeLua(std::string_view content)
 {
-    return !boost::regex_search(content.begin(), content.end(), DEFAULT_STATE);
+    return ALScriptMessages::looksLikeLua(content);
 }
 
 ALScriptWorkspace::Language ALScriptWorkspace::resolve(const LLInventoryItem* item, std::string_view content, const std::string& requested)
@@ -406,31 +390,14 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
 std::vector<ALScriptWorkspace::Diagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& errors, bool lua)
 {
     std::vector<Diagnostic> out;
-    for (LLSD::array_const_iterator it = errors.beginArray(); it != errors.endArray(); ++it)
+    for (const ALScriptMessages::Place& place : ALScriptMessages::readDiagnostics(errors, lua))
     {
-        std::string line = it->asString();
-        LLStringUtil::stripNonprintable(line);
-        Diagnostic   diagnostic;
-        boost::smatch found;
-        if (lua && boost::regex_match(line, found, LUAU_LOCATION))
-        {
-            diagnostic.line    = llmax(0, std::atoi(found[2].str().c_str()) - 1);
-            diagnostic.level   = "ERROR";
-            diagnostic.message = found[3].str();
-        }
-        else if (!lua && boost::regex_search(line, found, LSL_LOCATION))
-        {
-            diagnostic.line      = std::atoi(found[1].str().c_str());
-            diagnostic.column    = std::atoi(found[2].str().c_str());
-            diagnostic.hasColumn = true;
-            diagnostic.level     = found[3].str();
-            diagnostic.message   = found[4].str();
-        }
-        else
-        {
-            diagnostic.level   = "ERROR";
-            diagnostic.message = line;
-        }
+        Diagnostic diagnostic;
+        diagnostic.line      = place.line;
+        diagnostic.column    = place.column;
+        diagnostic.hasColumn = place.hasColumn;
+        diagnostic.level     = place.level;
+        diagnostic.message   = place.message;
         out.push_back(std::move(diagnostic));
     }
     return out;
@@ -1045,9 +1012,9 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
 void ALScriptWorkspace::ingestChat(const LLChat& chat)
 {
     const RuntimeEvent::Channel channel = chat.mChatType == CHAT_TYPE_OWNER ? RuntimeEvent::Channel::OwnerSay : RuntimeEvent::Channel::Debug;
-    const std::vector<std::string> lines = LLStringUtil::getTokens(chat.mText, "\n");
-    boost::smatch                  match;
-    const bool                     header = !lines.empty() && boost::regex_match(lines.front(), match, RUNTIME_ERROR_HEADER);
+    const std::vector<std::string>  lines = LLStringUtil::getTokens(chat.mText, "\n");
+    ALScriptMessages::Header        named;
+    const bool                      header = !lines.empty() && ALScriptMessages::readRuntimeHeader(lines.front(), named);
 
     // A line that is not the start of an error, with nothing being
     // joined, is an event by itself.
@@ -1068,7 +1035,7 @@ void ALScriptWorkspace::ingestChat(const LLChat& chat)
     {
         if (LLViewerObject* prim = gObjectList.findObject(chat.mFromID))
         {
-            if (LLInventoryItem* item = scriptNamed(prim, match[2].str()))
+            if (LLInventoryItem* item = scriptNamed(prim, named.script))
             {
                 lua = item->getRuntime() == "luau";
             }
@@ -1138,14 +1105,14 @@ void ALScriptWorkspace::deliverRuntime(const Burst& burst)
     // An error: the header names the object and the script, and the rest
     // is the stack.
     std::vector<std::string> lines = LLStringUtil::getTokens(event.message, "\n");
-    if (!lines.empty() && endsWith(lines.front(), RUNTIME_ERROR_MARKER))
+    if (!lines.empty() && ALScriptMessages::endsRuntimeError(lines.front()))
     {
         event.isError = true;
-        boost::smatch match;
-        if (boost::regex_match(lines.front(), match, RUNTIME_ERROR_HEADER))
+        ALScriptMessages::Header named;
+        if (ALScriptMessages::readRuntimeHeader(lines.front(), named))
         {
-            event.objectName = match[1].str();
-            event.scriptName = match[2].str();
+            event.objectName = named.object;
+            event.scriptName = named.script;
             lines.erase(lines.begin());
         }
         else
@@ -1166,40 +1133,27 @@ void ALScriptWorkspace::deliverRuntime(const Burst& burst)
         // Where: Luau names the chunk and a one-based line; LSL gives a
         // zero-based line and column, or nothing at all, as "Math Error"
         // comes.
-        bool located = false;
+        std::vector<std::string> said;
         for (const std::string& text : burst.texts)
         {
             for (const std::string& line : LLStringUtil::getTokens(text, "\n"))
             {
-                boost::smatch match;
-                if (event.lua && boost::regex_match(line, match, LUAU_LOCATION))
-                {
-                    event.line  = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10)) - 1;
-                    event.error = match[3].str();
-                    located     = true;
-                }
-                else if (!event.lua && boost::regex_match(line, match, LSL_LOCATION))
-                {
-                    event.line   = static_cast<S32>(std::strtol(match[1].str().c_str(), nullptr, 10));
-                    event.column = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10));
-                    event.error  = match[4].str();
-                    located      = true;
-                }
-                if (located)
-                {
-                    break;
-                }
-            }
-            if (located)
-            {
-                break;
+                said.push_back(line);
             }
         }
-        if (!located)
+        ALScriptMessages::Location where;
+        const bool                 located = ALScriptMessages::readRuntimeLocation(said, event.lua, where);
+        if (located)
+        {
+            event.line   = where.line;
+            event.column = where.column;
+            event.error  = where.message;
+        }
+        else
         {
             for (const std::string& line : lines)
             {
-                if (!line.empty() && line.find(RUNTIME_ERROR_MARKER) == std::string::npos)
+                if (!line.empty() && !ALScriptMessages::endsRuntimeError(line))
                 {
                     event.error = line;
                     break;

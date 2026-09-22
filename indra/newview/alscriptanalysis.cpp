@@ -155,7 +155,29 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     const std::string docs_path  = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
     const std::string lsl_path   = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
     const U32         generation = mDefinitionsGeneration;
-    mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation]() {
+    // Which check of this script this is: a later one asked for while
+    // this one waits makes it stale, and the worker passes it over. Only
+    // checks are numbered -- a hover or a completion is about a place,
+    // and is cheap.
+    U32 serial = 0;
+    if (request.kind == Kind::Check)
+    {
+        const std::lock_guard<std::mutex> lock(mLatestMutex);
+        serial                    = ++mAskSerial;
+        mLatestCheck[request.id] = serial;
+    }
+    mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation, serial]() {
+        if (serial != 0)
+        {
+            const std::lock_guard<std::mutex> lock(mLatestMutex);
+            const auto                        latest = mLatestCheck.find(request.id);
+            if (latest != mLatestCheck.end() && latest->second != serial)
+            {
+                // A newer check of this script is already waiting: this
+                // one's answer would be thrown away on arrival.
+                return;
+            }
+        }
         if (!mWorker)
         {
             mWorker = std::make_unique<Worker>();

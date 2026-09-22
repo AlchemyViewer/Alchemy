@@ -249,6 +249,11 @@ struct ALScriptPreprocessor::Job
     callback_t callback;
     S32        rounds      = 0;
     S32        outstanding = 0;
+    // The first round of a run tries again for what failed before: an
+    // include that was not there may be there now. Only this job's own
+    // -- what its first attempt asks for -- rather than every failure
+    // every script ever had.
+    bool       retry       = false;
 };
 
 ALScriptPreprocessor::ALScriptPreprocessor() = default;
@@ -469,7 +474,7 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
     return out;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, std::set<std::string>* wanted, std::string& text, std::string& assetId)
+ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t* wanted, std::string& text, std::string& assetId)
 {
     if (!c.file.empty())
     {
@@ -479,8 +484,9 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, std::set<
     auto cached = mTexts.find(c.path);
     if (cached != mTexts.end() && cached->second.assetId == c.assetId)
     {
-        text    = cached->second.text;
-        assetId = c.assetId.isNull() ? std::string() : c.assetId.asString();
+        cached->second.used = ++mUse;
+        text                = cached->second.text;
+        assetId             = c.assetId.isNull() ? std::string() : c.assetId.asString();
         return ALPreprocessor::Found::Yes;
     }
     if (mFailed.count(c.path))
@@ -494,7 +500,7 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, std::set<
     return ALPreprocessor::Found::Pending;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, const Request& request, std::set<std::string>* wanted, std::string& path, std::string& text)
+ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, const Request& request, wanted_t* wanted, std::string& path, std::string& text)
 {
     static const std::string CONFIG_NAME(".luaurc");
     Candidate                candidate;
@@ -588,7 +594,7 @@ ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, c
 }
 
 ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Request& request,
-                                                    std::set<std::string>* wanted)
+                                                    wanted_t* wanted)
 {
     ALPreprocessor::Ask ask = ask_in;
     if (ask.from.empty())
@@ -686,7 +692,7 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     return options;
 }
 
-ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, std::set<std::string>* wanted, bool optimize)
+ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, wanted_t* wanted, bool optimize)
 {
     ALPreprocessor::Options options = optionsFor(request, optimize);
     options.resolve                 = [this, &request, wanted](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
@@ -735,8 +741,10 @@ void ALScriptPreprocessor::run(const Request& request, callback_t callback)
     auto job      = std::make_shared<Job>();
     job->request  = request;
     job->callback = std::move(callback);
-    // What failed before may come now.
-    mFailed.clear();
+    // What this script's own includes failed at before may come now;
+    // another script's failures are its own, and clearing them would
+    // have every other tab fetch its missing include again.
+    job->retry = true;
     if (request.ref.inInventory())
     {
         attemptJob(job);
@@ -756,8 +764,41 @@ void ALScriptPreprocessor::run(const Request& request, callback_t callback)
 
 void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
 {
-    std::set<std::string>  wanted;
+    wanted_t               wanted;
     ALPreprocessor::Result result = attempt(job->request, &wanted, true);
+    if (job->retry)
+    {
+        // What this run's own includes failed at before: asked for
+        // again, once.
+        job->retry = false;
+        wanted_t   again;
+        bool       any = false;
+        for (const std::string& path : mFailed)
+        {
+            again.insert(path);
+        }
+        for (const std::string& path : again)
+        {
+            // Only what this script names: attempt() with the failures
+            // forgotten says what it wants, which is the ones it reaches.
+            mFailed.erase(path);
+            any = true;
+        }
+        if (any)
+        {
+            wanted.clear();
+            result = attempt(job->request, &wanted, true);
+            // Whatever this run does not name goes back to failed, so
+            // that another tab's missing include stays missing.
+            for (const std::string& path : again)
+            {
+                if (!wanted.count(path))
+                {
+                    mFailed.insert(path);
+                }
+            }
+        }
+    }
     if (wanted.empty() || ++job->rounds > MAX_ROUNDS)
     {
         if (job->callback)
@@ -776,6 +817,30 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
                 attemptJob(job);
             }
         });
+    }
+}
+
+void ALScriptPreprocessor::trimTexts()
+{
+    // What is held, within the budget: the least lately read let go of
+    // first, and the newest always kept whatever its size.
+    constexpr size_t BUDGET = 16u * 1024u * 1024u;
+    while (mHeld > BUDGET && mTexts.size() > 1)
+    {
+        auto oldest = mTexts.begin();
+        for (auto it = mTexts.begin(); it != mTexts.end(); ++it)
+        {
+            if (it->second.used < oldest->second.used)
+            {
+                oldest = it;
+            }
+        }
+        if (oldest->second.used == mUse)
+        {
+            break;
+        }
+        mHeld -= oldest->second.text.size();
+        mTexts.erase(oldest);
     }
 }
 
@@ -803,8 +868,15 @@ void ALScriptPreprocessor::fetch(const std::string& path, std::function<void()> 
             {
                 cached.text = envelope->source;
             }
+            cached.used = ++mUse;
+            if (const auto was = mTexts.find(path); was != mTexts.end())
+            {
+                mHeld -= was->second.text.size();
+            }
+            mHeld += cached.text.size();
             mTexts[path] = std::move(cached);
             mFailed.erase(path);
+            trimTexts();
         }
         done();
     });
@@ -816,7 +888,7 @@ void ALScriptPreprocessor::fetchConfig(const Request& request, std::function<voi
     {
         return;
     }
-    std::set<std::string> wanted;
+    wanted_t              wanted;
     std::string           path, text;
     if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, &wanted, path, text) != ALPreprocessor::Found::Pending || wanted.empty())
     {
