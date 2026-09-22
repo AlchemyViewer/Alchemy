@@ -32,6 +32,7 @@
 #include "alscriptenvelope.h"
 #include "llagent.h"
 #include "lldir.h"
+#include "llsdjson.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
 #include "llviewercontrol.h"
@@ -40,6 +41,7 @@
 #include "llviewerobjectlist.h"
 #include "llvoavatarself.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -169,6 +171,74 @@ namespace
         buffer << in.rdbuf();
         out = buffer.str();
         return true;
+    }
+
+    // The folders an `.lslrc` in a folder adds to an LSL include's
+    // search -- `{"include": ["../lib", "/abs/path"]}`, each relative to
+    // the folder the file is in unless from a root -- as `.luaurc`
+    // aliases do for `require`. Nothing where there is no such file, or
+    // it is not what it should be.
+    std::vector<std::string> lslrcFolders(const std::string& folder)
+    {
+        std::vector<std::string> out;
+        if (folder.empty())
+        {
+            return out;
+        }
+        std::string text;
+        if (!readFile(gDirUtilp->add(folder, ".lslrc"), text))
+        {
+            return out;
+        }
+        LLSD        config;
+        std::string error;
+        if (!LlsdFromJsonString(text, config, &error) || !config.isMap() || !config.has("include"))
+        {
+            if (!error.empty())
+            {
+                LL_WARNS("ScriptPreprocessor") << folder << "/.lslrc is not a configuration: " << error << LL_ENDL;
+            }
+            return out;
+        }
+        const LLSD& listed = config["include"];
+        for (LLSD::array_const_iterator it = listed.beginArray(); it != listed.endArray(); ++it)
+        {
+            std::string dir = it->asString();
+            if (dir.empty())
+            {
+                continue;
+            }
+            if (!ALLuauConfig::absolute(dir))
+            {
+                dir = gDirUtilp->add(folder, dir);
+            }
+            while (dir.size() > 1 && (dir.back() == '/' || dir.back() == '\\'))
+            {
+                dir.pop_back();
+            }
+            out.push_back(dir);
+        }
+        return out;
+    }
+
+    // The nearest `.lslrc` up from a folder: its folders, or none.
+    std::vector<std::string> nearestLslrcFolders(std::string folder)
+    {
+        for (int depth = 0; depth < 32 && !folder.empty(); ++depth)
+        {
+            std::vector<std::string> found = lslrcFolders(folder);
+            if (!found.empty() || gDirUtilp->fileExists(gDirUtilp->add(folder, ".lslrc")))
+            {
+                return found;
+            }
+            const std::string up = gDirUtilp->getDirName(folder);
+            if (up == folder)
+            {
+                break;
+            }
+            folder = up;
+        }
+        return {};
     }
 } // namespace
 
@@ -337,6 +407,30 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
             if (disk && !folder().empty())
             {
                 dirs.push_back(folder());
+            }
+            if (!request.lua)
+            {
+                // Then wherever an `.lslrc` says: the nearest up from the
+                // asking file, and the include folder's own.
+                std::vector<std::string> more;
+                if (!from.empty())
+                {
+                    more = nearestLslrcFolders(gDirUtilp->getDirName(from));
+                }
+                if (disk && !folder().empty())
+                {
+                    for (const std::string& dir : lslrcFolders(folder()))
+                    {
+                        more.push_back(dir);
+                    }
+                }
+                for (const std::string& dir : more)
+                {
+                    if (std::find(dirs.begin(), dirs.end(), dir) == dirs.end())
+                    {
+                        dirs.push_back(dir);
+                    }
+                }
             }
             std::vector<std::string> names{ ask.name };
             if (request.lua)
