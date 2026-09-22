@@ -3019,86 +3019,134 @@ bool LLStringUtil::formatDatetime(std::string& replacement, std::string_view tok
 // [FOO,datetime,format]
 
 
+namespace
+{
+    // The formatting over a map, or over two: what each bracketed token is
+    // replaced by comes from `replace(replacement, token)`, and the seconds
+    // a datetime counts from, from `datetime(seconds)`, so that the loop is
+    // written once.
+    template <class Replace, class Datetime>
+    S32 formatWith(std::string& s, Replace replace, Datetime datetime)
+    {
+        S32 res = 0;
+
+        // Every substitution is bracketed, so a string with no '[' cannot
+        // produce one. Bail before building `output`: the loop below would
+        // copy the whole string into it and assign back, and most strings
+        // that reach here (button labels, menu entries, tooltips) have
+        // nothing to substitute.
+        if (s.find('[') == std::string::npos)
+        {
+            return res;
+        }
+
+        std::string output;
+        std::vector<std::string> tokens;
+
+        std::string::size_type start = 0;
+        std::string::size_type prev_start = 0;
+        std::string::size_type key_start = 0;
+        while ((key_start = LLStringUtil::getSubstitution(s, start, tokens)) != std::string::npos)
+        {
+            output += std::string(s, prev_start, key_start-prev_start);
+            prev_start = start;
+
+            bool found_replacement = false;
+            std::string replacement;
+
+            if (tokens.size() == 0)
+            {
+                found_replacement = false;
+            }
+            else if (tokens.size() == 1)
+            {
+                found_replacement = replace(replacement, tokens[0]);
+            }
+            else if (tokens[1] == "number")
+            {
+                std::string param = "0";
+
+                if (tokens.size() > 2) param = tokens[2];
+                found_replacement = replace(replacement, tokens[0]);
+                if (found_replacement) LLStringUtil::formatNumber(replacement, param);
+            }
+            else if (tokens[1] == "datetime")
+            {
+                std::string param;
+                if (tokens.size() > 2) param = tokens[2];
+
+                S32 secFromEpoch = 0;
+                if (datetime(secFromEpoch))
+                {
+                    found_replacement = LLStringUtil::formatDatetime(replacement, tokens[0], param, secFromEpoch);
+                }
+            }
+
+            if (found_replacement)
+            {
+                output += replacement;
+                res++;
+            }
+            else
+            {
+                // we had no replacement, use the string as is
+                // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
+                output += std::string(s, key_start, start-key_start);
+            }
+            tokens.clear();
+        }
+        // send the remainder of the string (with no further matches for bracketed names)
+        output += std::string(s, start);
+        s = output;
+        return res;
+    }
+
+    // The seconds a map's "datetime" says, where it says any.
+    bool datetimeOf(const LLStringUtil::format_map_t& substitutions, S32& seconds)
+    {
+        LLStringUtil::format_map_t::const_iterator iter = substitutions.find("datetime");
+        return iter != substitutions.end() && LLStringUtil::convertToS32(iter->second(), seconds);
+    }
+}
+
 // static
 template<>
 S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
-    S32 res = 0;
+    return formatWith(
+        s, [&](std::string& replacement, std::string_view token) { return simpleReplacement(replacement, token, substitutions); },
+        [&](S32& seconds) { return datetimeOf(substitutions, seconds); });
+}
 
-    // Every substitution is bracketed, so a string with no '[' cannot produce
-    // one. Bail before building `output`: the loop below would copy the whole
-    // string into it and assign back, and most strings that reach here (button
-    // labels, menu entries, tooltips) have nothing to substitute.
-    if (s.find('[') == std::string::npos)
-    {
-        return res;
-    }
-
-    std::string output;
-    std::vector<std::string> tokens;
-
-    std::string::size_type start = 0;
-    std::string::size_type prev_start = 0;
-    std::string::size_type key_start = 0;
-    while ((key_start = getSubstitution(s, start, tokens)) != std::string::npos)
-    {
-        output += std::string(s, prev_start, key_start-prev_start);
-        prev_start = start;
-
-        bool found_replacement = false;
-        std::string replacement;
-
-        if (tokens.size() == 0)
+// static
+template<>
+S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions, const format_map_t& fallback)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
+    // As a merge of the two with the first's keys kept would have it: the
+    // bare token in either, the first first, then the bracketed one.
+    auto find = [](const format_map_t& in, std::string_view key, std::string& out) {
+        format_map_t::const_iterator iter = in.find(key);
+        if (iter == in.end())
         {
-            found_replacement = false;
+            return false;
         }
-        else if (tokens.size() == 1)
-        {
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-        }
-        else if (tokens[1] == "number")
-        {
-            std::string param = "0";
-
-            if (tokens.size() > 2) param = tokens[2];
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-            if (found_replacement) formatNumber (replacement, param);
-        }
-        else if (tokens[1] == "datetime")
-        {
-            std::string param;
-            if (tokens.size() > 2) param = tokens[2];
-
-            format_map_t::const_iterator iter = substitutions.find("datetime");
-            if (iter != substitutions.end())
+        out = iter->second;
+        return true;
+    };
+    return formatWith(
+        s,
+        [&](std::string& replacement, std::string_view token) {
+            if (find(substitutions, token, replacement) || find(fallback, token, replacement))
             {
-                S32 secFromEpoch = 0;
-                bool r = LLStringUtil::convertToS32(iter->second(), secFromEpoch);
-                if (r)
-                {
-                    found_replacement = formatDatetime(replacement, tokens[0], param, secFromEpoch);
-                }
+                return true;
             }
-        }
-
-        if (found_replacement)
-        {
-            output += replacement;
-            res++;
-        }
-        else
-        {
-            // we had no replacement, use the string as is
-            // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
-            output += std::string(s, key_start, start-key_start);
-        }
-        tokens.clear();
-    }
-    // send the remainder of the string (with no further matches for bracketed names)
-    output += std::string(s, start);
-    s = output;
-    return res;
+            static thread_local std::string bracketed;
+            bracketed.assign(1, '[').append(token).append(1, ']');
+            return find(substitutions, bracketed, replacement) || find(fallback, bracketed, replacement);
+        },
+        [&](S32& seconds) { return datetimeOf(substitutions, seconds) || datetimeOf(fallback, seconds); });
 }
 
 //static

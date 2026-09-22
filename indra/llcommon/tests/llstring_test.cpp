@@ -1079,6 +1079,48 @@ namespace tut
                       std::string("no bar here [MISSING] -=[Stylized Name]=-"));
     }
 
+    template<> template<>
+    void string_index_object_t::test<48>()
+    {
+        set_test_name("format over two maps reads the first's value where both have a key, as a merge with the first kept would");
+
+        LLStringUtil::format_map_t first;
+        first["[APP]"] = "Alchemy";
+        first["[BOTH]"] = "first";
+        first["[BARE]"] = "bracketed in the first";
+        first["datetime"] = "0";
+        LLStringUtil::format_map_t second;
+        second["[NAME]"] = "Rye";
+        second["[BOTH]"] = "second";
+        second["BARE"] = "bare in the second";
+        second["[COUNT]"] = "3.14159";
+
+        // A bare key is found before a bracketed one whichever map has it,
+        // as the merge's one lookup order had it.
+        const char* const text = "[APP] for [NAME]: [BOTH], [BARE], [COUNT,number,2], [MISSING]";
+        std::string       s(text);
+        ensure_equals("five put in", 5, LLStringUtil::format(s, first, second));
+        ensure_equals("from either, the first first, a number formatted, what neither has left", s,
+                      std::string("Alchemy for Rye: first, bare in the second, 3.14, [MISSING]"));
+
+        // The same as the merge would give.
+        LLStringUtil::format_map_t merged = first;
+        merged.insert(second.begin(), second.end());
+        std::string m(text);
+        LLStringUtil::format(m, merged);
+        ensure_equals("as the merge", s, m);
+
+        // The maps the other way about: the second's value where both have
+        // the key.
+        std::string r("[BOTH]");
+        ensure_equals("one put in", 1, LLStringUtil::format(r, second, first));
+        ensure_equals("the other first", r, std::string("second"));
+
+        std::string plain("nothing bracketed");
+        ensure_equals("nothing to do", 0, LLStringUtil::format(plain, first, second));
+        ensure_equals("and nothing done", plain, std::string("nothing bracketed"));
+    }
+
     // Both views replaceString takes are allowed to point into the string it is
     // replacing into, and both are read after a replace that can have moved the
     // buffer under them. Taking them by value used to make that safe without

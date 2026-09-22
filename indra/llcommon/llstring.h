@@ -308,6 +308,11 @@ public:
     LL_COMMON_API static void formatNumber(string_type& numStr, string_view_type decimals);
     LL_COMMON_API static bool formatDatetime(string_type& replacement, string_view_type token, string_view_type param, S32 secFromEpoch);
     LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions);
+    // The same over two maps, the first's value taken where both have a
+    // key: what a caller's arguments laid over LLTrans's defaults come
+    // to, without merging the maps -- a copy of every default for every
+    // string formatted, which is what the merge cost.
+    LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions, const format_map_t& fallback);
     LL_COMMON_API static S32 format(string_type& s, const LLSD& substitutions);
     LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const format_map_t& substitutions);
     LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const LLSD& substitutions);
@@ -472,7 +477,8 @@ public:
     LL_COMMON_API static void       testHarness();
 #endif
 
-private:
+    // The next bracketed token from `start`: where it begins, its parts
+    // split at commas, and `start` moved past it. What format() reads by.
     LL_COMMON_API static size_type getSubstitution(const string_type& instr, size_type& start, std::vector<string_type >& tokens);
 };
 
