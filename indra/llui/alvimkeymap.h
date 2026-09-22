@@ -101,18 +101,21 @@ public:
     bool recording() const { return mRecording != 0; }
     char recordingInto() const { return mRecording; }
 
-    // The lines entered on the : line and on the search line, oldest
-    // first, for Up and Down on the line, q: q/ @: and :history -- the
-    // keymap's own unless told to share another's, as the editors of one
-    // studio do, since a line entered in one is wanted in the next.
-    struct History
+    // What one vim shares among its buffers, which here are the keymaps
+    // of one studio's editors: the lines entered on the : line and on
+    // the search line, oldest first, for Up and Down on the line, q: q/
+    // @: and :history; and the settings a :set changes, ignorecase and
+    // smartcase. The keymap's own unless told to share another's.
+    struct Shared
     {
         std::vector<std::string> command;
         std::vector<std::string> search;
+        bool                     ignoreCase = false;
+        bool                     smartCase  = false;
     };
-    const History&                 history() const { return *mHistory; }
-    std::shared_ptr<History>       sharedHistory() const { return mHistory; }
-    void                           shareHistory(std::shared_ptr<History> history);
+    const Shared&           shared() const { return *mShared; }
+    std::shared_ptr<Shared> sharedState() const { return mShared; }
+    void                    share(std::shared_ptr<Shared> shared);
 
     // One thing typed: a character, or a key with its modifiers.
     struct Input
@@ -208,10 +211,32 @@ private:
     {
         std::string regex;
         bool        caseSensitive = true;
+        // Where a match may start, as \%V \%# \%23l \%<23l \%>23l \%23c
+        // and \%23v ask -- the last visual area, the caret, a line, a
+        // column -- since the engine has no such atoms: a match anywhere
+        // else is dropped. Vim ties the atom to its place in the pattern;
+        // here it is the match's start, which is where they are written.
+        struct Where
+        {
+            enum class Kind : U8
+            {
+                Visual,
+                Caret,
+                Line,
+                Column
+            };
+            Kind kind    = Kind::Line;
+            // -1 before, 0 at, 1 after; the number, 1-based as vim counts.
+            S32  side    = 0;
+            S32  number  = 0;
+        };
+        std::vector<Where> where;
     };
     Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
+    // The matches a pattern's places allow, the rest dropped.
+    void    constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches) const;
     // The history of a line kind, and the line entered into it.
-    std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mHistory->command : mHistory->search; }
+    std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mShared->command : mShared->search; }
     void                      remember(llwchar kind, const std::string& line);
     // g and v: the command over every line the pattern picks out, or
     // every line it does not.
@@ -259,14 +284,12 @@ private:
     llwchar mFindChar    = 0;
     bool    mFindForward = true;
     bool    mFindTill    = false;
-    // The search, for n and N; :s sets it too. And how case is matched,
-    // as :set ignorecase and smartcase have it: sensitive unless told
-    // otherwise, as vim's own defaults are.
+    // The search, for n and N; :s sets it too. How case is matched is
+    // in the shared state: sensitive unless :set ignorecase says, as
+    // vim's own default is.
     std::string mSearchPattern;
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
-    bool        mIgnoreCase      = false;
-    bool        mSmartCase       = false;
 
     std::map<char, Register>  mRegisters;
     Register                  mUnnamed;
@@ -300,7 +323,7 @@ private:
     // not walking.
     std::string              mLine;
     llwchar                  mLineKind = ':';
-    std::shared_ptr<History> mHistory = std::make_shared<History>();
+    std::shared_ptr<Shared>  mShared = std::make_shared<Shared>();
     S32                      mHistoryAt = -1;
     std::string              mHistoryPrefix;
     // The last :s, for :s with nothing after it, :&, :&&, & and g&: its

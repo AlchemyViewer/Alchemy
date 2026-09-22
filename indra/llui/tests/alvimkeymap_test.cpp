@@ -687,4 +687,29 @@ namespace tut
         keys(":g/\\v^(lower)/s/end/END/<CR>");
         ensure_equals(":g takes vim's spelling too", flat(e.text()), std::string("lower W zed END|"));
     }
+    template<> template<>
+    void alvimkeymap_object::test<17>()
+    {
+        set_test_name("~ in a pattern is the last replacement, \\%[] an optional sequence, and \\%V \\%# \\%l \\%c say where a match may start");
+        ALCodeEditor& e = make("fun func function\nfun func function\nfun func function\n");
+        keys(":s/fun\\%[ction]/X/g<CR>");
+        ensure_equals("\\%[ction] takes as much of the sequence as is there", flat(e.text()), std::string("X X X|fun func function|fun func function|"));
+        keys("u:s/func/Y/<CR>j:s/~tion/Z/<CR>");
+        ensure_equals("~ is the last replacement, as text", flat(e.text()), std::string("fun Y function|fun func function|fun func function|"));
+        ensure("nothing matched Ytion, so an error", vim->messageIsError());
+        keys("gg0wve<Esc>:%s/\\%Vfun/V/g<CR>");
+        ensure_equals("\\%V: only where the last visual area was", flat(e.text()), std::string("fun Y Vction|fun func function|fun func function|"));
+        keys(":%s/\\%3lfun/L/g<CR>");
+        ensure_equals("\\%3l: only on line 3", flat(e.text()), std::string("fun Y Vction|fun func function|L Lc Lction|"));
+        keys(":%s/\\%>1lfun\\%<3l/M/g<CR>");
+        ensure_equals("\\%>1l and \\%<3l: between", flat(e.text()), std::string("fun Y Vction|M Mc Mction|L Lc Lction|"));
+        keys(":%s/\\%5cf/C/g<CR>");
+        ensure("\\%5c: nothing at column 5", vim->messageIsError());
+        keys(":%s/\\%3cn/C/g<CR>");
+        ensure_equals("at column 3", flat(e.text()), std::string("fuC Y Vction|M Mc Mction|L Lc Lction|"));
+        keys("gg0:%s/\\%#fu/H/g<CR>");
+        ensure_equals("\\%#: only at the caret", flat(e.text()), std::string("HC Y Vction|M Mc Mction|L Lc Lction|"));
+        keys(":set ic<CR>");
+        ensure("the setting is shared with whoever shares the state", vim->shared().ignoreCase);
+    }
 }
