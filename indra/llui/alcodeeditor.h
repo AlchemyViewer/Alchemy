@@ -281,6 +281,10 @@ public:
     void supplyCompletions(const ALTextPos& at, std::vector<Completion> more);
     bool completionOpen() const;
     void closeCompletion();
+    // Whether the list opens on its own as an identifier is typed, or only
+    // when asked for.
+    void setAutoComplete(bool on) { mAutoComplete = on; }
+    bool getAutoComplete() const { return mAutoComplete; }
     // Puts the chosen completion in place of the prefix; a function comes
     // with its brackets, the caret between them where it takes anything,
     // and the call's signature asked for. False with none open.
@@ -338,6 +342,9 @@ public:
     void                            setPlaceholders(std::vector<ALTextRange> ranges, const ALTextPos& after);
     bool                            nextPlaceholder(S32 direction);
     void                            clearPlaceholders();
+    // Everything typing puts up let go of at once: the list, the
+    // signature and the stops.
+    void                            dropTyping();
     // The names of a signature's parameters, from how a completion's
     // detail reads: "integer llSay(integer channel, string msg)" or
     // "(channel: number, msg: string) -> ()". The list is the bracket

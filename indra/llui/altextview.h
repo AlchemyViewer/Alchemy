@@ -262,6 +262,9 @@ public:
     // one first again.
     void           setModalKeymap(std::unique_ptr<ALModalKeymap> keymap);
     ALModalKeymap* modalKeymap() const { return mModal.get(); }
+    // Whether a character typed now goes into the text: always, but for a
+    // modal keymap outside its inserting modes, where it is a command.
+    bool           typingText() const { return !mModal || mModal->inserting(); }
 
     // The caret put at a place, or a stretch selected, and brought into
     // view: where a list of places sends it.

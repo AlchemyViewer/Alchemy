@@ -716,4 +716,26 @@ namespace tut
         f.setShowWhitespace(ALCodeEditor::Whitespace::Trailing);
         ensure_equals("all three", f.blanksOn(0).size(), size_t(3));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<19>()
+    {
+        set_test_name("a capital typed into a word keeps the list up and what was answered about the word");
+        ALCodeEditor& e = make("integer countDown;\ncou");
+        e.setCaret(e.document().end());
+        S32 asked = 0;
+        e.setCompletionRequest([&asked](const ALTextPos&, std::string_view) { ++asked; });
+        type("n");
+        ensure("open", e.completionOpen());
+        ensure_equals("asked once about the word", asked, 1);
+        // As the viewer delivers it: the key with its shift, then the
+        // character.
+        e.handleKeyHere('T', MASK_SHIFT);
+        ensure("the shift closed nothing", e.completionOpen());
+        ensure("char taken", e.handleUnicodeCharHere('t'));
+        e.handleKeyHere('D', MASK_SHIFT);
+        ensure("char taken", e.handleUnicodeCharHere('D'));
+        ensure("still open", e.completionOpen());
+        ensure_equals("and not asked again about the same word", asked, 1);
+    }
 }

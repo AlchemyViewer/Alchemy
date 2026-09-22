@@ -59,7 +59,7 @@ namespace tut
             }
         }
 
-        ALCodeEditor& make(const char* text, const char* syntax = "lsl")
+        ALCodeEditor& make(const char* text, const char* syntax = "lsl", bool auto_complete = false)
         {
             if (!ui.ok())
             {
@@ -75,7 +75,7 @@ namespace tut
             p.rect         = LLRect(0, 200, 400, 0);
             p.default_text  = text;
             p.syntax        = syntax;
-            p.auto_complete = false;
+            p.auto_complete = auto_complete;
             editor          = LLUICtrlFactory::create<ALCodeEditor>(p);
             editor->setFont(LLFontGL::getFontMonospace());
             editor->setFocus(true);
@@ -1058,5 +1058,37 @@ namespace tut
         ensure_equals("a count after > shifts so many from the range's end", e.document().line(2), std::string("\tapple"));
         keys(":1>><CR>");
         ensure_equals("doubled, two steps", e.document().line(0), std::string("\t\tpear"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<27>()
+    {
+        set_test_name("with completion on, a command opens no list, and one Escape closes what typing put up and leaves insert");
+        ALCodeEditor& e = make("counter = count;\n", "lsl", true);
+        keys("ll");
+        ensure("no list for a motion inside a word", !e.completionOpen());
+        keys("x.");
+        ensure("nor for an edit, or its repeat", !e.completionOpen());
+        keys("A co");
+        ensure("inserting", vim->inserting());
+        ensure("the list opens as typing goes", e.completionOpen());
+        keys("<Esc>");
+        ensure("one Escape closes the list", !e.completionOpen());
+        ensure("and leaves insert", !vim->inserting());
+
+        keys("o");
+        ALCodeEditor::Signature call;
+        call.label = "llSay(integer channel, string msg)";
+        e.showSignature(e.caret(), call);
+        ensure("a signature while inserting", e.signature() != nullptr);
+        keys("<Esc>");
+        ensure("gone with the one Escape", e.signature() == nullptr && !vim->inserting());
+        e.showSignature(e.caret(), call);
+        ensure("an answer arriving after is not shown", e.signature() == nullptr);
+
+        keys("ico");
+        ensure("up again", e.completionOpen());
+        keys("<C-c>");
+        ensure("control-c leaves insert and the list", !vim->inserting() && !e.completionOpen());
     }
 }

@@ -2644,9 +2644,32 @@ void ALCodeEditor::clearPlaceholders()
 
 // --- input -------------------------------------------------------------------
 
+void ALCodeEditor::dropTyping()
+{
+    closeCompletion();
+    hideSignature();
+    clearPlaceholders();
+}
+
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
     hideCard();
+    // Outside a modal keymap's inserting modes a key is a command, and
+    // nothing the typing puts up -- the list, the signature, a snippet's
+    // stops -- is in play: the keymap has the key, whatever it is.
+    if (!typingText())
+    {
+        dropTyping();
+        return ALTextView::handleKeyHere(key, mask);
+    }
+    // Under a modal keymap one Escape closes whatever the typing has up
+    // and leaves the inserting mode as well, as vim's own popup menu has
+    // it, rather than taking a second press to reach the keymap.
+    if (key == KEY_ESCAPE && mask == MASK_NONE && modalKeymap())
+    {
+        dropTyping();
+        return ALTextView::handleKeyHere(key, mask);
+    }
     if (!mPlaceholders.empty() && !completionOpen())
     {
         if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT))
@@ -2695,8 +2718,10 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
                 break;
         }
     }
-    else if (completionOpen() && key != KEY_BACKSPACE)
+    else if (completionOpen() && key != KEY_BACKSPACE && !(mask == MASK_SHIFT && key >= 0x20 && key < KEY_SPECIAL))
     {
+        // A capital is a character like any other: what it is decides,
+        // when it comes, rather than the shift closing the list under it.
         closeCompletion();
     }
     if (mSignature && key == KEY_ESCAPE && mask == MASK_NONE)
@@ -2705,6 +2730,12 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         return true;
     }
     const bool taken = ALTextView::handleKeyHere(key, mask);
+    if (!typingText())
+    {
+        // The key left the inserting mode: Control-[ or Control-C in vim.
+        dropTyping();
+        return taken;
+    }
     if (taken && mSignature && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE))
     {
         mSignatureRequest(caret());
@@ -2714,10 +2745,18 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 
 bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
+    const bool typing   = typingText();
     const bool was_open = completionOpen();
     if (!ALTextView::handleUnicodeCharHere(uni_char))
     {
         return false;
+    }
+    if (!typing || !typingText())
+    {
+        // A command to a modal keymap -- a motion, an operator, a line
+        // being typed -- put nothing in to complete or to call.
+        dropTyping();
+        return true;
     }
     const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));
     if (uni_char == '.' && mAutoComplete && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
@@ -3136,6 +3175,11 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
 
 void ALCodeEditor::showSignature(const ALTextPos& at, Signature signature)
 {
+    if (!typingText())
+    {
+        // An answer that came after a modal keymap stopped inserting.
+        return;
+    }
     mSignature   = std::move(signature);
     mSignatureAt = at;
 }

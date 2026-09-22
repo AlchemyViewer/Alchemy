@@ -3664,7 +3664,9 @@ void ALTextView::drawBand(F32 alpha)
 
 bool ALTextView::handleKeyHere(KEY key, MASK mask)
 {
-    if (key == KEY_ESCAPE && mask == MASK_NONE && findShown())
+    // Escape closes the find bar, but for a modal keymap's inserting
+    // mode, which it leaves first; the next Escape closes the bar.
+    if (key == KEY_ESCAPE && mask == MASK_NONE && findShown() && typingText() != (mModal != nullptr))
     {
         hideFind();
         return true;
