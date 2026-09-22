@@ -230,6 +230,18 @@ namespace tut
         strip->reshape(500, HEIGHT);
         ensure("but to half the strip: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() <= 250);
         strip->die();
+
+        // A name cut to fit keeps its extension and a few letters before
+        // it, with an ellipsis in the middle.
+        const LLFontGL*   font = LLFontGL::getFontSansSerifSmall();
+        const std::string name = "a_very_long_name_that_wants_a_great_deal_of_room.lsl";
+        ensure_equals("a name that fits is itself", ALTabStrip::shortened(font, name, 10000), name);
+        const std::string cut = ALTabStrip::shortened(font, name, font->getWidth(name) / 2);
+        ensure("shorter: " + cut, cut.size() < name.size() && font->getWidth(cut) <= font->getWidth(name) / 2);
+        ensure("the end kept: " + cut, cut.size() >= 7 && cut.compare(cut.size() - 7, 7, "oom.lsl") == 0);
+        ensure("the start kept: " + cut, cut.compare(0, 2, "a_") == 0);
+        ensure("an ellipsis between: " + cut, cut.find("\xE2\x80\xA6") != std::string::npos);
+        ensure_equals("no room for even the end: the whole, for the renderer to cut", ALTabStrip::shortened(font, name, 4), name);
     }
 
     // A preview tab has no way out: it is not being held, so there is

@@ -100,6 +100,53 @@ U8 ALTabStrip::styleOf(const Tab& tab)
     return tab.preview ? LLFontGL::ITALIC : LLFontGL::NORMAL;
 }
 
+// A name that fits is itself. One that does not keeps its end -- the
+// extension and a few letters before it -- and as much of its start as
+// leaves room for an ellipsis between; where even the end will not fit,
+// the whole is given back for the renderer to cut at its end.
+std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label, S32 room)
+{
+    if (font->getWidth(label) <= room)
+    {
+        return label;
+    }
+    static const std::string ELLIPSIS = "\xE2\x80\xA6";
+    // The end: the extension where the name has one near its end, with
+    // three letters before it; else the last four letters.
+    const size_t dot  = label.rfind('.');
+    size_t       tail = dot != std::string::npos && label.size() - dot <= 6 ? dot : label.size();
+    for (S32 letters = 0; letters < (dot != std::string::npos && tail == dot ? 3 : 4) && tail > 0; ++letters)
+    {
+        --tail;
+        while (tail > 0 && (static_cast<unsigned char>(label[tail]) & 0xC0) == 0x80)
+        {
+            --tail;
+        }
+    }
+    const std::string end   = label.substr(tail);
+    const S32         fixed = font->getWidth(ELLIPSIS + end);
+    if (fixed > room || tail < 2)
+    {
+        return label;
+    }
+    // The start: as many whole characters as fit before the ellipsis.
+    size_t head = 0;
+    while (head < tail)
+    {
+        size_t next = head + 1;
+        while (next < tail && (static_cast<unsigned char>(label[next]) & 0xC0) == 0x80)
+        {
+            ++next;
+        }
+        if (font->getWidth(label.substr(0, next)) + fixed > room)
+        {
+            break;
+        }
+        head = next;
+    }
+    return head == 0 ? label : label.substr(0, head) + ELLIPSIS + end;
+}
+
 // Each tab wants the width of its words. Where they all fit, each gets
 // that, and a name too long for the usual most a tab may be is let run on
 // into whatever room is spare, up to half the strip, so that a long name
@@ -268,13 +315,14 @@ void ALTabStrip::draw()
         }
 
         // The name stops short of the way out, which every held tab has
-        // and a preview does not.
+        // and a preview does not; one too long is cut in the middle, so
+        // that its end -- the extension, the number -- still shows.
         const S32 room = r.mRight - PAD - CLOSE - PAD / 2 - x;
         if (room > 0)
         {
             const U8 style = styleOf(tab);
             F32 after = (F32)x;
-            font->renderUTF8(tab.label, 0, (F32)x, (F32)baseline, (current ? ink : quiet).get() % alpha,
+            font->renderUTF8(shortened(font, tab.label, room), 0, (F32)x, (F32)baseline, (current ? ink : quiet).get() % alpha,
                              LLFontGL::LEFT, LLFontGL::BOTTOM, style, LLFontGL::NO_SHADOW,
                              S32_MAX, room, &after, /*use_ellipses=*/true);
             if (!tab.detail.empty())

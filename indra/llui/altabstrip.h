@@ -43,7 +43,8 @@ class LLFontGL;
 // one decision over all of them: they share the strip, a long name taking
 // the spare room while there is any, the wide ones giving way first when
 // there is not, and cut their names short before they overlap. A name too
-// long for its tab ends in an ellipsis, and the whole of it is the tab's tip.
+// long for its tab is cut in the middle, its end -- the extension -- kept,
+// and the whole of it is the tab's tip.
 //
 // A tab may be a preview: what is being looked at without being held, which
 // the next look replaces. It is drawn in the other face so that a reader
@@ -144,6 +145,11 @@ public:
 protected:
     friend class LLUICtrlFactory;
     ALTabStrip(const Params& p);
+
+public:
+    // A name cut to fit a width, in the middle, its end kept. Public for
+    // the test of it.
+    static std::string shortened(const LLFontGL* font, const std::string& label, S32 room);
 
 private:
     // Every tab's width, decided together.
