@@ -426,7 +426,18 @@ public:
     // comes later through supplyHover; shown if the mouse is still there.
     typedef std::function<void(const ALTextPos& at, std::string_view word)> hover_request_t;
     void setHoverRequest(hover_request_t request) { mHoverRequest = std::move(request); }
-    void supplyHover(const ALTextPos& at, const std::string& text);
+    // A line of what a card says that is a way somewhere -- where the word
+    // was declared -- by its words: a link on the card that hands its
+    // value to the handler, and the card goes.
+    struct CardLink
+    {
+        std::string line;
+        std::string tooltip;
+        LLSD        value;
+    };
+    void supplyHover(const ALTextPos& at, const std::string& text, std::vector<CardLink> links = {});
+    typedef std::function<void(const LLSD& value)> card_link_t;
+    void setCardLinkHandler(card_link_t handler) { mCardLinkHandler = std::move(handler); }
     // What is said of the problems and the word the mouse rests on, in a
     // card over the text: each problem first, in its squiggle's colour;
     // then what the word is -- its first line in the editor's own face,
@@ -440,7 +451,8 @@ public:
         std::string message;
         LLColor4    color;
     };
-    void        showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems = {});
+    void        showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems = {},
+                         const std::vector<CardLink>& links = {});
     // Whether the mouse resting on the text brings up a card at all, and
     // after how long, in seconds; below zero, when the tooltip manager
     // asks, which is the viewer's own tooltip delay.
@@ -688,6 +700,8 @@ private:
     ALTextRange             mHoverAsked;
     U32                     mHoverAskedVersion = 0;
     std::string             mHoverAnswer;
+    std::vector<CardLink>   mHoverLinks;
+    card_link_t             mCardLinkHandler;
     S32                     mMouseX = -1;
     S32                     mMouseY = -1;
     std::optional<Signature> mSignature;

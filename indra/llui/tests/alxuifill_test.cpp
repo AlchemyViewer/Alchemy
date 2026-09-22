@@ -28,6 +28,7 @@
 #include "../aldockpanel.h"
 #include "../aljumpbar.h"
 #include "../aloutputview.h"
+#include "../alpanelist.h"
 #include "../alscopebar.h"
 #include "../altabstrip.h"
 #include "../llfloater.h"
@@ -71,12 +72,14 @@ namespace tut
             ALDockPanel::Params  dock;
             ALJumpBar::Params    jump;
             ALOutputView::Params output;
+            ALPaneList::Params   pane;
             ALScopeBar::Params   scope;
             ALTabStrip::Params   tabs;
             (void)editor.name;
             (void)dock.name;
             (void)jump.name;
             (void)output.name;
+            (void)pane.name;
             (void)scope.name;
             (void)tabs.name;
         }

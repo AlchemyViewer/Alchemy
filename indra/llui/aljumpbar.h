@@ -81,6 +81,28 @@ public:
     // something to click.
     void setTrailer(const std::string& text);
 
+    // The same, in pieces, of which the ones with a value may be pressed:
+    // what the words say about the path is sometimes a way somewhere --
+    // the caret's line is where Go to Line starts, a count of problems
+    // is the list of them. A piece with no value is only said.
+    struct TrailerPart
+    {
+        std::string text;
+        std::string value;
+        std::string toolTip;
+        friend bool operator==(const TrailerPart& a, const TrailerPart& b)
+        {
+            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip;
+        }
+    };
+    void setTrailer(std::vector<TrailerPart> parts);
+
+    typedef boost::signals2::signal<void(const std::string&)> trailer_signal_t;
+    boost::signals2::connection onTrailerChosen(const trailer_signal_t::slot_type& cb)
+    {
+        return mTrailerChosen.connect(cb);
+    }
+
     // A step chosen: the crumb it was chosen on, and the value chosen there.
     // Pressing a crumb chooses its own value, which is going there; opening
     // it and picking a sibling chooses that one, which is going sideways.
@@ -108,11 +130,25 @@ private:
     size_t folded() const;
     S32 widthOf(const Crumb& crumb) const;
     void chose(size_t at, std::string value);
+    void choseTrailer(std::string value);
+    // The trailer's pieces given their words and their places, right up
+    // against the far edge: what a change of words alone asks for, which
+    // is every move of a caret, and needs nothing built again.
+    void layTrailer();
 
     std::vector<Crumb>      mCrumbs;
     std::vector<LLView*>    mParts;
-    LLTextBox*              mTrailer = nullptr;
+    LLView*                 mTrailer = nullptr;
+    std::vector<LLTextBox*> mTrailerPieces;
+    // Where the path ended, and how many crumbs it folded, when it was
+    // built: what the trailer's room starts from, and what a trailer of
+    // another width would have to fold again.
+    S32                     mPathEnd = 0;
+    size_t                  mFolded  = 0;
+    std::vector<TrailerPart> mTrailerParts;
+    // The pieces run together, which is what the room is measured by.
     std::string             mTrailerText;
     chose_signal_t          mChose;
+    trailer_signal_t        mTrailerChosen;
     ALDeferredRebuild       mRebuild;
 };

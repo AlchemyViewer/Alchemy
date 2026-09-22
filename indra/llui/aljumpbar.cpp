@@ -54,6 +54,10 @@ ALJumpBar::ALJumpBar(const Params& p)
     mTrailerText(p.trailer),
     mRebuild([this]() { build(); })
 {
+    if (!mTrailerText.empty())
+    {
+        mTrailerParts.push_back({ mTrailerText, std::string(), std::string() });
+    }
 }
 
 ALJumpBar::~ALJumpBar() = default;
@@ -66,7 +70,41 @@ void ALJumpBar::setPath(std::vector<Crumb> crumbs)
 
 void ALJumpBar::setTrailer(const std::string& text)
 {
-    mTrailerText = text;
+    std::vector<TrailerPart> parts;
+    if (!text.empty())
+    {
+        parts.push_back({ text, std::string(), std::string() });
+    }
+    setTrailer(std::move(parts));
+}
+
+void ALJumpBar::setTrailer(std::vector<TrailerPart> parts)
+{
+    // Said on every move of a caret, and the same words most of the time:
+    // the bar is built again only for words that have changed.
+    if (parts == mTrailerParts)
+    {
+        return;
+    }
+    // The same pieces with other words -- the caret's line and column
+    // moving -- are the same text boxes with other words in them, where
+    // the path still folds where it did: nothing is built again.
+    bool same_pieces = mTrailer && parts.size() == mTrailerParts.size() && parts.size() == mTrailerPieces.size();
+    for (size_t i = 0; same_pieces && i < parts.size(); ++i)
+    {
+        same_pieces = parts[i].value == mTrailerParts[i].value && parts[i].toolTip == mTrailerParts[i].toolTip;
+    }
+    mTrailerParts = std::move(parts);
+    mTrailerText.clear();
+    for (const TrailerPart& part : mTrailerParts)
+    {
+        mTrailerText += part.text;
+    }
+    if (same_pieces && folded() == mFolded)
+    {
+        layTrailer();
+        return;
+    }
     mRebuild.request();
 }
 
@@ -116,10 +154,12 @@ void ALJumpBar::build()
         delete mTrailer;
         mTrailer = nullptr;
     }
+    mTrailerPieces.clear();
 
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
     const S32 height = getRect().getHeight();
     const size_t first = folded();
+    mFolded = first;
     S32 x = 0;
 
     // A crumb that could have been something else is a button with an arrow
@@ -198,20 +238,75 @@ void ALJumpBar::build()
               mCrumbs[i].toolTip);
     }
 
+    mPathEnd = x;
     if (!mTrailerText.empty())
     {
         // At the right end, as said: the room past the path is its, and
-        // the words sit against its far edge.
-        LLTextBox::Params tp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
-        tp.name = "trailer";
-        tp.rect = LLRect(x + TRAILER_GAP, height - 3, getRect().getWidth() - CRUMB_PAD, 0);
-        tp.font = font;
-        tp.font_halign = LLFontGL::RIGHT;
-        tp.font_valign = LLFontGL::VCENTER;
-        tp.initial_value = mTrailerText;
-        mTrailer = LLUICtrlFactory::create<LLTextBox>(tp);
+        // the words sit against its far edge, piece by piece, a piece
+        // with somewhere to go pressed like a link.
+        LLPanel::Params pp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        pp.name               = "trailer";
+        pp.rect               = LLRect(0, height, 1, 0);
+        pp.background_visible = false;
+        pp.mouse_opaque       = false;
+        LLPanel* trailer      = LLUICtrlFactory::create<LLPanel>(pp);
+        for (size_t i = 0; i < mTrailerParts.size(); ++i)
+        {
+            const TrailerPart& part = mTrailerParts[i];
+            LLTextBox::Params  tp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
+            tp.name         = "trailer_" + std::to_string(i);
+            tp.rect         = LLRect(0, height - 3, 1, 0);
+            tp.font         = font;
+            tp.font_valign  = LLFontGL::VCENTER;
+            tp.tool_tip     = part.toolTip;
+            tp.mouse_opaque = !part.value.empty();
+            LLTextBox* piece = LLUICtrlFactory::create<LLTextBox>(tp);
+            if (!part.value.empty())
+            {
+                const std::string value = part.value;
+                piece->setClickedCallback([this, value](void*) { choseTrailer(value); });
+            }
+            trailer->addChild(piece);
+            mTrailerPieces.push_back(piece);
+        }
+        mTrailer = trailer;
         addChild(mTrailer);
+        layTrailer();
     }
+}
+
+void ALJumpBar::layTrailer()
+{
+    if (!mTrailer)
+    {
+        return;
+    }
+    const LLFontGL* font   = LLFontGL::getFontSansSerifSmall();
+    const S32       height = getRect().getHeight();
+    const S32       left   = mPathEnd + TRAILER_GAP;
+    const S32       right  = llmax(left + 1, getRect().getWidth() - CRUMB_PAD);
+    mTrailer->setShape(LLRect(left, height, right, 0));
+    // The pieces measured one by one, as they are placed: each rounds on
+    // its own, and their sum is not the whole's. Each is a pixel wider
+    // than its words, for that rounding; the last one's pixel inside.
+    S32 total = 0;
+    for (const TrailerPart& part : mTrailerParts)
+    {
+        total += font->getWidth(part.text);
+    }
+    S32 at = llmax(0, (right - left) - total - 1);
+    for (size_t i = 0; i < mTrailerPieces.size() && i < mTrailerParts.size(); ++i)
+    {
+        const S32 width = font->getWidth(mTrailerParts[i].text);
+        mTrailerPieces[i]->setText(mTrailerParts[i].text);
+        mTrailerPieces[i]->setShape(LLRect(at, height - 3, at + width + 1, 0));
+        at += width;
+    }
+}
+
+void ALJumpBar::choseTrailer(std::string value)
+{
+    mRebuild.around([&]() { mTrailerChosen(value); });
 }
 
 // The value is copied first: what is chosen may be the path being replaced.

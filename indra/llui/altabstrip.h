@@ -129,6 +129,12 @@ public:
     }
     // The tabs dragged into a new order, given as their values in it:
     // the caller keeps its own list in that order.
+    // A tab double-clicked: a preview held, as it is anywhere a preview
+    // is -- the caller says it is one no longer.
+    boost::signals2::connection onHeld(const tab_signal_t::slot_type& cb)
+    {
+        return mHeldSignal.connect(cb);
+    }
     typedef boost::signals2::signal<void(const std::vector<std::string>&)> order_signal_t;
     boost::signals2::connection onReordered(const order_signal_t::slot_type& cb)
     {
@@ -154,6 +160,7 @@ public:
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     void onMouseCaptureLost() override;
     bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
@@ -209,6 +216,7 @@ private:
     S32                 mGap;
     tab_signal_t        mChosenSignal;
     tab_signal_t        mClosedSignal;
+    tab_signal_t        mHeldSignal;
     tab_menu_signal_t   mMenuSignal;
     order_signal_t      mReorderedSignal;
     list_signal_t       mListSignal;

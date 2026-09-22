@@ -357,4 +357,27 @@ namespace tut
         ensure_equals("and nothing scrolled", strip->rectOf(0).mLeft, 0);
         strip->die();
     }
+
+    // A preview is held by a double-click on it, as a preview is anywhere:
+    // the strip says which, and the caller says it is a preview no longer.
+    template<> template<>
+    void altabstrip_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip*                  strip = make();
+        std::vector<ALTabStrip::Tab> tabs  = three();
+        tabs[2].preview                    = true;
+        strip->setTabs(tabs, "c");
+        std::vector<std::string> held;
+        strip->onHeld([&held](const std::string& value) { held.push_back(value); });
+        const LLRect preview = strip->rectOf(2);
+        ensure("a double-click on a tab is taken", strip->handleDoubleClick(preview.getCenterX(), preview.getCenterY(), MASK_NONE));
+        ensure_equals("said once", held.size(), 1u);
+        ensure_equals("of the tab under it", held.back(), std::string("c"));
+        ensure("nowhere, nothing", !strip->handleDoubleClick(2000, 2000, MASK_NONE) || held.size() == 1u);
+        strip->die();
+    }
 }

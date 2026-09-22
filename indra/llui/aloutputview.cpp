@@ -275,6 +275,41 @@ ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 lin
         source.value   = LLSD(static_cast<S32>(serial));
         addSubstitution(std::move(source));
     }
+    // The entry's own links within what was said: a line's bytes as the
+    // entry has them are the document's, but for the first line's, which
+    // start after the stamp and the source.
+    for (size_t i = 0; i < entry.links.size(); ++i)
+    {
+        const Entry::Link& link = entry.links[i];
+        if (link.line < 0 || link.line >= shown.lines)
+        {
+            continue;
+        }
+        const S32          at     = first + link.line;
+        const S32          offset = link.line == 0 ? laid.textBegin : 0;
+        const S32          length = document().lineLength(at);
+        const std::string& text   = document().line(at);
+        S32                begin  = link.begin >= 0 ? offset + link.begin : offset;
+        if (link.begin < 0)
+        {
+            while (begin < length && (text[begin] == ' ' || text[begin] == '\t'))
+            {
+                ++begin;
+            }
+        }
+        const S32 end = link.end >= 0 ? llmin(length, offset + link.end) : length;
+        if (begin >= end)
+        {
+            continue;
+        }
+        Substitution own;
+        own.range          = ALTextRange(ALTextPos(at, begin), ALTextPos(at, end));
+        own.link           = true;
+        own.tooltip        = link.tooltip;
+        own.value["entry"] = static_cast<S32>(serial);
+        own.value["link"]  = static_cast<S32>(i);
+        addSubstitution(std::move(own));
+    }
     linkUrlsOn(first, laid.textBegin);
     for (S32 l = first + 1; l < first + shown.lines; ++l)
     {
@@ -294,6 +329,19 @@ void ALOutputView::followed(const Substitution& link)
         else
         {
             mUrlChosen(link.url);
+        }
+        return;
+    }
+    if (link.value.isMap())
+    {
+        // One of the entry's own links: the entry, with the link's value.
+        const Entry* entry = entryOf(static_cast<U32>(link.value["entry"].asInteger()));
+        const size_t index = static_cast<size_t>(link.value["link"].asInteger());
+        if (entry && index < entry->links.size())
+        {
+            Entry chosen = *entry;
+            chosen.value = entry->links[index].value;
+            mEntryChosen(chosen);
         }
         return;
     }
@@ -320,21 +368,13 @@ void ALOutputView::append(Entry entry)
 {
     const bool follow = atTail();
     const U32  serial = mNextSerial++;
+    entry.lane        = llmin<U8>(entry.lane, LANES - 1);
+    const U8 lane     = entry.lane;
     mEntries.push_back(std::move(entry));
     mSerials.push_back(serial);
-    while (static_cast<S32>(mEntries.size()) > mCapacity)
-    {
-        const U32 oldest = mSerials.front();
-        mEntries.pop_front();
-        mSerials.pop_front();
-        if (!mShown.empty() && mShown.front().serial == oldest)
-        {
-            document().removeFirstLines(mShown.front().lines);
-            mShown.pop_front();
-            ++mShownGeneration;
-        }
-    }
-    if (passes(mEntries.back()))
+    ++mLaneCount[lane];
+    trim(lane);
+    if (!mEntries.empty() && mSerials.back() == serial && passes(mEntries.back()))
     {
         show(mEntries.back(), serial);
         if (follow)
@@ -349,24 +389,90 @@ void ALOutputView::clearEntries()
     mEntries.clear();
     mSerials.clear();
     mShown.clear();
+    for (S32& count : mLaneCount)
+    {
+        count = 0;
+    }
     ++mShownGeneration;
     setText("");
 }
 
-void ALOutputView::setCapacity(S32 capacity)
+S32 ALOutputView::capacity(U8 lane) const
 {
-    mCapacity = llmax(1, capacity);
-    while (static_cast<S32>(mEntries.size()) > mCapacity)
+    return lane < LANES && mLaneCapacity[lane] > 0 ? mLaneCapacity[lane] : mCapacity;
+}
+
+void ALOutputView::setCapacity(S32 capacity, U8 lane)
+{
+    if (lane >= LANES)
     {
-        const U32 oldest = mSerials.front();
-        mEntries.pop_front();
-        mSerials.pop_front();
-        if (!mShown.empty() && mShown.front().serial == oldest)
+        return;
+    }
+    if (lane == 0)
+    {
+        mCapacity = llmax(1, capacity);
+    }
+    else
+    {
+        mLaneCapacity[lane] = llmax(1, capacity);
+    }
+    for (U8 each = 0; each < LANES; ++each)
+    {
+        trim(each);
+    }
+}
+
+void ALOutputView::trim(U8 lane)
+{
+    const S32 fill = capacity(lane);
+    while (mLaneCount[lane] > fill)
+    {
+        // The lane's oldest: the log's oldest, most of the time, whose
+        // lines are the text's first.
+        size_t oldest = 0;
+        while (oldest < mEntries.size() && mEntries[oldest].lane != lane)
         {
-            document().removeFirstLines(mShown.front().lines);
-            mShown.pop_front();
-            ++mShownGeneration;
+            ++oldest;
         }
+        if (oldest == mEntries.size())
+        {
+            mLaneCount[lane] = 0;
+            return;
+        }
+        removeAt(oldest);
+    }
+}
+
+void ALOutputView::removeAt(size_t index)
+{
+    const U32 serial = mSerials[index];
+    --mLaneCount[mEntries[index].lane];
+    mEntries.erase(mEntries.begin() + static_cast<std::ptrdiff_t>(index));
+    mSerials.erase(mSerials.begin() + static_cast<std::ptrdiff_t>(index));
+    // Its lines, where it is shown: at the top, as the oldest is, or
+    // wherever the lines before it end.
+    S32 line = 0;
+    for (size_t i = 0; i < mShown.size(); ++i)
+    {
+        if (mShown[i].serial == serial)
+        {
+            if (i == 0)
+            {
+                document().removeFirstLines(mShown.front().lines);
+            }
+            else
+            {
+                hideAt(line, mShown[i].lines);
+            }
+            mShown.erase(mShown.begin() + static_cast<std::ptrdiff_t>(i));
+            ++mShownGeneration;
+            return;
+        }
+        if (mShown[i].serial > serial)
+        {
+            return;
+        }
+        line += mShown[i].lines;
     }
 }
 

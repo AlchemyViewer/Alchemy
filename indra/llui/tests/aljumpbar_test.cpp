@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../aljumpbar.h"
+#include "../lltextbox.h"
 
 #include "../llbutton.h"
 #include "../llflyoutbutton.h"
@@ -237,6 +238,71 @@ namespace tut
         gIdleCallbacks.callFunctions();
         ensure_equals("and then the new one", crumbsIn(bar), 2);
         ensure("of which the last is where it went", bar->findChild<LLView>("crumb_1") != nullptr);
+        delete bar;
+    }
+
+    // What is said past the path may be in pieces, and a piece with a value
+    // is a way somewhere: pressing it says the value. A piece without one is
+    // only said, and the same pieces said again build nothing again.
+    template<> template<>
+    void aljumpbar_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALJumpBar* bar = make();
+        bar->setPath(path());
+
+        std::vector<std::string> chosen;
+        bar->onTrailerChosen([&chosen](const std::string& value) { chosen.push_back(value); });
+        const std::vector<ALJumpBar::TrailerPart> parts = { { "Ln 3, Col 1", "line", "Go to a line" },
+                                                            { "   ", std::string(), std::string() },
+                                                            { "2 errors", "problems", "The problems" } };
+        bar->setTrailer(parts);
+        LLTextBox* line     = bar->findChild<LLTextBox>("trailer_0", true);
+        LLTextBox* gap      = bar->findChild<LLTextBox>("trailer_1", true);
+        LLTextBox* problems = bar->findChild<LLTextBox>("trailer_2", true);
+        ensure("each piece", line && gap && problems);
+        ensure("in the order said", line->getRect().mRight <= problems->getRect().mLeft);
+        ensure("past the end of the path", bar->getChild<LLView>("trailer")->getRect().mLeft >= bar->getChild<LLView>("crumb_3")->getRect().mRight);
+
+        const auto press = [](LLTextBox* piece) {
+            const S32 x = piece->getRect().getWidth() / 2;
+            const S32 y = piece->getRect().getHeight() / 2;
+            piece->handleMouseDown(x, y, MASK_NONE);
+            piece->handleMouseUp(x, y, MASK_NONE);
+        };
+        press(problems);
+        ensure_equals("said once", chosen.size(), 1u);
+        ensure_equals("with the piece's value", chosen.back(), std::string("problems"));
+        press(gap);
+        ensure_equals("a piece with no value says nothing", chosen.size(), 1u);
+        press(line);
+        ensure_equals("and the other says its own", chosen.back(), std::string("line"));
+
+        const LLView* before = bar->findChild<LLView>("trailer", true);
+        bar->setTrailer(parts);
+        ensure("the same pieces again are the same pieces", bar->findChild<LLView>("trailer", true) == before);
+
+        // Other words in the same pieces -- the caret moving -- change the
+        // words where they are: nothing of the path is built again.
+        const LLView* crumb = bar->findChild<LLView>("crumb_0", true);
+        std::vector<ALJumpBar::TrailerPart> moved = parts;
+        moved[0].text = "Ln 120, Col 14";
+        bar->setTrailer(moved);
+        ensure("the same trailer", bar->findChild<LLView>("trailer", true) == before);
+        ensure("the same path", bar->findChild<LLView>("crumb_0", true) == crumb);
+        LLTextBox* again = bar->findChild<LLTextBox>("trailer_0", true);
+        ensure("the same piece", again == line);
+        ensure_equals("with the new words", again->getText(), std::string("Ln 120, Col 14"));
+        ensure("still in order", again->getRect().mRight <= bar->findChild<LLTextBox>("trailer_2", true)->getRect().mLeft);
+        ensure("and against the far edge", bar->findChild<LLTextBox>("trailer_2", true)->getRect().mRight <= bar->getChild<LLView>("trailer")->getRect().getWidth());
+
+        // Another piece, and the trailer is built again.
+        moved.push_back({ "1 warning", "problems", "The problems" });
+        bar->setTrailer(moved);
+        ensure("a fourth piece", bar->findChild<LLTextBox>("trailer_3", true) != nullptr);
         delete bar;
     }
 }

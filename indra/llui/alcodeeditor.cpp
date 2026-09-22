@@ -3446,6 +3446,7 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
     ALTextRange                    about;
     const std::vector<CardProblem> problems = problemsUnder(at, about);
     std::string                    says;
+    std::vector<CardLink>          links;
     const ALTextRange              word = identifierAt(at);
     // A string literal says its own size, anywhere in it -- the space
     // after its comma as much as the word before -- since what the
@@ -3480,6 +3481,7 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
             if (!mHoverAnswer.empty())
             {
                 says  = mHoverAnswer;
+                links = mHoverLinks;
                 about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
             }
         }
@@ -3488,6 +3490,7 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
             mHoverAsked        = word;
             mHoverAskedVersion = version;
             mHoverAnswer.clear();
+            mHoverLinks.clear();
             mHoverRequest(word.begin, document().text(word));
         }
     }
@@ -3495,7 +3498,7 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
     {
         return false;
     }
-    showCard(about, says, problems);
+    showCard(about, says, problems, links);
     return true;
 }
 
@@ -3568,7 +3571,8 @@ void ALCodeEditor::styleAsCode(const ALTextView& view, S32 line, std::vector<ALT
     }
 }
 
-void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems)
+void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems,
+                            const std::vector<CardLink>& links)
 {
     // The card is one of the studio's small floating things, and they
     // all have the one look: the ground a shade off the text's own, and
@@ -3597,10 +3601,19 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         p.context_menu = std::string();
         mCard         = LLUICtrlFactory::create<ALTextView>(p);
         mCard->setVisible(false);
-        mCard->onLinkClicked([](const ALTextView::Substitution& link) {
+        mCard->onLinkClicked([this](const ALTextView::Substitution& link) {
             if (!link.url.empty())
             {
                 LLUrlAction::clickAction(link.url, false);
+                return;
+            }
+            // A way somewhere the caller gave: gone to, and the card with
+            // it, since it is about where the caret is no longer.
+            if (link.value.isDefined() && mCardLinkHandler)
+            {
+                const LLSD value = link.value;
+                hideCard();
+                mCardLinkHandler(value);
             }
         });
         addChild(mCard);
@@ -3673,6 +3686,24 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         }
     }
     mCard->setStyles(std::move(styles));
+    // The caller's own links, each on the line that says it, below the
+    // head; then every URL.
+    for (const CardLink& link : links)
+    {
+        for (S32 line = llmax(0, head_line + 1); line < lines; ++line)
+        {
+            if (mCard->document().line(line) == link.line)
+            {
+                ALTextView::Substitution way;
+                way.range   = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+                way.link    = true;
+                way.tooltip = link.tooltip;
+                way.value   = link.value;
+                mCard->addSubstitution(std::move(way));
+                break;
+            }
+        }
+    }
     for (S32 line = 0; line < lines; ++line)
     {
         mCard->linkUrlsOn(line);
@@ -3754,7 +3785,7 @@ bool ALCodeEditor::cardShown() const
     return mCard && mCard->getVisible();
 }
 
-void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
+void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std::vector<CardLink> links)
 {
     if (text.empty() || mHoverAsked.empty() || at != mHoverAsked.begin || document().version() != mHoverAskedVersion)
     {
@@ -3762,6 +3793,7 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
     }
     // Kept for the word, and shown now if the mouse is still on it.
     mHoverAnswer = text;
+    mHoverLinks  = std::move(links);
     if (mMouseX < 0 || !textRect().pointInRect(mMouseX, mMouseY))
     {
         return;
@@ -3774,7 +3806,7 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text)
     }
     ALTextRange                    about;
     const std::vector<CardProblem> problems = problemsUnder(under, about);
-    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems);
+    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems, mHoverLinks);
 }
 
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)

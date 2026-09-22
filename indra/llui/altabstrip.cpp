@@ -658,6 +658,17 @@ bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleMiddleMouseDown(x, y, mask);
 }
 
+bool ALTabStrip::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    const S32 which = at(x, y);
+    if (which >= 0 && !closeRectOf(which).pointInRect(x, y))
+    {
+        mHeldSignal(mTabs[which].value);
+        return true;
+    }
+    return LLUICtrl::handleDoubleClick(x, y, mask);
+}
+
 bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mPressedClose >= 0 && hasMouseCapture())

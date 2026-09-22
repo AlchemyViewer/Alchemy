@@ -30,6 +30,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 
 // A log a pane shows: the last so many things something said, each with
 // when, who and what kind, kept in the order they came and shown through
@@ -104,6 +105,24 @@ public:
         std::string             tooltip;
         // What the caller wants back when the source is followed.
         LLSD                    value;
+        // Which of the log's lanes it is kept in: each keeps its own
+        // fill, so that what one kind of thing says -- a chatty debug
+        // channel -- does not push out what another does.
+        U8                      lane = 0;
+        // Stretches of what was said that are links too -- the frames of
+        // a stack, each a place to go -- by the line of the text they are
+        // on and the bytes of that line, the line's own from its first
+        // word to its end where none are given; followed, the entry is
+        // answered with the link's value in place of its own.
+        struct Link
+        {
+            S32         line  = 0;
+            S32         begin = -1;
+            S32         end   = -1;
+            std::string tooltip;
+            LLSD        value;
+        };
+        std::vector<Link>       links;
         // What a filter may go by beside the words: the caller's own
         // key, an object's id say.
         LLSD                    key;
@@ -112,12 +131,17 @@ public:
     void                     append(Entry entry);
     void                     clearEntries();
     const std::deque<Entry>& entries() const { return mEntries; }
-    S32                      capacity() const { return mCapacity; }
-    void                     setCapacity(S32 capacity);
+    // How many entries a lane keeps, the oldest going past it; a lane not
+    // given one keeps the first lane's.
+    static constexpr U8      LANES = 4;
+    S32                      capacity(U8 lane = 0) const;
+    void                     setCapacity(S32 capacity, U8 lane = 0);
 
     // Which entries are shown: all of them, or the ones the filter takes.
     typedef std::function<bool(const Entry&)> filter_t;
     void setFilter(filter_t filter);
+    // Whether the filter takes an entry: what is shown of entries().
+    bool shows(const Entry& entry) const { return passes(entry); }
 
     // An entry's source followed.
     typedef boost::signals2::signal<void(const Entry&)> entry_signal_t;
@@ -158,6 +182,9 @@ private:
         mutable const LLFontGL* measured = nullptr;
     };
     void refill();
+    // The oldest of a lane let go of, past its fill, with its lines.
+    void trim(U8 lane);
+    void removeAt(size_t index);
     void show(const Entry& entry, U32 serial);
     // An entry's lines put into the text at a line -- before what is
     // there, or after the last, or as the whole where nothing is shown
@@ -194,6 +221,8 @@ private:
     U32               mNextSerial = 1;
     filter_t          mFilter;
     S32               mCapacity = 500;
+    S32               mLaneCapacity[LANES] = { 0, 0, 0, 0 };
+    S32               mLaneCount[LANES]    = { 0, 0, 0, 0 };
     LLUIColor         mTimeColor;
     const LLFontGL*   mTimeFont = nullptr;
     LLUIColor         mSourceColor;

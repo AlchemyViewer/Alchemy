@@ -206,4 +206,85 @@ namespace tut
         v.setCapacity(2);
         ensure_equals("a smaller capacity drops the oldest with their lines", v.text(), std::string("[12:00:00] Thing: three\n[12:00:00] Thing (error): four"));
     }
+
+    template<> template<>
+    void aloutputview_object::test<4>()
+    {
+        set_test_name("an entry's own links lie on the lines of what was said, and hand the entry back with their values");
+        ALOutputView& v = make(10);
+        ALOutputView::Entry e = entry("error", "boom\nstack traceback:\n  s:7 function f\nsee main here");
+        ALOutputView::Entry::Link frame;
+        frame.line     = 2;
+        frame.tooltip  = "Open s at line 7";
+        frame.value    = 7;
+        ALOutputView::Entry::Link word;
+        word.line  = 0;
+        word.begin = 0;
+        word.end   = 4;
+        word.value = 1;
+        ALOutputView::Entry::Link part;
+        part.line  = 3;
+        part.begin = 4;
+        part.end   = 8;
+        part.value = 4;
+        e.links = { frame, word, part };
+        v.append(entry("", "before"));
+        v.append(e);
+        ensure_equals("three links", v.substitutions().size(), size_t(3));
+        // On the first line, past the stamp and the source.
+        ensure("the first line's word", v.substitutions()[0].range == ALTextRange(ALTextPos(1, 26), ALTextPos(1, 30)));
+        ensure_equals("which is the word", v.document().line(1).substr(26, 4), std::string("boom"));
+        // The frame from its first word, past the indent, to the line's end.
+        ensure("the frame's line", v.substitutions()[1].range == ALTextRange(ALTextPos(3, 2), ALTextPos(3, 16)));
+        ensure_equals("with its tooltip", v.substitutions()[1].tooltip, std::string("Open s at line 7"));
+        ensure("a stretch of a later line", v.substitutions()[2].range == ALTextRange(ALTextPos(4, 4), ALTextPos(4, 8)));
+
+        LLSD chosen;
+        v.onEntryChosen([&chosen](const ALOutputView::Entry& picked) { chosen = picked.value; });
+        S32 x, y;
+        pointOf(3, 6, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        ensure_equals("the entry with the frame's value", chosen.asInteger(), 7);
+
+        v.setFilter([](const ALOutputView::Entry& one) { return one.kind == "error"; });
+        ensure("the filter's answer, asked", v.shows(v.entries().back()) && !v.shows(v.entries().front()));
+        ensure("the links laid again where the entry moved", v.substitutions()[1].range == ALTextRange(ALTextPos(2, 2), ALTextPos(2, 16)));
+    }
+
+    template<> template<>
+    void aloutputview_object::test<5>()
+    {
+        set_test_name("each lane keeps its own fill: what one kind of thing says does not push out what another does");
+        ALOutputView& v = make(3);
+        v.setCapacity(2, 1);
+        ensure_equals("a lane given a fill keeps it", v.capacity(1), 2);
+        ensure_equals("one not given keeps the first lane's", v.capacity(2), 3);
+        const auto in_lane = [](const char* text, U8 lane) {
+            ALOutputView::Entry one = entry("", text);
+            one.lane                = lane;
+            return one;
+        };
+        v.append(in_lane("chat0", 0));
+        v.append(in_lane("kept", 1));
+        v.append(in_lane("chat1", 0));
+        v.append(in_lane("chat2", 0));
+        v.append(in_lane("chat3", 0));
+        ensure_equals("the chatty lane lost its oldest, the other kept its own",
+                      v.text(), std::string("[12:00:00] Thing: kept\n[12:00:00] Thing: chat1\n[12:00:00] Thing: chat2\n[12:00:00] Thing: chat3"));
+        v.append(in_lane("again", 1));
+        v.append(in_lane("third", 1));
+        ensure_equals("past its own fill, a lane's oldest goes from among the others",
+                      v.text(), std::string("[12:00:00] Thing: chat1\n[12:00:00] Thing: chat2\n[12:00:00] Thing: chat3\n[12:00:00] Thing: again\n[12:00:00] Thing: third"));
+        ensure_equals("and the log holds what the lanes keep", v.entries().size(), size_t(5));
+        v.setFilter([](const ALOutputView::Entry& one) { return one.lane == 0; });
+        v.append(in_lane("fourth", 1));
+        ensure_equals("one not shown goes without a trace", v.text(),
+                      std::string("[12:00:00] Thing: chat1\n[12:00:00] Thing: chat2\n[12:00:00] Thing: chat3"));
+        v.setFilter(nullptr);
+        ensure_equals("the lane's two newest", v.text(),
+                      std::string("[12:00:00] Thing: chat1\n[12:00:00] Thing: chat2\n[12:00:00] Thing: chat3\n[12:00:00] Thing: third\n[12:00:00] Thing: fourth"));
+        v.append(in_lane("chat4", 0));
+        ensure_equals("the middle one of a lane goes from the middle", v.document().line(0), std::string("[12:00:00] Thing: chat2"));
+    }
 }
