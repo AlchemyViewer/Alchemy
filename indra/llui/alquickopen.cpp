@@ -41,6 +41,8 @@ namespace
     constexpr S32 GAP = 4;
     // The inset from the frame, once there is one.
     constexpr S32 INSET = 6;
+    // The list's own border, which LLScrollListCtrl keeps to itself.
+    constexpr S32 BORDER = 2;
 
     // What each degree of meaning it is worth. The gaps are wide because
     // these are kinds and not amounts: no number of scattered letters adds up
@@ -412,14 +414,29 @@ bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
 // static
 S32 ALQuickOpen::heightForRows(S32 rows)
 {
-    // The list's rows are its font's line height and its row padding
-    // each, inside its border; the field and the gap and the insets
-    // above and around.
-    const LLScrollListCtrl::Params& lp   = LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>();
-    const LLFontGL*                 font = lp.font.isProvided() ? lp.font() : LLFontGL::getFontSansSerifSmall();
-    const S32                       row  = (font ? font->getLineHeight() : 16) + lp.row_padding;
-    const S32                       border = 2;
-    return 2 * INSET + FIELD_HEIGHT + GAP + 2 * border + llmax(1, rows) * row;
+    // A row is what a list made as this one's is makes of one text row:
+    // measured once on such a list, so that whatever the skin gives the
+    // list -- its face, its padding -- is what is counted.
+    static S32 row = -1;
+    if (row < 0)
+    {
+        LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
+        lp.name         = "measure";
+        lp.rect         = LLRect(0, 100, 100, 0);
+        lp.draw_heading = false;
+        LLScrollListCtrl* list = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
+        LLScrollListColumn::Params column;
+        column.name = "label";
+        list->addColumn(column);
+        LLSD item;
+        item["columns"][0]["column"] = "label";
+        item["columns"][0]["value"]  = "Xg";
+        list->addElement(item);
+        // What one row needs, its border included.
+        row = llmax(8, list->getRequiredRect().getHeight() - 2 * BORDER);
+        delete list;
+    }
+    return 2 * INSET + FIELD_HEIGHT + GAP + 2 * BORDER + llmax(1, rows) * row;
 }
 
 void ALQuickOpen::layout()

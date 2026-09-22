@@ -4113,13 +4113,21 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
     }
     const ALTextDocument& d = view.document();
     // The last visual area, as a range: whole lines for a line-wise one,
-    // the character under either end included otherwise.
+    // the character under either end included otherwise; a block is the
+    // lines between its ends and the columns between them.
     ALTextRange visual;
+    S32         block_left = -1, block_right = -1;
     if (mVisualLast != Mode::Normal)
     {
         const ALTextPos a = mVisualLastAnchor < mVisualLastCaret ? mVisualLastAnchor : mVisualLastCaret;
         const ALTextPos b = mVisualLastAnchor < mVisualLastCaret ? mVisualLastCaret : mVisualLastAnchor;
         visual            = mVisualLast == Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
+        if (mVisualLast == Mode::VisualBlock)
+        {
+            block_left  = llmin(mVisualLastAnchor.column, mVisualLastCaret.column);
+            block_right = llmax(mVisualLastAnchor.column, mVisualLastCaret.column);
+            visual      = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
+        }
     }
     const ALTextPos caret = view.caret();
     auto            allowed = [&](size_t index) {
@@ -4153,6 +4161,10 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
                 }
                 case Pattern::Where::Kind::Visual:
                     if (mVisualLast == Mode::Normal || at < visual.begin || !(at < visual.end))
+                    {
+                        return false;
+                    }
+                    if (block_left >= 0 && (at.column < block_left || at.column > block_right))
                     {
                         return false;
                     }

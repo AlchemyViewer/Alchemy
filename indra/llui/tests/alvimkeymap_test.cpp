@@ -729,5 +729,12 @@ namespace tut
         ensure_equals("\\%d91 and \\%x5d are the brackets", flat(e.text()), std::string("START_ fooX|foo_|foo_ foo[barEND|"));
         keys(":%s/\\%u0058/Y/<CR>");
         ensure_equals("\\u0058 is X", flat(e.text()), std::string("START_ fooY|foo_|foo_ foo[barEND|"));
+        // A block-wise area is its columns on each of its lines.
+        e.setText("ab ab\nab ab\nab ab\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("gg0<C-v>jl<Esc>:%s/\\%Vab/X/g<CR>");
+        ensure_equals("\\%V on a block: the first columns of the first two lines", flat(e.text()), std::string("X ab|X ab|ab ab|"));
+        keys(":%s/\\Va\\{1,2}b/Y/<CR>");
+        ensure_equals("\\{n,m} under \\V is the multi still", flat(e.text()), std::string("X Y|X Y|Y ab|"));
     }
 }
