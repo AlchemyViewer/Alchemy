@@ -3261,6 +3261,7 @@ void ALVimKeymap::endConfirming(ALTextView& view)
 {
     const ALTextDocument& d = view.document();
     mMode                   = Mode::Normal;
+    view.undoJournal().endGroup();
     if (mConfirming.lastLine >= 0)
     {
         const S32 line = llclamp(mConfirming.lastLine, 0, d.lineCount() - 1);
@@ -3815,9 +3816,6 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     bool  zs_seen  = false;
     // Where each \K was put, for the pattern without them.
     std::vector<size_t> k_at;
-    // How deep in the engine's brackets the output is, so that a \zs at
-    // the top can split the pattern into groups.
-    S32   depth    = 0;
     auto  literal  = [&](char c) {
         static const std::string specials("\\^$.|?*+()[]{}");
         if (specials.find(c) != std::string::npos)
@@ -3826,6 +3824,38 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
         }
         out.regex += c;
     };
+    // %[abc]: a, ab or abc -- each item optional and the next only with
+    // it. `at` is the [; the index of the ] comes back, or npos.
+    auto optionalSequence = [&](size_t at) {
+        const size_t close = vim.find(']', at + 1);
+        if (close == std::string::npos)
+        {
+            return std::string::npos;
+        }
+        S32 opened = 0;
+        for (size_t k = at + 1; k < close; ++k)
+        {
+            out.regex += "(?:";
+            if (vim[k] == '\\' && k + 1 < close)
+            {
+                out.regex += '\\';
+                out.regex += vim[++k];
+            }
+            else
+            {
+                literal(vim[k]);
+            }
+            ++opened;
+        }
+        for (S32 k = 0; k < opened; ++k)
+        {
+            out.regex += ")?";
+        }
+        return close;
+    };
+    // How deep in the engine's brackets the output is, so that a \zs at
+    // the top can split the pattern into groups.
+    S32   depth    = 0;
     for (size_t i = 0; i < vim.size(); ++i)
     {
         const char c = vim[i];
@@ -3941,32 +3971,11 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     }
                     if (i + 1 < vim.size() && vim[i + 1] == '[')
                     {
-                        // \%[abc]: a, ab or abc -- each item optional and
-                        // the next only with it.
-                        const size_t close = vim.find(']', i + 2);
+                        const size_t close = optionalSequence(i + 1);
                         if (close == std::string::npos)
                         {
                             literal('%');
                             continue;
-                        }
-                        S32 opened = 0;
-                        for (size_t k = i + 2; k < close; ++k)
-                        {
-                            out.regex += "(?:";
-                            if (vim[k] == '\\' && k + 1 < close)
-                            {
-                                out.regex += '\\';
-                                out.regex += vim[++k];
-                            }
-                            else
-                            {
-                                literal(vim[k]);
-                            }
-                            ++opened;
-                        }
-                        for (S32 k = 0; k < opened; ++k)
-                        {
-                            out.regex += ")?";
                         }
                         i = close;
                         continue;
@@ -4139,6 +4148,18 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                             out.regex += "(?:";
                             ++depth;
                             ++i;
+                        }
+                        else if (i + 1 < vim.size() && vim[i + 1] == '[')
+                        {
+                            const size_t close = optionalSequence(i + 1);
+                            if (close == std::string::npos)
+                            {
+                                literal('%');
+                            }
+                            else
+                            {
+                                i = close;
+                            }
                         }
                         else
                         {
@@ -4584,6 +4605,8 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         mConfirming       = Confirming();
         mConfirming.edits = std::move(edits);
         mMode             = Mode::Confirm;
+        // Everything said yes to is one step to undo, as the :s is.
+        view.undoJournal().beginGroup();
         askNext(view);
         return false;
     }

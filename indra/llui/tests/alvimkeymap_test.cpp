@@ -736,6 +736,12 @@ namespace tut
         ensure_equals("\\%V on a block: the first columns of the first two lines", flat(e.text()), std::string("X ab|X ab|ab ab|"));
         keys(":%s/\\Va\\{1,2}b/Y/<CR>");
         ensure_equals("\\{n,m} under \\V is the multi still", flat(e.text()), std::string("X Y|X Y|Y ab|"));
+        e.setText("fun func function aaab\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys(":s/\\vfun%[ction]/Z/g<CR>");
+        ensure_equals("%[] under \\v", flat(e.text()), std::string("Z Z Z aaab|"));
+        keys(":s/\\va{-2,}/Q/<CR>");
+        ensure_equals("{-n,} under \\v is lazy: the fewest", flat(e.text()), std::string("Z Z Z Qab|"));
     }
     template<> template<>
     void alvimkeymap_object::test<19>()
@@ -756,11 +762,11 @@ namespace tut
         ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
         keys(":%s/a/c/gc<CR>a");
         ensure_equals("a: all the rest", flat(e.text()), std::string("b c b c|c c|"));
-        keys(":%s/c/d/gc<CR>y<Esc>");
-        ensure_equals("escape stops it after the one", flat(e.text()), std::string("b d b c|c c|"));
+        keys(":%s/c/d/gc<CR>yy<Esc>");
+        ensure_equals("escape stops it after the two", flat(e.text()), std::string("b d b d|c c|"));
         ensure("normal again", vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
-        ensure_equals("each one its own step to undo", flat(e.text()), std::string("b c b c|c c|"));
+        ensure_equals("the whole asking is one step to undo, as vim has it", flat(e.text()), std::string("b c b c|c c|"));
         // A \zs inside brackets with a place before it.
         e.setText("xab xab\nxab\n");
         vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
