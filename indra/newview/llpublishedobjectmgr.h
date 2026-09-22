@@ -123,6 +123,22 @@ public:
     explicit LLPublishedObjectMgr(LLScriptEditorWSServer* server = nullptr);
     ~LLPublishedObjectMgr();
 
+    // The root and its children, in a stable order; the root must not be null.
+    static std::vector<LLViewerObject*> linksetOf(LLViewerObject* root);
+
+    // What the world tells the server, and what it comes to: a publish
+    // sent once every prim's inventory is in, an object.update for a
+    // property or an inventory that changed, a linkset's children added
+    // or removed sent together after a short wait.
+    void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
+    void onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id);
+    void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial = -1);
+    void onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child);
+    void onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id);
+    void buildAndSendPublish(const LLUUID& object_id);
+    void scheduleLinksetFlush(const LLUUID& root_id, F32 delay);
+    void flushLinksetUpdate(const LLUUID& root_id);
+
     bool hasPublished(const LLUUID& object_id) const { return mPublishedObjects.find(object_id) != mPublishedObjects.end(); }
     void erasePublished(const LLUUID& object_id) { mPublishedObjects.erase(object_id); }
     PublishedObjectInfo* getPublished(const LLUUID& object_id);

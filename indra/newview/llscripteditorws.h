@@ -197,6 +197,9 @@ public:
 
     void onStarted() override;
     void onStopped() override;
+    // False once nobody has been connected for the idle timeout, which
+    // stops the server.
+    bool update() override;
     void onConnectionOpened(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
     void onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t& connection) override;
 
@@ -222,7 +225,7 @@ public:
     void unpublishObject(const LLUUID& object_id, const std::string& reason = "");
     bool isObjectPublished(const LLUUID& object_id) const;
 
-    // *TODO*: These should be moved to LLPublishedObjectMgr at some point.
+    // The world's way in to the publishing, which the manager does.
     void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
     void onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id);
     void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial = -1);
@@ -284,10 +287,6 @@ protected:
     static std::string getPrimName(LLViewerObject* obj);
     void notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const;
     void notifyAll(const std::string& method, const LLSD& params) const;
-    void buildAndSendPublish(const LLUUID& object_id);
-    void scheduleLinksetFlush(const LLUUID& root_id, F32 delay);
-    void cancelLinksetFlushTimer(const LLUUID& root_id);
-    void flushLinksetUpdate(const LLUUID& root_id);
 
     /// Wraps `fn` in a MethodHandler with a weak-ptr guard on this server,
     /// so the handler safely no-ops after server shutdown. `fn` is called
@@ -347,7 +346,12 @@ private:
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
+    // The manager sends through the server and names prims as it does.
+    friend class LLPublishedObjectMgr;
     mutable LLPublishedObjectMgr mPublishedObjectManager;
+    // When the last client went, in the timer's seconds; zero while one
+    // is connected.
+    std::atomic<F64>             mIdleSince{ 0.0 };
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mCompiledConnection;
 

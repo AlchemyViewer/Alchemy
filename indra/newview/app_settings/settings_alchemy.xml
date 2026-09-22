@@ -4016,6 +4016,17 @@
             <key>Value</key>
             <string>))</string>
         </map>
+        <key>ExternalWebsocketSyncIdleTimeout</key>
+        <map>
+            <key>Comment</key>
+            <string>Seconds the script editor server stays up with no editor connected, after the last one went, before it stops; zero keeps it up for the session.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>600</integer>
+        </map>
         <key>FindLandSort</key>
         <map>
             <key>Comment</key>

@@ -82,10 +82,6 @@ namespace
     constexpr F32 NOTECARD_UPLOAD_TIMEOUT = 30.0f;
     constexpr F32 ITEM_CREATE_TIMEOUT     = 30.0f;
 
-    // Linkset flush coalescing delays (seconds).
-    constexpr F32 LINKSET_ADD_FLUSH_DELAY    = 5.0f;
-    constexpr F32 LINKSET_REMOVE_FLUSH_DELAY = 0.2f;
-
     static const boost::regex LUAU_LOCATION_PATTERN(
         R"(^([^:]*):([0-9]+):\s*(.*)$)");
 
@@ -135,20 +131,6 @@ namespace
             return false;
         };
         return std::make_pair(std::move(on_success), std::move(on_failure));
-    }
-
-    // Returns [root, *root->getChildren()] in stable order. Root must be non-null.
-    std::vector<LLViewerObject*> collect_linkset(LLViewerObject* root)
-    {
-        std::vector<LLViewerObject*> prims;
-        const auto& children = root->getChildren();
-        prims.reserve(1 + children.size());
-        prims.push_back(root);
-        for (LLViewerObject* child : children)
-        {
-            prims.push_back(child);
-        }
-        return prims;
     }
 
     // Returns the value of NV pair key on obj as a string, or empty if
@@ -473,7 +455,7 @@ void LLScriptEditorWSServer::onConnectionOpened(const LLWebsocketMgr::WSConnecti
     LLJSONRPCServer::onConnectionOpened(connection);
 
     LL_INFOS("ScriptEditorWS") << "New script editor client connected via JSON-RPC" << LL_ENDL;
-
+    mIdleSince = 0.0;
 }
 
 void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t& connection)
@@ -493,8 +475,28 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
 
         LL_DEBUGS("ScriptEditorWS") << "Removed connection from active connections. Total: "
                                    << mActiveConnections.size() << LL_ENDL;
-        // TODO: When connections reach 0, stop the server after a timeout.
+        if (mActiveConnections.empty())
+        {
+            // Nothing listening: from here the idle time counts, and
+            // update() stops the server once it has run out.
+            mIdleSince = LLTimer::getTotalSeconds().value();
+        }
     }
+}
+
+bool LLScriptEditorWSServer::update()
+{
+    // A server nobody is connected to stops after a while, so that a
+    // port is not held for a client that has gone; it starts again the
+    // next time an editor asks for it. Zero keeps it up for the session.
+    static LLCachedControl<S32> idle_timeout(gSavedSettings, "ExternalWebsocketSyncIdleTimeout", 600);
+    const F64                   since = mIdleSince.load();
+    if (since > 0.0 && idle_timeout > 0 && LLTimer::getTotalSeconds().value() - since >= static_cast<F64>(idle_timeout) && getConnectionCount() == 0)
+    {
+        LL_INFOS("ScriptEditorWS") << "No script editor client for " << static_cast<S32>(idle_timeout) << " seconds; stopping the server" << LL_ENDL;
+        return false;
+    }
+    return true;
 }
 
 bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
@@ -2454,7 +2456,7 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
     }
 
     // Collect root + all children
-    std::vector<LLViewerObject*> prims = collect_linkset(root);
+    std::vector<LLViewerObject*> prims = LLPublishedObjectMgr::linksetOf(root);
 
     // Request object properties for each prim in the linkset (root + children),
     // matching the hover path so name/description metadata is refreshed.
@@ -2491,274 +2493,32 @@ bool LLScriptEditorWSServer::isObjectPublished(const LLUUID& object_id) const
     return mPublishedObjectManager.hasPublished(object_id);
 }
 
+// The publishing's bookkeeping lives in the manager; these are the
+// world's way in, kept on the server since that is what the world holds.
 void LLScriptEditorWSServer::onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (mPublishedObjectManager.handlePrimInventoryReadyEvent(object_id, prim_id))
-    {
-        LL_DEBUGS("ScriptEditorWS") << "All prim inventories ready for object " << object_id << LL_ENDL;
-        buildAndSendPublish(object_id);
-    }
-}
-
-void LLScriptEditorWSServer::buildAndSendPublish(const LLUUID& object_id)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.hasPendingPublish(object_id))
-    {
-        LL_WARNS("ScriptEditorWS") << "buildAndSendPublish: no pending publish for " << object_id << LL_ENDL;
-        return;
-    }
-
-    LLViewerObject* root = gObjectList.findObject(object_id);
-    if (!root)
-    {
-        LL_WARNS("ScriptEditorWS") << "buildAndSendPublish: root object gone: " << object_id << LL_ENDL;
-        mPublishedObjectManager.cancelPendingPublish(object_id);
-        return;
-    }
-
-    LLSD pub = mPublishedObjectManager.buildPublishedObjectLLSD(root);
-
-    // Store in the published registry
-    LLPublishedObjectMgr::PublishedObjectInfo info;
-    info.mObjectID          = root->getID();
-    info.mOwnerID           = root->mOwnerID;
-    info.mObjectName        = pub["object_name"].asString();
-    info.mObjectDescription = pub["object_description"].asString();
-    if (root->getRegion())
-    {
-        info.mRegionName = root->getRegion()->getName();
-    }
-    LLSelectNode* root_select_node = LLSelectMgr::instance().getSelection()->findNode(root);
-    if (root_select_node
-        && root_select_node->mValid
-        && !root_select_node->mFromTaskID.isNull()
-        && !root->isAttachment())
-    {
-        info.mCanSaveBackToContents = true;
-        info.mSourceTaskID = root_select_node->mFromTaskID;
-    }
-    else
-    {
-        info.mCanSaveBackToContents = false;
-        info.mSourceTaskID.setNull();
-    }
-
-    S32 link_num = 1;
-    std::vector<LLViewerObject*> prims = collect_linkset(root);
-    for (LLViewerObject* prim : prims)
-    {
-        LLPublishedObjectMgr::PublishedPrimInfo prim_info;
-        prim_info.mPrimID          = prim->getID();
-        prim_info.mPrimName        = getPrimName(prim);  // Use helper with selection fallback
-        prim_info.mLinkNumber      = link_num++;
-        prim_info.mInventorySerial = static_cast<S16>(prim->getInventorySerial());
-        info.mPrims.push_back(prim_info);
-    }
-
-    LLPublishedObjectMgr::PublishedObjectInfo& published_info = mPublishedObjectManager.finalizePendingPublish(object_id, std::move(info));
-
-    // Align outgoing publish payload with any property responses that arrived
-    // while inventory-gated publish was still pending.
-    pub["object_name"] = published_info.mObjectName;
-    pub["can_save_back"] = published_info.mCanSaveBackToContents;
-    pub["object_description"] = published_info.mObjectDescription;
-    if (pub.has("linked_objects"))
-    {
-        LLSD& linked_objects = pub["linked_objects"];
-        for (S32 i = 0; i < linked_objects.size(); ++i)
-        {
-            const LLUUID link_id = linked_objects[i]["link_id"].asUUID();
-            auto prim_it = std::find_if(
-                published_info.mPrims.begin(),
-                published_info.mPrims.end(),
-                [&](const LLPublishedObjectMgr::PublishedPrimInfo& p)
-                {
-                    return p.mPrimID == link_id;
-                });
-            if (prim_it != published_info.mPrims.end())
-            {
-                linked_objects[i]["link_name"] = prim_it->mPrimName;
-                linked_objects[i]["link_description"] = prim_it->mPrimDescription;
-            }
-        }
-    }
-
-    // Send notification
-    LLSD message;
-    message["object"] = pub;
-    notifyAll("object.publish", message);
-
-    LL_INFOS("ScriptEditorWS") << "Published object " << object_id
-        << " (" << pub["object_name"].asString() << ") with "
-        << (prims.size() - 1) << " linked prim(s)" << LL_ENDL;
-
-    // Re-request object properties now that the object is published so
-    // onObjectPropertyChanged can emit object.update for root and linked prims.
-    for (LLViewerObject* prim : prims)
-    {
-        LLSelectMgr::instance().requestObjectPropertiesFamily(prim);
-    }
+    mPublishedObjectManager.onPrimInventoryReady(object_id, prim_id);
 }
 
 void LLScriptEditorWSServer::onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!child)
-    {
-        return;
-    }
-
-    if (!mPublishedObjectManager.reconcileLinksetChildAdded(
-            root_id,
-            child,
-            LLTimer::getTotalSeconds().value()))
-    {
-        return;
-    }
-
-    // Request inventory (async; fires onPrimInventoryChanged when ready).
-    child->requestInventory();
-
-    // Start safety-timeout timer (no-op if one is already pending for this root)
-    scheduleLinksetFlush(root_id, LINKSET_ADD_FLUSH_DELAY);
+    mPublishedObjectManager.onLinksetChildAdded(root_id, child);
 }
 
 void LLScriptEditorWSServer::onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.reconcileLinksetChildRemoved(root_id, child_id))
-    {
-        return;
-    }
-
-    // Schedule coalesced flush - multiple simultaneous removes share one timer
-    scheduleLinksetFlush(root_id, LINKSET_REMOVE_FLUSH_DELAY);
-}
-
-void LLScriptEditorWSServer::scheduleLinksetFlush(const LLUUID& root_id, F32 delay)
-{
-    // No-op if a timer is already pending for this root_id
-    if (mPublishedObjectManager.hasActiveLinksetFlushTimer(root_id))
-    {
-        return;
-    }
-
-    wptr_t weak = std::static_pointer_cast<LLScriptEditorWSServer>(shared_from_this());
-    LLEventTimer* t = LLEventTimer::run_after(delay, [weak, root_id]()
-    {
-        if (auto self = weak.lock())
-        {
-            self->mPublishedObjectManager.clearLinksetFlushTimer(root_id);
-            self->mPublishedObjectManager.clearPendingNewChildren(root_id); // clear any remaining pending children (timeout path)
-            self->flushLinksetUpdate(root_id);
-        }
-    });
-    mPublishedObjectManager.setLinksetFlushTimer(root_id, t->getWeak());
-}
-
-void LLScriptEditorWSServer::cancelLinksetFlushTimer(const LLUUID& root_id)
-{
-    mPublishedObjectManager.cancelLinksetFlushTimer(root_id);
-}
-
-void LLScriptEditorWSServer::flushLinksetUpdate(const LLUUID& root_id)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLSD update;
-    if (!mPublishedObjectManager.buildLinksetUpdateLLSD(root_id, update))
-    {
-        return;
-    }
-    notifyAll("object.update", update);
-
-    const LLSD linked_objects = update["linked_objects"];
-    LL_INFOS("ScriptEditorWS") << "Linkset update for " << root_id
-        << ": " << linked_objects.size() << " child(ren)" << LL_ENDL;
+    mPublishedObjectManager.onLinksetChildRemoved(root_id, child_id);
 }
 
 void LLScriptEditorWSServer::onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    if (!mPublishedObjectManager.hasPublished(object_id))
-    {
-        return;
-    }
-
-    LLViewerObject* prim = gObjectList.findObject(prim_id);
-    if (!prim)
-    {
-        return;
-    }
-
-    auto inv_result = mPublishedObjectManager.handlePrimInventoryChangedEvent(
-        object_id, prim_id, prim, LLTimer::getTotalSeconds().value());
-
-    if (inv_result.mTimingConsumed)
-    {
-        LL_DEBUGS("ScriptEditorWS") << "[Phase0] inventory refresh object_id=" << object_id
-            << " prim_id=" << prim_id
-            << " elapsed_sec=" << inv_result.mTimingElapsedSec << LL_ENDL;
-    }
-
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_READY_WAIT)
-    {
-        return;
-    }
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_READY_FLUSH_NOW)
-    {
-        cancelLinksetFlushTimer(object_id);
-        flushLinksetUpdate(object_id);
-        return;
-    }
-    if (inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::ROOT_INVENTORY_UPDATE ||
-        inv_result.mKind == LLPublishedObjectMgr::InventoryChangeKind::CHILD_INVENTORY_UPDATE)
-    {
-        notifyAll("object.update", inv_result.mUpdate);
-        if (inv_result.mHasPendingItemCreate)
-        {
-            LLEventPumps::instance().post(
-                inv_result.mPendingItemCreatePump,
-                LLSD().with("prim_id", prim_id));
-        }
-
-        LL_DEBUGS("ScriptEditorWS") << "Sent object.update for prim " << prim_id
-                                    << " in object " << object_id << LL_ENDL;
-    }
+    mPublishedObjectManager.onPrimInventoryChanged(object_id, prim_id);
 }
 
 void LLScriptEditorWSServer::onObjectPropertyChanged(
     const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    LLViewerObject* prim = gObjectList.findObject(prim_id);
-    if (!prim)
-    {
-        return;
-    }
-
-    LLUUID root_id = prim->getRootEdit()->getID();
-
-    mPublishedObjectManager.recordPendingPropertyChange(root_id, prim_id, name, desc);
-
-    bool should_refresh_inventory = mPublishedObjectManager.markPrimInventorySerialAndDetectChange(
-        root_id,
-        prim_id,
-        inventory_serial);
-
-    LLSD update;
-    if (mPublishedObjectManager.applyPropertyChange(root_id, prim_id, name, desc, update))
-    {
-        notifyAll("object.update", update);
-    }
-
-    if (should_refresh_inventory && !mPublishedObjectManager.hasInventoryRequestStart(prim_id))
-    {
-        prim->dirtyInventory();
-        mPublishedObjectManager.setInventoryRequestStart(prim_id, LLTimer::getTotalSeconds().value());
-        prim->requestInventory();
-    }
+    mPublishedObjectManager.onObjectPropertyChanged(prim_id, name, desc, inventory_serial);
 }
 
 void LLScriptEditorWSServer::unpublishObject(const LLUUID& object_id, const std::string& reason)
