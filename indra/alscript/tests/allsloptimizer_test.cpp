@@ -329,11 +329,27 @@ namespace tut
         ensure("an index, a negative integer: " + r.text, has("string b = \"-7\";"));
         ensure("down a path: " + r.text, has("string c = \"v\";"));
         ensure("a fraction is left: " + r.text, has("string d = llJsonGetValue"));
-        ensure("true is left", has("string e = llJsonGetValue"));
-        ensure("out of range is left", has("string f = llJsonGetValue"));
+        ensure("true is its constant: " + r.text, has("string e = JSON_TRUE;"));
+        ensure("out of range is JSON_INVALID: " + r.text, has("string f = JSON_INVALID;"));
         ensure("duplicate keys are left", has("string g = llJsonGetValue"));
         ensure("a trailing comma is left", has("string h = llJsonGetValue"));
         ensure("an escape unescaped: " + r.text, has("string i = \"a\\\"b\";"));
+        // The answers that are constants are the constants' names.
+        const std::string more = wrap("", "        string a = llJsonGetValue(\"[true, null]\", [0]);\n        string b = llJsonGetValue(\"[1]\", [3]);\n        string c = llJsonValueType(\"{\\\"a\\\": [1, {}]}\", [\"a\", 1]);\n        string d = llJsonValueType(\"{\\\"a\\\": 1}\", [\"b\"]);\n        string e = llJsonValueType(\"[1,]\", []);\n        string f = llList2Json(JSON_OBJECT, [\"name\", \"Ann Lee\", \"count\", 3]);\n        string g = llList2Json(JSON_ARRAY, [1, \"true\"]);\n        string h = llList2Json(JSON_ARRAY, [1.5]);\n        list i = llJson2List(\"[1, \\\"two\\\", -3]\");\n        list j = llJson2List(\"{\\\"k\\\": \\\"v\\\"}\");\n        list k = llJson2List(\"[true]\");\n        llSay(0, a + b + c + d + e + f + g + h + llList2CSV(i) + llList2CSV(j) + llList2CSV(k));\n        a = b = c = d = e = f = g = h = \"\"; i = j = k = [];\n");
+        ALLSLOptimizer::Result m = ALLSLOptimizer::run(more, options());
+        ensure("optimized", m.optimized);
+        auto hasm = [&m](const char* text) { return m.text.find(text) != std::string::npos; };
+        ensure("true is JSON_TRUE: " + m.text, hasm("string a = JSON_TRUE;"));
+        ensure("a miss is JSON_INVALID: " + m.text, hasm("string b = JSON_INVALID;"));
+        ensure("the type of a nested object: " + m.text, hasm("string c = JSON_OBJECT;"));
+        ensure("the type of nothing: " + m.text, hasm("string d = JSON_INVALID;"));
+        ensure("malformed is left to the simulator: " + m.text, hasm("string e = llJsonValueType"));
+        ensure("an object from plain strings and integers: " + m.text, hasm("string f = \"{\\\"name\\\":\\\"Ann Lee\\\",\\\"count\\\":3}\";"));
+        ensure("a string that reads as a JSON word is left: " + m.text, hasm("string g = llList2Json"));
+        ensure("a float is left: " + m.text, hasm("string h = llList2Json"));
+        ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", -3];"));
+        ensure("an object to a list: " + m.text, hasm("list j = [\"k\", \"v\"];"));
+        ensure("a true in it is left: " + m.text, hasm("list k = llJson2List"));
     }
     template<> template<>
     void allsloptimizer_object::test<13>()
@@ -388,12 +404,12 @@ namespace tut
         ensure("twice became its expression with the argument in: " + r.text, has("(i * 2 + g)"));
         ensure("thrice uses its parameter thrice, so only a constant would do: left: " + r.text, has("thrice(g)") && has("thrice(i)") && has("integer thrice(integer x)"));
         ensure("loop has a label and a jump: left: " + r.text, has("loop();") && has("@again;"));
-        S32 notes = 0;
+        S32 said = 0;
         for (const ALScriptProblem& p : r.problems)
         {
-            notes += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of its one call") != std::string::npos;
+            said += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of its one call") != std::string::npos;
         }
-        ensure_equals("two notes", notes, 2);
+        ensure_equals("two notes", said, 2);
         // The map leads from the block back to the function's own lines.
         const size_t at = r.text.find("llSay(0, what + (string)i_1);");
         ensure("found", at != std::string::npos);
@@ -404,5 +420,59 @@ namespace tut
         }
         const ALSourceMap::Loc from = r.map.toSource(line, 8);
         ensure_equals("the llSay came from the function's fifth line", from.line, 4);
+        // With the folds on, a note about the block's code points at the
+        // function's own lines.
+        o.constfold = true;
+        r           = ALLSLOptimizer::run(source, o);
+        bool folded_in_body = false;
+        for (const ALScriptProblem& p : r.problems)
+        {
+            if (p.severity == ALScriptProblem::Severity::Note && p.message.find("n * 2") != std::string::npos)
+            {
+                folded_in_body = p.line == 3;
+            }
+        }
+        ensure("a note on the body's code is at the function's line: " + notes(r), folded_in_body);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<14>()
+    {
+        set_test_name("a small function returning an expression goes in every place, and a marked one whatever its size");
+        const std::string source =
+            "integer sq(integer x)\n"
+            "{\n"
+            "    return x * x;\n"
+            "}\n"
+            "shout(string what)\n"
+            "{\n"
+            "    llShout(0, what);\n"
+            "    llShout(1, what);\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        integer a = sq(2) + sq(3);\n"
+            "        shout(\"x\");\n"
+            "        shout(\"y\");\n"
+            "        llSay(0, (string)a);\n"
+            "    }\n"
+            "}\n";
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        o.dcr                     = false;
+        o.constfold               = false;
+        ALLSLInliner::Result put  = ALLSLInliner::run(source);
+        ensure("sq went into both places, once each round: " + put.text, put.text.find("integer a = (2 * 2) + (3 * 3);") != std::string::npos);
+        ensure("and is gone", put.text.find("integer sq(") == std::string::npos);
+        ensure("shout, called twice and unmarked, stays: " + put.text, put.text.find("shout(\"x\");") != std::string::npos && put.text.find("shout(string what)") != std::string::npos);
+        ensure_equals("two rounds", put.inlined, 2);
+        put = ALLSLInliner::run(source, { "shout" });
+        ensure("marked, shout goes into both places: " + put.text,
+               put.text.find("string what = \"x\";") != std::string::npos && put.text.find("string what = \"y\";") != std::string::npos &&
+               put.text.find("shout(string what)") == std::string::npos);
+        ensure_equals("four rounds", put.inlined, 4);
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+        ensure("the optimizer reads the result: " + notes(r), r.optimized && r.text.find("(2 * 2) + (3 * 3)") != std::string::npos);
     }
 } // namespace tut

@@ -475,8 +475,34 @@ namespace
     struct Ctx
     {
         ScriptAllocator*       allocator = nullptr;
+        ScriptContext*         context   = nullptr;
         ALLSLOptimizer::Target target    = ALLSLOptimizer::Target::Mono;
         bool                   foldtabs  = false;
+
+        // A builtin constant as an answer: the JSON_* names, whose values
+        // are characters no literal may carry, are folded to the name.
+        // The value handed back is the builtin's own, which the call
+        // recognises and puts the name in for.
+        std::map<LSLConstant*, std::string> namedValues;
+        LSLConstant*                        builtin(const char* name)
+        {
+            if (!context || !context->builtins)
+            {
+                return nullptr;
+            }
+            LSLSymbol* sym = context->builtins->lookup(name, SYM_VARIABLE);
+            if (!sym || !sym->getConstantValue())
+            {
+                return nullptr;
+            }
+            namedValues.emplace(sym->getConstantValue(), name);
+            return sym->getConstantValue();
+        }
+        const std::string* nameOf(LSLConstant* value) const
+        {
+            const auto found = namedValues.find(value);
+            return found == namedValues.end() ? nullptr : &found->second;
+        }
 
         LSLConstant* integer(int v) { return allocator->newTracked<LSLIntegerConstant>(v); }
         LSLConstant* number(double v)
@@ -1080,6 +1106,67 @@ namespace
         }
     };
 
+    // The value a path of keys and indexes reaches, or null.
+    const JsonValue* jsonAt(const JsonValue& root, const std::vector<LSLConstant*>& path)
+    {
+        const JsonValue* at = &root;
+        for (LSLConstant* step : path)
+        {
+            if (step->getNodeSubType() == NODE_STRING_CONSTANT && at->kind == JsonValue::Kind::Object)
+            {
+                const char*      key   = static_cast<LSLStringConstant*>(step)->getValue();
+                const JsonValue* found = nullptr;
+                for (const auto& field : at->fields)
+                {
+                    if (field.first == key)
+                    {
+                        found = &field.second;
+                    }
+                }
+                if (!found)
+                {
+                    return nullptr;
+                }
+                at = found;
+            }
+            else if (step->getNodeSubType() == NODE_INTEGER_CONSTANT && at->kind == JsonValue::Kind::Array)
+            {
+                const int index = static_cast<LSLIntegerConstant*>(step)->getValue();
+                if (index < 0 || static_cast<size_t>(index) >= at->items.size())
+                {
+                    return nullptr;
+                }
+                at = &at->items[static_cast<size_t>(index)];
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
+        return at;
+    }
+
+    // A string that reads as a string to every JSON writer and reader:
+    // starts with a letter, holds letters, digits, spaces and plain
+    // punctuation, and is not a word JSON has a meaning for.
+    bool plainJsonString(const std::string& s)
+    {
+        if (s.empty() || !isalpha(static_cast<unsigned char>(s[0])))
+        {
+            return false;
+        }
+        for (const char ch : s)
+        {
+            if (!(isalnum(static_cast<unsigned char>(ch)) || ch == ' ' || ch == '_' || ch == '-' || ch == '.' || ch == ',' || ch == ':' || ch == ';' ||
+                  ch == '!' || ch == '?' || ch == '\'' || ch == '(' || ch == ')' || ch == '#' || ch == '@' || ch == '%' || ch == '&' || ch == '*' ||
+                  ch == '+' || ch == '=' || ch == '/' || ch == '|' || ch == '~' || ch == '^' || ch == '$'))
+            {
+                return false;
+            }
+        }
+        return s != "true" && s != "false" && s != "null";
+    }
+
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
 
     const std::unordered_map<std::string, Evaluator>& evaluators()
@@ -1512,42 +1599,134 @@ namespace
                   JsonValue  root;
                   JsonReader reader(json);
                   if (!reader.whole(root)) return nullptr;
-                  const JsonValue* at = &root;
-                  for (LSLConstant* step : elements(path))
-                  {
-                      if (step->getNodeSubType() == NODE_STRING_CONSTANT && at->kind == JsonValue::Kind::Object)
-                      {
-                          const char*      key   = static_cast<LSLStringConstant*>(step)->getValue();
-                          const JsonValue* found = nullptr;
-                          for (const auto& field : at->fields)
-                          {
-                              if (field.first == key)
-                              {
-                                  found = &field.second;
-                              }
-                          }
-                          if (!found) return nullptr;
-                          at = found;
-                      }
-                      else if (step->getNodeSubType() == NODE_INTEGER_CONSTANT && at->kind == JsonValue::Kind::Array)
-                      {
-                          const int index = static_cast<LSLIntegerConstant*>(step)->getValue();
-                          if (index < 0 || static_cast<size_t>(index) >= at->items.size()) return nullptr;
-                          at = &at->items[static_cast<size_t>(index)];
-                      }
-                      else
-                      {
-                          return nullptr;
-                      }
-                  }
+                  const JsonValue* at = jsonAt(root, elements(path));
+                  if (!at) return c.builtin("JSON_INVALID");
                   // A string or a plain number: what is written is what
-                  // is answered. The rest -- true, false, null, a nested
-                  // object or array -- the simulator spells its own way.
-                  if (at->kind == JsonValue::Kind::String || at->kind == JsonValue::Kind::Number)
+                  // is answered; true, false and null are their constants.
+                  // A nested object or array the simulator spells its own
+                  // way.
+                  switch (at->kind)
                   {
-                      return c.string(at->text);
+                      case JsonValue::Kind::String:
+                      case JsonValue::Kind::Number: return c.string(at->text);
+                      case JsonValue::Kind::True:   return c.builtin("JSON_TRUE");
+                      case JsonValue::Kind::False:  return c.builtin("JSON_FALSE");
+                      case JsonValue::Kind::Null:   return c.builtin("JSON_NULL");
+                      default:                      return nullptr;
+                  }
+              } },
+            { "llJsonValueType",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string      json;
+                  LSLListConstant* path;
+                  if (!argString(a, 0, json) || !argList(a, 1, path)) return nullptr;
+                  JsonValue  root;
+                  JsonReader reader(json);
+                  if (!reader.whole(root)) return nullptr;
+                  const JsonValue* at = jsonAt(root, elements(path));
+                  if (!at) return c.builtin("JSON_INVALID");
+                  switch (at->kind)
+                  {
+                      case JsonValue::Kind::Object: return c.builtin("JSON_OBJECT");
+                      case JsonValue::Kind::Array:  return c.builtin("JSON_ARRAY");
+                      case JsonValue::Kind::String: return c.builtin("JSON_STRING");
+                      case JsonValue::Kind::Number: return c.builtin("JSON_NUMBER");
+                      case JsonValue::Kind::True:   return c.builtin("JSON_TRUE");
+                      case JsonValue::Kind::False:  return c.builtin("JSON_FALSE");
+                      case JsonValue::Kind::Null:   return c.builtin("JSON_NULL");
                   }
                   return nullptr;
+              } },
+            { "llList2Json",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  // Only what every writer spells alike: integers and
+                  // plain strings -- letters, digits after the first,
+                  // spaces and the punctuation that needs no escape --
+                  // that read as nothing else. Floats, JSON values as
+                  // strings, and anything wanting an escape are left.
+                  LSLListConstant* items;
+                  if (a.empty() || a[0]->getNodeSubType() != NODE_STRING_CONSTANT || !argList(a, 1, items)) return nullptr;
+                  // The kind is a JSON_* value, which is no ASCII string.
+                  const std::string kind   = static_cast<LSLStringConstant*>(a[0])->getValue();
+                  LSLConstant*      array  = c.builtin("JSON_ARRAY");
+                  LSLConstant*      object = c.builtin("JSON_OBJECT");
+                  const bool        is_array  = array && kind == static_cast<LSLStringConstant*>(array)->getValue();
+                  const bool        is_object = object && kind == static_cast<LSLStringConstant*>(object)->getValue();
+                  if (!is_array && !is_object) return nullptr;
+                  const std::vector<LSLConstant*> list = elements(items);
+                  if (is_object && list.size() % 2 != 0) return nullptr;
+                  std::string out = is_array ? "[" : "{";
+                  for (size_t i = 0; i < list.size(); ++i)
+                  {
+                      // A comma before each item, or before each pair.
+                      if (i > 0 && (is_array || i % 2 == 0)) out += ",";
+                      LSLConstant* item = list[i];
+                      if (is_object && i % 2 == 0)
+                      {
+                          std::string key;
+                          if (!argString({ item }, 0, key) || !plainJsonString(key)) return nullptr;
+                          out += "\"" + key + "\":";
+                          continue;
+                      }
+                      if (item->getNodeSubType() == NODE_INTEGER_CONSTANT)
+                      {
+                          out += std::to_string(static_cast<LSLIntegerConstant*>(item)->getValue());
+                          continue;
+                      }
+                      std::string text;
+                      if (!argString({ item }, 0, text) || !plainJsonString(text)) return nullptr;
+                      out += "\"" + text + "\"";
+                  }
+                  out += is_array ? "]" : "}";
+                  return c.string(out);
+              } },
+            { "llJson2List",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  // An array's items or an object's keys and values, where
+                  // every one is an integer or a plain string; anything
+                  // else the simulator types its own way.
+                  std::string json;
+                  if (!argString(a, 0, json)) return nullptr;
+                  JsonValue  root;
+                  JsonReader reader(json);
+                  if (!reader.whole(root)) return nullptr;
+                  std::vector<const JsonValue*> values;
+                  std::vector<LSLConstant*>     out;
+                  auto                          push = [&](const JsonValue& v) {
+                      if (v.kind == JsonValue::Kind::Number)
+                      {
+                          if (v.text.size() > 10) return false;
+                          out.push_back(c.integer(static_cast<int>(std::strtol(v.text.c_str(), nullptr, 10))));
+                          return true;
+                      }
+                      if (v.kind == JsonValue::Kind::String && plainJsonString(v.text))
+                      {
+                          out.push_back(c.string(v.text));
+                          return true;
+                      }
+                      return false;
+                  };
+                  if (root.kind == JsonValue::Kind::Array)
+                  {
+                      for (const JsonValue& v : root.items)
+                      {
+                          if (!push(v)) return nullptr;
+                      }
+                  }
+                  else if (root.kind == JsonValue::Kind::Object)
+                  {
+                      for (const auto& field : root.fields)
+                      {
+                          if (!plainJsonString(field.first)) return nullptr;
+                          out.push_back(c.string(field.first));
+                          if (!push(field.second)) return nullptr;
+                      }
+                  }
+                  else
+                  {
+                      return nullptr;
+                  }
+                  return listOf(c, out);
               } },
             { "llList2CSV",
               [](Ctx& c, const Args& a) -> LSLConstant* {
@@ -1821,7 +2000,31 @@ namespace
                 args.push_back(cv);
             }
             LSLConstant* value = evaluate(ctx, sym->getName(), args);
-            if (!value || !inlineable(value, true))
+            if (!value)
+            {
+                return false;
+            }
+            if (const std::string* name = ctx.nameOf(value))
+            {
+                // The builtin's name in place of the call: a token the
+                // compiler already has.
+                LSLSymbol* builtin = ctx.context->builtins->lookup(name->c_str(), SYM_VARIABLE);
+                if (!builtin)
+                {
+                    return false;
+                }
+                // newTracked passes the context itself.
+                auto* id = ctx.allocator->newTracked<LSLIdentifier>(ctx.allocator->copyStr(name->c_str()));
+                id->setSymbol(builtin);
+                auto* lvalue = ctx.allocator->newTracked<LSLLValueExpression>(id, static_cast<LSLIdentifier*>(nullptr));
+                lvalue->setLoc(expr->getLoc());
+                id->setLoc(expr->getLoc());
+                report.note(expr->getLoc(), "evaluated " + render(expr) + " to " + *name);
+                LSLASTNode::replaceNode(expr, lvalue);
+                ++changes;
+                return true;
+            }
+            if (!inlineable(value, true))
             {
                 return false;
             }
@@ -2945,7 +3148,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     ALSourceMap inlinedMap;
     if (options.inlining)
     {
-        ALLSLInliner::Result put = ALLSLInliner::run(source);
+        ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames);
         if (put.inlined > 0)
         {
             inlined    = std::move(put.text);
@@ -2957,12 +3160,38 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
             }
         }
     }
+    // What is said from here on is said of the inlined text, and brought
+    // back to the source on the way out.
+    const size_t saidOfInlined = result.problems.size();
+    const auto   bringBack     = [&]() {
+        if (inlinedMap.empty())
+        {
+            return;
+        }
+        for (size_t i = saidOfInlined; i < result.problems.size(); ++i)
+        {
+            ALScriptProblem&       p    = result.problems[i];
+            const ALSourceMap::Loc from = inlinedMap.toSource(p.line, p.column);
+            const ALSourceMap::Loc to   = inlinedMap.toSource(p.endLine, p.endColumn);
+            if (from.found())
+            {
+                p.line   = from.line;
+                p.column = from.column;
+            }
+            if (to.found())
+            {
+                p.endLine   = to.line;
+                p.endColumn = to.column;
+            }
+        }
+    };
 
     ScopedScriptParser parser(nullptr);
     LSLScript*         script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
     if (!script || parser.logger.getErrors())
     {
         collectMessages(parser.logger, result.problems);
+        bringBack();
         return result;
     }
     script->collectSymbols();
@@ -2978,11 +3207,13 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     if (parser.logger.getErrors())
     {
         collectMessages(parser.logger, result.problems);
+        bringBack();
         return result;
     }
 
     Ctx ctx;
     ctx.allocator = &parser.allocator;
+    ctx.context   = &parser.context;
     ctx.target    = options.target;
     ctx.foldtabs  = options.foldtabs;
     Report report(result.problems);
@@ -3047,6 +3278,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     {
         result.map = result.map.composed(inlinedMap);
     }
+    bringBack();
     result.sizeAfter = result.text.size();
     result.optimized = true;
     return result;

@@ -76,9 +76,13 @@ public:
         // The compiler turns a tab in a literal into spaces, so a fold that
         // would put one there is refused unless this says otherwise.
         bool foldtabs = false;
-        // A user function called from one place put in that place, before
-        // the rest; off by default.
-        bool inlining = false;
+        // A user function called from one place put in that place, and a
+        // small one returning an expression in every place, before the
+        // rest; off by default. The functions named here are put in
+        // place wherever they are called, whatever their size: what the
+        // script marked `inline`.
+        bool                     inlining = false;
+        std::vector<std::string> inlineNames;
     };
 
     struct Result

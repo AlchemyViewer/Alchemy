@@ -29,12 +29,16 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 // A user function called from one place is put in that place, and the
 // function goes: a call is a frame the script pays for, and a function
-// with one caller is a block that was given a name. Done in the text,
-// from what the parse says of it, so that the script the optimizer then
-// reads is an ordinary script with ordinary scopes.
+// with one caller is a block that was given a name. A small function
+// returning an expression goes in every place it is called, since the
+// expression costs about what the call did; and a function the script
+// marked `inline` goes in every place whatever its size. Done in the
+// text, from what the parse says of it, so that the script the
+// optimizer then reads is an ordinary script with ordinary scopes.
 //
 // Two shapes are taken. A function returning nothing, called as a
 // statement, becomes a block: each parameter a local of the block set
@@ -61,6 +65,7 @@ public:
     };
 
     // Needs the builtins loaded through ALLSLService, as the optimizer
-    // does; the source must parse, or it is returned as it is.
-    static Result run(std::string_view source);
+    // does; the source must parse, or it is returned as it is. The
+    // functions named are put in place wherever they are called.
+    static Result run(std::string_view source, const std::vector<std::string>& marked = {});
 };

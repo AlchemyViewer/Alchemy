@@ -353,7 +353,7 @@ namespace
 
     // One round: the first function that can go in place goes. Whether
     // one did.
-    bool inlineOne(std::string& text, ALSourceMap& map, ALScriptProblem& note)
+    bool inlineOne(std::string& text, ALSourceMap& map, ALScriptProblem& note, const std::vector<std::string>& marked)
     {
         ScopedScriptParser parser(nullptr);
         LSLScript*         script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
@@ -397,11 +397,17 @@ namespace
                 continue;
             }
             const auto found = calls.find(sym);
-            if (found == calls.end() || found->second.size() != 1)
+            if (found == calls.end() || found->second.empty())
             {
                 continue;
             }
+            // The one call, or the first of several where the function is
+            // marked or is small enough to go everywhere; the function
+            // goes with its last call.
+            const bool   is_marked = std::find(marked.begin(), marked.end(), sym->getName()) != marked.end();
+            const size_t callCount = found->second.size();
             LSLFunctionExpression* call = found->second.front();
+            const bool   last      = callCount == 1;
             if (isInside(call, function))
             {
                 continue;
@@ -457,6 +463,10 @@ namespace
 
             if (returnsNothing && bare)
             {
+                if (!last && !is_marked)
+                {
+                    continue;
+                }
                 // A block in place of the statement: each parameter a
                 // local set to its argument, then the body.
                 bool plain = true;
@@ -575,11 +585,14 @@ namespace
 
                 Weave weave(lines);
                 weave.edits.push_back(Edit{ beginOf(statement), endOf(statement), std::move(block) });
-                for (S32 line = fbegin.line; line <= fend.line; ++line)
+                if (last)
                 {
-                    weave.droppedLines.insert(line);
+                    for (S32 line = fbegin.line; line <= fend.line; ++line)
+                    {
+                        weave.droppedLines.insert(line);
+                    }
                 }
-                note = noteAt(statement, std::string("put the function ") + sym->getName() + " in place of its one call");
+                note = noteAt(statement, std::string("put the function ") + sym->getName() + (last ? " in place of its one call" : " in place of a call"));
                 weave.run(text, map);
                 return true;
             }
@@ -596,6 +609,12 @@ namespace
                 }
                 LSLExpression* expr = static_cast<LSLReturnStatement*>(only)->getExpr();
                 if (!expr)
+                {
+                    continue;
+                }
+                // Several calls: only where marked, or small enough that
+                // the expression costs about what the call did.
+                if (!last && !is_marked && nodesOf(expr).size() > 8)
                 {
                     continue;
                 }
@@ -665,11 +684,14 @@ namespace
 
                 Weave weave(lines);
                 weave.edits.push_back(Edit{ beginOf(call), endOf(call), std::move(block) });
-                for (S32 line = fbegin.line; line <= fend.line; ++line)
+                if (last)
                 {
-                    weave.droppedLines.insert(line);
+                    for (S32 line = fbegin.line; line <= fend.line; ++line)
+                    {
+                        weave.droppedLines.insert(line);
+                    }
                 }
-                note = noteAt(call, std::string("put what the function ") + sym->getName() + " returns in place of its one call");
+                note = noteAt(call, std::string("put what the function ") + sym->getName() + (last ? " returns in place of its one call" : " returns in place of a call"));
                 weave.run(text, map);
                 return true;
             }
@@ -679,7 +701,7 @@ namespace
 } // namespace
 
 // static
-ALLSLInliner::Result ALLSLInliner::run(std::string_view source)
+ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked)
 {
     Result result;
     result.text = std::string(source);
@@ -703,11 +725,11 @@ ALLSLInliner::Result ALLSLInliner::run(std::string_view source)
     }
     // Round after round, each over the text the last made, its map over
     // the last's, until nothing more can go.
-    for (int round = 0; round < 64; ++round)
+    for (int round = 0; round < 256; ++round)
     {
         ALSourceMap     step;
         ALScriptProblem note;
-        if (!inlineOne(result.text, step, note))
+        if (!inlineOne(result.text, step, note, marked))
         {
             break;
         }
