@@ -30,9 +30,12 @@
 #include "llfloater.h"
 #include "lllayoutstack.h"
 
+#include <algorithm>
+
 void ALPaneFolds::bind(LLView* window, std::vector<Pane> panes)
 {
     mPanes.clear();
+    mStacks.clear();
 
     for (Pane& pane : panes)
     {
@@ -40,6 +43,17 @@ void ALPaneFolds::bind(LLView* window, std::vector<Pane> panes)
 
         bound.mRegion = window->findChildView(pane.mPanel, true);
         bound.mPanel = ALViewType::as<LLLayoutPanel>(bound.mRegion);
+        // A drag on the stack's bars ended: the region's size is worth
+        // keeping now rather than at the window's close. One connection a
+        // stack, however many regions sit in it.
+        if (LLLayoutStack* stack = bound.mPanel ? ALViewType::as<LLLayoutStack>(bound.mPanel->getParent()) : nullptr)
+        {
+            const bool known = std::any_of(mPanes.begin(), mPanes.end(), [stack](const Bound& b) { return b.mPanel && b.mPanel->getParent() == stack; });
+            if (!known)
+            {
+                mStacks.emplace_back(stack->onResizeDone([this]() { mChanged(); }));
+            }
+        }
         bound.mButton = pane.mButton.empty() ? nullptr : window->findChild<LLButton>(pane.mButton, true);
         // Everything the region holds, moved into a pane of its own that
         // fills it: the tree gains a level and every name in it is where it

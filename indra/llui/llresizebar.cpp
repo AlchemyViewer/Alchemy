@@ -114,6 +114,10 @@ bool LLResizeBar::handleMouseUp(S32 x, S32 y, MASK mask)
         // Release the mouse
         gFocusMgr.setMouseCapture( NULL );
         handled = true;
+        if (mResizeDoneListener)
+        {
+            mResizeDoneListener();
+        }
     }
     else
     {

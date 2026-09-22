@@ -65,6 +65,9 @@ public:
     void            setAllowDoubleClickSnapping(bool allow) { mAllowDoubleClickSnapping = allow; }
     bool            canResize() const { return getEnabled() && mMaxSize > mMinSize; }
     void            setResizeListener(std::function<void(void*)> listener) { mResizeListener = listener; }
+    // Told once when a drag on the bar ends, where the listener above
+    // is told of every step of it.
+    void            setResizeDoneListener(std::function<void()> listener) { mResizeDoneListener = std::move(listener); }
 
 private:
     S32                             mDragLastScreenX;
@@ -79,6 +82,7 @@ private:
                                     mAllowDoubleClickSnapping;
     LLView*                         mResizingView;
     std::function<void(void*)>      mResizeListener;
+    std::function<void()>           mResizeDoneListener;
 };
 
 #endif  // LL_RESIZEBAR_H

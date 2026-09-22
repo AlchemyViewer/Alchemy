@@ -31,6 +31,8 @@
 #include "llpanel.h"
 #include "llresizebar.h"
 
+#include <boost/signals2.hpp>
+
 
 class LLLayoutPanel;
 
@@ -113,6 +115,11 @@ public:
     // panel that the stack reads from the file.
     EOrientation getOrientation() const { return mOrientation; }
 
+    // A drag on one of the stack's bars ended: whoever keeps the panels'
+    // sizes may take them now rather than at the window's close.
+    typedef boost::signals2::signal<void()> resize_done_signal_t;
+    boost::signals2::connection onResizeDone(const resize_done_signal_t::slot_type& cb) { return mResizeDone.connect(cb); }
+
     static void updateClass();
 
 protected:
@@ -157,6 +164,7 @@ private:
     S32  mDragHandleThickness;
     S32  mDragHandleShift;
     LLUIColor mDragHandleColor;
+    resize_done_signal_t mResizeDone;
 }; // end class LLLayoutStack
 
 

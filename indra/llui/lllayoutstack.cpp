@@ -685,6 +685,9 @@ void LLLayoutStack::createResizeBar(LLLayoutPanel* panelp)
         resize_params.snapping_enabled(false);
         LLResizeBar* resize_bar = LLUICtrlFactory::create<LLResizeBar>(resize_params);
         panelp->mResizeBar = resize_bar;
+        // The bar is the stack's child and goes with it, so the stack
+        // outlives the listener.
+        resize_bar->setResizeDoneListener([this]() { mResizeDone(); });
 
         if (mShowDragHandle)
         {

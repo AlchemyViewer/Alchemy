@@ -102,7 +102,8 @@ public:
     void save(LLSD& state) const;
     void load(const LLSD& state);
 
-    // A region folded or unfolded, from a button or a call.
+    // A region folded or unfolded, from a button or a call; or a drag on
+    // its stack's bars ended, its size worth keeping now.
     typedef boost::signals2::signal<void()> changed_signal_t;
     boost::signals2::connection onChanged(const changed_signal_t::slot_type& cb) { return mChanged.connect(cb); }
 
@@ -122,4 +123,6 @@ private:
 
     std::vector<Bound> mPanes;
     changed_signal_t mChanged;
+    // To the stacks the regions sit in, for their bars.
+    std::vector<boost::signals2::scoped_connection> mStacks;
 };
