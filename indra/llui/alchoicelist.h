@@ -85,6 +85,11 @@ public:
     // to, once the choices are in.
     S32                        heightFor(S32 rows);
 
+    // The line around the list, where a view is themed after it was made:
+    // the list floats over an editor and wears that editor's colours, not
+    // the skin's, which a script theme has nothing to do with.
+    void                       setBorderColor(const LLUIColor& color) { mBorderColor = color; }
+
     typedef boost::signals2::signal<void(S32 index)> choice_signal_t;
     // A choice picked: double-clicked.
     boost::signals2::connection onPicked(const choice_signal_t::slot_type& slot) { return mPicked.connect(slot); }

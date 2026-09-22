@@ -173,6 +173,38 @@ public:
     // extent is seen without counting spaces.
     void setShowIndentGuides(bool show) { mShowIndentGuides = show; }
     bool getShowIndentGuides() const { return mShowIndentGuides; }
+    // Where the blank parts of a line are drawn as marks of their own: a
+    // dot in the middle of a space's column, an arrow across a tab to the
+    // stop it reached, and a ring around a no-break space -- the one that
+    // arrives by being pasted, looks exactly like a space, and stops a
+    // script compiling with a message about a character nobody can see.
+    //
+    // Never; only under the selection, which is the way to ask about a
+    // particular line without the rest of the script filling with dots;
+    // only where they trail a line, which is the kind worth deleting;
+    // or everywhere.
+    enum class Whitespace
+    {
+        None,
+        Selection,
+        Trailing,
+        All
+    };
+    void       setShowWhitespace(Whitespace how) { mShowWhitespace = how; }
+    Whitespace getShowWhitespace() const { return mShowWhitespace; }
+    // Which bytes of a line would be marked in the mode set, in order and
+    // without overlap: the drawing walks the glyphs on a row, this walks
+    // the line, and the test walks this.
+    struct Blank
+    {
+        S32  begin = 0;
+        S32  end   = 0;
+        char kind  = ' ';   // ' ', '\t', or 'n' for a no-break space
+    };
+    // `from` and `to` narrow the scan to a stretch of the line, which is
+    // how the drawing asks about one row of a wrapped line without
+    // walking the whole of it once per row.
+    std::vector<Blank> blanksOn(S32 line, S32 from = 0, S32 to = S32_MAX) const;
     // Line numbers counted from the caret's line, which is numbered as
     // itself: what a jump of so many lines reads off.
     void setRelativeLineNumbers(bool relative) { mRelativeLineNumbers = relative; }
@@ -282,6 +314,17 @@ public:
     // caret's is the one it is on or at the end of.
     ALTextRange identifierAt(const ALTextPos& pos) const;
     ALTextRange identifierAtCaret() const;
+    // The whole string literal a position is in, quotes and all: the run
+    // of string and escape tokens around it, carried across lines while
+    // one begins or ends inside a string, so that a long string is one
+    // literal rather than a line of one. Empty where the position is not
+    // in a string.
+    ALTextRange stringAt(const ALTextPos& pos) const;
+    // What to say about one: its size, which is what a scripter wants of
+    // a string and what the type alone never says -- the bytes it comes
+    // to, the characters where they are not the same number, and what it
+    // is written as where the escapes make that longer.
+    std::string stringSize(const ALTextRange& literal) const;
 
     // --- placeholders ----------------------------------------------------------------
 
@@ -369,6 +412,9 @@ protected:
     S32  leftInset() const override { return gutterWidth(); }
     void drawBeforeRows(const LLRect& text) override;
     void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) override;
+    // The blank marks on one row, over the glyphs the layout placed, so
+    // that a tab is marked across the width it actually took.
+    void drawWhitespace(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha);
     void revealLine(S32 line) override;
     bool performFold(ALEditorCommand command) override;
     bool canFold(ALEditorCommand command) const override;
@@ -436,6 +482,10 @@ private:
     LLUIColor mHighlightColor;
     LLUIColor mChangedColor;
     bool      mShowIndentGuides    = true;
+    // Under the selection by default: nothing changes about a script
+    // sitting there, and the marks are there the moment anything is
+    // picked out, which is when they are wanted.
+    Whitespace mShowWhitespace      = Whitespace::Selection;
     bool      mRelativeLineNumbers = false;
     bool      mColorBrackets       = true;
     bool      mStickyHeaders       = true;

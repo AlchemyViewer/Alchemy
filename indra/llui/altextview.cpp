@@ -27,6 +27,7 @@
 #include "altextview.h"
 
 #include "altextchars.h"
+#include "alsurface.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
 #include "lldir.h"
@@ -2912,20 +2913,11 @@ void ALTextView::drawMapPreview(F32 alpha)
     top                 = llmax(top, local.mBottom + PAD + height);
     const S32    right  = map.mLeft - PAD;
     const LLRect box(right - width, top, right, top - height);
-    const LLColor4& bg  = backgroundColor();
-    const LLColor4& ink = textColor();
-    LLColor4 ground, faint, wash;
-    for (S32 i = 0; i < 3; ++i)
-    {
-        ground.mV[i] = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.06f;
-        faint.mV[i]  = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.45f;
-        wash.mV[i]   = bg.mV[i] + (ink.mV[i] - bg.mV[i]) * 0.14f;
-    }
-    ground.mV[VALPHA] = 0.97f * alpha;
-    faint.mV[VALPHA]  = alpha;
-    wash.mV[VALPHA]   = alpha;
-    gl_rect_2d(box, ground, true);
-    gl_rect_2d(box, faint % 0.6f, false);
+    const LLColor4& bg    = backgroundColor();
+    const LLColor4& ink   = textColor();
+    const LLColor4  faint = ALSurface::shade(bg, ink, 0.45f) % alpha;
+    const LLColor4  wash  = ALSurface::shade(bg, ink, 0.14f) % alpha;
+    ALSurface::draw(box, bg, ink, alpha);
     LLLocalClipRect clip(LLRect(box.mLeft + 1, box.mTop - 1, box.mRight - 1, box.mBottom + 1));
     // The numbers take the room the widest needs.
     const std::string widest  = std::to_string(last + 1);
@@ -3563,8 +3555,8 @@ void ALTextView::drawBand(F32 alpha)
     const LLRect    band(local.mLeft, local.mBottom + bandHeight(), local.mRight, local.mBottom);
     const LLColor4& paper = backgroundColor();
     const LLColor4& ink   = textColor();
-    gl_rect_2d(band, lerp(paper, ink, 0.06f) % alpha);
-    gl_rect_2d(band.mLeft, band.mTop, band.mRight, band.mTop - 1, lerp(paper, ink, 0.2f) % alpha);
+    gl_rect_2d(band, ALSurface::ground(paper, ink) % alpha);
+    gl_rect_2d(band.mLeft, band.mTop, band.mRight, band.mTop - 1, ALSurface::frame(ink, alpha));
     const LLFontGL* font = getFont();
     if (!font)
     {

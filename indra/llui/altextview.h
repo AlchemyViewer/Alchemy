@@ -207,6 +207,12 @@ public:
     // What is behind the text now -- read-only, focused or neither -- and
     // what the text is drawn in, for whatever draws beside them.
     const LLColor4& backgroundColor() const;
+    // The ground under the text, where a view is themed after it was
+    // made: a hover card follows the script colours, which the colour
+    // table may change while it is open.
+    void            setBackgroundColor(const LLUIColor& color) { mBgColor = mBgReadOnlyColor = mBgFocusColor = color; }
+    void            setTextColor(const LLUIColor& color) { mTextColor = mTextReadOnlyColor = color; }
+    void            setSelectionColor(const LLUIColor& color) { mSelectionColor = color; }
     // Whether the keyboard is on the text itself, rather than on the
     // find bar's field inside the view: what the caret, the caret's
     // line and the matched bracket follow. hasFocus counts a child.

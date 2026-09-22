@@ -26,6 +26,8 @@
 
 #include "alfindbar.h"
 
+#include "alsurface.h"
+
 #include "llfontgl.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -66,6 +68,7 @@ public:
 
     void setGlyph(const std::string& glyph) { mGlyph = glyph; }
     void setInk(const LLColor4& ink) { mInk = ink; }
+    void setLit(const LLColor4& lit) { mLit = lit; }
     bool getToggleState() const { return mOn; }
     void setToggleState(bool on) { mOn = on; }
 
@@ -200,7 +203,10 @@ ALFindBar::Flat* ALFindBar::flat(const std::string& name, const std::string& gly
     fp.name     = name;
     fp.rect     = LLRect(0, ROW, SMALL_W, 0);
     fp.tool_tip = tip;
-    Flat* made  = new Flat(fp, glyph, toggle, mInkColor, LLUIColorTable::instance().getColor("CodeCompletionBorderColor", LLColor4::blue));
+    // The band behind a glyph that is switched on. The view's own
+    // colours, which setColors puts back whenever the theme moves; what
+    // is here is only what it wears until the first of those.
+    Flat* made  = new Flat(fp, glyph, toggle, mInkColor, ALSurface::chosen(LLColor4::black, mInkColor.get()));
     addChild(made);
     return made;
 }
@@ -309,30 +315,20 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error)
 
 void ALFindBar::setColors(const LLColor4& background, const LLColor4& ink)
 {
-    LLColor4 bg = background;
-    for (S32 i = 0; i < 3; ++i)
-    {
-        bg.mV[i] = background.mV[i] + (ink.mV[i] - background.mV[i]) * 0.08f;
-    }
-    bg.mV[VALPHA] = 1.f;
-    mBgColor      = bg;
-    mInkColor     = ink;
+    mBgColor  = ALSurface::ground(background, ink);
+    mInkColor = ink;
+    const LLColor4 chosen = ALSurface::chosen(background, ink);
     for (Flat* glyph : { mExpand, mCase, mWord, mRegex, mPrev, mNextButton, mSelection, mCloseButton, mPreserveCase, mReplaceOne, mReplaceEvery })
     {
         glyph->setInk(ink);
+        glyph->setLit(chosen);
     }
     mCount->setColor(ink);
     // The fields in the view's own colours: its ground behind the text,
     // its ink for the text and the caret, and a shade between them for
     // the label and the selection.
-    LLColor4 faint = background;
-    LLColor4 lit   = background;
-    for (S32 i = 0; i < 3; ++i)
-    {
-        faint.mV[i] = background.mV[i] + (ink.mV[i] - background.mV[i]) * 0.45f;
-        lit.mV[i]   = background.mV[i] + (ink.mV[i] - background.mV[i]) * 0.25f;
-    }
-    faint.mV[VALPHA] = lit.mV[VALPHA] = 1.f;
+    const LLColor4 faint = ALSurface::shade(background, ink, 0.45f);
+    const LLColor4 lit   = ALSurface::shade(background, ink, 0.25f);
     for (LLLineEditor* field : { mFind, mReplaceField })
     {
         LLColor4 ground = background;
@@ -370,7 +366,7 @@ void ALFindBar::draw()
     const F32    alpha = getDrawContext().mAlpha;
     const LLRect local = getLocalRect();
     gl_rect_2d(local, mBgColor.get() % alpha);
-    gl_rect_2d(local, mInkColor.get() % (0.25f * alpha), false);
+    gl_rect_2d(local, ALSurface::frame(mInkColor.get(), alpha), false);
     LLPanel::draw();
 }
 

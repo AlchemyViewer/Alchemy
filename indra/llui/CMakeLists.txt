@@ -130,6 +130,7 @@ target_sources(
     alsettingrow.cpp
     alspecimenlist.cpp
     alstudiofloater.cpp
+    alsurface.cpp
     alcodeeditor.cpp
     alfindbar.cpp
     alkeymap.cpp
@@ -309,6 +310,7 @@ target_sources(
         alsettingrow.h
         alspecimenlist.h
         alstudiofloater.h
+        alsurface.h
         alundostack.h
         alstringmatch.h
         alcodeeditor.h

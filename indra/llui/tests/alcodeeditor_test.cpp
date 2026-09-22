@@ -26,6 +26,9 @@
 
 #include "../alcodeeditor.h"
 
+#include "../alchoicelist.h"
+#include "../alsurface.h"
+
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
@@ -607,5 +610,110 @@ namespace tut
         e.setDecorations({ d });
         e.handleToolTip(e.leftEdge() + 2, text.mTop - e.layout().rowHeight() - e.layout().rowHeight() / 2, MASK_NONE);
         ensure("the gutter's card", e.cardShown() && e.card()->text() == "something is wrong here");
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<16>()
+    {
+        set_test_name("a string literal is one thing to the mouse wherever in it, and says its size");
+        ALCodeEditor& e = make("default { state_entry() { llSay(0, \"Hello, Avatar!\"); } }\n");
+        // Anywhere in the literal, quotes and all, is the same literal --
+        // the comma and the space in it as much as the words.
+        const ALTextRange whole = e.stringAt(ALTextPos(0, 41));
+        ensure_equals("the quotes are in it", e.document().text(whole), std::string("\"Hello, Avatar!\""));
+        for (S32 column = whole.begin.column; column < whole.end.column; ++column)
+        {
+            ensure("the same literal from every byte of it", e.stringAt(ALTextPos(0, column)) == whole);
+        }
+        ensure("and nothing outside it", e.stringAt(ALTextPos(0, whole.end.column)).empty());
+        ensure("nor of a name", e.stringAt(ALTextPos(0, 0)).empty());
+        // Its size is of what it holds, not of what it is written as.
+        ensure_equals("the bytes between the quotes", e.stringSize(whole), std::string("14 bytes"));
+
+        // An escape is one byte, and what it is written as is said too.
+        ALCodeEditor& f = make("default { state_entry() { llSay(0, \"a\\tb\"); } }\n");
+        const ALTextRange escaped = f.stringAt(ALTextPos(0, 36));
+        ensure_equals("the whole literal", f.document().text(escaped), std::string("\"a\\tb\""));
+        ensure_equals("the tab counted once, and the source said", f.stringSize(escaped), std::string("3 bytes, 6 as written"));
+
+        // And the card comes up on the comma, where no word is.
+        const LLRect text = f.textRect();
+        S32          row  = 0;
+        const F32    x    = f.layout().xOf(0, 36, &row);
+        const S32    at_x = static_cast<S32>(static_cast<F32>(text.mLeft) + x) + 1;
+        const S32    at_y = text.mTop - f.layout().rowHeight() / 2;
+        ensure("taken", f.handleToolTip(at_x, at_y, MASK_NONE));
+        ensure("a card, and wider than one word wrapped", f.cardShown() && f.card()->getRect().getWidth() > 60);
+        ensure("saying what it is and how big", f.card()->document().lineCount() == 2);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<17>()
+    {
+        set_test_name("what the editor floats over its text wears the editor's colours, not the skin's");
+        ALCodeEditor& e = make("integer count;\nllSay(0, co");
+        // A script theme of colours the skin has never heard of, so that
+        // anything taken from the colour table cannot match by accident.
+        const LLColor4 paper(0.97f, 0.96f, 0.93f, 1.f);
+        const LLColor4 ink(0.11f, 0.12f, 0.15f, 1.f);
+        e.setBackgroundColor(paper);
+        e.setTextColor(ink);
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("the list is open", e.completionOpen());
+        ALChoiceList* list = e.findChild<ALChoiceList>("completions");
+        ensure("and is a child of the editor", list != nullptr);
+        ensure("its ground is the one every surface sits on", list->backgroundColor() == ALSurface::ground(paper, ink));
+        ensure("its text is the editor's own", list->textColor() == ink);
+        ensure("and the row it points at is the one band", list->selectionColor() == ALSurface::chosen(paper, ink));
+        // A surface is opaque whatever it was mixed from: the text behind
+        // a card is the one thing the card must not show.
+        ensure_equals("opaque from translucent parts", ALSurface::ground(LLColor4(0.f, 0.f, 0.f, 0.2f), LLColor4(1.f, 1.f, 1.f, 0.5f)).mV[VALPHA], 1.f);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<18>()
+    {
+        set_test_name("which blanks a line shows as marks, by the mode the editor is in");
+        // A leading tab, a space after the comma, a no-break space where a
+        // space was meant, and two spaces trailing the line.
+        //          0   1234567 8 9 01 2   34 567 89
+        const std::string source = "\tllSay(0, \"a" + std::string("\xc2\xa0") + "b\");  ";
+        ALCodeEditor&     e      = make(source.c_str());
+        ensure_equals("the line is as counted", source.size(), size_t(20));
+
+        // Under the selection is the mode it starts in, and with nothing
+        // selected that is nothing at all.
+        ensure("nothing selected, nothing marked", e.blanksOn(0).empty());
+
+        e.setShowWhitespace(ALCodeEditor::Whitespace::All);
+        std::vector<ALCodeEditor::Blank> all = e.blanksOn(0);
+        ensure_equals("every blank on the line", all.size(), size_t(5));
+        ensure("the leading tab", all[0].begin == 0 && all[0].end == 1 && all[0].kind == '\t');
+        ensure("the space after the comma", all[1].begin == 9 && all[1].kind == ' ');
+        // The no-break space is two bytes and one mark, and is not a space.
+        ensure("the no-break space, whole", all[2].begin == 12 && all[2].end == 14 && all[2].kind == 'n');
+        ensure("the two that trail", all[3].begin == 18 && all[4].begin == 19);
+
+        e.setShowWhitespace(ALCodeEditor::Whitespace::Trailing);
+        std::vector<ALCodeEditor::Blank> tail = e.blanksOn(0);
+        ensure_equals("only what the line ends in", tail.size(), size_t(2));
+        ensure("which is where the line ends", tail[0].begin == 18 && tail[1].begin == 19);
+
+        e.setShowWhitespace(ALCodeEditor::Whitespace::None);
+        ensure("and none is none", e.blanksOn(0).empty());
+
+        // Under the selection: what the selection covers, and no more.
+        e.setShowWhitespace(ALCodeEditor::Whitespace::Selection);
+        e.setSelection(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 12)));
+        std::vector<ALCodeEditor::Blank> picked = e.blanksOn(0);
+        ensure_equals("the one blank in it", picked.size(), size_t(1));
+        ensure("the space after the comma", picked[0].begin == 9);
+
+        // A line of nothing but blanks trails all the way: there is
+        // nothing there for them to trail.
+        ALCodeEditor& f = make("   ");
+        f.setShowWhitespace(ALCodeEditor::Whitespace::Trailing);
+        ensure_equals("all three", f.blanksOn(0).size(), size_t(3));
     }
 }

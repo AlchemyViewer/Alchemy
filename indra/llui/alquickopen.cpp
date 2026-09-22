@@ -26,6 +26,8 @@
 
 #include "alquickopen.h"
 
+#include "alsurface.h"
+
 #include "lllineeditor.h"
 #include "llrender2dutils.h"
 #include "llscrolllistctrl.h"
@@ -305,7 +307,9 @@ void ALQuickOpen::fill()
         row["columns"][0]["column"] = "label";
         row["columns"][0]["value"]  = mHint;
         mList->addElement(row);
-        mList->selectFirstItem();
+        // Not chosen: return takes what was typed whatever the list says
+        // (`chooseSelected`), and a chosen row draws a band inset within
+        // the list, which is a box of its own width under the field's.
         return;
     }
     mRanked = rank(mCandidates, mQuery);
@@ -351,21 +355,13 @@ void ALQuickOpen::chooseSelected(bool hold)
 
 void ALQuickOpen::setColors(const LLColor4& background, const LLColor4& ink)
 {
-    auto between = [&](F32 how) {
-        LLColor4 c = background;
-        for (S32 i = 0; i < 3; ++i)
-        {
-            c.mV[i] = background.mV[i] + (ink.mV[i] - background.mV[i]) * how;
-        }
-        c.mV[VALPHA] = 1.f;
-        return c;
-    };
+    auto between = [&](F32 how) { return ALSurface::shade(background, ink, how); };
     const LLColor4 ground = between(0.f);
     const LLColor4 faint  = between(0.45f);
     const LLColor4 lit    = between(0.2f);
     const LLColor4 dim    = between(0.7f);
     mThemed = true;
-    mGround = between(0.06f);
+    mGround = ALSurface::ground(background, ink);
     mInk    = ink;
     mInk.mV[VALPHA] = 1.f;
     setBackgroundVisible(false);
@@ -463,23 +459,34 @@ void ALQuickOpen::layout()
 
 void ALQuickOpen::draw()
 {
+    const F32    alpha = getDrawContext().mAlpha;
+    const LLRect local = getLocalRect();
     if (mThemed)
     {
-        // The card: its ground, a frame in a quarter of the ink as the
-        // find bar's, and the field outlined a shade stronger so that
-        // where to type is plain.
-        const F32    alpha = getDrawContext().mAlpha;
-        const LLRect local = getLocalRect();
+        // The card: its ground, and a frame in a quarter of the ink as
+        // the find bar's.
         gl_rect_2d(local, mGround % alpha, true);
-        gl_rect_2d(local, mInk % (0.25f * alpha), false);
-        if (mField)
-        {
-            LLRect field = mField->getRect();
-            field.stretch(1);
-            gl_rect_2d(field, mInk % (0.35f * alpha), false);
-        }
+        gl_rect_2d(local, ALSurface::frame(mInk, alpha), false);
     }
     LLPanel::draw();
+    if (mThemed)
+    {
+        // The boxes inside, drawn over their own grounds rather than
+        // under them: a frame outside a child's rect loses the edge the
+        // child paints over, and one inside its rect is the same width
+        // as the box below it to the pixel, which two frames drawn a
+        // pixel apart are not. The field's is the heavier of the two,
+        // being where the typing goes, and is said as a multiple of the
+        // one frame weight so that it cannot drift away from it.
+        if (mField)
+        {
+            gl_rect_2d(mField->getRect(), mInk % (1.4f * ALSurface::FRAME * alpha), false);
+        }
+        if (mList)
+        {
+            gl_rect_2d(mList->getRect(), ALSurface::frame(mInk, alpha), false);
+        }
+    }
 }
 
 void ALQuickOpen::reshape(S32 width, S32 height, bool called_from_parent)
