@@ -737,4 +737,34 @@ namespace tut
         keys(":%s/\\Va\\{1,2}b/Y/<CR>");
         ensure_equals("\\{n,m} under \\V is the multi still", flat(e.text()), std::string("X Y|X Y|Y ab|"));
     }
+    template<> template<>
+    void alvimkeymap_object::test<19>()
+    {
+        set_test_name(":s with the c flag asks about each match -- y n a q l -- and a place before a \\zs inside brackets is about the whole");
+        ALCodeEditor& e = make("a a a a\na a\n");
+        keys(":%s/a/b/gc<CR>");
+        ensure("asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        ensure_equals("the question", vim->status(), std::string("replace with b (y/n/a/q/l)?"));
+        ensure("the first match selected", e.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+        keys("y");
+        ensure_equals("y: this one", flat(e.text()), std::string("b a a a|a a|"));
+        ensure("the next selected, where it now is", e.selection().normalised() == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)));
+        keys("n");
+        ensure_equals("n: not this one", flat(e.text()), std::string("b a a a|a a|"));
+        keys("l");
+        ensure_equals("l: this one and no more", flat(e.text()), std::string("b a b a|a a|"));
+        ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys(":%s/a/c/gc<CR>a");
+        ensure_equals("a: all the rest", flat(e.text()), std::string("b c b c|c c|"));
+        keys(":%s/c/d/gc<CR>y<Esc>");
+        ensure_equals("escape stops it after the one", flat(e.text()), std::string("b d b c|c c|"));
+        ensure("normal again", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys("u");
+        ensure_equals("each one its own step to undo", flat(e.text()), std::string("b c b c|c c|"));
+        // A \zs inside brackets with a place before it.
+        e.setText("xab xab\nxab\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("gg0ve<Esc>:%s/\\%Vx\\(a\\zsb\\)/Y/g<CR>");
+        ensure_equals("the whole starts in the area, the match after the \\zs: only the first", flat(e.text()), std::string("xaY xab|xab|"));
+    }
 }

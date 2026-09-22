@@ -415,10 +415,11 @@ bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
 S32 ALQuickOpen::heightForRows(S32 rows)
 {
     // A row is what a list made as this one's is makes of one text row:
-    // measured once on such a list, so that whatever the skin gives the
-    // list -- its face, its padding -- is what is counted.
-    static S32 row = -1;
-    if (row < 0)
+    // measured on such a list each time, since the faces change size
+    // under the UI's scale, so that whatever the skin gives the list --
+    // its face, its padding -- is what is counted. A list is cheap; a
+    // popover asks once.
+    S32 row = -1;
     {
         LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
         lp.name         = "measure";

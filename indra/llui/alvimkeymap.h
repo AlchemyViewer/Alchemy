@@ -64,7 +64,9 @@ public:
         VisualLine,
         VisualBlock,
         Command,
-        Search
+        Search,
+        // :s with the c flag asking about each match: y, n, a, q, l.
+        Confirm
     };
 
     struct Hooks
@@ -237,13 +239,37 @@ private:
         };
         std::vector<Where> where;
         // The group the match is, where a \zs made one; the search is
-        // told, and says where the whole began.
-        S32 matchGroup = 0;
+        // told, and says where the whole began. Where a \zs inside
+        // brackets had to be the engine's \K instead, the pattern
+        // without it, whose matches end where these do and say where
+        // the whole began.
+        S32         matchGroup = 0;
+        std::string wholeRegex;
     };
     Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
     // The matches a pattern's places allow, the rest dropped; `wholes`
     // says where each whole match began, for the places before a \zs.
     void    constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const;
+    // The pattern's matches within a scope, the places applied, with
+    // where each whole match began.
+    std::vector<ALTextRange> matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
+                                       std::vector<ALTextPos>& wholes) const;
+    // The :s asking about each match: the edits left to make, in order,
+    // and the one being asked about; the text put in, for the question.
+    struct Confirming
+    {
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        size_t                                           at      = 0;
+        S32                                              made    = 0;
+        S32                                              lines   = 0;
+        S32                                              lastLine = -1;
+    };
+    Confirming mConfirming;
+    bool       confirmKey(ALTextView& view, const Input& input);
+    // One of the edits made, the ones after it moved by what it changed.
+    void       applyConfirmed(ALTextView& view, size_t index);
+    void       askNext(ALTextView& view);
+    void       endConfirming(ALTextView& view);
     // The history of a line kind, and the line entered into it.
     std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mShared->command : mShared->search; }
     void                      remember(llwchar kind, const std::string& line);

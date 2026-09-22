@@ -358,6 +358,11 @@ std::string ALVimKeymap::status() const
         case Mode::VisualBlock: return recording + "-- VISUAL BLOCK --";
         case Mode::Command:
         case Mode::Search:      return utf8Of(mLineKind) + mLine;
+        case Mode::Confirm:
+        {
+            const std::string& with = mConfirming.at < mConfirming.edits.size() ? mConfirming.edits[mConfirming.at].second : std::string();
+            return recording + "replace with " + with + " (y/n/a/q/l)?";
+        }
         case Mode::Normal:
         default:
         {
@@ -396,7 +401,7 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
 {
     // Insert mode stays insert mode wherever the click lands; a line
     // being typed is not the mouse's.
-    if (mMode == Mode::Insert || mMode == Mode::Replace || mMode == Mode::Command || mMode == Mode::Search)
+    if (mMode == Mode::Insert || mMode == Mode::Replace || mMode == Mode::Command || mMode == Mode::Search || mMode == Mode::Confirm)
     {
         return;
     }
@@ -514,6 +519,9 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         case Mode::Command:
         case Mode::Search:
             taken = commandLine(view, input);
+            break;
+        case Mode::Confirm:
+            taken = confirmKey(view, input);
             break;
         default:
             taken = normal(view, input);
@@ -2999,16 +3007,14 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     // ignorecase alone says; a pattern in vim's spelling.
     const Pattern pattern_in = whole_word ? Pattern{ pattern, !mShared->ignoreCase } : patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
-    options.matchGroup       = pattern_in.matchGroup;
     std::string              error;
     std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, nullptr, &error, &wholes);
+    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, nullptr, error, wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches, wholes);
     if (matches.empty())
     {
         say("E486: Pattern not found: " + pattern, true);
@@ -3155,6 +3161,123 @@ void ALVimKeymap::share(std::shared_ptr<Shared> shared)
         mShared    = std::move(shared);
         mHistoryAt = -1;
     }
+}
+
+// --- :s asking about each match -------------------------------------------------
+
+void ALVimKeymap::askNext(ALTextView& view)
+{
+    if (mConfirming.at >= mConfirming.edits.size())
+    {
+        endConfirming(view);
+        return;
+    }
+    // The match shown as the selection, so that the question is plainly
+    // about it.
+    view.setSelection(mConfirming.edits[mConfirming.at].first);
+    bump();
+}
+
+void ALVimKeymap::applyConfirmed(ALTextView& view, size_t index)
+{
+    const ALTextRange r = mConfirming.edits[index].first.normalised();
+    const std::string t = mConfirming.edits[index].second;
+    if (!view.replaceAll({ { r, t } }))
+    {
+        return;
+    }
+    if (r.begin.line != mConfirming.lastLine)
+    {
+        ++mConfirming.lines;
+    }
+    mConfirming.lastLine = r.begin.line;
+    ++mConfirming.made;
+    // Where the replaced stretch now ends, and how the ones after move.
+    const S32       t_lines = static_cast<S32>(std::count(t.begin(), t.end(), '\n'));
+    const size_t    last_nl = t.rfind('\n');
+    const S32       t_last  = static_cast<S32>(last_nl == std::string::npos ? t.size() : t.size() - last_nl - 1);
+    const ALTextPos new_end = t_lines == 0 ? ALTextPos(r.begin.line, r.begin.column + t_last) : ALTextPos(r.begin.line + t_lines, t_last);
+    const S32       delta_lines = new_end.line - r.end.line;
+    auto            moved       = [&](ALTextPos p) {
+        if (p.line == r.end.line && !(p < r.end))
+        {
+            return ALTextPos(new_end.line, p.column + new_end.column - r.end.column);
+        }
+        if (p.line > r.end.line)
+        {
+            return ALTextPos(p.line + delta_lines, p.column);
+        }
+        return p;
+    };
+    for (size_t k = index + 1; k < mConfirming.edits.size(); ++k)
+    {
+        ALTextRange& f = mConfirming.edits[k].first;
+        f              = ALTextRange(moved(f.begin), moved(f.end));
+    }
+}
+
+bool ALVimKeymap::confirmKey(ALTextView& view, const Input& input)
+{
+    if (!input.isChar)
+    {
+        if (input.key == KEY_ESCAPE)
+        {
+            endConfirming(view);
+            return true;
+        }
+        // A plain key's character follows; a chord or a Return is nobody's.
+        return input.key == KEY_RETURN || (input.mask & (MASK_CONTROL | MASK_ALT)) != 0;
+    }
+    switch (input.ch)
+    {
+        case 'y':
+            applyConfirmed(view, mConfirming.at++);
+            askNext(view);
+            return true;
+        case 'n':
+            ++mConfirming.at;
+            askNext(view);
+            return true;
+        case 'l':
+            applyConfirmed(view, mConfirming.at++);
+            endConfirming(view);
+            return true;
+        case 'a':
+            while (mConfirming.at < mConfirming.edits.size())
+            {
+                applyConfirmed(view, mConfirming.at++);
+            }
+            endConfirming(view);
+            return true;
+        case 'q':
+            endConfirming(view);
+            return true;
+        default:
+            return true;
+    }
+}
+
+void ALVimKeymap::endConfirming(ALTextView& view)
+{
+    const ALTextDocument& d = view.document();
+    mMode                   = Mode::Normal;
+    if (mConfirming.lastLine >= 0)
+    {
+        const S32 line = llclamp(mConfirming.lastLine, 0, d.lineCount() - 1);
+        moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
+    }
+    else
+    {
+        moveTo(view, view.caret());
+    }
+    if (mConfirming.made > 1)
+    {
+        say(std::to_string(mConfirming.made) + " substitutions on " + std::to_string(mConfirming.lines) + " line" + (mConfirming.lines == 1 ? "" : "s"));
+    }
+    const bool changed = mConfirming.made > 0;
+    mConfirming        = Confirming();
+    finishCommand(changed);
+    bump();
 }
 
 void ALVimKeymap::remember(llwchar kind, const std::string& line)
@@ -3619,17 +3742,15 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     options.regex         = true;
     const Pattern pattern_in = patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
-    options.matchGroup       = pattern_in.matchGroup;
     const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
     std::string              error;
     std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error, &wholes);
+    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches, wholes);
     std::vector<S32> lines;
     for (S32 line = first; line <= last; ++line)
     {
@@ -3692,6 +3813,8 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     Magic magic    = Magic::Magic;
     bool  looking  = false;
     bool  zs_seen  = false;
+    // Where each \K was put, for the pattern without them.
+    std::vector<size_t> k_at;
     // How deep in the engine's brackets the output is, so that a \zs at
     // the top can split the pattern into groups.
     S32   depth    = 0;
@@ -3789,7 +3912,11 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         }
                         else
                         {
+                            // The engine's \K, and a note of where it went,
+                            // so that the pattern without it can be had.
+                            k_at.push_back(out.regex.size());
                             out.regex += "\\K";
+                            zs_seen = true;
                         }
                         ++i;
                         continue;
@@ -4086,6 +4213,14 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     {
         out.regex += ")";
     }
+    if (!k_at.empty() && !out.where.empty())
+    {
+        out.wholeRegex = out.regex;
+        for (size_t k = k_at.size(); k-- > 0;)
+        {
+            out.wholeRegex.erase(k_at[k], 2);
+        }
+    }
     if (case_in_pattern)
     {
         out.caseSensitive = *case_in_pattern;
@@ -4103,6 +4238,37 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
         out.caseSensitive = true;
     }
     return out;
+}
+
+std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
+                                                std::vector<ALTextPos>& wholes) const
+{
+    const ALTextDocument& d = view.document();
+    options.matchGroup      = pattern.matchGroup;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern.regex, options, scope, &error, &wholes);
+    if (error.empty() && !pattern.wholeRegex.empty())
+    {
+        // The pattern without its \K matches the same stretches whole:
+        // each match here is the whole one that ends where it does.
+        std::string              other;
+        std::vector<ALTextRange> full = ALTextSearch::matches(d, pattern.wholeRegex, options, scope, &other);
+        for (size_t i = 0; i < matches.size() && i < wholes.size(); ++i)
+        {
+            for (const ALTextRange& f : full)
+            {
+                if (f.end == matches[i].end)
+                {
+                    wholes[i] = f.begin;
+                    break;
+                }
+            }
+        }
+    }
+    if (error.empty())
+    {
+        constrain(view, pattern, matches, wholes);
+    }
+    return matches;
 }
 
 void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const
@@ -4359,6 +4525,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const bool exactcase  = flags.find('I') != std::string::npos;
     const bool count_only = flags.find('n') != std::string::npos;
     const bool quiet      = flags.find('e') != std::string::npos;
+    const bool asking     = flags.find('c') != std::string::npos;
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
     options.regex         = true;
@@ -4368,13 +4535,12 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
     std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error, &wholes);
+    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches, wholes);
     if (matches.empty())
     {
         if (!quiet)
@@ -4409,6 +4575,16 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     if (count_only)
     {
         say(std::to_string(count) + " match" + (count == 1 ? "" : "es") + " on " + std::to_string(lines) + " line" + (lines == 1 ? "" : "s"));
+        return false;
+    }
+    if (asking && !view.isReadOnly())
+    {
+        // Each match asked about in turn; the command finishes when the
+        // asking ends, so nothing is done here.
+        mConfirming       = Confirming();
+        mConfirming.edits = std::move(edits);
+        mMode             = Mode::Confirm;
+        askNext(view);
         return false;
     }
     // The caret goes to the last line substituted on, as it will lie
