@@ -453,6 +453,28 @@
             <key>Value</key>
             <map />
         </map>
+        <key>ALScriptStudioTabWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How many columns a tab stop is in Script Studio's editors, and how far the formatter indents a level with spaces.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>ALScriptStudioInsertSpaces</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's editors indent with spaces to the next tab stop rather than with a tab character, and the formatter indents alike.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioPreflight</key>
         <map>
             <key>Comment</key>

@@ -120,6 +120,7 @@ public:
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool undo() override;
     bool redo() override;
 
@@ -624,6 +625,15 @@ private:
     // showing the line as it is typed and going back on escape.
     void goToLine();
     void goToSymbol();
+    // Every open tab, to pick one from by name.
+    void showAllTabs();
+    // An object's or a prim's row in the explorer folded shut or opened,
+    // by what it stands for; and the one under a point of the explorer,
+    // where the point is on its arrow.
+    void explorerFold(const LLUUID& id, bool prim, std::optional<bool> folded = std::nullopt);
+    bool explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim);
+    // Every command the menus hold, to give one by name.
+    void showCommandPalette();
 
     // The outline and the breadcrumb, from what the check said the script
     // declares; the inspector, from what is at the caret, a moment after
@@ -681,6 +691,8 @@ private:
         std::string name;
         bool        script = false;
         bool        lua    = false;
+        // A prim of a linkset's own row, rather than its object's.
+        bool        primRow = false;
         bool        isItem() const { return item.notNull(); }
         ALScriptRef ref() const { return ALScriptRef(prim, item); }
     };
@@ -916,6 +928,11 @@ private:
     std::string                        mSearchQuery;
     LLScrollListCtrl*                  mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
+    // The objects and the prims of linksets folded shut in the explorer,
+    // each by its id -- apart, since a linkset's root prim has its
+    // object's.
+    boost::unordered_flat_set<LLUUID>  mExplorerFolded;
+    boost::unordered_flat_set<LLUUID>  mExplorerFoldedPrims;
     std::vector<Pinned>                mPinned;
     // A prim whose new item is to be opened once its contents list it,
     // by name where the region gave no id.

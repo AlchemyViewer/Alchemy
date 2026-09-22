@@ -90,13 +90,15 @@
     <floater.string name="RunningYes">running</floater.string>
     <floater.string name="RunningNo">stopped</floater.string>
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
-    <floater.string name="RowObjectTip">[NAME]: an object in world, of [COUNT] prim(s). What it holds is listed under it; double-click a script or a notecard to open it, right-click for everything else.</floater.string>
+    <floater.string name="RowObjectTip">[NAME]: an object in world, of [COUNT] prim(s). What it holds is listed under it -- its arrow, a double-click or the left and right keys fold it; double-click a script or a notecard to open it, right-click for everything else.</floater.string>
     <floater.string name="RowAwayTip">[NAME]: pinned, and not in sight now; listed as it was last seen. Unpin it from the right-click menu.</floater.string>
     <floater.string name="RowPrimTip">[NAME]: a prim of [OBJECT], with what it holds listed under it.</floater.string>
     <floater.string name="RowScriptTip">[NAME]: [KIND] in [OBJECT], [STATE]. Double-click to open it; right-click to start, stop, reset, recompile, rename or delete it.</floater.string>
     <floater.string name="RowNotecardTip">[NAME]: a notecard in [OBJECT]. Double-click to open it as text; right-click to rename or delete it.</floater.string>
     <floater.string name="StateUnknown">asking...</floater.string>
     <floater.string name="PinnedMark">* </floater.string>
+    <floater.string name="ArrowOpen">&#9662; </floater.string>
+    <floater.string name="ArrowFolded">&#9656; </floater.string>
     <floater.string name="NewKindScript">script</floater.string>
     <floater.string name="NewKindLua">Lua script</floater.string>
     <floater.string name="NewKindNotecard">notecard</floater.string>
@@ -112,7 +114,7 @@
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
-    <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
+    <floater.string name="NothingKnown">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
     <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>
@@ -120,9 +122,9 @@
     <floater.string name="LookingAcrossB">Looking for [NAME] across [COUNT] other scripts of the object...</floater.string>
     <floater.string name="ReferencesFoundAcrossA">1 place where [NAME] stands, in [FILES] scripts.</floater.string>
     <floater.string name="ReferencesFoundAcrossB">[COUNT] places where [NAME] stands, in [FILES] scripts.</floater.string>
-    <floater.string name="LevelError">ERROR</floater.string>
-    <floater.string name="LevelWarning">WARNING</floater.string>
-    <floater.string name="LevelNote">NOTE</floater.string>
+    <floater.string name="LevelError">Error</floater.string>
+    <floater.string name="LevelWarning">Warning</floater.string>
+    <floater.string name="LevelNote">Note</floater.string>
     <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
     <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
     <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
@@ -132,7 +134,6 @@
     <floater.string name="RenamedAcrossStale">[COUNT] place(s) renamed to [NAME] in [FILES] scripts; [OPENED] opened with the change unsaved; [STALE] left alone, changed since they were read or on disk.</floater.string>
     <floater.string name="RenameMissed">[COUNT] place(s) in [NAME] no longer read as they did, and were not renamed.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
-    <floater.string name="SelectedLine">1 line selected</floater.string>
     <floater.string name="SelectedLinesA">1 line selected</floater.string>
     <floater.string name="SelectedLinesB">[COUNT] lines selected</floater.string>
     <floater.string name="SelectedCharsA">1 character selected</floater.string>
@@ -144,6 +145,11 @@
     <floater.string name="CrumbRootTip">[NAME]: press to go to the top; its arrow lists what the script declares</floater.string>
     <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
+    <floater.string name="AllTabsTitle">Open Tabs</floater.string>
+    <floater.string name="CommandsTitle">Commands</floater.string>
+    <floater.string name="CommandsPlaceholder">A command by name: format, fold, vim, preprocess...</floater.string>
+    <floater.string name="AllTabsPlaceholder">A script or a notecard by name</floater.string>
+    <floater.string name="TabUnsaved">unsaved</floater.string>
     <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
     <floater.string name="GoToLineTitle">Go to Line</floater.string>
     <floater.string name="VimHistoryTitle">[KIND] lines entered</floater.string>
@@ -245,92 +251,6 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="revert" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="revert" />
             </menu_item_call>
-            <menu_item_check label="Check Before Saving" layout="topleft" name="preflight">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
-            </menu_item_check>
-            <menu
-             label="Preprocessor"
-             layout="topleft"
-             mouse_opaque="false"
-             name="preprocessor_menu"
-             tear_off="false"
-             width="200">
-                <menu_item_call label="Preprocess Now" layout="topleft" name="preprocess">
-                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preprocess" />
-                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
-                </menu_item_call>
-                <menu_item_separator layout="topleft" />
-                <menu_item_check label="Preprocess on Save" layout="topleft" name="preproc_enabled">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
-                </menu_item_check>
-                <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
-                </menu_item_check>
-                <menu_item_call label="Choose Include Folder..." layout="topleft" name="preproc_folder">
-                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
-                </menu_item_call>
-                <menu_item_separator layout="topleft" />
-                <menu
-                 label="Firestorm"
-                 layout="topleft"
-                 mouse_opaque="false"
-                 name="preproc_firestorm_menu"
-                 tear_off="false"
-                 width="200">
-                    <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
-                    </menu_item_check>
-                    <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
-                    </menu_item_check>
-                    <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
-                    </menu_item_check>
-                </menu>
-                <menu
-                 label="Extensions"
-                 layout="topleft"
-                 mouse_opaque="false"
-                 name="preproc_extensions_menu"
-                 tear_off="false"
-                 width="200">
-                    <menu_item_check label="Break, Continue, &amp;= |= ^= and inline" layout="topleft" name="preproc_extensions">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
-                    </menu_item_check>
-                </menu>
-                <menu
-                 label="Optimizer"
-                 layout="topleft"
-                 mouse_opaque="false"
-                 name="preproc_optimizer_menu"
-                 tear_off="false"
-                 width="200">
-                    <menu_item_check label="Optimize" layout="topleft" name="preproc_optimize">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_optimize" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_optimize" />
-                    </menu_item_check>
-                    <menu_item_separator layout="topleft" />
-                    <menu_item_check label="Shrink Names" layout="topleft" name="preproc_shrink">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_shrink" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_shrink" />
-                    </menu_item_check>
-                    <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
-                    </menu_item_check>
-                    <menu_item_check label="Inline Functions Called Once" layout="topleft" name="preproc_inline">
-                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_inline" />
-                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
-                    </menu_item_check>
-                </menu>
-            </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Open File..." layout="topleft" name="open_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="open_file" />
@@ -342,15 +262,15 @@
              name="open_recent"
              tear_off="false"
              width="200" />
-            <menu_item_call label="Load from File..." layout="topleft" name="load_file">
+            <menu_item_call label="Replace Text from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
             </menu_item_call>
-            <menu_item_call label="Save to File..." layout="topleft" name="save_file">
+            <menu_item_call label="Export to File..." layout="topleft" name="save_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
             </menu_item_call>
-            <menu_item_call label="Save As..." layout="topleft" name="save_as">
+            <menu_item_call label="Save File As..." layout="topleft" name="save_as">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_as" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_as" />
             </menu_item_call>
@@ -404,6 +324,22 @@
             <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment" shortcut="control|/">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
+            </menu_item_call>
+            <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line" shortcut="control|shift|D">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="duplicate_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="duplicate_line" />
+            </menu_item_call>
+            <menu_item_call label="Delete Line" layout="topleft" name="delete_line" shortcut="control|shift|K">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="delete_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="delete_line" />
+            </menu_item_call>
+            <menu_item_call label="Move Line Up" layout="topleft" name="move_line_up" shortcut="alt|UP">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_up" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_up" />
+            </menu_item_call>
+            <menu_item_call label="Move Line Down" layout="topleft" name="move_line_down" shortcut="alt|DOWN">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_down" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_down" />
             </menu_item_call>
             <menu_item_call label="Complete" layout="topleft" name="complete">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
@@ -498,24 +434,8 @@
             <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab" shortcut="control|PGUP">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_tab" />
             </menu_item_call>
-        </menu>
-        <menu
-         label="Help"
-         layout="topleft"
-         mouse_opaque="false"
-         name="help"
-         tear_off="false"
-         width="200">
-            <menu_item_call label="Reference for the Word at the Caret" layout="topleft" name="reference" shortcut="F1">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="reference" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="reference" />
-            </menu_item_call>
-            <menu_item_call label="Browse the Reference..." layout="topleft" name="browse_reference">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="browse_reference" />
-            </menu_item_call>
-            <menu_item_call label="Open in the Wiki" layout="topleft" name="wiki">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="wiki" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="wiki" />
+            <menu_item_call label="All Tabs..." layout="topleft" name="all_tabs">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="all_tabs" />
             </menu_item_call>
         </menu>
         <menu
@@ -525,6 +445,10 @@
          name="view"
          tear_off="false"
          width="200">
+            <menu_item_call label="Command Palette..." layout="topleft" name="command_palette" shortcut="control|shift|P">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="command_palette" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="word_wrap" />
@@ -638,11 +562,11 @@
                 </menu_item_check>
             </menu>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Fold" layout="topleft" name="fold">
+            <menu_item_call label="Fold" layout="topleft" name="fold" shortcut="control|shift|[">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold" />
             </menu_item_call>
-            <menu_item_call label="Unfold" layout="topleft" name="unfold">
+            <menu_item_call label="Unfold" layout="topleft" name="unfold" shortcut="control|shift|]">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold" />
             </menu_item_call>
@@ -676,7 +600,7 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded" shortcut="control|shift|P">
+            <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded" shortcut="control|alt|P">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="expanded" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="expanded" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="expanded" />
@@ -685,6 +609,111 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
+        </menu>
+        <menu
+         label="Build"
+         layout="topleft"
+         mouse_opaque="false"
+         name="build"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Preprocess Now" layout="topleft" name="preprocess">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preprocess" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Check Before Saving" layout="topleft" name="preflight">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
+            </menu_item_check>
+            <menu_item_check label="Preprocess on Save" layout="topleft" name="preproc_enabled">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
+            </menu_item_check>
+            <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
+            </menu_item_check>
+            <menu_item_call label="Choose Include Folder..." layout="topleft" name="preproc_folder">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu
+             label="Firestorm"
+             layout="topleft"
+             mouse_opaque="false"
+             name="preproc_firestorm_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
+                </menu_item_check>
+                <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
+                </menu_item_check>
+                <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
+                </menu_item_check>
+            </menu>
+            <menu
+             label="Extensions"
+             layout="topleft"
+             mouse_opaque="false"
+             name="preproc_extensions_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_check label="Break, Continue, &amp;= |= ^= and inline" layout="topleft" name="preproc_extensions">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
+                </menu_item_check>
+            </menu>
+            <menu
+             label="Optimizer"
+             layout="topleft"
+             mouse_opaque="false"
+             name="preproc_optimizer_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_check label="Optimize" layout="topleft" name="preproc_optimize">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_optimize" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_optimize" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Shrink Names" layout="topleft" name="preproc_shrink">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_shrink" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_shrink" />
+                </menu_item_check>
+                <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
+                </menu_item_check>
+                <menu_item_check label="Inline Functions Called Once" layout="topleft" name="preproc_inline">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_inline" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
+                </menu_item_check>
+            </menu>
+        </menu>
+        <menu
+         label="Help"
+         layout="topleft"
+         mouse_opaque="false"
+         name="help"
+         tear_off="false"
+         width="200">
+            <menu_item_call label="Reference for the Word at the Caret" layout="topleft" name="reference" shortcut="F1">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="reference" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="reference" />
+            </menu_item_call>
+            <menu_item_call label="Browse the Reference..." layout="topleft" name="browse_reference">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="browse_reference" />
+            </menu_item_call>
+            <menu_item_call label="Open in the Wiki" layout="topleft" name="wiki">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="wiki" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="wiki" />
+            </menu_item_call>
         </menu>
     </menu_bar>
 
@@ -701,7 +730,7 @@
      layout="topleft"
      left="8"
      name="save_btn"
-     tool_tip="Save and compile the script (Control+S); a notecard is saved as it is"
+     tool_tip="Save and compile the script ([KEYS]); a notecard is saved as it is"
      top="41"
      width="26" />
     <button
@@ -711,7 +740,7 @@
      layout="topleft"
      left_pad="2"
      name="save_all_btn"
-     tool_tip="Save every script with unsaved changes (Control+Alt+S)"
+     tool_tip="Save every script with unsaved changes ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -721,7 +750,7 @@
      layout="topleft"
      left_pad="8"
      name="undo_btn"
-     tool_tip="Undo the last change (Control+Z)"
+     tool_tip="Undo the last change ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -731,7 +760,7 @@
      layout="topleft"
      left_pad="2"
      name="redo_btn"
-     tool_tip="Redo what was undone (Control+Y)"
+     tool_tip="Redo what was undone ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -741,7 +770,7 @@
      layout="topleft"
      left_pad="8"
      name="find_btn"
-     tool_tip="Find in this script (Control+F); Control+Shift+F finds across scripts"
+     tool_tip="Find in this script ([KEYS]); [KEYS2] finds across scripts"
      top_delta="0"
      width="26" />
     <button
@@ -751,7 +780,7 @@
      layout="topleft"
      left_pad="2"
      name="format_btn"
-     tool_tip="Put the script's indentation and spacing right (Shift+Alt+F)"
+     tool_tip="Put the script's indentation and spacing right ([KEYS])"
      top_delta="0"
      width="26" />
     <button
@@ -775,7 +804,7 @@
      layout="topleft"
      name="fold_explorer"
      right="-182"
-     tool_tip="The objects in hand and their scripts, down the left (Control+Alt+0)"
+     tool_tip="The objects in hand and their scripts, down the left ([KEYS])"
      top_delta="0"
      width="92" />
     <button
@@ -784,11 +813,11 @@
      image_overlay="SidebarBottom_Off"
      image_overlay_alignment="left"
      is_toggle="true"
-     label="Lists"
+     label="Panel"
      layout="topleft"
      name="fold_bottom"
      right="-108"
-     tool_tip="The band under the editor: the problems, the references, what the scripts say, and search (Control+Alt+1, 2 and 3)"
+     tool_tip="The panel under the editor: the problems ([KEYS]), the references ([KEYS2]), what the scripts say ([KEYS3]), and search ([KEYS4])"
      top_delta="0"
      width="70" />
     <button
@@ -801,7 +830,7 @@
      layout="topleft"
      name="fold_inspector"
      right="-8"
-     tool_tip="The outline and the symbol at the caret, down the right (Control+Alt+4)"
+     tool_tip="The outline and the symbol at the caret, down the right ([KEYS])"
      top_delta="0"
      width="96" />
 
@@ -847,8 +876,7 @@
              width="240">
                 <scroll_list.columns label="" name="icon" width="20" />
                 <scroll_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
-                <scroll_list.columns label="Type" name="kind" tool_tip="What each row is: an object, a prim, an LSL or Lua script, or a notecard" width="72" />
-                <scroll_list.columns label="State" name="run" tool_tip="Whether a script runs in its object" width="54" />
+                <scroll_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
             </scroll_list>
             <button
              follows="left|bottom"
@@ -893,11 +921,11 @@
             <button
              follows="left|bottom"
              height="22"
-             label="Fetch"
+             image_overlay="Refresh_Off"
              layout="topleft"
              left_pad="2"
              name="explorer_refresh"
-             tool_tip="List the objects' contents again"
+             tool_tip="Refresh: ask the region for what the objects hold again"
              top_delta="0"
              width="46" />
         </layout_panel>
@@ -1160,7 +1188,7 @@
                                      top="0"
                                      width="574">
                                         <scroll_list.columns label="Line" name="line" width="70" />
-                                        <scroll_list.columns label="Level" name="level" width="80" />
+                                        <scroll_list.columns label="Level" name="level" width="64" />
                                         <scroll_list.columns label="Source" name="source" width="90" />
                                         <scroll_list.columns dynamic_width="true" label="Message" name="message" />
                                     </scroll_list>
@@ -1230,8 +1258,7 @@
                              layout="topleft"
                              left="0"
                              name="output"
-                             placeholder="What the scripts say on the debug channel and to their owner appears here, as it is said."
-                             tool_tip="What the scripts said on the debug channel and to their owner; a script's name is a link to it, at the line of a run-time error, and a URL in what was said is one too"
+                             placeholder="What the scripts say on the debug channel and to their owner appears here, as it is said. A script's name is a link to it, at the line of a run-time error."
                              top_pad="2"
                              width="574" />
                         </panel>
@@ -1356,8 +1383,8 @@
                      layout="topleft"
                      left="0"
                      name="symbol"
+                     placeholder="The symbol at the caret: its declaration, its documentation and its page on the wiki. F1 looks up the word at the caret; Help browses the whole reference."
                      read_only="true"
-                     tool_tip="The symbol at the caret: its declaration, its documentation and its page on the wiki; F1 asks for a word, and the Help menu browses the whole reference"
                      top="0"
                      width="250"
                      word_wrap="true" />

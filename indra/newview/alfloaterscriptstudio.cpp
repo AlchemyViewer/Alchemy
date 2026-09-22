@@ -431,6 +431,40 @@ bool ALFloaterScriptStudio::postBuild()
         mSaveRect = false;
     }
     setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
+    // The toolbar's tips say their keys as the menus have them, in the
+    // platform's own spelling: Ctrl+S here, the Command symbol on a Mac.
+    const auto keys_in_tip = [this](const char* control, std::initializer_list<const char*> items) {
+        LLView* view = findChild<LLView>(control);
+        if (!view)
+        {
+            return;
+        }
+        std::string tip = view->getToolTip();
+        S32         n   = 0;
+        for (const char* name : items)
+        {
+            ++n;
+            const LLMenuItemGL* item  = menuBar()->findChild<LLMenuItemGL>(name, true);
+            const std::string   keys  = item ? item->getAcceleratorString() : std::string();
+            const std::string   field = n == 1 ? std::string("[KEYS]") : "[KEYS" + std::to_string(n) + "]";
+            if (keys.empty())
+            {
+                // Nothing bound: the brackets that would have held it go too.
+                LLStringUtil::replaceString(tip, " (" + field + ")", std::string());
+            }
+            LLStringUtil::replaceString(tip, field, keys);
+        }
+        view->setToolTip(tip);
+    };
+    keys_in_tip("save_btn", { "save" });
+    keys_in_tip("save_all_btn", { "save_all" });
+    keys_in_tip("undo_btn", { "undo" });
+    keys_in_tip("redo_btn", { "redo" });
+    keys_in_tip("find_btn", { "find", "find_in_files" });
+    keys_in_tip("format_btn", { "format" });
+    keys_in_tip("fold_explorer", { "explorer" });
+    keys_in_tip("fold_bottom", { "problems", "references", "output", "find_in_files" });
+    keys_in_tip("fold_inspector", { "inspector" });
     setStatusLine(getChild<LLTextBox>("status"));
     mFolds.bind(this, { { "explorer", "explorer_panel", "fold_explorer", getString("PaneExplorer") },
                         { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
@@ -492,6 +526,7 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs->onClosed(boost::bind(&ALFloaterScriptStudio::closeDocument, this, _1));
     mTabs->onMenu(boost::bind(&ALFloaterScriptStudio::showTabMenu, this, _1, _2, _3));
     mTabs->onReordered(boost::bind(&ALFloaterScriptStudio::onTabsReordered, this, _1));
+    mTabs->onListAsked([this]() { showAllTabs(); });
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
     // The pane's filters: which levels, which source, which words.
@@ -652,6 +687,18 @@ bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
         cycleTab(mask & MASK_SHIFT ? -1 : 1);
         return true;
     }
+    // Left and right fold and open the object or the prim chosen in the
+    // explorer, as a tree's keys do.
+    if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE && mExplorer && mExplorer->hasFocus())
+    {
+        const std::vector<ExplorerRow> rows = explorerChoice();
+        if (rows.size() == 1 && !rows.front().isItem())
+        {
+            const ExplorerRow& row = rows.front();
+            explorerFold(row.primRow ? row.prim : row.root, row.primRow, key == KEY_LEFT);
+            return true;
+        }
+    }
     if (handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask))
     {
         return true;
@@ -757,7 +804,8 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     p.read_only         = read_only;
     p.word_wrap         = mWordWrap;
     p.show_line_numbers = mLineNumbers;
-    p.soft_tabs         = true;
+    p.soft_tabs         = gSavedSettings.getBOOL("ALScriptStudioInsertSpaces");
+    p.tab_width         = llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16);
     // The studio's own colours, which a theme sets as one: the legacy
     // script colours for the text and the ground, and every kind under
     // the Script prefix. By name, as a XUI file gives them, so that the
@@ -855,6 +903,8 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     }
     editor.setWordWrap(mWordWrap);
     editor.setShowLineNumbers(mLineNumbers);
+    editor.setSoftTabs(gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
+    editor.setTabWidth(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16));
     editor.setShowIndentGuides(mIndentGuides);
     editor.setShowWhitespace(mWhitespace);
     editor.setRelativeLineNumbers(mRelativeNumbers);
@@ -2723,9 +2773,12 @@ void ALFloaterScriptStudio::problemCounts(const Doc& doc, S32& errors, S32& warn
 void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
 {
     const ALTextPos             caret = doc.editor->caret();
+    const ALTextDocument&       text  = doc.editor->document();
     LLStringUtil::format_map_t args;
     args["[LINE]"]  = std::to_string(caret.line + 1);
-    args["[COL]"]   = std::to_string(caret.column + 1);
+    // Where the caret is as it is seen -- a character a column, a tab to
+    // its stop -- rather than its byte in the line.
+    args["[COL]"]   = std::to_string(text.displayColumn(caret, doc.editor->getTabWidth()) + 1);
     std::vector<std::string> parts;
     if (!mVimBanner.empty())
     {
@@ -2743,7 +2796,9 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         }
         else
         {
-            parts.push_back(counted("SelectedChars", selection.end.column - selection.begin.column));
+            // Characters as they are seen, not the bytes they are
+            // written in; a tab is one.
+            parts.push_back(counted("SelectedChars", text.displayColumn(selection.end, 1) - text.displayColumn(selection.begin, 1)));
         }
     }
     S32 errors = 0, warnings = 0;
@@ -3882,15 +3937,20 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         // the column is cut at the column's edge, and the squiggle that
         // would otherwise have to be hovered instead is in a file this
         // window may not even have open.
+        // The column as the status line counts it, where the problem is in
+        // the text open here; an include's is its byte, for want of its text.
+        const S32 column = problem->file.empty() && problem->line < doc->editor->document().lineCount()
+                               ? doc->editor->document().displayColumn(ALTextPos(problem->line, problem->column), doc->editor->getTabWidth())
+                               : problem->column;
         const std::string place = (problem->file.empty() ? doc->name : problem->fileName) +
-                                  (problem->hasColumn ? llformat(":%d:%d", problem->line + 1, problem->column + 1)
+                                  (problem->hasColumn ? llformat(":%d:%d", problem->line + 1, column + 1)
                                                       : llformat(":%d", problem->line + 1));
         const std::string tip = place + "\n" + problem->message;
         LLSD row;
         row["value"]                = value;
         row["columns"][0]["column"] = "line";
         row["columns"][0]["value"]  = (problem->fileName.empty() ? std::string() : problem->fileName + ":") +
-                                     (problem->hasColumn ? llformat("%d:%d", problem->line + 1, problem->column + 1) : llformat("%d", problem->line + 1));
+                                     (problem->hasColumn ? llformat("%d:%d", problem->line + 1, column + 1) : llformat("%d", problem->line + 1));
         row["columns"][1]["column"] = "level";
         row["columns"][1]["value"]  = getString(problem->level == Doc::Level::Error ? "LevelError" : problem->level == Doc::Level::Warning ? "LevelWarning" : "LevelNote");
         row["columns"][2]["column"] = "source";
@@ -4005,7 +4065,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
     if (!refs.found)
     {
-        setStatus(getString("NoReferences", args));
+        setStatus(getString("NothingKnown", args));
         return;
     }
     // Back to the source: the declaration and each place in this script
@@ -5123,7 +5183,7 @@ void ALFloaterScriptStudio::goToLine()
             S32 line, column;
             if (placeOf(*doc, typed, line, column))
             {
-                doc->editor->goTo(ALTextPos(line - 1, llmax(0, column - 1)));
+                doc->editor->goTo(column > 0 ? doc->editor->document().posAtDisplayColumn(line - 1, column - 1, doc->editor->getTabWidth()) : ALTextPos(line - 1, 0));
             }
             else
             {
@@ -5165,7 +5225,7 @@ void ALFloaterScriptStudio::goToLine()
         else if (there)
         {
             quick->setHint(studio->getString(column > 0 ? "GoToLineGoColumn" : "GoToLineGo", args));
-            doc->editor->goTo(ALTextPos(line - 1, llmax(0, column - 1)));
+            doc->editor->goTo(column > 0 ? doc->editor->document().posAtDisplayColumn(line - 1, column - 1, doc->editor->getTabWidth()) : ALTextPos(line - 1, 0));
         }
         else
         {
@@ -5173,6 +5233,94 @@ void ALFloaterScriptStudio::goToLine()
         }
     });
     quick->setQuery(std::string());
+}
+
+void ALFloaterScriptStudio::showCommandPalette()
+{
+    LLMenuBarGL* bar = menuBar();
+    if (!bar)
+    {
+        return;
+    }
+    // Every command the menus hold that could be given now, by the path
+    // of menus it is under, with its keys beside it: the menus searched
+    // by name rather than walked.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    std::function<void(LLView*, const std::string&)> collect = [&](LLView* menu, const std::string& path) {
+        for (LLView* child : *menu->getChildList())
+        {
+            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            {
+                if (LLMenuGL* under = branch->getBranch())
+                {
+                    collect(under, path + branch->getLabel() + " \xE2\x80\xBA ");
+                }
+                continue;
+            }
+            LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+            if (!item || dynamic_cast<LLMenuItemSeparatorGL*>(item) || item->getLabel().empty() || item->getName() == "command_palette")
+            {
+                continue;
+            }
+            // Enabled as the menu would show it on opening.
+            item->buildDrawLabel();
+            if (!item->getEnabled() || !item->getVisible())
+            {
+                continue;
+            }
+            ALQuickOpen::Candidate one;
+            one.label  = path + item->getLabel();
+            one.detail = item->getAcceleratorString();
+            one.value  = item->getName();
+            candidates.push_back(std::move(one));
+        }
+    };
+    collect(bar, std::string());
+    const LLHandle<LLFloater> handle = getHandle();
+    quickOpen(std::move(candidates), getString("CommandsPlaceholder"), getString("CommandsTitle"), [handle](const std::string& value) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        LLMenuBarGL*           bar    = studio ? studio->menuBar() : nullptr;
+        if (LLMenuItemGL* item = bar ? bar->findChild<LLMenuItemGL>(value, true) : nullptr)
+        {
+            if (Doc* doc = studio->active())
+            {
+                // The command is about the editor the palette came up over.
+                doc->editor->setFocus(true);
+            }
+            item->onCommit();
+        }
+    }, mEditorHost);
+}
+
+void ALFloaterScriptStudio::showAllTabs()
+{
+    if (mDocs.empty())
+    {
+        return;
+    }
+    // Every tab by its name, as the strip has it, with where it lives or
+    // that it is unsaved beside it: what the strip's list button offers
+    // once the tabs run past it, and the Go menu at any time.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (const ALTabStrip::Tab& tab : mTabs->tabs())
+    {
+        ALQuickOpen::Candidate one;
+        one.label  = tab.label;
+        one.detail = tab.dirty ? getString("TabUnsaved") : tab.detail;
+        one.value  = tab.value;
+        candidates.push_back(std::move(one));
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    quickOpen(std::move(candidates), getString("AllTabsPlaceholder"), getString("AllTabsTitle"), [handle](const std::string& value) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->onTabChosen(value);
+            if (Doc* doc = studio->active())
+            {
+                doc->editor->setFocus(true);
+            }
+        }
+    }, mEditorHost);
 }
 
 void ALFloaterScriptStudio::goToSymbol()
@@ -6226,7 +6374,9 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
         last = to.line > from.line && to.column == 0 ? to.line - 1 : to.line;
     }
     ALScriptFormatter::Options options;
-    options.lua = doc.language.lua;
+    options.lua    = doc.language.lua;
+    options.indent = llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16);
+    options.tabs   = !gSavedSettings.getBOOL("ALScriptStudioInsertSpaces");
     const std::string text      = document.text();
     const std::string formatted = ALScriptFormatter::formatLines(text, options, first, last);
     // Line for line, since only some lines were asked for and the
@@ -6663,21 +6813,25 @@ void ALFloaterScriptStudio::fillExplorer()
     std::vector<ExplorerRow> chosen = explorerChoice();
     const S32                scroll = mExplorer->getScrollPos();
     mExplorer->deleteAllItems();
-    auto row = [&](const LLSD& value, const char* image, const std::string& name, const std::string& kind, const std::string& run, const std::string& tip) {
+    // What a row is -- an object, a prim, a script -- is its icon and its
+    // tip; the columns are its name and its state.
+    auto row = [&](const LLSD& value, const char* image, const std::string& name, const std::string& run, const std::string& tip) {
         LLSD r;
         r["value"]                  = value;
         r["columns"][0]["column"]   = "icon";
         r["columns"][0]["type"]     = "icon";
         r["columns"][0]["value"]    = image;
         r["columns"][0]["tool_tip"] = tip;
-        for (S32 i = 1; i < 4; ++i)
+        for (S32 i = 1; i < 3; ++i)
         {
-            r["columns"][i]["column"]   = i == 1 ? "name" : i == 2 ? "kind" : "run";
-            r["columns"][i]["value"]    = i == 1 ? name : i == 2 ? kind : run;
+            r["columns"][i]["column"]   = i == 1 ? "name" : "run";
+            r["columns"][i]["value"]    = i == 1 ? name : run;
             r["columns"][i]["tool_tip"] = tip;
         }
         return mExplorer->addElement(r);
     };
+    const std::string arrow_open   = getString("ArrowOpen");
+    const std::string arrow_folded = getString("ArrowFolded");
     auto wasChosen = [&chosen](const LLSD& value) {
         const LLUUID root = value["root"].asUUID();
         const LLUUID prim = value.has("prim") ? value["prim"].asUUID() : root;
@@ -6701,10 +6855,15 @@ void ALFloaterScriptStudio::fillExplorer()
         args["[NAME]"]   = object.name;
         args["[OBJECT]"] = object.name;
         args["[COUNT]"]  = std::to_string(object.prims.size());
-        LLScrollListItem* line = row(at, many ? "Inv_Object_Multi" : "Inv_Object", pin + object.name,
-                                     getString(!object.present ? "KindAway" : many ? "KindLinkset" : "KindObject"), LLStringUtil::null,
+        const bool        object_folded = mExplorerFolded.contains(object.root);
+        LLScrollListItem* line = row(at, many ? "Inv_Object_Multi" : "Inv_Object", (object_folded ? arrow_folded : arrow_open) + pin + object.name,
+                                     object.present ? LLStringUtil::null : getString("KindAway"),
                                      getString(object.present ? "RowObjectTip" : "RowAwayTip", args));
         line->setSelected(wasChosen(at));
+        if (object_folded)
+        {
+            continue;
+        }
         const std::string indent = many ? "        " : "    ";
         for (const ExplorerPrim& prim : object.prims)
         {
@@ -6712,9 +6871,14 @@ void ALFloaterScriptStudio::fillExplorer()
             {
                 at["prim"]     = prim.id;
                 args["[NAME]"] = prim.name.empty() ? getString("ObjectUnnamed") : prim.name;
-                line = row(at, "Studio_Prim", "    " + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name), getString("KindPrim"), LLStringUtil::null,
-                           getString("RowPrimTip", args));
+                const bool prim_folded = mExplorerFoldedPrims.contains(prim.id);
+                line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name),
+                           LLStringUtil::null, getString("RowPrimTip", args));
                 line->setSelected(wasChosen(at));
+                if (prim_folded)
+                {
+                    continue;
+                }
             }
             for (const ALScriptWorkspace::Item& item : prim.items)
             {
@@ -6749,7 +6913,7 @@ void ALFloaterScriptStudio::fillExplorer()
                 args["[KIND]"]         = kind;
                 args["[STATE]"]        = run;
                 const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" || item.name == ".lslrc" ? "Studio_Config" : "Inv_Notecard";
-                line = row(value, image, indent + item.name, kind, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
+                line = row(value, image, indent + item.name, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
                 line->setSelected(wasChosen(value));
             }
         }
@@ -6784,6 +6948,7 @@ std::vector<ALFloaterScriptStudio::ExplorerRow> ALFloaterScriptStudio::explorerC
         row.name   = value["name"].asString();
         row.script = value["script"].asBoolean();
         row.lua    = value["lua"].asBoolean();
+        row.primRow = value.has("prim") && !value.has("item");
         if (row.prim.isNull())
         {
             row.prim = row.root;
@@ -6838,7 +7003,73 @@ void ALFloaterScriptStudio::onExplorerChosen()
         {
             openScript(row.ref(), row.name);
         }
+        else
+        {
+            // An object or a prim: folded shut, or opened.
+            explorerFold(row.primRow ? row.prim : row.root, row.primRow);
+        }
     }
+}
+
+void ALFloaterScriptStudio::explorerFold(const LLUUID& id, bool prim, std::optional<bool> folded)
+{
+    boost::unordered_flat_set<LLUUID>& set  = prim ? mExplorerFoldedPrims : mExplorerFolded;
+    const bool                         now  = set.contains(id);
+    const bool                         want = folded.value_or(!now);
+    if (want == now)
+    {
+        return;
+    }
+    if (want)
+    {
+        set.insert(id);
+    }
+    else
+    {
+        set.erase(id);
+    }
+    fillExplorer();
+}
+
+bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim_row)
+{
+    LLScrollListItem* item = mExplorer->hitItem(x, y);
+    if (!item || !item->getValue().isMap() || item->getValue().has("item"))
+    {
+        return false;
+    }
+    // The arrow is the start of the name, after a prim's indent: from
+    // the name column's edge to just past the arrow.
+    const LLSD&         value = item->getValue();
+    const bool          prim  = value.has("prim");
+    const LLScrollListColumn* icon = mExplorer->getColumn("icon");
+    const S32           left  = mExplorer->getItemListRect().mLeft + (icon ? icon->getWidth() : 0) + mExplorer->getColumnPadding();
+    const S32           right = left + LLFontGL::getFontSansSerifSmall()->getWidth((prim ? std::string("    ") : std::string()) + getString("ArrowOpen")) + 4;
+    if (x < left - 2 || x > right)
+    {
+        return false;
+    }
+    id       = prim ? value["prim"].asUUID() : value["root"].asUUID();
+    prim_row = prim;
+    return true;
+}
+
+bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    // An arrow in the explorer folds its row, and the press goes on to
+    // the list, which chooses the row as any press would.
+    if (mask == MASK_NONE && mExplorer && mExplorer->isInVisibleChain())
+    {
+        S32 lx = 0, ly = 0;
+        localPointToOtherView(x, y, &lx, &ly, mExplorer);
+        LLUUID id;
+        bool   prim = false;
+        if (mExplorer->pointInView(lx, ly) && explorerArrowAt(lx, ly, id, prim))
+        {
+            explorerFold(id, prim);
+        }
+    }
+    return ALStudioFloater::handleMouseDown(x, y, mask);
 }
 
 bool ALFloaterScriptStudio::explorerActionEnabled(const std::string& action) const
@@ -7579,6 +7810,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->editor->toggleComment();
     }
+    else if (doc && (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down"))
+    {
+        // The editor's own line commands, by the names the keymap has.
+        if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(action))
+        {
+            doc->editor->perform(*command);
+        }
+    }
     else if (doc && action == "complete")
     {
         doc->editor->perform(ALEditorCommand::Complete);
@@ -7704,6 +7943,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     else if (action == "next_tab" || action == "previous_tab")
     {
         cycleTab(action == "next_tab" ? 1 : -1);
+    }
+    else if (action == "all_tabs")
+    {
+        showAllTabs();
+    }
+    else if (action == "command_palette")
+    {
+        showCommandPalette();
     }
     else if (action == "indent_guides")
     {
@@ -7909,6 +8156,11 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "format_selection")
     {
         return doc && doc->loaded && doc->modifiable && !doc->notecard && !doc->editor->selection().empty();
+    }
+    if (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down")
+    {
+        const std::optional<ALEditorCommand> command = alEditorCommandFromName(action);
+        return doc && doc->modifiable && command && doc->editor->canPerform(*command);
     }
     if (action == "fold")
     {

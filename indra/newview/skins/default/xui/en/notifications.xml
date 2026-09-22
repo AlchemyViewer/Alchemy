@@ -1768,7 +1768,7 @@ A name for the new [KIND]:
        default="true"
        index="0"
        name="OK"
-       text="Make It"/>
+       text="Create"/>
       <button
        index="1"
        name="Cancel"

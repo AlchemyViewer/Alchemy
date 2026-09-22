@@ -36,6 +36,7 @@ class ALFontField;
 class LLColorSwatchCtrl;
 class LLComboBox;
 class LLPanel;
+class LLScrollListCtrl;
 class LLTabContainer;
 class LLTextBox;
 
@@ -82,10 +83,16 @@ private:
     void onFontPart(const std::string& part, const std::string& value);
     void onIncludeFolder();
     void refreshIncludeFolder();
+    // Where an include is looked for: the places in the setting's order,
+    // each ticked on or off, moved up and down.
+    void refreshIncludeOrder();
+    void storeIncludeOrder();
+    void moveIncludePlace(S32 by);
 
     LLTabContainer*                                        mTabs        = nullptr;
     LLComboBox*                                            mThemes      = nullptr;
     LLComboBox*                                            mPreviewLang = nullptr;
+    LLScrollListCtrl*                                      mOrder       = nullptr;
     ALFontField*                                           mFont        = nullptr;
     LLPanel*                                               mSwatches    = nullptr;
     ALCodeEditor*                                          mPreview     = nullptr;

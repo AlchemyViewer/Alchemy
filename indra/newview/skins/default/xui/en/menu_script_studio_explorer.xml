@@ -67,7 +67,7 @@
     <menu_item_check.on_enable function="Explorer.Enable" parameter="pin" />
   </menu_item_check>
   <menu_item_separator layout="topleft" />
-  <menu_item_call label="Fetch Again" layout="topleft" name="refresh">
+  <menu_item_call label="Refresh" layout="topleft" name="refresh">
     <menu_item_call.on_click function="Explorer.Action" parameter="refresh" />
   </menu_item_call>
   <menu_item_call label="Copy" layout="topleft" name="copy">

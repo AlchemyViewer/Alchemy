@@ -36,11 +36,15 @@
 #include "lldirpicker.h"
 #include "llnotificationsutil.h"
 #include "llscrollcontainer.h"
+#include "llscrolllistctrl.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+
+#include <algorithm>
+#include <sstream>
 
 namespace
 {
@@ -54,7 +58,11 @@ namespace
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder",
+        "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces",
     };
+
+    // The places an include is looked for, as the setting spells them.
+    const char* const PLACES[] = { "inventory", "object", "disk" };
 
     const S32 SWATCH_ROW    = 24;
     const S32 SWATCH_WIDTH  = 48;
@@ -76,12 +84,21 @@ bool ALFloaterScriptPreferences::postBuild()
     mSwatches    = getChild<LLPanel>("swatches");
     mPreview     = getChild<ALCodeEditor>("preview");
     mFolder      = getChild<LLTextBox>("include_folder");
+    mOrder       = getChild<LLScrollListCtrl>("include_order");
 
     mThemes->setCommitCallback([this](LLUICtrl*, const LLSD&) { onTheme(); });
     getChild<LLButton>("save_theme")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSaveTheme(); });
     getChild<LLButton>("restore_skin")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRestoreSkin(); });
     mPreviewLang->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshPreview(); });
     getChild<LLButton>("choose_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onIncludeFolder(); });
+    mOrder->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeIncludeOrder(); });
+    getChild<LLButton>("order_up")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(-1); });
+    getChild<LLButton>("order_down")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(1); });
+    // The editors open take the typing settings as they change.
+    for (const char* name : { "tab_width", "insert_spaces" })
+    {
+        getChild<LLUICtrl>(name)->setCommitCallback([](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::refreshAll(); });
+    }
     getChild<LLButton>("ok")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOK(); });
     getChild<LLButton>("cancel")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCancel(); });
 
@@ -94,6 +111,7 @@ bool ALFloaterScriptPreferences::postBuild()
     refreshSwatches();
     refreshPreview();
     refreshIncludeFolder();
+    refreshIncludeOrder();
     return true;
 }
 
@@ -110,6 +128,7 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     refreshFont();
     refreshPreview();
     refreshIncludeFolder();
+    refreshIncludeOrder();
     if (ALPanelScriptKeymap* keys = findChild<ALPanelScriptKeymap>("keys_tab"))
     {
         keys->refresh();
@@ -396,6 +415,84 @@ void ALFloaterScriptPreferences::refreshIncludeFolder()
 {
     const std::string folder = gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder");
     mFolder->setText(folder.empty() ? getString("NoFolder") : folder);
+}
+
+void ALFloaterScriptPreferences::refreshIncludeOrder()
+{
+    // The places the setting names, in its order and ticked; after them
+    // those it leaves out, unticked.
+    std::vector<std::string> named;
+    std::istringstream       words(gSavedSettings.getString("ALScriptPreprocIncludeOrder"));
+    std::string              word;
+    while (words >> word)
+    {
+        const bool known = std::find(std::begin(PLACES), std::end(PLACES), word) != std::end(PLACES);
+        if (known && std::find(named.begin(), named.end(), word) == named.end())
+        {
+            named.push_back(word);
+        }
+    }
+    const S32 chosen = mOrder->getFirstSelectedIndex();
+    mOrder->deleteAllItems();
+    const auto add = [this](const std::string& place, bool on) {
+        LLSD row;
+        row["value"]                = place;
+        row["columns"][0]["column"] = "on";
+        row["columns"][0]["type"]   = "checkbox";
+        row["columns"][0]["value"]  = on;
+        row["columns"][1]["column"] = "place";
+        row["columns"][1]["value"]  = getString(place == "inventory" ? "PlaceInventory" : place == "object" ? "PlaceObject" : "PlaceDisk");
+        mOrder->addElement(row);
+    };
+    for (const std::string& place : named)
+    {
+        add(place, true);
+    }
+    for (const char* place : PLACES)
+    {
+        if (std::find(named.begin(), named.end(), place) == named.end())
+        {
+            add(place, false);
+        }
+    }
+    if (chosen >= 0)
+    {
+        mOrder->selectNthItem(chosen);
+    }
+}
+
+void ALFloaterScriptPreferences::storeIncludeOrder()
+{
+    std::string order;
+    for (LLScrollListItem* item : mOrder->getAllData())
+    {
+        const LLScrollListCell* on = item->getColumn(0);
+        if (on && on->getValue().asBoolean())
+        {
+            order += (order.empty() ? "" : " ") + item->getValue().asString();
+        }
+    }
+    gSavedSettings.setString("ALScriptPreprocIncludeOrder", order);
+}
+
+void ALFloaterScriptPreferences::moveIncludePlace(S32 by)
+{
+    const S32 at = mOrder->getFirstSelectedIndex();
+    const S32 to = at + by;
+    if (at < 0 || to < 0 || to >= mOrder->getItemCount())
+    {
+        return;
+    }
+    if (by < 0)
+    {
+        mOrder->swapWithPrevious(at);
+    }
+    else
+    {
+        mOrder->swapWithNext(at);
+    }
+    mOrder->selectNthItem(to);
+    storeIncludeOrder();
 }
 
 void ALFloaterScriptPreferences::onIncludeFolder()
