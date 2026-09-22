@@ -356,7 +356,7 @@ void LLNotificationForm::append(const LLSD& sub_form)
     }
 }
 
-void LLNotificationForm::formatElements(const LLSD& substitutions)
+void LLNotificationForm::formatElements(const LLStringUtil::format_map_t& defaults, const LLSD& substitutions)
 {
     for (LLSD::array_iterator it = mFormData.beginArray();
         it != mFormData.endArray();
@@ -366,13 +366,13 @@ void LLNotificationForm::formatElements(const LLSD& substitutions)
         if ((*it).has("text"))
         {
             std::string text = (*it)["text"].asString();
-            LLStringUtil::format(text, substitutions);
+            LLStringUtil::format(text, defaults, substitutions);
             (*it)["text"] = text;
         }
         if ((*it)["type"].asString() == "text" && (*it).has("value"))
         {
             std::string value = (*it)["value"].asString();
-            LLStringUtil::format(value, substitutions);
+            LLStringUtil::format(value, defaults, substitutions);
             (*it)["value"] = value;
         }
     }
@@ -863,13 +863,9 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
     mTemplatep = LLNotifications::instance().getTemplate(template_name);
     if (!mTemplatep) return;
 
-    // add default substitutions
-    const LLStringUtil::format_map_t& default_args = LLTrans::getDefaultArgs();
-    for (LLStringUtil::format_map_t::const_iterator iter = default_args.begin();
-         iter != default_args.end(); ++iter)
-    {
-        mSubstitutions[std::string(iter->first)] = iter->second;
-    }
+    // The default substitutions -- [APP_NAME] and the rest -- are read
+    // beside these wherever the template's words are formatted, rather
+    // than copied into every notification made.
     mSubstitutions["_URL"] = getURL();
     mSubstitutions["_NAME"] = template_name;
     // TODO: something like this so that a missing alert is sensible:
@@ -879,7 +875,7 @@ void LLNotification::init(const std::string& template_name, const LLSD& form_ele
     mForm->append(form_elements);
 
     // apply substitution to form labels
-    mForm->formatElements(mSubstitutions);
+    mForm->formatElements(LLTrans::getDefaultArgs(), mSubstitutions);
 
     mIgnored = mForm->getIgnored();
 
@@ -914,7 +910,7 @@ std::string LLNotification::getMessage() const
         return std::string();
 
     std::string message = mTemplatep->mMessage;
-    LLStringUtil::format(message, mSubstitutions);
+    LLStringUtil::format(message, LLTrans::getDefaultArgs(), mSubstitutions);
     return message;
 }
 
@@ -924,14 +920,14 @@ std::string LLNotification::getFooter() const
         return std::string();
 
     std::string footer = mTemplatep->mFooter;
-    LLStringUtil::format(footer, mSubstitutions);
+    LLStringUtil::format(footer, LLTrans::getDefaultArgs(), mSubstitutions);
     return footer;
 }
 
 std::string LLNotification::getLabel() const
 {
     std::string label = mTemplatep->mLabel;
-    LLStringUtil::format(label, mSubstitutions);
+    LLStringUtil::format(label, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? label : "");
 }
 
@@ -947,7 +943,7 @@ std::string LLNotification::getURL() const
     if (!mTemplatep)
         return std::string();
     std::string url = mTemplatep->mURL;
-    LLStringUtil::format(url, mSubstitutions);
+    LLStringUtil::format(url, LLTrans::getDefaultArgs(), mSubstitutions);
     return (mTemplatep ? url : "");
 }
 

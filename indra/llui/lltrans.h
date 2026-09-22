@@ -88,6 +88,10 @@ public:
     // may have different plurals for 0, 1, 2 and > 2.
     // See "AgeWeeksA", "AgeWeeksB", etc. in strings.xml for examples.
     static std::string getCountString(std::string_view language, std::string_view xml_desc, S32 count);
+    // The form a count takes in a language: the suffix -- "A", "B", "C" --
+    // of the string that says it, as getCountString picks it; for whoever
+    // keeps the strings for the forms and only needs to know which.
+    static const char* countForm(std::string_view language, S32 count);
 
     /**
      * @brief Returns a translated string

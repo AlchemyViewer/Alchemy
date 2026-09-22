@@ -289,6 +289,22 @@ bool LLTrans::findString(std::string& result, std::string_view xml_desc, const L
 //static
 std::string LLTrans::getCountString(std::string_view language, std::string_view xml_desc, S32 count)
 {
+    const char* form = countForm(language, count);
+
+    // Translate that string
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = llformat("%d", count);
+
+    // Look up "AgeYearsB" or "AgeWeeksC" including the "form"; the
+    // description is a view, which is not a C string.
+    std::string key(xml_desc);
+    key += form;
+    return getString(key, args);
+}
+
+//static
+const char* LLTrans::countForm(std::string_view language, S32 count)
+{
     // Compute which string identifier to use
     const char* form = "";
     if (language == "ru") // Russian
@@ -341,16 +357,7 @@ std::string LLTrans::getCountString(std::string_view language, std::string_view 
             form = "B";
         }
     }
-
-    // Translate that string
-    LLStringUtil::format_map_t args;
-    args["[COUNT]"] = llformat("%d", count);
-
-    // Look up "AgeYearsB" or "AgeWeeksC" including the "form"; the
-    // description is a view, which is not a C string.
-    std::string key(xml_desc);
-    key += form;
-    return getString(key, args);
+    return form;
 }
 
 void LLTrans::setDefaultArg(const std::string& name, const std::string& value)

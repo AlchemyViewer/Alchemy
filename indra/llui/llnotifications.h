@@ -257,7 +257,9 @@ public:
     bool getElementEnabled(std::string_view element_name) const;
     void setElementEnabled(std::string_view element_name, bool enabled);
     void addElement(const std::string& type, const std::string& name, const LLSD& value = LLSD(), bool enabled = true);
-    void formatElements(const LLSD& substitutions);
+    // The defaults -- LLTrans's -- read beside the substitutions, the
+    // defaults first where both have a key.
+    void formatElements(const LLStringUtil::format_map_t& defaults, const LLSD& substitutions);
     // appends form elements from another form serialized as LLSD
     void append(const LLSD& sub_form);
     std::string getDefaultOption();
