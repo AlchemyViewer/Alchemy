@@ -26,6 +26,7 @@
 
 #include "altextview.h"
 
+#include "altextchars.h"
 #include "alviewtype.h"
 #include "llclipboard.h"
 #include "lldir.h"
@@ -117,11 +118,6 @@ namespace
             default:
                 return false;
         }
-    }
-
-    bool identifierByte(char c)
-    {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     // The layout knows a substitution and an atom by one id each; atoms
@@ -622,7 +618,7 @@ std::string ALTextView::wordBeforeCaret() const
 {
     const std::string& line  = mDocument.line(mCaret.line);
     S32                begin = llmin(mCaret.column, static_cast<S32>(line.size()));
-    while (begin > 0 && identifierByte(line[begin - 1]))
+    while (begin > 0 && alIdentifierByte(line[begin - 1]))
     {
         --begin;
     }
@@ -834,16 +830,20 @@ void ALTextView::addStyle(Style style)
     mStyles.insert(at, std::move(style));
 }
 
+std::vector<ALTextView::Style>::const_iterator ALTextView::firstStyleOn(S32 line) const
+{
+    // The styles are in order and none over another, so their ends are
+    // in order too: the first that reaches the line is found by them.
+    return std::lower_bound(mStyles.begin(), mStyles.end(), ALTextPos(line, 0), [](const Style& s, const ALTextPos& p) { return s.range.end <= p; });
+}
+
 void ALTextView::provideRuns(S32 line, std::vector<ALTextLayout::Run>& out) const
 {
     const S32 length = mDocument.lineLength(line);
-    for (const Style& style : mStyles)
+    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
     {
-        if (style.range.begin.line > line)
-        {
-            break;
-        }
-        if (!style.font || style.range.end.line < line)
+        const Style& style = *it;
+        if (!style.font)
         {
             continue;
         }
@@ -991,7 +991,12 @@ void ALTextView::placeAtomViews()
         // Its box: where the row is on the screen, if it is, and where the
         // layout put the gap on the row.
         bool placed = false;
-        if (row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line))
+        // Its line first, before its row is measured: an atom on a line
+        // scrolled away has no box, and there may be hundreds of them.
+        const bool line_in_sight = row_h > 0 && atom.at.line < mDocument.lineCount() && !mLayout.hidden(atom.at.line) &&
+                                   mLayout.lineTop(atom.at.line) < mScrollY + text.getHeight() &&
+                                   mLayout.lineTop(atom.at.line) + mLayout.lineHeight(atom.at.line) > mScrollY;
+        if (line_in_sight)
         {
             S32       row;
             const F32 x0     = mLayout.xOf(atom.at.line, atom.at.column, &row);
@@ -1878,18 +1883,17 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         }
         case C::Indent:
-        {
-            const auto [first, last] = selectedLines();
-            if (last > first)
+            // A selection, however small, indents its lines; a caret
+            // alone puts a tab in.
+            if (hasSelection())
             {
                 indentLines(true);
             }
             else
             {
-                insertText(tabText(selection().normalised().begin));
+                insertText(tabText(mCaret));
             }
             return true;
-        }
         case C::Unindent:
             indentLines(false);
             return true;
@@ -2416,13 +2420,7 @@ S32 ALTextView::getPreeditFontSize() const
 
 const std::string& ALTextView::getPreeditStringUtf8() const
 {
-    if (!mWholeTextValid || mWholeTextVersion != mDocument.version())
-    {
-        mWholeText        = mDocument.text();
-        mWholeTextVersion = mDocument.version();
-        mWholeTextValid   = true;
-    }
-    return mWholeText;
+    return mDocument.wholeText();
 }
 
 // --- the context menu ------------------------------------------------------------
@@ -3215,13 +3213,10 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
         }
     }
     // A style's colour over the grammar's.
-    for (const Style& style : mStyles)
+    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
     {
-        if (style.range.begin.line > line)
-        {
-            break;
-        }
-        if (!style.color || style.range.end.line < line)
+        const Style& style = *it;
+        if (!style.color)
         {
             continue;
         }
@@ -3302,13 +3297,10 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
         }
     }
     // The styles that underline, in the style's colour or the text's.
-    for (const Style& style : mStyles)
+    for (auto it = firstStyleOn(line); it != mStyles.end() && it->range.begin.line <= line; ++it)
     {
-        if (style.range.begin.line > line)
-        {
-            break;
-        }
-        if (!(style.flags & LLFontGL::UNDERLINE) || style.range.end.line < line)
+        const Style& style = *it;
+        if (!(style.flags & LLFontGL::UNDERLINE))
         {
             continue;
         }
@@ -3759,9 +3751,12 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     mClickY         = y;
     if (!mTripleClick.hasExpired() && near)
     {
-        // The third click takes the line.
-        mAnchor    = mDocument.lineStart(mCaret.line);
-        mCaret     = mCaret.line + 1 < mDocument.lineCount() ? mDocument.lineStart(mCaret.line + 1) : mDocument.lineEnd(mCaret.line);
+        // The third click takes the line; through placeCaret, so that
+        // whoever follows the caret hears of it.
+        const S32 line = mCaret.line;
+        mAnchor        = mDocument.lineStart(line);
+        placeCaret(line + 1 < mDocument.lineCount() ? mDocument.lineStart(line + 1) : mDocument.lineEnd(line), true);
+        mDesiredX  = -1.f;
         mSelecting = false;
         if (mModal)
         {
@@ -3964,9 +3959,9 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
     setFocus(true);
     const ALTextRange word = mDocument.wordAt(posAtLocal(x, y, false));
     mAnchor                = word.begin;
-    mCaret                 = word.end;
-    mDesiredX              = -1.f;
-    mSelecting             = false;
+    placeCaret(word.end, true);
+    mDesiredX  = -1.f;
+    mSelecting = false;
     armTripleClick();
     if (mModal)
     {

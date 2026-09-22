@@ -185,6 +185,12 @@ private:
     std::deque<Entry> mEntries;
     std::deque<U32>   mSerials;
     std::deque<Shown> mShown;
+    // Where each shown entry's first line is, summed up once after the
+    // shown change and kept: what a row asks for as it is drawn and a
+    // line as it is laid out, of which there are many.
+    mutable std::vector<S32> mFirsts;
+    mutable U32              mFirstsOf       = 0;
+    U32                      mShownGeneration = 1;
     U32               mNextSerial = 1;
     filter_t          mFilter;
     S32               mCapacity = 500;

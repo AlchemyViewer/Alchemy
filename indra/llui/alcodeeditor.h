@@ -157,6 +157,9 @@ public:
     // its match, skipping what is inside strings and comments. False where
     // the caret is at no bracket, or the bracket has no match.
     bool matchingBrackets(ALTextPos& open, ALTextPos& close);
+    // The bracket at a position and its match, likewise; what vim's %
+    // and its bracket objects ask, so that they and the box drawn agree.
+    bool matchBracketAt(const ALTextPos& at, ALTextPos& match);
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
@@ -509,5 +512,17 @@ private:
     // card.
     ALTextView*             mCard = nullptr;
     ALTextRange             mCardAbout;
+    // The matched pair as last found, for the frame: asked once before
+    // the rows are drawn rather than by every row, since finding it may
+    // read to the end of the text.
+    struct Brackets
+    {
+        U32       version = 0;
+        ALTextPos caret{ -1, -1 };
+        bool      matched = false;
+        ALTextPos open;
+        ALTextPos close;
+    };
+    Brackets                mBrackets;
     LLRect                  mCardAnchor;
 };

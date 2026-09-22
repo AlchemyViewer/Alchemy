@@ -26,7 +26,9 @@
 
 #include "alcodeeditor.h"
 
+#include "altextchars.h"
 #include "llfocusmgr.h"
+#include "llstl.h"
 #include "llrender2dutils.h"
 #include "alchoicelist.h"
 #include "llstring.h"
@@ -35,11 +37,11 @@
 #include "llurlaction.h"
 #include "lluictrlfactory.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <optional>
 
 static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
@@ -80,12 +82,6 @@ namespace
     {
         return kind == ALSyntaxKind::String || kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment ||
                kind == ALSyntaxKind::Escape || kind == ALSyntaxKind::AttributeValue;
-    }
-
-    // Where a position past an edit ends up once the edit is made.
-    bool identifierByte(char c)
-    {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     // A line with nothing but whitespace, or nothing.
@@ -374,59 +370,80 @@ bool ALCodeEditor::highlighted(const ALTextPos& at) const
 
 bool ALCodeEditor::matchingBrackets(ALTextPos& open, ALTextPos& close)
 {
-    const ALTextPos at = caret();
+    const ALTextPos    at   = caret();
     const std::string& line = document().line(at.line);
     // The bracket just before the caret, else the one under it.
-    ALTextPos from = at;
-    char      c = 0, partner = 0;
-    bool      opens = false;
+    char partner = 0;
+    bool opens   = false;
+    ALTextPos from;
     if (at.column > 0 && bracketOf(line[at.column - 1], partner, opens))
     {
         from = ALTextPos(at.line, at.column - 1);
-        c    = line[at.column - 1];
     }
     else if (at.column < static_cast<S32>(line.size()) && bracketOf(line[at.column], partner, opens))
     {
-        c = line[at.column];
+        from = at;
     }
     else
     {
         return false;
     }
-
-    // Whether a byte of a line is inside a string or a comment.
-    auto quietAt = [&](S32 l, S32 column) {
-        for (const ALSyntaxToken& token : highlighter().tokens(l))
-        {
-            if (token.begin <= column && column < token.end)
-            {
-                return quiet(token.kind);
-            }
-        }
-        return false;
-    };
-    if (quietAt(from.line, from.column))
+    ALTextPos match;
+    if (!matchBracketAt(from, match))
     {
         return false;
     }
+    open  = opens ? from : match;
+    close = opens ? match : from;
+    return true;
+}
 
+bool ALCodeEditor::matchBracketAt(const ALTextPos& from, ALTextPos& match)
+{
+    const ALTextDocument& doc  = document();
+    const std::string&    line = doc.line(from.line);
+    char                  c = 0, partner = 0;
+    bool                  opens = false;
+    if (from.column < 0 || from.column >= static_cast<S32>(line.size()) || !bracketOf(line[from.column], partner, opens))
+    {
+        return false;
+    }
+    c = line[from.column];
+
+    // A line's bytes walked with a cursor over its tokens, which are in
+    // order, so that whether a byte is inside a string or a comment
+    // costs the tokens once per line rather than once per byte.
     S32 depth = 0;
     if (opens)
     {
-        for (S32 l = from.line; l < document().lineCount(); ++l)
+        for (S32 l = from.line; l < doc.lineCount(); ++l)
         {
-            const std::string& text = document().line(l);
+            const std::string&                text   = doc.line(l);
+            const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
+            size_t                            t      = 0;
             for (S32 i = (l == from.line ? from.column : 0); i < static_cast<S32>(text.size()); ++i)
             {
-                if ((text[i] == c || text[i] == partner) && !quietAt(l, i))
+                if (text[i] != c && text[i] != partner)
                 {
-                    depth += (text[i] == c) ? 1 : -1;
-                    if (depth == 0)
+                    continue;
+                }
+                while (t < tokens.size() && tokens[t].end <= i)
+                {
+                    ++t;
+                }
+                if (t < tokens.size() && tokens[t].begin <= i && quiet(tokens[t].kind))
+                {
+                    if (l == from.line && i == from.column)
                     {
-                        open  = from;
-                        close = ALTextPos(l, i);
-                        return true;
+                        return false;
                     }
+                    continue;
+                }
+                depth += (text[i] == c) ? 1 : -1;
+                if (depth == 0)
+                {
+                    match = ALTextPos(l, i);
+                    return true;
                 }
             }
         }
@@ -435,18 +452,32 @@ bool ALCodeEditor::matchingBrackets(ALTextPos& open, ALTextPos& close)
     {
         for (S32 l = from.line; l >= 0; --l)
         {
-            const std::string& text = document().line(l);
+            const std::string&                text   = doc.line(l);
+            const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
+            size_t                            t      = tokens.size();
             for (S32 i = (l == from.line ? from.column : static_cast<S32>(text.size()) - 1); i >= 0; --i)
             {
-                if ((text[i] == c || text[i] == partner) && !quietAt(l, i))
+                if (text[i] != c && text[i] != partner)
                 {
-                    depth += (text[i] == c) ? 1 : -1;
-                    if (depth == 0)
+                    continue;
+                }
+                while (t > 0 && tokens[t - 1].begin > i)
+                {
+                    --t;
+                }
+                if (t > 0 && tokens[t - 1].end > i && quiet(tokens[t - 1].kind))
+                {
+                    if (l == from.line && i == from.column)
                     {
-                        open  = ALTextPos(l, i);
-                        close = from;
-                        return true;
+                        return false;
                     }
+                    continue;
+                }
+                depth += (text[i] == c) ? 1 : -1;
+                if (depth == 0)
+                {
+                    match = ALTextPos(l, i);
+                    return true;
                 }
             }
         }
@@ -944,6 +975,22 @@ void ALCodeEditor::drawAfterRows(const LLRect& text)
 void ALCodeEditor::drawBeforeRows(const LLRect& text)
 {
     const F32 alpha = getDrawContext().mAlpha;
+    // The matched pair for this frame, found again only where the text
+    // or the caret moved since the last.
+    if (mMatchBrackets && keyboardOnText())
+    {
+        if (mBrackets.version != document().version() || mBrackets.caret != caret())
+        {
+            mBrackets.version = document().version();
+            mBrackets.caret   = caret();
+            mBrackets.matched = matchingBrackets(mBrackets.open, mBrackets.close);
+        }
+    }
+    else
+    {
+        mBrackets.matched = false;
+        mBrackets.caret   = ALTextPos(-1, -1);
+    }
     if (mHighlightCurrentLine && keyboardOnText() && !hasSelection())
     {
         S32 row;
@@ -1125,18 +1172,14 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha);
         }
     }
-    if (mMatchBrackets && keyboardOnText())
+    if (mBrackets.matched && (line == mBrackets.open.line || line == mBrackets.close.line))
     {
-        ALTextPos open, close;
-        if (matchingBrackets(open, close))
+        for (const ALTextPos& at : { mBrackets.open, mBrackets.close })
         {
-            for (const ALTextPos& at : { open, close })
+            F32 x0, x1;
+            if (at.line == line && spanOnRow(line, row, ALTextRange(at, document().nextCluster(at)), x0, x1))
             {
-                F32 x0, x1;
-                if (spanOnRow(line, row, ALTextRange(at, document().nextCluster(at)), x0, x1))
-                {
-                    gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
-                }
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
             }
         }
     }
@@ -1523,13 +1566,13 @@ void ALCodeEditor::documentCompletions(const ALTextPos& at, std::string_view pre
         size_t             i    = 0;
         while (i < line.size())
         {
-            if (!identifierByte(line[i]))
+            if (!alIdentifierByte(line[i]))
             {
                 ++i;
                 continue;
             }
             size_t j = i;
-            while (j < line.size() && identifierByte(line[j]))
+            while (j < line.size() && alIdentifierByte(line[j]))
             {
                 ++j;
             }
@@ -1706,12 +1749,12 @@ LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
     {
         return completion.icon;
     }
-    static std::map<std::string, LLUIImagePtr> looked_up;
-    const char*                                name  = iconNameOf(completion);
-    auto                                       found = looked_up.find(name);
+    static boost::unordered_flat_map<std::string, LLUIImagePtr, ll::string_hash, std::equal_to<>> looked_up;
+    const std::string_view                                                                       name = iconNameOf(completion);
+    auto                                                                                         found = looked_up.find(name);
     if (found == looked_up.end())
     {
-        found = looked_up.emplace(name, LLUI::getUIImage(name)).first;
+        found = looked_up.emplace(std::string(name), LLUI::getUIImage(std::string(name))).first;
     }
     return found->second;
 }
@@ -1821,21 +1864,21 @@ void ALCodeEditor::openCompletion()
 
 ALTextRange ALCodeEditor::identifierAt(const ALTextPos& at) const
 {
-    const ALTextDocument& doc = document();
-    const ALTextPos       pos = doc.clamp(at);
-    const std::string     line = doc.text(ALTextRange(ALTextPos(pos.line, 0), ALTextPos(pos.line, doc.lineLength(pos.line))));
+    const ALTextDocument& doc  = document();
+    const ALTextPos       pos  = doc.clamp(at);
+    const std::string&    line = doc.line(pos.line);
     const S32             n    = static_cast<S32>(line.size());
-    if (pos.column >= n || !identifierByte(line[pos.column]))
+    if (pos.column >= n || !alIdentifierByte(line[pos.column]))
     {
         return ALTextRange();
     }
     S32 begin = pos.column;
     S32 end   = pos.column + 1;
-    while (begin > 0 && identifierByte(line[begin - 1]))
+    while (begin > 0 && alIdentifierByte(line[begin - 1]))
     {
         --begin;
     }
-    while (end < n && identifierByte(line[end]))
+    while (end < n && alIdentifierByte(line[end]))
     {
         ++end;
     }
@@ -2321,7 +2364,7 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     {
         return false;
     }
-    const bool identifier = uni_char < 0x80 && identifierByte(static_cast<char>(uni_char));
+    const bool identifier = uni_char < 0x80 && alIdentifierByte(static_cast<char>(uni_char));
     if (uni_char == '.' && mAutoComplete && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
     {
         // A member is coming: what there is to choose from, at once.

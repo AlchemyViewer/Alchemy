@@ -544,6 +544,9 @@ public:
     void               setPlaceholder(const std::string& text) { mPlaceholder = text; }
     const std::string& placeholder() const { return mPlaceholder; }
 
+    // What a tab typed at a place puts in: a tab, or spaces to the next
+    // stop where tabs are soft.
+    std::string tabText(const ALTextPos& at) const;
     // The rect the text is drawn in.
     LLRect textRect() const;
     // The view less the band a modal keymap has under the text: where
@@ -630,7 +633,6 @@ protected:
 
 private:
     void                 moveVertically(S32 rows, bool extend);
-    std::string          tabText(const ALTextPos& at) const;
     void                 indentLines(bool in);
     void                 duplicateLines();
     void                 moveLines(S32 direction);
@@ -674,6 +676,8 @@ private:
     // of its stretches in fonts of their own.
     void provideSubstitutions(S32 line, std::vector<ALTextLayout::Substitution>& out) const;
     void provideRuns(S32 line, std::vector<ALTextLayout::Run>& out) const;
+    // The first style that reaches a line, by the styles' order.
+    std::vector<Style>::const_iterator firstStyleOn(S32 line) const;
     // A position inside what is shown as one thing, moved out to the side
     // it came from -- past it going forward from `from`, before it going
     // back -- else as it is.
@@ -757,10 +761,6 @@ private:
     std::vector<S32> mPreeditSegmentEnds;
     standouts_t      mPreeditStandouts;
     std::string      mPreeditOverwritten;
-    // The whole text, joined for the input method when it asks.
-    mutable std::string mWholeText;
-    mutable U32         mWholeTextVersion = 0;
-    mutable bool        mWholeTextValid   = false;
 
     std::string             mContextMenuFile;
     LLHandle<LLContextMenu> mContextMenuHandle;

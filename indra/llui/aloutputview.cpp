@@ -214,6 +214,7 @@ void ALOutputView::followTail()
 void ALOutputView::show(const Entry& entry, U32 serial)
 {
     mShown.push_back(showAt(entry, serial, document().lineCount(), !mShown.empty()));
+    ++mShownGeneration;
 }
 
 ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 line, bool among_others)
@@ -305,14 +306,14 @@ void ALOutputView::followed(const Substitution& link)
 
 const ALOutputView::Entry* ALOutputView::entryOf(U32 serial) const
 {
-    for (size_t i = 0; i < mSerials.size(); ++i)
+    // The serials go up as the entries came, so the one wanted is found
+    // by halving.
+    const auto at = std::lower_bound(mSerials.begin(), mSerials.end(), serial);
+    if (at == mSerials.end() || *at != serial)
     {
-        if (mSerials[i] == serial)
-        {
-            return &mEntries[i];
-        }
+        return nullptr;
     }
-    return nullptr;
+    return &mEntries[static_cast<size_t>(at - mSerials.begin())];
 }
 
 void ALOutputView::append(Entry entry)
@@ -330,6 +331,7 @@ void ALOutputView::append(Entry entry)
         {
             document().removeFirstLines(mShown.front().lines);
             mShown.pop_front();
+            ++mShownGeneration;
         }
     }
     if (passes(mEntries.back()))
@@ -347,6 +349,7 @@ void ALOutputView::clearEntries()
     mEntries.clear();
     mSerials.clear();
     mShown.clear();
+    ++mShownGeneration;
     setText("");
 }
 
@@ -362,6 +365,7 @@ void ALOutputView::setCapacity(S32 capacity)
         {
             document().removeFirstLines(mShown.front().lines);
             mShown.pop_front();
+            ++mShownGeneration;
         }
     }
 }
@@ -428,6 +432,7 @@ void ALOutputView::refill()
         hideAt(line, mShown[old++].lines);
     }
     mShown.swap(next);
+    ++mShownGeneration;
     if (follow)
     {
         followTail();
@@ -436,20 +441,34 @@ void ALOutputView::refill()
 
 const ALOutputView::Shown* ALOutputView::shownAt(S32 line, S32* first_line) const
 {
-    S32 first = 0;
-    for (const Shown& shown : mShown)
+    if (mFirstsOf != mShownGeneration)
     {
-        if (line < first + shown.lines)
+        mFirsts.clear();
+        mFirsts.reserve(mShown.size());
+        S32 first = 0;
+        for (const Shown& shown : mShown)
         {
-            if (first_line)
-            {
-                *first_line = first;
-            }
-            return &shown;
+            mFirsts.push_back(first);
+            first += shown.lines;
         }
-        first += shown.lines;
+        mFirstsOf = mShownGeneration;
     }
-    return nullptr;
+    // The last entry whose first line is at or before the line.
+    const auto after = std::upper_bound(mFirsts.begin(), mFirsts.end(), line);
+    if (after == mFirsts.begin())
+    {
+        return nullptr;
+    }
+    const size_t index = static_cast<size_t>(after - mFirsts.begin()) - 1;
+    if (line >= mFirsts[index] + mShown[index].lines)
+    {
+        return nullptr;
+    }
+    if (first_line)
+    {
+        *first_line = mFirsts[index];
+    }
+    return &mShown[index];
 }
 
 void ALOutputView::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors)

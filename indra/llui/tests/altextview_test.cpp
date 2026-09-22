@@ -824,4 +824,35 @@ namespace tut
         key(KEY_F6, MASK_SHIFT);
         ensure("Shift-F6 past the start: the text", gFocusMgr.getKeyboardFocus() == &v);
     }
+
+    template<> template<>
+    void altextview_object::test<23>()
+    {
+        set_test_name("a double click and a triple click move the caret through the same door as a key, and a tab with any selection indents");
+        ALTextView& v = make("hello world\nsecond line\n");
+        S32         moved = 0;
+        boost::signals2::scoped_connection heard = v.onCaretMoved([&moved]() { ++moved; });
+        S32 x, y;
+        pointOf(0, 8, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleMouseUp(x, y, MASK_NONE);
+        const S32 before = moved;
+        v.handleDoubleClick(x, y, MASK_NONE);
+        ensure_equals("the word", v.selectedText(), std::string("world"));
+        ensure("the double click was heard", moved > before);
+        const S32 after_double = moved;
+        v.handleMouseDown(x, y, MASK_NONE);
+        ensure_equals("the third click takes the line", v.selectedText(), std::string("hello world\n"));
+        ensure("and was heard", moved > after_double);
+        v.handleMouseUp(x, y, MASK_NONE);
+        // A selection within one line: Tab indents the line rather than
+        // putting a tab over the selection.
+        v.setSelection(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 5)));
+        v.perform(ALEditorCommand::Indent);
+        ensure_equals("the line indented", v.document().line(1), std::string("    second line"));
+        ensure("the selection kept, moved along", v.selection().normalised() == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 9)));
+        v.setCaret(ALTextPos(1, 0));
+        v.perform(ALEditorCommand::Indent);
+        ensure_equals("a caret alone puts a tab in", v.document().line(1), std::string("        second line"));
+    }
 }
