@@ -328,4 +328,47 @@ namespace tut
         ensure_equals("the first is plain", layout.rowHeightOf(0, 0), row);
         ensure_equals("the second holds the stretch", layout.rowHeightOf(0, layout.rowOf(0, 12)), big->getLineSpacing());
     }
+
+    template<> template<>
+    void altextlayout_object::test<8>()
+    {
+        set_test_name("an indent puts a line's rows in from the edge -- the first by one amount, the rest by another -- and the rows are narrower by as much");
+        ready("aaaa bbbb cccc\nzz");
+        const F32 four = layout.xOf(0, 4);
+        const F32 nine = layout.xOf(0, 9);
+        F32       rest = four;
+        layout.setIndentProvider([&rest, four](S32 line) {
+            ALTextLayout::Indent indent;
+            indent.rest = rest;
+            if (line == 1)
+            {
+                indent.first = four * 2.f;
+            }
+            return indent;
+        });
+        layout.setWrapWidth(static_cast<S32>(nine) + 2);
+        // The first row starts at the edge and holds 'aaaa bbbb '; the
+        // second, wrapped, hangs in by four letters with 'cccc' beside
+        // the indent.
+        ensure_equals("first row from the edge", layout.xOf(0, 0), 0.f);
+        ensure_equals("two rows", layout.rowCount(0), 2);
+        ensure("the second row starts at the indent", near(layout.xOf(0, layout.line(0).rows[1].begin), four));
+        ensure_equals("a point in the indent is the row's start", layout.columnAt(0, 1, four / 2.f, true), layout.line(0).rows[1].begin);
+        ensure("a column on the second row counts from the edge", near(layout.xOf(0, layout.line(0).rows[1].begin + 2), four + layout.xOf(0, 2)));
+        // Hanging in by eight, the rows after the first keep a quarter of
+        // the wrap at least -- two letters here -- so 'cccc', with
+        // nowhere to break, goes two letters a row.
+        rest = layout.xOf(0, 8);
+        layout.invalidateLine(0);
+        ensure_equals("narrower rows, two letters each", layout.rowCount(0), 3);
+        rest = four;
+        layout.invalidateLine(0);
+        // The next line's first row is in by the other amount.
+        ensure("the second line's first row in by eight", near(layout.xOf(1, 0), four * 2.f));
+        ensure_equals("and the hit test agrees", layout.columnAt(1, 0, four * 2.f + layout.xOf(0, 1), false), 1);
+        // No wrap: the first row's indent still stands.
+        layout.setWrapWidth(0);
+        ensure("unwrapped, the line still starts at its indent", near(layout.xOf(1, 0), four * 2.f));
+        ensure_equals("and has one row", layout.rowCount(0), 1);
+    }
 }

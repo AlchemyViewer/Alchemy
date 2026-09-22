@@ -192,7 +192,8 @@ ALTextView::Params::Params()
     link_color("link_color"),
     spellcheck("spellcheck", false),
     spell_error_color("spell_error_color"),
-    takes_focus("takes_focus", true)
+    takes_focus("takes_focus", true),
+    placeholder("placeholder")
 {
 }
 
@@ -240,6 +241,7 @@ ALTextView::ALTextView(const Params& p)
 
     mLinkColor       = p.link_color.isProvided() ? p.link_color() : LLUIColorTable::instance().getColor("HTMLLinkColor", LLColor4(0.4f, 0.6f, 1.f, 1.f));
     mSpellErrorColor = p.spell_error_color.isProvided() ? p.spell_error_color() : LLUIColorTable::instance().getColor("TextSpellErrorColor", LLColor4(1.f, 0.f, 0.f, 0.8f));
+    mPlaceholder     = p.placeholder.isProvided() ? p.placeholder() : std::string();
     mSpellCheck      = p.spellcheck;
     mTakesFocus      = p.takes_focus;
 
@@ -3529,6 +3531,14 @@ void ALTextView::draw()
         LLLocalClipRect clip(text);
         drawRows(text);
         drawAfterRows(text);
+        if (mDocument.empty() && !mPlaceholder.empty() && mFont)
+        {
+            // What will be here, said where the first line would be, in
+            // the ink dimmed.
+            const F32 baseline = static_cast<F32>(text.mTop - llround(mFont->getAscenderHeight()));
+            mFont->renderUTF8(mPlaceholder, 0, static_cast<F32>(text.mLeft), baseline, lerp(backgroundColor(), textColor(), 0.5f) % alpha, LLFontGL::LEFT,
+                              LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.getWidth(), nullptr, true);
+        }
     }
     if (mScrollMap)
     {

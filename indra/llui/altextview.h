@@ -161,6 +161,9 @@ public:
         // Whether a click gives the view the keyboard; a card over an
         // editor leaves it where it was.
         Optional<bool>        takes_focus;
+        // Said, dimly, in place of the text while there is none: what
+        // will appear here, or what to type.
+        Optional<std::string> placeholder;
 
         Params();
     };
@@ -177,6 +180,7 @@ public:
     ALTextDocument&            document() { return mDocument; }
     const ALTextDocument&      document() const { return mDocument; }
     ALTextLayout&              layout() { return mLayout; }
+    const ALTextLayout&        layout() const { return mLayout; }
     ALSyntaxHighlighter&       highlighter() { return mHighlighter; }
     const ALSyntaxHighlighter& highlighter() const { return mHighlighter; }
     ALTextUndo&                undoJournal() { return mUndo; }
@@ -532,6 +536,10 @@ public:
     typedef std::function<bool(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)> drop_handler_t;
     void setDropHandler(drop_handler_t handler) { mDropHandler = std::move(handler); }
 
+    // What is said in place of the text while there is none.
+    void               setPlaceholder(const std::string& text) { mPlaceholder = text; }
+    const std::string& placeholder() const { return mPlaceholder; }
+
     // The rect the text is drawn in.
     LLRect textRect() const;
     // The view less the band a modal keymap has under the text: where
@@ -805,6 +813,7 @@ private:
     };
     std::vector<SpellLine>                  mSpellLines;
     LLUIColor                               mSpellErrorColor;
+    std::string                             mPlaceholder;
     LLFrameTimer                            mSpellTimer;
     std::vector<std::string>                mSuggestions;
     ALTextRange                             mSuggestedFor;

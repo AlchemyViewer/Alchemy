@@ -236,6 +236,12 @@ void ALTextLayout::setRunProvider(run_provider_t provider)
     invalidateAll();
 }
 
+void ALTextLayout::setIndentProvider(indent_provider_t provider)
+{
+    mIndents = std::move(provider);
+    invalidateAll();
+}
+
 void ALTextLayout::invalidateLine(S32 index)
 {
     if (index < 0 || index >= lineCount())
@@ -475,13 +481,24 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     const S32    length      = static_cast<S32>(text.size());
     const S32    row_height  = rowHeight();
     const S32    row_ascent  = mFont ? llround(mFont->getAscenderHeight()) : 0;
+    // How far in the rows start: the first, and the ones after it. A
+    // row's x runs from the line's edge, so its start is that much
+    // before its first glyph's pen and its width that much more.
+    Indent indent;
+    if (mIndents)
+    {
+        indent       = mIndents(index);
+        indent.first = llmax(0.f, indent.first);
+        indent.rest  = llmax(0.f, indent.rest);
+    }
     auto add_row = [&](size_t glyph_begin, size_t glyph_end) {
-        Row row;
+        Row       row;
+        const F32 in   = out.rows.empty() ? indent.first : indent.rest;
         row.glyphBegin = glyph_begin;
         row.glyphEnd   = glyph_end;
         row.begin      = glyph_begin < glyph_count ? out.glyphs[glyph_begin].cluster : length;
         row.end        = glyph_end < glyph_count ? out.glyphs[glyph_end].cluster : length;
-        row.xStart     = glyph_begin < glyph_count ? out.glyphs[glyph_begin].pen : out.width;
+        row.xStart     = (glyph_begin < glyph_count ? out.glyphs[glyph_begin].pen : out.width) - in;
         row.width      = (glyph_end < glyph_count ? out.glyphs[glyph_end].pen : out.width) - row.xStart;
         row.top        = out.height;
         row.textHeight = row_height;
@@ -521,7 +538,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         out.height += row.height;
         out.rows.push_back(row);
     };
-    if (mWrapWidth <= 0 || out.width <= static_cast<F32>(mWrapWidth) || glyph_count == 0)
+    if (mWrapWidth <= 0 || out.width + indent.first <= static_cast<F32>(mWrapWidth) || glyph_count == 0)
     {
         add_row(0, glyph_count);
         return;
@@ -532,16 +549,18 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     size_t    row_begin  = 0;
     while (row_begin < glyph_count)
     {
-        // The first glyph whose right edge is past the wrap. A space or a
-        // tab never is: whitespace at a break hangs past the edge rather
-        // than being what forces the break.
-        const F32 x_start = out.glyphs[row_begin].pen;
-        size_t    over    = row_begin;
+        // The first glyph whose right edge is past the wrap, the row's
+        // indent taken off it. A space or a tab never is: whitespace at
+        // a break hangs past the edge rather than being what forces the
+        // break.
+        const F32 x_start  = out.glyphs[row_begin].pen;
+        const F32 wrap_row = llmax(wrap * 0.25f, wrap - (row_begin == 0 ? indent.first : indent.rest));
+        size_t    over     = row_begin;
         while (over < glyph_count)
         {
             const Glyph& glyph = out.glyphs[over];
             const char   byte  = text[glyph.cluster];
-            if (byte != ' ' && byte != '\t' && glyph.pen + glyph.advance - x_start > wrap)
+            if (byte != ' ' && byte != '\t' && glyph.pen + glyph.advance - x_start > wrap_row)
             {
                 break;
             }

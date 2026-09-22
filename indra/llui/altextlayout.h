@@ -123,6 +123,17 @@ public:
     };
     typedef std::function<void(S32 line, std::vector<Run>& out)> run_provider_t;
 
+    // How far in a line's rows start, in the UI's pixels: the first row,
+    // and the rows after it where the line wraps -- a log's message
+    // carried on under where it began, say. The rows are narrower by as
+    // much, and the caret and the hit test count from the line's edge.
+    struct Indent
+    {
+        F32 first = 0.f;
+        F32 rest  = 0.f;
+    };
+    typedef std::function<Indent(S32 line)> indent_provider_t;
+
     // A row of a line: the bytes it holds, the glyphs it holds, where in
     // the unwrapped line it starts, since the glyphs keep their unwrapped
     // pen; where it sits under the line's top and how tall it is, since
@@ -181,6 +192,9 @@ public:
     // Asked, as each line is laid out, what stretches of it are shaped in
     // a font of their own; likewise.
     void setRunProvider(run_provider_t provider);
+    // Asked, as each line is laid out, how far in its rows start;
+    // likewise.
+    void setIndentProvider(indent_provider_t provider);
     void invalidateLine(S32 index);
     // A space's advance in the UI's pixels, as every other x the layout
     // hands out is: what a column is, for whoever draws by columns.
@@ -275,4 +289,5 @@ private:
     std::vector<Substitution>          mSubstitutionScratch;
     run_provider_t                     mRuns;
     std::vector<Run>                   mRunScratch;
+    indent_provider_t                  mIndents;
 };
