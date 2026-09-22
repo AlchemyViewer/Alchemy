@@ -815,5 +815,13 @@ namespace tut
         ensure("first again", first->hasFocus());
         v.document().remove(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         ensure("its atom gone with the line, the keyboard on the text", v.atoms().size() == 2 && gFocusMgr.getKeyboardFocus() == &v);
+        // An edited text keeps Tab for itself; F6 goes into the views.
+        v.setReadOnly(false);
+        v.setCaret(ALTextPos(0, 0));
+        ensure("Tab is a tab now", !v.handleKeyHere(KEY_TAB, MASK_NONE) || !v.atomViewFocused());
+        key(KEY_F6);
+        ensure("F6 goes into the first view", second->hasFocus());
+        key(KEY_F6, MASK_SHIFT);
+        ensure("Shift-F6 past the start: the text", gFocusMgr.getKeyboardFocus() == &v);
     }
 }

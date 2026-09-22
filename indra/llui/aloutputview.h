@@ -118,10 +118,12 @@ private:
     };
     void refill();
     void show(const Entry& entry, U32 serial);
-    // An entry shown at a place among the shown, its first line there;
-    // and one of the shown hidden again, from its first line.
-    void showAt(const Entry& entry, U32 serial, size_t index, S32 line);
-    void hideAt(size_t index, S32 line);
+    // An entry's lines put into the text at a line -- before what is
+    // there, or after the last, or as the whole where nothing is shown
+    // -- with its links, and what was shown; and so many lines from a
+    // line taken out again.
+    Shown showAt(const Entry& entry, U32 serial, S32 line, bool among_others);
+    void  hideAt(S32 line, S32 lines);
     bool passes(const Entry& entry) const { return !mFilter || mFilter(entry); }
     // Whether the last row is in sight, which is when a new one should be.
     bool atTail();

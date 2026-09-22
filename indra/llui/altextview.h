@@ -355,11 +355,13 @@ public:
     void placeAtomViews();
     // The keyboard, among the atoms' views: from the text, Tab goes to
     // the first view after the caret and Shift-Tab to the last before
-    // it, where the text is read-only and takes no tab of its own; from
-    // a view, Tab and Shift-Tab go on to the next and back to the one
-    // before, and past the ends back to the text, as does Escape. A view
-    // that loses its box -- scrolled away, its atom gone -- hands the
-    // keyboard back to the text. Whether one of them has the keyboard.
+    // it, where the text is read-only and takes no tab of its own -- F6
+    // and Shift-F6 do the same from a text that is edited, where a Tab
+    // is a tab; from a view, Tab and Shift-Tab go on to the next and
+    // back to the one before, and past the ends back to the text, as
+    // does Escape. A view that loses its box -- scrolled away, its atom
+    // gone -- hands the keyboard back to the text. Whether one of them
+    // has the keyboard.
     bool atomViewFocused() const;
     // The keyboard moved to the next or the previous atom's view from
     // wherever it is, or back to the text past the ends; false with none.

@@ -3522,8 +3522,8 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
     }
     // The keyboard among the atoms' views: from one of them, Tab moves
     // on and Escape comes back to the text; from a read-only text, which
-    // has no tab of its own, Tab goes into them.
-    if ((key == KEY_TAB && (mask & ~MASK_SHIFT) == MASK_NONE) || (key == KEY_ESCAPE && mask == MASK_NONE))
+    // has no tab of its own, Tab goes into them, and from any text F6.
+    if (((key == KEY_TAB || key == KEY_F6) && (mask & ~MASK_SHIFT) == MASK_NONE) || (key == KEY_ESCAPE && mask == MASK_NONE))
     {
         const bool from_view = atomViewFocused();
         if (from_view && key == KEY_ESCAPE)
@@ -3534,7 +3534,7 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
             }
             return true;
         }
-        if (key == KEY_TAB && (from_view || mReadOnly) && focusAtomView((mask & MASK_SHIFT) == 0))
+        if (key != KEY_ESCAPE && (from_view || mReadOnly || key == KEY_F6) && focusAtomView((mask & MASK_SHIFT) == 0))
         {
             return true;
         }
