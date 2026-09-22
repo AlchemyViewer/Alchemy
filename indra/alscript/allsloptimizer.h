@@ -76,6 +76,16 @@ public:
         // The compiler turns a tab in a literal into spaces, so a fold that
         // would put one there is refused unless this says otherwise.
         bool foldtabs = false;
+        // Whether every change made is noted. A caller that reads the
+        // notes -- the studio's problems pane -- leaves this on; one
+        // that only wants the text turns it off, and the run does not
+        // print the before and after of every fold to say so.
+        bool notes = true;
+        // What one run may visit, over all its rounds: a script large
+        // enough that the passes keep finding work would otherwise hold
+        // whoever asked for as long as it liked. A run that reaches it
+        // stops where it is and says so; what it has done so far stands.
+        size_t visitBudget = 40u * 1000u * 1000u;
         // A user function called from one place put in that place, and a
         // small one returning an expression in every place, before the
         // rest; off by default. The functions named here are put in
@@ -100,6 +110,9 @@ public:
         size_t sizeBefore = 0;
         size_t sizeAfter  = 0;
         bool   optimized  = false;
+        // The run reached its budget and stopped early; what it did
+        // stands, and there may have been more to do.
+        bool   stoppedEarly = false;
     };
 
     // Needs the builtins loaded through ALLSLService first; without them

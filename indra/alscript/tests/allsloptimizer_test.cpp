@@ -660,4 +660,25 @@ namespace tut
         ensure("early went in, its return a jump to the label already there: " + put.text, has("if (n < 0) jump next;") && !has("_ret") && has("            @next;"));
         ensure_equals("one went", put.inlined, 1);
     }
+    template<> template<>
+    void allsloptimizer_object::test<18>()
+    {
+        set_test_name("a run nobody reads the notes of says nothing, and one that reaches its budget stops where it is");
+        const std::string       source = wrap("", "        integer a = 1 + 2;\n        integer b = 3 * 4;\n        llSay(0, (string)(a + b));\n");
+        ALLSLOptimizer::Options o      = options();
+        ALLSLOptimizer::Result  said   = ALLSLOptimizer::run(source, o);
+        ensure("the folds are said", !said.problems.empty());
+        o.notes = false;
+        ALLSLOptimizer::Result quiet = ALLSLOptimizer::run(source, o);
+        ensure("nothing said", quiet.problems.empty());
+        ensure_equals("and the same text either way", quiet.text, said.text);
+        // A budget too small for a round stops before the first, and
+        // says so where the notes are read.
+        o.notes       = true;
+        o.visitBudget = 1;
+        ALLSLOptimizer::Result stopped = ALLSLOptimizer::run(source, o);
+        ensure("it stopped early", stopped.stoppedEarly);
+        ensure("and said so: " + notes(stopped), !stopped.problems.empty() && stopped.problems.back().key == std::string("OptimizerStoppedEarly"));
+        ensure("what it has stands", !stopped.text.empty());
+    }
 } // namespace tut

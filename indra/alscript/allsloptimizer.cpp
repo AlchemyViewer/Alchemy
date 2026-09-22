@@ -27,6 +27,8 @@
 
 #include "allsloptimizer.h"
 
+#include "alscriptengine.h"
+
 #include "allslinliner.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -124,12 +126,20 @@ namespace
     class Report
     {
     public:
-        explicit Report(ALScriptProblems& problems) : mProblems(problems) {}
+        Report(ALScriptProblems& problems, bool wanted) : mProblems(problems), mWanted(wanted) {}
+
+        // Whether anybody reads the notes: a pass that would have to
+        // print a subtree to say what it did asks first.
+        bool wanted() const { return mWanted; }
 
         // A note with a key a translation may be found under, and the
         // words -- [1], [2] ... in the text -- it is built from.
         void note(const Tailslide::YYLTYPE* loc, const char* key, std::string_view text, std::vector<std::string> args = {})
         {
+            if (!mWanted)
+            {
+                return;
+            }
             ALScriptProblem p;
             p.severity = ALScriptProblem::Severity::Note;
             p.source   = ALScriptProblem::Source::Optimizer;
@@ -148,6 +158,7 @@ namespace
 
     private:
         ALScriptProblems& mProblems;
+        bool              mWanted = true;
     };
 
     std::string render(LSLASTNode* node)
@@ -1873,17 +1884,35 @@ namespace
 
     LSLConstant* evaluate(Ctx& ctx, const char* name, const Args& args)
     {
-        if (!strcmp(name, "llList2Integer")) return listGet(ctx, args, NODE_INTEGER_CONSTANT);
-        if (!strcmp(name, "llList2Float")) return listGet(ctx, args, NODE_FLOAT_CONSTANT);
-        if (!strcmp(name, "llList2String")) return listGet(ctx, args, NODE_STRING_CONSTANT);
-        if (!strcmp(name, "llList2Key")) return listGet(ctx, args, NODE_KEY_CONSTANT);
-        if (!strcmp(name, "llList2Vector")) return listGet(ctx, args, NODE_VECTOR_CONSTANT);
-        if (!strcmp(name, "llList2Rot")) return listGet(ctx, args, NODE_QUATERNION_CONSTANT);
+        // The list getters are in the table with the rest; nothing is
+        // compared before it is looked up.
+        static const boost::unordered_flat_map<std::string, LSLNodeSubType, ll::string_hash, std::equal_to<>> GETTERS = {
+            { "llList2Integer", NODE_INTEGER_CONSTANT },   { "llList2Float", NODE_FLOAT_CONSTANT },
+            { "llList2String", NODE_STRING_CONSTANT },     { "llList2Key", NODE_KEY_CONSTANT },
+            { "llList2Vector", NODE_VECTOR_CONSTANT },     { "llList2Rot", NODE_QUATERNION_CONSTANT },
+        };
+        if (const auto getter = GETTERS.find(name); getter != GETTERS.end())
+        {
+            return listGet(ctx, args, getter->second);
+        }
         auto it = evaluators().find(name);
         return it == evaluators().end() ? nullptr : it->second(ctx, args);
     }
 
     // ---- the passes -----------------------------------------------------------------------------
+
+    // How many nodes a script is, for the budget: a round costs about
+    // one visit of each.
+    struct Gather : public ASTVisitor
+    {
+        size_t& count;
+        explicit Gather(size_t& into) : count(into) {}
+        bool visit(LSLASTNode* node) override
+        {
+            ++count;
+            return true;
+        }
+    };
 
     struct Pass
     {
@@ -1942,12 +1971,23 @@ namespace
 
         void fold(LSLASTNode* node, LSLConstant* cv, const char* key, const char* what)
         {
-            const std::string was = render(node);
-            LSLConstantExpression* expr = constant(cv, node);
-            const std::string      now  = render(expr);
-            if (was != now)
+            // What it was and what it became, printed only where the
+            // notes are read: printing is a visit of the whole subtree,
+            // and a fold is what a pass does most.
+            LSLConstantExpression* expr = nullptr;
+            if (report.wanted())
             {
-                report.note(node->getLoc(), key, std::string(what) + " [1] to [2]", { was, now });
+                const std::string was = render(node);
+                expr                  = constant(cv, node);
+                const std::string now = render(expr);
+                if (was != now)
+                {
+                    report.note(node->getLoc(), key, std::string(what) + " [1] to [2]", { was, now });
+                }
+            }
+            else
+            {
+                expr = constant(cv, node);
             }
             LSLASTNode::replaceNode(node, expr);
             ++changes;
@@ -3209,6 +3249,7 @@ namespace
 
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
 {
+    AL_SCRIPT_ENGINE_HELD;
     Result result;
     result.text       = std::string(source);
     result.sizeBefore = source.size();
@@ -3300,11 +3341,28 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     ctx.context   = &parser.context;
     ctx.target    = options.target;
     ctx.foldtabs  = options.foldtabs;
-    Report report(result.problems);
+    Report report(result.problems, options.notes);
     // Each pass opens the way for the others; round and round until a
-    // round changes nothing.
+    // round changes nothing -- or until the run has visited as much as
+    // its budget allows, since a large script whose passes keep finding
+    // work would otherwise hold whoever asked for as long as it liked.
+    size_t     visited = 0;
+    const auto nodes   = [&]() {
+        size_t count = 0;
+        Gather gather(count);
+        script->visit(&gather);
+        return count;
+    };
+    const size_t perRound = std::max<size_t>(1, nodes());
     for (int round = 0; round < 64; ++round)
     {
+        visited += perRound;
+        if (visited > options.visitBudget)
+        {
+            result.stoppedEarly = true;
+            report.note(nullptr, "OptimizerStoppedEarly", "stopped after [1] rounds: there may be more to do", { std::to_string(round) });
+            break;
+        }
         int changes = 0;
         if (options.constfold)
         {

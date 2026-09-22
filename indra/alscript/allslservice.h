@@ -62,8 +62,14 @@ public:
 
     // Everything Tailslide has to say about one script, in the order it
     // was said. `mono` chooses Mono's rules for what a global initialiser
-    // may be; LSO's otherwise.
+    // may be; LSO's otherwise. The tree is kept, so that the questions
+    // asked of the same text afterwards -- what it declares, what every
+    // name is, what goes beside it -- need no second parse.
     ALScriptProblems check(std::string_view source, bool mono = true);
+    // Whether the text last asked about parsed at all, which tells a
+    // caller "nothing here" from "the script is broken": a query
+    // answers nothing either way.
+    bool parsed() const;
 
     // The script's own symbols in scope at a position: its globals,
     // functions, states, and the parameters and locals of what encloses

@@ -26,6 +26,13 @@
 
 #include "allslinliner.h"
 
+#include "alscriptengine.h"
+
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include "allslservice.h"
 #include "allsltraits.h"
 
@@ -308,9 +315,11 @@ namespace
 
     // The names visible from a node: every symbol table up from it, and
     // the builtins.
-    std::set<std::string> visibleFrom(LSLASTNode* node)
+    typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> Names;
+
+    Names visibleFrom(LSLASTNode* node)
     {
-        std::set<std::string> names;
+        Names names;
         for (LSLASTNode* n = node; n; n = n->getParent())
         {
             if (LSLSymbolTable* table = n->getSymbolTable())
@@ -368,7 +377,6 @@ namespace
 
     // The fresh names a round has given out, so that two blocks in one
     // function do not share a label.
-    typedef std::set<std::string> Names;
 
     std::string freshName(const std::string& base, const Names& taken, Names& used, ScriptContext& context)
     {
@@ -820,9 +828,9 @@ namespace
         // The functions, and every call of each; and what each function
         // calls, since one that reaches itself -- through others or not --
         // can never go in place: each copy would carry another call of it.
-        std::vector<LSLGlobalFunction*>                           functions;
-        std::map<LSLSymbol*, std::vector<LSLFunctionExpression*>> calls;
-        std::map<LSLSymbol*, std::set<LSLSymbol*>>                callees;
+        std::vector<LSLGlobalFunction*>                                            functions;
+        boost::unordered_flat_map<LSLSymbol*, std::vector<LSLFunctionExpression*>> calls;
+        boost::unordered_flat_map<LSLSymbol*, boost::unordered_flat_set<LSLSymbol*>> callees;
         for (LSLASTNode* node : nodesOf(script))
         {
             if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
@@ -848,26 +856,47 @@ namespace
                 }
             }
         }
+        // Whether a function reaches itself through calls, answered once
+        // per function and kept: the graph is the same all round, and
+        // walking it afresh for each was the round's own cost. Reading
+        // it never writes it, so a function with no callees is not made
+        // an entry of.
+        boost::unordered_flat_map<LSLSymbol*, bool> reaches;
+        const auto                                  callsOf = [&](LSLSymbol* sym) -> const boost::unordered_flat_set<LSLSymbol*>* {
+            const auto found = callees.find(sym);
+            return found == callees.end() ? nullptr : &found->second;
+        };
         auto recursive = [&](LSLSymbol* sym) {
-            std::set<LSLSymbol*>    seen;
-            std::vector<LSLSymbol*> stack(callees[sym].begin(), callees[sym].end());
+            if (const auto known = reaches.find(sym); known != reaches.end())
+            {
+                return known->second;
+            }
+            bool                                 itself = false;
+            boost::unordered_flat_set<LSLSymbol*> seen;
+            std::vector<LSLSymbol*>              stack;
+            if (const auto* first = callsOf(sym))
+            {
+                stack.assign(first->begin(), first->end());
+            }
             while (!stack.empty())
             {
                 LSLSymbol* at = stack.back();
                 stack.pop_back();
                 if (at == sym)
                 {
-                    return true;
+                    itself = true;
+                    break;
                 }
                 if (seen.insert(at).second)
                 {
-                    for (LSLSymbol* next : callees[at])
+                    if (const auto* next = callsOf(at))
                     {
-                        stack.push_back(next);
+                        stack.insert(stack.end(), next->begin(), next->end());
                     }
                 }
             }
-            return false;
+            reaches[sym] = itself;
+            return itself;
         };
         // What is taken this round: the stretches edited and the lines
         // dropped, which no other edit may cross.
@@ -984,6 +1013,7 @@ namespace
 // static
 ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked)
 {
+    AL_SCRIPT_ENGINE_HELD;
     Result result;
     result.text = std::string(source);
     // The map of the text as it is: each line its own.

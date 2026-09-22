@@ -36,6 +36,7 @@ target_sources(
         allslservice.h
         allsltraits.h
         alpreprocessor.h
+        alscriptengine.h
         alscriptenvelope.h
         alscriptformatter.h
         alscriptproblem.h

@@ -26,6 +26,8 @@
 
 #include "allslservice.h"
 
+#include "alscriptengine.h"
+
 #include "almessagemap.h"
 
 #include "llfile.h"
@@ -163,17 +165,6 @@ namespace
 
     // The script parsed and its symbols resolved, for a query; the
     // messages are not the point here.
-    Tailslide::LSLScript* resolved(Tailslide::ScopedScriptParser& parser, std::string_view source)
-    {
-        Tailslide::LSLScript* script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
-        if (script)
-        {
-            script->collectSymbols();
-            script->determineTypes();
-        }
-        return script;
-    }
-
     // Every node whose span holds the position, outermost first. Several
     // children of one node can: a call gives its name and its argument
     // list the whole call's span.
@@ -454,6 +445,46 @@ namespace
 struct ALLSLService::Impl
 {
     bool builtins = false;
+
+    // The script last parsed and resolved, kept: one request asks four
+    // questions of the same text -- what is wrong with it, what it
+    // declares, what every name is, what goes beside it -- and each was
+    // parsing the whole script again. The parser owns the tree, so it
+    // is kept with it.
+    std::unique_ptr<Tailslide::ScopedScriptParser> parser;
+    std::string                                    text;
+    Tailslide::LSLScript*                          script = nullptr;
+    bool                                           parsed = false;
+
+    // The tree for a text, parsed and resolved if it is not the one in
+    // hand. Null where it does not parse.
+    Tailslide::LSLScript* resolve(std::string_view source)
+    {
+        if (parser && text == source)
+        {
+            return script;
+        }
+        parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
+        text.assign(source);
+        script = parser->parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        parsed = script != nullptr && !parser->logger.getErrors();
+        if (script)
+        {
+            script->collectSymbols();
+            script->determineTypes();
+        }
+        return script;
+    }
+
+    // The tree let go of: what a check that runs the later passes over
+    // it leaves behind, since those passes change it.
+    void forget()
+    {
+        parser.reset();
+        text.clear();
+        script = nullptr;
+        parsed = false;
+    }
 };
 
 ALLSLService::ALLSLService()
@@ -465,6 +496,7 @@ ALLSLService::~ALLSLService() = default;
 
 bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
 {
+    AL_SCRIPT_ENGINE_HELD;
     // Tailslide exits the process over a file it cannot open, so the file
     // is opened here first. A line it cannot read it reports on stderr and
     // skips, which the process survives.
@@ -482,6 +514,11 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
     return true;
 }
 
+bool ALLSLService::parsed() const
+{
+    return mImpl->parsed;
+}
+
 bool ALLSLService::hasBuiltins() const
 {
     return mImpl->builtins;
@@ -495,21 +532,24 @@ bool ALLSLService::builtinsLoaded()
 
 ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
 {
+    AL_SCRIPT_ENGINE_HELD;
     // The passes in the order Tailslide's own tool runs them. The tree is
     // checked even after errors: the messages are the point here, and the
     // optimizer, which is what a broken tree would upset, is not run.
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript* script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
+    // The tree the queries will want, checked in place: the later
+    // passes change it, but only in ways the queries read -- the
+    // symbols, the types and the reference data they themselves ask
+    // for -- so the four questions of one request share one parse.
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     if (script)
     {
-        script->collectSymbols();
-        script->determineTypes();
         script->recalculateReferenceData();
         script->propagateValues();
         script->finalPass();
         script->validateGlobals(mono);
         script->checkSymbols();
     }
+    Tailslide::ScopedScriptParser& parser = *mImpl->parser;
 
     ALScriptProblems problems;
     for (Tailslide::LogMessage* message : parser.logger.getMessages())
@@ -565,8 +605,8 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
 
 std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S32 line, S32 column)
 {
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     std::vector<ALScriptCompletion> out;
     if (!script)
     {
@@ -610,8 +650,8 @@ std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S
 
 ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 {
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     ALScriptHover                 answer;
     if (!script)
     {
@@ -648,8 +688,8 @@ ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 
 ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32 column)
 {
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     ALScriptSignature             answer;
     if (!script)
     {
@@ -703,8 +743,8 @@ ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32
 
 ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S32 column)
 {
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     ALScriptReferences            answer;
     if (!script)
     {
@@ -739,8 +779,8 @@ ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S
 
 std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 {
-    Tailslide::ScopedScriptParser     parser(nullptr);
-    Tailslide::LSLScript*             script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     std::vector<ALScriptOutlineEntry> out;
     if (!script)
     {
@@ -804,8 +844,8 @@ std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 
 std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view source)
 {
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    AL_SCRIPT_ENGINE_HELD;
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     if (!script)
     {
         return {};
@@ -823,12 +863,12 @@ std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view
 
 std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source, bool parameters)
 {
+    AL_SCRIPT_ENGINE_HELD;
     if (!parameters)
     {
         return {};
     }
-    Tailslide::ScopedScriptParser parser(nullptr);
-    Tailslide::LSLScript*         script = resolved(parser, source);
+    Tailslide::LSLScript* script = mImpl->resolve(source);
     if (!script)
     {
         return {};
