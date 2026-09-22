@@ -40,6 +40,11 @@ namespace
     const boost::regex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
     const boost::regex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
     const boost::regex DEFAULT_STATE(R"(\s*default\s*\{)");
+    // A frame of a Luau traceback: the chunk, bare -- a script's name,
+    // spaces and all -- or as Lua quotes one, and its one-based line, then
+    // nothing, the function, or a colon and where -- but not the words of
+    // an error, `chunk:12: attempt to`, which is the error's own line.
+    const boost::regex STACK_FRAME(R"re(^\s*(?:\[string "([^"]*)"\]|([^:\[\]"]*[^:\[\]"\s])):([0-9]+)(?:$|\s+\S.*$|:\s+in\s.*$))re");
 
     // How a script's run-time error starts: the object, the script, and
     // the words.
@@ -108,6 +113,18 @@ namespace ALScriptMessages
     {
         const size_t n = strlen(RUNTIME_ERROR_MARKER);
         return line.size() >= n && line.compare(line.size() - n, n, RUNTIME_ERROR_MARKER) == 0;
+    }
+
+    bool readStackFrame(const std::string& line, Frame& out)
+    {
+        boost::smatch match;
+        if (!boost::regex_match(line, match, STACK_FRAME))
+        {
+            return false;
+        }
+        out.chunk = match[1].matched ? match[1].str() : match[2].str();
+        out.line  = static_cast<S32>(std::strtol(match[3].str().c_str(), nullptr, 10)) - 1;
+        return out.line >= 0;
     }
 
     bool readRuntimeLocation(const std::vector<std::string>& lines, bool lua, Location& out)

@@ -133,4 +133,62 @@ namespace tut
         // An LSL error read as Luau's is not read by it.
         ensure("the wrong VM finds nothing", !ALScriptMessages::readRuntimeLocation(lsl, true, where) || where.line != 5);
     }
+
+    template<> template<>
+    void alscriptmessages_object::test<7>()
+    {
+        set_test_name("a Luau traceback's frames, each its chunk and its line, and nothing else read as one");
+        ALScriptMessages::Frame frame;
+        ensure("a bare frame", ALScriptMessages::readStackFrame("s:7", frame));
+        ensure_equals("its chunk", frame.chunk, std::string("s"));
+        ensure_equals("its line, one off", frame.line, 6);
+        ensure("indented, with the function", ALScriptMessages::readStackFrame("  My Script:12 function counter", frame));
+        ensure_equals("a script's name, spaces and all", frame.chunk, std::string("My Script"));
+        ensure_equals("that line", frame.line, 11);
+        ensure("as Lua quotes a chunk", ALScriptMessages::readStackFrame("[string \"My Script\"]:30: in function 'tick'", frame));
+        ensure_equals("the quoted name, spaces and all", frame.chunk, std::string("My Script"));
+        ensure_equals("and its line", frame.line, 29);
+        ensure("the heading is no frame", !ALScriptMessages::readStackFrame("stack traceback:", frame));
+        ensure("nor a C function", !ALScriptMessages::readStackFrame("[C] function error", frame));
+        ensure("nor the error's own line", !ALScriptMessages::readStackFrame("s:7: attempt to index nil", frame));
+        ensure("nor words", !ALScriptMessages::readStackFrame("Math Error", frame));
+        ensure("nor a line zero", !ALScriptMessages::readStackFrame("s:0", frame));
+    }
+
+    template<> template<>
+    void alscriptmessages_object::test<8>()
+    {
+        // As the simulator's executor says a fault: the error as the VM
+        // raised it, then lua_debugtrace's frames -- the script loaded as
+        // "=lua_script", so its chunk reads `lua_script`; a C function as
+        // `[C]`; a deep stack's middle folded -- each on a line of its
+        // own (slua Executor/src/Script.cpp, VM/src/ldebug.cpp).
+        set_test_name("a SLua fault as the simulator says it: where it happened, and each frame of the script");
+        const std::vector<std::string> said = { "Object [script:Counter] Script run-time error",
+                                                "lua_script:12: attempt to index nil with 'field'",
+                                                "[C] function error",
+                                                "lua_script:12 function tick",
+                                                "... (+4 frames)",
+                                                "lua_script:30" };
+        ALScriptMessages::Header named;
+        ensure("the header", ALScriptMessages::readRuntimeHeader(said[0], named));
+        ensure_equals("names the script", named.script, std::string("Counter"));
+        ALScriptMessages::Location where;
+        ensure("where", ALScriptMessages::readRuntimeLocation(said, true, where));
+        ensure_equals("its line", where.line, 11);
+        ensure_equals("its words", where.message, std::string("attempt to index nil with 'field'"));
+        std::vector<S32> frames;
+        for (size_t i = 1; i < said.size(); ++i)
+        {
+            ALScriptMessages::Frame frame;
+            if (ALScriptMessages::readStackFrame(said[i], frame))
+            {
+                ensure_equals("the script's chunk", frame.chunk, std::string("lua_script"));
+                frames.push_back(frame.line);
+            }
+        }
+        ensure_equals("the script's two frames, and nothing else", frames.size(), size_t(2));
+        ensure_equals("the function's", frames[0], 11);
+        ensure_equals("the one that called it", frames[1], 29);
+    }
 }

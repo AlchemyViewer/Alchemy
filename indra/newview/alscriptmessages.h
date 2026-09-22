@@ -86,4 +86,16 @@ namespace ALScriptMessages
         std::string message;
     };
     bool readRuntimeLocation(const std::vector<std::string>& lines, bool lua, Location& out);
+
+    // A frame of a Luau stack as a traceback lists it -- `chunk:12`,
+    // `chunk:12 function name`, `[string "chunk"]:12: in function 'f'`
+    // -- by its chunk and its zero-based line. False for a line that is
+    // no such frame: `stack traceback:`, a C function's `[C] function
+    // error`, or the error's own words.
+    struct Frame
+    {
+        std::string chunk;
+        S32         line = -1;
+    };
+    bool readStackFrame(const std::string& line, Frame& out);
 }
