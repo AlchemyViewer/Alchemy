@@ -28,6 +28,7 @@
 #include "alscriptpreprocessor.h"
 
 #include "allslservice.h"
+#include "alscriptanalysis.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
 #include "llagent.h"
@@ -724,7 +725,9 @@ bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
 
 ALPreprocessor::Result ALScriptPreprocessor::runNow(const Request& request)
 {
-    return attempt(request, nullptr, false);
+    ALPreprocessor::Result result = attempt(request, nullptr, false);
+    alTranslateScriptProblems(result.problems);
+    return result;
 }
 
 void ALScriptPreprocessor::run(const Request& request, callback_t callback)
@@ -759,6 +762,7 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     {
         if (job->callback)
         {
+            alTranslateScriptProblems(result.problems);
             job->callback(result);
         }
         return;

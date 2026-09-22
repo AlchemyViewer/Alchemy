@@ -103,8 +103,8 @@
     <floater.string name="GutterTitle">[ATTR], layer by layer</floater.string>
     <floater.string name="GutterLayer">Layer</floater.string>
     <floater.string name="GutterSays">Says</floater.string>
-    <floater.string name="GutterWriteHere">Write here</floater.string>
-    <floater.string name="GutterListTip">Every layer of this file, and what each says about [ATTR]; a dot marks the one the merge takes. Choose a layer and press Write here to give it the value in force.</floater.string>
+    <floater.string name="GutterWriteHere">Write Here</floater.string>
+    <floater.string name="GutterListTip">Every layer of this file, and what each says about [ATTR]; a dot marks the one the merge takes. Choose a layer and press Write Here to give it the value in force.</floater.string>
     <floater.string name="GutterForceTip">A dot marks the layer whose value is in force</floater.string>
     <floater.string name="GutterLayerTip">The skin and the language the layer belongs to, in the order they are merged</floater.string>
     <floater.string name="GutterSaysTip">What this layer writes for [ATTR], or nothing where it does not write it</floater.string>
@@ -1790,7 +1790,7 @@
                                 <button
                                  follows="left|top"
                                  height="22"
-                                 label="Repair file"
+                                 label="Repair File"
                                  layout="topleft"
                                  left_pad="12"
                                  name="translate_repair_file"
@@ -1800,7 +1800,7 @@
                                 <button
                                  follows="left|top"
                                  height="22"
-                                 label="Repair language"
+                                 label="Repair Language"
                                  layout="topleft"
                                  left_pad="4"
                                  name="translate_repair_all"
@@ -1810,7 +1810,7 @@
                                 <button
                                  follows="left|top"
                                  height="22"
-                                 label="Repair roots"
+                                 label="Repair Roots"
                                  layout="topleft"
                                  left_pad="4"
                                  name="translate_repair_roots"
@@ -1820,11 +1820,11 @@
                                 <button
                                  follows="left|top"
                                  height="22"
-                                 label="Remove orphans"
+                                 label="Remove Orphans"
                                  layout="topleft"
                                  left_pad="12"
                                  name="translate_remove_orphans"
-                                 tool_tip="Take out of every file of this language each value written for something the base no longer has: an element of a lost name, an element with no name, an attribute the base's element does not carry. What the base has moved is left for Repair, and what it has at more than one path is left for you."
+                                 tool_tip="Take out of every file of this language each value written for something the base no longer has: an element of a lost name, an element with no name, an attribute the base's element does not carry. What the base has moved is left for Repair File, and what it has at more than one path is left for you."
                                  top_delta="0"
                                  width="110" />
                                 <text
@@ -2282,7 +2282,7 @@
                             <button
                              follows="top|right"
                              height="20"
-                             label="Open in editor"
+                             label="Open in Editor"
                              layout="topleft"
                              left_pad="4"
                              name="jump_btn"
@@ -2337,7 +2337,7 @@
                             <button
                              follows="left|top"
                              height="22"
-                             label="Write here"
+                             label="Write Here"
                              layout="topleft"
                              left="0"
                              name="write_override"
@@ -2350,7 +2350,7 @@
                              layout="topleft"
                              left_pad="6"
                              name="override_field"
-                             tool_tip="The field the list below is about, and what Write here writes: the value in force, into the layer chosen there"
+                             tool_tip="The field the list below is about, and what Write Here writes: the value in force, into the layer chosen there"
                              top_delta="4"
                              use_ellipses="true"
                              width="380" />

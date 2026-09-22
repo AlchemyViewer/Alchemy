@@ -298,7 +298,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         LLViewerInventoryItem* item = gInventory.getItem(ref.item);
         if (!item)
         {
-            answer.error = "no such item";
+            answer.error = LLTrans::getString("WorkspaceNoSuchItem");
             callback(answer);
             return;
         }
@@ -312,7 +312,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         answer.assetId       = item->getAssetUUID();
         if (!answer.viewable)
         {
-            answer.error = "not permitted";
+            answer.error = LLTrans::getString("WorkspaceNotPermitted");
             callback(answer);
             return;
         }
@@ -327,7 +327,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
     if (!object || !item || !object->getRegion())
     {
-        answer.error = object ? "no such item in the object" : "no such object";
+        answer.error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         callback(answer);
         return;
     }
@@ -338,7 +338,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     answer.assetId      = item->getAssetUUID();
     if (!answer.viewable)
     {
-        answer.error = "not permitted";
+        answer.error = LLTrans::getString("WorkspaceNotPermitted");
         callback(answer);
         return;
     }
@@ -359,7 +359,7 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
     }
     else if (!readAsset(asset_id, type, answer.text))
     {
-        answer.error = "the asset could not be read";
+        answer.error = LLTrans::getString("WorkspaceAssetUnreadable");
     }
     else if (type == LLAssetType::AT_NOTECARD)
     {
@@ -378,7 +378,7 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
             }
             else
             {
-                answer.error = "the notecard could not be read";
+                answer.error = LLTrans::getString("WorkspaceNotecardUnreadable");
             }
         }
     }
@@ -467,7 +467,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     auto failed = [this, ref, callback](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
         CompileResult result;
         result.ref   = ref;
-        result.error = reason.empty() ? std::string("the upload failed") : reason;
+        result.error = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
         LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
         return true;
     };
@@ -477,13 +477,13 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         LLViewerRegion* region = gAgent.getRegion();
         if (!region)
         {
-            error = "no region";
+            error = LLTrans::getString("WorkspaceNoRegion");
             return false;
         }
         const std::string url = region->getCapability("UpdateScriptAgent");
         if (url.empty())
         {
-            error = "the region cannot update scripts";
+            error = LLTrans::getString("WorkspaceRegionCannotUpdateScripts");
             return false;
         }
         LLViewerInventoryItem* item      = gInventory.getItem(ref.item);
@@ -502,13 +502,13 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     LLViewerObject* object = gObjectList.findObject(ref.object);
     if (!object || !object->getRegion())
     {
-        error = "no such object";
+        error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
     const std::string url = object->getRegion()->getCapability("UpdateScriptTask");
     if (url.empty())
     {
-        error = "the region cannot update scripts";
+        error = LLTrans::getString("WorkspaceRegionCannotUpdateScripts");
         return false;
     }
     LLInventoryItem* item      = object->getInventoryItem(ref.item);
@@ -533,7 +533,7 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     std::stringstream out;
     if (!notecard.exportStream(out))
     {
-        error = "the notecard could not be written";
+        error = LLTrans::getString("WorkspaceNotecardUnwritable");
         return false;
     }
     const std::string buffer   = out.str();
@@ -556,7 +556,7 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
         CompileResult result;
         result.ref      = ref;
         result.notecard = true;
-        result.error    = reason.empty() ? std::string("the upload failed") : reason;
+        result.error    = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
         LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
         return true;
     };
@@ -566,13 +566,13 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
         LLViewerRegion* region = gAgent.getRegion();
         if (!region)
         {
-            error = "no region";
+            error = LLTrans::getString("WorkspaceNoRegion");
             return false;
         }
         const std::string url = region->getCapability("UpdateNotecardAgentInventory");
         if (url.empty())
         {
-            error = "the region cannot update notecards";
+            error = LLTrans::getString("WorkspaceRegionCannotUpdateNotecards");
             return false;
         }
         LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
@@ -585,13 +585,13 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     LLViewerObject* object = gObjectList.findObject(ref.object);
     if (!object || !object->getRegion())
     {
-        error = "no such object";
+        error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
     const std::string url = object->getRegion()->getCapability("UpdateNotecardTaskInventory");
     if (url.empty())
     {
-        error = "the region cannot update notecards";
+        error = LLTrans::getString("WorkspaceRegionCannotUpdateNotecards");
         return false;
     }
     LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
@@ -853,18 +853,18 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
 {
     if (name.empty())
     {
-        error = "a name is needed";
+        error = LLTrans::getString("WorkspaceNameNeeded");
         return false;
     }
     LLViewerObject* prim = gObjectList.findObject(prim_id);
     if (!prim || !prim->getRegion())
     {
-        error = "no such object";
+        error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
     if (!prim->permModify())
     {
-        error = "the object may not be changed";
+        error = LLTrans::getString("WorkspaceObjectNotModifiable");
         return false;
     }
     // The region makes the item where it can; a script may still be asked
@@ -872,7 +872,7 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
     const bool cap = prim->getRegion()->isCapabilityAvailable("CreateTaskInventoryItem");
     if (notecard && !cap)
     {
-        error = "the region cannot make a notecard in an object";
+        error = LLTrans::getString("WorkspaceRegionCannotMakeNotecard");
         return false;
     }
     const LLAssetType::EType     asset_type = notecard ? LLAssetType::AT_NOTECARD : LLAssetType::AT_LSL_TEXT;
@@ -932,7 +932,7 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
 {
     if (name.empty())
     {
-        error = "a name is needed";
+        error = LLTrans::getString("WorkspaceNameNeeded");
         return false;
     }
     if (ref.inInventory())
@@ -940,7 +940,7 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
         LLViewerInventoryItem* item = gInventory.getItem(ref.item);
         if (!item)
         {
-            error = "no such item";
+            error = LLTrans::getString("WorkspaceNoSuchItem");
             return false;
         }
         if (item->getName() != name)
@@ -955,12 +955,12 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
     LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
     if (!item)
     {
-        error = object ? "no such item in the object" : "no such object";
+        error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
     if (!object->permModify())
     {
-        error = "the object may not be changed";
+        error = LLTrans::getString("WorkspaceObjectNotModifiable");
         return false;
     }
     if (item->getName() == name)
@@ -980,13 +980,13 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
         LLViewerInventoryItem* item = gInventory.getItem(ref.item);
         if (!item)
         {
-            error = "no such item";
+            error = LLTrans::getString("WorkspaceNoSuchItem");
             return false;
         }
         const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
         if (trash.isNull())
         {
-            error = "no trash folder";
+            error = LLTrans::getString("WorkspaceNoTrash");
             return false;
         }
         gInventory.changeItemParent(item, trash, false);
@@ -996,12 +996,12 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
     LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
     if (!item)
     {
-        error = object ? "no such item in the object" : "no such object";
+        error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
     if (!object->permModify())
     {
-        error = "the object may not be changed";
+        error = LLTrans::getString("WorkspaceObjectNotModifiable");
         return false;
     }
     object->removeInventory(ref.item);
@@ -1012,7 +1012,7 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
 {
     if (prims.empty())
     {
-        error = "nothing to do";
+        error = LLTrans::getString("WorkspaceNothingToDo");
         return false;
     }
     const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
@@ -1022,7 +1022,7 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
     LLFloaterScriptQueue* queue = LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));
     if (!queue)
     {
-        error = "the queue could not be opened";
+        error = LLTrans::getString("WorkspaceQueueCannotOpen");
         return false;
     }
     queue->setCompileTarget(target.empty() ? std::string("auto") : target);
@@ -1033,7 +1033,7 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
     if (!queue->start())
     {
         queue->closeFloater();
-        error = "the queue would not start";
+        error = LLTrans::getString("WorkspaceQueueWouldNotStart");
         return false;
     }
     queue->setTitle(LLTrans::getString(title));

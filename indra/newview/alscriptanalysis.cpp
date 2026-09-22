@@ -31,6 +31,8 @@
 #include "llappviewer.h"
 #include "llfile.h"
 #include "llsyntaxid.h"
+#include "alsaid.h"
+#include "lltrans.h"
 #include "threadpool.h"
 #include "workqueue.h"
 
@@ -79,7 +81,9 @@ struct ALScriptAnalysis::Worker
         const std::string source = readWhole(path);
         if (source.empty())
         {
-            luauError = "No Luau definitions at " + path;
+            // Said with a key, for the main thread to put into the
+            // viewer's language; what the engine says is said as it is.
+            luauError = "\x01AnalysisNoLuauDefinitions\x01" + path;
             return;
         }
         std::string error;
@@ -104,7 +108,7 @@ struct ALScriptAnalysis::Worker
         lslError.clear();
         if (path.empty())
         {
-            lslError = "No LSL builtins";
+            lslError = "\x01AnalysisNoLSLBuiltins\x01";
             return;
         }
         std::string error;
@@ -224,6 +228,48 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     break;
             }
         }
-        LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() { callback(result); });
+        // The words in the viewer's language, on the main thread, where
+        // the strings are.
+        LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
+            alTranslateScriptProblems(result.problems);
+            // A definitions error of this code's own carries its key
+            // between the marks, with what it is about after.
+            if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')
+            {
+                const size_t end = result.definitionsError.find('\x01', 1);
+                if (end != std::string::npos)
+                {
+                    LLStringUtil::format_map_t args;
+                    args["[PATH]"] = result.definitionsError.substr(end + 1);
+                    result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
+                }
+            }
+            callback(result);
+        });
     });
+}
+
+std::string alScriptProblemWords(const ALScriptProblem& problem)
+{
+    if (problem.key.empty())
+    {
+        return problem.message;
+    }
+    // The skin's text for the key, found once and kept; the words go in
+    // by their marks, with no map made. A key the skin lacks is marked
+    // so, and the message stays the code's own English.
+    static const std::string MISSING("\x01");
+    const std::string&       text = alSaidTemplate(problem.key, MISSING);
+    return text == MISSING ? problem.message : ALScriptProblem::fill(text, problem.args);
+}
+
+void alTranslateScriptProblems(ALScriptProblems& problems)
+{
+    for (ALScriptProblem& problem : problems)
+    {
+        if (!problem.key.empty())
+        {
+            problem.message = alScriptProblemWords(problem);
+        }
+    }
 }

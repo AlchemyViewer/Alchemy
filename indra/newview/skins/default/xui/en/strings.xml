@@ -358,6 +358,162 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="XUITreeHiddenHere">hidden here</string>
 	<string name="XUITreeDisabled">disabled</string>
 
+	<!-- The vim keymap's words, in the band under the editor's text
+	     (alvimkeymap.cpp): the modes, the questions, and what a command
+	     says of what it did or could not do. The E-numbers are vim's own,
+	     which people search for; keep them. -->
+	<string name="VimRecording">recording @[REGISTER]</string>
+	<string name="VimModeInsert">-- INSERT --</string>
+	<string name="VimModeReplace">-- REPLACE --</string>
+	<string name="VimModeVisual">-- VISUAL --</string>
+	<string name="VimModeVisualLine">-- VISUAL LINE --</string>
+	<string name="VimModeVisualBlock">-- VISUAL BLOCK --</string>
+	<string name="VimConfirmReplace">replace with [WITH] (y/n/a/q/l)?</string>
+	<string name="VimConfirmReplaceLines">replace with [WITH] (over [COUNT] lines) (y/n/a/q/l)?</string>
+	<string name="VimTooRecursive">E169: Command too recursive</string>
+	<string name="VimNoPreviousCommand">E30: No previous command line</string>
+	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
+	<string name="VimMarkNotSet">E20: Mark not set</string>
+	<string name="VimNothingInRegister">E353: Nothing in register [REGISTER]</string>
+	<string name="VimBadPattern">E486: [ERROR]</string>
+	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
+	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>
+	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
+	<string name="VimLinesYanked">[COUNT] lines yanked</string>
+	<string name="VimFewerLines">[COUNT] fewer lines</string>
+	<string name="VimLinesShiftedRight">[COUNT] lines >ed 1 time</string>
+	<string name="VimLinesShiftedLeft">[COUNT] lines &lt;ed 1 time</string>
+	<string name="VimSubstitutionsOneLine">[COUNT] substitutions on 1 line</string>
+	<string name="VimSubstitutions">[COUNT] substitutions on [LINES] lines</string>
+	<string name="VimOneMatch">1 match on 1 line</string>
+	<string name="VimMatchesOneLine">[COUNT] matches on 1 line</string>
+	<string name="VimMatches">[COUNT] matches on [LINES] lines</string>
+	<string name="VimOneLine">1 line</string>
+	<string name="VimLines">[COUNT] lines</string>
+	<string name="VimNothingSubstituted">[MESSAGE] -- nothing substituted</string>
+
+	<!-- Script Studio's own words about a script, from the alscript
+	     library: each problem carries a key and the words it is about,
+	     and the studio puts them into the string for the key, so that a
+	     language may say them its own way. Keep the [1], [2]... marks. -->
+	<!-- The preprocessor's own problems (alpreprocessor.cpp); [1], [2] are the names and words the problem is about -->
+	<string name="PreprocBadCase">cannot find ':' or '{' after case</string>
+	<string name="PreprocBadDirective">ill formed preprocessor directive '#[1]'</string>
+	<string name="PreprocBadInclude">ill formed #include directive</string>
+	<string name="PreprocBadParameters">ill formed parameter list of macro '[1]'</string>
+	<string name="PreprocBadSwitch">ill formed switch statement</string>
+	<string name="PreprocDefineNeedsName">macro name missing in #define</string>
+	<string name="PreprocDefinedNeedsClose">missing ')' after 'defined'</string>
+	<string name="PreprocDefinedNeedsName">macro name missing after 'defined'</string>
+	<string name="PreprocDefinedNotAName">'defined' cannot be used as a macro name</string>
+	<string name="PreprocDirectiveNeedsName">macro name missing in #[1]</string>
+	<string name="PreprocDivisionByZero">division by zero in preprocessor expression</string>
+	<string name="PreprocDuplicateParameter">duplicate macro parameter '[1]'</string>
+	<string name="PreprocElifAfterElse">#elif after #else</string>
+	<string name="PreprocElifWithoutIf">#elif without #if</string>
+	<string name="PreprocElseAfterElse">#else after #else</string>
+	<string name="PreprocElseWithoutIf">#else without #if</string>
+	<string name="PreprocEndifWithoutIf">#endif without #if</string>
+	<string name="PreprocExpectedClose">expected ')' in preprocessor expression</string>
+	<string name="PreprocExpectedColon">expected ':' in preprocessor expression</string>
+	<string name="PreprocExpectedValue">expected a value in preprocessor expression</string>
+	<string name="PreprocIfNeedsExpression">#if with no expression</string>
+	<string name="PreprocIfWithoutEndif">#if without #endif at the end of the file</string>
+	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>
+	<string name="PreprocIncludeNotFound">could not find include file '[1]'</string>
+	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>
+	<string name="PreprocMacroRedefined">macro '[1]' redefined</string>
+	<string name="PreprocModuleNotFound">could not find module '[1]'</string>
+	<string name="PreprocNoVariableBefore">no variable before '[1]'</string>
+	<string name="PreprocNotAnInteger">'[1]' is not an integer constant</string>
+	<string name="PreprocOutsideLoop">[1] outside a loop</string>
+	<string name="PreprocPasteAtEnd">'##' cannot be at either end of a macro body</string>
+	<string name="PreprocPastingInvalid">pasting '[1]' and '[2]' does not give a valid token</string>
+	<string name="PreprocRequireTooDeep">require nested too deeply at '[1]'</string>
+	<string name="PreprocRequiresItself">'[1]' requires itself</string>
+	<string name="PreprocReservedWordAsName">'[1]' is a name here, which break and continue reserve</string>
+	<string name="PreprocStringizeNeedsParameter">'#' is not followed by a macro parameter</string>
+	<string name="PreprocTooFewArguments">too few arguments for macro '[1]'</string>
+	<string name="PreprocTooManyArguments">too many arguments for macro '[1]'</string>
+	<string name="PreprocUndefNeedsName">macro name missing in #undef</string>
+	<string name="PreprocUnexpectedInExpression">unexpected '[1]' in preprocessor expression</string>
+	<string name="PreprocUnterminatedArguments">unterminated argument list invoking macro '[1]'</string>
+
+	<!-- The optimizer's notes on what it did (allsloptimizer.cpp) -->
+	<string name="OptimizerDoRunsOnce">a do loop whose condition is always false runs once; kept its body</string>
+	<string name="OptimizerDroppedCast">dropped the cast in [1]</string>
+	<string name="OptimizerEvaluated">evaluated [1] to [2]</string>
+	<string name="OptimizerFolded">folded [1] to [2]</string>
+	<string name="OptimizerIfAlwaysFalse">the condition of this if is always false; kept only what runs</string>
+	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
+	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>
+	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
+	<string name="OptimizerRemovedFor">removed a for loop whose condition is always false; its initialisers stay</string>
+	<string name="OptimizerRemovedFunction">removed the unused function [1]</string>
+	<string name="OptimizerRemovedGlobal">removed the unused global [1]</string>
+	<string name="OptimizerRemovedLabel">removed the label [1], which nothing jumps to</string>
+	<string name="OptimizerRemovedLocal">removed the unused local [1]</string>
+	<string name="OptimizerRemovedNoEffect">removed [1], which does nothing</string>
+	<string name="OptimizerRemovedState">removed the state [1], which nothing enters</string>
+	<string name="OptimizerRemovedUnreachable">removed [1], which can never run</string>
+	<string name="OptimizerRemovedWhile">removed a while loop whose condition is always false</string>
+	<string name="OptimizerRenamed">renamed the [1] [2] to [3]</string>
+	<string name="OptimizerSimplified">simplified [1] to [2]</string>
+	<string name="OptimizerSwappedBranches">swapped the branches of if ([1]) and dropped the !</string>
+	<string name="OptimizerTurnedEmptyBranch">turned an empty if branch around</string>
+	<string name="OptimizerWroteAs">wrote [1] as [2]</string>
+
+	<!-- The inliner's notes (allslinliner.cpp) -->
+	<string name="InlinerPutExpression">put what the function [1] returns in place of a call</string>
+	<string name="InlinerPutExpressionOnce">put what the function [1] returns in place of its one call</string>
+	<string name="InlinerPutFunction">put the function [1] in place of a call</string>
+	<string name="InlinerPutFunctionOnce">put the function [1] in place of its one call</string>
+
+	<!-- What the studio says in place of Luau's own words (alluauservice.cpp) -->
+	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
+	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
+
+	<!-- What the script workspace says when a load, a save or a queue
+	     cannot go ahead (alscriptworkspace.cpp), and the analyzers when
+	     their definitions are missing (alscriptanalysis.cpp) -->
+	<string name="WorkspaceNoSuchItem">no such item</string>
+	<string name="WorkspaceNotPermitted">not permitted</string>
+	<string name="WorkspaceNoSuchItemInObject">no such item in the object</string>
+	<string name="WorkspaceNoSuchObject">no such object</string>
+	<string name="WorkspaceAssetUnreadable">the asset could not be read</string>
+	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
+	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>
+	<string name="WorkspaceUploadFailed">the upload failed</string>
+	<string name="WorkspaceNoRegion">no region</string>
+	<string name="WorkspaceRegionCannotUpdateScripts">the region cannot update scripts</string>
+	<string name="WorkspaceRegionCannotUpdateNotecards">the region cannot update notecards</string>
+	<string name="WorkspaceRegionCannotMakeNotecard">the region cannot make a notecard in an object</string>
+	<string name="WorkspaceNameNeeded">a name is needed</string>
+	<string name="WorkspaceObjectNotModifiable">the object may not be changed</string>
+	<string name="WorkspaceNoTrash">no trash folder</string>
+	<string name="WorkspaceNothingToDo">nothing to do</string>
+	<string name="WorkspaceQueueCannotOpen">the queue could not be opened</string>
+	<string name="WorkspaceQueueWouldNotStart">the queue would not start</string>
+	<string name="AnalysisNoLuauDefinitions">No Luau definitions at [PATH]</string>
+	<string name="AnalysisNoLSLBuiltins">No LSL builtins</string>
+
+	<!-- Why an edit of a XUI file could not be made (alxuiedit.cpp), in
+	     XUI Studio's status line -->
+	<string name="XUIEditNoFile">no file to write</string>
+	<string name="XUIEditCannotOpen">could not open [PATH]</string>
+	<string name="XUIEditCannotWrite">could not write [PATH]</string>
+	<string name="XUIEditNoElement">no element at that path</string>
+	<string name="XUIEditCannotRead">could not read the element</string>
+	<string name="XUIEditTextAroundChildren">the text of [NAME] is written around its children</string>
+	<string name="XUIEditMoveIntoItself">an element cannot be moved into itself</string>
+	<string name="XUIEditMoveBesideItself">an element cannot be moved beside itself</string>
+	<string name="XUIEditRootNotCopied">the root is not a thing to copy</string>
+	<string name="XUIEditNoPlaceFor">could not find where [NAME] would go</string>
+	<string name="XUIEditNotCarried">the element does not carry [NAME]</string>
+	<string name="XUIEditAlreadyCarries">the element already carries [NAME]</string>
+	<string name="XUIEditSameName">that is the name it has</string>
+	<string name="XUIEditWouldCrossEdge">[NAME] would cross the edge it is measured from, which moves the element to the other side of its parent rather than by [COUNT] pixels</string>
+
 	<!-- ToolTips for notecards -->
 	<string name="TooltipNotecardNotAllowedTypeDrop">
 Items of this type can't be attached

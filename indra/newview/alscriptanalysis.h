@@ -51,6 +51,14 @@ namespace LL
 // Tailslide's builtins are a table the library holds once for the whole
 // process and adds to rather than replaces, so the LSL builtins are loaded
 // once; the Luau definitions are read again when the region's change.
+// A problem's words in the viewer's language: where the problem carries a
+// key -- one of this code's own messages -- the skin's string for the
+// key with the problem's words put in for [1], [2] and so on, else the
+// message as the engine said it. And every problem of a list put into
+// them, where they come off the analyzers and the preprocessor.
+std::string alScriptProblemWords(const ALScriptProblem& problem);
+void        alTranslateScriptProblems(ALScriptProblems& problems);
+
 class ALScriptAnalysis : public LLSingleton<ALScriptAnalysis>
 {
     LLSINGLETON(ALScriptAnalysis);
