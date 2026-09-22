@@ -807,5 +807,18 @@ namespace tut
         ensure_equals("\\_s reaches the next line, and the two lines are one", flat(e.text()), std::string("one joined four|five|"));
         keys(":%s/four\\n//<CR>");
         ensure_equals("\\n taken out joins the lines", flat(e.text()), std::string("one joined five|"));
+        // An asking :s under :g asks once, over every line's matches in
+        // order, after the :g has been through them.
+        e.setText("a x\nb\na y\na z\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys(":g/^a/s/a/A/c<CR>");
+        ensure("asking after the g", vim->mode() == ALVimKeymap::Mode::Confirm);
+        ensure_equals("three to ask about", e.highlights().size(), size_t(3));
+        ensure("the first line's first", e.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+        keys("yny");
+        ensure_equals("the first and the third said yes to", flat(e.text()), std::string("A x|b|a y|A z|"));
+        ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
+        keys("u");
+        ensure_equals("one step to undo for the lot", flat(e.text()), std::string("a x|b|a y|a z|"));
     }
 }

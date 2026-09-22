@@ -3794,8 +3794,11 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         say(std::to_string(lines.size()) + " line" + (lines.size() == 1 ? "" : "s"));
         return true;
     }
-    // One step to undo for the lot.
+    // One step to undo for the lot; an asking :s among the commands
+    // gathers its edits here and the asking runs once, in order, after.
     view.undoJournal().beginGroup();
+    mConfirming           = Confirming();
+    mConfirming.gathering = true;
     for (auto it = lines.rbegin(); it != lines.rend(); ++it)
     {
         const S32 line = *it;
@@ -3809,6 +3812,17 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
             break;
         }
     }
+    mConfirming.gathering = false;
+    if (!mConfirming.edits.empty() && !mMessageError)
+    {
+        // The group stays open for the asking to close.
+        std::sort(mConfirming.edits.begin(), mConfirming.edits.end(),
+                  [](const std::pair<ALTextRange, std::string>& a, const std::pair<ALTextRange, std::string>& b) { return a.first.begin < b.first.begin; });
+        mMode = Mode::Confirm;
+        askNext(view);
+        return false;
+    }
+    mConfirming = Confirming();
     view.undoJournal().endGroup();
     return !mMessageError;
 }
@@ -4648,6 +4662,15 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     }
     if (asking && !view.isReadOnly())
     {
+        if (mConfirming.gathering)
+        {
+            // A :g's line: the edits kept for the asking after the :g.
+            for (auto& edit : edits)
+            {
+                mConfirming.edits.push_back(std::move(edit));
+            }
+            return false;
+        }
         // Each match asked about in turn; the command finishes when the
         // asking ends, so nothing is done here.
         mConfirming       = Confirming();

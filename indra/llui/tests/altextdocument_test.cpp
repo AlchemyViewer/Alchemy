@@ -150,6 +150,13 @@ namespace tut
         ensure("the empty line", doc.posAt(3) == ALTextPos(1, 0));
         ensure("a break's own offset is the line end before it", doc.posAt(2) == ALTextPos(0, 2));
         ensure("past everything is the end", doc.posAt(99) == doc.end());
+        // The whole text is kept between edits and follows them.
+        ensure_equals("the whole", doc.wholeText(), std::string("ab\n\ncde"));
+        ensure("the line starts", doc.lineStarts() == std::vector<size_t>({ 0, 3, 4 }));
+        doc.insert(ALTextPos(0, 2), "X\nY");
+        ensure_equals("the whole after an edit", doc.wholeText(), std::string("abX\nY\n\ncde"));
+        ensure("the starts after it", doc.lineStarts() == std::vector<size_t>({ 0, 4, 6, 7 }));
+        ensure("and the offsets", doc.offsetOf(ALTextPos(3, 1)) == 8 && doc.posAt(8) == ALTextPos(3, 1));
     }
 
     template<> template<>

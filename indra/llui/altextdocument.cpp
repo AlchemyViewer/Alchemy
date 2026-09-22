@@ -206,6 +206,34 @@ std::string ALTextDocument::text() const
     return joinLines(mLines);
 }
 
+const std::string& ALTextDocument::wholeText() const
+{
+    if (!mWholeValid || mWholeVersion != mVersion)
+    {
+        mWhole.clear();
+        mLineStarts.clear();
+        mLineStarts.reserve(mLines.size());
+        for (size_t l = 0; l < mLines.size(); ++l)
+        {
+            if (l > 0)
+            {
+                mWhole += '\n';
+            }
+            mLineStarts.push_back(mWhole.size());
+            mWhole += mLines[l];
+        }
+        mWholeVersion = mVersion;
+        mWholeValid   = true;
+    }
+    return mWhole;
+}
+
+const std::vector<size_t>& ALTextDocument::lineStarts() const
+{
+    wholeText();
+    return mLineStarts;
+}
+
 std::string ALTextDocument::text(const ALTextRange& range_in) const
 {
     const ALTextRange range = clampBytes(range_in.normalised());
@@ -394,27 +422,20 @@ ALTextRange ALTextDocument::wordAt(ALTextPos pos) const
 
 size_t ALTextDocument::offsetOf(ALTextPos pos) const
 {
-    pos           = clampBytes(pos);
-    size_t offset = 0;
-    for (S32 l = 0; l < pos.line; ++l)
-    {
-        offset += mLines[l].size() + 1;
-    }
-    return offset + pos.column;
+    pos = clampBytes(pos);
+    return lineStarts()[static_cast<size_t>(pos.line)] + static_cast<size_t>(pos.column);
 }
 
 ALTextPos ALTextDocument::posAt(size_t offset) const
 {
-    for (S32 l = 0; l < lineCount(); ++l)
+    const std::vector<size_t>& starts = lineStarts();
+    if (offset >= mWhole.size())
     {
-        const size_t length = mLines[l].size();
-        if (offset <= length)
-        {
-            return ALTextPos(l, static_cast<S32>(offset));
-        }
-        offset -= length + 1;
+        return end();
     }
-    return end();
+    const auto after = std::upper_bound(starts.begin(), starts.end(), offset);
+    const S32  line  = static_cast<S32>(after - starts.begin()) - 1;
+    return ALTextPos(line, static_cast<S32>(offset - starts[static_cast<size_t>(line)]));
 }
 
 S32 ALTextDocument::displayColumn(ALTextPos pos, S32 tab_width) const

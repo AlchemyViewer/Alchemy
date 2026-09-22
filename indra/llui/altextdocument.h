@@ -128,6 +128,11 @@ public:
     Edit        setText(std::string_view text);
     std::string text() const;
     std::string text(const ALTextRange& range) const;
+    // The whole text kept from one asking to the next while nothing
+    // changes, for whoever reads it whole often -- a search that may
+    // cross lines, say -- with where each line starts in it.
+    const std::string&         wholeText() const;
+    const std::vector<size_t>& lineStarts() const;
 
     S32                lineCount() const { return static_cast<S32>(mLines.size()); }
     const std::string& line(S32 index) const;
@@ -215,4 +220,10 @@ private:
     std::vector<std::string> mLines;
     U32                      mVersion = 0;
     changed_signal_t         mChanged;
+    // The whole text and its line starts as of a version; good while
+    // the version is the current one.
+    mutable std::string         mWhole;
+    mutable std::vector<size_t> mLineStarts;
+    mutable U32                 mWholeVersion = 0;
+    mutable bool                mWholeValid   = false;
 };

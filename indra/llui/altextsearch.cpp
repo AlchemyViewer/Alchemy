@@ -234,26 +234,18 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     const S32 last  = llmin(within.end.line, doc.lineCount() - 1);
     if (options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos))
     {
-        // The scope's lines as one text, whole, so that a line's start
-        // is a start and the search runs from the scope's own start.
-        std::string      text;
-        std::vector<S32> starts;
-        for (S32 line = first; line <= last; ++line)
-        {
-            if (line > first)
-            {
-                text += '\n';
-            }
-            starts.push_back(static_cast<S32>(text.size()));
-            text += doc.line(line);
-        }
-        auto posOf = [&](S32 offset) {
-            const auto after = std::upper_bound(starts.begin(), starts.end(), offset);
-            const S32  index = static_cast<S32>(after - starts.begin()) - 1;
-            return ALTextPos(first + index, offset - starts[static_cast<size_t>(index)]);
+        // The whole text, which the document keeps between edits, searched
+        // between the scope's ends; a line's start is a start, and what
+        // stands before the scope is there for a look behind.
+        const std::string&         text   = doc.wholeText();
+        const std::vector<size_t>& starts = doc.lineStarts();
+        auto                       posOf  = [&](S32 offset) {
+            const auto after = std::upper_bound(starts.begin(), starts.end(), static_cast<size_t>(offset));
+            const S32  line  = static_cast<S32>(after - starts.begin()) - 1;
+            return ALTextPos(line, offset - static_cast<S32>(starts[static_cast<size_t>(line)]));
         };
-        const S32 from = llclamp(within.begin.column, 0, doc.lineLength(first));
-        const S32 to   = starts.back() + llclamp(within.end.column, 0, doc.lineLength(last));
+        const S32 from = static_cast<S32>(starts[static_cast<size_t>(first)]) + llclamp(within.begin.column, 0, doc.lineLength(first));
+        const S32 to   = static_cast<S32>(starts[static_cast<size_t>(last)]) + llclamp(within.end.column, 0, doc.lineLength(last));
         searchIn(text, from, to, posOf);
         return out;
     }

@@ -266,6 +266,10 @@ private:
         S32                                              made    = 0;
         S32                                              lines   = 0;
         S32                                              lastLine = -1;
+        // While a :g runs its command over the lines, an asking :s puts
+        // its edits here and asks nothing; the asking starts, over the
+        // lot in order, once the :g is through.
+        bool                                             gathering = false;
     };
     Confirming mConfirming;
     bool       confirmKey(ALTextView& view, const Input& input);
