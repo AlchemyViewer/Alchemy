@@ -723,6 +723,9 @@ namespace
         bool usedLazyLists() const { return mUsedLazyLists; }
         bool usedExtensions() const { return mUsedExtensions; }
         void problem(ALScriptProblem::Severity severity, const std::string& message, const Token& at);
+        // The same with a key a translation may be found under, and the
+        // words -- [1], [2] ... in the text -- it is built from.
+        void problem(ALScriptProblem::Severity severity, const char* key, std::string_view text, std::vector<std::string> args, const Token& at);
 
         // A macro of the run's own: `NAME body` or `NAME(params) body` as
         // a define line would have it, or one whose value is where it
@@ -796,6 +799,13 @@ namespace
         mResult.problems.push_back(p);
     }
 
+    void Engine::problem(ALScriptProblem::Severity severity, const char* key, std::string_view text, std::vector<std::string> args, const Token& at)
+    {
+        problem(severity, ALScriptProblem::fill(text, args), at);
+        mResult.problems.back().key  = key;
+        mResult.problems.back().args = std::move(args);
+    }
+
     void Engine::predefine(const std::string& definition)
     {
         const Tokens line = Lexer(mOptions.lua, 0).run(definition);
@@ -832,7 +842,7 @@ namespace
             Token at;
             at.file = f.index;
             at.line = f.tokens.empty() ? 0 : f.tokens.back().line;
-            problem(ALScriptProblem::Severity::Error, "#if without #endif at the end of the file", at);
+            problem(ALScriptProblem::Severity::Error, "PreprocIfWithoutEndif", "#if without #endif at the end of the file", {}, at);
         }
         mFiles.pop_back();
     }
@@ -1071,7 +1081,7 @@ namespace
         }
         if (!closed)
         {
-            problem(ALScriptProblem::Severity::Error, "unterminated argument list invoking macro '" + m.name + "'", t);
+            problem(ALScriptProblem::Severity::Error, "PreprocUnterminatedArguments", "unterminated argument list invoking macro '[1]'", { m.name }, t);
             emit(t);
             for (const Token& r : read)
             {
@@ -1102,8 +1112,8 @@ namespace
         }
         if (args.size() != m.params.size())
         {
-            problem(ALScriptProblem::Severity::Error,
-                    (args.size() < m.params.size() ? "too few arguments for macro '" : "too many arguments for macro '") + m.name + "'", t);
+            problem(ALScriptProblem::Severity::Error, args.size() < m.params.size() ? "PreprocTooFewArguments" : "PreprocTooManyArguments",
+                    args.size() < m.params.size() ? "too few arguments for macro '[1]'" : "too many arguments for macro '[1]'", { m.name }, t);
             emit(t);
             for (const Token& r : read)
             {
@@ -1175,7 +1185,7 @@ namespace
         Tokens lexed = Lexer(mOptions.lua, site.file).run(left.text + right.text);
         if (lexed.size() != 1 || lexed[0].blank())
         {
-            problem(ALScriptProblem::Severity::Error, "pasting '" + left.text + "' and '" + right.text + "' does not give a valid token", site);
+            problem(ALScriptProblem::Severity::Error, "PreprocPastingInvalid", "pasting '[1]' and '[2]' does not give a valid token", { left.text, right.text }, site);
             return false;
         }
         out          = lexed[0];
@@ -1427,23 +1437,23 @@ namespace
             mOk = true;
             if (!peek())
             {
-                fail("#if with no expression");
+                fail("PreprocIfNeedsExpression", "#if with no expression");
             }
             S64 v = ternary();
             if (mOk && peek())
             {
-                fail("unexpected '" + peek()->text + "' in preprocessor expression");
+                fail("PreprocUnexpectedInExpression", "unexpected '[1]' in preprocessor expression", { peek()->text });
             }
             ok = mOk;
             return mOk ? v : 0;
         }
 
     private:
-        void fail(const std::string& message)
+        void fail(const char* key, std::string_view text, std::vector<std::string> args = {})
         {
             if (mOk)
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, message, mAt);
+                mEngine.problem(ALScriptProblem::Severity::Error, key, text, std::move(args), mAt);
             }
             mOk = false;
         }
@@ -1473,7 +1483,7 @@ namespace
                 S64 a = ternary();
                 if (!accept(":"))
                 {
-                    fail("expected ':' in preprocessor expression");
+                    fail("PreprocExpectedColon", "expected ':' in preprocessor expression");
                 }
                 S64 b = ternary();
                 return c ? a : b;
@@ -1546,7 +1556,7 @@ namespace
             {
                 if (b == 0)
                 {
-                    fail("division by zero in preprocessor expression");
+                    fail("PreprocDivisionByZero", "division by zero in preprocessor expression");
                     return 0;
                 }
                 if (a == std::numeric_limits<S64>::min() && b == -1)
@@ -1572,7 +1582,7 @@ namespace
             const Token* t = peek();
             if (!t)
             {
-                fail("expected a value in preprocessor expression");
+                fail("PreprocExpectedValue", "expected a value in preprocessor expression");
                 return 0;
             }
             if (t->kind == Kind::Number)
@@ -1582,7 +1592,7 @@ namespace
                 S64  v  = parseInteger(t->text, ok);
                 if (!ok)
                 {
-                    fail("'" + t->text + "' is not an integer constant");
+                    fail("PreprocNotAnInteger", "'[1]' is not an integer constant", { t->text });
                 }
                 return v;
             }
@@ -1596,11 +1606,11 @@ namespace
                 S64 v = ternary();
                 if (!accept(")"))
                 {
-                    fail("expected ')' in preprocessor expression");
+                    fail("PreprocExpectedClose", "expected ')' in preprocessor expression");
                 }
                 return v;
             }
-            fail("unexpected '" + t->text + "' in preprocessor expression");
+            fail("PreprocUnexpectedInExpression", "unexpected '[1]' in preprocessor expression", { t->text });
             return 0;
         }
 
@@ -1635,7 +1645,7 @@ namespace
                 }
                 if (j >= line.size() || line[j].kind != Kind::Ident)
                 {
-                    problem(ALScriptProblem::Severity::Error, "macro name missing after 'defined'", hash);
+                    problem(ALScriptProblem::Severity::Error, "PreprocDefinedNeedsName", "macro name missing after 'defined'", {}, hash);
                     return false;
                 }
                 size_t k = j;
@@ -1644,7 +1654,7 @@ namespace
                     k = skipBlank(line, j + 1);
                     if (k >= line.size() || !line[k].is(Kind::Punct, ")"))
                     {
-                        problem(ALScriptProblem::Severity::Error, "missing ')' after 'defined'", hash);
+                        problem(ALScriptProblem::Severity::Error, "PreprocDefinedNeedsClose", "missing ')' after 'defined'", {}, hash);
                         return false;
                     }
                 }
@@ -1666,14 +1676,14 @@ namespace
     {
         if (at >= line.size() || line[at].kind != Kind::Ident)
         {
-            problem(ALScriptProblem::Severity::Error, "macro name missing in #define", hash);
+            problem(ALScriptProblem::Severity::Error, "PreprocDefineNeedsName", "macro name missing in #define", {}, hash);
             return;
         }
         Macro m;
         m.name = line[at].text;
         if (m.name == "defined")
         {
-            problem(ALScriptProblem::Severity::Error, "'defined' cannot be used as a macro name", line[at]);
+            problem(ALScriptProblem::Severity::Error, "PreprocDefinedNotAName", "'defined' cannot be used as a macro name", {}, line[at]);
             return;
         }
         size_t i = at + 1;
@@ -1711,7 +1721,7 @@ namespace
                     }
                     if (std::find(m.params.begin(), m.params.end(), line[i].text) != m.params.end())
                     {
-                        problem(ALScriptProblem::Severity::Error, "duplicate macro parameter '" + line[i].text + "'", line[i]);
+                        problem(ALScriptProblem::Severity::Error, "PreprocDuplicateParameter", "duplicate macro parameter '[1]'", { line[i].text }, line[i]);
                         return;
                     }
                     m.params.push_back(line[i].text);
@@ -1732,7 +1742,7 @@ namespace
             }
             if (!ok)
             {
-                problem(ALScriptProblem::Severity::Error, "ill formed parameter list of macro '" + m.name + "'", line[at]);
+                problem(ALScriptProblem::Severity::Error, "PreprocBadParameters", "ill formed parameter list of macro '[1]'", { m.name }, line[at]);
                 return;
             }
         }
@@ -1759,7 +1769,7 @@ namespace
         }
         if (!m.body.empty() && (m.body.front().is(Kind::Punct, "##") || m.body.back().is(Kind::Punct, "##")))
         {
-            problem(ALScriptProblem::Severity::Error, "'##' cannot be at either end of a macro body", line[at]);
+            problem(ALScriptProblem::Severity::Error, "PreprocPasteAtEnd", "'##' cannot be at either end of a macro body", {}, line[at]);
             return;
         }
         if (m.functionLike)
@@ -1771,7 +1781,7 @@ namespace
                     const size_t j = skipBlank(m.body, k + 1);
                     if (j >= m.body.size() || paramIndex(m, m.body[j]) < 0)
                     {
-                        problem(ALScriptProblem::Severity::Error, "'#' is not followed by a macro parameter", line[at]);
+                        problem(ALScriptProblem::Severity::Error, "PreprocStringizeNeedsParameter", "'#' is not followed by a macro parameter", {}, line[at]);
                         return;
                     }
                 }
@@ -1780,7 +1790,7 @@ namespace
         auto it = mMacros.find(m.name);
         if (it != mMacros.end() && it->second.dynamic == Macro::Dynamic::None && !it->second.sameAs(m))
         {
-            problem(ALScriptProblem::Severity::Warning, "macro '" + m.name + "' redefined", line[at]);
+            problem(ALScriptProblem::Severity::Warning, "PreprocMacroRedefined", "macro '[1]' redefined", { m.name }, line[at]);
         }
         if (m.name == "USE_SWITCHES")
         {
@@ -1822,20 +1832,20 @@ namespace
             }
             if (j >= rest.size())
             {
-                problem(ALScriptProblem::Severity::Error, "missing '>' in #include", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocIncludeNeedsClose", "missing '>' in #include", {}, hash);
                 return;
             }
             ask.name = trim(ask.name);
         }
         else
         {
-            problem(ALScriptProblem::Severity::Error, "ill formed #include directive", hash);
+            problem(ALScriptProblem::Severity::Error, "PreprocBadInclude", "ill formed #include directive", {}, hash);
             return;
         }
         ask.from = mFiles.back()->path;
         if (S32(mFiles.size()) > mOptions.includeDepth)
         {
-            problem(ALScriptProblem::Severity::Error, "#include nested too deeply at '" + ask.name + "'", hash);
+            problem(ALScriptProblem::Severity::Error, "PreprocIncludeTooDeep", "#include nested too deeply at '[1]'", { ask.name }, hash);
             return;
         }
         ALPreprocessor::Include found;
@@ -1849,7 +1859,7 @@ namespace
                 }
                 return;
             case ALPreprocessor::Found::No:
-                problem(ALScriptProblem::Severity::Error, "could not find include file '" + ask.name + "'", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocIncludeNotFound", "could not find include file '[1]'", { ask.name }, hash);
                 return;
             case ALPreprocessor::Found::Yes:
                 break;
@@ -1906,7 +1916,7 @@ namespace
             {
                 if (after >= line.size() || line[after].kind != Kind::Ident)
                 {
-                    problem(ALScriptProblem::Severity::Error, "macro name missing in #" + name, hash);
+                    problem(ALScriptProblem::Severity::Error, "PreprocDirectiveNeedsName", "macro name missing in #[1]", { name }, hash);
                 }
                 else
                 {
@@ -1921,13 +1931,13 @@ namespace
         {
             if (f.conds.empty())
             {
-                problem(ALScriptProblem::Severity::Error, "#elif without #if", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocElifWithoutIf", "#elif without #if", {}, hash);
                 return;
             }
             Cond& c = f.conds.back();
             if (c.seenElse)
             {
-                problem(ALScriptProblem::Severity::Error, "#elif after #else", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocElifAfterElse", "#elif after #else", {}, hash);
             }
             if (c.taken || !parentActive())
             {
@@ -1944,13 +1954,13 @@ namespace
         {
             if (f.conds.empty())
             {
-                problem(ALScriptProblem::Severity::Error, "#else without #if", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocElseWithoutIf", "#else without #if", {}, hash);
                 return;
             }
             Cond& c = f.conds.back();
             if (c.seenElse)
             {
-                problem(ALScriptProblem::Severity::Error, "#else after #else", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocElseAfterElse", "#else after #else", {}, hash);
             }
             c.active   = !c.taken && parentActive();
             c.taken    = true;
@@ -1961,7 +1971,7 @@ namespace
         {
             if (f.conds.empty())
             {
-                problem(ALScriptProblem::Severity::Error, "#endif without #if", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocEndifWithoutIf", "#endif without #if", {}, hash);
                 return;
             }
             f.conds.pop_back();
@@ -1979,7 +1989,7 @@ namespace
         {
             if (after >= line.size() || line[after].kind != Kind::Ident)
             {
-                problem(ALScriptProblem::Severity::Error, "macro name missing in #undef", hash);
+                problem(ALScriptProblem::Severity::Error, "PreprocUndefNeedsName", "macro name missing in #undef", {}, hash);
                 return;
             }
             mMacros.erase(line[after].text);
@@ -2014,7 +2024,7 @@ namespace
         }
         else
         {
-            problem(ALScriptProblem::Severity::Error, "ill formed preprocessor directive '#" + (name.empty() ? line[i].text : name) + "'", hash);
+            problem(ALScriptProblem::Severity::Error, "PreprocBadDirective", "ill formed preprocessor directive '#[1]'", { name.empty() ? line[i].text : name }, hash);
         }
     }
 
@@ -2229,7 +2239,7 @@ namespace
                 }
                 if (lhs_begin == back)
                 {
-                    mEngine.problem(ALScriptProblem::Severity::Error, std::string("no variable before '") + op + "'", t);
+                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocNoVariableBefore", "no variable before '[1]'", { op }, t);
                     out.push_back(t);
                     continue;
                 }
@@ -2432,7 +2442,7 @@ namespace
                     const bool   ends_well  = after_word < to && (in[after_word].is(Kind::Punct, ";") || in[after_word].kind == Kind::Number);
                     if (!statement_position || !ends_well)
                     {
-                        mEngine.problem(ALScriptProblem::Severity::Error, "'" + t.text + "' is a name here, which break and continue reserve", t);
+                        mEngine.problem(ALScriptProblem::Severity::Error, "PreprocReservedWordAsName", "'[1]' is a name here, which break and continue reserve", { t.text }, t);
                         out.push_back(t);
                         ++i;
                         continue;
@@ -2466,7 +2476,7 @@ namespace
                             }
                             if (!target)
                             {
-                                mEngine.problem(ALScriptProblem::Severity::Error, std::string(is_break ? "break" : "continue") + " outside a loop", t);
+                                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocOutsideLoop", "[1] outside a loop", { is_break ? "break" : "continue" }, t);
                             }
                         }
                         if (target)
@@ -2638,7 +2648,7 @@ namespace
                             }
                         }
                     }
-                    mEngine.problem(ALScriptProblem::Severity::Error, "ill formed switch statement", in[i]);
+                    mEngine.problem(ALScriptProblem::Severity::Error, "PreprocBadSwitch", "ill formed switch statement", {}, in[i]);
                 }
                 out.push_back(in[i]);
                 ++i;
@@ -2678,7 +2688,7 @@ namespace
                     }
                     if (e >= body.size())
                     {
-                        mEngine.problem(ALScriptProblem::Severity::Error, "cannot find ':' or '{' after case", t);
+                        mEngine.problem(ALScriptProblem::Severity::Error, "PreprocBadCase", "cannot find ':' or '{' after case", {}, t);
                         inner.push_back(t);
                         continue;
                     }
@@ -3142,7 +3152,7 @@ namespace
             }
             if (answer == ALPreprocessor::Found::No)
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "could not find module '" + name + "'", at);
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocModuleNotFound", "could not find module '[1]'", { name }, at);
                 return false;
             }
             key = found.path.empty() ? name : found.path;
@@ -3152,12 +3162,12 @@ namespace
             }
             if (mInProgress.count(key))
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "'" + name + "' requires itself", at);
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocRequiresItself", "'[1]' requires itself", { name }, at);
                 return true;
             }
             if (S32(mInProgress.size()) >= mOptions.includeDepth)
             {
-                mEngine.problem(ALScriptProblem::Severity::Error, "require nested too deeply at '" + name + "'", at);
+                mEngine.problem(ALScriptProblem::Severity::Error, "PreprocRequireTooDeep", "require nested too deeply at '[1]'", { name }, at);
                 return false;
             }
             if (std::find(mResult.includes.begin(), mResult.includes.end(), key) == mResult.includes.end())

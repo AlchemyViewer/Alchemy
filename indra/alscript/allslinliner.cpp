@@ -338,7 +338,7 @@ namespace
         return context.builtins && context.builtins->lookup(name.c_str(), SYM_ANY);
     }
 
-    ALScriptProblem noteAt(LSLASTNode* at, const std::string& message)
+    ALScriptProblem noteAt(LSLASTNode* at, const char* key, std::string_view text, std::vector<std::string> args)
     {
         ALScriptProblem p;
         p.severity = ALScriptProblem::Severity::Note;
@@ -349,7 +349,9 @@ namespace
         p.column    = b.column;
         p.endLine   = e.line;
         p.endColumn = e.column;
-        p.message   = message;
+        p.message   = ALScriptProblem::fill(text, args);
+        p.key       = key;
+        p.args      = std::move(args);
         return p;
     }
 
@@ -575,7 +577,8 @@ namespace
             }
             block.push_back(std::move(closing));
             out.edit     = Edit{ beginOf(statement), endOf(statement), std::move(block) };
-            out.note     = noteAt(statement, std::string("put the function ") + sym->getName() + (last ? " in place of its one call" : " in place of a call"));
+            out.note     = noteAt(statement, last ? "InlinerPutFunctionOnce" : "InlinerPutFunction",
+                                  last ? "put the function [1] in place of its one call" : "put the function [1] in place of a call", { sym->getName() });
             out.callLine = beginOf(statement).line;
             return true;
         }
@@ -786,7 +789,8 @@ namespace
             block.back().push_back(Piece{ ")", endOf(call), false });
             out.edit     = Edit{ beginOf(call), endOf(call), std::move(block) };
             out.before   = std::move(before);
-            out.note     = noteAt(call, std::string("put what the function ") + sym->getName() + (last ? " returns in place of its one call" : " returns in place of a call"));
+            out.note     = noteAt(call, last ? "InlinerPutExpressionOnce" : "InlinerPutExpression",
+                                  last ? "put what the function [1] returns in place of its one call" : "put what the function [1] returns in place of a call", { sym->getName() });
             out.callLine = beginOf(call).line;
             return true;
         }

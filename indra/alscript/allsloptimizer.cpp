@@ -31,6 +31,7 @@
 #include "allslservice.h"
 #include "allsltraits.h"
 #include "llmath.h"
+#include "llstl.h"
 #include "llquaternion.h"
 #include "v3math.h"
 
@@ -40,12 +41,13 @@
 #include <tailslide/passes/values.hh>
 #include <tailslide/visitor.hh>
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <functional>
 #include <set>
-#include <unordered_map>
 
 namespace
 {
@@ -124,7 +126,9 @@ namespace
     public:
         explicit Report(ALScriptProblems& problems) : mProblems(problems) {}
 
-        void note(const Tailslide::YYLTYPE* loc, const std::string& message)
+        // A note with a key a translation may be found under, and the
+        // words -- [1], [2] ... in the text -- it is built from.
+        void note(const Tailslide::YYLTYPE* loc, const char* key, std::string_view text, std::vector<std::string> args = {})
         {
             ALScriptProblem p;
             p.severity = ALScriptProblem::Severity::Note;
@@ -136,7 +140,9 @@ namespace
                 p.endLine   = zeroBased(loc->last_line);
                 p.endColumn = std::max(0, loc->last_column);
             }
-            p.message = message;
+            p.message = ALScriptProblem::fill(text, args);
+            p.key     = key;
+            p.args    = std::move(args);
             mProblems.push_back(std::move(p));
         }
 
@@ -1146,9 +1152,9 @@ namespace
 
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
 
-    const std::unordered_map<std::string, Evaluator>& evaluators()
+    const boost::unordered_flat_map<std::string, Evaluator, ll::string_hash, std::equal_to<>>& evaluators()
     {
-        static const std::unordered_map<std::string, Evaluator> table = {
+        static const boost::unordered_flat_map<std::string, Evaluator, ll::string_hash, std::equal_to<>> table = {
             { "llAbs",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   int v;
@@ -1934,14 +1940,14 @@ namespace
             }
         }
 
-        void fold(LSLASTNode* node, LSLConstant* cv, const char* what)
+        void fold(LSLASTNode* node, LSLConstant* cv, const char* key, const char* what)
         {
             const std::string was = render(node);
             LSLConstantExpression* expr = constant(cv, node);
             const std::string      now  = render(expr);
             if (was != now)
             {
-                report.note(node->getLoc(), std::string(what) + " " + was + " to " + now);
+                report.note(node->getLoc(), key, std::string(what) + " [1] to [2]", { was, now });
             }
             LSLASTNode::replaceNode(node, expr);
             ++changes;
@@ -1970,7 +1976,7 @@ namespace
             LSLConstant* cv = expr->getConstantValue();
             if (cv && inlineable(cv))
             {
-                fold(expr, cv, "folded");
+                fold(expr, cv, "OptimizerFolded", "folded");
                 return false;
             }
             return true;
@@ -1991,7 +1997,7 @@ namespace
             LSLConstant* cv = lvalue->getConstantValue();
             if (cv && inlineable(cv))
             {
-                fold(lvalue, cv, "inlined");
+                fold(lvalue, cv, "OptimizerInlinedConstant", "inlined");
             }
             return false;
         }
@@ -2094,7 +2100,7 @@ namespace
                 auto* lvalue = ctx.allocator->newTracked<LSLLValueExpression>(id, static_cast<LSLIdentifier*>(nullptr));
                 lvalue->setLoc(expr->getLoc());
                 id->setLoc(expr->getLoc());
-                report.note(expr->getLoc(), "evaluated " + render(expr) + " to " + *name);
+                report.note(expr->getLoc(), "OptimizerEvaluated", "evaluated [1] to [2]", { render(expr), *name });
                 LSLASTNode::replaceNode(expr, lvalue);
                 ++changes;
                 return true;
@@ -2103,7 +2109,7 @@ namespace
             {
                 return false;
             }
-            fold(expr, value, "evaluated");
+            fold(expr, value, "OptimizerEvaluated", "evaluated");
             return true;
         }
     };
@@ -2193,7 +2199,7 @@ namespace
                 LSLExpression* x = static_cast<LSLUnaryExpression*>(inner)->getChildExpr();
                 if (x && x->getIType() == expr->getIType())
                 {
-                    report.note(expr->getLoc(), "simplified " + render(expr) + " to " + render(x));
+                    report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { render(expr), render(x) });
                     inner->setChild(0, nullptr);
                     putInPlace(expr, x, ctx.allocator);
                     ++changes;
@@ -2227,7 +2233,7 @@ namespace
                         const std::string was = render(expr);
                         bin->setOperation(opposite);
                         inner->getParent()->takeChild(inner->getParentSlot());
-                        report.note(expr->getLoc(), "simplified " + was + " to " + render(bin));
+                        report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(bin) });
                         putInPlace(expr, bin, ctx.allocator);
                         ++changes;
                     }
@@ -2242,7 +2248,7 @@ namespace
             LSLExpression* child = expr->getChildExpr();
             if (child && child->getIType() == expr->getIType() && expr->getIType() != LST_ERROR)
             {
-                report.note(expr->getLoc(), "dropped the cast in " + render(expr));
+                report.note(expr->getLoc(), "OptimizerDroppedCast", "dropped the cast in [1]", { render(expr) });
                 expr->setChild(0, nullptr);
                 putInPlace(expr, child, ctx.allocator);
                 ++changes;
@@ -2263,7 +2269,7 @@ namespace
                 auto* empty = ctx.allocator->newTracked<LSLConstantExpression>(ctx.allocator->newTracked<LSLListConstant>(nullptr));
                 auto* test  = ctx.allocator->newTracked<LSLBinaryExpression>(arg, OP_NEQ, static_cast<LSLExpression*>(empty));
                 test->setType(TYPE(LST_INTEGER));
-                report.note(expr->getLoc(), "wrote " + render(expr) + " as " + render(test));
+                report.note(expr->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { render(expr), render(test) });
                 putInPlace(expr, test, ctx.allocator);
                 ++changes;
             }
@@ -2307,7 +2313,7 @@ namespace
                 sum->setType(TYPE(LST_LIST));
                 sum->setLoc(next->getLoc());
             }
-            report.note(expr->getLoc(), "wrote " + was + " as " + render(sum));
+            report.note(expr->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { was, render(sum) });
             putInPlace(expr, sum, ctx.allocator);
             ++changes;
             return false;
@@ -2334,7 +2340,7 @@ namespace
                     inner->setChild(0, nullptr);
                     stmt->setCheckExpr(c);
                     swapBranches(stmt);
-                    report.note(stmt->getLoc(), "swapped the branches of if (" + render(c) + ") and dropped the !");
+                    report.note(stmt->getLoc(), "OptimizerSwappedBranches", "swapped the branches of if ([1]) and dropped the !", { render(c) });
                     ++changes;
                 }
                 return false;
@@ -2350,7 +2356,7 @@ namespace
                 stmt->setTrueBranch(nullptr);
                 stmt->setFalseBranch(nullptr);
                 stmt->setTrueBranch(no);
-                report.note(stmt->getLoc(), "turned an empty if branch around");
+                report.note(stmt->getLoc(), "OptimizerTurnedEmptyBranch", "turned an empty if branch around");
                 ++changes;
             }
             return false;
@@ -2426,7 +2432,7 @@ namespace
         {
             const std::string was  = render(expr);
             auto*             kept = static_cast<LSLExpression*>(expr->takeChild(slot));
-            report.note(expr->getLoc(), "simplified " + was + " to " + render(kept));
+            report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(kept) });
             putInPlace(expr, kept, ctx.allocator);
             ++changes;
             return false;
@@ -2434,7 +2440,7 @@ namespace
 
         bool become(LSLBinaryExpression* expr, LSLConstant* cv)
         {
-            fold(expr, cv, "simplified");
+            fold(expr, cv, "OptimizerSimplified", "simplified");
             return false;
         }
 
@@ -2448,7 +2454,7 @@ namespace
                                         : ctx.allocator->newTracked<LSLFloatConstant>(-static_cast<LSLFloatConstant*>(cv)->getValue());
             expr->setOperation(op);
             expr->setRHS(constant(pos, expr->getRHS()));
-            report.note(expr->getLoc(), "simplified " + was + " to " + render(expr));
+            report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(expr) });
             ++changes;
             return false;
         }
@@ -2466,7 +2472,7 @@ namespace
             }
             auto* negated = ctx.allocator->newTracked<LSLUnaryExpression>(operand, OP_BOOLEAN_NOT);
             negated->setType(TYPE(LST_INTEGER));
-            report.note(expr->getLoc(), "simplified " + was + " to " + render(negated));
+            report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(negated) });
             putInPlace(expr, negated, ctx.allocator);
             ++changes;
             return false;
@@ -2493,7 +2499,7 @@ namespace
                 {
                     const std::string was  = render(expr);
                     auto*             kept = static_cast<LSLExpression*>(bin->takeChild(keepSlot));
-                    report.note(expr->getLoc(), "simplified " + was + " to " + render(kept));
+                    report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(kept) });
                     LSLASTNode::replaceNode(expr, kept);
                     ++changes;
                     return;
@@ -2509,7 +2515,7 @@ namespace
                     {
                         const std::string was = render(expr);
                         once->setChild(0, nullptr);
-                        report.note(expr->getLoc(), "simplified " + was + " to " + render(x));
+                        report.note(expr->getLoc(), "OptimizerSimplified", "simplified [1] to [2]", { was, render(x) });
                         LSLASTNode::replaceNode(expr, x);
                         ++changes;
                     }
@@ -2544,10 +2550,11 @@ namespace
             visitChildren(block);
             bool                     dead = false;
             std::vector<LSLASTNode*> going;
-            const auto               go = [&](LSLASTNode* stmt, const std::string& why) {
-                if (!why.empty())
+            // Removed for a reason, said; or silently, with nothing.
+            const auto               go = [&](LSLASTNode* stmt, const char* key, const char* why) {
+                if (key)
                 {
-                    report.note(stmt->getLoc(), "removed " + render(stmt) + why);
+                    report.note(stmt->getLoc(), key, std::string("removed [1]") + why, { render(stmt) });
                 }
                 going.push_back(stmt);
             };
@@ -2558,13 +2565,13 @@ namespace
                     dead = false;
                     if (unusedLabel(stmt))
                     {
-                        go(stmt, std::string());
+                        go(stmt, nullptr, "");
                     }
                     continue;
                 }
                 if (dead)
                 {
-                    go(stmt, ", which can never run");
+                    go(stmt, "OptimizerRemovedUnreachable", ", which can never run");
                     continue;
                 }
                 switch (stmt->getNodeSubType())
@@ -2575,12 +2582,12 @@ namespace
                         dead = true;
                         break;
                     case NODE_NOP_STATEMENT:
-                        go(stmt, std::string());
+                        go(stmt, nullptr, "");
                         break;
                     case NODE_COMPOUND_STATEMENT:
                         if (!stmt->hasChildren())
                         {
-                            go(stmt, std::string());
+                            go(stmt, nullptr, "");
                         }
                         break;
                     case NODE_EXPRESSION_STATEMENT:
@@ -2588,14 +2595,14 @@ namespace
                         LSLExpression* expr = static_cast<LSLExpressionStatement*>(stmt)->getExpr();
                         if (sideEffectFree(expr) || callsNothing(expr))
                         {
-                            go(stmt, ", which does nothing");
+                            go(stmt, "OptimizerRemovedNoEffect", ", which does nothing");
                         }
                         break;
                     }
                     case NODE_DECLARATION:
                         if (unusedLocal(static_cast<LSLDeclaration*>(stmt)))
                         {
-                            go(stmt, std::string());
+                            go(stmt, nullptr, "");
                         }
                         break;
                     default:
@@ -2620,7 +2627,8 @@ namespace
             }
             const bool    taken  = static_cast<LSLIntegerConstant*>(cv)->getValue() != 0;
             LSLStatement* branch = taken ? stmt->getTrueBranch() : stmt->getFalseBranch();
-            report.note(stmt->getLoc(), std::string("the condition of this if is always ") + (taken ? "true" : "false") + "; kept only what runs");
+            report.note(stmt->getLoc(), taken ? "OptimizerIfAlwaysTrue" : "OptimizerIfAlwaysFalse",
+                        taken ? "the condition of this if is always true; kept only what runs" : "the condition of this if is always false; kept only what runs");
             replaceStatement(stmt, branch ? static_cast<LSLStatement*>(stmt->takeChild(taken ? 1 : 2)) : nullptr);
             return false;
         }
@@ -2630,7 +2638,7 @@ namespace
             visitChildren(stmt);
             if (isInteger(stmt->getCheckExpr(), 0))
             {
-                report.note(stmt->getLoc(), "removed a while loop whose condition is always false");
+                report.note(stmt->getLoc(), "OptimizerRemovedWhile", "removed a while loop whose condition is always false");
                 replaceStatement(stmt, nullptr);
             }
             return false;
@@ -2641,7 +2649,7 @@ namespace
             visitChildren(stmt);
             if (isInteger(stmt->getCheckExpr(), 0))
             {
-                report.note(stmt->getLoc(), "a do loop whose condition is always false runs once; kept its body");
+                report.note(stmt->getLoc(), "OptimizerDoRunsOnce", "a do loop whose condition is always false runs once; kept its body");
                 replaceStatement(stmt, static_cast<LSLStatement*>(stmt->takeChild(0)));
             }
             return false;
@@ -2664,7 +2672,7 @@ namespace
                     es->setLoc(expr->getLoc());
                     block->pushChild(es);
                 }
-                report.note(stmt->getLoc(), "removed a for loop whose condition is always false; its initialisers stay");
+                report.note(stmt->getLoc(), "OptimizerRemovedFor", "removed a for loop whose condition is always false; its initialisers stay");
                 replaceStatement(stmt, block->hasChildren() ? block : nullptr);
             }
             return false;
@@ -2727,7 +2735,7 @@ namespace
             {
                 return false;
             }
-            report.note(label->getLoc(), "removed the label " + render(label) + ", which nothing jumps to");
+            report.note(label->getLoc(), "OptimizerRemovedLabel", "removed the label [1], which nothing jumps to", { render(label) });
             return true;
         }
 
@@ -2744,7 +2752,7 @@ namespace
                 return false;
             }
             forget(decl, sym);
-            report.note(decl->getLoc(), "removed the unused local " + std::string(sym->getName()));
+            report.note(decl->getLoc(), "OptimizerRemovedLocal", "removed the unused local [1]", { sym->getName() });
             return true;
         }
 
@@ -2771,12 +2779,12 @@ namespace
                 }
                 if (global->getNodeType() == NODE_GLOBAL_VARIABLE)
                 {
-                    report.note(global->getLoc(), "removed the unused global " + std::string(sym->getName()));
+                    report.note(global->getLoc(), "OptimizerRemovedGlobal", "removed the unused global [1]", { sym->getName() });
                     going.push_back(global);
                 }
                 else if (global->getNodeType() == NODE_GLOBAL_FUNCTION)
                 {
-                    report.note(global->getLoc(), "removed the unused function " + std::string(sym->getName()));
+                    report.note(global->getLoc(), "OptimizerRemovedFunction", "removed the unused function [1]", { sym->getName() });
                     going.push_back(global);
                 }
             }
@@ -2788,7 +2796,7 @@ namespace
             }
         }
 
-        std::unordered_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
+        boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
 
         void states(LSLScript* script)
         {
@@ -2800,7 +2808,7 @@ namespace
                 {
                     continue;
                 }
-                report.note(state->getLoc(), "removed the state " + std::string(sym->getName()) + ", which nothing enters");
+                report.note(state->getLoc(), "OptimizerRemovedState", "removed the state [1], which nothing enters", { sym->getName() });
                 going.push_back(state);
             }
             for (LSLASTNode* state : going)
@@ -2919,7 +2927,7 @@ namespace
             const std::string name = next();
             sym->setMangledName(allocator.copyStr(name.c_str()));
             result.renamed.emplace(sym->getName(), name);
-            report.note(sym->getLoc(), std::string("renamed the ") + LSLSymbol::getTypeName(sym->getSymbolType()) + " " + sym->getName() + " to " + name);
+            report.note(sym->getLoc(), "OptimizerRenamed", "renamed the [1] [2] to [3]", { LSLSymbol::getTypeName(sym->getSymbolType()), sym->getName(), name });
         }
     }
 
@@ -3212,6 +3220,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
         p.severity = ALScriptProblem::Severity::Error;
         p.source   = ALScriptProblem::Source::Optimizer;
         p.message  = "the LSL definitions are not loaded, so nothing was optimized";
+        p.key      = "OptimizerNoDefinitions";
         result.problems.push_back(std::move(p));
         return result;
     }

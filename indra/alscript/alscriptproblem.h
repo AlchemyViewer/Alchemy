@@ -27,6 +27,7 @@
 #include "stdtypes.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 // What the LSL and SLua analyzers report: a range in the script, how bad it
@@ -69,6 +70,29 @@ struct ALScriptProblem
     // The included file the problem is in, by the identity the source
     // map's files carry, or empty for the script itself.
     std::string file;
+    // For a message of this library's own -- the preprocessor's, the
+    // optimizer's, the inliner's -- a key a translation may be found
+    // under, and the words the message was built with, in order, so
+    // that the translated form is built the same way: [1], [2] and so
+    // on in its text stand for them. Empty for a message from an engine
+    // -- the parser, Luau -- which speaks for itself.
+    std::string              key;
+    std::vector<std::string> args;
+
+    // `text` with [1], [2] ... replaced by the args, in order.
+    static std::string fill(std::string_view text, const std::vector<std::string>& args)
+    {
+        std::string out(text);
+        for (size_t i = 0; i < args.size() && i < 9; ++i)
+        {
+            const std::string mark = "[" + std::to_string(i + 1) + "]";
+            for (size_t at = out.find(mark); at != std::string::npos; at = out.find(mark, at + args[i].size()))
+            {
+                out.replace(at, mark.size(), args[i]);
+            }
+        }
+        return out;
+    }
 };
 
 typedef std::vector<ALScriptProblem> ALScriptProblems;

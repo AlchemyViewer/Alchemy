@@ -27,6 +27,7 @@
 #include "alluauservice.h"
 
 #include "llsdjson.h"
+#include "llstl.h"
 
 #include "Luau/AstQuery.h"
 #include "Luau/Autocomplete.h"
@@ -44,8 +45,9 @@
 #include "Luau/TypeArena.h"
 #include "Luau/TypePack.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <set>
-#include <unordered_map>
 
 namespace
 {
@@ -963,7 +965,7 @@ struct ALLuauService::Impl
         std::string documentation;
         std::string link;
     };
-    std::unordered_map<std::string, Doc> docs;
+    boost::unordered_flat_map<std::string, Doc, ll::string_hash, std::equal_to<>> docs;
 
     // The script checked, for a query; the text is what the resolver
     // serves, and the front end lays out the module again only when it
@@ -1128,8 +1130,10 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     for (const Luau::TypeError& error : result.errors)
     {
-        const bool  syntax  = Luau::get_if<Luau::SyntaxError>(&error.data) != nullptr;
-        std::string message = Luau::toString(error);
+        const bool               syntax  = Luau::get_if<Luau::SyntaxError>(&error.data) != nullptr;
+        std::string              message = Luau::toString(error);
+        std::string              key;
+        std::vector<std::string> args;
         if (const Luau::UnknownProperty* unknown = Luau::get_if<Luau::UnknownProperty>(&error.data))
         {
             // Named by what was written -- `ll`, not the table's fields --
@@ -1150,18 +1154,20 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             {
                 head = typeText(unknown->table);
             }
-            message = "Key '" + unknown->key + "' not found in " + head;
+            // Said in this library's own words, so the studio may put
+            // them in another language.
             const std::string nearest = nearestProperty(unknown->table, unknown->key);
-            if (!nearest.empty())
-            {
-                message += "; did you mean '" + nearest + "'?";
-            }
+            key                       = nearest.empty() ? "LuauKeyNotFound" : "LuauKeyNotFoundDidYouMean";
+            args                      = { unknown->key, head, nearest };
+            message                   = ALScriptProblem::fill(nearest.empty() ? "Key '[1]' not found in [2]" : "Key '[1]' not found in [2]; did you mean '[3]'?", args);
         }
         problems.push_back(problemAt(error.location,
                                      ALScriptProblem::Severity::Error,
                                      syntax ? ALScriptProblem::Source::Parser : ALScriptProblem::Source::Types,
                                      std::string(),
                                      std::move(message)));
+        problems.back().key  = key;
+        problems.back().args = std::move(args);
     }
     for (const Luau::LintWarning& warning : result.lintResult.errors)
     {

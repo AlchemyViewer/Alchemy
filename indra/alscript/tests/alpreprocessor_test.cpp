@@ -664,4 +664,22 @@ namespace tut
         r = ALPreprocessor::run("while (a) { break; } x = 1; @late;\n", o);
         ensure_equals("a label that is not right after the loop is not the loop's", r.text, std::string("while (a) { jump _brk1; }@_brk1; x = 1; @late;\n"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<16>()
+    {
+        set_test_name("a problem of the preprocessor's own carries a key and its words, for a translation to be built the same way");
+        ALPreprocessor::Options o = options();
+        o.extensions              = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run("continue;\n#define f(a, a) a\n", o);
+        // The directives go first, the extensions after: the macro's
+        // problem is said before the loop's.
+        ensure_equals("two problems", r.problems.size(), size_t(2));
+        ensure_equals("the words", r.problems[1].message, std::string("continue outside a loop"));
+        ensure_equals("the key", r.problems[1].key, std::string("PreprocOutsideLoop"));
+        ensure("the word it was built with", r.problems[1].args.size() == 1 && r.problems[1].args[0] == "continue");
+        ensure_equals("the macro's key", r.problems[0].key, std::string("PreprocDuplicateParameter"));
+        ensure("and its word", r.problems[0].args.size() == 1 && r.problems[0].args[0] == "a");
+        ensure_equals("a translation is the text with the words put in", ALScriptProblem::fill("[1] hors d'une boucle ([1], [2])", { "continue", "x" }), std::string("continue hors d'une boucle (continue, x)"));
+        ensure_equals("a word with a mark in it is not read again", ALScriptProblem::fill("[1]", { "[2]" }), std::string("[2]"));
+    }
 } // namespace tut
