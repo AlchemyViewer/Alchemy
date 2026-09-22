@@ -294,6 +294,12 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
         return edit;
     }
 
+    // The whole text kept, if it is, is patched rather than made again:
+    // the stretch replaced in it, and the line starts from the edit on.
+    const bool   patch     = mWholeValid && mWholeVersion == mVersion;
+    const size_t patch_at  = patch ? mLineStarts[static_cast<size_t>(range.begin.line)] + static_cast<size_t>(range.begin.column) : 0;
+    const size_t patch_end = edit.removed.size();
+
     // The line the range starts in keeps what came before it, the line it
     // ends in keeps what comes after, and the pieces go between.
     pieces.front().insert(0, mLines[range.begin.line], 0, range.begin.column);
@@ -304,6 +310,16 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
                   std::make_move_iterator(pieces.end()));
 
     ++mVersion;
+    if (patch)
+    {
+        mWhole.replace(patch_at, patch_end, edit.inserted);
+        mLineStarts.resize(static_cast<size_t>(range.begin.line) + 1);
+        for (size_t l = static_cast<size_t>(range.begin.line) + 1; l < mLines.size(); ++l)
+        {
+            mLineStarts.push_back(mLineStarts.back() + mLines[l - 1].size() + 1);
+        }
+        mWholeVersion = mVersion;
+    }
     mChanged(edit);
     return edit;
 }

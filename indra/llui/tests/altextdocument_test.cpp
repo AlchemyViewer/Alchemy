@@ -157,6 +157,15 @@ namespace tut
         ensure_equals("the whole after an edit", doc.wholeText(), std::string("abX\nY\n\ncde"));
         ensure("the starts after it", doc.lineStarts() == std::vector<size_t>({ 0, 4, 6, 7 }));
         ensure("and the offsets", doc.offsetOf(ALTextPos(3, 1)) == 8 && doc.posAt(8) == ALTextPos(3, 1));
+        // Patched in place, whatever the edit's shape: lines taken out,
+        // put in, and the end of the text.
+        doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(2, 0)), "");
+        ensure_equals("lines taken out", doc.wholeText(), std::string("a\ncde"));
+        ensure("the starts follow", doc.lineStarts() == std::vector<size_t>({ 0, 2 }));
+        doc.append("\nf");
+        ensure_equals("appended", doc.wholeText(), std::string("a\ncde\nf"));
+        ensure("the starts again", doc.lineStarts() == std::vector<size_t>({ 0, 2, 6 }));
+        ensure_equals("as made afresh", doc.wholeText(), doc.text());
     }
 
     template<> template<>

@@ -360,8 +360,17 @@ std::string ALVimKeymap::status() const
         case Mode::Search:      return utf8Of(mLineKind) + mLine;
         case Mode::Confirm:
         {
-            const std::string& with = mConfirming.at < mConfirming.edits.size() ? mConfirming.edits[mConfirming.at].second : std::string();
-            return recording + "replace with " + with + " (y/n/a/q/l)?";
+            if (mConfirming.at >= mConfirming.edits.size())
+            {
+                return recording + "replace with  (y/n/a/q/l)?";
+            }
+            // The question, saying how many lines the match runs over
+            // where it runs over more than one, since the selection is
+            // the only other sign of that.
+            const auto&       edit  = mConfirming.edits[mConfirming.at];
+            const ALTextRange match = edit.first.normalised();
+            const S32         lines = match.end.line - match.begin.line + 1;
+            return recording + "replace with " + edit.second + (lines > 1 ? " (over " + std::to_string(lines) + " lines)" : std::string()) + " (y/n/a/q/l)?";
         }
         case Mode::Normal:
         default:
@@ -461,6 +470,17 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
 std::string ALVimKeymap::registerText(char name) const
 {
     return fetch(name).text;
+}
+
+bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
+{
+    if (mMode != Mode::Command && mMode != Mode::Search)
+    {
+        return false;
+    }
+    line  = utf8Of(mLineKind) + mLine;
+    caret = static_cast<S32>(line.size());
+    return true;
 }
 
 void ALVimKeymap::say(const std::string& message, bool error)
@@ -3813,6 +3833,13 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         }
     }
     mConfirming.gathering = false;
+    if (mMessageError && !mConfirming.edits.empty())
+    {
+        // An error part way: what was gathered from the lines before it
+        // is not asked about, as vim stops there too; said, since the
+        // error alone would not say so.
+        say(mMessage + " -- nothing substituted", true);
+    }
     if (!mConfirming.edits.empty() && !mMessageError)
     {
         // The group stays open for the asking to close.

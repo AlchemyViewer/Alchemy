@@ -85,10 +85,11 @@ public:
     Hooks& hooks() { return mHooks; }
     // What was typed after : or / so far.
     const std::string& commandLine() const { return mLine; }
+    bool               typingLine(std::string& line, S32& caret) const override;
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
-    const std::string& message() const { return mMessage; }
-    bool               messageIsError() const { return mMessageError; }
+    std::string message() const override { return mMessage; }
+    bool        messageIsError() const override { return mMessageError; }
     // A register's text, or nothing.
     std::string registerText(char name) const;
 

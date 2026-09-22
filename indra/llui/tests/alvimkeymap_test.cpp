@@ -820,5 +820,16 @@ namespace tut
         ensure("done", vim->mode() == ALVimKeymap::Mode::Normal);
         keys("u");
         ensure_equals("one step to undo for the lot", flat(e.text()), std::string("a x|b|a y|a z|"));
+        // A match over lines says so in the question; an error part way
+        // through a :g drops what was gathered and says so.
+        keys(":%s/x\\nb/Q/c<CR>");
+        ensure_equals("the question says how many lines", vim->status(), std::string("replace with Q (over 2 lines) (y/n/a/q/l)?"));
+        keys("q");
+        // The lines are run from the last up: the last gathers its edit,
+        // the one before errors.
+        keys(":g/a/s/z/Z/c<CR>");
+        ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: z -- nothing substituted"));
+        ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
     }
 }
