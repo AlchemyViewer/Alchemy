@@ -521,6 +521,9 @@ bool LLScriptEditorWSServer::update()
 bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, const LLUUID& item_id, std::string_view script_name,
     const LLHandle<LLPanel>& editor_handle, const std::string& script_id, bool lua)
 {
+    // The subscriptions are the main thread's; a caller from any other
+    // trips here rather than races.
+    llassert(on_main_thread());
     if (editor_handle.isDead())
     {
         return false;
@@ -548,6 +551,7 @@ bool LLScriptEditorWSServer::subscribeScriptEditor(const LLUUID& object_id, cons
 
 void LLScriptEditorWSServer::unsubscribeEditor(const std::string &script_id)
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -572,6 +576,7 @@ void LLScriptEditorWSServer::unsubscribeEditor(const std::string &script_id)
 
 void LLScriptEditorWSServer::unsubscribeConnection(U32 connection_id)
 {
+    llassert(on_main_thread());
     for (auto it = mSubscriptions.begin(); it != mSubscriptions.end(); ++it)
     {
         if (it->second.mConnectionID == connection_id)
@@ -588,6 +593,7 @@ void LLScriptEditorWSServer::unsubscribeConnection(U32 connection_id)
 
 LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSubscription(const std::string &script_id, U32 connection_id)
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -632,6 +638,7 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
 
 LLHandle<LLPanel> LLScriptEditorWSServer::findEditorForScript(const std::string& script_id) const
 {
+    llassert(on_main_thread());
     auto it = mSubscriptions.find(script_id);
     if (it != mSubscriptions.end())
     {
@@ -642,6 +649,7 @@ LLHandle<LLPanel> LLScriptEditorWSServer::findEditorForScript(const std::string&
 
 std::set<std::string> LLScriptEditorWSServer::getActiveScripts() const
 {
+    llassert(on_main_thread());
     std::set<std::string> active_scripts;
     for (const auto& [script_id, subinfo] : mSubscriptions)
     {
