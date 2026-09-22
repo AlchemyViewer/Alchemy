@@ -54,6 +54,9 @@
 #include "llfilepicker.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
+#include "llfloatersidepanelcontainer.h"
+#include "lllandmarkactions.h"
+#include "lllandmarklist.h"
 #include "llenvironment.h"
 #include "llinventoryicon.h"
 #include "llinventorymodel.h"
@@ -881,6 +884,52 @@ void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc)
     doc.editor->setAtoms(std::move(atoms));
 }
 
+void ALFloaterScriptStudio::carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items)
+{
+    text = doc.editor->text();
+    items.clear();
+    if (doc.embedded.empty())
+    {
+        return;
+    }
+    // Each item's new number, given in the order the text first stands
+    // them; an item the text no longer stands anywhere is left behind.
+    std::map<U32, U32> renumbered;
+    for (size_t i = 0; i + 3 < text.size(); ++i)
+    {
+        const unsigned char b0 = static_cast<unsigned char>(text[i]);
+        const unsigned char b1 = static_cast<unsigned char>(text[i + 1]);
+        const unsigned char b2 = static_cast<unsigned char>(text[i + 2]);
+        const unsigned char b3 = static_cast<unsigned char>(text[i + 3]);
+        if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+        {
+            continue;
+        }
+        const U32 code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
+        const U32 index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
+        if (index < doc.embedded.size() && doc.embedded[index].notNull())
+        {
+            const auto found = renumbered.find(index);
+            U32        fresh;
+            if (found == renumbered.end())
+            {
+                fresh = static_cast<U32>(items.size());
+                items.push_back(doc.embedded[index]);
+                renumbered[index] = fresh;
+            }
+            else
+            {
+                fresh = found->second;
+            }
+            const U32 c = static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR) + fresh;
+            text[i + 1]  = static_cast<char>(0x80 | ((c >> 12) & 0x3F));
+            text[i + 2]  = static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+            text[i + 3]  = static_cast<char>(0x80 | (c & 0x3F));
+        }
+        i += 3;
+    }
+}
+
 ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& at, size_t index)
 {
     const LLPointer<LLInventoryItem> item = doc.embedded[index];
@@ -950,6 +999,36 @@ void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<L
                 preview->setNotecardInfo(ref.item, ref.object);
                 preview->openFloater(key);
                 preview->setFocus(true);
+            }
+            return;
+        }
+        case LLAssetType::AT_LANDMARK:
+        {
+            // The place: the landmark already in the inventory for it, or
+            // a copy taken into the landmarks folder and then shown.
+            auto show = [](const LLUUID& landmark_id) {
+                LLSD key;
+                key["type"] = "landmark";
+                key["id"]   = landmark_id;
+                LLFloaterSidePanelContainer::showPanel("places", key);
+            };
+            auto placed = [ref, item, show](LLLandmark* landmark) {
+                LLVector3d where;
+                if (!landmark || !landmark->getGlobalPos(where))
+                {
+                    return;
+                }
+                if (LLViewerInventoryItem* mine = LLLandmarkActions::findLandmarkForGlobalPos(where))
+                {
+                    show(mine->getUUID());
+                    return;
+                }
+                copy_inventory_from_notecard(get_folder_by_itemtype(item), ref.object, ref.item, item,
+                                             gInventoryCallbacks.registerCB(new LLBoostFuncInventoryCallback(show)));
+            };
+            if (LLLandmark* landmark = gLandmarkList.getAsset(item->getAssetUUID(), placed))
+            {
+                placed(landmark);
             }
             return;
         }
@@ -2688,8 +2767,14 @@ void ALFloaterScriptStudio::save(Doc& doc)
     }
     if (doc.notecard)
     {
+        // What goes back: the text with the items it still stands
+        // somewhere, numbered afresh, and those items alone, as the
+        // legacy notecard prunes what an edit took out.
+        std::string                             text;
+        std::vector<LLPointer<LLInventoryItem>> items;
+        carriedForSave(doc, text, items);
         std::string error;
-        if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, doc.editor->text(), doc.embedded, nullptr, error))
+        if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
         {
             setStatus(error, true);
             return;
@@ -2898,10 +2983,12 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         const bool                   preprocessing = ALScriptPreprocessor::enabled();
         const ALTextDocument& text = doc.editor->document();
         // The transform a line's first statement is written for, by its
-        // shape -- `switch (`, `case ...:`, `default:`, `break;`, `break
-        // 2;`, `continue;`, `inline f(` or `inline integer f(` -- and
-        // nothing for a line where one of the words is a name of the
-        // script's own; the word itself comes back in `word`.
+        // shape -- `switch (`, `case ...:`, `break;`, `break 2;`,
+        // `continue;`, `inline f(` or `inline integer f(` -- and nothing
+        // for a line where one of the words is a name of the script's
+        // own; the word itself comes back in `word`. (A `default:` is
+        // never the line the parser stops on: the switch's own line
+        // comes first.)
         auto shapeOf = [&text](S32 index, std::string& word) -> const char* {
             const std::string& line = text.line(index);
             auto               isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
@@ -2933,10 +3020,6 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
                 // `case <what>:` -- the colon somewhere after, and the
                 // word not used as a name would be: `case = 1;`, `case(`.
                 return following != '=' && following != '(' && following != '.' && following != ';' && line.find(':', end) != std::string::npos ? "PreprocHintSwitch" : nullptr;
-            }
-            if (word == "default")
-            {
-                return following == ':' ? "PreprocHintSwitch" : nullptr;
             }
             if (word == "break" || word == "continue")
             {

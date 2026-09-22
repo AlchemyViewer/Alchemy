@@ -454,6 +454,9 @@ private:
     // -- that opens the item or offers a copy of it; and the opening.
     void             placeEmbeddedItems(Doc& doc);
     ALTextView::Atom embeddedAtom(Doc& doc, const ALTextPos& at, size_t index);
+    // The text and the items as a save takes them: only the items the
+    // text still stands somewhere, numbered afresh in the text.
+    void             carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items);
     void             openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item);
     void save(Doc& doc);
     void saveAll();
