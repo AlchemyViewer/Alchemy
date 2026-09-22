@@ -44,6 +44,7 @@
 #include "llsyntaxid.h"
 #include "llversioninfo.h"
 #include "llbutton.h"
+#include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
@@ -72,6 +73,7 @@
 #include "lltabcontainer.h"
 #include "lltextbox.h"
 #include "lltexteditor.h"
+#include "lltooldraganddrop.h"
 #include "lltrans.h"
 #include "llexternaleditor.h"
 #include "lllogchat.h"
@@ -930,12 +932,100 @@ void ALFloaterScriptStudio::carriedForSave(Doc& doc, std::string& text, std::vec
     }
 }
 
+bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)
+{
+    // As the legacy notecard has it: an item from the inventory, of a
+    // kind a notecard may carry, that the next owner may have whole;
+    // never one out of another notecard, since only what is in the
+    // inventory can be verified.
+    if (LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_NOTECARD)
+    {
+        return false;
+    }
+    if (!doc.loaded || !doc.modifiable || doc.editor->isReadOnly())
+    {
+        *accept = ACCEPT_NO;
+        return true;
+    }
+    bool supported = false;
+    switch (type)
+    {
+        case DAD_SETTINGS:
+            supported = LLEnvironment::instance().isExtendedEnvironmentEnabled();
+            if (!supported && tooltip.empty())
+            {
+                tooltip = LLTrans::getString("TooltipNotecardNotAllowedTypeDrop");
+            }
+            break;
+        case DAD_CALLINGCARD:
+        case DAD_TEXTURE:
+        case DAD_SOUND:
+        case DAD_LANDMARK:
+        case DAD_SCRIPT:
+        case DAD_CLOTHING:
+        case DAD_OBJECT:
+        case DAD_NOTECARD:
+        case DAD_BODYPART:
+        case DAD_ANIMATION:
+        case DAD_GESTURE:
+        case DAD_MESH:
+        case DAD_MATERIAL:
+            supported = true;
+            break;
+        default:
+            break;
+    }
+    LLInventoryItem* item = static_cast<LLInventoryItem*>(cargo);
+    if (!item || !supported)
+    {
+        *accept = ACCEPT_NO;
+        return true;
+    }
+    if ((item->getPermissions().getMaskNextOwner() & PERM_ITEM_UNRESTRICTED) != PERM_ITEM_UNRESTRICTED)
+    {
+        *accept = ACCEPT_NO;
+        if (tooltip.empty())
+        {
+            tooltip = LLTrans::getString("TooltipNotecardOwnerRestrictedDrop");
+        }
+        return true;
+    }
+    *accept = ACCEPT_YES_COPY_MULTI;
+    if (drop)
+    {
+        // The item after the ones carried, and its character in the text
+        // where the drop landed, one step to undo; the button follows the
+        // edit through the document's change.
+        const size_t index = doc.embedded.size();
+        if (index >= static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS))
+        {
+            *accept = ACCEPT_NO;
+            return true;
+        }
+        doc.embedded.push_back(item);
+        const ALTextPos at = doc.editor->posAtLocal(x, y, true);
+        doc.editor->replaceAll({ { ALTextRange(at, at), utf8str_from_cp(static_cast<llwchar>(LLTextEditor::FIRST_EMBEDDED_CHAR + index)) } });
+    }
+    return true;
+}
+
 ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& at, size_t index)
 {
     const LLPointer<LLInventoryItem> item = doc.embedded[index];
     const LLFontGL*                  font = LLFontGL::getFontSansSerifSmall();
     LLStringUtil::format_map_t       args;
     args["[NAME]"] = item->getName();
+    // What a press does, by the kind: opens, plays, or takes a copy.
+    const char* tip = "EmbeddedItemCopyTip";
+    switch (item->getType())
+    {
+        case LLAssetType::AT_TEXTURE:
+        case LLAssetType::AT_MATERIAL:
+        case LLAssetType::AT_CALLINGCARD:
+        case LLAssetType::AT_LANDMARK: tip = "EmbeddedItemOpenTip"; break;
+        case LLAssetType::AT_SOUND: tip = "EmbeddedItemPlayTip"; break;
+        default: break;
+    }
     // A button with the item's icon and name, as wide as they are.
     LLButton::Params p;
     p.name                    = "embedded_item";
@@ -943,7 +1033,7 @@ ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& 
     p.font                    = font;
     p.image_overlay           = LLUI::getUIImage(LLInventoryIcon::getIconName(item->getType(), item->getInventoryType(), item->getFlags()));
     p.image_overlay_alignment = "left";
-    p.tool_tip                = getString("EmbeddedItemTip", args);
+    p.tool_tip                = getString(tip, args);
     const S32 width           = font->getWidth(item->getName()) + 16 + 12;
     p.rect                    = LLRect(0, 0, width, 0);
     LLButton*         button  = LLUICtrlFactory::create<LLButton>(p);
@@ -1100,6 +1190,29 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         takeCarriedText(doc);
         placeEmbeddedItems(doc);
         doc.editor->setReadOnly(!answer.modifiable);
+        {
+            Doc* raw = &doc;
+            doc.editor->setDropHandler([this, raw](S32 x, S32 y, MASK, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
+                return dropOnNotecard(*raw, x, y, drop, type, cargo, accept, tooltip);
+            });
+            // A placeholder put back by an edit -- an undo, a redo, a
+            // paste -- gets its button again, once the edit is through.
+            const std::string id = doc.id;
+            doc.embeddedEdits    = doc.editor->document().onChanged([this, id](const ALTextDocument::Edit& edit) {
+                if (edit.inserted.find('\xF4') != std::string::npos)
+                {
+                    const LLHandle<LLFloater> handle = getHandle();
+                    doOnIdleOneTime([handle, id]() {
+                        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                        const size_t           index  = studio ? studio->indexOf(id) : NONE;
+                        if (index != NONE)
+                        {
+                            studio->placeEmbeddedItems(*studio->mDocs[index]);
+                        }
+                    });
+                }
+            });
+        }
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
@@ -2350,46 +2463,16 @@ void ALFloaterScriptStudio::pumpVim()
     {
         return;
     }
-    ALVimKeymap* vim = doc->editor ? dynamic_cast<ALVimKeymap*>(doc->editor->modalKeymap()) : nullptr;
-    if (!vim)
-    {
-        if (!mVimBanner.empty())
-        {
-            mVimBanner.clear();
-            refreshTrailer(*doc);
-        }
-        return;
-    }
-    if (vim->generation() == mVimSeen)
-    {
-        return;
-    }
-    mVimSeen = vim->generation();
-    // The mode in the bottom strip; the : line as it is typed, and what
-    // the mode says, in the status line.
-    const ALVimKeymap::Mode mode   = vim->mode();
-    const bool              typing = mode == ALVimKeymap::Mode::Command || mode == ALVimKeymap::Mode::Search;
-    std::string             banner = typing ? getString("VimNormal") : vim->status();
-    if (mode == ALVimKeymap::Mode::Normal && banner.empty())
-    {
-        banner = getString("VimNormal");
-    }
-    else if (mode == ALVimKeymap::Mode::Normal)
-    {
-        banner = getString("VimNormal") + " " + banner;
-    }
+    // The mode, the : line as it is typed and what the mode says are
+    // all in the band the editor draws under its text, where vim has
+    // them; the bottom strip says only that vim is on, so that a reader
+    // of the strip knows why the keys do what they do.
+    ALVimKeymap* vim    = doc->editor ? dynamic_cast<ALVimKeymap*>(doc->editor->modalKeymap()) : nullptr;
+    std::string  banner = vim ? getString("VimNormal") : std::string();
     if (banner != mVimBanner)
     {
         mVimBanner = banner;
         refreshTrailer(*doc);
-    }
-    if (typing)
-    {
-        setStatus(vim->status());
-    }
-    else if (!vim->message().empty())
-    {
-        setStatus(vim->message(), vim->messageIsError());
     }
 }
 

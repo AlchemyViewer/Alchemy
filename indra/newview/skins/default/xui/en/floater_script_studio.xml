@@ -89,7 +89,7 @@
     <floater.string name="SavedNotecard">[NAME] saved.</floater.string>
     <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
     <floater.string name="PreflightErrors">[COUNT] error(s) the analyzers found in [NAME]; save again to compile anyway.</floater.string>
-    <floater.string name="VimNormal">-- NORMAL --</floater.string>
+    <floater.string name="VimNormal">vim</floater.string>
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
@@ -167,7 +167,9 @@
     <floater.string name="FileOpenElsewhere">[FILE] is open in another tab.</floater.string>
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
-    <floater.string name="EmbeddedItemTip">[NAME], carried in the notecard: open it, or take a copy</floater.string>
+    <floater.string name="EmbeddedItemOpenTip">[NAME], carried in the notecard: press to open it</floater.string>
+    <floater.string name="EmbeddedItemPlayTip">[NAME], carried in the notecard: press to play it and take a copy</floater.string>
+    <floater.string name="EmbeddedItemCopyTip">[NAME], carried in the notecard: press to take a copy</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Preprocess on Save and Preprocessor > Firestorm > Switch Statements)</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Preprocess on Save and Preprocessor > Extensions)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>

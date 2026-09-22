@@ -188,6 +188,9 @@ private:
         // notecard with the items it came with, never analysed.
         bool                                       notecard = false;
         std::vector<LLPointer<LLInventoryItem>>    embedded;
+        // An edit that put a placeholder back -- an undo of a deletion,
+        // a redo of a drop -- has the items placed again.
+        boost::signals2::scoped_connection         embeddedEdits;
         // The envelope the asset came in, whose source the editor holds
         // and whose expanded code the other editor shows; a save runs
         // the preprocessor over the source and wraps both again.
@@ -457,6 +460,9 @@ private:
     // The text and the items as a save takes them: only the items the
     // text still stands somewhere, numbered afresh in the text.
     void             carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items);
+    // An inventory item dragged onto a notecard: taken where it is
+    // dropped, as the legacy notecard takes one, if it may be given on.
+    bool             dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
     void             openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item);
     void save(Doc& doc);
     void saveAll();
@@ -726,7 +732,6 @@ private:
     // and what it says in the status line, and w, q and the rest
     // answered here.
     bool                               mVimMode      = false;
-    U32                                mVimSeen      = 0;
     std::string                        mVimBanner;
     bool                               mStickyHeaders   = true;
     // The scrollbar as a map: whether, how wide, whether it previews the
