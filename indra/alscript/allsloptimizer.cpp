@@ -27,6 +27,7 @@
 
 #include "allsloptimizer.h"
 
+#include "allslinliner.h"
 #include "allslservice.h"
 #include "llmath.h"
 #include "llquaternion.h"
@@ -2937,6 +2938,26 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
         return result;
     }
 
+    // The functions called once put in place first, in the text, so that
+    // what is parsed below is an ordinary script; its map is under the
+    // printer's.
+    std::string inlined;
+    ALSourceMap inlinedMap;
+    if (options.inlining)
+    {
+        ALLSLInliner::Result put = ALLSLInliner::run(source);
+        if (put.inlined > 0)
+        {
+            inlined    = std::move(put.text);
+            inlinedMap = std::move(put.map);
+            source     = inlined;
+            for (ALScriptProblem& note : put.notes)
+            {
+                result.problems.push_back(std::move(note));
+            }
+        }
+    }
+
     ScopedScriptParser parser(nullptr);
     LSLScript*         script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
     if (!script || parser.logger.getErrors())
@@ -3022,6 +3043,10 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     script->visit(&printer);
     result.text      = printer.mStream.str();
     result.map       = printer.map(std::string());
+    if (!inlinedMap.empty())
+    {
+        result.map = result.map.composed(inlinedMap);
+    }
     result.sizeAfter = result.text.size();
     result.optimized = true;
     return result;

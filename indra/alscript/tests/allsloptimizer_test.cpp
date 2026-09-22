@@ -25,6 +25,7 @@
 
 #include "linden_common.h"
 
+#include "../allslinliner.h"
 #include "../allsloptimizer.h"
 #include "../allslservice.h"
 
@@ -333,5 +334,75 @@ namespace tut
         ensure("duplicate keys are left", has("string g = llJsonGetValue"));
         ensure("a trailing comma is left", has("string h = llJsonGetValue"));
         ensure("an escape unescaped: " + r.text, has("string i = \"a\\\"b\";"));
+    }
+    template<> template<>
+    void allsloptimizer_object::test<13>()
+    {
+        set_test_name("a function called once is put in its place: a void one as a block with its parameters as locals, a one-return one as its expression");
+        const std::string source =
+            "integer g;\n"
+            "say(string what, integer n)\n"
+            "{\n"
+            "    integer i = n * 2;\n"
+            "    llSay(0, what + (string)i);\n"
+            "}\n"
+            "integer twice(integer x)\n"
+            "{\n"
+            "    return x * 2 + g;\n"
+            "}\n"
+            "integer thrice(integer x)\n"
+            "{\n"
+            "    return x + x + x;\n"
+            "}\n"
+            "loop()\n"
+            "{\n"
+            "    @again;\n"
+            "    jump again;\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        integer i = 1;\n"
+            "        say(\"hi\", i);\n"
+            "        g = twice(i) + thrice(g) + thrice(i);\n"
+            "        loop();\n"
+            "    }\n"
+            "}\n";
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        o.dcr                     = false;
+        o.constfold               = false;
+        ALLSLOptimizer::Result r  = ALLSLOptimizer::run(source, o);
+        ensure("optimized: " + notes(r), r.optimized);
+        // The inliner's own text is what the optimizer read.
+        const ALLSLInliner::Result put = ALLSLInliner::run(source);
+        ensure_equals("two put in place", put.inlined, 2);
+        ensure("the block where the call was: " + put.text,
+               put.text.find("        {\nstring what = \"hi\";\ninteger n = i;\n\n    integer i_1 = n * 2;\n    llSay(0, what + (string)i_1);\n\n}\n") != std::string::npos);
+        ensure("the expression where the other call was: " + put.text, put.text.find("g = (i * 2 + g) + thrice(g) + thrice(i);") != std::string::npos);
+        auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+        ensure("say went into a block, its i renamed past the caller's: " + r.text, has("integer i_1 = n * 2;") && has("llSay(0, what + (string)i_1);"));
+        ensure("the parameters became locals set to the arguments: " + r.text, has("string what = \"hi\";") && has("integer n = i;"));
+        ensure("say is gone: " + r.text, !has("say(string what"));
+        ensure("twice became its expression with the argument in: " + r.text, has("(i * 2 + g)"));
+        ensure("thrice uses its parameter thrice, so only a constant would do: left: " + r.text, has("thrice(g)") && has("thrice(i)") && has("integer thrice(integer x)"));
+        ensure("loop has a label and a jump: left: " + r.text, has("loop();") && has("@again;"));
+        S32 notes = 0;
+        for (const ALScriptProblem& p : r.problems)
+        {
+            notes += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of its one call") != std::string::npos;
+        }
+        ensure_equals("two notes", notes, 2);
+        // The map leads from the block back to the function's own lines.
+        const size_t at = r.text.find("llSay(0, what + (string)i_1);");
+        ensure("found", at != std::string::npos);
+        S32 line = 0;
+        for (size_t i = 0; i < at; ++i)
+        {
+            line += r.text[i] == '\n';
+        }
+        const ALSourceMap::Loc from = r.map.toSource(line, 8);
+        ensure_equals("the llSay came from the function's fifth line", from.line, 4);
     }
 } // namespace tut

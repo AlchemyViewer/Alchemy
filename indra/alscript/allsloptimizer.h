@@ -76,6 +76,9 @@ public:
         // The compiler turns a tab in a literal into spaces, so a fold that
         // would put one there is refused unless this says otherwise.
         bool foldtabs = false;
+        // A user function called from one place put in that place, before
+        // the rest; off by default.
+        bool inlining = false;
     };
 
     struct Result

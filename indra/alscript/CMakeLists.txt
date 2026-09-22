@@ -9,6 +9,7 @@ add_library(alscript STATIC)
 target_sources(
   alscript
   PRIVATE
+    allslinliner.cpp
     allsloptimizer.cpp
     alluauconfig.cpp
     alluauservice.cpp
@@ -24,6 +25,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        allslinliner.h
         allsloptimizer.h
         allsltraits.inc
         alluauconfig.h
